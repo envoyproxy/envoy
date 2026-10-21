@@ -923,6 +923,144 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsTwoOnDemandVirtualHostsRouteResponses) {
   }
 }
 
+// Verifies that when an on-demand VirtualHost (whose resource.name differs from the requested
+// alias) is removed by the management server, a subsequent HTTP request for the same domain
+// triggers a new on-demand VHDS DeltaDiscoveryRequest and succeeds instead of hanging, both when
+// vhds_answered_alias_cache is disabled and when it is enabled.
+TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandVirtualHostRemoved) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.vhds_answered_alias_cache", "false");
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // 1. First on-demand request for vhost.first (alias "my_route/vhost.first", resolved with
+  // resource.name "my_route/vhost_1").
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.first")}, {},
+                                           vhds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "103", vhds_stream_.get(),
+      {"my_route/vhost.first"});
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  if (routeConfigType() == RouteConfigType::Rds) {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                        {"my_route"}, {}, {}, true));
+  }
+
+  // 2. Management server pushes an update removing "my_route/vhost_1".
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {}, {"my_route/vhost_1"}, "104", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 3. Subsequent HTTP request for vhost.first must re-trigger an on-demand VHDS request and
+  // succeed once the VirtualHost is returned.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr second_response =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  const AssertionResult got_re_request = compareDeltaDiscoveryRequest(
+      Config::TestTypeUrl::get().VirtualHost, {vhdsRequestResourceName("vhost.first")}, {},
+      vhds_stream_.get());
+  EXPECT_TRUE(got_re_request);
+  if (got_re_request) {
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "105",
+        vhds_stream_.get(), {"my_route/vhost.first"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    waitForNextUpstreamRequest(1);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(second_response->waitForEndStream());
+    EXPECT_EQ("200", second_response->headers().getStatusValue());
+  }
+
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandVirtualHostRemovedWithAnsweredAliasCache) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.vhds_answered_alias_cache", "true");
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // 1. First on-demand request for vhost.first (alias "my_route/vhost.first", resolved with
+  // resource.name "my_route/vhost_1").
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.first")}, {},
+                                           vhds_stream_.get()));
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "103", vhds_stream_.get(),
+      {"my_route/vhost.first"});
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  if (routeConfigType() == RouteConfigType::Rds) {
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                        {"my_route"}, {}, {}, true));
+  }
+
+  // 2. Management server pushes an update removing "my_route/vhost_1".
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {}, {"my_route/vhost_1"}, "104", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 3. Subsequent HTTP request for vhost.first must re-trigger an on-demand VHDS request and
+  // succeed once the VirtualHost is returned, even when vhds_answered_alias_cache is enabled.
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  IntegrationStreamDecoderPtr second_response =
+      codec_client_->makeHeaderOnlyRequest(request_headers);
+  const AssertionResult got_re_request = compareDeltaDiscoveryRequest(
+      Config::TestTypeUrl::get().VirtualHost, {vhdsRequestResourceName("vhost.first")}, {},
+      vhds_stream_.get());
+  EXPECT_TRUE(got_re_request);
+  if (got_re_request) {
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "105",
+        vhds_stream_.get(), {"my_route/vhost.first"});
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    waitForNextUpstreamRequest(1);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(second_response->waitForEndStream());
+    EXPECT_EQ("200", second_response->headers().getStatusValue());
+  }
+
+  cleanupUpstreamAndDownstream();
+}
+
 // Test class for VHDS on-demand updates with request bodies
 class OnDemandVhdsWithBodyIntegrationTest
     : public testing::TestWithParam<std::tuple<HttpProtocolTestParams, VhdsIntegrationTestParam>>,

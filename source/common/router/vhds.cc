@@ -130,6 +130,8 @@ absl::Status VhdsSubscription::onConfigUpdate(
     const std::vector<Envoy::Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
+  const bool remove_resource_aliases =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_remove_resource_aliases");
   VhdsConfigUpdateReceiver::VirtualHostRefVector added_vhosts;
   std::set<std::string> added_resource_ids;
   for (const auto& resource : added_resources) {
@@ -141,14 +143,29 @@ absl::Status VhdsSubscription::onConfigUpdate(
     if (!resource.get().hasResource()) {
       continue;
     }
+    if (remove_resource_aliases && !resource.get().aliases().empty()) {
+      auto& aliases = resource_aliases_[resource.get().name()];
+      aliases.insert(resource.get().aliases().begin(), resource.get().aliases().end());
+    }
     added_vhosts.emplace_back(
         Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::VirtualHost>(
             resource.get().resource()));
   }
+  Protobuf::RepeatedPtrField<std::string> removed_resources_with_aliases = removed_resources;
+  if (remove_resource_aliases) {
+    for (const auto& removed_resource : removed_resources) {
+      if (auto it = resource_aliases_.find(removed_resource); it != resource_aliases_.end()) {
+        for (const auto& alias : it->second) {
+          *removed_resources_with_aliases.Add() = alias;
+        }
+        resource_aliases_.erase(it);
+      }
+    }
+  }
   // The receiver builds the new route configuration, warms it up and publishes it to its observer.
   // This subscription doesn't publish anything itself.
-  if (receiver_.onVhdsUpdate(added_vhosts, std::move(added_resource_ids), removed_resources,
-                             version_info)) {
+  if (receiver_.onVhdsUpdate(added_vhosts, std::move(added_resource_ids),
+                             removed_resources_with_aliases, version_info)) {
     stats_.config_reload_.inc();
     ENVOY_LOG(debug, "vhds: loading new configuration: config_name={} version={}",
               route_config_name_, version_info);

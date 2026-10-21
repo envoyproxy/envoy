@@ -208,6 +208,14 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_remove_resource_aliases")) {
+      for (const auto& resource : message.resources()) {
+        if (resource.has_resource() && !resource.aliases().empty()) {
+          auto& aliases = resource_aliases_[resource.name()];
+          aliases.insert(resource.aliases().begin(), resource.aliases().end());
+        }
+      }
+    }
     if (requested_resource_state_.contains(Wildcard)) {
       for (const auto& resource : message.resources()) {
         addResourceStateFromServer(resource);
@@ -242,6 +250,7 @@ void DeltaSubscriptionState::handleGoodResponse(
                erased_count == 0) {
       wildcard_resource_state_.erase(resource_name);
     }
+    removeResourceAliases(resource_name);
   }
   ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", typeUrl(),
             message.resources().size(), message.removed_resources().size());
@@ -352,6 +361,20 @@ void DeltaSubscriptionState::addResourceStateFromServer(
   }
 }
 
+void DeltaSubscriptionState::removeResourceAliases(const std::string& resource_name) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_remove_resource_aliases")) {
+    return;
+  }
+  if (auto alias_it = resource_aliases_.find(resource_name); alias_it != resource_aliases_.end()) {
+    for (const auto& alias : alias_it->second) {
+      requested_resource_state_.erase(alias);
+      ambiguous_resource_state_.erase(alias);
+      wildcard_resource_state_.erase(alias);
+    }
+    resource_aliases_.erase(alias_it);
+  }
+}
+
 void DeltaSubscriptionState::setResourceTtl(
     const envoy::service::discovery::v3::Resource& resource) {
   if (resource.has_ttl()) {
@@ -373,6 +396,7 @@ void DeltaSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& e
                erased_count > 0) {
       removed_resources.Add(std::string(resource));
     }
+    removeResourceAliases(resource);
   }
   callbacks().onConfigUpdate({}, removed_resources, "");
 }

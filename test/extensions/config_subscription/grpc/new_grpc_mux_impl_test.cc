@@ -661,18 +661,92 @@ TEST_P(NewGrpcMuxImplTest, XdsTpSingleton) {
 
 TEST_P(NewGrpcMuxImplTest, RequestOnDemandUpdate) {
   setup();
-
-  auto foo_sub = grpc_mux_->addWatch("foo", {"x", "y"}, callbacks_, resource_decoder_, {});
+  InSequence s;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
+  auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder_, {});
+  foo_sub->accept({"*"});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"x", "y"}});
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"x", "y"}});
   grpc_mux_->start();
 
-  // Additionally add "z" to the watch: it is both subscribed on the wire and routed to this watch.
-  expectSendMessage({.type_url = "foo", .resource_names_subscribe = {"z"}});
-  foo_sub->append({"z"});
+  // Additionally add "z_alias" to the watch: it is subscribed on the wire.
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"z_alias"}});
+  foo_sub->append({"z_alias"});
 
-  // On watch removal all of its resources -- including the on-demand "z" -- are unsubscribed.
-  expectSendMessage({.type_url = "foo", .resource_names_unsubscribe = {"x", "y", "z"}});
+  // A duplicate append for "z_alias" while it is still watched sends nothing on the wire.
+  foo_sub->append({"z_alias"});
+
+  // Server responds with resource "z" carrying alias "z_alias".
+  {
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("1");
+    response->set_nonce("n1");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("z");
+    auto* resource = response->add_resources();
+    resource->set_name("z");
+    resource->set_version("1");
+    resource->add_aliases("z_alias");
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1")).WillOnce(Return(absl::OkStatus()));
+    expectSendMessage({.type_url = type_url, .nonce = "n1"});
+    onDiscoveryResponse(std::move(response));
+  }
+
+  // With vhds_remove_resource_aliases disabled, removing resource "z" does not remove its alias
+  // "z_alias" from watch interest, so re-appending "z_alias" sends nothing on the wire.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.vhds_remove_resource_aliases", "false"}});
+    auto remove_response =
+        std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    remove_response->set_type_url(type_url);
+    remove_response->set_system_version_info("2");
+    remove_response->set_nonce("n2");
+    remove_response->add_removed_resources("z");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "2")).WillOnce(Return(absl::OkStatus()));
+    expectSendMessage({.type_url = type_url, .nonce = "n2"});
+    onDiscoveryResponse(std::move(remove_response));
+
+    foo_sub->append({"z_alias"});
+  }
+
+  // Server re-adds resource "z" carrying alias "z_alias", and then removes "z" with
+  // vhds_remove_resource_aliases enabled (default), which removes "z_alias" from watch interest.
+  {
+    auto add_response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    add_response->set_type_url(type_url);
+    add_response->set_system_version_info("3");
+    add_response->set_nonce("n3");
+    envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment;
+    load_assignment.set_cluster_name("z");
+    auto* resource = add_response->add_resources();
+    resource->set_name("z");
+    resource->set_version("3");
+    resource->add_aliases("z_alias");
+    std::ignore = resource->mutable_resource()->PackFrom(load_assignment);
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "3")).WillOnce(Return(absl::OkStatus()));
+    expectSendMessage({.type_url = type_url, .nonce = "n3"});
+    onDiscoveryResponse(std::move(add_response));
+
+    auto response = std::make_unique<envoy::service::discovery::v3::DeltaDiscoveryResponse>();
+    response->set_type_url(type_url);
+    response->set_system_version_info("4");
+    response->set_nonce("n4");
+    response->add_removed_resources("z");
+    EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "4")).WillOnce(Return(absl::OkStatus()));
+    expectSendMessage({.type_url = type_url, .nonce = "n4"});
+    onDiscoveryResponse(std::move(response));
+  }
+
+  // After "z" was removed, appending "z_alias" again sends a new DeltaDiscoveryRequest on the wire.
+  expectSendMessage({.type_url = type_url, .resource_names_subscribe = {"z_alias"}});
+  foo_sub->append({"z_alias"});
+
+  // On watch removal all of its resources -- including the on-demand "z_alias" -- are unsubscribed.
+  expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"x", "y", "z_alias"}});
 }
 
 TEST_P(NewGrpcMuxImplTest, Shutdown) {

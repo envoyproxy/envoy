@@ -144,6 +144,7 @@ private:
   };
 
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
+  void removeResourceAliases(const std::string& resource_name);
   OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);
   OptRef<const ResourceState> getRequestedResourceState(absl::string_view resource_name) const;
 
@@ -160,6 +161,8 @@ private:
   // Used for storing resources that we lost interest in, but could
   // also be a part of wildcard subscription.
   absl::node_hash_map<std::string, std::string> ambiguous_resource_state_;
+  // Maps a resource name to the aliases associated with that resource when it was added/updated.
+  absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> resource_aliases_;
 
   // Not all xDS resources supports heartbeats due to there being specific information encoded in
   // an empty response, which is indistinguishable from a heartbeat in some cases. For now we just
