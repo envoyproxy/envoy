@@ -169,6 +169,36 @@ TEST_F(ExtractorTest, TestDuplicatedHeadersWithUniqueTokenPrefixes) {
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
 
+// Per RFC 9110 Section 5.3, a single header line joining multiple values with commas is
+// equivalent to sending the field on multiple header lines, so a single "Authorization"
+// header with two comma-joined Bearer credentials should yield two tokens, the same as
+// TestDuplicatedHeadersWithDuplicatedTokenPrefixes above.
+TEST_F(ExtractorTest, TestCommaJoinedHeaderWithDuplicatedTokenPrefixes) {
+  auto headers = TestRequestHeaderMapImpl{
+      {"Authorization", absl::StrCat("Bearer ", GoodToken, ", Bearer ", GoodToken)}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 2);
+
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+  EXPECT_EQ(tokens[1]->token(), GoodToken);
+  EXPECT_TRUE(tokens[1]->isIssuerAllowed("issuer1"));
+}
+
+// A single header line only splits into multiple tokens where the configured value_prefix
+// repeats; a trailing differently-prefixed credential doesn't match the prefix a second
+// time, so (as with the un-split, single-prefix case) the whole remainder is kept as part
+// of the one extracted token, matching the existing "flexible match" behavior.
+TEST_F(ExtractorTest, TestCommaJoinedHeaderWithUniqueTokenPrefixes) {
+  auto headers = TestRequestHeaderMapImpl{
+      {"Authorization", absl::StrCat("Bearer ", GoodToken, ", Basic basic")}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  EXPECT_EQ(tokens[0]->token(), absl::StrCat(GoodToken, ", Basic basic"));
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+}
+
 // Test extracting JWT as Bearer token from the default header location: "Authorization" -
 // using an actual (correctly-formatted) JWT but token is invalid, like: GoodToken +
 // chars_after_space expected to get all token include characters after the space:
@@ -236,6 +266,17 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
 // Make sure a double custom header does not concatenate the token
 TEST_F(ExtractorTest, TestDoubleCustomHeaderToken) {
   auto headers = TestRequestHeaderMapImpl{{"token-header", "jwt_token"}, {"token-header", "foo"}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+  EXPECT_EQ(tokens[1]->token(), "foo");
+}
+
+// A custom header without a value_prefix has no scheme to delimit tokens, so per RFC 9110
+// Section 5.3 a single comma-joined header line is equivalent to two separate header lines
+// (as in TestDoubleCustomHeaderToken above) and should split into two tokens.
+TEST_F(ExtractorTest, TestCommaJoinedCustomHeaderToken) {
+  auto headers = TestRequestHeaderMapImpl{{"token-header", "jwt_token, foo"}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0]->token(), "jwt_token");
