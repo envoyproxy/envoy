@@ -80,9 +80,23 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
             return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
                                                std::move(above_overflow));
           }));
+  upstream_stats_store_ =
+      std::make_unique<Stats::TestIsolatedStoreImpl>(static_cast<Stats::Store&>(stats_store_));
   ON_CALL(factory_context_storage_->server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(*factory_context_storage_, statsScope())
-      .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+      .WillByDefault(ReturnRef(*upstream_stats_store_->rootScope()));
+  ON_CALL(*factory_context_storage_, scope())
+      .WillByDefault(ReturnRef(*upstream_stats_store_->rootScope()));
+  ON_CALL(*factory_context_storage_, serverScope())
+      .WillByDefault(ReturnRef(*upstream_stats_store_->rootScope()));
+  ON_CALL(factory_context_storage_->server_context_, scope())
+      .WillByDefault(ReturnRef(*upstream_stats_store_->rootScope()));
+  ON_CALL(factory_context_storage_->server_context_, serverScope())
+      .WillByDefault(ReturnRef(*upstream_stats_store_->rootScope()));
+  ON_CALL(*server_factory_context_storage_, scope())
+      .WillByDefault(ReturnRef(*upstream_stats_store_->rootScope()));
+  ON_CALL(*server_factory_context_storage_, serverScope())
+      .WillByDefault(ReturnRef(*upstream_stats_store_->rootScope()));
   ON_CALL(factory_context_storage_->server_context_, sslContextManager())
       .WillByDefault(ReturnRef(context_manager_));
   ON_CALL(factory_context_storage_->server_context_, threadLocal())
@@ -92,8 +106,6 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   config_helper_.addConfigModifier(
       [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void { bootstrap.clear_admin(); });
 #endif
-  upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
-      server_factory_context_.serverScope().symbolTable());
 }
 
 BaseIntegrationTest::~BaseIntegrationTest() = default;
