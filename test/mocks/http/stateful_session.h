@@ -10,15 +10,16 @@ namespace Http {
 
 class MockSessionState : public SessionState {
 public:
-  MOCK_METHOD(std::optional<absl::string_view>, upstreamAddress, (), (const));
-  MOCK_METHOD(bool, onUpdate, (absl::string_view host_address, Http::ResponseHeaderMap& headers));
+  MOCK_METHOD(std::optional<absl::string_view>, upstreamAddress, (), (const, override));
+  MOCK_METHOD(bool, onUpdate, (absl::string_view host_address, Http::ResponseHeaderMap& headers),
+              (override));
 };
 
 class MockSessionStateFactory : public Http::SessionStateFactory {
 public:
   MockSessionStateFactory();
 
-  MOCK_METHOD(Http::SessionStatePtr, create, (Http::RequestHeaderMap & headers), (const));
+  MOCK_METHOD(Http::SessionStatePtr, create, (Http::RequestHeaderMap & headers), (const, override));
   MOCK_METHOD(bool, isStrict, (), (const));
 };
 
@@ -31,7 +32,8 @@ public:
   }
 
   MOCK_METHOD(SessionStateFactorySharedPtr, createSessionStateFactory,
-              (const Protobuf::Message&, Server::Configuration::GenericFactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::GenericFactoryContext&),
+              (override));
 
   std::string name() const override { return "envoy.http.stateful_session.mock"; }
 };

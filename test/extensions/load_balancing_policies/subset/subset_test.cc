@@ -48,18 +48,18 @@ public:
   ~MockLoadBalancerSubsetInfo() override;
 
   // Upstream::LoadBalancerSubsetInfo
-  MOCK_METHOD(bool, isEnabled, (), (const));
+  MOCK_METHOD(bool, isEnabled, (), (const, override));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy,
-              fallbackPolicy, (), (const));
+              fallbackPolicy, (), (const, override));
   MOCK_METHOD(envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetMetadataFallbackPolicy,
-              metadataFallbackPolicy, (), (const));
-  MOCK_METHOD(const Protobuf::Struct&, defaultSubset, (), (const));
-  MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const));
-  MOCK_METHOD(bool, localityWeightAware, (), (const));
-  MOCK_METHOD(bool, scaleLocalityWeight, (), (const));
-  MOCK_METHOD(bool, panicModeAny, (), (const));
-  MOCK_METHOD(bool, listAsAny, (), (const));
-  MOCK_METHOD(bool, allowRedundantKeys, (), (const));
+              metadataFallbackPolicy, (), (const, override));
+  MOCK_METHOD(const Protobuf::Struct&, defaultSubset, (), (const, override));
+  MOCK_METHOD(const std::vector<SubsetSelectorPtr>&, subsetSelectors, (), (const, override));
+  MOCK_METHOD(bool, localityWeightAware, (), (const, override));
+  MOCK_METHOD(bool, scaleLocalityWeight, (), (const, override));
+  MOCK_METHOD(bool, panicModeAny, (), (const, override));
+  MOCK_METHOD(bool, listAsAny, (), (const, override));
+  MOCK_METHOD(bool, allowRedundantKeys, (), (const, override));
 
   std::vector<SubsetSelectorPtr> subset_selectors_;
 };

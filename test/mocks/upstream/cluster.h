@@ -17,18 +17,18 @@ public:
   ~MockCluster() override;
 
   // Upstream::Cluster
-  MOCK_METHOD(HealthChecker*, healthChecker, ());
-  MOCK_METHOD(ClusterInfoConstSharedPtr, info, (), (const));
-  MOCK_METHOD(Outlier::Detector*, outlierDetector, ());
-  MOCK_METHOD(const Outlier::Detector*, outlierDetector, (), (const));
-  MOCK_METHOD(void, initialize, (std::function<absl::Status()> callback));
-  MOCK_METHOD(InitializePhase, initializePhase, (), (const));
-  MOCK_METHOD(PrioritySet&, prioritySet, ());
-  MOCK_METHOD(const PrioritySet&, prioritySet, (), (const));
-  MOCK_METHOD(UnitFloat, dropOverload, (), (const));
-  MOCK_METHOD(const std::string&, dropCategory, (), (const));
-  MOCK_METHOD(void, setDropOverload, (UnitFloat));
-  MOCK_METHOD(void, setDropCategory, (absl::string_view));
+  MOCK_METHOD(HealthChecker*, healthChecker, (), (override));
+  MOCK_METHOD(ClusterInfoConstSharedPtr, info, (), (const, override));
+  MOCK_METHOD(Outlier::Detector*, outlierDetector, (), (override));
+  MOCK_METHOD(const Outlier::Detector*, outlierDetector, (), (const, override));
+  MOCK_METHOD(void, initialize, (std::function<absl::Status()> callback), (override));
+  MOCK_METHOD(InitializePhase, initializePhase, (), (const, override));
+  MOCK_METHOD(PrioritySet&, prioritySet, (), (override));
+  MOCK_METHOD(const PrioritySet&, prioritySet, (), (const, override));
+  MOCK_METHOD(UnitFloat, dropOverload, (), (const, override));
+  MOCK_METHOD(const std::string&, dropCategory, (), (const, override));
+  MOCK_METHOD(void, setDropOverload, (UnitFloat), (override));
+  MOCK_METHOD(void, setDropCategory, (absl::string_view), (override));
 
   std::shared_ptr<MockClusterInfo> info_{new ::testing::NiceMock<MockClusterInfo>()};
   std::function<void()> initialize_callback_;

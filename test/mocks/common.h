@@ -62,8 +62,8 @@ public:
   void advanceTimeAsyncImpl(const Duration& duration) override {
     real_time_.advanceTimeAsyncImpl(duration);
   }
-  MOCK_METHOD(SystemTime, systemTime, ());
-  MOCK_METHOD(MonotonicTime, monotonicTime, ());
+  MOCK_METHOD(SystemTime, systemTime, (), (override));
+  MOCK_METHOD(MonotonicTime, monotonicTime, (), (override));
 
   Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
 };
@@ -72,10 +72,10 @@ class MockBackOffStrategy : public BackOffStrategy {
 public:
   ~MockBackOffStrategy() override = default;
 
-  MOCK_METHOD(uint64_t, nextBackOffMs, ());
-  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(uint64_t, nextBackOffMs, (), (override));
+  MOCK_METHOD(void, reset, (), (override));
   MOCK_METHOD(void, reset, (uint64_t base_interval));
-  MOCK_METHOD(bool, isOverTimeLimit, (uint64_t interval_ms), (const));
+  MOCK_METHOD(bool, isOverTimeLimit, (uint64_t interval_ms), (const, override));
 };
 
 // Captures absl::string_view parameters into temp strings, for use
@@ -102,8 +102,8 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
 
 class MockScopeTrackedObject : public ScopeTrackedObject {
 public:
-  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
-  MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const, override));
+  MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const, override));
 };
 
 namespace ConnectionPool {
@@ -114,7 +114,7 @@ public:
   ~MockCancellable() override;
 
   // ConnectionPool::Cancellable
-  MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy));
+  MOCK_METHOD(void, cancel, (CancelPolicy cancel_policy), (override));
 };
 } // namespace ConnectionPool
 
@@ -125,8 +125,8 @@ public:
   MockRandomGenerator(uint64_t value);
   ~MockRandomGenerator() override;
 
-  MOCK_METHOD(uint64_t, random, ());
-  MOCK_METHOD(std::string, uuid, ());
+  MOCK_METHOD(uint64_t, random, (), (override));
+  MOCK_METHOD(std::string, uuid, (), (override));
 
   uint64_t value_;
   const std::string uuid_{"a121e9e1-feae-4136-9e0e-6fac343d56c9"};
@@ -137,11 +137,12 @@ public:
 class MockKeyValueStore : public KeyValueStore {
 public:
   MOCK_METHOD(void, addOrUpdate,
-              (absl::string_view, absl::string_view, std::optional<std::chrono::seconds> ttl));
-  MOCK_METHOD(void, remove, (absl::string_view));
-  MOCK_METHOD(std::optional<absl::string_view>, get, (absl::string_view));
-  MOCK_METHOD(void, flush, ());
-  MOCK_METHOD(void, iterate, (ConstIterateCb), (const));
+              (absl::string_view, absl::string_view, std::optional<std::chrono::seconds> ttl),
+              (override));
+  MOCK_METHOD(void, remove, (absl::string_view), (override));
+  MOCK_METHOD(std::optional<absl::string_view>, get, (absl::string_view), (override));
+  MOCK_METHOD(void, flush, (), (override));
+  MOCK_METHOD(void, iterate, (ConstIterateCb), (const, override));
 };
 
 class MockKeyValueStoreFactory : public KeyValueStoreFactory {
@@ -149,8 +150,9 @@ public:
   MockKeyValueStoreFactory();
   MOCK_METHOD(KeyValueStorePtr, createStore,
               (const Protobuf::Message&, ProtobufMessage::ValidationVisitor&, Event::Dispatcher&,
-               Filesystem::Instance&));
-  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+               Filesystem::Instance&),
+              (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
   std::string category() const override { return "envoy.common.key_value"; }
   std::string name() const override { return "mock_key_value_store_factory"; }
 };
@@ -161,9 +163,10 @@ struct MockLogSink : Logger::SinkDelegate {
   }
   ~MockLogSink() override { restoreDelegate(); }
 
-  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&));
+  MOCK_METHOD(void, log, (absl::string_view, const spdlog::details::log_msg&), (override));
   MOCK_METHOD(void, logWithStableName,
-              (absl::string_view, absl::string_view, absl::string_view, absl::string_view));
+              (absl::string_view, absl::string_view, absl::string_view, absl::string_view),
+              (override));
   void flush() override {}
 };
 

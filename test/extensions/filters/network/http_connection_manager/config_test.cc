@@ -4231,10 +4231,12 @@ public:
                    HttpConnectionManager& config,
                Server::Configuration::ServerFactoryContext& factory_context,
                Init::Manager& init_manager, const std::string& stat_prefix,
-               Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager));
+               Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager),
+              (override));
   MOCK_METHOD(Router::ScopeKeyBuilderPtr, createScopeKeyBuilder,
               (const envoy::extensions::filters::network::http_connection_manager::v3::
-                   HttpConnectionManager& config));
+                   HttpConnectionManager& config),
+              (override));
 };
 
 // Test that SRDS createConfigProvider and createScopeKeyBuilder receive the listener init manager.

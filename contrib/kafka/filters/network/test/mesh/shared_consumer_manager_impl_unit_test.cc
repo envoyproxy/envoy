@@ -24,8 +24,8 @@ using testing::Return;
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
-              (const));
-  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
+              (const, override));
+  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const, override));
 };
 
 class MockKafkaConsumerFactory : public KafkaConsumerFactory {
@@ -33,7 +33,7 @@ public:
   MOCK_METHOD(KafkaConsumerPtr, createConsumer,
               (InboundRecordProcessor&, Thread::ThreadFactory&, const std::string&, const int32_t,
                const RawKafkaConfig&),
-              (const));
+              (const, override));
 };
 
 class SharedConsumerManagerTest : public testing::Test {
@@ -94,9 +94,9 @@ TEST_F(SharedConsumerManagerTest, ShouldHandleMissingConfig) {
 
 class MockRecordCb : public RecordCb {
 public:
-  MOCK_METHOD(CallbackReply, receive, (InboundRecordSharedPtr), ());
-  MOCK_METHOD(TopicToPartitionsMap, interest, (), (const));
-  MOCK_METHOD(std::string, toString, (), (const));
+  MOCK_METHOD(CallbackReply, receive, (InboundRecordSharedPtr), (override));
+  MOCK_METHOD(TopicToPartitionsMap, interest, (), (const, override));
+  MOCK_METHOD(std::string, toString, (), (const, override));
 };
 
 TEST_F(SharedConsumerManagerTest, ShouldProcessCallback) {

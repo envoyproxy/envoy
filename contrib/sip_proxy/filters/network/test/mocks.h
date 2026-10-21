@@ -34,16 +34,16 @@ public:
   ~MockConfig() override;
 
   // SipProxy::Config
-  MOCK_METHOD(SipFilters::FilterChainFactory&, filterFactory, ());
-  MOCK_METHOD(SipFilterStats&, stats, ());
-  MOCK_METHOD(Router::Config&, routerConfig, ());
-  MOCK_METHOD(std::shared_ptr<SipSettings>, settings, ());
+  MOCK_METHOD(SipFilters::FilterChainFactory&, filterFactory, (), (override));
+  MOCK_METHOD(SipFilterStats&, stats, (), (override));
+  MOCK_METHOD(Router::Config&, routerConfig, (), (override));
+  MOCK_METHOD(std::shared_ptr<SipSettings>, settings, (), (override));
 };
 
 class MockRouterFilterConfig : public Router::RouterFilterConfig {
 public:
   // Router::RouterFilterConfig
-  MOCK_METHOD(Router::RouterStats&, stats, ());
+  MOCK_METHOD(Router::RouterStats&, stats, (), (override));
 };
 
 class MockDecoderEventHandler : public DecoderEventHandler {
@@ -52,10 +52,10 @@ public:
   ~MockDecoderEventHandler() override;
 
   // SipProxy::DecoderEventHandler
-  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata));
-  MOCK_METHOD(FilterStatus, transportEnd, ());
-  MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));
-  MOCK_METHOD(FilterStatus, messageEnd, ());
+  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata), (override));
+  MOCK_METHOD(FilterStatus, transportEnd, (), (override));
+  MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata), (override));
+  MOCK_METHOD(FilterStatus, messageEnd, (), (override));
 };
 
 class MockDecoderCallbacks : public DecoderCallbacks {
@@ -63,8 +63,8 @@ public:
   MockDecoderCallbacks();
   ~MockDecoderCallbacks() override;
 
-  MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, (MessageMetadataSharedPtr));
-  MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, (), (const));
+  MOCK_METHOD(DecoderEventHandler&, newDecoderEventHandler, (MessageMetadataSharedPtr), (override));
+  MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, (), (const, override));
 
   std::shared_ptr<SipProxy::SipSettings> settings_;
 };
@@ -76,7 +76,7 @@ public:
 
   // SipProxy::DirectResponse
   MOCK_METHOD(DirectResponse::ResponseType, encode,
-              (MessageMetadata & metadata, Buffer::Instance& buffer), (const));
+              (MessageMetadata & metadata, Buffer::Instance& buffer), (const, override));
 };
 
 namespace Router {
@@ -91,16 +91,16 @@ public:
   ~MockDecoderFilter() override;
 
   // SipProxy::SipFilters::DecoderFilter
-  MOCK_METHOD(void, onDestroy, ());
-  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks));
+  MOCK_METHOD(void, onDestroy, (), (override));
+  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallbacks & callbacks), (override));
   MOCK_METHOD(bool, passthroughSupported, (), (const));
 
   // SipProxy::DecoderEventHandler
   MOCK_METHOD(FilterStatus, passthroughData, (Buffer::Instance & data));
-  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata));
-  MOCK_METHOD(FilterStatus, transportEnd, ());
-  MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata));
-  MOCK_METHOD(FilterStatus, messageEnd, ());
+  MOCK_METHOD(FilterStatus, transportBegin, (MessageMetadataSharedPtr metadata), (override));
+  MOCK_METHOD(FilterStatus, transportEnd, (), (override));
+  MOCK_METHOD(FilterStatus, messageBegin, (MessageMetadataSharedPtr metadata), (override));
+  MOCK_METHOD(FilterStatus, messageEnd, (), (override));
 };
 
 class MockDecoderFilterCallbacks : public DecoderFilterCallbacks {
@@ -109,30 +109,33 @@ public:
   ~MockDecoderFilterCallbacks() override;
 
   // SipProxy::SipFilters::DecoderFilterCallbacks
-  MOCK_METHOD(uint64_t, streamId, (), (const));
-  MOCK_METHOD(std::string, transactionId, (), (const));
-  MOCK_METHOD(const Network::Connection*, connection, (), (const));
-  MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
+  MOCK_METHOD(uint64_t, streamId, (), (const, override));
+  MOCK_METHOD(std::string, transactionId, (), (const, override));
+  MOCK_METHOD(const Network::Connection*, connection, (), (const, override));
+  MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (override));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool));
-  MOCK_METHOD(void, startUpstreamResponse, ());
-  MOCK_METHOD(ResponseStatus, upstreamData, (MessageMetadataSharedPtr));
-  MOCK_METHOD(void, resetDownstreamConnection, ());
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
-  MOCK_METHOD(std::shared_ptr<Router::TransactionInfos>, transactionInfos, ());
-  MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, (), (const));
-  MOCK_METHOD(std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler>, traHandler, ());
-  MOCK_METHOD(void, onReset, ());
+  MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool), (override));
+  MOCK_METHOD(void, startUpstreamResponse, (), (override));
+  MOCK_METHOD(ResponseStatus, upstreamData, (MessageMetadataSharedPtr), (override));
+  MOCK_METHOD(void, resetDownstreamConnection, (), (override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
+  MOCK_METHOD(std::shared_ptr<Router::TransactionInfos>, transactionInfos, (), (override));
+  MOCK_METHOD(std::shared_ptr<SipProxy::SipSettings>, settings, (), (const, override));
+  MOCK_METHOD(std::shared_ptr<SipProxy::TrafficRoutingAssistantHandler>, traHandler, (),
+              (override));
+  MOCK_METHOD(void, onReset, (), (override));
   MOCK_METHOD(void, pushIntoPendingList,
               (const std::string&, const std::string&, SipFilters::DecoderFilterCallbacks&,
-               std::function<void(void)>));
+               std::function<void(void)>),
+              (override));
   MOCK_METHOD(void, onResponseHandleForPendingList,
               (const std::string&, const std::string&,
-               std::function<void(MessageMetadataSharedPtr, DecoderEventHandler&)>));
-  MOCK_METHOD(void, eraseActiveTransFromPendingList, (std::string&));
-  MOCK_METHOD(void, continueHandling, (const std::string&, bool));
-  MOCK_METHOD(MessageMetadataSharedPtr, metadata, ());
-  MOCK_METHOD(SipFilterStats&, stats, ());
+               std::function<void(MessageMetadataSharedPtr, DecoderEventHandler&)>),
+              (override));
+  MOCK_METHOD(void, eraseActiveTransFromPendingList, (std::string&), (override));
+  MOCK_METHOD(void, continueHandling, (const std::string&, bool), (override));
+  MOCK_METHOD(MessageMetadataSharedPtr, metadata, (), (override));
+  MOCK_METHOD(SipFilterStats&, stats, (), (override));
 
   uint64_t stream_id_{1};
   std::string transaction_id_{"test"};
@@ -177,8 +180,9 @@ public:
   ~MockRouteEntry() override;
 
   // SipProxy::Router::RouteEntry
-  MOCK_METHOD(const std::string&, clusterName, (), (const));
-  MOCK_METHOD(const Envoy::Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const));
+  MOCK_METHOD(const std::string&, clusterName, (), (const, override));
+  MOCK_METHOD(const Envoy::Router::MetadataMatchCriteria*, metadataMatchCriteria, (),
+              (const, override));
   std::string cluster_name_{"fake_cluster"};
 };
 
@@ -188,7 +192,7 @@ public:
   ~MockRoute() override;
 
   // SipProxy::Router::Route
-  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const, override));
 
   NiceMock<MockRouteEntry> route_entry_;
 };
@@ -203,14 +207,15 @@ public:
   MOCK_METHOD(void, updateTrafficRoutingAssistant,
               (const std::string&, const std::string&, const std::string&,
                const std::optional<TraContextMap>),
-              ());
+              (override));
   MOCK_METHOD(QueryStatus, retrieveTrafficRoutingAssistant,
               (const std::string&, const std::string&, const std::optional<TraContextMap>,
                SipFilters::DecoderFilterCallbacks&, std::string&),
-              ());
+              (override));
   MOCK_METHOD(void, deleteTrafficRoutingAssistant,
-              (const std::string&, const std::string&, const std::optional<TraContextMap>), ());
-  MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), ());
+              (const std::string&, const std::string&, const std::optional<TraContextMap>),
+              (override));
+  MOCK_METHOD(void, subscribeTrafficRoutingAssistant, (const std::string&), (override));
   MOCK_METHOD(void, doSubscribe,
               (const envoy::extensions::filters::network::sip_proxy::v3alpha::CustomizedAffinity),
               ());
@@ -235,7 +240,7 @@ public:
   ~MockConnectionManager() override;
 
   MOCK_METHOD(std::shared_ptr<TrafficRoutingAssistantHandler>, traHandler, ());
-  MOCK_METHOD(std::shared_ptr<SipSettings>, settings, (), (const));
+  MOCK_METHOD(std::shared_ptr<SipSettings>, settings, (), (const, override));
 };
 
 class MockTrafficRoutingAssistantHandlerDeep : public TrafficRoutingAssistantHandler {

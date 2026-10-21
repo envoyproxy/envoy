@@ -18,19 +18,25 @@ class MockHealthCheckEventLogger : public HealthCheckEventLogger {
 public:
   MOCK_METHOD(void, logEjectUnhealthy,
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-               envoy::data::core::v3::HealthCheckFailureType, uint64_t));
+               envoy::data::core::v3::HealthCheckFailureType, uint64_t),
+              (override));
   MOCK_METHOD(void, logAddHealthy,
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-               bool));
+               bool),
+              (override));
   MOCK_METHOD(void, logSuccessfulHealthCheck,
-              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&));
+              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&),
+              (override));
   MOCK_METHOD(void, logUnhealthy,
               (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&,
-               envoy::data::core::v3::HealthCheckFailureType, bool, uint64_t));
+               envoy::data::core::v3::HealthCheckFailureType, bool, uint64_t),
+              (override));
   MOCK_METHOD(void, logDegraded,
-              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&));
+              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&),
+              (override));
   MOCK_METHOD(void, logNoLongerDegraded,
-              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&));
+              (envoy::data::core::v3::HealthCheckerType, const HostDescriptionConstSharedPtr&),
+              (override));
 };
 } // namespace Upstream
 

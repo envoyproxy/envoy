@@ -29,7 +29,7 @@ using HotRestartMessage = envoy::HotRestartMessage;
 
 class MockHotRestartMessageSender : public HotRestartMessageSender {
 public:
-  MOCK_METHOD(void, sendHotRestartMessage, (envoy::HotRestartMessage && msg));
+  MOCK_METHOD(void, sendHotRestartMessage, (envoy::HotRestartMessage && msg), (override));
 };
 
 class HotRestartingParentTest : public testing::Test {

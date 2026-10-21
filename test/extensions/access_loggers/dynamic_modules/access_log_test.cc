@@ -21,13 +21,13 @@ using ::Envoy::StatusHelpers::HasStatusMessage;
 
 class MockSlot : public ThreadLocal::Slot {
 public:
-  MOCK_METHOD(ThreadLocal::ThreadLocalObjectSharedPtr, get, ());
-  MOCK_METHOD(bool, currentThreadRegistered, ());
-  MOCK_METHOD(void, runOnAllThreads, (const UpdateCb& cb));
+  MOCK_METHOD(ThreadLocal::ThreadLocalObjectSharedPtr, get, (), (override));
+  MOCK_METHOD(bool, currentThreadRegistered, (), (override));
+  MOCK_METHOD(void, runOnAllThreads, (const UpdateCb& cb), (override));
   MOCK_METHOD(void, runOnAllThreads,
-              (const UpdateCb& cb, const std::function<void()>& main_callback));
-  MOCK_METHOD(bool, isShutdown, (), (const));
-  MOCK_METHOD(void, set, (InitializeCb cb));
+              (const UpdateCb& cb, const std::function<void()>& main_callback), (override));
+  MOCK_METHOD(bool, isShutdown, (), (const, override));
+  MOCK_METHOD(void, set, (InitializeCb cb), (override));
 };
 
 class DynamicModuleAccessLogTest : public testing::Test {

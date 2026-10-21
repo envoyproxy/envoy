@@ -19,7 +19,8 @@ public:
 
   MOCK_METHOD(ClusterDiscoveryCallbackHandlePtr, requestOnDemandClusterDiscovery,
               (absl::string_view name, ClusterDiscoveryCallbackPtr callback,
-               std::chrono::milliseconds timeout));
+               std::chrono::milliseconds timeout),
+              (override));
 };
 
 } // namespace Upstream

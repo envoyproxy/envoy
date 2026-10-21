@@ -14,8 +14,8 @@ public:
   MockTracerFactoryContext();
   ~MockTracerFactoryContext() override;
 
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (override));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (override));
 
   testing::NiceMock<Configuration::MockServerFactoryContext> server_factory_context_;
 };

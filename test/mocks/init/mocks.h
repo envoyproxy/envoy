@@ -70,12 +70,12 @@ public:
  * invoking the saved target with the watcher argument.
  */
 struct MockManager : Manager {
-  MOCK_METHOD(Manager::State, state, (), (const));
-  MOCK_METHOD(void, add, (const Target&));
-  MOCK_METHOD(void, initialize, (const Watcher&));
-  MOCK_METHOD(void, updateWatcher, (const Watcher&));
+  MOCK_METHOD(Manager::State, state, (), (const, override));
+  MOCK_METHOD(void, add, (const Target&), (override));
+  MOCK_METHOD(void, initialize, (const Watcher&), (override));
+  MOCK_METHOD(void, updateWatcher, (const Watcher&), (override));
   MOCK_METHOD((const absl::flat_hash_map<std::string, uint32_t>&), unreadyTargets, (), (const));
-  MOCK_METHOD(void, dumpUnreadyTargets, (envoy::admin::v3::UnreadyTargetsDumps&));
+  MOCK_METHOD(void, dumpUnreadyTargets, (envoy::admin::v3::UnreadyTargetsDumps&), (override));
 };
 
 } // namespace Init

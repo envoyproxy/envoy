@@ -26,8 +26,8 @@ namespace Mesh {
 
 class MockInboundRecordProcessor : public InboundRecordProcessor {
 public:
-  MOCK_METHOD(void, receive, (InboundRecordSharedPtr), ());
-  MOCK_METHOD(bool, waitUntilInterest, (const std::string&, const int32_t), (const));
+  MOCK_METHOD(void, receive, (InboundRecordSharedPtr), (override));
+  MOCK_METHOD(bool, waitUntilInterest, (const std::string&, const int32_t), (const, override));
 };
 
 class UpstreamKafkaConsumerTest : public testing::Test {

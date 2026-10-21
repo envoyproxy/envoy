@@ -25,8 +25,8 @@ namespace {
 
 class OverrideOsSysCallsImpl : public Api::OsSysCallsImpl {
 public:
-  MOCK_METHOD(bool, supportsUdpGro, (), (const));
-  MOCK_METHOD(bool, supportsMmsg, (), (const));
+  MOCK_METHOD(bool, supportsUdpGro, (), (const, override));
+  MOCK_METHOD(bool, supportsMmsg, (), (const, override));
 };
 
 class UdpFuzz;

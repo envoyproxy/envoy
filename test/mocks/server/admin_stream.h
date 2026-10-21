@@ -19,14 +19,14 @@ public:
   MockAdminStream();
   ~MockAdminStream() override;
 
-  MOCK_METHOD(void, setEndStreamOnComplete, (bool));
-  MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>));
-  MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const));
-  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const));
+  MOCK_METHOD(void, setEndStreamOnComplete, (bool), (override));
+  MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>), (override));
+  MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const, override));
+  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const, override));
   MOCK_METHOD(NiceMock<Http::MockStreamDecoderFilterCallbacks>&, getDecoderFilterCallbacks, (),
-              (const));
-  MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
-  MOCK_METHOD(Http::Utility::QueryParamsMulti, queryParams, (), (const));
+              (const, override));
+  MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, (), (override));
+  MOCK_METHOD(Http::Utility::QueryParamsMulti, queryParams, (), (const, override));
 };
 
 /**
@@ -39,14 +39,14 @@ public:
   StrictMockAdminStream();
   ~StrictMockAdminStream() override;
 
-  MOCK_METHOD(void, setEndStreamOnComplete, (bool));
-  MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>));
-  MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const));
-  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const));
+  MOCK_METHOD(void, setEndStreamOnComplete, (bool), (override));
+  MOCK_METHOD(void, addOnDestroyCallback, (std::function<void()>), (override));
+  MOCK_METHOD(const Buffer::Instance*, getRequestBody, (), (const, override));
+  MOCK_METHOD(Http::RequestHeaderMap&, getRequestHeaders, (), (const, override));
   MOCK_METHOD(::testing::StrictMock<Http::MockStreamDecoderFilterCallbacks>&,
-              getDecoderFilterCallbacks, (), (const));
-  MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
-  MOCK_METHOD(Http::Utility::QueryParamsMulti, queryParams, (), (const));
+              getDecoderFilterCallbacks, (), (const, override));
+  MOCK_METHOD(Http::Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, (), (override));
+  MOCK_METHOD(Http::Utility::QueryParamsMulti, queryParams, (), (const, override));
 };
 } // namespace Server
 } // namespace Envoy

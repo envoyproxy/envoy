@@ -13,17 +13,19 @@ public:
   MockGrpcStream() = default;
   ~MockGrpcStream() override = default;
 
-  MOCK_METHOD(void, establishNewStream, ());
-  MOCK_METHOD(bool, grpcStreamAvailable, (), (const));
-  MOCK_METHOD(void, sendMessage, (const RequestProto& request));
-  MOCK_METHOD(void, maybeUpdateQueueSizeStat, (uint64_t size));
-  MOCK_METHOD(bool, checkRateLimitAllowsDrain, ());
-  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
-  MOCK_METHOD(void, onReceiveInitialMetadata, (Http::ResponseHeaderMapPtr && metadata));
-  MOCK_METHOD(void, onReceiveMessage, (ResponseProtoPtr<ResponseProto> && message));
-  MOCK_METHOD(void, onReceiveTrailingMetadata, (Http::ResponseTrailerMapPtr && metadata));
-  MOCK_METHOD(void, onRemoteClose, (Grpc::Status::GrpcStatus status, const std::string& message));
-  MOCK_METHOD(void, closeStream, ());
+  MOCK_METHOD(void, establishNewStream, (), (override));
+  MOCK_METHOD(bool, grpcStreamAvailable, (), (const, override));
+  MOCK_METHOD(void, sendMessage, (const RequestProto& request), (override));
+  MOCK_METHOD(void, maybeUpdateQueueSizeStat, (uint64_t size), (override));
+  MOCK_METHOD(bool, checkRateLimitAllowsDrain, (), (override));
+  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata), (override));
+  MOCK_METHOD(void, onReceiveInitialMetadata, (Http::ResponseHeaderMapPtr && metadata), (override));
+  MOCK_METHOD(void, onReceiveMessage, (ResponseProtoPtr<ResponseProto> && message), (override));
+  MOCK_METHOD(void, onReceiveTrailingMetadata, (Http::ResponseTrailerMapPtr && metadata),
+              (override));
+  MOCK_METHOD(void, onRemoteClose, (Grpc::Status::GrpcStatus status, const std::string& message),
+              (override));
+  MOCK_METHOD(void, closeStream, (), (override));
 };
 
 } // namespace Config

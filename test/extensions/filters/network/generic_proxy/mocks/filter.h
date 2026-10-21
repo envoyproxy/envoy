@@ -16,18 +16,18 @@ class MockRequestFramesHandler : public RequestFramesHandler {
 public:
   MockRequestFramesHandler();
 
-  MOCK_METHOD(void, onRequestCommonFrame, (RequestCommonFramePtr));
+  MOCK_METHOD(void, onRequestCommonFrame, (RequestCommonFramePtr), (override));
 };
 
 class MockDecoderFilter : public DecoderFilter {
 public:
   MockDecoderFilter();
 
-  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onDestroy, (), (override));
 
-  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks));
-  MOCK_METHOD(HeaderFilterStatus, decodeHeaderFrame, (RequestHeaderFrame&));
-  MOCK_METHOD(CommonFilterStatus, decodeCommonFrame, (RequestCommonFrame&));
+  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks), (override));
+  MOCK_METHOD(HeaderFilterStatus, decodeHeaderFrame, (RequestHeaderFrame&), (override));
+  MOCK_METHOD(CommonFilterStatus, decodeCommonFrame, (RequestCommonFrame&), (override));
 
   DecoderFilterCallback* decoder_callbacks_{};
 };
@@ -36,11 +36,11 @@ class MockEncoderFilter : public EncoderFilter {
 public:
   MockEncoderFilter();
 
-  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onDestroy, (), (override));
 
-  MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallback & callbacks));
-  MOCK_METHOD(HeaderFilterStatus, encodeHeaderFrame, (ResponseHeaderFrame&));
-  MOCK_METHOD(CommonFilterStatus, encodeCommonFrame, (ResponseCommonFrame&));
+  MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallback & callbacks), (override));
+  MOCK_METHOD(HeaderFilterStatus, encodeHeaderFrame, (ResponseHeaderFrame&), (override));
+  MOCK_METHOD(CommonFilterStatus, encodeCommonFrame, (ResponseCommonFrame&), (override));
 
   EncoderFilterCallback* encoder_callbacks_{};
 };
@@ -49,15 +49,15 @@ class MockStreamFilter : public StreamFilter {
 public:
   MockStreamFilter();
 
-  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onDestroy, (), (override));
 
-  MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallback & callbacks));
-  MOCK_METHOD(HeaderFilterStatus, decodeHeaderFrame, (RequestHeaderFrame&));
-  MOCK_METHOD(CommonFilterStatus, decodeCommonFrame, (RequestCommonFrame&));
+  MOCK_METHOD(void, setEncoderFilterCallbacks, (EncoderFilterCallback & callbacks), (override));
+  MOCK_METHOD(HeaderFilterStatus, decodeHeaderFrame, (RequestHeaderFrame&), (override));
+  MOCK_METHOD(CommonFilterStatus, decodeCommonFrame, (RequestCommonFrame&), (override));
 
-  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks));
-  MOCK_METHOD(HeaderFilterStatus, encodeHeaderFrame, (ResponseHeaderFrame&));
-  MOCK_METHOD(CommonFilterStatus, encodeCommonFrame, (ResponseCommonFrame&));
+  MOCK_METHOD(void, setDecoderFilterCallbacks, (DecoderFilterCallback & callbacks), (override));
+  MOCK_METHOD(HeaderFilterStatus, encodeHeaderFrame, (ResponseHeaderFrame&), (override));
+  MOCK_METHOD(CommonFilterStatus, encodeCommonFrame, (ResponseCommonFrame&), (override));
 
   DecoderFilterCallback* decoder_callbacks_{};
   EncoderFilterCallback* encoder_callbacks_{};
@@ -69,57 +69,60 @@ public:
 
   MOCK_METHOD(FilterFactoryCb, createFilterFactoryFromProto,
               (const Protobuf::Message& config, const std::string& stat_prefix,
-               Server::Configuration::FactoryContext& context));
-  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
-  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyRouteConfigProto, ());
+               Server::Configuration::FactoryContext& context),
+              (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyRouteConfigProto, (), (override));
   MOCK_METHOD(RouteSpecificFilterConfigConstSharedPtr, createRouteSpecificFilterConfig,
               (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
-               ProtobufMessage::ValidationVisitor&));
-  MOCK_METHOD(std::string, name, (), (const));
-  MOCK_METHOD(absl::Status, validateCodec, (const TypedExtensionConfig&));
-  MOCK_METHOD(std::set<std::string>, configTypes, ());
-  MOCK_METHOD(bool, isTerminalFilter, ());
+               ProtobufMessage::ValidationVisitor&),
+              (override));
+  MOCK_METHOD(std::string, name, (), (const, override));
+  MOCK_METHOD(absl::Status, validateCodec, (const TypedExtensionConfig&), (override));
+  MOCK_METHOD(std::set<std::string>, configTypes, (), (override));
+  MOCK_METHOD(bool, isTerminalFilter, (), (override));
 };
 
 class MockFilterChainFactoryCallbacks : public FilterChainFactoryCallbacks {
 public:
   MockFilterChainFactoryCallbacks() = default;
 
-  MOCK_METHOD(void, addDecoderFilter, (DecoderFilterSharedPtr filter));
-  MOCK_METHOD(void, addEncoderFilter, (EncoderFilterSharedPtr filter));
-  MOCK_METHOD(void, addFilter, (StreamFilterSharedPtr filter));
-  MOCK_METHOD(absl::string_view, filterConfigName, (), (const));
-  MOCK_METHOD(void, setFilterConfigName, (absl::string_view name));
+  MOCK_METHOD(void, addDecoderFilter, (DecoderFilterSharedPtr filter), (override));
+  MOCK_METHOD(void, addEncoderFilter, (EncoderFilterSharedPtr filter), (override));
+  MOCK_METHOD(void, addFilter, (StreamFilterSharedPtr filter), (override));
+  MOCK_METHOD(absl::string_view, filterConfigName, (), (const, override));
+  MOCK_METHOD(void, setFilterConfigName, (absl::string_view name), (override));
 };
 
 template <class Base> class MockStreamFilterCallbacks : public Base {
 public:
-  MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(const CodecFactory&, codecFactory, ());
-  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const));
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
-  MOCK_METHOD(Tracing::Span&, activeSpan, ());
-  MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const));
-  MOCK_METHOD(const Network::Connection*, connection, (), (const));
+  MOCK_METHOD(Envoy::Event::Dispatcher&, dispatcher, (), (override));
+  MOCK_METHOD(const CodecFactory&, codecFactory, (), (override));
+  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const, override));
+  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (), (const, override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
+  MOCK_METHOD(Tracing::Span&, activeSpan, (), (override));
+  MOCK_METHOD(OptRef<const Tracing::Config>, tracingConfig, (), (const, override));
+  MOCK_METHOD(const Network::Connection*, connection, (), (const, override));
 };
 
 class MockDecoderFilterCallback : public MockStreamFilterCallbacks<DecoderFilterCallback> {
 public:
   MockDecoderFilterCallback();
 
-  MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction));
-  MOCK_METHOD(void, continueDecoding, ());
-  MOCK_METHOD(void, onResponseHeaderFrame, (ResponseHeaderFramePtr));
-  MOCK_METHOD(void, onResponseCommonFrame, (ResponseCommonFramePtr));
-  MOCK_METHOD(void, setRequestFramesHandler, (RequestFramesHandler*));
-  MOCK_METHOD(void, completeDirectly, ());
-  MOCK_METHOD(absl::string_view, filterConfigName, (), (const));
+  MOCK_METHOD(void, sendLocalReply, (Status, absl::string_view, ResponseUpdateFunction),
+              (override));
+  MOCK_METHOD(void, continueDecoding, (), (override));
+  MOCK_METHOD(void, onResponseHeaderFrame, (ResponseHeaderFramePtr), (override));
+  MOCK_METHOD(void, onResponseCommonFrame, (ResponseCommonFramePtr), (override));
+  MOCK_METHOD(void, setRequestFramesHandler, (RequestFramesHandler*), (override));
+  MOCK_METHOD(void, completeDirectly, (), (override));
+  MOCK_METHOD(absl::string_view, filterConfigName, (), (const, override));
 };
 
 class MockEncoderFilterCallback : public MockStreamFilterCallbacks<EncoderFilterCallback> {
 public:
-  MOCK_METHOD(void, continueEncoding, ());
+  MOCK_METHOD(void, continueEncoding, (), (override));
 };
 
 } // namespace GenericProxy

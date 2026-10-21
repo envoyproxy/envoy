@@ -16,10 +16,12 @@ namespace ConnectionPool {
 class MockCallbacks : public Callbacks {
   MOCK_METHOD(void, onPoolFailure,
               (PoolFailureReason reason, absl::string_view transport_failure_reason,
-               Upstream::HostDescriptionConstSharedPtr host));
+               Upstream::HostDescriptionConstSharedPtr host),
+              (override));
   MOCK_METHOD(void, onPoolReady,
               (RequestEncoder & encoder, Upstream::HostDescriptionConstSharedPtr host,
-               StreamInfo::StreamInfo& info, std::optional<Http::Protocol> protocol));
+               StreamInfo::StreamInfo& info, std::optional<Http::Protocol> protocol),
+              (override));
 };
 
 class MockInstance : public Instance {
@@ -29,16 +31,18 @@ public:
 
   // Http::ConnectionPool::Instance
   MOCK_METHOD(Http::Protocol, protocol, (), (const));
-  MOCK_METHOD(void, addIdleCallback, (IdleCb cb));
-  MOCK_METHOD(bool, isIdle, (), (const));
-  MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior));
-  MOCK_METHOD(bool, hasActiveConnections, (), (const));
+  MOCK_METHOD(void, addIdleCallback, (IdleCb cb), (override));
+  MOCK_METHOD(bool, isIdle, (), (const, override));
+  MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior),
+              (override));
+  MOCK_METHOD(bool, hasActiveConnections, (), (const, override));
   MOCK_METHOD(Cancellable*, newStream,
               (ResponseDecoder & response_decoder, Callbacks& callbacks,
-               const Instance::StreamOptions&));
-  MOCK_METHOD(bool, maybePreconnect, (float));
-  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
-  MOCK_METHOD(absl::string_view, protocolDescription, (), (const));
+               const Instance::StreamOptions&),
+              (override));
+  MOCK_METHOD(bool, maybePreconnect, (float), (override));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const, override));
+  MOCK_METHOD(absl::string_view, protocolDescription, (), (const, override));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (override));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;

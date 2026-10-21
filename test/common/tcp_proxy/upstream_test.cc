@@ -261,8 +261,8 @@ TEST_P(HttpUpstreamTest, UpstreamWatermarks) {
 
 class MockHttpConnPoolCallbacks : public HttpConnPool::Callbacks {
 public:
-  MOCK_METHOD(void, onSuccess, (Http::RequestEncoder * request_encoder));
-  MOCK_METHOD(void, onFailure, ());
+  MOCK_METHOD(void, onSuccess, (Http::RequestEncoder * request_encoder), (override));
+  MOCK_METHOD(void, onFailure, (), (override));
 };
 
 TEST_P(HttpUpstreamTest, DownstreamDisconnectBeforeConnectResponse) {

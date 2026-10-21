@@ -21,9 +21,9 @@ public:
   MockOdCdsApi();
   ~MockOdCdsApi() override;
 
-  MOCK_METHOD(void, updateOnDemand, (std::string cluster_name));
-  MOCK_METHOD(bool, isKnownMissing, (absl::string_view cluster_name), (const));
-  MOCK_METHOD(void, recordKnownMissingAnswer, ());
+  MOCK_METHOD(void, updateOnDemand, (std::string cluster_name), (override));
+  MOCK_METHOD(bool, isKnownMissing, (absl::string_view cluster_name), (const, override));
+  MOCK_METHOD(void, recordKnownMissingAnswer, (), (override));
 };
 
 } // namespace Upstream

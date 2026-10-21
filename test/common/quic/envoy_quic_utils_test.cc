@@ -41,10 +41,10 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
 class MockServerHeaderValidator : public HeaderValidator {
 public:
   ~MockServerHeaderValidator() override = default;
-  MOCK_METHOD(void, startHeaderBlock, ());
-  MOCK_METHOD(bool, finishHeaderBlock, (bool is_trailing_headers));
+  MOCK_METHOD(void, startHeaderBlock, (), (override));
+  MOCK_METHOD(bool, finishHeaderBlock, (bool is_trailing_headers), (override));
   MOCK_METHOD(Http::HeaderUtility::HeaderValidationResult, validateHeader,
-              (absl::string_view header_name, absl::string_view header_value));
+              (absl::string_view header_name, absl::string_view header_value), (override));
 };
 
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {

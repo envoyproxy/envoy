@@ -22,7 +22,7 @@ class KafkaResponseParserTest : public testing::Test, public BufferBasedTest {};
 class MockResponseParserResolver : public ResponseParserResolver {
 public:
   MockResponseParserResolver() = default;
-  MOCK_METHOD(ResponseParserSharedPtr, createParser, (ResponseContextSharedPtr), (const));
+  MOCK_METHOD(ResponseParserSharedPtr, createParser, (ResponseContextSharedPtr), (const, override));
 };
 
 class MockParser : public ResponseParser {

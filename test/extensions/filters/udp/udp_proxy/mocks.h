@@ -19,10 +19,10 @@ public:
   MockReadFilterCallbacks();
   ~MockReadFilterCallbacks() override;
 
-  MOCK_METHOD(uint64_t, sessionId, (), (const));
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
-  MOCK_METHOD(bool, continueFilterChain, ());
-  MOCK_METHOD(void, injectDatagramToFilterChain, (Network::UdpRecvData & data));
+  MOCK_METHOD(uint64_t, sessionId, (), (const, override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
+  MOCK_METHOD(bool, continueFilterChain, (), (override));
+  MOCK_METHOD(void, injectDatagramToFilterChain, (Network::UdpRecvData & data), (override));
 
   uint64_t session_id_{1};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -33,9 +33,9 @@ public:
   MockWriteFilterCallbacks();
   ~MockWriteFilterCallbacks() override;
 
-  MOCK_METHOD(uint64_t, sessionId, (), (const));
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
-  MOCK_METHOD(void, injectDatagramToFilterChain, (Network::UdpRecvData & data));
+  MOCK_METHOD(uint64_t, sessionId, (), (const, override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
+  MOCK_METHOD(void, injectDatagramToFilterChain, (Network::UdpRecvData & data), (override));
 
   uint64_t session_id_{1};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
@@ -46,26 +46,28 @@ public:
   MockUdpTunnelingConfig(Http::HeaderEvaluator& header_evaluator);
   ~MockUdpTunnelingConfig() override;
 
-  MOCK_METHOD(const std::string, proxyHost, (const StreamInfo::StreamInfo& stream_info), (const));
-  MOCK_METHOD(const std::string, targetHost, (const StreamInfo::StreamInfo& stream_info), (const));
-  MOCK_METHOD(const std::optional<uint32_t>&, proxyPort, (), (const));
-  MOCK_METHOD(uint32_t, defaultTargetPort, (), (const));
-  MOCK_METHOD(bool, usePost, (), (const));
-  MOCK_METHOD(const std::string&, postPath, (), (const));
-  MOCK_METHOD(Http::HeaderEvaluator&, headerEvaluator, (), (const));
-  MOCK_METHOD(uint32_t, maxConnectAttempts, (), (const));
-  MOCK_METHOD(const BackOffStrategyPtr&, backoffStrategy, (), (const));
-  MOCK_METHOD(bool, bufferEnabled, (), (const));
-  MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const));
-  MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const));
+  MOCK_METHOD(const std::string, proxyHost, (const StreamInfo::StreamInfo& stream_info),
+              (const, override));
+  MOCK_METHOD(const std::string, targetHost, (const StreamInfo::StreamInfo& stream_info),
+              (const, override));
+  MOCK_METHOD(const std::optional<uint32_t>&, proxyPort, (), (const, override));
+  MOCK_METHOD(uint32_t, defaultTargetPort, (), (const, override));
+  MOCK_METHOD(bool, usePost, (), (const, override));
+  MOCK_METHOD(const std::string&, postPath, (), (const, override));
+  MOCK_METHOD(Http::HeaderEvaluator&, headerEvaluator, (), (const, override));
+  MOCK_METHOD(uint32_t, maxConnectAttempts, (), (const, override));
+  MOCK_METHOD(const BackOffStrategyPtr&, backoffStrategy, (), (const, override));
+  MOCK_METHOD(bool, bufferEnabled, (), (const, override));
+  MOCK_METHOD(uint32_t, maxBufferedDatagrams, (), (const, override));
+  MOCK_METHOD(uint64_t, maxBufferedBytes, (), (const, override));
   MOCK_METHOD(void, propagateResponseHeaders,
               (Http::ResponseHeaderMapPtr && headers,
                const StreamInfo::FilterStateSharedPtr& filter_state),
-              (const));
+              (const, override));
   MOCK_METHOD(void, propagateResponseTrailers,
               (Http::ResponseTrailerMapPtr && trailers,
                const StreamInfo::FilterStateSharedPtr& filter_state),
-              (const));
+              (const, override));
 
   std::string default_proxy_host_ = "default.host.com";
   std::string default_target_host_ = "default.target.host";
@@ -79,26 +81,26 @@ class MockTunnelCreationCallbacks : public TunnelCreationCallbacks {
 public:
   ~MockTunnelCreationCallbacks() override;
 
-  MOCK_METHOD(void, onStreamSuccess, (Http::RequestEncoder & request_encoder));
-  MOCK_METHOD(void, onStreamFailure, ());
+  MOCK_METHOD(void, onStreamSuccess, (Http::RequestEncoder & request_encoder), (override));
+  MOCK_METHOD(void, onStreamFailure, (), (override));
 };
 
 class MockUpstreamTunnelCallbacks : public UpstreamTunnelCallbacks {
 public:
   ~MockUpstreamTunnelCallbacks() override;
 
-  MOCK_METHOD(void, onUpstreamEvent, (Network::ConnectionEvent event));
-  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
-  MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, onUpstreamEvent, (Network::ConnectionEvent event), (override));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, (), (override));
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, (), (override));
+  MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream), (override));
 };
 
 class MockHttpUpstream : public HttpUpstream {
 public:
   ~MockHttpUpstream() override;
 
-  MOCK_METHOD(void, encodeData, (Buffer::Instance & data));
-  MOCK_METHOD(void, onDownstreamEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data), (override));
+  MOCK_METHOD(void, onDownstreamEvent, (Network::ConnectionEvent event), (override));
 };
 
 class MockHttpStreamCallbacks : public HttpStreamCallbacks {
@@ -109,11 +111,13 @@ public:
               (StreamInfo::StreamInfo * info, std::unique_ptr<HttpUpstream>&& upstream,
                const Upstream::HostDescription& host,
                const Network::ConnectionInfoProvider& address_provider,
-               Ssl::ConnectionInfoConstSharedPtr ssl_info));
+               Ssl::ConnectionInfoConstSharedPtr ssl_info),
+              (override));
   MOCK_METHOD(void, onStreamFailure,
               (ConnectionPool::PoolFailureReason reason, absl::string_view failure_reason,
-               const Upstream::HostDescription& host));
-  MOCK_METHOD(void, resetIdleTimer, ());
+               const Upstream::HostDescription& host),
+              (override));
+  MOCK_METHOD(void, resetIdleTimer, (), (override));
 };
 
 } // namespace SessionFilters

@@ -16,9 +16,9 @@ public:
   ~MockAccessLogFile() override;
 
   // AccessLog::AccessLogFile
-  MOCK_METHOD(void, write, (absl::string_view data));
-  MOCK_METHOD(void, reopen, ());
-  MOCK_METHOD(void, flush, ());
+  MOCK_METHOD(void, write, (absl::string_view data), (override));
+  MOCK_METHOD(void, reopen, (), (override));
+  MOCK_METHOD(void, flush, (), (override));
 };
 
 class MockFilter : public Filter {
@@ -27,7 +27,8 @@ public:
   ~MockFilter() override;
 
   // AccessLog::Filter
-  MOCK_METHOD(bool, evaluate, (const Formatter::Context&, const StreamInfo::StreamInfo&), (const));
+  MOCK_METHOD(bool, evaluate, (const Formatter::Context&, const StreamInfo::StreamInfo&),
+              (const, override));
 };
 
 class MockAccessLogManager : public AccessLogManager {
@@ -36,9 +37,9 @@ public:
   ~MockAccessLogManager() override;
 
   // AccessLog::AccessLogManager
-  MOCK_METHOD(void, reopen, ());
+  MOCK_METHOD(void, reopen, (), (override));
   MOCK_METHOD(absl::StatusOr<AccessLogFileSharedPtr>, createAccessLog,
-              (const Envoy::Filesystem::FilePathAndType& file_info));
+              (const Envoy::Filesystem::FilePathAndType& file_info), (override));
 
   std::shared_ptr<MockAccessLogFile> file_{new testing::NiceMock<MockAccessLogFile>()};
 };
@@ -49,7 +50,7 @@ public:
   ~MockInstance() override;
 
   // AccessLog::Instance
-  MOCK_METHOD(void, log, (const Formatter::Context&, const StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, log, (const Formatter::Context&, const StreamInfo::StreamInfo&), (override));
 };
 
 } // namespace AccessLog

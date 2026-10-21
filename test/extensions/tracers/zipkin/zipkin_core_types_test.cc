@@ -354,14 +354,15 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
 class MockTracer : public TracerInterface {
 public:
   MOCK_METHOD(SpanPtr, startSpan,
-              (const Tracing::Config&, const std::string& span_name, SystemTime timestamp), ());
+              (const Tracing::Config&, const std::string& span_name, SystemTime timestamp),
+              (override));
   MOCK_METHOD(SpanPtr, startSpan,
               (const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
                const SpanContext& parent_context),
-              ());
-  MOCK_METHOD(void, reportSpan, (Span && span), ());
+              (override));
+  MOCK_METHOD(void, reportSpan, (Span && span), (override));
   MOCK_METHOD(envoy::config::trace::v3::ZipkinConfig::TraceContextOption, traceContextOption, (),
-              (const));
+              (const, override));
 };
 
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {

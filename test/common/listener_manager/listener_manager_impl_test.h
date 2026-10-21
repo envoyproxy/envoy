@@ -486,7 +486,7 @@ protected:
   class DumbInternalListenerRegistry : public Singleton::Instance,
                                        public Network::InternalListenerRegistry {
   public:
-    MOCK_METHOD(Network::LocalInternalListenerRegistry*, getLocalRegistry, ());
+    MOCK_METHOD(Network::LocalInternalListenerRegistry*, getLocalRegistry, (), (override));
   };
   std::shared_ptr<DumbInternalListenerRegistry> internal_registry_{
       std::make_shared<DumbInternalListenerRegistry>()};

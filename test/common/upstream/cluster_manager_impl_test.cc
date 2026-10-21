@@ -2016,8 +2016,8 @@ class MockClusterManagerCluster : public ClusterManagerCluster {
 public:
   MockClusterManagerCluster() { ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_)); }
 
-  MOCK_METHOD(Cluster&, cluster, ());
-  MOCK_METHOD(LoadBalancerFactorySharedPtr, loadBalancerFactory, ());
+  MOCK_METHOD(Cluster&, cluster, (), (override));
+  MOCK_METHOD(LoadBalancerFactorySharedPtr, loadBalancerFactory, (), (override));
   bool addedOrUpdated() override { return added_or_updated_; }
   void setAddedOrUpdated() override {
     ASSERT(!added_or_updated_);

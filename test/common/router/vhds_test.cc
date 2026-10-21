@@ -37,7 +37,7 @@ using ::testing::Not;
 
 class MockRouteConfigUpdateObserver : public Rds::RouteConfigUpdateObserver {
 public:
-  MOCK_METHOD(void, onConfigWarmed, ());
+  MOCK_METHOD(void, onConfigWarmed, (), (override));
 };
 
 class VhdsTest : public testing::Test {

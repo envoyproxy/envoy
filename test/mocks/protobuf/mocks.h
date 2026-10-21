@@ -12,10 +12,10 @@ public:
   MockValidationVisitor();
   ~MockValidationVisitor() override;
 
-  MOCK_METHOD(absl::Status, onUnknownField, (absl::string_view));
-  MOCK_METHOD(absl::Status, onDeprecatedField, (absl::string_view, bool));
-  MOCK_METHOD(void, onWorkInProgress, (absl::string_view));
-  MOCK_METHOD(OptRef<Runtime::Loader>, runtime, ());
+  MOCK_METHOD(absl::Status, onUnknownField, (absl::string_view), (override));
+  MOCK_METHOD(absl::Status, onDeprecatedField, (absl::string_view, bool), (override));
+  MOCK_METHOD(void, onWorkInProgress, (absl::string_view), (override));
+  MOCK_METHOD(OptRef<Runtime::Loader>, runtime, (), (override));
 
   bool skipValidation() override { return skip_validation_; }
   void setSkipValidation(bool s) { skip_validation_ = s; }
@@ -29,8 +29,8 @@ public:
   MockValidationContext();
   ~MockValidationContext() override;
 
-  MOCK_METHOD(ValidationVisitor&, staticValidationVisitor, ());
-  MOCK_METHOD(ValidationVisitor&, dynamicValidationVisitor, ());
+  MOCK_METHOD(ValidationVisitor&, staticValidationVisitor, (), (override));
+  MOCK_METHOD(ValidationVisitor&, dynamicValidationVisitor, (), (override));
 
   testing::NiceMock<MockValidationVisitor> static_validation_visitor_;
   testing::NiceMock<MockValidationVisitor> dynamic_validation_visitor_;

@@ -17,12 +17,12 @@ public:
   MockConfig();
   ~MockConfig() override;
 
-  MOCK_METHOD(OperationName, operationName, (), (const));
-  MOCK_METHOD(void, modifySpan, (Span&, bool), (const));
-  MOCK_METHOD(bool, verbose, (), (const));
-  MOCK_METHOD(uint32_t, maxPathTagLength, (), (const));
-  MOCK_METHOD(bool, spawnUpstreamSpan, (), (const));
-  MOCK_METHOD(bool, noContextPropagation, (), (const));
+  MOCK_METHOD(OperationName, operationName, (), (const, override));
+  MOCK_METHOD(void, modifySpan, (Span&, bool), (const, override));
+  MOCK_METHOD(bool, verbose, (), (const, override));
+  MOCK_METHOD(uint32_t, maxPathTagLength, (), (const, override));
+  MOCK_METHOD(bool, spawnUpstreamSpan, (), (const, override));
+  MOCK_METHOD(bool, noContextPropagation, (), (const, override));
 
   OperationName operation_name_{OperationName::Ingress};
   bool verbose_{false};
@@ -35,22 +35,23 @@ public:
   MockSpan();
   ~MockSpan() override;
 
-  MOCK_METHOD(void, setOperation, (absl::string_view operation));
-  MOCK_METHOD(void, setTag, (absl::string_view name, absl::string_view value));
+  MOCK_METHOD(void, setOperation, (absl::string_view operation), (override));
+  MOCK_METHOD(void, setTag, (absl::string_view name, absl::string_view value), (override));
   MOCK_METHOD(void, setTypedTag,
-              (absl::string_view name, absl::string_view value, TagValueType type));
-  MOCK_METHOD(void, log, (SystemTime timestamp, const std::string& event));
-  MOCK_METHOD(void, finishSpan, ());
+              (absl::string_view name, absl::string_view value, TagValueType type), (override));
+  MOCK_METHOD(void, log, (SystemTime timestamp, const std::string& event), (override));
+  MOCK_METHOD(void, finishSpan, (), (override));
   MOCK_METHOD(void, injectContext,
-              (Tracing::TraceContext & request_headers, const Tracing::UpstreamContext& upstream));
-  MOCK_METHOD(void, setSampled, (bool sampled));
-  MOCK_METHOD(void, disableLocalDecision, ());
+              (Tracing::TraceContext & request_headers, const Tracing::UpstreamContext& upstream),
+              (override));
+  MOCK_METHOD(void, setSampled, (bool sampled), (override));
+  MOCK_METHOD(void, disableLocalDecision, (), (override));
   MOCK_METHOD(bool, exportedSpan, (), (const, override));
-  MOCK_METHOD(bool, useLocalDecision, (), (const));
-  MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
-  MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
-  MOCK_METHOD(std::string, getTraceId, (), (const));
-  MOCK_METHOD(std::string, getSpanId, (), (const));
+  MOCK_METHOD(bool, useLocalDecision, (), (const, override));
+  MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value), (override));
+  MOCK_METHOD(std::string, getBaggage, (absl::string_view key), (override));
+  MOCK_METHOD(std::string, getTraceId, (), (const, override));
+  MOCK_METHOD(std::string, getSpanId, (), (const, override));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {
@@ -100,7 +101,8 @@ public:
   MockTracerManager();
   ~MockTracerManager() override;
 
-  MOCK_METHOD(TracerSharedPtr, getOrCreateTracer, (const envoy::config::trace::v3::Tracing_Http*));
+  MOCK_METHOD(TracerSharedPtr, getOrCreateTracer, (const envoy::config::trace::v3::Tracing_Http*),
+              (override));
 };
 
 } // namespace Tracing

@@ -43,13 +43,13 @@ public:
   }
 
   MOCK_METHOD(void, send,
-              (envoy::service::network_ext_proc::v3::ProcessingRequest && request,
-               bool end_stream));
-  MOCK_METHOD(bool, close, ());
-  MOCK_METHOD(bool, halfCloseAndDeleteOnRemoteClose, ());
-  MOCK_METHOD(void, notifyFilterDestroy, ());
-  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+              (envoy::service::network_ext_proc::v3::ProcessingRequest && request, bool end_stream),
+              (override));
+  MOCK_METHOD(bool, close, (), (override));
+  MOCK_METHOD(bool, halfCloseAndDeleteOnRemoteClose, (), (override));
+  MOCK_METHOD(void, notifyFilterDestroy, (), (override));
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const, override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
 };
 
 class MockExternalProcessorClient : public ExternalProcessorClient {
@@ -58,16 +58,18 @@ public:
               (ExternalProcessorCallbacks & callbacks,
                const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                Http::AsyncClient::StreamOptions& options,
-               Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks));
+               Http::StreamFilterSidestreamWatermarkCallbacks& watermark_callbacks),
+              (override));
   MOCK_METHOD(
       void, sendRequest,
       (envoy::service::network_ext_proc::v3::ProcessingRequest && request, bool end_stream,
        const uint64_t stream_id,
        CommonExtProc::RequestCallbacks<envoy::service::network_ext_proc::v3::ProcessingResponse>*
            callbacks,
-       CommonExtProc::StreamBase* stream));
-  MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const));
+       CommonExtProc::StreamBase* stream),
+      (override));
+  MOCK_METHOD(void, cancel, (), (override));
+  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const, override));
 };
 
 class NetworkExtProcFilterTest : public testing::Test {

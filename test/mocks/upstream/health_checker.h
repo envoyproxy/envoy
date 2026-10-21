@@ -12,8 +12,8 @@ public:
   MockHealthChecker();
   ~MockHealthChecker() override;
 
-  MOCK_METHOD(void, addHostCheckCompleteCb, (HostStatusCb callback));
-  MOCK_METHOD(void, start, ());
+  MOCK_METHOD(void, addHostCheckCompleteCb, (HostStatusCb callback), (override));
+  MOCK_METHOD(void, start, (), (override));
 
   void runCallbacks(Upstream::HostSharedPtr host, HealthTransition changed_state,
                     HealthState current_check_result) {

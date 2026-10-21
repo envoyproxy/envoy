@@ -15,9 +15,9 @@ public:
   MockCdsApi();
   ~MockCdsApi() override;
 
-  MOCK_METHOD(void, initialize, ());
-  MOCK_METHOD(void, setInitializedCb, (std::function<void()> callback));
-  MOCK_METHOD(const std::string, versionInfo, (), (const));
+  MOCK_METHOD(void, initialize, (), (override));
+  MOCK_METHOD(void, setInitializedCb, (std::function<void()> callback), (override));
+  MOCK_METHOD(const std::string, versionInfo, (), (const, override));
 
   std::function<void()> initialized_callback_;
 };

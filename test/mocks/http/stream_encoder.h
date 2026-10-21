@@ -16,7 +16,7 @@ public:
   MockHttp1StreamEncoderOptions();
   ~MockHttp1StreamEncoderOptions() override;
 
-  MOCK_METHOD(void, disableChunkEncoding, ());
+  MOCK_METHOD(void, disableChunkEncoding, (), (override));
   MOCK_METHOD(void, enableHalfClose, ());
 };
 
@@ -26,15 +26,16 @@ public:
   ~MockRequestEncoder() override;
 
   // Http::RequestEncoder
-  MOCK_METHOD(Status, encodeHeaders, (const RequestHeaderMap& headers, bool end_stream));
-  MOCK_METHOD(void, encodeTrailers, (const RequestTrailerMap& trailers));
-  MOCK_METHOD(void, enableTcpTunneling, ());
+  MOCK_METHOD(Status, encodeHeaders, (const RequestHeaderMap& headers, bool end_stream),
+              (override));
+  MOCK_METHOD(void, encodeTrailers, (const RequestTrailerMap& trailers), (override));
+  MOCK_METHOD(void, enableTcpTunneling, (), (override));
 
   // Http::StreamEncoder
-  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
-  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
-  MOCK_METHOD(Stream&, getStream, (), ());
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream), (override));
+  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector), (override));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, (), (override));
+  MOCK_METHOD(Stream&, getStream, (), (override));
 
   testing::NiceMock<MockStream> stream_;
 };
@@ -45,22 +46,23 @@ public:
   ~MockResponseEncoder() override;
 
   // Http::ResponseEncoder
-  MOCK_METHOD(void, encode1xxHeaders, (const ResponseHeaderMap& headers));
-  MOCK_METHOD(void, encodeHeaders, (const ResponseHeaderMap& headers, bool end_stream));
-  MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers));
-  MOCK_METHOD(void, setRequestDecoder, (RequestDecoder & decoder));
+  MOCK_METHOD(void, encode1xxHeaders, (const ResponseHeaderMap& headers), (override));
+  MOCK_METHOD(void, encodeHeaders, (const ResponseHeaderMap& headers, bool end_stream), (override));
+  MOCK_METHOD(void, encodeTrailers, (const ResponseTrailerMap& trailers), (override));
+  MOCK_METHOD(void, setRequestDecoder, (RequestDecoder & decoder), (override));
   MOCK_METHOD(void, setDeferredLoggingHeadersAndTrailers,
               (Http::RequestHeaderMapConstSharedPtr request_header_map,
                Http::ResponseHeaderMapConstSharedPtr response_header_map,
                Http::ResponseTrailerMapConstSharedPtr response_trailer_map,
-               StreamInfo::StreamInfo& stream_info));
+               StreamInfo::StreamInfo& stream_info),
+              (override));
 
   // Http::StreamEncoder
-  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
-  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, ());
-  MOCK_METHOD(bool, streamErrorOnInvalidHttpMessage, (), (const));
-  MOCK_METHOD(Stream&, getStream, (), ());
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream), (override));
+  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector), (override));
+  MOCK_METHOD(Http1StreamEncoderOptionsOptRef, http1StreamEncoderOptions, (), (override));
+  MOCK_METHOD(bool, streamErrorOnInvalidHttpMessage, (), (const, override));
+  MOCK_METHOD(Stream&, getStream, (), (override));
 
   testing::NiceMock<MockStream> stream_;
 };

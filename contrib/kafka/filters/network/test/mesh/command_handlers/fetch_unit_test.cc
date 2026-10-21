@@ -20,20 +20,21 @@ using testing::ReturnRef;
 
 class MockAbstractRequestListener : public AbstractRequestListener {
 public:
-  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr));
-  MOCK_METHOD(void, onRequestReadyForAnswer, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr), (override));
+  MOCK_METHOD(void, onRequestReadyForAnswer, (), (override));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
 };
 
 class MockRecordCallbackProcessor : public RecordCallbackProcessor {
 public:
-  MOCK_METHOD(void, processCallback, (const RecordCbSharedPtr&));
-  MOCK_METHOD(void, removeCallback, (const RecordCbSharedPtr&));
+  MOCK_METHOD(void, processCallback, (const RecordCbSharedPtr&), (override));
+  MOCK_METHOD(void, removeCallback, (const RecordCbSharedPtr&), (override));
 };
 
 class MockFetchRecordConverter : public FetchRecordConverter {
 public:
-  MOCK_METHOD(std::vector<FetchableTopicResponse>, convert, (const InboundRecordsMap&), (const));
+  MOCK_METHOD(std::vector<FetchableTopicResponse>, convert, (const InboundRecordsMap&),
+              (const, override));
 };
 
 class FetchUnitTest : public testing::Test {

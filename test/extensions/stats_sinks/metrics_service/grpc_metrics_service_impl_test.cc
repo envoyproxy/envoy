@@ -95,7 +95,7 @@ public:
                             envoy::service::metrics::v3::StreamMetricsResponse>(async_client) {}
 
   // GrpcMetricsStreamer
-  MOCK_METHOD(void, send, (MetricsPtr && metrics));
+  MOCK_METHOD(void, send, (MetricsPtr && metrics), (override));
 };
 
 class MetricsServiceSinkTest : public testing::Test {

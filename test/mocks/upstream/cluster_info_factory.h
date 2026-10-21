@@ -14,7 +14,8 @@ public:
   MockClusterInfoFactory();
   ~MockClusterInfoFactory() override;
 
-  MOCK_METHOD(ClusterInfoConstSharedPtr, createClusterInfo, (const CreateClusterInfoParams&));
+  MOCK_METHOD(ClusterInfoConstSharedPtr, createClusterInfo, (const CreateClusterInfoParams&),
+              (override));
 };
 } // namespace Upstream
 } // namespace Envoy

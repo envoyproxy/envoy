@@ -13,9 +13,9 @@ namespace {
 
 class MockAbstractRequestListener : public AbstractRequestListener {
 public:
-  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr));
-  MOCK_METHOD(void, onRequestReadyForAnswer, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr), (override));
+  MOCK_METHOD(void, onRequestReadyForAnswer, (), (override));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
 };
 
 TEST(ListOffsetsTest, shouldBeAlwaysReadyForAnswer) {

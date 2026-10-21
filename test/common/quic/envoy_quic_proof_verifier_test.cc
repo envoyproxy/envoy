@@ -31,7 +31,8 @@ namespace Quic {
 
 class MockProofVerifierCallback : public quic::ProofVerifierCallback {
 public:
-  MOCK_METHOD(void, Run, (bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>*));
+  MOCK_METHOD(void, Run, (bool, const std::string&, std::unique_ptr<quic::ProofVerifyDetails>*),
+              (override));
 };
 
 class EnvoyQuicProofVerifierTest : public testing::Test {

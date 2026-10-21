@@ -21,11 +21,12 @@ public:
   ~MockClient() override;
 
   // ExtAuthz::Client
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (), (override));
   MOCK_METHOD(void, check,
               (RequestCallbacks & callbacks, const envoy::service::auth::v3::CheckRequest& request,
-               Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info));
-  MOCK_METHOD(StreamInfo::StreamInfo const*, streamInfo, (), (const));
+               Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info),
+              (override));
+  MOCK_METHOD(StreamInfo::StreamInfo const*, streamInfo, (), (const, override));
 };
 
 class MockRequestCallbacks : public RequestCallbacks {

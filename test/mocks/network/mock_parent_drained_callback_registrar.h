@@ -10,8 +10,8 @@ namespace Network {
 class MockParentDrainedCallbackRegistrar : public ParentDrainedCallbackRegistrar {
 public:
   MOCK_METHOD(void, registerParentDrainedCallback,
-              (const Address::InstanceConstSharedPtr& address,
-               absl::AnyInvocable<void()> callback));
+              (const Address::InstanceConstSharedPtr& address, absl::AnyInvocable<void()> callback),
+              (override));
 };
 
 } // namespace Network

@@ -31,10 +31,11 @@ using ::testing::StrictMock;
 
 class MockExtensionConfig : public ExtensionConfig {
 public:
-  MOCK_METHOD(const absl::string_view, adminId, ());
-  MOCK_METHOD(void, clearTapConfig, ());
+  MOCK_METHOD(const absl::string_view, adminId, (), (override));
+  MOCK_METHOD(void, clearTapConfig, (), (override));
   MOCK_METHOD(void, newTapConfig,
-              (const envoy::config::tap::v3::TapConfig& proto_config, Sink* admin_streamer));
+              (const envoy::config::tap::v3::TapConfig& proto_config, Sink* admin_streamer),
+              (override));
 };
 
 // MockDispatcherQueued buffers posted callbacks until they are explicitly asked

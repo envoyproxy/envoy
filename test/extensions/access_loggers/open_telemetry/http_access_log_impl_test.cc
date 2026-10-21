@@ -36,7 +36,7 @@ public:
                    resource_detectors,
                Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
                const Tracers::OpenTelemetry::ResourceProviderOptions& options),
-              (const));
+              (const, override));
 };
 
 class HttpAccessLoggerImplTest : public testing::Test {

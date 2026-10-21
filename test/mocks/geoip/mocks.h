@@ -14,8 +14,8 @@ class MockDriver : public Driver {
 public:
   MOCK_METHOD(void, lookup,
               (Geolocation::LookupRequest && request, Geolocation::LookupGeoHeadersCallback&&),
-              (const));
-  MOCK_METHOD(absl::Span<const Http::LowerCaseString>, geoHeaderNames, (), (const));
+              (const, override));
+  MOCK_METHOD(absl::Span<const Http::LowerCaseString>, geoHeaderNames, (), (const, override));
 };
 
 using MockDriverSharedPtr = std::shared_ptr<MockDriver>;

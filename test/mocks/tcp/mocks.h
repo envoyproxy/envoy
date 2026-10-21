@@ -18,9 +18,11 @@ namespace ConnectionPool {
 class MockCallbacks : public Callbacks {
   MOCK_METHOD(void, onPoolFailure,
               (PoolFailureReason reason, absl::string_view details,
-               Upstream::HostDescriptionConstSharedPtr host));
+               Upstream::HostDescriptionConstSharedPtr host),
+              (override));
   MOCK_METHOD(void, onPoolReady,
-              (ConnectionDataPtr && conn, Upstream::HostDescriptionConstSharedPtr host));
+              (ConnectionDataPtr && conn, Upstream::HostDescriptionConstSharedPtr host),
+              (override));
 };
 
 class MockUpstreamCallbacks : public UpstreamCallbacks {
@@ -29,10 +31,10 @@ public:
   ~MockUpstreamCallbacks() override;
 
   // Tcp::ConnectionPool::UpstreamCallbacks
-  MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
-  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(void, onUpstreamData, (Buffer::Instance & data, bool end_stream), (override));
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event), (override));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, (), (override));
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, (), (override));
 };
 
 class MockConnectionData : public ConnectionData {
@@ -41,10 +43,10 @@ public:
   ~MockConnectionData() override;
 
   // Tcp::ConnectionPool::ConnectionData
-  MOCK_METHOD(Network::ClientConnection&, connection, ());
-  MOCK_METHOD(void, addUpstreamCallbacks, (ConnectionPool::UpstreamCallbacks&));
+  MOCK_METHOD(Network::ClientConnection&, connection, (), (override));
+  MOCK_METHOD(void, addUpstreamCallbacks, (ConnectionPool::UpstreamCallbacks&), (override));
   void setConnectionState(ConnectionStatePtr&& state) override { setConnectionState_(state); }
-  MOCK_METHOD(ConnectionPool::ConnectionState*, connectionState, ());
+  MOCK_METHOD(ConnectionPool::ConnectionState*, connectionState, (), (override));
 
   MOCK_METHOD(void, setConnectionState_, (ConnectionPool::ConnectionStatePtr & state));
 
@@ -59,13 +61,15 @@ public:
   ~MockInstance() override;
 
   // Tcp::ConnectionPool::Instance
-  MOCK_METHOD(void, addIdleCallback, (IdleCb cb));
-  MOCK_METHOD(bool, isIdle, (), (const));
-  MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior));
-  MOCK_METHOD(void, closeConnections, ());
-  MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
-  MOCK_METHOD(bool, maybePreconnect, (float), ());
-  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
+  MOCK_METHOD(void, addIdleCallback, (IdleCb cb), (override));
+  MOCK_METHOD(bool, isIdle, (), (const, override));
+  MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior),
+              (override));
+  MOCK_METHOD(void, closeConnections, (), (override));
+  MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks),
+              (override));
+  MOCK_METHOD(bool, maybePreconnect, (float), (override));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const, override));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (override));
 
   Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);
@@ -95,10 +99,10 @@ public:
   MockAsyncTcpClientCallbacks() = default;
   ~MockAsyncTcpClientCallbacks() override = default;
 
-  MOCK_METHOD(void, onData, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
-  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(void, onData, (Buffer::Instance & data, bool end_stream), (override));
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event), (override));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, (), (override));
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, (), (override));
 };
 
 class MockAsyncTcpClient : public AsyncTcpClient {
@@ -106,15 +110,15 @@ public:
   MockAsyncTcpClient() = default;
   ~MockAsyncTcpClient() override = default;
 
-  MOCK_METHOD(bool, connect, ());
-  MOCK_METHOD(void, close, (Network::ConnectionCloseType type));
-  MOCK_METHOD(StreamInfo::DetectedCloseType, detectedCloseType, (), (const));
-  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(void, readDisable, (bool disable));
-  MOCK_METHOD(void, setAsyncTcpClientCallbacks, (AsyncTcpClientCallbacks & callbacks));
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(bool, connected, ());
-  MOCK_METHOD(OptRef<StreamInfo::StreamInfo>, getStreamInfo, ());
+  MOCK_METHOD(bool, connect, (), (override));
+  MOCK_METHOD(void, close, (Network::ConnectionCloseType type), (override));
+  MOCK_METHOD(StreamInfo::DetectedCloseType, detectedCloseType, (), (const, override));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream), (override));
+  MOCK_METHOD(void, readDisable, (bool disable), (override));
+  MOCK_METHOD(void, setAsyncTcpClientCallbacks, (AsyncTcpClientCallbacks & callbacks), (override));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
+  MOCK_METHOD(bool, connected, (), (override));
+  MOCK_METHOD(OptRef<StreamInfo::StreamInfo>, getStreamInfo, (), (override));
 };
 
 } // namespace AsyncClient

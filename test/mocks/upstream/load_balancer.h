@@ -15,13 +15,14 @@ public:
   ~MockLoadBalancer() override;
 
   // Upstream::LoadBalancer
-  MOCK_METHOD(HostSelectionResponse, chooseHost, (LoadBalancerContext * context));
-  MOCK_METHOD(HostConstSharedPtr, peekAnotherHost, (LoadBalancerContext * context));
+  MOCK_METHOD(HostSelectionResponse, chooseHost, (LoadBalancerContext * context), (override));
+  MOCK_METHOD(HostConstSharedPtr, peekAnotherHost, (LoadBalancerContext * context), (override));
   MOCK_METHOD(std::optional<Upstream::SelectedPoolAndConnection>, selectExistingConnection,
               (Upstream::LoadBalancerContext * context, const Upstream::Host& host,
-               std::vector<uint8_t>& hash_key));
+               std::vector<uint8_t>& hash_key),
+              (override));
   MOCK_METHOD(OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>, lifetimeCallbacks,
-              ());
+              (), (override));
 
   std::shared_ptr<MockHost> host_{new NiceMock<MockHost>()};
 };

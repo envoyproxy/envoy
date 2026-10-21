@@ -24,17 +24,20 @@ public:
   MockMetadataFetcher();
   ~MockMetadataFetcher() override;
 
-  MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(absl::string_view, failureToString, (MetadataFetcher::MetadataReceiver::Failure));
+  MOCK_METHOD(void, cancel, (), (override));
+  MOCK_METHOD(absl::string_view, failureToString, (MetadataFetcher::MetadataReceiver::Failure),
+              (override));
   MOCK_METHOD(void, fetch,
               (Http::RequestMessage & message, Tracing::Span& parent_span,
-               MetadataFetcher::MetadataReceiver& receiver));
+               MetadataFetcher::MetadataReceiver& receiver),
+              (override));
 };
 
 class MockMetadataReceiver : public MetadataFetcher::MetadataReceiver {
 public:
-  MOCK_METHOD(void, onMetadataSuccess, (const std::string&& body));
-  MOCK_METHOD(void, onMetadataError, (MetadataFetcher::MetadataReceiver::Failure reason));
+  MOCK_METHOD(void, onMetadataSuccess, (const std::string&& body), (override));
+  MOCK_METHOD(void, onMetadataError, (MetadataFetcher::MetadataReceiver::Failure reason),
+              (override));
 };
 
 class MockCredentialsProvider : public CredentialsProvider {
@@ -42,9 +45,9 @@ public:
   MockCredentialsProvider();
   ~MockCredentialsProvider() override;
 
-  MOCK_METHOD(Credentials, getCredentials, ());
-  MOCK_METHOD(bool, credentialsPending, ());
-  MOCK_METHOD(std::string, providerName, ());
+  MOCK_METHOD(Credentials, getCredentials, (), (override));
+  MOCK_METHOD(bool, credentialsPending, (), (override));
+  MOCK_METHOD(std::string, providerName, (), (override));
 };
 
 class MockSigner : public Signer {
@@ -52,13 +55,15 @@ public:
   MockSigner();
   ~MockSigner() override;
 
-  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, const absl::string_view));
+  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, const absl::string_view),
+              (override));
   MOCK_METHOD(absl::Status, sign,
-              (Http::RequestHeaderMap&, const std::string&, const absl::string_view));
-  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, const absl::string_view));
-  MOCK_METHOD(absl::Status, signUnsignedPayload,
-              (Http::RequestHeaderMap&, const absl::string_view));
-  MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback&&));
+              (Http::RequestHeaderMap&, const std::string&, const absl::string_view), (override));
+  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, const absl::string_view),
+              (override));
+  MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, const absl::string_view),
+              (override));
+  MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback &&), (override));
 };
 
 class MockFetchMetadata {
@@ -75,30 +80,34 @@ public:
   MOCK_METHOD(absl::Status, addManagedCluster,
               (absl::string_view cluster_name,
                const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type,
-               absl::string_view uri));
+               absl::string_view uri),
+              (override));
 
   MOCK_METHOD(absl::StatusOr<AwsManagedClusterUpdateCallbacksHandlePtr>,
               addManagedClusterUpdateCallbacks,
-              (absl::string_view cluster_name, AwsManagedClusterUpdateCallbacks& cb));
-  MOCK_METHOD(absl::StatusOr<std::string>, getUriFromClusterName, (absl::string_view cluster_name));
-  MOCK_METHOD(void, createQueuedClusters, ());
+              (absl::string_view cluster_name, AwsManagedClusterUpdateCallbacks& cb), (override));
+  MOCK_METHOD(absl::StatusOr<std::string>, getUriFromClusterName, (absl::string_view cluster_name),
+              (override));
+  MOCK_METHOD(void, createQueuedClusters, (), (override));
 };
 
 class MockAwsManagedClusterUpdateCallbacks : public AwsManagedClusterUpdateCallbacks {
 public:
-  MOCK_METHOD(void, onClusterAddOrUpdate, ());
+  MOCK_METHOD(void, onClusterAddOrUpdate, (), (override));
 };
 
 class MockCredentialsProviderChain : public CredentialsProviderChain {
 public:
   MOCK_METHOD(Credentials, chainGetCredentials, ());
-  MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback&&));
-  MOCK_METHOD(void, onCredentialUpdate, ());
+  MOCK_METHOD(bool, addCallbackIfChainCredentialsPending, (CredentialsPendingCallback &&),
+              (override));
+  MOCK_METHOD(void, onCredentialUpdate, (), (override));
 };
 
 class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
 public:
-  MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
+  MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (),
+              (const, override));
   MOCK_METHOD(
       CredentialsProviderSharedPtr, mockCreateCredentialsFileCredentialsProvider,
       (Server::Configuration::ServerFactoryContext&,
@@ -115,38 +124,42 @@ public:
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
       (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr, absl::string_view,
-       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
+       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&),
+      (override));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
               (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, absl::string_view, absl::string_view,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
-               absl::string_view));
+               absl::string_view),
+              (override));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
               (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
-               std::chrono::seconds, absl::string_view));
+               std::chrono::seconds, absl::string_view),
+              (override));
 
   MOCK_METHOD(
       CredentialsProviderSharedPtr, createAssumeRoleCredentialsProvider,
       (Server::Configuration::ServerFactoryContext & context,
        AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
-       const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config));
+       const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config),
+      (override));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
               (Server::Configuration::ServerFactoryContext & context,
                AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
                const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
                    iam_roles_anywhere_config),
-              (const));
+              (const, override));
 };
 
 class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {
 public:
   MOCK_METHOD(absl::StatusOr<EC_KEY*>, derivePrivateKey,
-              (absl::string_view access_key_id, absl::string_view secret_access_key));
-  MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key));
+              (absl::string_view access_key_id, absl::string_view secret_access_key), (override));
+  MOCK_METHOD(bool, derivePublicKey, (EC_KEY * ec_key), (override));
 };
 
 // Friend class for testing callbacks
@@ -212,36 +225,37 @@ public:
   ~MockIAMRolesAnywhereSigV4Signer() override = default;
   MOCK_METHOD(absl::Status, sign,
               (Http::RequestMessage & message, bool sign_body,
-               const absl::string_view override_region));
+               const absl::string_view override_region),
+              (override));
   MOCK_METHOD(absl::Status, sign,
-              (Http::RequestHeaderMap&, const std::string&, const absl::string_view));
+              (Http::RequestHeaderMap&, const std::string&, const absl::string_view), (override));
 
 private:
   MOCK_METHOD(std::string, createCredentialScope,
               (const absl::string_view short_date, const absl::string_view override_region),
-              (const));
+              (const, override));
 
   MOCK_METHOD(absl::StatusOr<std::string>, createSignature,
               (const X509Credentials& credentials, const absl::string_view string_to_sign),
-              (const));
+              (const, override));
 
   MOCK_METHOD(std::string, createAuthorizationHeader,
               (const X509Credentials& x509_credentials, const absl::string_view credential_scope,
                (const std::map<std::string, std::string>& canonical_headers),
                const absl::string_view signature),
-              (const));
+              (const, override));
 
   MOCK_METHOD(std::string, createStringToSign,
               (const X509Credentials& x509_credentials, const absl::string_view canonical_request,
                const absl::string_view long_date, const absl::string_view credential_scope),
-              (const));
+              (const, override));
 };
 
 class MockX509CredentialsProvider : public X509CredentialsProvider {
 public:
   ~MockX509CredentialsProvider() override = default;
 
-  MOCK_METHOD(X509Credentials, getCredentials, ());
+  MOCK_METHOD(X509Credentials, getCredentials, (), (override));
 };
 
 } // namespace Aws

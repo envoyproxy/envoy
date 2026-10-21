@@ -31,8 +31,8 @@ namespace {
 
 class MockWriter : public UdpStatsdSink::Writer {
 public:
-  MOCK_METHOD(void, write, (const std::string& message));
-  MOCK_METHOD(void, writeBuffer, (Buffer::Instance & buffer));
+  MOCK_METHOD(void, write, (const std::string& message), (override));
+  MOCK_METHOD(void, writeBuffer, (Buffer::Instance & buffer), (override));
 
   void delegateBufferFake() {
     ON_CALL(*this, writeBuffer).WillByDefault([this](Buffer::Instance& buffer) {

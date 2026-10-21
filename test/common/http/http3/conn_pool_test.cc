@@ -37,8 +37,8 @@ public:
 
 class MockPoolConnectResultCallback : public PoolConnectResultCallback {
 public:
-  MOCK_METHOD(void, onHandshakeComplete, ());
-  MOCK_METHOD(void, onZeroRttHandshakeFailed, ());
+  MOCK_METHOD(void, onHandshakeComplete, (), (override));
+  MOCK_METHOD(void, onZeroRttHandshakeFailed, (), (override));
 };
 
 class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
@@ -138,7 +138,7 @@ public:
       : Quic::QuicClientTransportSocketFactory(std::move(config), factory_context,
                                                creation_status) {}
 
-  MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, ());
+  MOCK_METHOD(Envoy::Ssl::ClientContextSharedPtr, sslCtx, (), (override));
 };
 
 TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {

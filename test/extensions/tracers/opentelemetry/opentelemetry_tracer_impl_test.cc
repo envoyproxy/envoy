@@ -39,7 +39,7 @@ public:
                    resource_detectors,
                Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
                const ResourceProviderOptions& options),
-              (const));
+              (const, override));
 };
 
 namespace {

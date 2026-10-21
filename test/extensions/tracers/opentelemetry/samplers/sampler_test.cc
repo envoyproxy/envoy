@@ -38,7 +38,8 @@ class TestSamplerFactory : public SamplerFactory {
 public:
   MOCK_METHOD(SamplerSharedPtr, createSampler,
               (const Protobuf::Message& message,
-               Server::Configuration::TracerFactoryContext& context));
+               Server::Configuration::TracerFactoryContext& context),
+              (override));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Struct>();

@@ -49,8 +49,8 @@ using AccessLogType = envoy::data::accesslog::v3::AccessLogType;
 class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD(void, log, (LogRecord && entry));
-  MOCK_METHOD(void, log, (Protobuf::Empty && entry));
+  MOCK_METHOD(void, log, (LogRecord && entry), (override));
+  MOCK_METHOD(void, log, (Protobuf::Empty && entry), (override));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
@@ -60,7 +60,8 @@ public:
       GrpcAccessLoggerSharedPtr, getOrCreateLogger,
       (const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
            config,
-       Common::GrpcAccessLoggerType logger_type));
+       Common::GrpcAccessLoggerType logger_type),
+      (override));
 };
 
 class AccessLogTest : public testing::Test {

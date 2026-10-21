@@ -19,8 +19,8 @@ namespace {
 
 class MockStreamIdProvider : public StreamInfo::StreamIdProvider {
 public:
-  MOCK_METHOD(std::optional<absl::string_view>, toStringView, (), (const));
-  MOCK_METHOD(std::optional<uint64_t>, toInteger, (), (const));
+  MOCK_METHOD(std::optional<absl::string_view>, toStringView, (), (const, override));
+  MOCK_METHOD(std::optional<uint64_t>, toInteger, (), (const, override));
 };
 
 class DynamicModuleAccessLogAbiTest : public testing::Test {

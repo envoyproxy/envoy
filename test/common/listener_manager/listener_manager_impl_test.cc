@@ -205,7 +205,7 @@ public:
 
 class MockLdsApi : public LdsApi {
 public:
-  MOCK_METHOD(std::string, versionInfo, (), (const));
+  MOCK_METHOD(std::string, versionInfo, (), (const, override));
 };
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyFilter) {

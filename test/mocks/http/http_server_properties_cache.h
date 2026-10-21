@@ -11,21 +11,22 @@ public:
   ~MockHttpServerPropertiesCache() override;
 
   MOCK_METHOD(void, setAlternatives,
-              (const Origin& origin, std::vector<AlternateProtocol>& protocols));
-  MOCK_METHOD(void, setSrtt, (const Origin& origin, std::chrono::microseconds srtt));
+              (const Origin& origin, std::vector<AlternateProtocol>& protocols), (override));
+  MOCK_METHOD(void, setSrtt, (const Origin& origin, std::chrono::microseconds srtt), (override));
   MOCK_METHOD(std::chrono::microseconds, getSrtt, (const Origin& origin, bool use_canonical_suffix),
-              (const));
-  MOCK_METHOD(void, setConcurrentStreams, (const Origin& origin, uint32_t concurrent_streams));
-  MOCK_METHOD(uint32_t, getConcurrentStreams, (const Origin& origin), (const));
+              (const, override));
+  MOCK_METHOD(void, setConcurrentStreams, (const Origin& origin, uint32_t concurrent_streams),
+              (override));
+  MOCK_METHOD(uint32_t, getConcurrentStreams, (const Origin& origin), (const, override));
   MOCK_METHOD(OptRef<const std::vector<AlternateProtocol>>, findAlternatives,
-              (const Origin& origin));
-  MOCK_METHOD(size_t, size, (), (const));
+              (const Origin& origin), (override));
+  MOCK_METHOD(size_t, size, (), (const, override));
   MOCK_METHOD(HttpServerPropertiesCache::Http3StatusTracker&, getOrCreateHttp3StatusTracker,
-              (const Origin& origin));
-  MOCK_METHOD(bool, isHttp3Broken, (const Origin& origin));
-  MOCK_METHOD(void, markHttp3Broken, (const Origin& origin));
-  MOCK_METHOD(void, resetBrokenness, ());
-  MOCK_METHOD(void, resetStatus, ());
+              (const Origin& origin), (override));
+  MOCK_METHOD(bool, isHttp3Broken, (const Origin& origin), (override));
+  MOCK_METHOD(void, markHttp3Broken, (const Origin& origin), (override));
+  MOCK_METHOD(void, resetBrokenness, (), (override));
+  MOCK_METHOD(void, resetStatus, (), (override));
 };
 
 class MockHttpServerPropertiesCacheManager : public HttpServerPropertiesCacheManager {
@@ -34,8 +35,10 @@ public:
 
   MOCK_METHOD(HttpServerPropertiesCacheSharedPtr, getCache,
               (const envoy::config::core::v3::AlternateProtocolsCacheOptions& config,
-               Event::Dispatcher& dispatcher));
-  MOCK_METHOD(void, forEachThreadLocalCache, (HttpServerPropertiesCacheManager::CacheFn));
+               Event::Dispatcher& dispatcher),
+              (override));
+  MOCK_METHOD(void, forEachThreadLocalCache, (HttpServerPropertiesCacheManager::CacheFn),
+              (override));
 };
 
 } // namespace Http

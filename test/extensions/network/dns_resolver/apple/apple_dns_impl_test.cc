@@ -81,13 +81,14 @@ public:
   MockDnsService() = default;
   ~MockDnsService() = default;
 
-  MOCK_METHOD(void, dnsServiceRefDeallocate, (DNSServiceRef sdRef));
-  MOCK_METHOD(dnssd_sock_t, dnsServiceRefSockFD, (DNSServiceRef sdRef));
-  MOCK_METHOD(DNSServiceErrorType, dnsServiceProcessResult, (DNSServiceRef sdRef));
+  MOCK_METHOD(void, dnsServiceRefDeallocate, (DNSServiceRef sdRef), (override));
+  MOCK_METHOD(dnssd_sock_t, dnsServiceRefSockFD, (DNSServiceRef sdRef), (override));
+  MOCK_METHOD(DNSServiceErrorType, dnsServiceProcessResult, (DNSServiceRef sdRef), (override));
   MOCK_METHOD(DNSServiceErrorType, dnsServiceGetAddrInfo,
               (DNSServiceRef * sdRef, DNSServiceFlags flags, uint32_t interfaceIndex,
                DNSServiceProtocol protocol, const char* hostname,
-               DNSServiceGetAddrInfoReply callBack, void* context));
+               DNSServiceGetAddrInfoReply callBack, void* context),
+              (override));
 };
 
 MATCHER_P(HasTrace, expected_trace, "") {

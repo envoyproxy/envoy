@@ -15,7 +15,7 @@ public:
   ~MockCompressor() override;
 
   // Compressor::Compressor
-  MOCK_METHOD(void, compress, (Buffer::Instance & buffer, State state));
+  MOCK_METHOD(void, compress, (Buffer::Instance & buffer, State state), (override));
 };
 
 class MockCompressorFactory : public CompressorFactory {
@@ -24,9 +24,9 @@ public:
   ~MockCompressorFactory() override;
 
   // Compressor::CompressorFactory
-  MOCK_METHOD(CompressorPtr, createCompressor, ());
-  MOCK_METHOD(const std::string&, statsPrefix, (), (const));
-  MOCK_METHOD(const std::string&, contentEncoding, (), (const));
+  MOCK_METHOD(CompressorPtr, createCompressor, (), (override));
+  MOCK_METHOD(const std::string&, statsPrefix, (), (const, override));
+  MOCK_METHOD(const std::string&, contentEncoding, (), (const, override));
 
   const std::string stats_prefix_{"mock"};
   const std::string content_encoding_{"mock"};

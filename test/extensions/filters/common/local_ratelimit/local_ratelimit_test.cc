@@ -109,7 +109,7 @@ TEST(ShareProviderManagerTest, ShareProviderManagerTest) {
 class MockShareProvider : public ShareProvider {
 public:
   MockShareProvider() = default;
-  MOCK_METHOD(double, getTokensShareFactor, (), (const));
+  MOCK_METHOD(double, getTokensShareFactor, (), (const, override));
 };
 
 class LocalRateLimiterImplTest : public testing::Test {

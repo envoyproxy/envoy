@@ -138,8 +138,9 @@ public:
     EXPECT_CALL(*this, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
   }
 
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(void, onCertificateSelectionResult, (OptRef<const Ssl::TlsContext>, bool));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
+  MOCK_METHOD(void, onCertificateSelectionResult, (OptRef<const Ssl::TlsContext>, bool),
+              (override));
 };
 
 // A dynamic certificate whose OCSP stapling policy always fails.

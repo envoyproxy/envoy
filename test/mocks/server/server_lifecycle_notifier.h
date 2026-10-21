@@ -12,9 +12,10 @@ public:
   MockServerLifecycleNotifier();
   ~MockServerLifecycleNotifier() override;
 
-  MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback, (Stage, StageCallback));
+  MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback, (Stage, StageCallback),
+              (override));
   MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback,
-              (Stage, StageCallbackWithCompletion));
+              (Stage, StageCallbackWithCompletion), (override));
 };
 } // namespace Server
 } // namespace Envoy

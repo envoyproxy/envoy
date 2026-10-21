@@ -14,11 +14,11 @@ class MockThreadLocalOverloadState : public ThreadLocalOverloadState {
 public:
   MockThreadLocalOverloadState();
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
-  MOCK_METHOD(bool, tryAllocateResource, (OverloadProactiveResourceName, int64_t));
-  MOCK_METHOD(bool, tryDeallocateResource, (OverloadProactiveResourceName, int64_t));
-  MOCK_METHOD(bool, isResourceMonitorEnabled, (OverloadProactiveResourceName));
+  MOCK_METHOD(bool, tryAllocateResource, (OverloadProactiveResourceName, int64_t), (override));
+  MOCK_METHOD(bool, tryDeallocateResource, (OverloadProactiveResourceName, int64_t), (override));
+  MOCK_METHOD(bool, isResourceMonitorEnabled, (OverloadProactiveResourceName), (override));
   MOCK_METHOD(ProactiveResourceMonitorOptRef, getProactiveResourceMonitorForTest,
-              (OverloadProactiveResourceName));
+              (OverloadProactiveResourceName), (override));
 
 private:
   const OverloadActionState disabled_state_;
@@ -30,14 +30,14 @@ public:
   ~MockOverloadManager() override;
 
   // OverloadManager
-  MOCK_METHOD(void, start, ());
+  MOCK_METHOD(void, start, (), (override));
   MOCK_METHOD(bool, registerForAction,
-              (const std::string& action, Event::Dispatcher& dispatcher,
-               OverloadActionCb callback));
+              (const std::string& action, Event::Dispatcher& dispatcher, OverloadActionCb callback),
+              (override));
   MOCK_METHOD(Event::ScaledRangeTimerManagerFactory, scaledTimerFactory, (), (override));
-  MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
-  MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (absl::string_view));
-  MOCK_METHOD(void, stop, ());
+  MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, (), (override));
+  MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (absl::string_view), (override));
+  MOCK_METHOD(void, stop, (), (override));
   MOCK_METHOD(std::optional<envoy::config::overload::v3::ShrinkHeapConfig>, getShrinkHeapConfig, (),
               (const, override));
 
@@ -49,7 +49,7 @@ public:
   MockLoadShedPoint() = default;
 
   // LoadShedPoint
-  MOCK_METHOD(bool, shouldShedLoad, ());
+  MOCK_METHOD(bool, shouldShedLoad, (), (override));
 };
 
 } // namespace Server

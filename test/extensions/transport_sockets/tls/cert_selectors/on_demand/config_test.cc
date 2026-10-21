@@ -32,7 +32,7 @@ using ::testing::Return;
 class MockTlsCertificateSelectorContext : public Ssl::TlsCertificateSelectorContext {
 public:
   ~MockTlsCertificateSelectorContext() override = default;
-  MOCK_METHOD(const std::vector<Ssl::TlsContext>&, getTlsContexts, (), (const));
+  MOCK_METHOD(const std::vector<Ssl::TlsContext>&, getTlsContexts, (), (const, override));
 };
 
 class OnDemandTest : public ::testing::Test {

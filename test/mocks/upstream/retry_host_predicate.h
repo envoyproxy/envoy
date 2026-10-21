@@ -12,8 +12,8 @@ public:
   MockRetryHostPredicate();
   ~MockRetryHostPredicate() override;
 
-  MOCK_METHOD(bool, shouldSelectAnotherHost, (const Host& candidate_host));
-  MOCK_METHOD(void, onHostAttempted, (HostDescriptionConstSharedPtr));
+  MOCK_METHOD(bool, shouldSelectAnotherHost, (const Host& candidate_host), (override));
+  MOCK_METHOD(void, onHostAttempted, (HostDescriptionConstSharedPtr), (override));
 };
 } // namespace Upstream
 } // namespace Envoy

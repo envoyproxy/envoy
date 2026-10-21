@@ -41,17 +41,17 @@ public:
 
 class MockIoHandle : public IoHandle {
 public:
-  MOCK_METHOD(void, setEof, ());
-  MOCK_METHOD(void, setRst, ());
-  MOCK_METHOD(bool, hasReceivedEof, (), (const));
-  MOCK_METHOD(void, onPeerDestroy, ());
-  MOCK_METHOD(void, setNewDataAvailable, ());
-  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
-  MOCK_METHOD(bool, canReceiveData, (), (const));
-  MOCK_METHOD(bool, isWriteUnblocked, (), (const));
-  MOCK_METHOD(void, onPeerBufferLowWatermark, ());
-  MOCK_METHOD(bool, isReadable, (), (const));
-  MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, ());
+  MOCK_METHOD(void, setEof, (), (override));
+  MOCK_METHOD(void, setRst, (), (override));
+  MOCK_METHOD(bool, hasReceivedEof, (), (const, override));
+  MOCK_METHOD(void, onPeerDestroy, (), (override));
+  MOCK_METHOD(void, setNewDataAvailable, (), (override));
+  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, (), (override));
+  MOCK_METHOD(bool, canReceiveData, (), (const, override));
+  MOCK_METHOD(bool, isWriteUnblocked, (), (const, override));
+  MOCK_METHOD(void, onPeerBufferLowWatermark, (), (override));
+  MOCK_METHOD(bool, isReadable, (), (const, override));
+  MOCK_METHOD(PassthroughStateSharedPtr, passthroughState, (), (override));
 };
 
 class FileEventImplTest : public testing::Test {

@@ -31,9 +31,10 @@ protected:
 class MockEvwatchObserver : public Evwatch::Observer {
 public:
   MOCK_METHOD(void, onPrepare,
-              (MonotonicTime prepare_time, std::optional<MonotonicTime::duration> timeout));
-  MOCK_METHOD(void, onCheck, (MonotonicTime check_time));
-  MOCK_METHOD(void, onClose, ());
+              (MonotonicTime prepare_time, std::optional<MonotonicTime::duration> timeout),
+              (override));
+  MOCK_METHOD(void, onCheck, (MonotonicTime check_time), (override));
+  MOCK_METHOD(void, onClose, (), (override));
 };
 
 TEST_F(LibeventSchedulerTest, RegisterAndUnregisterObservers) {

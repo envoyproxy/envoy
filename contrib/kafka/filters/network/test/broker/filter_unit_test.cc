@@ -24,30 +24,30 @@ namespace Broker {
 
 class MockKafkaMetricsFacade : public KafkaMetricsFacade {
 public:
-  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
-  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
-  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
-  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
-  MOCK_METHOD(void, onRequestException, ());
-  MOCK_METHOD(void, onResponseException, ());
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr), (override));
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr), (override));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr), (override));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr), (override));
+  MOCK_METHOD(void, onRequestException, (), (override));
+  MOCK_METHOD(void, onResponseException, (), (override));
 };
 
 using MockKafkaMetricsFacadeSharedPtr = std::shared_ptr<MockKafkaMetricsFacade>;
 
 class MockRequestHandler : public RequestHandler {
 public:
-  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
-  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
-  MOCK_METHOD(void, setReadFilterCallbacks, (Network::ReadFilterCallbacks&));
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr), (override));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr), (override));
+  MOCK_METHOD(void, setReadFilterCallbacks, (Network::ReadFilterCallbacks&), (override));
 };
 
 using MockRequestHandlerSharedPtr = std::shared_ptr<MockRequestHandler>;
 
 class MockResponseRewriter : public ResponseRewriter {
 public:
-  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
-  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
-  MOCK_METHOD(void, process, (Buffer::Instance&));
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr), (override));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr), (override));
+  MOCK_METHOD(void, process, (Buffer::Instance&), (override));
 };
 
 using MockResponseRewriterSharedPtr = std::shared_ptr<MockResponseRewriter>;
@@ -55,9 +55,9 @@ using MockResponseRewriterSharedPtr = std::shared_ptr<MockResponseRewriter>;
 class MockResponseDecoder : public ResponseDecoder {
 public:
   MockResponseDecoder() : ResponseDecoder{{}} {};
-  MOCK_METHOD(void, onData, (Buffer::Instance&));
-  MOCK_METHOD(void, expectResponse, (const int32_t, const int16_t, const int16_t));
-  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(void, onData, (Buffer::Instance&), (override));
+  MOCK_METHOD(void, expectResponse, (const int32_t, const int16_t, const int16_t), (override));
+  MOCK_METHOD(void, reset, (), (override));
 };
 
 using MockResponseDecoderSharedPtr = std::shared_ptr<MockResponseDecoder>;
@@ -65,30 +65,30 @@ using MockResponseDecoderSharedPtr = std::shared_ptr<MockResponseDecoder>;
 class MockRequestDecoder : public RequestDecoder {
 public:
   MockRequestDecoder() : RequestDecoder{{}} {};
-  MOCK_METHOD(void, onData, (Buffer::Instance&));
-  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(void, onData, (Buffer::Instance&), (override));
+  MOCK_METHOD(void, reset, (), (override));
 };
 
 using MockRequestDecoderSharedPtr = std::shared_ptr<MockRequestDecoder>;
 
 class MockTimeSource : public TimeSource {
 public:
-  MOCK_METHOD(SystemTime, systemTime, ());
-  MOCK_METHOD(MonotonicTime, monotonicTime, ());
+  MOCK_METHOD(SystemTime, systemTime, (), (override));
+  MOCK_METHOD(MonotonicTime, monotonicTime, (), (override));
 };
 
 class MockRichRequestMetrics : public RichRequestMetrics {
 public:
-  MOCK_METHOD(void, onRequest, (const int16_t));
-  MOCK_METHOD(void, onUnknownRequest, ());
-  MOCK_METHOD(void, onBrokenRequest, ());
+  MOCK_METHOD(void, onRequest, (const int16_t), (override));
+  MOCK_METHOD(void, onUnknownRequest, (), (override));
+  MOCK_METHOD(void, onBrokenRequest, (), (override));
 };
 
 class MockRichResponseMetrics : public RichResponseMetrics {
 public:
-  MOCK_METHOD(void, onResponse, (const int16_t, const long long duration));
-  MOCK_METHOD(void, onUnknownResponse, ());
-  MOCK_METHOD(void, onBrokenResponse, ());
+  MOCK_METHOD(void, onResponse, (const int16_t, const long long duration), (override));
+  MOCK_METHOD(void, onUnknownResponse, (), (override));
+  MOCK_METHOD(void, onBrokenResponse, (), (override));
 };
 
 class MockResponse : public AbstractResponse {

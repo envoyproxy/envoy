@@ -32,7 +32,7 @@ struct MockNullResponseDecoder : public NullResponseDecoder {
   MockNullResponseDecoder(Transport& transport, Protocol& protocol)
       : NullResponseDecoder(transport, protocol) {}
 
-  MOCK_METHOD(ThriftFilters::ResponseStatus, upstreamData, (Buffer::Instance & data), ());
+  MOCK_METHOD(ThriftFilters::ResponseStatus, upstreamData, (Buffer::Instance & data), (override));
 };
 
 class ShadowWriterTest : public testing::Test {
@@ -474,7 +474,7 @@ struct MockOnDataNullResponseDecoder : public NullResponseDecoder {
   MockOnDataNullResponseDecoder(Transport& transport, Protocol& protocol)
       : NullResponseDecoder(transport, protocol) {}
 
-  MOCK_METHOD(bool, onData, (), ());
+  MOCK_METHOD(bool, onData, (), (override));
 };
 
 TEST_F(ShadowWriterTest, NullResponseDecoderExceptionHandling) {

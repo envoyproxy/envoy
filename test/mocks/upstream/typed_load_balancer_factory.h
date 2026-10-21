@@ -20,11 +20,12 @@ public:
   ~MockTypedLoadBalancerFactory() override;
 
   // Upstream::TypedLoadBalancerFactory
-  MOCK_METHOD(std::string, name, (), (const));
+  MOCK_METHOD(std::string, name, (), (const, override));
   MOCK_METHOD(ThreadAwareLoadBalancerPtr, create,
               (OptRef<const LoadBalancerConfig> lb_config, const ClusterInfo& cluster_info,
                const PrioritySet& priority_set, Runtime::Loader& runtime,
-               Random::RandomGenerator& random, TimeSource& time_source));
+               Random::RandomGenerator& random, TimeSource& time_source),
+              (override));
 
   absl::StatusOr<LoadBalancerConfigPtr> loadConfig(Server::Configuration::ServerFactoryContext&,
                                                    const Protobuf::Message&) override {

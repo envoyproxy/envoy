@@ -1093,7 +1093,7 @@ public:
   }
 
   MOCK_METHOD(absl::Status, onConfigUpdate,
-              (const std::vector<Config::DecodedResourceRef>&, const std::string&));
+              (const std::vector<Config::DecodedResourceRef>&, const std::string&), (override));
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added,
                               const Protobuf::RepeatedPtrField<std::string>& removed,
                               const std::string& version) override {
@@ -1264,7 +1264,8 @@ public:
   MockCvcValidationCallback() = default;
   ~MockCvcValidationCallback() override = default;
   MOCK_METHOD(void, validateCvc,
-              (const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&));
+              (const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&),
+              (override));
 };
 
 // Validate that CertificateValidationContextSdsApi updates secrets successfully if
@@ -1362,7 +1363,7 @@ public:
   MockGenericSecretValidationCallback() = default;
   ~MockGenericSecretValidationCallback() override = default;
   MOCK_METHOD(void, validateGenericSecret,
-              (const envoy::extensions::transport_sockets::tls::v3::GenericSecret&));
+              (const envoy::extensions::transport_sockets::tls::v3::GenericSecret&), (override));
 };
 
 // Validate that GenericSecretSdsApi updates secrets successfully if

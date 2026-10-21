@@ -12,7 +12,7 @@ public:
   MockStreamResetHandler() = default;
 
   // Http::StreamResetHandler
-  MOCK_METHOD(void, resetStream, (StreamResetReason reason));
+  MOCK_METHOD(void, resetStream, (StreamResetReason reason), (override));
 };
 
 } // namespace Http

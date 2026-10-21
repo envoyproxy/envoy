@@ -23,15 +23,15 @@ public:
   MOCK_METHOD(void, createFilterChain, ());
   MOCK_METHOD(void, sendRequestToUpstream, ());
   MOCK_METHOD(RemotingCommandPtr&, downstreamRequest, ());
-  MOCK_METHOD(void, sendResponseToDownstream, ());
+  MOCK_METHOD(void, sendResponseToDownstream, (), (override));
   MOCK_METHOD(void, onQueryTopicRoute, ());
-  MOCK_METHOD(void, onError, (absl::string_view));
+  MOCK_METHOD(void, onError, (absl::string_view), (override));
   MOCK_METHOD(ConnectionManager&, connectionManager, ());
-  MOCK_METHOD(void, onReset, ());
+  MOCK_METHOD(void, onReset, (), (override));
   MOCK_METHOD(bool, onUpstreamData,
               (Buffer::Instance&, bool, Tcp::ConnectionPool::ConnectionDataPtr&));
-  MOCK_METHOD(MessageMetadataSharedPtr, metadata, (), (const));
-  MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
+  MOCK_METHOD(MessageMetadataSharedPtr, metadata, (), (const, override));
+  MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (override));
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -41,12 +41,12 @@ public:
   MockConfig();
   ~MockConfig() override = default;
 
-  MOCK_METHOD(RocketmqFilterStats&, stats, ());
-  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(Router::RouterPtr, createRouter, ());
-  MOCK_METHOD(bool, developMode, (), (const));
-  MOCK_METHOD(std::string, proxyAddress, ());
-  MOCK_METHOD(Router::Config&, routerConfig, ());
+  MOCK_METHOD(RocketmqFilterStats&, stats, (), (override));
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), (override));
+  MOCK_METHOD(Router::RouterPtr, createRouter, (), (override));
+  MOCK_METHOD(bool, developMode, (), (const, override));
+  MOCK_METHOD(std::string, proxyAddress, (), (override));
+  MOCK_METHOD(Router::Config&, routerConfig, (), (override));
 
 private:
   Stats::IsolatedStoreImpl store_;
@@ -63,8 +63,8 @@ public:
   ~MockRouteEntry() override;
 
   // RocketmqProxy::Router::RouteEntry
-  MOCK_METHOD(const std::string&, clusterName, (), (const));
-  MOCK_METHOD(Envoy::Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const));
+  MOCK_METHOD(const std::string&, clusterName, (), (const, override));
+  MOCK_METHOD(Envoy::Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const, override));
 
   std::string cluster_name_{"fake_cluster"};
 };
@@ -75,7 +75,7 @@ public:
   ~MockRoute() override;
 
   // RocketmqProxy::Router::Route
-  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const));
+  MOCK_METHOD(const RouteEntry*, routeEntry, (), (const, override));
 
   NiceMock<MockRouteEntry> route_entry_;
 };

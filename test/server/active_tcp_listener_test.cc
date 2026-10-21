@@ -38,11 +38,11 @@ namespace {
 class MockTcpConnectionHandler : public Network::TcpConnectionHandler,
                                  public Network::MockConnectionHandler {
 public:
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByTag,
-              (uint64_t listener_tag, const Network::Address::Instance&));
+              (uint64_t listener_tag, const Network::Address::Instance&), (override));
   MOCK_METHOD(Network::BalancedConnectionHandlerOptRef, getBalancedHandlerByAddress,
-              (const Network::Address::Instance& address));
+              (const Network::Address::Instance& address), (override));
   MOCK_METHOD(Network::Listener*, createListener_,
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                Runtime::Loader& runtime, Random::RandomGenerator& random,
@@ -52,7 +52,8 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                Runtime::Loader& runtime, Random::RandomGenerator& random,
                const Network::ListenerConfig& listener_config,
-               Server::ThreadLocalOverloadStateOptRef overload_state));
+               Server::ThreadLocalOverloadStateOptRef overload_state),
+              (override));
 };
 
 class ActiveTcpListenerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {

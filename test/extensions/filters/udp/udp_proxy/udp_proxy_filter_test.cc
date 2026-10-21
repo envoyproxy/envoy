@@ -83,7 +83,8 @@ public:
 
   const SessionStorageType& activeSessions() const { return sessions_; }
 
-  MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host));
+  MOCK_METHOD(Network::SocketPtr, createUdpSocket, (const Upstream::HostConstSharedPtr& host),
+              (override));
 };
 
 class TestStickySessionUdpProxyFilter : public TestUdpProxyFilter,

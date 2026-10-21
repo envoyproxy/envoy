@@ -116,15 +116,16 @@ public:
       return {0, Network::IoSocketError::getIoSocketEagainError()};
     }
   }
-  MOCK_METHOD(bool, isWriteBlocked, (), (const));
-  MOCK_METHOD(void, setWritable, ());
+  MOCK_METHOD(bool, isWriteBlocked, (), (const, override));
+  MOCK_METHOD(void, setWritable, (), (override));
   MOCK_METHOD(uint64_t, getMaxPacketSize, (const Network::Address::Instance& peer_address),
-              (const));
-  MOCK_METHOD(bool, isBatchMode, (), (const));
+              (const, override));
+  MOCK_METHOD(bool, isBatchMode, (), (const, override));
   MOCK_METHOD(Network::UdpPacketWriterBuffer, getNextWriteLocation,
               (const Network::Address::Ip* local_ip,
-               const Network::Address::Instance& peer_address));
-  MOCK_METHOD(Api::IoCallUint64Result, flush, ());
+               const Network::Address::Instance& peer_address),
+              (override));
+  MOCK_METHOD(Api::IoCallUint64Result, flush, (), (override));
 
 private:
   const bool is_return_ok_forwrite_packet_;

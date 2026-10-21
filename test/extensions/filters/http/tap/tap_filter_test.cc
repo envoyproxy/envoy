@@ -21,7 +21,7 @@ namespace {
 
 class MockFilterConfig : public FilterConfig {
 public:
-  MOCK_METHOD(HttpTapConfigSharedPtr, currentConfig, ());
+  MOCK_METHOD(HttpTapConfigSharedPtr, currentConfig, (), (override));
   FilterStats& stats() override { return stats_; }
   const envoy::extensions::filters::http::tap::v3::Tap& getTapConfig() const override {
     return tap_config_;
@@ -34,13 +34,13 @@ public:
 
 class MockHttpPerRequestTapper : public HttpPerRequestTapper {
 public:
-  MOCK_METHOD(void, onRequestHeaders, (const Http::RequestHeaderMap& headers));
-  MOCK_METHOD(void, onRequestBody, (const Buffer::Instance& data));
-  MOCK_METHOD(void, onRequestTrailers, (const Http::RequestTrailerMap& headers));
-  MOCK_METHOD(void, onResponseHeaders, (const Http::ResponseHeaderMap& headers));
-  MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data));
-  MOCK_METHOD(void, onResponseTrailers, (const Http::ResponseTrailerMap& headers));
-  MOCK_METHOD(bool, onDestroyLog, ());
+  MOCK_METHOD(void, onRequestHeaders, (const Http::RequestHeaderMap& headers), (override));
+  MOCK_METHOD(void, onRequestBody, (const Buffer::Instance& data), (override));
+  MOCK_METHOD(void, onRequestTrailers, (const Http::RequestTrailerMap& headers), (override));
+  MOCK_METHOD(void, onResponseHeaders, (const Http::ResponseHeaderMap& headers), (override));
+  MOCK_METHOD(void, onResponseBody, (const Buffer::Instance& data), (override));
+  MOCK_METHOD(void, onResponseTrailers, (const Http::ResponseTrailerMap& headers), (override));
+  MOCK_METHOD(bool, onDestroyLog, (), (override));
 };
 
 class TapFilterTest : public testing::Test {

@@ -23,8 +23,8 @@ namespace {
 class MockUpstreamKafkaConfiguration : public UpstreamKafkaConfiguration {
 public:
   MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic, (const std::string&),
-              (const));
-  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
+              (const, override));
+  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const, override));
 };
 
 TEST(UpstreamKafkaFacadeTest, shouldCreateProducerOnlyOnceForTheSameCluster) {

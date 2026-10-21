@@ -42,12 +42,12 @@ public:
   }
 
   MOCK_METHOD(void, appendUpstreamRequest,
-              (uint64_t stream_id, UpstreamRequestCallbacks* pending_request));
-  MOCK_METHOD(void, removeUpstreamRequest, (uint64_t stream_id));
-  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const));
-  MOCK_METHOD(ClientCodec&, clientCodec, ());
-  MOCK_METHOD(OptRef<Network::Connection>, upstreamConnection, ());
-  MOCK_METHOD(void, cleanUp, (bool close_connection));
+              (uint64_t stream_id, UpstreamRequestCallbacks* pending_request), (override));
+  MOCK_METHOD(void, removeUpstreamRequest, (uint64_t stream_id), (override));
+  MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, (), (const, override));
+  MOCK_METHOD(ClientCodec&, clientCodec, (), (override));
+  MOCK_METHOD(OptRef<Network::Connection>, upstreamConnection, (), (override));
+  MOCK_METHOD(void, cleanUp, (bool close_connection), (override));
 
   std::shared_ptr<Upstream::MockHostDescription> host_description_ =
       std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -61,7 +61,7 @@ public:
   MOCK_METHOD(GenericUpstreamSharedPtr, createGenericUpstream,
               (Upstream::ThreadLocalCluster&, Upstream::LoadBalancerContext*, Network::Connection&,
                const CodecFactory&, bool),
-              (const));
+              (const, override));
 };
 
 class RouterFilterTest : public testing::Test {

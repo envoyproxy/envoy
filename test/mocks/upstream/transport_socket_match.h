@@ -20,10 +20,10 @@ public:
   MOCK_METHOD(TransportSocketMatcher::MatchData, resolve,
               (const envoy::config::core::v3::Metadata*, const envoy::config::core::v3::Metadata*,
                Network::TransportSocketOptionsConstSharedPtr),
-              (const));
-  MOCK_METHOD(bool, allMatchesSupportAlpn, (), (const));
-  MOCK_METHOD(bool, usesFilterState, (), (const));
-  MOCK_METHOD(std::vector<absl::string_view>, matchNames, (), (const));
+              (const, override));
+  MOCK_METHOD(bool, allMatchesSupportAlpn, (), (const, override));
+  MOCK_METHOD(bool, usesFilterState, (), (const, override));
+  MOCK_METHOD(std::vector<absl::string_view>, matchNames, (), (const, override));
 
   Network::UpstreamTransportSocketFactoryPtr socket_factory_;
   Stats::TestUtil::TestStore stats_store_;

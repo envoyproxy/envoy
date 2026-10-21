@@ -140,14 +140,14 @@ public:
   MockCounter();
   ~MockCounter() override;
 
-  MOCK_METHOD(void, add, (uint64_t amount));
-  MOCK_METHOD(void, inc, ());
-  MOCK_METHOD(uint64_t, latch, ());
-  MOCK_METHOD(void, reset, ());
-  MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(void, markUnused, ());
-  MOCK_METHOD(bool, hidden, (), (const));
-  MOCK_METHOD(uint64_t, value, (), (const));
+  MOCK_METHOD(void, add, (uint64_t amount), (override));
+  MOCK_METHOD(void, inc, (), (override));
+  MOCK_METHOD(uint64_t, latch, (), (override));
+  MOCK_METHOD(void, reset, (), (override));
+  MOCK_METHOD(bool, used, (), (const, override));
+  MOCK_METHOD(void, markUnused, (), (override));
+  MOCK_METHOD(bool, hidden, (), (const, override));
+  MOCK_METHOD(uint64_t, value, (), (const, override));
 
   bool used_ = false;
   bool hidden_ = false;
@@ -160,19 +160,19 @@ public:
   MockGauge();
   ~MockGauge() override;
 
-  MOCK_METHOD(void, add, (uint64_t amount));
-  MOCK_METHOD(void, dec, ());
-  MOCK_METHOD(void, inc, ());
-  MOCK_METHOD(void, set, (uint64_t value));
-  MOCK_METHOD(void, setParentValue, (uint64_t parent_value));
-  MOCK_METHOD(void, sub, (uint64_t amount));
-  MOCK_METHOD(void, mergeImportMode, (ImportMode));
-  MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(void, markUnused, ());
-  MOCK_METHOD(bool, hidden, (), (const));
-  MOCK_METHOD(uint64_t, value, (), (const));
+  MOCK_METHOD(void, add, (uint64_t amount), (override));
+  MOCK_METHOD(void, dec, (), (override));
+  MOCK_METHOD(void, inc, (), (override));
+  MOCK_METHOD(void, set, (uint64_t value), (override));
+  MOCK_METHOD(void, setParentValue, (uint64_t parent_value), (override));
+  MOCK_METHOD(void, sub, (uint64_t amount), (override));
+  MOCK_METHOD(void, mergeImportMode, (ImportMode), (override));
+  MOCK_METHOD(bool, used, (), (const, override));
+  MOCK_METHOD(void, markUnused, (), (override));
+  MOCK_METHOD(bool, hidden, (), (const, override));
+  MOCK_METHOD(uint64_t, value, (), (const, override));
   MOCK_METHOD(std::optional<bool>, cachedShouldImport, (), (const));
-  MOCK_METHOD(ImportMode, importMode, (), (const));
+  MOCK_METHOD(ImportMode, importMode, (), (const, override));
 
   bool used_ = false;
   bool hidden_ = false;
@@ -185,11 +185,11 @@ public:
   MockHistogram();
   ~MockHistogram() override;
 
-  MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(void, markUnused, ());
-  MOCK_METHOD(bool, hidden, (), (const));
-  MOCK_METHOD(Histogram::Unit, unit, (), (const));
-  MOCK_METHOD(void, recordValue, (uint64_t value));
+  MOCK_METHOD(bool, used, (), (const, override));
+  MOCK_METHOD(void, markUnused, (), (override));
+  MOCK_METHOD(bool, hidden, (), (const, override));
+  MOCK_METHOD(Histogram::Unit, unit, (), (const, override));
+  MOCK_METHOD(void, recordValue, (uint64_t value), (override));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
@@ -211,16 +211,16 @@ public:
   void merge() override {}
   std::string quantileSummary() const override { return ""; };
   std::string bucketSummary() const override { return ""; };
-  MOCK_METHOD(bool, used, (), (const));
-  MOCK_METHOD(void, markUnused, ());
-  MOCK_METHOD(bool, hidden, (), (const));
-  MOCK_METHOD(Histogram::Unit, unit, (), (const));
-  MOCK_METHOD(void, recordValue, (uint64_t value));
-  MOCK_METHOD(const HistogramStatistics&, cumulativeStatistics, (), (const));
-  MOCK_METHOD(const HistogramStatistics&, intervalStatistics, (), (const));
-  MOCK_METHOD(std::vector<Bucket>, detailedTotalBuckets, (), (const));
-  MOCK_METHOD(std::vector<Bucket>, detailedIntervalBuckets, (), (const));
-  MOCK_METHOD(uint64_t, cumulativeCountLessThanOrEqualToValue, (double value), (const));
+  MOCK_METHOD(bool, used, (), (const, override));
+  MOCK_METHOD(void, markUnused, (), (override));
+  MOCK_METHOD(bool, hidden, (), (const, override));
+  MOCK_METHOD(Histogram::Unit, unit, (), (const, override));
+  MOCK_METHOD(void, recordValue, (uint64_t value), (override));
+  MOCK_METHOD(const HistogramStatistics&, cumulativeStatistics, (), (const, override));
+  MOCK_METHOD(const HistogramStatistics&, intervalStatistics, (), (const, override));
+  MOCK_METHOD(std::vector<Bucket>, detailedTotalBuckets, (), (const, override));
+  MOCK_METHOD(std::vector<Bucket>, detailedIntervalBuckets, (), (const, override));
+  MOCK_METHOD(uint64_t, cumulativeCountLessThanOrEqualToValue, (double value), (const, override));
 
   // RefcountInterface
   void incRefCount() override { refcount_helper_.incRefCount(); }
@@ -245,7 +245,7 @@ public:
 
   MOCK_METHOD(void, set, (absl::string_view value), (override));
   MOCK_METHOD(bool, used, (), (const, override));
-  MOCK_METHOD(bool, hidden, (), (const));
+  MOCK_METHOD(bool, hidden, (), (const, override));
   MOCK_METHOD(std::string, value, (), (const, override));
 
   bool used_ = false;
@@ -258,13 +258,15 @@ public:
   MockMetricSnapshot();
   ~MockMetricSnapshot() override;
 
-  MOCK_METHOD(const std::vector<CounterSnapshot>&, counters, ());
-  MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, ());
-  MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, ());
-  MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, ());
-  MOCK_METHOD(const std::vector<Stats::PrimitiveCounterSnapshot>&, hostCounters, ());
-  MOCK_METHOD(const std::vector<Stats::PrimitiveGaugeSnapshot>&, hostGauges, ());
-  MOCK_METHOD(SystemTime, snapshotTime, (), (const));
+  MOCK_METHOD(const std::vector<CounterSnapshot>&, counters, (), (override));
+  MOCK_METHOD(const std::vector<std::reference_wrapper<const Gauge>>&, gauges, (), (override));
+  MOCK_METHOD(const std::vector<std::reference_wrapper<const ParentHistogram>>&, histograms, (),
+              (override));
+  MOCK_METHOD(const std::vector<std::reference_wrapper<const TextReadout>>&, textReadouts, (),
+              (override));
+  MOCK_METHOD(const std::vector<Stats::PrimitiveCounterSnapshot>&, hostCounters, (), (override));
+  MOCK_METHOD(const std::vector<Stats::PrimitiveGaugeSnapshot>&, hostGauges, (), (override));
+  MOCK_METHOD(SystemTime, snapshotTime, (), (const, override));
 
   std::vector<CounterSnapshot> counters_;
   std::vector<std::reference_wrapper<const Gauge>> gauges_;
@@ -280,18 +282,18 @@ public:
   MockSink();
   ~MockSink() override;
 
-  MOCK_METHOD(void, flush, (MetricSnapshot & snapshot));
-  MOCK_METHOD(void, onHistogramComplete, (const Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, flush, (MetricSnapshot & snapshot), (override));
+  MOCK_METHOD(void, onHistogramComplete, (const Histogram& histogram, uint64_t value), (override));
 };
 
 class MockSinkPredicates : public SinkPredicates {
 public:
   MockSinkPredicates();
   ~MockSinkPredicates() override;
-  MOCK_METHOD(bool, includeCounter, (const Counter&));
-  MOCK_METHOD(bool, includeGauge, (const Gauge&));
-  MOCK_METHOD(bool, includeTextReadout, (const TextReadout&));
-  MOCK_METHOD(bool, includeHistogram, (const Histogram&));
+  MOCK_METHOD(bool, includeCounter, (const Counter&), (override));
+  MOCK_METHOD(bool, includeGauge, (const Gauge&), (override));
+  MOCK_METHOD(bool, includeTextReadout, (const TextReadout&), (override));
+  MOCK_METHOD(bool, includeHistogram, (const Histogram&), (override));
 };
 
 class MockStore;
@@ -318,10 +320,10 @@ public:
   MOCK_METHOD(void, checkCreateScopeArgs, (bool, const ScopeStatsLimitSettings&));
   MOCK_METHOD(ScopeSharedPtr, createScope_,
               (const std::string& base_name, const std::string& tagged_name));
-  MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const));
-  MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const));
-  MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const));
-  MOCK_METHOD(TextReadoutOptConstRef, findTextReadout, (StatName), (const));
+  MOCK_METHOD(CounterOptConstRef, findCounter, (StatName), (const, override));
+  MOCK_METHOD(GaugeOptConstRef, findGauge, (StatName), (const, override));
+  MOCK_METHOD(HistogramOptConstRef, findHistogram, (StatName), (const, override));
+  MOCK_METHOD(TextReadoutOptConstRef, findTextReadout, (StatName), (const, override));
 
   // Override the lowest level of stat creation based on StatName to redirect
   // back to the old string-based mechanisms still on the MockStore object
@@ -351,15 +353,16 @@ public:
   ~MockStore() override;
 
   // Store
-  MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const));
-  MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const));
-  MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const));
-  MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
-  MOCK_METHOD(void, forEachSinkedHistogram, (SizeFn, StatFn<ParentHistogram>), (const));
+  MOCK_METHOD(void, forEachCounter, (SizeFn, StatFn<Counter>), (const, override));
+  MOCK_METHOD(void, forEachGauge, (SizeFn, StatFn<Gauge>), (const, override));
+  MOCK_METHOD(void, forEachTextReadout, (SizeFn, StatFn<TextReadout>), (const, override));
+  MOCK_METHOD(void, forEachHistogram, (SizeFn, StatFn<ParentHistogram>), (const, override));
+  MOCK_METHOD(void, forEachSinkedHistogram, (SizeFn, StatFn<ParentHistogram>), (const, override));
   MOCK_METHOD(Counter&, counter, (const std::string&));
   MOCK_METHOD(Gauge&, gauge, (const std::string&, Gauge::ImportMode));
   MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
-  MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value),
+              (override));
   MOCK_METHOD(TextReadout&, textReadout, (const std::string&));
 
   MockScope& mockScope() {
@@ -385,17 +388,18 @@ public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;
 
-  MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
-  MOCK_METHOD(const TagVector&, fixedTags, ());
+  MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value),
+              (override));
+  MOCK_METHOD(const TagVector&, fixedTags, (), (override));
 };
 
 class MockStatsMatcher : public StatsMatcher {
 public:
   MockStatsMatcher();
   ~MockStatsMatcher() override;
-  MOCK_METHOD(bool, rejects, (StatName name), (const));
-  MOCK_METHOD(StatsMatcher::FastResult, fastRejects, (StatName name), (const));
-  MOCK_METHOD(bool, slowRejects, (FastResult, StatName name), (const));
+  MOCK_METHOD(bool, rejects, (StatName name), (const, override));
+  MOCK_METHOD(StatsMatcher::FastResult, fastRejects, (StatName name), (const, override));
+  MOCK_METHOD(bool, slowRejects, (FastResult, StatName name), (const, override));
   bool acceptsAll() const override { return accepts_all_; }
   bool rejectsAll() const override { return rejects_all_; }
 

@@ -289,7 +289,8 @@ TEST_P(QuicNetworkConnectionTest, LocalAddress) {
 class MockGetSockOptSysCalls : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(Api::SysCallIntResult, getsockopt,
-              (os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen));
+              (os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen),
+              (override));
 };
 
 TEST_P(QuicNetworkConnectionTest, GetV6OnlySocketOptionFailure) {

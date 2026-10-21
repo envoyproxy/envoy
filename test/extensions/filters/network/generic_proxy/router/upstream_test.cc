@@ -69,14 +69,15 @@ public:
 
   MOCK_METHOD(void, onUpstreamFailure,
               (ConnectionPool::PoolFailureReason reason,
-               absl::string_view transport_failure_reason));
-  MOCK_METHOD(void, onUpstreamSuccess, ());
-
-  MOCK_METHOD(void, onConnectionClose, (Network::ConnectionEvent event));
+               absl::string_view transport_failure_reason),
+              (override));
+  MOCK_METHOD(void, onUpstreamSuccess, (), (override));
+  MOCK_METHOD(void, onConnectionClose, (Network::ConnectionEvent event), (override));
   MOCK_METHOD(void, onDecodingSuccess,
-              (ResponseHeaderFramePtr response_header_frame, std::optional<StartTime> start_time));
-  MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr response_common_frame));
-  MOCK_METHOD(void, onDecodingFailure, (absl::string_view reason));
+              (ResponseHeaderFramePtr response_header_frame, std::optional<StartTime> start_time),
+              (override));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr response_common_frame), (override));
+  MOCK_METHOD(void, onDecodingFailure, (absl::string_view reason), (override));
 
   GenericUpstream* upstream_{};
 };

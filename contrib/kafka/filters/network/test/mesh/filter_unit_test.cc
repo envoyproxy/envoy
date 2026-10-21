@@ -20,18 +20,18 @@ namespace {
 class MockRequestDecoder : public RequestDecoder {
 public:
   MockRequestDecoder() : RequestDecoder{{}} {};
-  MOCK_METHOD(void, onData, (Buffer::Instance&));
-  MOCK_METHOD(void, reset, ());
+  MOCK_METHOD(void, onData, (Buffer::Instance&), (override));
+  MOCK_METHOD(void, reset, (), (override));
 };
 
 using MockRequestDecoderSharedPtr = std::shared_ptr<MockRequestDecoder>;
 
 class MockInFlightRequest : public InFlightRequest {
 public:
-  MOCK_METHOD(void, startProcessing, ());
-  MOCK_METHOD(bool, finished, (), (const));
-  MOCK_METHOD(AbstractResponseSharedPtr, computeAnswer, (), (const));
-  MOCK_METHOD(void, abandon, ());
+  MOCK_METHOD(void, startProcessing, (), (override));
+  MOCK_METHOD(bool, finished, (), (const, override));
+  MOCK_METHOD(AbstractResponseSharedPtr, computeAnswer, (), (const, override));
+  MOCK_METHOD(void, abandon, (), (override));
 };
 
 using Request = std::shared_ptr<MockInFlightRequest>;
@@ -39,8 +39,8 @@ using Request = std::shared_ptr<MockInFlightRequest>;
 class MockResponse : public AbstractResponse {
 public:
   MockResponse() : AbstractResponse{ResponseMetadata{0, 0, 0}} {};
-  MOCK_METHOD(uint32_t, computeSize, (), (const));
-  MOCK_METHOD(uint32_t, encode, (Buffer::Instance & dst), (const));
+  MOCK_METHOD(uint32_t, computeSize, (), (const, override));
+  MOCK_METHOD(uint32_t, encode, (Buffer::Instance & dst), (const, override));
 };
 
 class FilterUnitTest : public testing::Test {
@@ -182,19 +182,19 @@ public:
   MOCK_METHOD(void, onData, (Buffer::Instance&));
   MOCK_METHOD(void, reset, ());
   MOCK_METHOD(std::optional<ClusterConfig>, computeClusterConfigForTopic,
-              (const std::string& topic), (const));
-  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const));
+              (const std::string& topic), (const, override));
+  MOCK_METHOD((std::pair<std::string, int32_t>), getAdvertisedAddress, (), (const, override));
 };
 
 class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
 public:
-  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&));
+  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&), (override));
 };
 
 class MockRecordCallbackProcessor : public RecordCallbackProcessor {
 public:
-  MOCK_METHOD(void, processCallback, (const RecordCbSharedPtr&));
-  MOCK_METHOD(void, removeCallback, (const RecordCbSharedPtr&));
+  MOCK_METHOD(void, processCallback, (const RecordCbSharedPtr&), (override));
+  MOCK_METHOD(void, removeCallback, (const RecordCbSharedPtr&), (override));
 };
 
 TEST(Filter, ShouldBeConstructable) {

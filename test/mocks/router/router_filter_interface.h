@@ -18,36 +18,42 @@ public:
   ~MockRouterFilterInterface() override;
 
   MOCK_METHOD(void, onUpstream1xxHeaders,
-              (Envoy::Http::ResponseHeaderMapPtr && headers, UpstreamRequest& upstream_request));
+              (Envoy::Http::ResponseHeaderMapPtr && headers, UpstreamRequest& upstream_request),
+              (override));
   MOCK_METHOD(void, onUpstreamHeaders,
               (uint64_t response_code, Envoy::Http::ResponseHeaderMapPtr&& headers,
-               UpstreamRequest& upstream_request, bool end_stream));
+               UpstreamRequest& upstream_request, bool end_stream),
+              (override));
   MOCK_METHOD(void, onUpstreamData,
-              (Buffer::Instance & data, UpstreamRequest& upstream_request, bool end_stream));
+              (Buffer::Instance & data, UpstreamRequest& upstream_request, bool end_stream),
+              (override));
   MOCK_METHOD(void, onUpstreamTrailers,
-              (Envoy::Http::ResponseTrailerMapPtr && trailers, UpstreamRequest& upstream_request));
-  MOCK_METHOD(void, onUpstreamMetadata, (Envoy::Http::MetadataMapPtr && metadata_map));
+              (Envoy::Http::ResponseTrailerMapPtr && trailers, UpstreamRequest& upstream_request),
+              (override));
+  MOCK_METHOD(void, onUpstreamMetadata, (Envoy::Http::MetadataMapPtr && metadata_map), (override));
   MOCK_METHOD(void, onUpstreamReset,
               (Envoy::Http::StreamResetReason reset_reason, absl::string_view transport_failure,
-               UpstreamRequest& upstream_request));
+               UpstreamRequest& upstream_request),
+              (override));
   MOCK_METHOD(void, onUpstreamHostSelected,
-              (Upstream::HostDescriptionConstSharedPtr host, bool success));
-  MOCK_METHOD(void, onPerTryTimeout, (UpstreamRequest & upstream_request));
-  MOCK_METHOD(void, onPerTryIdleTimeout, (UpstreamRequest & upstream_request));
-  MOCK_METHOD(void, onStreamMaxDurationReached, (UpstreamRequest & upstream_request));
-  MOCK_METHOD(void, setupRouteTimeoutForWebsocketUpgrade, ());
-  MOCK_METHOD(void, disableRouteTimeoutForWebsocketUpgrade, ());
+              (Upstream::HostDescriptionConstSharedPtr host, bool success), (override));
+  MOCK_METHOD(void, onPerTryTimeout, (UpstreamRequest & upstream_request), (override));
+  MOCK_METHOD(void, onPerTryIdleTimeout, (UpstreamRequest & upstream_request), (override));
+  MOCK_METHOD(void, onStreamMaxDurationReached, (UpstreamRequest & upstream_request), (override));
+  MOCK_METHOD(void, setupRouteTimeoutForWebsocketUpgrade, (), (override));
+  MOCK_METHOD(void, disableRouteTimeoutForWebsocketUpgrade, (), (override));
 
-  MOCK_METHOD(Envoy::Http::StreamDecoderFilterCallbacks*, callbacks, ());
-  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, cluster, ());
-  MOCK_METHOD(FilterConfig&, config, ());
-  MOCK_METHOD(TimeoutData, timeout, ());
-  MOCK_METHOD(std::optional<std::chrono::milliseconds>, dynamicMaxStreamDuration, (), (const));
-  MOCK_METHOD(Envoy::Http::RequestHeaderMap*, downstreamHeaders, ());
-  MOCK_METHOD(Envoy::Http::RequestTrailerMap*, downstreamTrailers, ());
-  MOCK_METHOD(bool, downstreamResponseStarted, (), (const));
-  MOCK_METHOD(bool, downstreamEndStream, (), (const));
-  MOCK_METHOD(uint32_t, attemptCount, (), (const));
+  MOCK_METHOD(Envoy::Http::StreamDecoderFilterCallbacks*, callbacks, (), (override));
+  MOCK_METHOD(Upstream::ClusterInfoConstSharedPtr, cluster, (), (override));
+  MOCK_METHOD(FilterConfig&, config, (), (override));
+  MOCK_METHOD(TimeoutData, timeout, (), (override));
+  MOCK_METHOD(std::optional<std::chrono::milliseconds>, dynamicMaxStreamDuration, (),
+              (const, override));
+  MOCK_METHOD(Envoy::Http::RequestHeaderMap*, downstreamHeaders, (), (override));
+  MOCK_METHOD(Envoy::Http::RequestTrailerMap*, downstreamTrailers, (), (override));
+  MOCK_METHOD(bool, downstreamResponseStarted, (), (const, override));
+  MOCK_METHOD(bool, downstreamEndStream, (), (const, override));
+  MOCK_METHOD(uint32_t, attemptCount, (), (const, override));
 
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockClientConnection> client_connection_;

@@ -22,7 +22,7 @@ public:
     return priority_load_;
   }
 
-  MOCK_METHOD(void, onHostAttempted, (HostDescriptionConstSharedPtr));
+  MOCK_METHOD(void, onHostAttempted, (HostDescriptionConstSharedPtr), (override));
 
 private:
   const HealthyAndDegradedLoad priority_load_;

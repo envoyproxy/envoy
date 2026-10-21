@@ -24,9 +24,9 @@ public:
   MockAsyncRequest();
   ~MockAsyncRequest() override;
 
-  MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
-  MOCK_METHOD(void, detach, ());
+  MOCK_METHOD(void, cancel, (), (override));
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const, override));
+  MOCK_METHOD(void, detach, (), (override));
 };
 
 class MockAsyncStream : public RawAsyncStream {
@@ -38,14 +38,14 @@ public:
     sendMessageRaw_(request, end_stream);
   }
   MOCK_METHOD(void, sendMessageRaw_, (Buffer::InstancePtr & request, bool end_stream));
-  MOCK_METHOD(void, closeStream, ());
-  MOCK_METHOD(void, resetStream, ());
-  MOCK_METHOD(void, waitForRemoteCloseAndDelete, ());
-  MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const));
-  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), ());
-  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks&));
-  MOCK_METHOD(void, removeWatermarkCallbacks, ());
+  MOCK_METHOD(void, closeStream, (), (override));
+  MOCK_METHOD(void, resetStream, (), (override));
+  MOCK_METHOD(void, waitForRemoteCloseAndDelete, (), (override));
+  MOCK_METHOD(bool, isAboveWriteBufferHighWatermark, (), (const, override));
+  MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const, override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
+  MOCK_METHOD(void, setWatermarkCallbacks, (Http::SidestreamWatermarkCallbacks&), (override));
+  MOCK_METHOD(void, removeWatermarkCallbacks, (), (override));
 };
 
 template <class ResponseType>
@@ -55,10 +55,11 @@ public:
     onSuccess_(*response, span);
   }
 
-  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
+  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata), (override));
   MOCK_METHOD(void, onSuccess_, (const ResponseType& response, Tracing::Span& span));
   MOCK_METHOD(void, onFailure,
-              (Status::GrpcStatus status, const std::string& message, Tracing::Span& span));
+              (Status::GrpcStatus status, const std::string& message, Tracing::Span& span),
+              (override));
 };
 
 template <class ResponseType>
@@ -76,11 +77,12 @@ public:
     onReceiveTrailingMetadata_(*metadata);
   }
 
-  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata));
+  MOCK_METHOD(void, onCreateInitialMetadata, (Http::RequestHeaderMap & metadata), (override));
   MOCK_METHOD(void, onReceiveInitialMetadata_, (const Http::ResponseHeaderMap& metadata));
   MOCK_METHOD(void, onReceiveMessage_, (const ResponseType& message));
   MOCK_METHOD(void, onReceiveTrailingMetadata_, (const Http::ResponseTrailerMap& metadata));
-  MOCK_METHOD(void, onRemoteClose, (Status::GrpcStatus status, const std::string& message));
+  MOCK_METHOD(void, onRemoteClose, (Status::GrpcStatus status, const std::string& message),
+              (override));
 };
 
 class MockAsyncClient : public RawAsyncClient {
@@ -91,12 +93,13 @@ public:
   MOCK_METHOD(AsyncRequest*, sendRaw,
               (absl::string_view service_full_name, absl::string_view method_name,
                Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
-               Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options));
+               Tracing::Span& parent_span, const Http::AsyncClient::RequestOptions& options),
+              (override));
   MOCK_METHOD(RawAsyncStream*, startRaw,
               (absl::string_view service_full_name, absl::string_view method_name,
-               RawAsyncStreamCallbacks& callbacks,
-               const Http::AsyncClient::StreamOptions& options));
-  MOCK_METHOD(absl::string_view, destination, ());
+               RawAsyncStreamCallbacks& callbacks, const Http::AsyncClient::StreamOptions& options),
+              (override));
+  MOCK_METHOD(absl::string_view, destination, (), (override));
 
   std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
   // Keep track of the number of requests to detect potential race condition.
@@ -108,7 +111,7 @@ public:
   MockAsyncClientFactory();
   ~MockAsyncClientFactory() override;
 
-  MOCK_METHOD(absl::StatusOr<RawAsyncClientPtr>, createUncachedRawAsyncClient, ());
+  MOCK_METHOD(absl::StatusOr<RawAsyncClientPtr>, createUncachedRawAsyncClient, (), (override));
 };
 
 class MockAsyncClientManager : public AsyncClientManager {
@@ -118,15 +121,18 @@ public:
 
   MOCK_METHOD(absl::StatusOr<AsyncClientFactoryPtr>, factoryForGrpcService,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               bool skip_cluster_check));
+               bool skip_cluster_check),
+              (override));
 
   MOCK_METHOD(absl::StatusOr<RawAsyncClientSharedPtr>, getOrCreateRawAsyncClient,
               (const envoy::config::core::v3::GrpcService& grpc_service, Stats::Scope& scope,
-               bool skip_cluster_check));
+               bool skip_cluster_check),
+              (override));
 
   MOCK_METHOD(absl::StatusOr<RawAsyncClientSharedPtr>, getOrCreateRawAsyncClientWithHashKey,
               (const GrpcServiceConfigWithHashKey& config_with_hash_key, Stats::Scope& scope,
-               bool skip_cluster_check));
+               bool skip_cluster_check),
+              (override));
 };
 
 #if defined(ENVOY_ENABLE_FULL_PROTOS)

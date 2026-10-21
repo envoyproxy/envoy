@@ -39,15 +39,15 @@ public:
                const TransportTapStats& stats, const Network::Connection& connection));
   MOCK_METHOD(Extensions::Common::Tap::PerTapSinkHandleManager*, createPerTapSinkHandleManager_,
               (uint64_t trace_id));
-  MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const));
-  MOCK_METHOD(uint32_t, maxBufferedTxBytes, (), (const));
-  MOCK_METHOD(uint32_t, minStreamedSentBytes, (), (const));
+  MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const, override));
+  MOCK_METHOD(uint32_t, maxBufferedTxBytes, (), (const, override));
+  MOCK_METHOD(uint32_t, minStreamedSentBytes, (), (const, override));
   MOCK_METHOD(Extensions::Common::Tap::Matcher::MatchStatusVector, createMatchStatusVector, (),
-              (const));
-  MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
-  MOCK_METHOD(bool, streaming, (), (const));
-  MOCK_METHOD(TimeSource&, timeSource, (), (const));
-  MOCK_METHOD(bool, shouldRecord, (), (const));
+              (const, override));
+  MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const, override));
+  MOCK_METHOD(bool, streaming, (), (const, override));
+  MOCK_METHOD(TimeSource&, timeSource, (), (const, override));
+  MOCK_METHOD(bool, shouldRecord, (), (const, override));
 };
 
 class PerSocketTapperImplTest : public testing::Test {

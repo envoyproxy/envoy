@@ -19,13 +19,13 @@ void PrintTo(const Key& key, std::ostream* os);
 
 class MockCacheFilterStats : public CacheFilterStats {
 public:
-  MOCK_METHOD(void, incForStatus, (CacheEntryStatus s));
-  MOCK_METHOD(void, incCacheSessionsEntries, ());
-  MOCK_METHOD(void, decCacheSessionsEntries, ());
-  MOCK_METHOD(void, incCacheSessionsSubscribers, ());
-  MOCK_METHOD(void, subCacheSessionsSubscribers, (uint64_t count));
-  MOCK_METHOD(void, addUpstreamBufferedBytes, (uint64_t bytes));
-  MOCK_METHOD(void, subUpstreamBufferedBytes, (uint64_t bytes));
+  MOCK_METHOD(void, incForStatus, (CacheEntryStatus s), (override));
+  MOCK_METHOD(void, incCacheSessionsEntries, (), (override));
+  MOCK_METHOD(void, decCacheSessionsEntries, (), (override));
+  MOCK_METHOD(void, incCacheSessionsSubscribers, (), (override));
+  MOCK_METHOD(void, subCacheSessionsSubscribers, (uint64_t count), (override));
+  MOCK_METHOD(void, addUpstreamBufferedBytes, (uint64_t bytes), (override));
+  MOCK_METHOD(void, subUpstreamBufferedBytes, (uint64_t bytes), (override));
 };
 
 class MockCacheSessions : public CacheSessions {
@@ -35,10 +35,11 @@ public:
         .Times(testing::AnyNumber())
         .WillRepeatedly(testing::ReturnRef(mock_stats_));
   }
-  MOCK_METHOD(void, lookup, (ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb));
+  MOCK_METHOD(void, lookup, (ActiveLookupRequestPtr request, ActiveLookupResultCallback&& cb),
+              (override));
   MOCK_METHOD(CacheInfo, cacheInfo, (), (const));
-  MOCK_METHOD(HttpCache&, cache, (), (const));
-  MOCK_METHOD(CacheFilterStats&, stats, (), (const));
+  MOCK_METHOD(HttpCache&, cache, (), (const, override));
+  MOCK_METHOD(CacheFilterStats&, stats, (), (const, override));
   testing::NiceMock<MockCacheFilterStats> mock_stats_;
 };
 
@@ -49,31 +50,34 @@ public:
         .Times(testing::AnyNumber())
         .WillRepeatedly(testing::Return(CacheInfo{"mock_cache"}));
   }
-  MOCK_METHOD(void, lookup, (LookupRequest && request, LookupCallback&& callback));
-  MOCK_METHOD(void, evict, (Event::Dispatcher & dispatcher, const Key& key));
-  MOCK_METHOD(void, touch, (const Key& key, SystemTime timestamp));
+  MOCK_METHOD(void, lookup, (LookupRequest && request, LookupCallback&& callback), (override));
+  MOCK_METHOD(void, evict, (Event::Dispatcher & dispatcher, const Key& key), (override));
+  MOCK_METHOD(void, touch, (const Key& key, SystemTime timestamp), (override));
   MOCK_METHOD(void, updateHeaders,
               (Event::Dispatcher & dispatcher, const Key& key,
                const Http::ResponseHeaderMap& updated_headers,
-               const ResponseMetadata& updated_metadata));
-  MOCK_METHOD(CacheInfo, cacheInfo, (), (const));
+               const ResponseMetadata& updated_metadata),
+              (override));
+  MOCK_METHOD(CacheInfo, cacheInfo, (), (const, override));
   MOCK_METHOD(void, insert,
               (Event::Dispatcher & dispatcher, Key key, Http::ResponseHeaderMapPtr headers,
                ResponseMetadata metadata, HttpSourcePtr source,
-               std::shared_ptr<CacheProgressReceiver> progress));
+               std::shared_ptr<CacheProgressReceiver> progress),
+              (override));
 };
 
 class MockCacheReader : public CacheReader {
 public:
   MOCK_METHOD(void, getBody,
-              (Event::Dispatcher & dispatcher, AdjustedByteRange range, GetBodyCallback&& cb));
+              (Event::Dispatcher & dispatcher, AdjustedByteRange range, GetBodyCallback&& cb),
+              (override));
 };
 
 class MockHttpSource : public HttpSource {
 public:
-  MOCK_METHOD(void, getHeaders, (GetHeadersCallback && cb));
-  MOCK_METHOD(void, getBody, (AdjustedByteRange range, GetBodyCallback&& cb));
-  MOCK_METHOD(void, getTrailers, (GetTrailersCallback && cb));
+  MOCK_METHOD(void, getHeaders, (GetHeadersCallback && cb), (override));
+  MOCK_METHOD(void, getBody, (AdjustedByteRange range, GetBodyCallback&& cb), (override));
+  MOCK_METHOD(void, getTrailers, (GetTrailersCallback && cb), (override));
 };
 
 class MockCacheFilterStatsProvider : public CacheFilterStatsProvider {
@@ -81,7 +85,7 @@ public:
   MockCacheFilterStatsProvider() {
     ON_CALL(*this, stats).WillByDefault(testing::ReturnRef(mock_stats_));
   }
-  MOCK_METHOD(CacheFilterStats&, stats, (), (const));
+  MOCK_METHOD(CacheFilterStats&, stats, (), (const, override));
   testing::NiceMock<MockCacheFilterStats> mock_stats_;
 };
 
@@ -111,38 +115,40 @@ private:
 class MockCacheProgressReceiver : public CacheProgressReceiver {
 public:
   MOCK_METHOD(void, onHeadersInserted,
-              (CacheReaderPtr cache_reader, Http::ResponseHeaderMapPtr headers, bool end_stream));
-  MOCK_METHOD(void, onBodyInserted, (AdjustedByteRange range, bool end_stream));
-  MOCK_METHOD(void, onTrailersInserted, (Http::ResponseTrailerMapPtr trailers));
-  MOCK_METHOD(void, onInsertFailed, (absl::Status));
+              (CacheReaderPtr cache_reader, Http::ResponseHeaderMapPtr headers, bool end_stream),
+              (override));
+  MOCK_METHOD(void, onBodyInserted, (AdjustedByteRange range, bool end_stream), (override));
+  MOCK_METHOD(void, onTrailersInserted, (Http::ResponseTrailerMapPtr trailers), (override));
+  MOCK_METHOD(void, onInsertFailed, (absl::Status), (override));
 };
 
 class MockHttpCacheFactory : public HttpCacheFactory {
 public:
   MOCK_METHOD(absl::StatusOr<std::shared_ptr<CacheSessions>>, getCache,
               (const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-               Server::Configuration::ServerFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context),
+              (override));
 };
 
 class MockUpstreamRequest : public UpstreamRequest {
 public:
   // HttpSource
-  MOCK_METHOD(void, getHeaders, (GetHeadersCallback && cb));
-  MOCK_METHOD(void, getBody, (AdjustedByteRange range, GetBodyCallback&& cb));
-  MOCK_METHOD(void, getTrailers, (GetTrailersCallback && cb));
+  MOCK_METHOD(void, getHeaders, (GetHeadersCallback && cb), (override));
+  MOCK_METHOD(void, getBody, (AdjustedByteRange range, GetBodyCallback&& cb), (override));
+  MOCK_METHOD(void, getTrailers, (GetTrailersCallback && cb), (override));
   // UpstreamRequest only
-  MOCK_METHOD(void, sendHeaders, (Http::RequestHeaderMapPtr h));
+  MOCK_METHOD(void, sendHeaders, (Http::RequestHeaderMapPtr h), (override));
 };
 
 class MockUpstreamRequestFactory : public UpstreamRequestFactory {
 public:
   MOCK_METHOD(UpstreamRequestPtr, create,
-              (const std::shared_ptr<const CacheFilterStatsProvider> stats_provider));
+              (const std::shared_ptr<const CacheFilterStatsProvider> stats_provider), (override));
 };
 
 class MockCacheableResponseChecker : public CacheableResponseChecker {
 public:
-  MOCK_METHOD(bool, isCacheableResponse, (const Http::ResponseHeaderMap& h), (const));
+  MOCK_METHOD(bool, isCacheableResponse, (const Http::ResponseHeaderMap& h), (const, override));
 };
 
 } // namespace CacheV2

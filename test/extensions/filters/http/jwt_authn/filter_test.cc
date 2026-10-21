@@ -23,7 +23,7 @@ using JwtVerify::Status;
 
 class MockMatcher : public Matcher {
 public:
-  MOCK_METHOD(bool, matches, (const Http::RequestHeaderMap& headers), (const));
+  MOCK_METHOD(bool, matches, (const Http::RequestHeaderMap& headers), (const, override));
 };
 
 JwtAuthnFilterStats generateMockStats(Stats::Scope& scope) {
@@ -42,13 +42,13 @@ public:
 
   MOCK_METHOD(const Verifier*, findVerifier,
               (const Http::RequestHeaderMap& headers, const StreamInfo::FilterState& filter_state),
-              (const));
+              (const, override));
   MOCK_METHOD((std::pair<const Verifier*, std::string>), findPerRouteVerifier,
-              (const PerRouteFilterConfig& per_route), (const));
-  MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const));
-  MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
-  MOCK_METHOD(bool, stripFailureResponse, (), (const));
-  MOCK_METHOD(void, sanitizePayloadHeaders, (Http::RequestHeaderMap & headers), (const));
+              (const PerRouteFilterConfig& per_route), (const, override));
+  MOCK_METHOD(bool, bypassCorsPreflightRequest, (), (const, override));
+  MOCK_METHOD(JwtAuthnFilterStats&, stats, (), (override));
+  MOCK_METHOD(bool, stripFailureResponse, (), (const, override));
+  MOCK_METHOD(void, sanitizePayloadHeaders, (Http::RequestHeaderMap & headers), (const, override));
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   JwtAuthnFilterStats stats_;

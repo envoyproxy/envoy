@@ -34,17 +34,17 @@ using RequestData = ThreadLocalController::RequestData;
 class MockThreadLocalController : public ThreadLocal::ThreadLocalObject,
                                   public ThreadLocalController {
 public:
-  MOCK_METHOD(RequestData, requestCounts, ());
-  MOCK_METHOD(void, recordSuccess, ());
-  MOCK_METHOD(void, recordFailure, ());
-  MOCK_METHOD(uint32_t, averageRps, (), (const));
-  MOCK_METHOD(std::chrono::seconds, samplingWindow, (), (const));
+  MOCK_METHOD(RequestData, requestCounts, (), (override));
+  MOCK_METHOD(void, recordSuccess, (), (override));
+  MOCK_METHOD(void, recordFailure, (), (override));
+  MOCK_METHOD(uint32_t, averageRps, (), (const, override));
+  MOCK_METHOD(std::chrono::seconds, samplingWindow, (), (const, override));
 };
 
 class MockResponseEvaluator : public ResponseEvaluator {
 public:
-  MOCK_METHOD(bool, isHttpSuccess, (uint64_t code), (const));
-  MOCK_METHOD(bool, isGrpcSuccess, (uint32_t status), (const));
+  MOCK_METHOD(bool, isHttpSuccess, (uint64_t code), (const, override));
+  MOCK_METHOD(bool, isGrpcSuccess, (uint32_t status), (const, override));
 };
 
 class TestConfig : public AdmissionControlFilterConfig {

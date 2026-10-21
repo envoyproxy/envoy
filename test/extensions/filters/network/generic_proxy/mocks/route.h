@@ -14,13 +14,14 @@ class MockRouteEntry : public RouteEntry {
 public:
   MockRouteEntry();
 
-  MOCK_METHOD(const std::string&, clusterName, (), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (absl::string_view), (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
-  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
-  MOCK_METHOD(absl::string_view, name, (), (const));
-  MOCK_METHOD(const std::chrono::milliseconds, timeout, (), (const));
-  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
+  MOCK_METHOD(const std::string&, clusterName, (), (const, override));
+  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (absl::string_view),
+              (const, override));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const, override));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const, override));
+  MOCK_METHOD(absl::string_view, name, (), (const, override));
+  MOCK_METHOD(const std::chrono::milliseconds, timeout, (), (const, override));
+  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const, override));
 
   std::string cluster_name_{"fake_cluster_name"};
 
@@ -34,7 +35,7 @@ class MockRouteMatcher : public RouteMatcher {
 public:
   MockRouteMatcher();
 
-  MOCK_METHOD(RouteEntryConstSharedPtr, routeEntry, (const MatchInput& request), (const));
+  MOCK_METHOD(RouteEntryConstSharedPtr, routeEntry, (const MatchInput& request), (const, override));
 
   std::shared_ptr<const testing::NiceMock<MockRouteEntry>> route_entry_{
       std::make_shared<testing::NiceMock<MockRouteEntry>>()};

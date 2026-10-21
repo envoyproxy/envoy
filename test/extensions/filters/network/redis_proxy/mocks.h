@@ -31,7 +31,7 @@ public:
   ~MockRouter() override;
 
   MOCK_METHOD(RouteSharedPtr, upstreamPool,
-              (std::string & key, const StreamInfo::StreamInfo& stream_info));
+              (std::string & key, const StreamInfo::StreamInfo& stream_info), (override));
   MOCK_METHOD(void, initializeReadFilterCallbacks, (Network::ReadFilterCallbacks * callbacks));
   RouteSharedPtr route_;
 };
@@ -41,8 +41,8 @@ public:
   MockRoute(ConnPool::InstanceSharedPtr);
   ~MockRoute() override;
 
-  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (const std::string&), (const));
-  MOCK_METHOD(const MirrorPolicies&, mirrorPolicies, (), (const));
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (const std::string&), (const, override));
+  MOCK_METHOD(const MirrorPolicies&, mirrorPolicies, (), (const, override));
   ConnPool::InstanceSharedPtr conn_pool_;
   MirrorPolicies policies_;
 };
@@ -52,8 +52,8 @@ public:
   MockMirrorPolicy(ConnPool::InstanceSharedPtr);
   ~MockMirrorPolicy() override = default;
 
-  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
-  MOCK_METHOD(bool, shouldMirror, (const std::string&), (const));
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const, override));
+  MOCK_METHOD(bool, shouldMirror, (const std::string&), (const, override));
 
   ConnPool::InstanceSharedPtr conn_pool_;
 };
@@ -64,7 +64,8 @@ public:
   MockFaultManager(const MockFaultManager& other);
   ~MockFaultManager() override;
 
-  MOCK_METHOD(const Common::Redis::Fault*, getFaultForCommand, (const std::string&), (const));
+  MOCK_METHOD(const Common::Redis::Fault*, getFaultForCommand, (const std::string&),
+              (const, override));
 };
 
 namespace ConnPool {
@@ -116,7 +117,7 @@ public:
   MockSplitRequest();
   ~MockSplitRequest() override;
 
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (), (override));
 };
 
 class MockSplitCallbacks : public SplitCallbacks {
@@ -129,10 +130,10 @@ public:
   void setDownstreamRespVersion(uint32_t version) override { downstream_resp_version_ = version; }
   Common::Redis::RespProtocolVersion protocolVersion() const override { return protocol_version_; }
 
-  MOCK_METHOD(bool, connectionAllowed, ());
-  MOCK_METHOD(void, onQuit, ());
-  MOCK_METHOD(void, onAuth, (const std::string& password));
-  MOCK_METHOD(void, onAuth, (const std::string& username, const std::string& password));
+  MOCK_METHOD(bool, connectionAllowed, (), (override));
+  MOCK_METHOD(void, onQuit, (), (override));
+  MOCK_METHOD(void, onAuth, (const std::string& password), (override));
+  MOCK_METHOD(void, onAuth, (const std::string& username, const std::string& password), (override));
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
 
   uint32_t currentDownstreamRespVersion() const override { return downstream_resp_version_; }
@@ -194,11 +195,12 @@ public:
   ~MockExternalAuthClient() override;
 
   // ExtAuthz::Client
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (), (override));
   MOCK_METHOD(void, authenticateExternal,
               (AuthenticateCallback & callback, CommandSplitter::SplitCallbacks& pending_request,
                const StreamInfo::StreamInfo& stream_info, std::string username,
-               std::string password));
+               std::string password),
+              (override));
 };
 
 class MockAuthenticateCallback : public AuthenticateCallback {

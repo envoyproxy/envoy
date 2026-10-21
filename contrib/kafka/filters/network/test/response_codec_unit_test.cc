@@ -17,12 +17,12 @@ namespace ResponseCodecUnitTest {
 class MockResponseInitialParserFactory : public ResponseInitialParserFactory {
 public:
   MOCK_METHOD(ResponseParserSharedPtr, create,
-              (ExpectedResponsesSharedPtr, const ResponseParserResolver&), (const));
+              (ExpectedResponsesSharedPtr, const ResponseParserResolver&), (const, override));
 };
 
 class MockParser : public ResponseParser {
 public:
-  MOCK_METHOD(ResponseParseResponse, parse, (absl::string_view&));
+  MOCK_METHOD(ResponseParseResponse, parse, (absl::string_view&), (override));
 };
 
 using MockParserSharedPtr = std::shared_ptr<MockParser>;
@@ -30,13 +30,13 @@ using MockParserSharedPtr = std::shared_ptr<MockParser>;
 class MockResponseParserResolver : public ResponseParserResolver {
 public:
   MockResponseParserResolver() : ResponseParserResolver({}) {};
-  MOCK_METHOD(ResponseParserSharedPtr, createParser, (ResponseContextSharedPtr), (const));
+  MOCK_METHOD(ResponseParserSharedPtr, createParser, (ResponseContextSharedPtr), (const, override));
 };
 
 class MockResponseCallback : public ResponseCallback {
 public:
-  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr));
-  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr));
+  MOCK_METHOD(void, onMessage, (AbstractResponseSharedPtr), (override));
+  MOCK_METHOD(void, onFailedParse, (ResponseMetadataSharedPtr), (override));
 };
 
 using MockResponseCallbackSharedPtr = std::shared_ptr<MockResponseCallback>;

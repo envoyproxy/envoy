@@ -26,7 +26,7 @@ class MockSingletonManager : public Singleton::Manager {
 public:
   MockSingletonManager() = default;
   MOCK_METHOD(Singleton::InstanceSharedPtr, get,
-              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin));
+              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin), (override));
 };
 
 class MockWorkloadMetadataProvider
@@ -35,7 +35,7 @@ class MockWorkloadMetadataProvider
 public:
   MockWorkloadMetadataProvider() = default;
   MOCK_METHOD(WorkloadMetadataObjectConstSharedPtr, GetMetadata,
-              (const Network::Address::InstanceConstSharedPtr& address));
+              (const Network::Address::InstanceConstSharedPtr& address), (override));
 };
 
 class PeerMetadataTest : public testing::Test {

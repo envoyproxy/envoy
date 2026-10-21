@@ -27,25 +27,28 @@ public:
   }
 
   // Upstream::ThreadLocalCluster
-  MOCK_METHOD(const PrioritySet&, prioritySet, ());
-  MOCK_METHOD(ClusterInfoConstSharedPtr, info, ());
-  MOCK_METHOD(LoadBalancer&, loadBalancer, ());
+  MOCK_METHOD(const PrioritySet&, prioritySet, (), (override));
+  MOCK_METHOD(ClusterInfoConstSharedPtr, info, (), (override));
+  MOCK_METHOD(LoadBalancer&, loadBalancer, (), (override));
   MOCK_METHOD(std::optional<HttpPoolData>, httpConnPool,
               (HostConstSharedPtr host, ResourcePriority priority,
-               std::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context));
-  MOCK_METHOD(HostSelectionResponse, chooseHost, (LoadBalancerContext * context));
+               std::optional<Http::Protocol> downstream_protocol, LoadBalancerContext* context),
+              (override));
+  MOCK_METHOD(HostSelectionResponse, chooseHost, (LoadBalancerContext * context), (override));
   MOCK_METHOD(std::optional<TcpPoolData>, tcpConnPool,
-              (HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context));
+              (HostConstSharedPtr host, ResourcePriority priority, LoadBalancerContext* context),
+              (override));
   MOCK_METHOD(std::optional<TcpPoolData>, tcpConnPool,
-              (ResourcePriority priority, LoadBalancerContext* context));
+              (ResourcePriority priority, LoadBalancerContext* context), (override));
   MOCK_METHOD(MockHost::MockCreateConnectionData, tcpConn_, (LoadBalancerContext * context));
-  MOCK_METHOD(Http::AsyncClient&, httpAsyncClient, ());
+  MOCK_METHOD(Http::AsyncClient&, httpAsyncClient, (), (override));
   MOCK_METHOD(Tcp::AsyncTcpClientPtr, tcpAsyncClient,
-              (LoadBalancerContext * context, Tcp::AsyncTcpClientOptionsConstSharedPtr options));
-  MOCK_METHOD(UnitFloat, dropOverload, (), (const));
-  MOCK_METHOD(const std::string&, dropCategory, (), (const));
-  MOCK_METHOD(void, setDropOverload, (UnitFloat));
-  MOCK_METHOD(void, setDropCategory, (absl::string_view));
+              (LoadBalancerContext * context, Tcp::AsyncTcpClientOptionsConstSharedPtr options),
+              (override));
+  MOCK_METHOD(UnitFloat, dropOverload, (), (const, override));
+  MOCK_METHOD(const std::string&, dropCategory, (), (const, override));
+  MOCK_METHOD(void, setDropOverload, (UnitFloat), (override));
+  MOCK_METHOD(void, setDropCategory, (absl::string_view), (override));
 
   NiceMock<MockClusterMockPrioritySet> cluster_;
   NiceMock<MockLoadBalancer> lb_;

@@ -21,8 +21,8 @@ public:
   MockDnsCacheResourceManager();
   ~MockDnsCacheResourceManager() override;
 
-  MOCK_METHOD(ResourceLimit&, pendingRequests, ());
-  MOCK_METHOD(DnsCacheCircuitBreakersStats&, stats, ());
+  MOCK_METHOD(ResourceLimit&, pendingRequests, (), (override));
+  MOCK_METHOD(DnsCacheCircuitBreakersStats&, stats, (), (override));
 
   NiceMock<Upstream::MockBasicResourceLimit> pending_requests_;
 };
@@ -60,13 +60,14 @@ public:
   MOCK_METHOD(DnsCache::AddUpdateCallbacksHandle*, addUpdateCallbacks_,
               (UpdateCallbacks & callbacks));
 
-  MOCK_METHOD((void), iterateHostMap, (IterateHostMapCb));
-  MOCK_METHOD((std::optional<const DnsHostInfoSharedPtr>), getHost, (absl::string_view));
+  MOCK_METHOD((void), iterateHostMap, (IterateHostMapCb), (override));
+  MOCK_METHOD((std::optional<const DnsHostInfoSharedPtr>), getHost, (absl::string_view),
+              (override));
   MOCK_METHOD(Upstream::ResourceAutoIncDec*, canCreateDnsRequest_, ());
-  MOCK_METHOD(void, forceRefreshHosts, ());
-  MOCK_METHOD(void, setIpVersionToRemove, (std::optional<Network::Address::IpVersion>));
-  MOCK_METHOD(std::optional<Network::Address::IpVersion>, getIpVersionToRemove, ());
-  MOCK_METHOD(void, stop, ());
+  MOCK_METHOD(void, forceRefreshHosts, (), (override));
+  MOCK_METHOD(void, setIpVersionToRemove, (std::optional<Network::Address::IpVersion>), (override));
+  MOCK_METHOD(std::optional<Network::Address::IpVersion>, getIpVersionToRemove, (), (override));
+  MOCK_METHOD(void, stop, (), (override));
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {
@@ -83,8 +84,9 @@ public:
   ~MockDnsCacheManager() override;
 
   MOCK_METHOD(absl::StatusOr<DnsCacheSharedPtr>, getCache,
-              (const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config));
-  MOCK_METHOD(DnsCacheSharedPtr, lookUpCacheByName, (absl::string_view cache_name));
+              (const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config),
+              (override));
+  MOCK_METHOD(DnsCacheSharedPtr, lookUpCacheByName, (absl::string_view cache_name), (override));
 
   std::shared_ptr<NiceMock<MockDnsCache>> dns_cache_{new NiceMock<MockDnsCache>()};
 };
@@ -94,14 +96,15 @@ public:
   MockDnsHostInfo();
   ~MockDnsHostInfo() override;
 
-  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
-  MOCK_METHOD(std::vector<Network::Address::InstanceConstSharedPtr>, addressList, (), (const));
-  MOCK_METHOD(const std::string&, resolvedHost, (), (const));
-  MOCK_METHOD(bool, isIpAddress, (), (const));
-  MOCK_METHOD(void, touch, ());
-  MOCK_METHOD(bool, firstResolveComplete, (), (const));
-  MOCK_METHOD(std::string, details, ());
-  MOCK_METHOD(Network::DnsResolver::ResolutionStatus, resolutionStatus, (), (const));
+  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const, override));
+  MOCK_METHOD(std::vector<Network::Address::InstanceConstSharedPtr>, addressList, (),
+              (const, override));
+  MOCK_METHOD(const std::string&, resolvedHost, (), (const, override));
+  MOCK_METHOD(bool, isIpAddress, (), (const, override));
+  MOCK_METHOD(void, touch, (), (override));
+  MOCK_METHOD(bool, firstResolveComplete, (), (const, override));
+  MOCK_METHOD(std::string, details, (), (override));
+  MOCK_METHOD(Network::DnsResolver::ResolutionStatus, resolutionStatus, (), (const, override));
 
   Network::Address::InstanceConstSharedPtr address_;
   std::vector<Network::Address::InstanceConstSharedPtr> address_list_;
@@ -114,11 +117,12 @@ public:
   ~MockUpdateCallbacks() override;
 
   MOCK_METHOD(absl::Status, onDnsHostAddOrUpdate,
-              (const std::string& host, const DnsHostInfoSharedPtr& address));
-  MOCK_METHOD(void, onDnsHostRemove, (const std::string& host));
+              (const std::string& host, const DnsHostInfoSharedPtr& address), (override));
+  MOCK_METHOD(void, onDnsHostRemove, (const std::string& host), (override));
   MOCK_METHOD(void, onDnsResolutionComplete,
               (const std::string& host, const DnsHostInfoSharedPtr& host_info,
-               Network::DnsResolver::ResolutionStatus status));
+               Network::DnsResolver::ResolutionStatus status),
+              (override));
 };
 
 class MockLoadDnsCacheEntryCallbacks : public DnsCache::LoadDnsCacheEntryCallbacks {
@@ -126,7 +130,7 @@ public:
   MockLoadDnsCacheEntryCallbacks();
   ~MockLoadDnsCacheEntryCallbacks() override;
 
-  MOCK_METHOD(void, onLoadDnsCacheComplete, (const DnsHostInfoSharedPtr&));
+  MOCK_METHOD(void, onLoadDnsCacheComplete, (const DnsHostInfoSharedPtr&), (override));
 };
 
 class MockDfpCluster : public DfpCluster {
@@ -135,10 +139,11 @@ public:
   ~MockDfpCluster() override = default;
 
   // Extensions::Common::DynamicForwardProxy::DfpCluster
-  MOCK_METHOD(bool, enableSubCluster, (), (const));
+  MOCK_METHOD(bool, enableSubCluster, (), (const, override));
   MOCK_METHOD((std::pair<bool, std::optional<envoy::config::cluster::v3::Cluster>>),
-              createSubClusterConfig, (const std::string&, const std::string&, const int));
-  MOCK_METHOD(bool, touch, (const std::string&));
+              createSubClusterConfig, (const std::string&, const std::string&, const int),
+              (override));
+  MOCK_METHOD(bool, touch, (const std::string&), (override));
 };
 
 } // namespace DynamicForwardProxy

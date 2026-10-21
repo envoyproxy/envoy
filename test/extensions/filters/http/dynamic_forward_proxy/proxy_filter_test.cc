@@ -716,7 +716,7 @@ class MockProxyFilter : public ProxyFilter {
 public:
   MockProxyFilter(const ProxyFilterConfigSharedPtr& config) : ProxyFilter(config) {}
   ~MockProxyFilter() override = default;
-  MOCK_METHOD(bool, isProxying, ());
+  MOCK_METHOD(bool, isProxying, (), (override));
 };
 
 class ProxySettingsProxyFilterTest : public ProxyFilterTest {

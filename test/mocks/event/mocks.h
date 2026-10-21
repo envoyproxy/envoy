@@ -118,12 +118,13 @@ public:
   }
 
   // Event::Dispatcher
-  MOCK_METHOD(void, registerWatchdog,
-              (const Server::WatchDogSharedPtr&, std::chrono::milliseconds));
-  MOCK_METHOD(void, registerEvwatchObserver, (Evwatch::Observer & observer));
-  MOCK_METHOD(void, unregisterEvwatchObserver, (Evwatch::Observer & observer));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::optional<std::string>&));
-  MOCK_METHOD(void, clearDeferredDeleteList, ());
+  MOCK_METHOD(void, registerWatchdog, (const Server::WatchDogSharedPtr&, std::chrono::milliseconds),
+              (override));
+  MOCK_METHOD(void, registerEvwatchObserver, (Evwatch::Observer & observer), (override));
+  MOCK_METHOD(void, unregisterEvwatchObserver, (Evwatch::Observer & observer), (override));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope&, const std::optional<std::string>&),
+              (override));
+  MOCK_METHOD(void, clearDeferredDeleteList, (), (override));
   MOCK_METHOD(Network::ServerConnection*, createServerConnection_, (StreamInfo::StreamInfo & info));
   MOCK_METHOD(Network::ClientConnection*, createClientConnection_,
               (Network::Address::InstanceConstSharedPtr address,
@@ -138,20 +139,21 @@ public:
   MOCK_METHOD(Timer*, createScaledTypedTimer_, (ScaledTimerType timer_type, Event::TimerCb cb));
   MOCK_METHOD(SchedulableCallback*, createSchedulableCallback_, (std::function<void()> cb));
   MOCK_METHOD(void, deferredDelete_, (DeferredDeletable * to_delete));
-  MOCK_METHOD(void, exit, ());
+  MOCK_METHOD(void, exit, (), (override));
   MOCK_METHOD(SignalEvent*, listenForSignal_, (signal_t signal_num, SignalCb cb));
-  MOCK_METHOD(void, post, (PostCb callback));
-  MOCK_METHOD(void, deleteInDispatcherThread, (DispatcherThreadDeletableConstPtr deletable));
-  MOCK_METHOD(void, run, (RunType type));
-  MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object));
-  MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object));
-  MOCK_METHOD(bool, trackedObjectStackIsEmpty, (), (const));
-  MOCK_METHOD(bool, isThreadSafe, (), (const));
+  MOCK_METHOD(void, post, (PostCb callback), (override));
+  MOCK_METHOD(void, deleteInDispatcherThread, (DispatcherThreadDeletableConstPtr deletable),
+              (override));
+  MOCK_METHOD(void, run, (RunType type), (override));
+  MOCK_METHOD(void, pushTrackedObject, (const ScopeTrackedObject* object), (override));
+  MOCK_METHOD(void, popTrackedObject, (const ScopeTrackedObject* expected_object), (override));
+  MOCK_METHOD(bool, trackedObjectStackIsEmpty, (), (const, override));
+  MOCK_METHOD(bool, isThreadSafe, (), (const, override));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
   MOCK_METHOD(Thread::ThreadId, getCurrentThreadId, ());
-  MOCK_METHOD(MonotonicTime, approximateMonotonicTime, (), (const));
-  MOCK_METHOD(void, updateApproximateMonotonicTime, ());
-  MOCK_METHOD(void, shutdown, ());
+  MOCK_METHOD(MonotonicTime, approximateMonotonicTime, (), (const, override));
+  MOCK_METHOD(void, updateApproximateMonotonicTime, (), (override));
+  MOCK_METHOD(void, shutdown, (), (override));
 
   std::unique_ptr<TimeSource> time_system_;
   std::list<DeferredDeletablePtr> to_delete_;
@@ -187,10 +189,12 @@ public:
   }
 
   // Timer
-  MOCK_METHOD(void, disableTimer, ());
-  MOCK_METHOD(void, enableTimer, (std::chrono::milliseconds, const ScopeTrackedObject* scope));
-  MOCK_METHOD(void, enableHRTimer, (std::chrono::microseconds, const ScopeTrackedObject* scope));
-  MOCK_METHOD(bool, enabled, ());
+  MOCK_METHOD(void, disableTimer, (), (override));
+  MOCK_METHOD(void, enableTimer, (std::chrono::milliseconds, const ScopeTrackedObject* scope),
+              (override));
+  MOCK_METHOD(void, enableHRTimer, (std::chrono::microseconds, const ScopeTrackedObject* scope),
+              (override));
+  MOCK_METHOD(bool, enabled, (), (override));
 
   MockDispatcher* dispatcher_{};
   const ScopeTrackedObject* scope_{};
@@ -239,10 +243,10 @@ public:
   }
 
   // SchedulableCallback
-  MOCK_METHOD(void, scheduleCallbackCurrentIteration, ());
-  MOCK_METHOD(void, scheduleCallbackNextIteration, ());
-  MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(bool, enabled, ());
+  MOCK_METHOD(void, scheduleCallbackCurrentIteration, (), (override));
+  MOCK_METHOD(void, scheduleCallbackNextIteration, (), (override));
+  MOCK_METHOD(void, cancel, (), (override));
+  MOCK_METHOD(bool, enabled, (), (override));
 
   MockDispatcher* dispatcher_{};
   bool enabled_{};
@@ -265,10 +269,10 @@ public:
   MockFileEvent();
   ~MockFileEvent() override;
 
-  MOCK_METHOD(void, activate, (uint32_t events));
-  MOCK_METHOD(void, setEnabled, (uint32_t events));
-  MOCK_METHOD(void, registerEventIfEmulatedEdge, (uint32_t event));
-  MOCK_METHOD(void, unregisterEventIfEmulatedEdge, (uint32_t event));
+  MOCK_METHOD(void, activate, (uint32_t events), (override));
+  MOCK_METHOD(void, setEnabled, (uint32_t events), (override));
+  MOCK_METHOD(void, registerEventIfEmulatedEdge, (uint32_t event), (override));
+  MOCK_METHOD(void, unregisterEventIfEmulatedEdge, (uint32_t event), (override));
 };
 
 } // namespace Event

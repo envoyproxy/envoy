@@ -22,7 +22,7 @@ class MockRequestParserResolver : public RequestParserResolver {
 public:
   MockRequestParserResolver() = default;
   MOCK_METHOD(RequestParserSharedPtr, createParser, (int16_t, int16_t, RequestContextSharedPtr),
-              (const));
+              (const, override));
 };
 
 TEST_F(KafkaRequestParserTest, RequestStartParserTestShouldReturnRequestHeaderParser) {

@@ -28,21 +28,21 @@ public:
                CommonExtProc::RequestCallbacks<envoy::service::ext_proc::v3::ProcessingResponse>*,
                CommonExtProc::StreamBase*),
               (override));
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (), (override));
 
-  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const));
+  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const, override));
 };
 
 class MockStream : public ExternalProcessorStream {
 public:
   MockStream();
   ~MockStream() override;
-  MOCK_METHOD(void, send, (envoy::service::ext_proc::v3::ProcessingRequest&&, bool));
-  MOCK_METHOD(bool, close, ());
-  MOCK_METHOD(bool, halfCloseAndDeleteOnRemoteClose, ());
+  MOCK_METHOD(void, send, (envoy::service::ext_proc::v3::ProcessingRequest&&, bool), (override));
+  MOCK_METHOD(bool, close, (), (override));
+  MOCK_METHOD(bool, halfCloseAndDeleteOnRemoteClose, (), (override));
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const override));
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
-  MOCK_METHOD(void, notifyFilterDestroy, ());
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
+  MOCK_METHOD(void, notifyFilterDestroy, (), (override));
 };
 
 } // namespace ExternalProcessing

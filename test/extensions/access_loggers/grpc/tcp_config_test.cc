@@ -108,7 +108,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+               Common::GrpcAccessLoggerType logger_type),
+              (override));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081

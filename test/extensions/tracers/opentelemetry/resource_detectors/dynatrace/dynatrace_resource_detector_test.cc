@@ -25,7 +25,7 @@ namespace OpenTelemetry {
 
 class MockDynatraceFileReader : public DynatraceMetadataFileReader {
 public:
-  MOCK_METHOD(std::string, readEnrichmentFile, (const std::string& file_path));
+  MOCK_METHOD(std::string, readEnrichmentFile, (const std::string& file_path), (override));
 };
 
 TEST(DynatraceResourceDetectorTest, DynatraceNotDeployed) {

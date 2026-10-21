@@ -49,7 +49,7 @@ namespace MongoProxy {
 
 class MockDecoder : public Decoder {
 public:
-  MOCK_METHOD(void, onData, (Buffer::Instance & data));
+  MOCK_METHOD(void, onData, (Buffer::Instance & data), (override));
 };
 
 class TestProxyFilter : public ProxyFilter {

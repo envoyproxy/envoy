@@ -15,11 +15,11 @@ public:
   ~MockSerializer() override;
 
   // DubboProxy::Serializer
-  MOCK_METHOD(SerializeType, type, (), (const));
-  MOCK_METHOD(RpcRequestPtr, deserializeRpcRequest, (Buffer::Instance&, Context&));
-  MOCK_METHOD(RpcResponsePtr, deserializeRpcResponse, (Buffer::Instance&, Context&));
-  MOCK_METHOD(void, serializeRpcRequest, (Buffer::Instance&, MessageMetadata&));
-  MOCK_METHOD(void, serializeRpcResponse, (Buffer::Instance&, MessageMetadata&));
+  MOCK_METHOD(SerializeType, type, (), (const, override));
+  MOCK_METHOD(RpcRequestPtr, deserializeRpcRequest, (Buffer::Instance&, Context&), (override));
+  MOCK_METHOD(RpcResponsePtr, deserializeRpcResponse, (Buffer::Instance&, Context&), (override));
+  MOCK_METHOD(void, serializeRpcRequest, (Buffer::Instance&, MessageMetadata&), (override));
+  MOCK_METHOD(void, serializeRpcResponse, (Buffer::Instance&, MessageMetadata&), (override));
 
   SerializeType type_{SerializeType::Hessian2};
 };

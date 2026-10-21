@@ -22,13 +22,14 @@ public:
   ~MockClient() override;
 
   // RateLimit::Client
-  MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(void, detach, ());
+  MOCK_METHOD(void, cancel, (), (override));
+  MOCK_METHOD(void, detach, (), (override));
   MOCK_METHOD(void, limit,
               (RequestCallbacks & callbacks, const std::string& domain,
                const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
-               uint32_t hits_addend));
+               uint32_t hits_addend),
+              (override));
 };
 
 } // namespace RateLimit

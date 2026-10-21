@@ -22,7 +22,7 @@ class MockAuthFactory : public AuthFactory {
 public:
   MOCK_METHOD(AuthenticatorPtr, create,
               (const JwtVerify::CheckAudience*, const std::optional<std::string>&, bool, bool),
-              (const));
+              (const, override));
 };
 
 class MockAuthenticator : public Authenticator {
@@ -41,32 +41,32 @@ public:
              std::move(callback));
   }
 
-  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, onDestroy, (), (override));
 };
 
 class MockVerifierCallbacks : public Verifier::Callbacks {
 public:
-  MOCK_METHOD(void, setExtractedData, (const Protobuf::Struct& payload));
-  MOCK_METHOD(void, clearRouteCache, ());
-  MOCK_METHOD(void, onComplete, (const Status& status));
+  MOCK_METHOD(void, setExtractedData, (const Protobuf::Struct& payload), (override));
+  MOCK_METHOD(void, clearRouteCache, (), (override));
+  MOCK_METHOD(void, onComplete, (const Status& status), (override));
 };
 
 class MockVerifier : public Verifier {
 public:
-  MOCK_METHOD(void, verify, (ContextSharedPtr context), (const));
+  MOCK_METHOD(void, verify, (ContextSharedPtr context), (const, override));
 };
 
 class MockExtractor : public Extractor {
 public:
   MOCK_METHOD(std::vector<JwtLocationConstPtr>, extract, (const Http::RequestHeaderMap& headers),
-              (const));
-  MOCK_METHOD(void, sanitizeHeaders, (Http::RequestHeaderMap & headers), (const));
+              (const, override));
+  MOCK_METHOD(void, sanitizeHeaders, (Http::RequestHeaderMap & headers), (const, override));
 };
 
 class MockJwtCache : public JwtCache {
 public:
-  MOCK_METHOD(JwtVerify::Jwt*, lookup, (const std::string&), ());
-  MOCK_METHOD(void, insert, (const std::string&, std::unique_ptr<JwtVerify::Jwt>&&), ());
+  MOCK_METHOD(JwtVerify::Jwt*, lookup, (const std::string&), (override));
+  MOCK_METHOD(void, insert, (const std::string&, std::unique_ptr<JwtVerify::Jwt>&&), (override));
 };
 
 class MockJwksData : public JwksCache::JwksData {
@@ -82,17 +82,17 @@ public:
     ON_CALL(*this, retryPolicy()).WillByDefault(::testing::ReturnRef(retry_policy_));
   }
 
-  MOCK_METHOD(bool, areAudiencesAllowed, (const std::vector<std::string>&), (const));
-  MOCK_METHOD(bool, isSubjectAllowed, (const absl::string_view), (const));
-  MOCK_METHOD(bool, isLifetimeAllowed, (const absl::Time&, const absl::Time*), (const));
+  MOCK_METHOD(bool, areAudiencesAllowed, (const std::vector<std::string>&), (const, override));
+  MOCK_METHOD(bool, isSubjectAllowed, (const absl::string_view), (const, override));
+  MOCK_METHOD(bool, isLifetimeAllowed, (const absl::Time&, const absl::Time*), (const, override));
   MOCK_METHOD(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&, getJwtProvider,
-              (), (const));
-  MOCK_METHOD(const std::vector<ClaimToHeader>&, claimsToHeaders, (), (const));
-  MOCK_METHOD(const Router::RetryPolicyConstSharedPtr&, retryPolicy, (), (const));
-  MOCK_METHOD(const JwtVerify::Jwks*, getJwksObj, (), (const));
-  MOCK_METHOD(bool, isExpired, (), (const));
-  MOCK_METHOD(const JwtVerify::Jwks*, setRemoteJwks, (JwksConstPtr&&), ());
-  MOCK_METHOD(JwtCache&, getJwtCache, (), ());
+              (), (const, override));
+  MOCK_METHOD(const std::vector<ClaimToHeader>&, claimsToHeaders, (), (const, override));
+  MOCK_METHOD(const Router::RetryPolicyConstSharedPtr&, retryPolicy, (), (const, override));
+  MOCK_METHOD(const JwtVerify::Jwks*, getJwksObj, (), (const, override));
+  MOCK_METHOD(bool, isExpired, (), (const, override));
+  MOCK_METHOD(const JwtVerify::Jwks*, setRemoteJwks, (JwksConstPtr &&), (override));
+  MOCK_METHOD(JwtCache&, getJwtCache, (), (override));
 
   envoy::extensions::filters::http::jwt_authn::v3::JwtProvider jwt_provider_;
   std::vector<ClaimToHeader> claims_to_headers_;
@@ -113,10 +113,10 @@ public:
     return {ALL_JWT_AUTHN_FILTER_STATS(POOL_COUNTER_PREFIX(scope, ""))};
   }
 
-  MOCK_METHOD(JwksData*, findByIssuer, (const std::string&), ());
-  MOCK_METHOD(JwksData*, findByProvider, (const std::string&), ());
-  MOCK_METHOD(JwksData*, getSingleProvider, ());
-  MOCK_METHOD(JwtAuthnFilterStats&, stats, ());
+  MOCK_METHOD(JwksData*, findByIssuer, (const std::string&), (override));
+  MOCK_METHOD(JwksData*, findByProvider, (const std::string&), (override));
+  MOCK_METHOD(JwksData*, getSingleProvider, (), (override));
+  MOCK_METHOD(JwtAuthnFilterStats&, stats, (), (override));
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   JwtAuthnFilterStats stats_;

@@ -22,9 +22,9 @@ public:
   MockWebTransportSession();
   ~MockWebTransportSession() override;
 
-  MOCK_METHOD(void, setWebTransportVisitor,
-              (std::unique_ptr<webtransport::SessionVisitor> visitor));
-  MOCK_METHOD(webtransport::Session*, rawWebTransportSession, ());
+  MOCK_METHOD(void, setWebTransportVisitor, (std::unique_ptr<webtransport::SessionVisitor> visitor),
+              (override));
+  MOCK_METHOD(webtransport::Session*, rawWebTransportSession, (), (override));
 };
 
 // Mock of QUICHE webtransport::Stream, for exercising the stream-level bridge.

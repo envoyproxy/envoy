@@ -18,53 +18,57 @@ public:
 
   Secret::SecretManager& secretManager() override { return *(secret_manager_); }
 
-  MOCK_METHOD(OptRef<Admin>, admin, ());
-  MOCK_METHOD(void, run, ());
-  MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
-  MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const));
-  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
-  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
-  MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, ());
-  MOCK_METHOD(void, drainListeners, (OptRef<const Network::ExtraShutdownListenerOptions> options));
-  MOCK_METHOD(DrainManager&, drainManager, ());
-  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
-  MOCK_METHOD(void, failHealthcheck, (bool fail));
-  MOCK_METHOD(bool, healthCheckFailed, ());
-  MOCK_METHOD(HotRestart&, hotRestart, ());
-  MOCK_METHOD(Init::Manager&, initManager, ());
-  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
-  MOCK_METHOD(ListenerManager&, listenerManager, ());
-  MOCK_METHOD(Envoy::MutexTracer*, mutexTracer, ());
-  MOCK_METHOD(const Options&, options, ());
-  MOCK_METHOD(OverloadManager&, overloadManager, ());
-  MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(OptRef<Admin>, admin, (), (override));
+  MOCK_METHOD(void, run, (), (override));
+  MOCK_METHOD(Api::Api&, api, (), (override));
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), (override));
+  MOCK_METHOD(Config::XdsManager&, xdsManager, (), (override));
+  MOCK_METHOD(const Upstream::ClusterManager&, clusterManager, (), (const, override));
+  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, (),
+              (override));
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, (), (override));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
+  MOCK_METHOD(Network::DnsResolverSharedPtr, dnsResolver, (), (override));
+  MOCK_METHOD(void, drainListeners, (OptRef<const Network::ExtraShutdownListenerOptions> options),
+              (override));
+  MOCK_METHOD(DrainManager&, drainManager, (), (override));
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (override));
+  MOCK_METHOD(void, failHealthcheck, (bool fail), (override));
+  MOCK_METHOD(bool, healthCheckFailed, (), (override));
+  MOCK_METHOD(HotRestart&, hotRestart, (), (override));
+  MOCK_METHOD(Init::Manager&, initManager, (), (override));
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, (), (override));
+  MOCK_METHOD(ListenerManager&, listenerManager, (), (override));
+  MOCK_METHOD(Envoy::MutexTracer*, mutexTracer, (), (override));
+  MOCK_METHOD(const Options&, options, (), (override));
+  MOCK_METHOD(OverloadManager&, overloadManager, (), (override));
+  MOCK_METHOD(OverloadManager&, nullOverloadManager, (), (override));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
-  MOCK_METHOD(Runtime::Loader&, runtime, ());
-  MOCK_METHOD(void, shutdown, ());
-  MOCK_METHOD(bool, isShutdown, ());
-  MOCK_METHOD(void, shutdownAdmin, ());
-  MOCK_METHOD(Singleton::Manager&, singletonManager, ());
-  MOCK_METHOD(time_t, startTimeCurrentEpoch, ());
-  MOCK_METHOD(time_t, startTimeFirstEpoch, ());
-  MOCK_METHOD(Stats::Store&, stats, ());
-  MOCK_METHOD(Grpc::Context&, grpcContext, ());
-  MOCK_METHOD(Http::Context&, httpContext, ());
-  MOCK_METHOD(Router::Context&, routerContext, ());
-  MOCK_METHOD(ProcessContextOptRef, processContext, ());
-  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
-  MOCK_METHOD(LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(Configuration::StatsConfig&, statsConfig, (), ());
-  MOCK_METHOD(Regex::Engine&, regexEngine, ());
-  MOCK_METHOD(void, flushStats, ());
-  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
-  MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, ());
-  MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, ());
-  MOCK_METHOD(bool, enableReusePortDefault, ());
-  MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates>&&));
+  MOCK_METHOD(Runtime::Loader&, runtime, (), (override));
+  MOCK_METHOD(void, shutdown, (), (override));
+  MOCK_METHOD(bool, isShutdown, (), (override));
+  MOCK_METHOD(void, shutdownAdmin, (), (override));
+  MOCK_METHOD(Singleton::Manager&, singletonManager, (), (override));
+  MOCK_METHOD(time_t, startTimeCurrentEpoch, (), (override));
+  MOCK_METHOD(time_t, startTimeFirstEpoch, (), (override));
+  MOCK_METHOD(Stats::Store&, stats, (), (override));
+  MOCK_METHOD(Grpc::Context&, grpcContext, (), (override));
+  MOCK_METHOD(Http::Context&, httpContext, (), (override));
+  MOCK_METHOD(Router::Context&, routerContext, (), (override));
+  MOCK_METHOD(ProcessContextOptRef, processContext, (), (override));
+  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, (), (override));
+  MOCK_METHOD(LocalInfo::LocalInfo&, localInfo, (), (const, override));
+  MOCK_METHOD(Configuration::StatsConfig&, statsConfig, (), (override));
+  MOCK_METHOD(Regex::Engine&, regexEngine, (), (override));
+  MOCK_METHOD(void, flushStats, (), (override));
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, (), (override));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (override));
+  MOCK_METHOD(Configuration::ServerFactoryContext&, serverFactoryContext, (), (override));
+  MOCK_METHOD(Configuration::TransportSocketFactoryContext&, transportSocketFactoryContext, (),
+              (override));
+  MOCK_METHOD(bool, enableReusePortDefault, (), (override));
+  MOCK_METHOD(void, setSinkPredicates, (std::unique_ptr<Envoy::Stats::SinkPredicates> &&),
+              (override));
 
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);

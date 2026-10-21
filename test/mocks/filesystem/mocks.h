@@ -25,9 +25,9 @@ public:
   Api::IoCallSizeResult pread(void* buf, uint64_t count, uint64_t offset) override;
   Api::IoCallSizeResult pwrite(const void* buf, uint64_t count, uint64_t offset) override;
   bool isOpen() const override { return is_open_; };
-  MOCK_METHOD(absl::string_view, path, (), (const));
-  MOCK_METHOD(DestinationType, destinationType, (), (const));
-  MOCK_METHOD(Api::IoCallResult<FileInfo>, info, ());
+  MOCK_METHOD(absl::string_view, path, (), (const, override));
+  MOCK_METHOD(DestinationType, destinationType, (), (const, override));
+  MOCK_METHOD(Api::IoCallResult<FileInfo>, info, (), (override));
 
   // The first parameter here must be `const FlagSet&` otherwise it doesn't compile with libstdc++
   MOCK_METHOD(Api::IoCallBoolResult, open_, (const FlagSet& flag));
@@ -59,15 +59,16 @@ public:
   ~MockInstance() override;
 
   // Filesystem::Instance
-  MOCK_METHOD(FilePtr, createFile, (const FilePathAndType&));
-  MOCK_METHOD(bool, fileExists, (const std::string&));
-  MOCK_METHOD(bool, directoryExists, (const std::string&));
-  MOCK_METHOD(ssize_t, fileSize, (const std::string&));
-  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (const std::string&));
-  MOCK_METHOD(absl::StatusOr<PathSplitResult>, splitPathFromFilename, (absl::string_view));
-  MOCK_METHOD(bool, illegalPath, (const std::string&));
-  MOCK_METHOD(Api::IoCallResult<FileInfo>, stat, (absl::string_view));
-  MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view));
+  MOCK_METHOD(FilePtr, createFile, (const FilePathAndType&), (override));
+  MOCK_METHOD(bool, fileExists, (const std::string&), (override));
+  MOCK_METHOD(bool, directoryExists, (const std::string&), (override));
+  MOCK_METHOD(ssize_t, fileSize, (const std::string&), (override));
+  MOCK_METHOD(absl::StatusOr<std::string>, fileReadToEnd, (const std::string&), (override));
+  MOCK_METHOD(absl::StatusOr<PathSplitResult>, splitPathFromFilename, (absl::string_view),
+              (override));
+  MOCK_METHOD(bool, illegalPath, (const std::string&), (override));
+  MOCK_METHOD(Api::IoCallResult<FileInfo>, stat, (absl::string_view), (override));
+  MOCK_METHOD(Api::IoCallBoolResult, createPath, (absl::string_view), (override));
 };
 
 class MockWatcher : public Watcher {
@@ -75,7 +76,7 @@ public:
   MockWatcher();
   ~MockWatcher() override;
 
-  MOCK_METHOD(absl::Status, addWatch, (absl::string_view, uint32_t, OnChangedCb));
+  MOCK_METHOD(absl::Status, addWatch, (absl::string_view, uint32_t, OnChangedCb), (override));
 };
 
 } // namespace Filesystem

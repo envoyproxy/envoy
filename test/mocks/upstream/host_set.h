@@ -26,24 +26,24 @@ public:
   }
 
   // Upstream::HostSet
-  MOCK_METHOD(const HostVector&, hosts, (), (const));
-  MOCK_METHOD(HostVectorConstSharedPtr, hostsPtr, (), (const));
-  MOCK_METHOD(const HostVector&, healthyHosts, (), (const));
-  MOCK_METHOD(HealthyHostVectorConstSharedPtr, healthyHostsPtr, (), (const));
-  MOCK_METHOD(const HostVector&, degradedHosts, (), (const));
-  MOCK_METHOD(DegradedHostVectorConstSharedPtr, degradedHostsPtr, (), (const));
-  MOCK_METHOD(const HostVector&, excludedHosts, (), (const));
-  MOCK_METHOD(ExcludedHostVectorConstSharedPtr, excludedHostsPtr, (), (const));
-  MOCK_METHOD(const HostsPerLocality&, hostsPerLocality, (), (const));
-  MOCK_METHOD(HostsPerLocalityConstSharedPtr, hostsPerLocalityPtr, (), (const));
-  MOCK_METHOD(const HostsPerLocality&, healthyHostsPerLocality, (), (const));
-  MOCK_METHOD(HostsPerLocalityConstSharedPtr, healthyHostsPerLocalityPtr, (), (const));
-  MOCK_METHOD(const HostsPerLocality&, degradedHostsPerLocality, (), (const));
-  MOCK_METHOD(HostsPerLocalityConstSharedPtr, degradedHostsPerLocalityPtr, (), (const));
-  MOCK_METHOD(const HostsPerLocality&, excludedHostsPerLocality, (), (const));
-  MOCK_METHOD(HostsPerLocalityConstSharedPtr, excludedHostsPerLocalityPtr, (), (const));
-  MOCK_METHOD(LocalityWeightsConstSharedPtr, localityWeights, (), (const));
-  MOCK_METHOD(uint32_t, priority, (), (const));
+  MOCK_METHOD(const HostVector&, hosts, (), (const, override));
+  MOCK_METHOD(HostVectorConstSharedPtr, hostsPtr, (), (const, override));
+  MOCK_METHOD(const HostVector&, healthyHosts, (), (const, override));
+  MOCK_METHOD(HealthyHostVectorConstSharedPtr, healthyHostsPtr, (), (const, override));
+  MOCK_METHOD(const HostVector&, degradedHosts, (), (const, override));
+  MOCK_METHOD(DegradedHostVectorConstSharedPtr, degradedHostsPtr, (), (const, override));
+  MOCK_METHOD(const HostVector&, excludedHosts, (), (const, override));
+  MOCK_METHOD(ExcludedHostVectorConstSharedPtr, excludedHostsPtr, (), (const, override));
+  MOCK_METHOD(const HostsPerLocality&, hostsPerLocality, (), (const, override));
+  MOCK_METHOD(HostsPerLocalityConstSharedPtr, hostsPerLocalityPtr, (), (const, override));
+  MOCK_METHOD(const HostsPerLocality&, healthyHostsPerLocality, (), (const, override));
+  MOCK_METHOD(HostsPerLocalityConstSharedPtr, healthyHostsPerLocalityPtr, (), (const, override));
+  MOCK_METHOD(const HostsPerLocality&, degradedHostsPerLocality, (), (const, override));
+  MOCK_METHOD(HostsPerLocalityConstSharedPtr, degradedHostsPerLocalityPtr, (), (const, override));
+  MOCK_METHOD(const HostsPerLocality&, excludedHostsPerLocality, (), (const, override));
+  MOCK_METHOD(HostsPerLocalityConstSharedPtr, excludedHostsPerLocalityPtr, (), (const, override));
+  MOCK_METHOD(LocalityWeightsConstSharedPtr, localityWeights, (), (const, override));
+  MOCK_METHOD(uint32_t, priority, (), (const, override));
   uint32_t overprovisioningFactor() const override { return overprovisioning_factor_; }
   void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
     overprovisioning_factor_ = overprovisioning_factor;

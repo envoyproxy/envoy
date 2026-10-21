@@ -15,9 +15,9 @@ public:
 
   std::string name() const override { return name_; }
 
-  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
   MOCK_METHOD(Tracing::DriverSharedPtr, createTracerDriver,
-              (const Protobuf::Message& config, TracerFactoryContext& context));
+              (const Protobuf::Message& config, TracerFactoryContext& context), (override));
 
 private:
   std::string name_;

@@ -18,12 +18,12 @@ namespace RequestCodecUnitTest {
 
 class MockParserFactory : public InitialParserFactory {
 public:
-  MOCK_METHOD(RequestParserSharedPtr, create, (const RequestParserResolver&), (const));
+  MOCK_METHOD(RequestParserSharedPtr, create, (const RequestParserResolver&), (const, override));
 };
 
 class MockParser : public RequestParser {
 public:
-  MOCK_METHOD(RequestParseResponse, parse, (absl::string_view&));
+  MOCK_METHOD(RequestParseResponse, parse, (absl::string_view&), (override));
 };
 
 using MockParserSharedPtr = std::shared_ptr<MockParser>;
@@ -32,13 +32,13 @@ class MockRequestParserResolver : public RequestParserResolver {
 public:
   MockRequestParserResolver() : RequestParserResolver({}) {};
   MOCK_METHOD(RequestParserSharedPtr, createParser, (int16_t, int16_t, RequestContextSharedPtr),
-              (const));
+              (const, override));
 };
 
 class MockRequestCallback : public RequestCallback {
 public:
-  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
-  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr), (override));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr), (override));
 };
 
 using MockRequestCallbackSharedPtr = std::shared_ptr<MockRequestCallback>;

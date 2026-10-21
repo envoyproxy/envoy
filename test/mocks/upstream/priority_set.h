@@ -20,18 +20,21 @@ public:
   void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
                           const HostVector& hosts_removed);
 
-  MOCK_METHOD(Common::CallbackHandlePtr, addMemberUpdateCb, (MemberUpdateCb callback), (const));
-  MOCK_METHOD(Common::CallbackHandlePtr, addPriorityUpdateCb, (PriorityUpdateCb callback), (const));
-  MOCK_METHOD(const std::vector<HostSetPtr>&, hostSetsPerPriority, (), (const));
+  MOCK_METHOD(Common::CallbackHandlePtr, addMemberUpdateCb, (MemberUpdateCb callback),
+              (const, override));
+  MOCK_METHOD(Common::CallbackHandlePtr, addPriorityUpdateCb, (PriorityUpdateCb callback),
+              (const, override));
+  MOCK_METHOD(const std::vector<HostSetPtr>&, hostSetsPerPriority, (), (const, override));
   MOCK_METHOD(std::vector<HostSetPtr>&, hostSetsPerPriority, ());
   MOCK_METHOD(void, updateHosts,
               (uint32_t priority, UpdateHostsParams&& update_hosts_params,
                LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
                std::optional<uint32_t> overprovisioning_factor,
-               HostLookupMapConstSharedPtr cross_priority_host_map));
-  MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&));
-  MOCK_METHOD(HostLookupMapConstSharedPtr, crossPriorityHostMap, (), (const));
+               HostLookupMapConstSharedPtr cross_priority_host_map),
+              (override));
+  MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&), (override));
+  MOCK_METHOD(HostLookupMapConstSharedPtr, crossPriorityHostMap, (), (const, override));
 
   bool batchUpdateActive() const override { return batch_update_active_; }
 

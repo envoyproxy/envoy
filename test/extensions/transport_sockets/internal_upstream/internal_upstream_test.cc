@@ -32,27 +32,28 @@ class TestObject : public StreamInfo::FilterState::Object {};
 
 class MockUserSpaceIoHandle : public Network::MockIoHandle, public IoHandle {
 public:
-  MOCK_METHOD(void, setEof, ());
-  MOCK_METHOD(void, setRst, ());
-  MOCK_METHOD(bool, hasReceivedEof, (), (const));
-  MOCK_METHOD(void, onPeerDestroy, ());
-  MOCK_METHOD(void, setNewDataAvailable, ());
-  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, ());
-  MOCK_METHOD(bool, canReceiveData, (), (const));
-  MOCK_METHOD(bool, isWriteUnblocked, (), (const));
-  MOCK_METHOD(void, onPeerBufferLowWatermark, ());
-  MOCK_METHOD(bool, isReadable, (), (const));
-  MOCK_METHOD(std::shared_ptr<PassthroughState>, passthroughState, ());
+  MOCK_METHOD(void, setEof, (), (override));
+  MOCK_METHOD(void, setRst, (), (override));
+  MOCK_METHOD(bool, hasReceivedEof, (), (const, override));
+  MOCK_METHOD(void, onPeerDestroy, (), (override));
+  MOCK_METHOD(void, setNewDataAvailable, (), (override));
+  MOCK_METHOD(Buffer::Instance*, getReceiveBuffer, (), (override));
+  MOCK_METHOD(bool, canReceiveData, (), (const, override));
+  MOCK_METHOD(bool, isWriteUnblocked, (), (const, override));
+  MOCK_METHOD(void, onPeerBufferLowWatermark, (), (override));
+  MOCK_METHOD(bool, isReadable, (), (const, override));
+  MOCK_METHOD(std::shared_ptr<PassthroughState>, passthroughState, (), (override));
 };
 
 class MockPassthroughState : public PassthroughState {
 public:
   MOCK_METHOD(void, initialize,
               (std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-               const StreamInfo::FilterState::Objects& filter_state_objects));
+               const StreamInfo::FilterState::Objects& filter_state_objects),
+              (override));
   MOCK_METHOD(void, mergeInto,
-              (envoy::config::core::v3::Metadata & metadata,
-               StreamInfo::FilterState& filter_state));
+              (envoy::config::core::v3::Metadata & metadata, StreamInfo::FilterState& filter_state),
+              (override));
 };
 
 class InternalSocketTest : public testing::Test {

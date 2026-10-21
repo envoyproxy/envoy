@@ -19,53 +19,63 @@ public:
   ~MockSecretManager() override;
 
   MOCK_METHOD(absl::Status, addStaticSecret,
-              (const envoy::extensions::transport_sockets::tls::v3::Secret& secret));
+              (const envoy::extensions::transport_sockets::tls::v3::Secret& secret), (override));
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findStaticTlsCertificateProvider,
-              (const std::string& name), (const));
+              (const std::string& name), (const, override));
   MOCK_METHOD(CertificateValidationContextConfigProviderSharedPtr,
-              findStaticCertificateValidationContextProvider, (const std::string& name), (const));
+              findStaticCertificateValidationContextProvider, (const std::string& name),
+              (const, override));
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr,
-              findStaticTlsSessionTicketKeysContextProvider, (const std::string& name), (const));
+              findStaticTlsSessionTicketKeysContextProvider, (const std::string& name),
+              (const, override));
   MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findStaticGenericSecretProvider,
-              (const std::string& name), (const));
+              (const std::string& name), (const, override));
   MOCK_METHOD(
       TlsCertificateConfigProviderSharedPtr, createInlineTlsCertificateProvider,
-      (const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate));
+      (const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate),
+      (override));
   MOCK_METHOD(CertificateValidationContextConfigProviderSharedPtr,
               createInlineCertificateValidationContextProvider,
               (const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
-                   certificate_validation_context));
+                   certificate_validation_context),
+              (override));
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr, createInlineTlsSessionTicketKeysProvider,
               (const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&
-                   tls_session_ticket_keys));
+                   tls_session_ticket_keys),
+              (override));
   MOCK_METHOD(GenericSecretConfigProviderSharedPtr, createInlineGenericSecretProvider,
-              (const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret));
+              (const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret),
+              (override));
   MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findOrCreateTlsCertificateProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager,
-               bool warm));
+               bool warm),
+              (override));
   MOCK_METHOD(CertificateValidationContextConfigProviderSharedPtr,
               findOrCreateCertificateValidationContextProvider,
               (const envoy::config::core::v3::ConfigSource& config_source,
                const std::string& config_name,
                Server::Configuration::ServerFactoryContext& server_context,
-               Init::Manager& init_manager));
+               Init::Manager& init_manager),
+              (override));
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr,
               findOrCreateTlsSessionTicketKeysContextProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
-               Server::Configuration::ServerFactoryContext&, Init::Manager& init_manager));
+               Server::Configuration::ServerFactoryContext&, Init::Manager& init_manager),
+              (override));
   MOCK_METHOD(GenericSecretConfigProviderSharedPtr, findOrCreateGenericSecretProvider,
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager,
-               bool warm));
-  MOCK_METHOD(std::vector<absl::string_view>, dynamicActiveSecretNames, (), (const));
+               bool warm),
+              (override));
+  MOCK_METHOD(std::vector<absl::string_view>, dynamicActiveSecretNames, (), (const, override));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {
 public:
   MockSecretCallbacks();
   ~MockSecretCallbacks() override;
-  MOCK_METHOD(absl::Status, onAddOrUpdateSecret, ());
+  MOCK_METHOD(absl::Status, onAddOrUpdateSecret, (), (override));
 };
 
 class MockGenericSecretConfigProvider : public GenericSecretConfigProvider {
@@ -75,12 +85,14 @@ public:
 
   using SecretType = envoy::extensions::transport_sockets::tls::v3::GenericSecret;
 
-  MOCK_METHOD(SecretType*, secret, (), (const));
+  MOCK_METHOD(SecretType*, secret, (), (const, override));
   MOCK_METHOD(Common::CallbackHandlePtr, addValidationCallback,
-              (std::function<absl::Status(const SecretType&)>));
-  MOCK_METHOD(Common::CallbackHandlePtr, addUpdateCallback, (std::function<absl::Status()>));
-  MOCK_METHOD(Common::CallbackHandlePtr, addRemoveCallback, (std::function<absl::Status()>));
-  MOCK_METHOD(const Init::Target*, initTarget, ());
+              (std::function<absl::Status(const SecretType&)>), (override));
+  MOCK_METHOD(Common::CallbackHandlePtr, addUpdateCallback, (std::function<absl::Status()>),
+              (override));
+  MOCK_METHOD(Common::CallbackHandlePtr, addRemoveCallback, (std::function<absl::Status()>),
+              (override));
+  MOCK_METHOD(const Init::Target*, initTarget, (), (override));
   void start() override {}
 };
 

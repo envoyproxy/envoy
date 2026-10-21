@@ -12,12 +12,12 @@ public:
   MockBasicResourceLimit();
   ~MockBasicResourceLimit() override;
 
-  MOCK_METHOD(bool, canCreate, ());
-  MOCK_METHOD(void, inc, ());
-  MOCK_METHOD(void, dec, ());
-  MOCK_METHOD(void, decBy, (uint64_t));
-  MOCK_METHOD(uint64_t, max, ());
-  MOCK_METHOD(uint64_t, count, (), (const));
+  MOCK_METHOD(bool, canCreate, (), (override));
+  MOCK_METHOD(void, inc, (), (override));
+  MOCK_METHOD(void, dec, (), (override));
+  MOCK_METHOD(void, decBy, (uint64_t), (override));
+  MOCK_METHOD(uint64_t, max, (), (override));
+  MOCK_METHOD(uint64_t, count, (), (const, override));
 };
 } // namespace Upstream
 } // namespace Envoy

@@ -82,8 +82,9 @@ public:
 
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes ietf_error,
-               const std::string&));
-  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+               const std::string&),
+              (override));
+  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame), (override));
 
   Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {
     return last_local_address_;
@@ -756,7 +757,7 @@ public:
               (os_fd_t socket, struct mmsghdr* msgvec, unsigned int vlen, int flags,
                struct timespec* timeout),
               (override));
-  MOCK_METHOD(bool, supportsUdpGro, (), (const));
+  MOCK_METHOD(bool, supportsUdpGro, (), (const, override));
 };
 
 // Ensures that the Network::Utility::readFromSocket function uses GRO.

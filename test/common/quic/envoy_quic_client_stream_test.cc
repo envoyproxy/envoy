@@ -35,7 +35,7 @@ constexpr unsigned int kStreamId = 4u;
 
 class MockDelegate : public PacketsToReadDelegate {
 public:
-  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));
+  MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const, override));
 };
 
 class EnvoyQuicClientStreamTest : public testing::Test {

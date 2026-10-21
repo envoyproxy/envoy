@@ -38,10 +38,11 @@ class MockRouteConfigProvider : public Rds::RouteConfigProvider {
 public:
   MockRouteConfigProvider() { ON_CALL(*this, config()).WillByDefault(Return(route_config_)); }
 
-  MOCK_METHOD(Rds::ConfigConstSharedPtr, config, (), (const));
-  MOCK_METHOD(const std::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (), (const));
-  MOCK_METHOD(SystemTime, lastUpdated, (), (const));
-  MOCK_METHOD(absl::Status, onConfigUpdate, ());
+  MOCK_METHOD(Rds::ConfigConstSharedPtr, config, (), (const, override));
+  MOCK_METHOD(const std::optional<Rds::RouteConfigProvider::ConfigInfo>&, configInfo, (),
+              (const, override));
+  MOCK_METHOD(SystemTime, lastUpdated, (), (const, override));
+  MOCK_METHOD(absl::Status, onConfigUpdate, (), (override));
 
   std::shared_ptr<NiceMock<MockRouteMatcher>> route_config_{new NiceMock<MockRouteMatcher>()};
 };

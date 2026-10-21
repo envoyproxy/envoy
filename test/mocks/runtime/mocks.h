@@ -33,27 +33,30 @@ public:
   }
 
   MOCK_METHOD(bool, deprecatedFeatureEnabled, (absl::string_view key, bool default_enabled),
-              (const));
-  MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
-  MOCK_METHOD(bool, featureEnabled, (absl::string_view key, uint64_t default_value), (const));
+              (const, override));
+  MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const, override));
+  MOCK_METHOD(bool, featureEnabled, (absl::string_view key, uint64_t default_value),
+              (const, override));
   MOCK_METHOD(bool, featureEnabled,
-              (absl::string_view key, uint64_t default_value, uint64_t random_value), (const));
+              (absl::string_view key, uint64_t default_value, uint64_t random_value),
+              (const, override));
   MOCK_METHOD(bool, featureEnabled,
               (absl::string_view key, uint64_t default_value, uint64_t random_value,
                uint64_t num_buckets),
-              (const));
+              (const, override));
   MOCK_METHOD(bool, featureEnabled,
               (absl::string_view key, const envoy::type::v3::FractionalPercent& default_value),
-              (const));
+              (const, override));
   MOCK_METHOD(bool, featureEnabled,
               (absl::string_view key, const envoy::type::v3::FractionalPercent& default_value,
                uint64_t random_value),
-              (const));
-  MOCK_METHOD(ConstStringOptRef, get, (absl::string_view key), (const));
-  MOCK_METHOD(uint64_t, getInteger, (absl::string_view key, uint64_t default_value), (const));
-  MOCK_METHOD(double, getDouble, (absl::string_view key, double default_value), (const));
-  MOCK_METHOD(bool, getBoolean, (absl::string_view key, bool default_value), (const));
-  MOCK_METHOD(const std::vector<OverrideLayerConstPtr>&, getLayers, (), (const));
+              (const, override));
+  MOCK_METHOD(ConstStringOptRef, get, (absl::string_view key), (const, override));
+  MOCK_METHOD(uint64_t, getInteger, (absl::string_view key, uint64_t default_value),
+              (const, override));
+  MOCK_METHOD(double, getDouble, (absl::string_view key, double default_value), (const, override));
+  MOCK_METHOD(bool, getBoolean, (absl::string_view key, bool default_value), (const, override));
+  MOCK_METHOD(const std::vector<OverrideLayerConstPtr>&, getLayers, (), (const, override));
 };
 
 class MockLoader : public Loader {
@@ -61,14 +64,15 @@ public:
   MockLoader();
   ~MockLoader() override;
 
-  MOCK_METHOD(absl::Status, initialize, (Upstream::ClusterManager & cm));
-  MOCK_METHOD(absl::Status, onWorkerThreadsRegistered, ());
-  MOCK_METHOD(const Snapshot&, snapshot, (), (const));
-  MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, ());
-  MOCK_METHOD(absl::Status, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
-  MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));
-  MOCK_METHOD(Stats::Scope&, getRootScope, ());
-  MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const));
+  MOCK_METHOD(absl::Status, initialize, (Upstream::ClusterManager & cm), (override));
+  MOCK_METHOD(absl::Status, onWorkerThreadsRegistered, (), (override));
+  MOCK_METHOD(const Snapshot&, snapshot, (), (const, override));
+  MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, (), (override));
+  MOCK_METHOD(absl::Status, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)),
+              (override));
+  MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback), (override));
+  MOCK_METHOD(Stats::Scope&, getRootScope, (), (override));
+  MOCK_METHOD(void, countDeprecatedFeatureUse, (), (const, override));
 
   SnapshotConstSharedPtr threadsafe_snapshot_{
       std::make_shared<const testing::NiceMock<MockSnapshot>>()};
@@ -81,8 +85,8 @@ public:
   MockOverrideLayer();
   ~MockOverrideLayer() override;
 
-  MOCK_METHOD(const std::string&, name, (), (const));
-  MOCK_METHOD(const Snapshot::EntryMap&, values, (), (const));
+  MOCK_METHOD(const std::string&, name, (), (const, override));
+  MOCK_METHOD(const Snapshot::EntryMap&, values, (), (const, override));
 };
 
 } // namespace Runtime

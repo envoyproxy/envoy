@@ -22,26 +22,26 @@ namespace {
 
 class MockAbstractRequestListener : public AbstractRequestListener {
 public:
-  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr));
-  MOCK_METHOD(void, onRequestReadyForAnswer, ());
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(void, onRequest, (InFlightRequestSharedPtr), (override));
+  MOCK_METHOD(void, onRequestReadyForAnswer, (), (override));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
 };
 
 class MockRecordExtractor : public RecordExtractor {
 public:
   MOCK_METHOD((std::vector<OutboundRecord>), extractRecords, (const std::vector<TopicProduceData>&),
-              (const));
+              (const, override));
 };
 
 class MockUpstreamKafkaFacade : public UpstreamKafkaFacade {
 public:
-  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&));
+  MOCK_METHOD(KafkaProducer&, getProducerForTopic, (const std::string&), (override));
 };
 
 class MockKafkaProducer : public KafkaProducer {
 public:
-  MOCK_METHOD(void, send, (const ProduceFinishCbSharedPtr, const OutboundRecord&), ());
-  MOCK_METHOD(void, markFinished, (), ());
+  MOCK_METHOD(void, send, (const ProduceFinishCbSharedPtr, const OutboundRecord&), (override));
+  MOCK_METHOD(void, markFinished, (), (override));
 };
 
 class ProduceUnitTest : public testing::Test {

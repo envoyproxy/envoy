@@ -60,7 +60,7 @@ public:
   MOCK_METHOD(UpstreamLocalAddress, getUpstreamLocalAddressImpl,
               (const Network::Address::InstanceConstSharedPtr& address,
                OptRef<const Network::TransportSocketOptions>),
-              (const));
+              (const, override));
 
   Network::Address::InstanceConstSharedPtr& address_;
 };
@@ -71,7 +71,7 @@ public:
               createLocalAddressSelector,
               (std::vector<::Envoy::Upstream::UpstreamLocalAddress> upstream_local_addresses,
                std::optional<std::string> cluster_name),
-              (const));
+              (const, override));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Empty>();
@@ -104,66 +104,73 @@ public:
   }
 
   // Upstream::ClusterInfo
-  MOCK_METHOD(bool, addedViaApi, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const));
-  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
-  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, tcpPoolIdleTimeout, (), (const));
-  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, maxConnectionDuration, (), (const));
+  MOCK_METHOD(bool, addedViaApi, (), (const, override));
+  MOCK_METHOD(std::chrono::milliseconds, connectTimeout, (), (const, override));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, idleTimeout, (), (const, override));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, tcpPoolIdleTimeout, (),
+              (const, override));
+  MOCK_METHOD(const std::optional<std::chrono::milliseconds>, maxConnectionDuration, (),
+              (const, override));
   MOCK_METHOD(const std::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(const std::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
   MOCK_METHOD(const std::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (), (const));
-  MOCK_METHOD(float, perUpstreamPreconnectRatio, (), (const));
-  MOCK_METHOD(float, peekaheadRatio, (), (const));
-  MOCK_METHOD(bool, shouldPreconnect, (const Host& host), (const));
-  MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
-  MOCK_METHOD(uint64_t, features, (), (const));
+  MOCK_METHOD(float, perUpstreamPreconnectRatio, (), (const, override));
+  MOCK_METHOD(float, peekaheadRatio, (), (const, override));
+  MOCK_METHOD(bool, shouldPreconnect, (const Host& host), (const, override));
+  MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const, override));
+  MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (),
+              (const, override));
+  MOCK_METHOD(uint64_t, features, (), (const, override));
   const HttpProtocolOptionsConfig& httpProtocolOptions() const override {
     return http_protocol_options_config_;
   }
   MOCK_METHOD(ProtocolOptionsConfigConstSharedPtr, extensionProtocolOptions, (const std::string&),
-              (const));
-  MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const));
-  MOCK_METHOD(TypedLoadBalancerFactory&, loadBalancerFactory, (), (const));
-  MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (), (const));
+              (const, override));
+  MOCK_METHOD(OptRef<const LoadBalancerConfig>, loadBalancerConfig, (), (const, override));
+  MOCK_METHOD(TypedLoadBalancerFactory&, loadBalancerFactory, (), (const, override));
+  MOCK_METHOD(const envoy::config::cluster::v3::Cluster::CommonLbConfig&, lbConfig, (),
+              (const, override));
   MOCK_METHOD(std::optional<bool>, processHttpForOutlierDetection, (Http::ResponseHeaderMap&),
-              (const));
-  MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const));
+              (const, override));
+  MOCK_METHOD(envoy::config::cluster::v3::Cluster::DiscoveryType, type, (), (const, override));
   MOCK_METHOD(OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>, clusterType, (),
-              (const));
-  MOCK_METHOD(OptRef<const Http::ClientCodecFactory>, upstreamHttpClientCodecFactory, (), (const));
+              (const, override));
+  MOCK_METHOD(OptRef<const Http::ClientCodecFactory>, upstreamHttpClientCodecFactory, (),
+              (const, override));
   MOCK_METHOD(OptRef<const envoy::config::core::v3::TypedExtensionConfig>, upstreamConfig, (),
-              (const));
-  MOCK_METHOD(bool, maintenanceMode, (), (const));
-  MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
-  MOCK_METHOD(std::optional<uint16_t>, maxResponseHeadersKb, (), (const));
-  MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
-  MOCK_METHOD(const std::string&, name, (), (const));
-  MOCK_METHOD(const std::string&, observabilityName, (), (const));
-  MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
-  MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const));
-  MOCK_METHOD(DeferredCreationCompatibleClusterTrafficStats&, trafficStats, (), (const));
-  MOCK_METHOD(ClusterLbStats&, lbStats, (), (const));
-  MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const));
-  MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const));
-  MOCK_METHOD(Stats::Scope&, statsScope, (), (const));
-  MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const));
-  MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (), (const));
-  MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const));
-  MOCK_METHOD(bool, perEndpointStatsEnabled, (), (const));
+              (const, override));
+  MOCK_METHOD(bool, maintenanceMode, (), (const, override));
+  MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const, override));
+  MOCK_METHOD(std::optional<uint16_t>, maxResponseHeadersKb, (), (const, override));
+  MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const, override));
+  MOCK_METHOD(const std::string&, name, (), (const, override));
+  MOCK_METHOD(const std::string&, observabilityName, (), (const, override));
+  MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const, override));
+  MOCK_METHOD(TransportSocketMatcher&, transportSocketMatcher, (), (const, override));
+  MOCK_METHOD(DeferredCreationCompatibleClusterTrafficStats&, trafficStats, (), (const, override));
+  MOCK_METHOD(ClusterLbStats&, lbStats, (), (const, override));
+  MOCK_METHOD(ClusterEndpointStats&, endpointStats, (), (const, override));
+  MOCK_METHOD(ClusterConfigUpdateStats&, configUpdateStats, (), (const, override));
+  MOCK_METHOD(Stats::Scope&, statsScope, (), (const, override));
+  MOCK_METHOD(ClusterLoadReportStats&, loadReportStats, (), (const, override));
+  MOCK_METHOD(ClusterRequestResponseSizeStatsOptRef, requestResponseSizeStats, (),
+              (const, override));
+  MOCK_METHOD(ClusterTimeoutBudgetStatsOptRef, timeoutBudgetStats, (), (const, override));
+  MOCK_METHOD(bool, perEndpointStatsEnabled, (), (const, override));
   MOCK_METHOD(UpstreamLocalAddressSelectorConstSharedPtr, getUpstreamLocalAddressSelector, (),
-              (const));
-  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
-  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
-  MOCK_METHOD(OptRef<const ClusterInfo::PendingRqQueuePolicy>, pendingRqQueuePolicy, (), (const));
-  MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
-  MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
-  MOCK_METHOD(bool, warmHosts, (), (const));
-  MOCK_METHOD(bool, setLocalInterfaceNameOnUpstreamConnections, (), (const));
-  MOCK_METHOD(const std::string&, edsServiceName, (), (const));
-  MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
+              (const, override));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const, override));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const, override));
+  MOCK_METHOD(OptRef<const ClusterInfo::PendingRqQueuePolicy>, pendingRqQueuePolicy, (),
+              (const, override));
+  MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const, override));
+  MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const, override));
+  MOCK_METHOD(bool, warmHosts, (), (const, override));
+  MOCK_METHOD(bool, setLocalInterfaceNameOnUpstreamConnections, (), (const, override));
+  MOCK_METHOD(const std::string&, edsServiceName, (), (const, override));
+  MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const, override));
   MOCK_METHOD(std::vector<Http::Protocol>, upstreamHttpProtocol, (std::optional<Http::Protocol>),
-              (const));
+              (const, override));
 
   MOCK_METHOD(bool, createFilterChain, (Http::FilterChainFactoryCallbacks & callbacks),
               (const, override));
@@ -171,12 +178,13 @@ public:
               (absl::string_view upgrade_type,
                const Http::FilterChainFactory::UpgradeMap* upgrade_map,
                Http::FilterChainFactoryCallbacks& callbacks),
-              (const));
-  MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol), (const));
+              (const, override));
+  MOCK_METHOD(Http::ClientHeaderValidatorPtr, makeHeaderValidator, (Http::Protocol),
+              (const, override));
   MOCK_METHOD(
       OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
-      happyEyeballsConfig, (), (const));
-  MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
+      happyEyeballsConfig, (), (const, override));
+  MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const, override));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;

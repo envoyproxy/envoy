@@ -15,10 +15,11 @@ namespace Broker {
 class MockBrokerFilterConfig : public BrokerFilterConfig {
 public:
   MOCK_METHOD((const std::string&), stat_prefix, (), (const));
-  MOCK_METHOD(bool, needsResponseRewrite, (), (const));
-  MOCK_METHOD((std::optional<HostAndPort>), findBrokerAddressOverride, (const uint32_t), (const));
-  MOCK_METHOD((absl::flat_hash_set<int16_t>), apiKeysAllowed, (), (const));
-  MOCK_METHOD((absl::flat_hash_set<int16_t>), apiKeysDenied, (), (const));
+  MOCK_METHOD(bool, needsResponseRewrite, (), (const, override));
+  MOCK_METHOD((std::optional<HostAndPort>), findBrokerAddressOverride, (const uint32_t),
+              (const, override));
+  MOCK_METHOD((absl::flat_hash_set<int16_t>), apiKeysAllowed, (), (const, override));
+  MOCK_METHOD((absl::flat_hash_set<int16_t>), apiKeysDenied, (), (const, override));
   MockBrokerFilterConfig() : BrokerFilterConfig{"prefix", false, {}, {}, {}} {};
 };
 

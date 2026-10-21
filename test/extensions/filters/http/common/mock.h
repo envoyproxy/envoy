@@ -16,8 +16,8 @@ namespace Common {
 
 class MockJwksFetcher : public JwksFetcher {
 public:
-  MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(void, fetch, (Tracing::Span & parent_span, JwksReceiver& receiver));
+  MOCK_METHOD(void, cancel, (), (override));
+  MOCK_METHOD(void, fetch, (Tracing::Span & parent_span, JwksReceiver& receiver), (override));
 };
 
 // A mock HTTP upstream.
@@ -54,7 +54,7 @@ public:
     onJwksSuccessImpl(*jwks.get());
   }
   MOCK_METHOD(void, onJwksSuccessImpl, (const Envoy::JwtVerify::Jwks& jwks));
-  MOCK_METHOD(void, onJwksError, (JwksFetcher::JwksReceiver::Failure reason));
+  MOCK_METHOD(void, onJwksError, (JwksFetcher::JwksReceiver::Failure reason), (override));
 };
 
 } // namespace Common

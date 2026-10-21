@@ -28,13 +28,16 @@ public:
   ~MockSubscriptionCallbacks() override;
 
   MOCK_METHOD(absl::Status, onConfigUpdate,
-              (const std::vector<DecodedResourceRef>& resources, const std::string& version_info));
+              (const std::vector<DecodedResourceRef>& resources, const std::string& version_info),
+              (override));
   MOCK_METHOD(absl::Status, onConfigUpdate,
               (const std::vector<DecodedResourceRef>& added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-               const std::string& system_version_info));
+               const std::string& system_version_info),
+              (override));
   MOCK_METHOD(void, onConfigUpdateFailed,
-              (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+              (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e),
+              (override));
 };
 
 class MockXdsConfigTracker : public XdsConfigTracker {
@@ -101,9 +104,9 @@ public:
   ~MockOpaqueResourceDecoder() override;
 
   MOCK_METHOD(Protobuf::Arena::UniquePtr<Protobuf::Message>, decodeResource,
-              (const Protobuf::Any& resource, Protobuf::Arena& arena));
-  MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
-  MOCK_METHOD(const Protobuf::ArenaOptions&, arenaOptions, (), (const));
+              (const Protobuf::Any& resource, Protobuf::Arena& arena), (override));
+  MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource), (override));
+  MOCK_METHOD(const Protobuf::ArenaOptions&, arenaOptions, (), (const, override));
 
   Protobuf::ArenaOptions arena_options_;
 };
@@ -115,27 +118,31 @@ public:
 
   MOCK_METHOD(void, onConfigUpdate,
               (const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
-               const std::string& version_info));
+               const std::string& version_info),
+              (override));
 
   MOCK_METHOD(void, onConfigUpdate,
-              (const std::vector<DecodedResourcePtr>& resources, const std::string& version_info));
+              (const std::vector<DecodedResourcePtr>& resources, const std::string& version_info),
+              (override));
 
   MOCK_METHOD(void, onConfigUpdate,
               (absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-               const std::string& system_version_info));
+               const std::string& system_version_info),
+              (override));
   MOCK_METHOD(void, onConfigUpdateFailed,
-              (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+              (Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e),
+              (override));
 };
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD(void, start, (const absl::flat_hash_set<std::string>& resources));
+  MOCK_METHOD(void, start, (const absl::flat_hash_set<std::string>& resources), (override));
   MOCK_METHOD(void, updateResourceInterest,
-              (const absl::flat_hash_set<std::string>& update_to_these_names));
+              (const absl::flat_hash_set<std::string>& update_to_these_names), (override));
   MOCK_METHOD(void, requestOnDemandUpdate,
-              (const absl::flat_hash_set<std::string>& add_these_names));
-  MOCK_METHOD(void, accept, (const absl::flat_hash_set<std::string>& patterns));
+              (const absl::flat_hash_set<std::string>& add_these_names), (override));
+  MOCK_METHOD(void, accept, (const absl::flat_hash_set<std::string>& patterns), (override));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -146,18 +153,19 @@ public:
   MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscriptionFromConfigSource,
               (const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoderSharedPtr resource_decoder,
-               const SubscriptionOptions& options));
+               OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options),
+              (override));
   MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscriptionOverAdsGrpcMux,
               (GrpcMuxSharedPtr & ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
                absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoderSharedPtr resource_decoder,
-               const SubscriptionOptions& options));
+               OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options),
+              (override));
   MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, collectionSubscriptionFromUrl,
               (const xds::core::v3::ResourceLocator& collection_locator,
                const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
                Stats::Scope& scope, SubscriptionCallbacks& callbacks,
-               OpaqueResourceDecoderSharedPtr resource_decoder));
+               OpaqueResourceDecoderSharedPtr resource_decoder),
+              (override));
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   MockSubscription* subscription_{};
@@ -191,11 +199,12 @@ public:
   MOCK_METHOD(GrpcMuxWatchPtr, addWatch,
               (const std::string& type_url, const absl::flat_hash_set<std::string>& resources,
                SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr resource_decoder,
-               const SubscriptionOptions& options));
+               const SubscriptionOptions& options),
+              (override));
 
   MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
 
-  MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
+  MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, (), (override));
 
   MOCK_METHOD(Upstream::LoadStatsReporter*, loadStatsReporter, (), (const, override));
   MOCK_METHOD(Upstream::LoadStatsReporter*, maybeCreateLoadStatsReporter, (), (override));
@@ -206,7 +215,8 @@ public:
        Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
        BackOffStrategyPtr&& backoff_strategy,
        const envoy::config::core::v3::ApiConfigSource& ads_config_source,
-       std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory));
+       std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory),
+      (override));
 };
 
 class MockGrpcStreamCallbacks
@@ -215,12 +225,13 @@ public:
   MockGrpcStreamCallbacks();
   ~MockGrpcStreamCallbacks() override;
 
-  MOCK_METHOD(void, onStreamEstablished, ());
-  MOCK_METHOD(void, onEstablishmentFailure, (bool));
+  MOCK_METHOD(void, onStreamEstablished, (), (override));
+  MOCK_METHOD(void, onEstablishmentFailure, (bool), (override));
   MOCK_METHOD(void, onDiscoveryResponse,
               (ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse> && message,
-               ControlPlaneStats& control_plane_stats));
-  MOCK_METHOD(void, onWriteable, ());
+               ControlPlaneStats& control_plane_stats),
+              (override));
+  MOCK_METHOD(void, onWriteable, (), (override));
 };
 
 class MockConfigProviderManager : public ConfigProviderManager {
@@ -232,21 +243,23 @@ public:
               (const Protobuf::Message& config_source_proto,
                Server::Configuration::ServerFactoryContext& factory_context,
                Init::Manager& init_manager, const std::string& stat_prefix,
-               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg),
+              (override));
   MOCK_METHOD(ConfigProviderPtr, createStaticConfigProvider,
               (std::vector<std::unique_ptr<const Protobuf::Message>> && config_protos,
                Server::Configuration::ServerFactoryContext& factory_context,
-               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg));
+               const Envoy::Config::ConfigProviderManager::OptionalArg& optarg),
+              (override));
 };
 
 class MockTypedFactory : public TypedFactory {
 public:
   ~MockTypedFactory() override;
 
-  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, ());
+  MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
   MOCK_METHOD(std::string, configType, ());
-  MOCK_METHOD(std::string, name, (), (const));
-  MOCK_METHOD(std::string, category, (), (const));
+  MOCK_METHOD(std::string, name, (), (const, override));
+  MOCK_METHOD(std::string, category, (), (const, override));
 };
 
 class MockContextProvider : public ContextProvider {
@@ -254,16 +267,16 @@ public:
   MockContextProvider();
   ~MockContextProvider() override;
 
-  MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const));
+  MOCK_METHOD(const xds::core::v3::ContextParams&, nodeContext, (), (const, override));
   MOCK_METHOD(const xds::core::v3::ContextParams&, dynamicContext,
-              (absl::string_view resource_type_url), (const));
+              (absl::string_view resource_type_url), (const, override));
   MOCK_METHOD(absl::Status, setDynamicContextParam,
-              (absl::string_view resource_type_url, absl::string_view key,
-               absl::string_view value));
+              (absl::string_view resource_type_url, absl::string_view key, absl::string_view value),
+              (override));
   MOCK_METHOD(absl::Status, unsetDynamicContextParam,
-              (absl::string_view resource_type_url, absl::string_view key));
+              (absl::string_view resource_type_url, absl::string_view key), (override));
   MOCK_METHOD(Common::CallbackHandlePtr, addDynamicContextUpdateCallback,
-              (UpdateNotificationCb callback), (const));
+              (UpdateNotificationCb callback), (const, override));
 
   Common::CallbackManager<absl::Status, absl::string_view> update_cb_handler_;
 };

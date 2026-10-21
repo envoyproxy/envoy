@@ -50,7 +50,7 @@ TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
 
 class MockAccessLog : public AccessLog::Instance {
 public:
-  MOCK_METHOD(void, log, (const Formatter::Context&, const StreamInfo::StreamInfo&));
+  MOCK_METHOD(void, log, (const Formatter::Context&, const StreamInfo::StreamInfo&), (override));
 };
 
 class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {

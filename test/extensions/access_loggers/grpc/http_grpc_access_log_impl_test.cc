@@ -36,8 +36,8 @@ using envoy::data::accesslog::v3::HTTPAccessLogEntry;
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry));
-  MOCK_METHOD(void, log, (envoy::data::accesslog::v3::TCPAccessLogEntry && entry));
+  MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry), (override));
+  MOCK_METHOD(void, log, (envoy::data::accesslog::v3::TCPAccessLogEntry && entry), (override));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
@@ -45,7 +45,8 @@ public:
   // GrpcAccessLoggerCache
   MOCK_METHOD(GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
               (const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
-               Common::GrpcAccessLoggerType logger_type));
+               Common::GrpcAccessLoggerType logger_type),
+              (override));
 };
 
 // Test for the issue described in https://github.com/envoyproxy/envoy/pull/18081

@@ -28,9 +28,9 @@ public:
   MOCK_METHOD(void, incErrors, (ErrorType), (override));
   MOCK_METHOD(void, processQuery, (const std::string&), (override));
   MOCK_METHOD(bool, onSSLRequest, (), (override));
-  MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
-  MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
-  MOCK_METHOD(bool, encryptUpstream, (bool, Buffer::Instance&));
+  MOCK_METHOD(bool, shouldEncryptUpstream, (), (const, override));
+  MOCK_METHOD(void, sendUpstream, (Buffer::Instance&), (override));
+  MOCK_METHOD(bool, encryptUpstream, (bool, Buffer::Instance&), (override));
   MOCK_METHOD(void, verifyDownstreamSSL, (), (override));
 };
 
@@ -735,7 +735,7 @@ public:
   MOCK_METHOD(void, setWatermarks, (uint64_t, uint32_t), (override));
   MOCK_METHOD(uint64_t, highWatermark, (), (const, override));
   MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
-  MOCK_METHOD(size_t, addFragments, (absl::Span<const absl::string_view>));
+  MOCK_METHOD(size_t, addFragments, (absl::Span<const absl::string_view>), (override));
 };
 
 // Test verifies that decoder calls Buffer::linearize method

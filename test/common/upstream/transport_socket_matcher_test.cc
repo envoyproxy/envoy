@@ -41,15 +41,15 @@ using Extensions::Matching::CommonInputs::TransportSocket::TransportSocketNameAc
 
 class FakeTransportSocketFactory : public Network::UpstreamTransportSocketFactory {
 public:
-  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
-  MOCK_METHOD(bool, supportsAlpn, (), (const));
-  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const, override));
+  MOCK_METHOD(bool, supportsAlpn, (), (const, override));
+  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const, override));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsConstSharedPtr,
                Upstream::HostDescriptionConstSharedPtr),
-              (const));
+              (const, override));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
-              (const));
+              (const, override));
   FakeTransportSocketFactory(std::string id, bool alpn) : supports_alpn_(alpn), id_(std::move(id)) {
     ON_CALL(*this, supportsAlpn).WillByDefault(Invoke([this]() { return supports_alpn_; }));
   }
@@ -66,14 +66,14 @@ class FooTransportSocketFactory
       public Server::Configuration::UpstreamTransportSocketConfigFactory,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  MOCK_METHOD(bool, implementsSecureTransport, (), (const));
+  MOCK_METHOD(bool, implementsSecureTransport, (), (const, override));
   MOCK_METHOD(Network::TransportSocketPtr, createTransportSocket,
               (Network::TransportSocketOptionsConstSharedPtr,
                Upstream::HostDescriptionConstSharedPtr),
-              (const));
+              (const, override));
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
-              (const));
-  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const));
+              (const, override));
+  MOCK_METHOD(absl::string_view, defaultServerNameIndication, (), (const, override));
 
   absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message& proto,

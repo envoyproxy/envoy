@@ -19,9 +19,10 @@ namespace {
 class MockSingletonSubscriptionCallbacks : public SingletonSubscriptionCallbacks {
 public:
   MOCK_METHOD(absl::Status, onResourceUpdate,
-              (const DecodedResource& resource, const std::string& version_info));
-  MOCK_METHOD(void, onResourceRemoved, ());
-  MOCK_METHOD(void, onFailure, (ConfigUpdateFailureReason reason, const EnvoyException* e));
+              (const DecodedResource& resource, const std::string& version_info), (override));
+  MOCK_METHOD(void, onResourceRemoved, (), (override));
+  MOCK_METHOD(void, onFailure, (ConfigUpdateFailureReason reason, const EnvoyException* e),
+              (override));
 };
 
 TEST(SingletonSubscriptionAdapterTest, SotWEmptyResources) {

@@ -147,13 +147,14 @@ private:
 class MockOAuth2CookieValidator : public CookieValidator {
 public:
   MOCK_METHOD(std::string&, username, (), (const));
-  MOCK_METHOD(std::string&, token, (), (const));
-  MOCK_METHOD(std::string&, idToken, (), (const));
-  MOCK_METHOD(std::string&, refreshToken, (), (const));
+  MOCK_METHOD(std::string&, token, (), (const, override));
+  MOCK_METHOD(std::string&, idToken, (), (const, override));
+  MOCK_METHOD(std::string&, refreshToken, (), (const, override));
 
-  MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const));
-  MOCK_METHOD(bool, isValid, (), (const));
-  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, absl::string_view secret));
+  MOCK_METHOD(bool, canUpdateTokenByRefreshToken, (), (const, override));
+  MOCK_METHOD(bool, isValid, (), (const, override));
+  MOCK_METHOD(void, setParams, (const Http::RequestHeaderMap& headers, absl::string_view secret),
+              (override));
 };
 
 class MockOAuth2Client : public OAuth2Client {
@@ -169,11 +170,13 @@ public:
 
   MOCK_METHOD(void, asyncGetAccessToken,
               (const std::string&, const std::string&, const std::string&, const std::string&,
-               const std::string&, Envoy::Extensions::HttpFilters::Oauth2::AuthType));
+               const std::string&, Envoy::Extensions::HttpFilters::Oauth2::AuthType),
+              (override));
 
   MOCK_METHOD(void, asyncRefreshAccessToken,
               (const std::string&, const std::string&, const std::string&,
-               Envoy::Extensions::HttpFilters::Oauth2::AuthType));
+               Envoy::Extensions::HttpFilters::Oauth2::AuthType),
+              (override));
 
   MOCK_METHOD(OAuthState, getState, (), (const, override));
 };

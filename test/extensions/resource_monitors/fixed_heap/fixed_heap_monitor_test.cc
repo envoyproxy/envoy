@@ -20,10 +20,10 @@ class MockMemoryStatsReader : public MemoryStatsReader {
 public:
   MockMemoryStatsReader() = default;
 
-  MOCK_METHOD(uint64_t, reservedHeapBytes, ());
-  MOCK_METHOD(uint64_t, unmappedHeapBytes, ());
-  MOCK_METHOD(uint64_t, freeMappedHeapBytes, ());
-  MOCK_METHOD(uint64_t, allocatedHeapBytes, ());
+  MOCK_METHOD(uint64_t, reservedHeapBytes, (), (override));
+  MOCK_METHOD(uint64_t, unmappedHeapBytes, (), (override));
+  MOCK_METHOD(uint64_t, freeMappedHeapBytes, (), (override));
+  MOCK_METHOD(uint64_t, allocatedHeapBytes, (), (override));
 };
 
 class ResourcePressure : public Server::ResourceUpdateCallbacks {

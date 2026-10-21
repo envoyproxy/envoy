@@ -63,10 +63,11 @@ public:
   }
 
   MOCK_METHOD(void, SendConnectionClosePacket,
-              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
-  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
+              (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&),
+              (override));
+  MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame), (override));
   MOCK_METHOD(quic::DatagramStatus, SendDatagram,
-              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool), (override));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
@@ -85,7 +86,7 @@ public:
                                   generator) {}
 
   MOCK_METHOD(quic::DatagramStatus, SendDatagram,
-              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool), (override));
 };
 
 class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {
@@ -119,24 +120,26 @@ public:
   }
 
   // From QuicSession.
-  MOCK_METHOD(quic::QuicSpdyStream*, CreateIncomingStream, (quic::QuicStreamId id));
+  MOCK_METHOD(quic::QuicSpdyStream*, CreateIncomingStream, (quic::QuicStreamId id), (override));
   MOCK_METHOD(quic::QuicSpdyStream*, CreateIncomingStream, (quic::PendingStream * pending));
-  MOCK_METHOD(quic::QuicSpdyStream*, CreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(quic::QuicSpdyStream*, CreateOutgoingBidirectionalStream, (), (override));
   MOCK_METHOD(quic::QuicSpdyStream*, CreateOutgoingUnidirectionalStream, ());
-  MOCK_METHOD(bool, ShouldCreateIncomingStream, (quic::QuicStreamId id));
-  MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(bool, ShouldCreateIncomingStream, (quic::QuicStreamId id), (override));
+  MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, (), (override));
   MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quic::EncryptionLevel level));
-  MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
+               quic::EncryptionLevel level),
+              (override));
+  MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id), (override));
   MOCK_METHOD(void, MaybeSendRstStreamFrame,
               (quic::QuicStreamId id, quic::QuicResetStreamError error,
-               quic::QuicStreamOffset bytes_written));
+               quic::QuicStreamOffset bytes_written),
+              (override));
   MOCK_METHOD(void, MaybeSendStopSendingFrame,
-              (quic::QuicStreamId id, quic::QuicResetStreamError error));
-  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+              (quic::QuicStreamId id, quic::QuicResetStreamError error), (override));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const, override));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -232,19 +235,21 @@ public:
   }
 
   // From QuicSession.
-  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateIncomingStream, (quic::QuicStreamId id));
+  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateIncomingStream, (quic::QuicStreamId id),
+              (override));
   MOCK_METHOD(quic::QuicSpdyClientStream*, CreateIncomingStream, (quic::PendingStream * pending));
-  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateOutgoingBidirectionalStream, (), (override));
   MOCK_METHOD(quic::QuicSpdyClientStream*, CreateOutgoingUnidirectionalStream, ());
-  MOCK_METHOD(bool, ShouldCreateIncomingStream, (quic::QuicStreamId id));
-  MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(bool, ShouldCreateIncomingStream, (quic::QuicStreamId id), (override));
+  MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, (), (override));
   MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD(quic::QuicConsumedData, WritevData,
               (quic::QuicStreamId id, size_t write_length, quic::QuicStreamOffset offset,
                quic::StreamSendingState state, quic::TransmissionType type,
-               quic::EncryptionLevel level));
-  MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id));
-  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+               quic::EncryptionLevel level),
+              (override));
+  MOCK_METHOD(bool, ShouldYield, (quic::QuicStreamId id), (override));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const, override));
 
   absl::string_view requestedServerName() const override {
     return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -340,12 +345,12 @@ inline std::string testParamsToString(
 
 class MockProofVerifyContext : public EnvoyQuicProofVerifyContext {
 public:
-  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const));
-  MOCK_METHOD(bool, isServer, (), (const));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (const, override));
+  MOCK_METHOD(bool, isServer, (), (const, override));
   MOCK_METHOD(const Network::TransportSocketOptionsConstSharedPtr&, transportSocketOptions, (),
-              (const));
+              (const, override));
   MOCK_METHOD(Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext,
-              extraValidationContext, (), (const));
+              extraValidationContext, (), (const, override));
 };
 
 class MockQuicConnectionDebugVisitor : public quic::QuicConnectionDebugVisitor {
@@ -355,8 +360,8 @@ public:
       : session_(session), stream_info_(stream_info) {}
 
   MOCK_METHOD(void, OnConnectionClosed,
-              (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), ());
-  MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), ());
+              (const quic::QuicConnectionCloseFrame&, quic::ConnectionCloseSource), (override));
+  MOCK_METHOD(void, OnConnectionCloseFrame, (const quic::QuicConnectionCloseFrame&), (override));
 
   quic::QuicSession& session_;
   const StreamInfo::StreamInfo& stream_info_;

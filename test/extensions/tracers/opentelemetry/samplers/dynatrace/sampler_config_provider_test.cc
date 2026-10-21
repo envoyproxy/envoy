@@ -86,7 +86,7 @@ TEST_F(SamplerConfigProviderTest, TestRequestIsSent) {
 TEST_F(SamplerConfigProviderTest, TestPendingRequestIsCanceled) {
   class TestRequest : public Http::AsyncClient::Request {
   public:
-    MOCK_METHOD(void, cancel, ());
+    MOCK_METHOD(void, cancel, (), (override));
   };
 
   NiceMock<TestRequest> test_request;

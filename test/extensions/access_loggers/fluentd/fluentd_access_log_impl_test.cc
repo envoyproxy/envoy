@@ -471,7 +471,7 @@ TEST_F(FluentdAccessLoggerCacheImplTest, JitteredExponentialBackOffStrategyConfi
 
 class MockFluentdAccessLogger : public FluentdService {
 public:
-  MOCK_METHOD(void, log, (EntryPtr&&));
+  MOCK_METHOD(void, log, (EntryPtr &&), (override));
 };
 
 class MockFluentdAccessLoggerCache
@@ -487,7 +487,7 @@ class MockFluentdFormatter : public FluentdFormatter {
 public:
   MOCK_METHOD(std::vector<uint8_t>, format,
               (const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info),
-              (const));
+              (const, override));
 };
 
 using FilterPtr = Envoy::AccessLog::FilterPtr;

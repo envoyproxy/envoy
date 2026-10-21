@@ -16,13 +16,13 @@ public:
                const std::vector<std::string> action_protos);
   ~MockWatchdog() override = default;
 
-  MOCK_METHOD(std::chrono::milliseconds, missTimeout, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, megaMissTimeout, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, killTimeout, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, multiKillTimeout, (), (const));
-  MOCK_METHOD(double, multiKillThreshold, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, missTimeout, (), (const, override));
+  MOCK_METHOD(std::chrono::milliseconds, megaMissTimeout, (), (const, override));
+  MOCK_METHOD(std::chrono::milliseconds, killTimeout, (), (const, override));
+  MOCK_METHOD(std::chrono::milliseconds, multiKillTimeout, (), (const, override));
+  MOCK_METHOD(double, multiKillThreshold, (), (const, override));
   MOCK_METHOD(Protobuf::RepeatedPtrField<envoy::config::bootstrap::v3::Watchdog::WatchdogAction>,
-              actions, (), (const));
+              actions, (), (const, override));
 
   std::chrono::milliseconds miss_;
   std::chrono::milliseconds megamiss_;

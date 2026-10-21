@@ -23,7 +23,7 @@ namespace Mesh {
 
 class MockProduceFinishCb : public ProduceFinishCb {
 public:
-  MOCK_METHOD(bool, accept, (const DeliveryMemento&));
+  MOCK_METHOD(bool, accept, (const DeliveryMemento&), (override));
 };
 
 class UpstreamKafkaClientTest : public testing::Test {

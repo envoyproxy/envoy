@@ -58,7 +58,8 @@ public:
               (Network::SocketSharedPtr && socket, Network::TcpListenerCallbacks& cb,
                Runtime::Loader& runtime, Random::RandomGenerator& random,
                const Network::ListenerConfig& listener_config,
-               Server::ThreadLocalOverloadStateOptRef overload_state));
+               Server::ThreadLocalOverloadStateOptRef overload_state),
+              (override));
 };
 
 class ConnectionHandlerTest : public testing::Test,
@@ -291,8 +292,8 @@ public:
 
     MOCK_METHOD(void, enable, (), (override));
     MOCK_METHOD(void, disable, (), (override));
-    MOCK_METHOD(void, setRejectFraction, (UnitFloat));
-    MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&));
+    MOCK_METHOD(void, setRejectFraction, (UnitFloat), (override));
+    MOCK_METHOD(void, configureLoadShedPoints, (Server::LoadShedPointProvider&), (override));
     MOCK_METHOD(Event::Dispatcher&, dispatcher, (), (override));
     MOCK_METHOD(Network::Address::InstanceConstSharedPtr&, localAddress, (), (const, override));
     MOCK_METHOD(Api::IoCallUint64Result, send, (const Network::UdpSendData&), (override));

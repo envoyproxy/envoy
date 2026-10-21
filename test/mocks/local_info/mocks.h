@@ -18,14 +18,14 @@ public:
   MockLocalInfo();
   ~MockLocalInfo() override;
 
-  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const));
-  MOCK_METHOD(const std::string&, zoneName, (), (const));
-  MOCK_METHOD(const std::string&, clusterName, (), (const));
-  MOCK_METHOD(const std::string&, nodeName, (), (const));
-  MOCK_METHOD(const Stats::StatName&, zoneStatName, (), (const));
-  MOCK_METHOD(envoy::config::core::v3::Node&, node, (), (const));
-  MOCK_METHOD(Config::ContextProvider&, contextProvider, ());
-  MOCK_METHOD(const Config::ContextProvider&, contextProvider, (), (const));
+  MOCK_METHOD(Network::Address::InstanceConstSharedPtr, address, (), (const, override));
+  MOCK_METHOD(const std::string&, zoneName, (), (const, override));
+  MOCK_METHOD(const std::string&, clusterName, (), (const, override));
+  MOCK_METHOD(const std::string&, nodeName, (), (const, override));
+  MOCK_METHOD(const Stats::StatName&, zoneStatName, (), (const, override));
+  MOCK_METHOD(envoy::config::core::v3::Node&, node, (), (const, override));
+  MOCK_METHOD(Config::ContextProvider&, contextProvider, (), (override));
+  MOCK_METHOD(const Config::ContextProvider&, contextProvider, (), (const, override));
 
   const Stats::StatName& makeZoneStatName() const;
 

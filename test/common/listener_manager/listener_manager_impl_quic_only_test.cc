@@ -46,7 +46,7 @@ public:
 
 class MockSupportsUdpGso : public Api::OsSysCallsImpl {
 public:
-  MOCK_METHOD(bool, supportsUdpGso, (), (const));
+  MOCK_METHOD(bool, supportsUdpGso, (), (const, override));
 };
 
 class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {

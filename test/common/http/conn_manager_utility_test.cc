@@ -79,13 +79,16 @@ public:
     ON_CALL(*this, useRequestIdForTraceSampling()).WillByDefault(Return(true));
   }
 
-  MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool, bool));
-  MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&));
-  MOCK_METHOD(std::optional<absl::string_view>, get, (const Http::RequestHeaderMap&), (const));
-  MOCK_METHOD(std::optional<uint64_t>, getInteger, (const Http::RequestHeaderMap&), (const));
-  MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&));
-  MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason));
-  MOCK_METHOD(bool, useRequestIdForTraceSampling, (), (const));
+  MOCK_METHOD(void, set, (Http::RequestHeaderMap&, bool, bool), (override));
+  MOCK_METHOD(void, setInResponse, (Http::ResponseHeaderMap&, const Http::RequestHeaderMap&),
+              (override));
+  MOCK_METHOD(std::optional<absl::string_view>, get, (const Http::RequestHeaderMap&),
+              (const, override));
+  MOCK_METHOD(std::optional<uint64_t>, getInteger, (const Http::RequestHeaderMap&),
+              (const, override));
+  MOCK_METHOD(Tracing::Reason, getTraceReason, (const Http::RequestHeaderMap&), (override));
+  MOCK_METHOD(void, setTraceReason, (Http::RequestHeaderMap&, Tracing::Reason), (override));
+  MOCK_METHOD(bool, useRequestIdForTraceSampling, (), (const, override));
 
 private:
   RequestIDExtensionSharedPtr real_;
@@ -93,7 +96,7 @@ private:
 
 class MockInternalAddressConfig : public Http::InternalAddressConfig {
 public:
-  MOCK_METHOD(bool, isInternalAddress, (const Network::Address::Instance&), (const));
+  MOCK_METHOD(bool, isInternalAddress, (const Network::Address::Instance&), (const, override));
 };
 
 const Http::LowerCaseString& traceStatusHeader() {

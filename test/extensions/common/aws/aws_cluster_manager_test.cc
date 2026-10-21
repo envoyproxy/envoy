@@ -27,7 +27,7 @@ public:
 
 class MockAwsManagedClusterUpdateCallbacks : public AwsManagedClusterUpdateCallbacks {
 public:
-  MOCK_METHOD(void, onClusterAddOrUpdate, ());
+  MOCK_METHOD(void, onClusterAddOrUpdate, (), (override));
 };
 
 class AwsClusterManagerFriend {

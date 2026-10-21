@@ -180,11 +180,12 @@ public:
     auto entry = std::make_unique<TestPendingStream>(*this, context, can_send_early_data);
     return addPendingStream(std::move(entry));
   }
-  MOCK_METHOD(ActiveClientPtr, instantiateActiveClient, ());
+  MOCK_METHOD(ActiveClientPtr, instantiateActiveClient, (), (override));
   MOCK_METHOD(void, onPoolFailure,
               (const Upstream::HostDescriptionConstSharedPtr& n, absl::string_view,
-               ConnectionPool::PoolFailureReason, AttachContext&));
-  MOCK_METHOD(void, onPoolReady, (ActiveClient&, AttachContext&));
+               ConnectionPool::PoolFailureReason, AttachContext&),
+              (override));
+  MOCK_METHOD(void, onPoolReady, (ActiveClient&, AttachContext&), (override));
   void setSkipPendingOverflowForTest(bool value) { skip_pending_overflow_on_active_rq_ = value; }
 };
 

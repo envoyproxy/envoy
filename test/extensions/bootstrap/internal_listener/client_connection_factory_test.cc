@@ -28,7 +28,7 @@ namespace {
 class MockInternalListenerManager : public Network::InternalListenerManager {
 public:
   MOCK_METHOD(Network::InternalListenerOptRef, findByAddress,
-              (const Network::Address::InstanceConstSharedPtr&));
+              (const Network::Address::InstanceConstSharedPtr&), (override));
 };
 
 // The internal connection factory is linked in this test suite. This test suite verifies the
@@ -80,17 +80,19 @@ public:
 
 class MockInternalListener : public Network::InternalListener {
 public:
-  MOCK_METHOD(uint64_t, listenerTag, ());
-  MOCK_METHOD(Network::Listener*, listener, ());
-  MOCK_METHOD(void, pauseListening, ());
-  MOCK_METHOD(void, resumeListening, ());
-  MOCK_METHOD(void, shutdownListener, (const Network::ExtraShutdownListenerOptions&));
-  MOCK_METHOD(void, updateListenerConfig, (Network::ListenerConfig&));
-  MOCK_METHOD(void, onFilterChainDraining, (const std::list<const Network::FilterChain*>&));
+  MOCK_METHOD(uint64_t, listenerTag, (), (override));
+  MOCK_METHOD(Network::Listener*, listener, (), (override));
+  MOCK_METHOD(void, pauseListening, (), (override));
+  MOCK_METHOD(void, resumeListening, (), (override));
+  MOCK_METHOD(void, shutdownListener, (const Network::ExtraShutdownListenerOptions&), (override));
+  MOCK_METHOD(void, updateListenerConfig, (Network::ListenerConfig&), (override));
+  MOCK_METHOD(void, onFilterChainDraining, (const std::list<const Network::FilterChain*>&),
+              (override));
   MOCK_METHOD(void, onFilterChainDrainStart,
-              (const std::list<const Network::FilterChain*>&, Network::ConnectionDrainEvent));
-  MOCK_METHOD(void, onListenerDrainStart, (Network::ConnectionDrainEvent));
-  MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr&&));
+              (const std::list<const Network::FilterChain*>&, Network::ConnectionDrainEvent),
+              (override));
+  MOCK_METHOD(void, onListenerDrainStart, (Network::ConnectionDrainEvent), (override));
+  MOCK_METHOD(void, onAccept, (Network::ConnectionSocketPtr &&), (override));
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 };
 

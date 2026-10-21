@@ -25,14 +25,15 @@ namespace {
 
 class SampleDetector : public ResourceDetector {
 public:
-  MOCK_METHOD(Resource, detect, ());
+  MOCK_METHOD(Resource, detect, (), (override));
 };
 
 class DetectorFactoryA : public ResourceDetectorFactory {
 public:
   MOCK_METHOD(ResourceDetectorPtr, createResourceDetector,
               (const Protobuf::Message& message,
-               Server::Configuration::ServerFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context),
+              (override));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Struct>();
@@ -45,7 +46,8 @@ class DetectorFactoryB : public ResourceDetectorFactory {
 public:
   MOCK_METHOD(ResourceDetectorPtr, createResourceDetector,
               (const Protobuf::Message& message,
-               Server::Configuration::ServerFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context),
+              (override));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::StringValue>();

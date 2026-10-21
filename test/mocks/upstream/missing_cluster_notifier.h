@@ -13,7 +13,7 @@ public:
   MockMissingClusterNotifier();
   ~MockMissingClusterNotifier() override;
 
-  MOCK_METHOD(void, notifyMissingCluster, (absl::string_view name));
+  MOCK_METHOD(void, notifyMissingCluster, (absl::string_view name), (override));
 };
 
 } // namespace Upstream

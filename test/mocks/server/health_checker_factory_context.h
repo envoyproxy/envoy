@@ -24,16 +24,16 @@ public:
   MockHealthCheckerFactoryContext();
   ~MockHealthCheckerFactoryContext() override;
 
-  MOCK_METHOD(Upstream::Cluster&, cluster, ());
-  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
+  MOCK_METHOD(Upstream::Cluster&, cluster, (), (override));
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, (), (override));
   MOCK_METHOD(Envoy::Random::RandomGenerator&, random, ());
-  MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
-  MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, ());
-  MOCK_METHOD(void, setEventLogger, (Upstream::HealthCheckEventLoggerPtr));
-  MOCK_METHOD(Server::Configuration::ServerFactoryContext&, serverFactoryContext, ());
-  MOCK_METHOD(Upstream::HealthFlagCallbacks&, healthFlagCallbacks, ());
+  MOCK_METHOD(Envoy::Runtime::Loader&, runtime, (), (override));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (override));
+  MOCK_METHOD(Api::Api&, api, (), (override));
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (override));
+  MOCK_METHOD(void, setEventLogger, (Upstream::HealthCheckEventLoggerPtr), (override));
+  MOCK_METHOD(Server::Configuration::ServerFactoryContext&, serverFactoryContext, (), (override));
+  MOCK_METHOD(Upstream::HealthFlagCallbacks&, healthFlagCallbacks, (), (override));
 
   Upstream::HealthCheckEventLoggerPtr eventLogger() override {
     if (!event_logger_) {

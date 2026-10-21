@@ -34,27 +34,32 @@ public:
   // Server::Worker
   MOCK_METHOD(void, addListener,
               (std::optional<uint64_t> overridden_listener, Network::ListenerConfig& listener,
-               AddListenerCompletion completion, Runtime::Loader&, Random::RandomGenerator&));
-  MOCK_METHOD(uint64_t, numConnections, (), (const));
+               AddListenerCompletion completion, Runtime::Loader&, Random::RandomGenerator&),
+              (override));
+  MOCK_METHOD(uint64_t, numConnections, (), (const, override));
   MOCK_METHOD(void, removeListener,
-              (Network::ListenerConfig & listener, std::function<void()> completion));
+              (Network::ListenerConfig & listener, std::function<void()> completion), (override));
   MOCK_METHOD(void, start,
               (OptRef<GuardDog> guard_dog, const std::function<void()>& cb,
-               std::optional<uint32_t> cpu_id));
-  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope));
-  MOCK_METHOD(void, stop, ());
+               std::optional<uint32_t> cpu_id),
+              (override));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope), (override));
+  MOCK_METHOD(void, stop, (), (override));
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener,
                const Network::ExtraShutdownListenerOptions& options,
-               std::function<void()> completion));
+               std::function<void()> completion),
+              (override));
   MOCK_METHOD(void, removeFilterChains,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
-               std::function<void()> completion));
+               std::function<void()> completion),
+              (override));
   MOCK_METHOD(void, onFilterChainDrain,
               (uint64_t listener_tag, const std::list<const Network::FilterChain*>& filter_chains,
-               Network::ConnectionDrainEvent drain_event));
+               Network::ConnectionDrainEvent drain_event),
+              (override));
   MOCK_METHOD(void, onListenerDrain,
-              (uint64_t listener_tag, Network::ConnectionDrainEvent drain_event));
+              (uint64_t listener_tag, Network::ConnectionDrainEvent drain_event), (override));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

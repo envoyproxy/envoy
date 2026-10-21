@@ -33,38 +33,43 @@ public:
   void initializeThreadLocalClusters(const std::vector<std::string>& cluster_names);
 
   // Upstream::ClusterManager
-  MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
-  MOCK_METHOD(bool, initialized, ());
+  MOCK_METHOD(absl::Status, initialize, (const envoy::config::bootstrap::v3::Bootstrap& bootstrap),
+              (override));
+  MOCK_METHOD(bool, initialized, (), (override));
   MOCK_METHOD(absl::StatusOr<bool>, addOrUpdateCluster,
               (const envoy::config::cluster::v3::Cluster& cluster, absl::string_view version_info,
-               const bool avoid_cds_removal));
-  MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback));
-  MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback));
+               const bool avoid_cds_removal),
+              (override));
+  MOCK_METHOD(void, setPrimaryClustersInitializedCb, (PrimaryClustersReadyCallback), (override));
+  MOCK_METHOD(void, setInitializedCb, (InitializationCompleteCallback), (override));
   MOCK_METHOD(absl::Status, initializeSecondaryClusters,
-              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
-  MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
-  MOCK_METHOD(void, forEachActiveCluster, (std::function<void(const Cluster&)>), (const));
-  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (absl::string_view cluster_name), (const));
+              (const envoy::config::bootstrap::v3::Bootstrap& bootstrap), (override));
+  MOCK_METHOD(ClusterInfoMaps, clusters, (), (const, override));
+  MOCK_METHOD(void, forEachActiveCluster, (std::function<void(const Cluster&)>), (const, override));
+  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (absl::string_view cluster_name),
+              (const, override));
   MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (absl::string_view cluster_name),
-              (const));
-  MOCK_METHOD(bool, hasCluster, (absl::string_view cluster_name), (const));
-  MOCK_METHOD(bool, hasActiveClusters, (), (const));
+              (const, override));
+  MOCK_METHOD(bool, hasCluster, (absl::string_view cluster_name), (const, override));
+  MOCK_METHOD(bool, hasActiveClusters, (), (const, override));
 
-  MOCK_METHOD(const ClusterSet&, primaryClusters, ());
-  MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
-  MOCK_METHOD(bool, removeCluster, (absl::string_view cluster, const bool remove_ignored));
-  MOCK_METHOD(void, shutdown, ());
-  MOCK_METHOD(bool, isShutdown, ());
-  MOCK_METHOD(const std::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (), (const));
-  MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, ());
+  MOCK_METHOD(const ClusterSet&, primaryClusters, (), (override));
+  MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster), (override));
+  MOCK_METHOD(bool, removeCluster, (absl::string_view cluster, const bool remove_ignored),
+              (override));
+  MOCK_METHOD(void, shutdown, (), (override));
+  MOCK_METHOD(bool, isShutdown, (), (override));
+  MOCK_METHOD(const std::optional<envoy::config::core::v3::BindConfig>&, bindConfig, (),
+              (const, override));
+  MOCK_METHOD(Config::GrpcMuxSharedPtr, adsMux, (), (override));
   MOCK_METHOD(absl::Status, replaceAdsMux,
               (const envoy::config::core::v3::ApiConfigSource& ads_config));
-  MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, ());
+  MOCK_METHOD(Grpc::AsyncClientManager&, grpcAsyncClientManager, (), (override));
   MOCK_METHOD(const std::string, versionInfo, (), (const));
-  MOCK_METHOD(const std::optional<std::string>&, localClusterName, (), (const));
+  MOCK_METHOD(const std::optional<std::string>&, localClusterName, (), (const, override));
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
-  MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
+  MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, (), (override));
   const ClusterTrafficStatNames& clusterStatNames() const override { return cluster_stat_names_; }
   const ClusterConfigUpdateStatNames& clusterConfigUpdateStatNames() const override {
     return cluster_config_update_stat_names_;
@@ -86,28 +91,31 @@ public:
     return cluster_timeout_budget_stat_names_;
   }
   MOCK_METHOD(void, drainConnections,
-              (absl::string_view cluster, DrainConnectionsHostPredicate predicate));
+              (absl::string_view cluster, DrainConnectionsHostPredicate predicate), (override));
   MOCK_METHOD(void, drainConnections,
               (DrainConnectionsHostPredicate predicate,
-               ConnectionPool::DrainBehavior drain_behavior));
+               ConnectionPool::DrainBehavior drain_behavior),
+              (override));
   MOCK_METHOD(void, drainOrCloseConnPools,
               (DrainConnectionsPoolPredicate predicate,
-               ConnectionPool::DrainBehavior drain_behavior));
-  MOCK_METHOD(absl::Status, checkActiveStaticCluster, (absl::string_view cluster));
+               ConnectionPool::DrainBehavior drain_behavior),
+              (override));
+  MOCK_METHOD(absl::Status, checkActiveStaticCluster, (absl::string_view cluster), (override));
   MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,
                const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-               ProtobufMessage::ValidationVisitor& validation_visitor));
+               ProtobufMessage::ValidationVisitor& validation_visitor),
+              (override));
   std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig> getCommonLbConfigPtr(
       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_lb_config) override {
     return std::make_shared<const envoy::config::cluster::v3::Cluster::CommonLbConfig>(
         common_lb_config);
   }
 
-  MOCK_METHOD(Config::EdsResourcesCacheOptRef, edsResourcesCache, ());
+  MOCK_METHOD(Config::EdsResourcesCacheOptRef, edsResourcesCache, (), (override));
   MOCK_METHOD(void, createNetworkObserverRegistries,
-              (Quic::EnvoyQuicNetworkObserverRegistryFactory&));
+              (Quic::EnvoyQuicNetworkObserverRegistryFactory&), (override));
 
   envoy::config::core::v3::BindConfig& mutableBindConfig();
 

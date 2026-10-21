@@ -25,12 +25,12 @@ public:
   MOCK_METHOD(bool, handleAction,
               (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                StreamInfo::StreamInfo&, std::string* effective_policy_id),
-              (const));
+              (const, override));
 
   MOCK_METHOD(bool, handleAction,
               (const Envoy::Network::Connection&, StreamInfo::StreamInfo&,
                std::string* effective_policy_id),
-              (const));
+              (const, override));
 };
 
 class MockMatcherEngine : public RoleBasedAccessControlMatcherEngineImpl {
@@ -45,12 +45,12 @@ public:
   MOCK_METHOD(bool, handleAction,
               (const Envoy::Network::Connection&, const Envoy::Http::RequestHeaderMap&,
                StreamInfo::StreamInfo&, std::string* effective_policy_id),
-              (const));
+              (const, override));
 
   MOCK_METHOD(bool, handleAction,
               (const Envoy::Network::Connection&, StreamInfo::StreamInfo&,
                std::string* effective_policy_id),
-              (const));
+              (const, override));
 };
 
 } // namespace RBAC

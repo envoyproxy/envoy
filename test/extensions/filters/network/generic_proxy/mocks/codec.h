@@ -19,12 +19,13 @@ public:
             testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
   }
 
-  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, std::optional<StartTime>));
-  MOCK_METHOD(void, onDecodingSuccess, (RequestCommonFramePtr));
-  MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
-  MOCK_METHOD(void, writeToConnection, (Buffer::Instance&));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestHeaderFramePtr, std::optional<StartTime>),
+              (override));
+  MOCK_METHOD(void, onDecodingSuccess, (RequestCommonFramePtr), (override));
+  MOCK_METHOD(void, onDecodingFailure, (absl::string_view), (override));
+  MOCK_METHOD(void, writeToConnection, (Buffer::Instance&), (override));
 
-  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
+  MOCK_METHOD(OptRef<Network::Connection>, connection, (), (override));
 };
 
 class MockClientCodecCallbacks : public ClientCodecCallbacks {
@@ -35,17 +36,18 @@ public:
             testing::Invoke([](Buffer::Instance& buffer) { buffer.drain(buffer.length()); }));
   }
 
-  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, std::optional<StartTime>));
-  MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr));
-  MOCK_METHOD(void, onDecodingFailure, (absl::string_view));
-  MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer));
-  MOCK_METHOD(OptRef<Network::Connection>, connection, ());
-  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, upstreamCluster, (), (const));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseHeaderFramePtr, std::optional<StartTime>),
+              (override));
+  MOCK_METHOD(void, onDecodingSuccess, (ResponseCommonFramePtr), (override));
+  MOCK_METHOD(void, onDecodingFailure, (absl::string_view), (override));
+  MOCK_METHOD(void, writeToConnection, (Buffer::Instance & buffer), (override));
+  MOCK_METHOD(OptRef<Network::Connection>, connection, (), (override));
+  MOCK_METHOD(OptRef<const Upstream::ClusterInfo>, upstreamCluster, (), (const, override));
 };
 
 class MockEncodingContext : public EncodingContext {
 public:
-  MOCK_METHOD(OptRef<const RouteEntry>, routeEntry, (), (const));
+  MOCK_METHOD(OptRef<const RouteEntry>, routeEntry, (), (const, override));
 };
 
 class MockServerCodec : public ServerCodec {
@@ -54,12 +56,12 @@ public:
     ON_CALL(*this, encode(_, _)).WillByDefault(testing::Return(EncodingResult{0}));
   }
 
-  MOCK_METHOD(void, setCodecCallbacks, (ServerCodecCallbacks & callbacks));
-  MOCK_METHOD(void, onConnected, ());
-  MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream));
-  MOCK_METHOD(EncodingResult, encode, (const StreamFrame&, EncodingContext& ctx));
+  MOCK_METHOD(void, setCodecCallbacks, (ServerCodecCallbacks & callbacks), (override));
+  MOCK_METHOD(void, onConnected, (), (override));
+  MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream), (override));
+  MOCK_METHOD(EncodingResult, encode, (const StreamFrame&, EncodingContext& ctx), (override));
   MOCK_METHOD(ResponseHeaderFramePtr, respond,
-              (Status status, absl::string_view, const RequestHeaderFrame&));
+              (Status status, absl::string_view, const RequestHeaderFrame&), (override));
 };
 
 class MockClientCodec : public ClientCodec {
@@ -68,17 +70,17 @@ public:
     ON_CALL(*this, encode(_, _)).WillByDefault(testing::Return(EncodingResult{0}));
   }
 
-  MOCK_METHOD(void, setCodecCallbacks, (ClientCodecCallbacks & callbacks));
-  MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream));
-  MOCK_METHOD(EncodingResult, encode, (const StreamFrame&, EncodingContext& ctx));
+  MOCK_METHOD(void, setCodecCallbacks, (ClientCodecCallbacks & callbacks), (override));
+  MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream), (override));
+  MOCK_METHOD(EncodingResult, encode, (const StreamFrame&, EncodingContext& ctx), (override));
 };
 
 class MockCodecFactory : public CodecFactory {
 public:
   MockCodecFactory();
 
-  MOCK_METHOD(ServerCodecPtr, createServerCodec, (), (const));
-  MOCK_METHOD(ClientCodecPtr, createClientCodec, (), (const));
+  MOCK_METHOD(ServerCodecPtr, createServerCodec, (), (const, override));
+  MOCK_METHOD(ClientCodecPtr, createClientCodec, (), (const, override));
 };
 
 class MockProxyFactory : public ProxyFactory {
@@ -88,7 +90,7 @@ public:
   MOCK_METHOD(void, createProxy,
               (Server::Configuration::FactoryContext&, Network::FilterManager&,
                FilterConfigSharedPtr),
-              (const));
+              (const, override));
 };
 
 class MockStreamCodecFactoryConfig : public CodecFactoryConfig {
@@ -96,9 +98,9 @@ public:
   MockStreamCodecFactoryConfig();
 
   MOCK_METHOD(CodecFactoryPtr, createCodecFactory,
-              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&), (override));
   MOCK_METHOD(ProxyFactoryPtr, createProxyFactory,
-              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
+              (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&), (override));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Protobuf::Struct>();

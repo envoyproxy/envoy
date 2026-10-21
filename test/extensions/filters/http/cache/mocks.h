@@ -11,35 +11,40 @@ namespace Cache {
 
 class MockLookupContext : public LookupContext {
 public:
-  MOCK_METHOD(void, getHeaders, (LookupHeadersCallback && cb));
-  MOCK_METHOD(void, getBody, (const AdjustedByteRange& range, LookupBodyCallback&& cb));
-  MOCK_METHOD(void, getTrailers, (LookupTrailersCallback && cb));
-  MOCK_METHOD(void, onDestroy, ());
+  MOCK_METHOD(void, getHeaders, (LookupHeadersCallback && cb), (override));
+  MOCK_METHOD(void, getBody, (const AdjustedByteRange& range, LookupBodyCallback&& cb), (override));
+  MOCK_METHOD(void, getTrailers, (LookupTrailersCallback && cb), (override));
+  MOCK_METHOD(void, onDestroy, (), (override));
 };
 
 class MockInsertContext : public InsertContext {
 public:
   MOCK_METHOD(void, insertHeaders,
               (const Http::ResponseHeaderMap& response_headers, const ResponseMetadata& metadata,
-               InsertCallback insert_complete, bool end_stream));
+               InsertCallback insert_complete, bool end_stream),
+              (override));
   MOCK_METHOD(void, insertBody,
               (const Buffer::Instance& fragment, InsertCallback ready_for_next_fragment,
-               bool end_stream));
+               bool end_stream),
+              (override));
   MOCK_METHOD(void, insertTrailers,
-              (const Http::ResponseTrailerMap& trailers, InsertCallback insert_complete));
-  MOCK_METHOD(void, onDestroy, ());
+              (const Http::ResponseTrailerMap& trailers, InsertCallback insert_complete),
+              (override));
+  MOCK_METHOD(void, onDestroy, (), (override));
 };
 
 class MockHttpCache : public HttpCache {
 public:
   MOCK_METHOD(LookupContextPtr, makeLookupContext,
-              (LookupRequest && request, Http::StreamFilterCallbacks& callbacks));
+              (LookupRequest && request, Http::StreamFilterCallbacks& callbacks), (override));
   MOCK_METHOD(InsertContextPtr, makeInsertContext,
-              (LookupContextPtr && lookup_context, Http::StreamFilterCallbacks& callbacks));
+              (LookupContextPtr && lookup_context, Http::StreamFilterCallbacks& callbacks),
+              (override));
   MOCK_METHOD(void, updateHeaders,
               (const LookupContext& lookup_context, const Http::ResponseHeaderMap& response_headers,
-               const ResponseMetadata& metadata, absl::AnyInvocable<void(bool)> on_complete));
-  MOCK_METHOD(CacheInfo, cacheInfo, (), (const));
+               const ResponseMetadata& metadata, absl::AnyInvocable<void(bool)> on_complete),
+              (override));
+  MOCK_METHOD(CacheInfo, cacheInfo, (), (const, override));
   MockLookupContext* mockLookupContext() {
     ASSERT(mock_lookup_context_ == nullptr);
     mock_lookup_context_ = std::make_unique<MockLookupContext>();

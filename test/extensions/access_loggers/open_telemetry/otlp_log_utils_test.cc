@@ -537,7 +537,7 @@ public:
                    resource_detectors,
                Server::Configuration::ServerFactoryContext& context, absl::string_view service_name,
                const Extensions::Tracers::OpenTelemetry::ResourceProviderOptions& options),
-              (const));
+              (const, override));
 };
 
 // Verifies that resource detectors detect and populate resource attributes and schema URL.

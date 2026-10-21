@@ -142,7 +142,7 @@ TEST_P(MainCommonTest, EnableCoreDump) {
 
 class MockPlatformImpl : public PlatformImpl {
 public:
-  MOCK_METHOD(bool, enableCoreDump, ());
+  MOCK_METHOD(bool, enableCoreDump, (), (override));
 };
 
 // Exercise enabling core dump and failing.

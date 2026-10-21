@@ -23,13 +23,13 @@ public:
   MOCK_METHOD(DrainManagerPtr, createChildManager,
               (Event::Dispatcher&, envoy::config::listener::v3::Listener::DrainType), (override));
   MOCK_METHOD(DrainManagerPtr, createChildManager, (Event::Dispatcher&), (override));
-  MOCK_METHOD(bool, draining, (Network::DrainDirection direction), (const));
-  MOCK_METHOD(void, startParentShutdownSequence, ());
+  MOCK_METHOD(bool, draining, (Network::DrainDirection direction), (const, override));
+  MOCK_METHOD(void, startParentShutdownSequence, (), (override));
   MOCK_METHOD(void, startDrainSequence,
-              (Network::DrainDirection direction, std::function<void()> completion));
+              (Network::DrainDirection direction, std::function<void()> completion), (override));
 
   // Network::DrainDecision
-  MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const));
+  MOCK_METHOD(bool, drainClose, (Network::DrainDirection direction), (const, override));
   MOCK_METHOD(Common::CallbackHandlePtr, addOnDrainCloseCb,
               (Network::DrainDirection direction, DrainCloseCb cb), (const, override));
 

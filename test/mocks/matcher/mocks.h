@@ -15,7 +15,7 @@ public:
   // won't work.
 
   MOCK_METHOD(absl::Status, performDataInputValidation,
-              (const Matcher::DataInputFactory<DataType>&, absl::string_view));
+              (const Matcher::DataInputFactory<DataType>&, absl::string_view), (override));
 };
 
 } // namespace Matcher

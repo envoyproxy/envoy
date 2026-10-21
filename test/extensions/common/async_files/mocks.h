@@ -27,25 +27,32 @@ public:
   // with the desired parameter to the on_complete callback.
   MOCK_METHOD(absl::StatusOr<CancelFunction>, stat,
               (Event::Dispatcher * dispatcher,
-               absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete));
+               absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete),
+              (override));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, createHardLink,
               (Event::Dispatcher * dispatcher, absl::string_view filename,
-               absl::AnyInvocable<void(absl::Status)> on_complete));
+               absl::AnyInvocable<void(absl::Status)> on_complete),
+              (override));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, close,
-              (Event::Dispatcher * dispatcher, absl::AnyInvocable<void(absl::Status)> on_complete));
+              (Event::Dispatcher * dispatcher, absl::AnyInvocable<void(absl::Status)> on_complete),
+              (override));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, read,
               (Event::Dispatcher * dispatcher, off_t offset, size_t length,
-               absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete));
+               absl::AnyInvocable<void(absl::StatusOr<Buffer::InstancePtr>)> on_complete),
+              (override));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, write,
               (Event::Dispatcher * dispatcher, Buffer::Instance& contents, off_t offset,
-               absl::AnyInvocable<void(absl::StatusOr<size_t>)> on_complete));
+               absl::AnyInvocable<void(absl::StatusOr<size_t>)> on_complete),
+              (override));
   MOCK_METHOD(
       absl::StatusOr<CancelFunction>, duplicate,
       (Event::Dispatcher * dispatcher,
-       absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete));
+       absl::AnyInvocable<void(absl::StatusOr<std::shared_ptr<AsyncFileContext>>)> on_complete),
+      (override));
   MOCK_METHOD(absl::StatusOr<CancelFunction>, truncate,
               (Event::Dispatcher * dispatcher, size_t length,
-               absl::AnyInvocable<void(absl::Status)> on_complete));
+               absl::AnyInvocable<void(absl::Status)> on_complete),
+              (override));
 
 private:
   std::shared_ptr<MockAsyncFileManager> manager_;
@@ -73,19 +80,24 @@ public:
   // The default behavior of the methods that would enqueue an action is to enqueue a mock action.
   MOCK_METHOD(CancelFunction, createAnonymousFile,
               (Event::Dispatcher * dispatcher, absl::string_view path,
-               absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
+               absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete),
+              (override));
   MOCK_METHOD(CancelFunction, openExistingFile,
               (Event::Dispatcher * dispatcher, absl::string_view filename, Mode mode,
-               absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete));
+               absl::AnyInvocable<void(absl::StatusOr<AsyncFileHandle>)> on_complete),
+              (override));
   MOCK_METHOD(CancelFunction, stat,
               (Event::Dispatcher * dispatcher, absl::string_view filename,
-               absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete));
+               absl::AnyInvocable<void(absl::StatusOr<struct stat>)> on_complete),
+              (override));
   MOCK_METHOD(CancelFunction, unlink,
               (Event::Dispatcher * dispatcher, absl::string_view filename,
-               absl::AnyInvocable<void(absl::Status)> on_complete));
-  MOCK_METHOD(std::string, describe, (), (const));
-  MOCK_METHOD(void, waitForIdle, ());
-  MOCK_METHOD(void, postCancelledActionForCleanup, (std::unique_ptr<AsyncFileAction> action));
+               absl::AnyInvocable<void(absl::Status)> on_complete),
+              (override));
+  MOCK_METHOD(std::string, describe, (), (const, override));
+  MOCK_METHOD(void, waitForIdle, (), (override));
+  MOCK_METHOD(void, postCancelledActionForCleanup, (std::unique_ptr<AsyncFileAction> action),
+              (override));
 
   // mockCancel is called any time any action queued by mock is cancelled. It isn't overriding
   // a function from the real class, it's just used for verification.
@@ -120,7 +132,8 @@ public:
 
 private:
   MOCK_METHOD(CancelFunction, enqueue,
-              (Event::Dispatcher * dispatcher, std::unique_ptr<AsyncFileAction> action));
+              (Event::Dispatcher * dispatcher, std::unique_ptr<AsyncFileAction> action),
+              (override));
   friend class MockAsyncFileContext;
 };
 
@@ -128,7 +141,8 @@ class MockAsyncFileManagerFactory : public Extensions::Common::AsyncFiles::Async
 public:
   MOCK_METHOD(std::shared_ptr<AsyncFileManager>, getAsyncFileManager,
               (const envoy::extensions::common::async_files::v3::AsyncFileManagerConfig& config,
-               Api::OsSysCalls* substitute_posix_file_operations));
+               Api::OsSysCalls* substitute_posix_file_operations),
+              (override));
 };
 
 // Add deduction guides for comping with the ctad-maybe-unsupported warning

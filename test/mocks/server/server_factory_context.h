@@ -45,12 +45,12 @@ public:
   MockStatsConfig();
   ~MockStatsConfig() override;
 
-  MOCK_METHOD(const std::list<Stats::SinkPtr>&, sinks, (), (const));
-  MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const));
-  MOCK_METHOD(bool, flushOnAdmin, (), (const));
+  MOCK_METHOD(const std::list<Stats::SinkPtr>&, sinks, (), (const, override));
+  MOCK_METHOD(std::chrono::milliseconds, flushInterval, (), (const, override));
+  MOCK_METHOD(bool, flushOnAdmin, (), (const, override));
   MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
-  MOCK_METHOD(bool, enableDeferredCreationStats, (), (const));
-  MOCK_METHOD(uint32_t, evictOnFlush, (), (const));
+  MOCK_METHOD(bool, enableDeferredCreationStats, (), (const, override));
+  MOCK_METHOD(uint32_t, evictOnFlush, (), (const, override));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {
@@ -58,41 +58,42 @@ public:
   MockServerFactoryContext();
   ~MockServerFactoryContext() override;
 
-  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
-  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
-  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
-  MOCK_METHOD(const Server::Options&, options, ());
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), (override));
+  MOCK_METHOD(Config::XdsManager&, xdsManager, (), (override));
+  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, (),
+              (override));
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, (), (override));
+  MOCK_METHOD(const Server::Options&, options, (), (override));
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
-  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
-  MOCK_METHOD(Stats::Scope&, scope, ());
-  MOCK_METHOD(Stats::Scope&, serverScope, ());
-  MOCK_METHOD(Singleton::Manager&, singletonManager, ());
-  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
-  MOCK_METHOD(OptRef<Server::Admin>, admin, ());
-  MOCK_METHOD(TimeSource&, timeSource, ());
+  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const, override));
+  MOCK_METHOD(Envoy::Runtime::Loader&, runtime, (), (override));
+  MOCK_METHOD(Stats::Scope&, scope, (), (override));
+  MOCK_METHOD(Stats::Scope&, serverScope, (), (override));
+  MOCK_METHOD(Singleton::Manager&, singletonManager, (), (override));
+  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, (), (override));
+  MOCK_METHOD(OptRef<Server::Admin>, admin, (), (override));
+  MOCK_METHOD(TimeSource&, timeSource, (), (override));
   MOCK_METHOD(Event::TestTimeSystem&, timeSystem, ());
-  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
-  MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(Secret::SecretManager&, secretManager, ());
-  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, (), (override));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (override));
+  MOCK_METHOD(Api::Api&, api, (), (override));
+  MOCK_METHOD(Secret::SecretManager&, secretManager, (), (override));
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, (), (override));
   Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
-  MOCK_METHOD(ProcessContextOptRef, processContext, ());
+  MOCK_METHOD(ProcessContextOptRef, processContext, (), (override));
   envoy::config::bootstrap::v3::Bootstrap& bootstrap() override { return bootstrap_; }
-  MOCK_METHOD(Server::DrainManager&, drainManager, ());
-  MOCK_METHOD(Init::Manager&, initManager, ());
-  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
+  MOCK_METHOD(Server::DrainManager&, drainManager, (), (override));
+  MOCK_METHOD(Init::Manager&, initManager, (), (override));
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, (), (override));
   Regex::Engine& regexEngine() override { return regex_engine_; }
-  MOCK_METHOD(StatsConfig&, statsConfig, (), ());
-  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
-  MOCK_METHOD(OverloadManager&, overloadManager, ());
-  MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(StatsConfig&, statsConfig, (), (override));
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (override));
+  MOCK_METHOD(OverloadManager&, overloadManager, (), (override));
+  MOCK_METHOD(OverloadManager&, nullOverloadManager, (), (override));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
-  MOCK_METHOD(bool, healthCheckFailed, (), (const));
+  MOCK_METHOD(bool, healthCheckFailed, (), (const, override));
 
   // Useful for when a test needs to change a static secret, which normally cannot be changed or
   // re-added after it is set. This creates a new secret manager and deletes the old one.
@@ -139,12 +140,12 @@ public:
   MockGenericFactoryContext();
   ~MockGenericFactoryContext() override;
 
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
-  MOCK_METHOD(Stats::Scope&, scope, ());
-  MOCK_METHOD(Stats::Scope&, statsScope, ());
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (override));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (override));
+  MOCK_METHOD(Stats::Scope&, scope, (), (override));
+  MOCK_METHOD(Stats::Scope&, statsScope, (), (override));
   MOCK_METHOD(Stats::Scope&, serverScope, ());
-  MOCK_METHOD(Init::Manager&, initManager, ());
+  MOCK_METHOD(Init::Manager&, initManager, (), (override));
 
   NiceMock<MockServerFactoryContext> server_context_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
@@ -160,41 +161,42 @@ public:
   StatelessMockServerFactoryContext() = default;
   ~StatelessMockServerFactoryContext() override = default;
 
-  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
-  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
-  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
-  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
-  MOCK_METHOD(const Server::Options&, options, ());
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, (), (override));
+  MOCK_METHOD(Config::XdsManager&, xdsManager, (), (override));
+  MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, (),
+              (override));
+  MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, (), (override));
+  MOCK_METHOD(const Server::Options&, options, (), (override));
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
-  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const));
-  MOCK_METHOD(Envoy::Runtime::Loader&, runtime, ());
-  MOCK_METHOD(Stats::Scope&, scope, ());
-  MOCK_METHOD(Stats::Scope&, serverScope, ());
-  MOCK_METHOD(Singleton::Manager&, singletonManager, ());
-  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, ());
-  MOCK_METHOD(OptRef<Server::Admin>, admin, ());
-  MOCK_METHOD(TimeSource&, timeSource, ());
+  MOCK_METHOD(const LocalInfo::LocalInfo&, localInfo, (), (const, override));
+  MOCK_METHOD(Envoy::Runtime::Loader&, runtime, (), (override));
+  MOCK_METHOD(Stats::Scope&, scope, (), (override));
+  MOCK_METHOD(Stats::Scope&, serverScope, (), (override));
+  MOCK_METHOD(Singleton::Manager&, singletonManager, (), (override));
+  MOCK_METHOD(ThreadLocal::Instance&, threadLocal, (), (override));
+  MOCK_METHOD(OptRef<Server::Admin>, admin, (), (override));
+  MOCK_METHOD(TimeSource&, timeSource, (), (override));
   MOCK_METHOD(Event::TestTimeSystem&, timeSystem, ());
-  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
-  MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(Http::Context&, httpContext, ());
-  MOCK_METHOD(Grpc::Context&, grpcContext, ());
-  MOCK_METHOD(Router::Context&, routerContext, ());
-  MOCK_METHOD(ProcessContextOptRef, processContext, ());
-  MOCK_METHOD(envoy::config::bootstrap::v3::Bootstrap&, bootstrap, ());
-  MOCK_METHOD(Server::DrainManager&, drainManager, ());
-  MOCK_METHOD(Init::Manager&, initManager, ());
-  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, ());
-  MOCK_METHOD(Regex::Engine&, regexEngine, ());
-  MOCK_METHOD(StatsConfig&, statsConfig, (), ());
-  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), ());
-  MOCK_METHOD(OverloadManager&, overloadManager, ());
-  MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
+  MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, (), (override));
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (override));
+  MOCK_METHOD(Api::Api&, api, (), (override));
+  MOCK_METHOD(Http::Context&, httpContext, (), (override));
+  MOCK_METHOD(Grpc::Context&, grpcContext, (), (override));
+  MOCK_METHOD(Router::Context&, routerContext, (), (override));
+  MOCK_METHOD(ProcessContextOptRef, processContext, (), (override));
+  MOCK_METHOD(envoy::config::bootstrap::v3::Bootstrap&, bootstrap, (), (override));
+  MOCK_METHOD(Server::DrainManager&, drainManager, (), (override));
+  MOCK_METHOD(Init::Manager&, initManager, (), (override));
+  MOCK_METHOD(ServerLifecycleNotifier&, lifecycleNotifier, (), (override));
+  MOCK_METHOD(Regex::Engine&, regexEngine, (), (override));
+  MOCK_METHOD(StatsConfig&, statsConfig, (), (override));
+  MOCK_METHOD(AccessLog::AccessLogManager&, accessLogManager, (), (override));
+  MOCK_METHOD(OverloadManager&, overloadManager, (), (override));
+  MOCK_METHOD(OverloadManager&, nullOverloadManager, (), (override));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
-  MOCK_METHOD(bool, healthCheckFailed, (), (const));
-  MOCK_METHOD(Secret::SecretManager&, secretManager, ());
-  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
+  MOCK_METHOD(bool, healthCheckFailed, (), (const, override));
+  MOCK_METHOD(Secret::SecretManager&, secretManager, (), (override));
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, (), (override));
 };
 
 } // namespace Configuration

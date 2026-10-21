@@ -12,8 +12,8 @@ namespace Api {
 class MockHotRestartOsSysCalls : public HotRestartOsSysCallsImpl {
 public:
   // Api::HotRestartOsSysCalls
-  MOCK_METHOD(SysCallIntResult, shmOpen, (const char*, int, mode_t));
-  MOCK_METHOD(SysCallIntResult, shmUnlink, (const char*));
+  MOCK_METHOD(SysCallIntResult, shmOpen, (const char*, int, mode_t), (override));
+  MOCK_METHOD(SysCallIntResult, shmUnlink, (const char*), (override));
 };
 
 } // namespace Api

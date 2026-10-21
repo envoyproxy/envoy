@@ -141,7 +141,7 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
 
 class MockClientCodecFactory : public ClientCodecFactory {
 public:
-  MOCK_METHOD(ClientConnectionPtr, createClientCodec, (const Context& context), (const));
+  MOCK_METHOD(ClientConnectionPtr, createClientCodec, (const Context& context), (const, override));
 };
 
 // When a cluster exposes an upstream ClientCodecFactory, CodecClientProd consults it and installs

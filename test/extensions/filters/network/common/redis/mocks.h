@@ -30,8 +30,9 @@ public:
   MockEncoder();
   ~MockEncoder() override;
 
-  MOCK_METHOD(void, encode, (const Common::Redis::RespValue& value, Buffer::Instance& out));
-  MOCK_METHOD(void, setProtocolVersion, (Common::Redis::RespProtocolVersion version));
+  MOCK_METHOD(void, encode, (const Common::Redis::RespValue& value, Buffer::Instance& out),
+              (override));
+  MOCK_METHOD(void, setProtocolVersion, (Common::Redis::RespProtocolVersion version), (override));
 
 private:
   Common::Redis::EncoderImpl real_encoder_;
@@ -42,7 +43,7 @@ public:
   MockDecoder();
   ~MockDecoder() override;
 
-  MOCK_METHOD(void, decode, (Buffer::Instance & data));
+  MOCK_METHOD(void, decode, (Buffer::Instance & data), (override));
 };
 
 namespace Client {
@@ -52,7 +53,7 @@ public:
   MockPoolRequest();
   ~MockPoolRequest() override;
 
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (), (override));
 };
 
 class MockClient : public Client {
@@ -84,12 +85,13 @@ public:
     return makeRequest_(request, callbacks);
   }
 
-  MOCK_METHOD(void, addConnectionCallbacks, (Network::ConnectionCallbacks & callbacks));
-  MOCK_METHOD(bool, active, ());
-  MOCK_METHOD(void, close, ());
+  MOCK_METHOD(void, addConnectionCallbacks, (Network::ConnectionCallbacks & callbacks), (override));
+  MOCK_METHOD(bool, active, (), (override));
+  MOCK_METHOD(void, close, (), (override));
   MOCK_METHOD(PoolRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
-  MOCK_METHOD(void, initialize, (const std::string& username, const std::string& password));
+  MOCK_METHOD(void, initialize, (const std::string& username, const std::string& password),
+              (override));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
   std::list<ClientCallbacks*> client_callbacks_;
@@ -107,7 +109,7 @@ public:
   }
 
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
-  MOCK_METHOD(void, onFailure, ());
+  MOCK_METHOD(void, onFailure, (), (override));
   MOCK_METHOD(void, onRedirection_,
               (Common::Redis::RespValuePtr & value, const std::string& host_address,
                bool ask_redirection));
@@ -124,9 +126,10 @@ public:
   ~MockAwsIamAuthenticator() override = default;
   MOCK_METHOD(std::string, getAuthToken,
               (absl::string_view auth_user,
-               const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config));
+               const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config),
+              (override));
   MOCK_METHOD(bool, addCallbackIfCredentialsPending,
-              (Extensions::Common::Aws::CredentialsPendingCallback && cb));
+              (Extensions::Common::Aws::CredentialsPendingCallback && cb), (override));
 };
 
 } // namespace AwsIamAuthenticator

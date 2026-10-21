@@ -19,7 +19,7 @@ public:
   MOCK_METHOD(EntryOwner*, add_, (std::string, Cb));
 
   // Server::ConfigTracker
-  MOCK_METHOD(const CbsMap&, getCallbacksMap, (), (const));
+  MOCK_METHOD(const CbsMap&, getCallbacksMap, (), (const, override));
   EntryOwnerPtr add(const std::string& key, Cb callback) override {
     return EntryOwnerPtr{add_(key, std::move(callback))};
   }

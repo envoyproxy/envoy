@@ -13,7 +13,7 @@ public:
 
   // Http::ApiListener
   MOCK_METHOD(RequestDecoderHandlePtr, newStreamHandle,
-              (ResponseEncoder & response_encoder, bool is_internally_created));
+              (ResponseEncoder & response_encoder, bool is_internally_created), (override));
 };
 
 } // namespace Http

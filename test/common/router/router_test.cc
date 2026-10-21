@@ -1358,7 +1358,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInRequestNotOverwritten) {
 class MockRetryOptionsPredicate : public Upstream::RetryOptionsPredicate {
 public:
   MOCK_METHOD(UpdateOptionsReturn, updateOptions, (const UpdateOptionsParameters& parameters),
-              (const));
+              (const, override));
 };
 
 // Also verify retry options predicates work.

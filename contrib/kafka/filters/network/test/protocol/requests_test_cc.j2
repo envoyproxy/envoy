@@ -24,8 +24,8 @@ protected:
 
 class MockMessageListener : public RequestCallback {
 public:
-  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr));
-  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr));
+  MOCK_METHOD(void, onMessage, (AbstractRequestSharedPtr), (override));
+  MOCK_METHOD(void, onFailedParse, (RequestParseFailureSharedPtr), (override));
 };
 
 /**

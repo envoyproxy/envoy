@@ -16,7 +16,7 @@ public:
 
   // Decompressor::Decompressor
   MOCK_METHOD(void, decompress,
-              (const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer));
+              (const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer), (override));
 };
 
 class MockDecompressorFactory : public DecompressorFactory {
@@ -25,9 +25,9 @@ public:
   ~MockDecompressorFactory() override;
 
   // Decompressor::DecompressorFactory
-  MOCK_METHOD(DecompressorPtr, createDecompressor, (const std::string&));
-  MOCK_METHOD(const std::string&, statsPrefix, (), (const));
-  MOCK_METHOD(const std::string&, contentEncoding, (), (const));
+  MOCK_METHOD(DecompressorPtr, createDecompressor, (const std::string&), (override));
+  MOCK_METHOD(const std::string&, statsPrefix, (), (const, override));
+  MOCK_METHOD(const std::string&, contentEncoding, (), (const, override));
 
   const std::string stats_prefix_{"mock"};
   const std::string content_encoding_{"mock"};

@@ -61,7 +61,7 @@ public:
   MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>, buildFilterChain,
               (const envoy::config::listener::v3::FilterChain&, FilterChainFactoryContextCreator&,
                bool),
-              (const));
+              (const, override));
 };
 
 class FilterChainManagerImplTest : public testing::TestWithParam<bool> {

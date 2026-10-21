@@ -35,12 +35,14 @@ using testing::Return;
 class MockCallbacks : public FilterCallbacks {
 public:
   MOCK_METHOD(Http::FilterHeadersStatus, handleOAuthFailure,
-              (const std::string& reason, const std::string& extra_details));
+              (const std::string& reason, const std::string& extra_details), (override));
   MOCK_METHOD(void, onGetAccessTokenSuccess,
-              (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
+              (const std::string&, const std::string&, const std::string&, std::chrono::seconds),
+              (override));
   MOCK_METHOD(void, onRefreshAccessTokenSuccess,
-              (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
-  MOCK_METHOD(Http::FilterHeadersStatus, onRefreshAccessTokenFailure, ());
+              (const std::string&, const std::string&, const std::string&, std::chrono::seconds),
+              (override));
+  MOCK_METHOD(Http::FilterHeadersStatus, onRefreshAccessTokenFailure, (), (override));
 };
 
 class OAuth2ClientTest : public testing::Test {

@@ -25,9 +25,9 @@ public:
 
   void runLowWatermarkCallbacks() { callback_.onBelowWriteBufferLowWatermark(); }
 
-  MOCK_METHOD(bool, start, ());
-  MOCK_METHOD(bool, sendRequest, ());
-  MOCK_METHOD(void, close, ());
+  MOCK_METHOD(bool, start, (), (override));
+  MOCK_METHOD(bool, sendRequest, (), (override));
+  MOCK_METHOD(void, close, (), (override));
 
 private:
   ClientCallback& callback_;
@@ -44,13 +44,13 @@ public:
     return {Network::ClientConnectionPtr{data.connection_}, data.host_description_};
   }
 
-  MOCK_METHOD(void, onResponseResult, (bool));
+  MOCK_METHOD(void, onResponseResult, (bool), (override));
   MOCK_METHOD(Upstream::MockHost::MockCreateConnectionData, createConnection_, ());
 
   // Network::ConnectionCallbacks
-  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
-  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event), (override));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, (), (override));
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, (), (override));
 };
 
 } // namespace ThriftHealthChecker

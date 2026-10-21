@@ -12,8 +12,8 @@ public:
   ~MockWatchDog() override;
 
   // Server::WatchDog
-  MOCK_METHOD(void, touch, ());
-  MOCK_METHOD(Thread::ThreadId, threadId, (), (const));
+  MOCK_METHOD(void, touch, (), (override));
+  MOCK_METHOD(Thread::ThreadId, threadId, (), (const, override));
 };
 } // namespace Server
 } // namespace Envoy

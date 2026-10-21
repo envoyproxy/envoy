@@ -21,7 +21,7 @@ class MockCpuStatsReader : public CpuStatsReader {
 public:
   MockCpuStatsReader() = default;
 
-  MOCK_METHOD(absl::StatusOr<double>, getUtilization, ());
+  MOCK_METHOD(absl::StatusOr<double>, getUtilization, (), (override));
 };
 
 class ResourcePressure : public Server::ResourceUpdateCallbacks {

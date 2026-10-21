@@ -21,26 +21,34 @@ namespace {
 // Create a custom MockReadFilter that doesn't set expectations in the constructor
 class CustomMockReadFilter : public Network::ReadFilter {
 public:
-  MOCK_METHOD(Network::FilterStatus, onData, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(Network::FilterStatus, onNewConnection, ());
-  MOCK_METHOD(void, initializeReadFilterCallbacks, (Network::ReadFilterCallbacks & callbacks));
+  MOCK_METHOD(Network::FilterStatus, onData, (Buffer::Instance & data, bool end_stream),
+              (override));
+  MOCK_METHOD(Network::FilterStatus, onNewConnection, (), (override));
+  MOCK_METHOD(void, initializeReadFilterCallbacks, (Network::ReadFilterCallbacks & callbacks),
+              (override));
 };
 
 // Create a custom MockWriteFilter that doesn't set expectations in the constructor
 class CustomMockWriteFilter : public Network::WriteFilter {
 public:
-  MOCK_METHOD(Network::FilterStatus, onWrite, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(void, initializeWriteFilterCallbacks, (Network::WriteFilterCallbacks & callbacks));
+  MOCK_METHOD(Network::FilterStatus, onWrite, (Buffer::Instance & data, bool end_stream),
+              (override));
+  MOCK_METHOD(void, initializeWriteFilterCallbacks, (Network::WriteFilterCallbacks & callbacks),
+              (override));
 };
 
 // Create a custom MockFilter that doesn't set expectations in the constructor
 class CustomMockFilter : public Network::Filter {
 public:
-  MOCK_METHOD(Network::FilterStatus, onData, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(Network::FilterStatus, onNewConnection, ());
-  MOCK_METHOD(Network::FilterStatus, onWrite, (Buffer::Instance & data, bool end_stream));
-  MOCK_METHOD(void, initializeReadFilterCallbacks, (Network::ReadFilterCallbacks & callbacks));
-  MOCK_METHOD(void, initializeWriteFilterCallbacks, (Network::WriteFilterCallbacks & callbacks));
+  MOCK_METHOD(Network::FilterStatus, onData, (Buffer::Instance & data, bool end_stream),
+              (override));
+  MOCK_METHOD(Network::FilterStatus, onNewConnection, (), (override));
+  MOCK_METHOD(Network::FilterStatus, onWrite, (Buffer::Instance & data, bool end_stream),
+              (override));
+  MOCK_METHOD(void, initializeReadFilterCallbacks, (Network::ReadFilterCallbacks & callbacks),
+              (override));
+  MOCK_METHOD(void, initializeWriteFilterCallbacks, (Network::WriteFilterCallbacks & callbacks),
+              (override));
 };
 
 struct TestFactory : public Envoy::Server::Configuration::NamedNetworkFilterConfigFactory {

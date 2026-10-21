@@ -13,7 +13,7 @@ public:
   MockRequestDecoderHandle();
   ~MockRequestDecoderHandle() override = default;
 
-  MOCK_METHOD(OptRef<RequestDecoder>, get, ());
+  MOCK_METHOD(OptRef<RequestDecoder>, get, (), (override));
 };
 
 class MockRequestDecoder : public RequestDecoder {
@@ -24,14 +24,15 @@ public:
   void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
 
   // Http::StreamDecoder
-  MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream), (override));
   MOCK_METHOD(void, decodeMetadata_, (MetadataMapPtr & metadata_map));
   MOCK_METHOD(void, sendLocalReply,
               (Code code, absl::string_view body,
                const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
                const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-               absl::string_view details));
-  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
+               absl::string_view details),
+              (override));
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, (), (override));
 
   void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
     decodeHeaders_(headers, end_stream);
@@ -41,8 +42,8 @@ public:
   // Http::RequestDecoder
   MOCK_METHOD(void, decodeHeaders_, (RequestHeaderMapSharedPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (RequestTrailerMapPtr & trailers));
-  MOCK_METHOD(AccessLog::InstanceSharedPtrVector, accessLogHandlers, ());
-  MOCK_METHOD(RequestDecoderHandlePtr, getRequestDecoderHandle, ());
+  MOCK_METHOD(AccessLog::InstanceSharedPtrVector, accessLogHandlers, (), (override));
+  MOCK_METHOD(RequestDecoderHandlePtr, getRequestDecoderHandle, (), (override));
 };
 
 class MockResponseDecoder : public ResponseDecoderImplBase {
@@ -53,7 +54,7 @@ public:
   void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
 
   // Http::StreamDecoder
-  MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream), (override));
   MOCK_METHOD(void, decodeMetadata_, (MetadataMapPtr & metadata_map));
 
   void decode1xxHeaders(ResponseHeaderMapPtr&& headers) override { decode1xxHeaders_(headers); }
@@ -67,7 +68,7 @@ public:
   MOCK_METHOD(void, decodeHeaders_, (ResponseHeaderMapPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (ResponseTrailerMapPtr & trailers));
   MOCK_METHOD(OptRef<WebTransportSession>, downstreamWebTransportSession, (), (override));
-  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const, override));
 };
 
 } // namespace Http

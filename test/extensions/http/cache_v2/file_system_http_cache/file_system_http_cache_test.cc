@@ -266,7 +266,7 @@ public:
   }
 
   MOCK_METHOD(Singleton::InstanceSharedPtr, get,
-              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin));
+              (const std::string& name, Singleton::SingletonFactoryCb cb, bool pin), (override));
   Singleton::InstanceSharedPtr realGet(const std::string& name, Singleton::SingletonFactoryCb cb,
                                        bool pin) {
     return Singleton::ManagerImpl::get(name, cb, pin);

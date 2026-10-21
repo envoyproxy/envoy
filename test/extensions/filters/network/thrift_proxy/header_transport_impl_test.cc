@@ -25,7 +25,7 @@ public:
   MockBuffer() = default;
   ~MockBuffer() override = default;
 
-  MOCK_METHOD(uint64_t, length, (), (const));
+  MOCK_METHOD(uint64_t, length, (), (const, override));
 };
 
 MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {

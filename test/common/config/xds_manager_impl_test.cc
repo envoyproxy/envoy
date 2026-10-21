@@ -56,7 +56,8 @@ public:
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
-               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>));
+               std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>),
+              (override));
   const std::string name_;
 };
 
