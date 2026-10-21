@@ -68,6 +68,21 @@ std::string sanitizeValue(const absl::string_view value) {
                                     });
 }
 
+// Append unchanged spans and escape characters directly, without an intermediate value string.
+void appendSanitizedValue(std::string& output, absl::string_view value) {
+  while (!value.empty()) {
+    const size_t position = value.find_first_of("\\\n\"");
+    if (position == absl::string_view::npos) {
+      output.append(value.data(), value.size());
+      return;
+    }
+    output.append(value.data(), position);
+    output.push_back('\\');
+    output.push_back(value[position] == '\n' ? 'n' : value[position]);
+    value.remove_prefix(position + 1);
+  }
+}
+
 /*
  * Comparator for Stats::Metric that does not require a string representation
  * to make the comparison, for memory efficiency.
@@ -1343,13 +1358,17 @@ bool PrometheusStatsFormatter::useProtobufFormat(const StatsParams& params,
 }
 
 std::string PrometheusStatsFormatter::formattedTags(std::vector<Stats::Tag>&& tags) {
-  std::vector<std::string> buf;
-  buf.reserve(tags.size());
+  std::string buf;
   for (Stats::Tag& tag : tags) {
     sanitizeNameInPlace(tag.name_);
-    buf.push_back(fmt::format("{}=\"{}\"", tag.name_, sanitizeValue(tag.value_)));
+    if (!buf.empty()) {
+      buf.push_back(',');
+    }
+    absl::StrAppend(&buf, tag.name_, "=\"");
+    appendSanitizedValue(buf, tag.value_);
+    buf.push_back('"');
   }
-  return absl::StrJoin(buf, ",");
+  return buf;
 }
 
 absl::Status PrometheusStatsFormatter::validateParams(const StatsParams& params,

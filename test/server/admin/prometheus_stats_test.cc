@@ -768,6 +768,61 @@ TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
   EXPECT_EQ(expected, actual);
 }
 
+TEST_F(PrometheusStatsFormatterTest, FormattedTagsEmptyAndBinaryValues) {
+  EXPECT_EQ("", PrometheusStatsFormatter::formattedTags({}));
+  EXPECT_EQ("empty=\"\"", PrometheusStatsFormatter::formattedTags({{"empty", ""}}));
+  const std::string binary("a\0b", 3);
+  const std::string expected = absl::StrCat("z=\"", binary, "\",a_=\"\\\\\\n\\\"\"");
+  EXPECT_EQ(expected, PrometheusStatsFormatter::formattedTags({{"z", binary}, {"a-", "\\\n\""}}));
+}
+
+TEST_F(PrometheusStatsFormatterTest, FormattedTagsEscapeBoundaries) {
+  EXPECT_EQ(
+      R"(first="\"tail",last="head\\",adjacent="\\\n\"",plain="tail")",
+      PrometheusStatsFormatter::formattedTags(
+          {{"first", "\"tail"}, {"last", "head\\"}, {"adjacent", "\\\n\""}, {"plain", "tail"}}));
+}
+
+TEST_F(PrometheusStatsFormatterTest, FormattedTagsAllByteValues) {
+  std::string value;
+  std::string expected = "bytes=\"";
+  for (uint32_t byte = 0; byte < 256; ++byte) {
+    const char character = static_cast<char>(byte);
+    value.push_back(character);
+    switch (character) {
+    case '\\':
+      expected.append(R"(\\)");
+      break;
+    case '\n':
+      expected.append(R"(\n)");
+      break;
+    case '"':
+      expected.append(R"(\")");
+      break;
+    default:
+      expected.push_back(character);
+      break;
+    }
+  }
+  expected.push_back('"');
+  EXPECT_EQ(expected, PrometheusStatsFormatter::formattedTags({{"bytes", value}}));
+}
+
+TEST_F(PrometheusStatsFormatterTest, FormattedTagsLongEscapedValues) {
+  std::string value;
+  std::string escaped;
+  for (uint32_t index = 0; index < 256; ++index) {
+    value.append("\\\"\n");
+    escaped.append(R"(\\\"\n)");
+  }
+  value.append("tail");
+  escaped.append("tail");
+  const std::string name(128, 'a');
+  const std::string expected = absl::StrCat(name, "_x=\"", escaped, "\",tail=\"\"");
+  EXPECT_EQ(expected,
+            PrometheusStatsFormatter::formattedTags({{name + ".x", value}, {"tail", ""}}));
+}
+
 TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
 
