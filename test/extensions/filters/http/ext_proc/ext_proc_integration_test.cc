@@ -1893,7 +1893,8 @@ public:
     }
     EXPECT_TRUE(upstream_request_->complete());
     processResponseHeadersMessage(*grpc_upstreams_[0], true, std::nullopt);
-    test_server_->waitForCounter("cluster.cluster_0.retry.upstream_rq_503", Ge(1));
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+        "cluster.cluster_0.retry.upstream_rq_503", 1);
     timeSystem().advanceTimeWaitImpl(std::chrono::seconds(1));
     // Upstream receives a retry request and returns a 200 response, which should not trigger a
     // retry.
@@ -2591,7 +2592,8 @@ TEST_P(ExtProcIntegrationTest, RequestMessageTimeoutWithLogging) {
   processRequestHeadersMessage(
       *grpc_upstreams_[0], true, [this](const HttpHeaders&, HeadersResponse&) {
         if (IsEnvoyGrpc()) {
-          test_server_->waitForCounter("cluster.ext_proc_server_0.upstream_rq_200", Ge(1));
+          test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+              "cluster.ext_proc_server_0.upstream_rq_200", 1);
         }
         // Travel forward 400 ms
         timeSystem().advanceTimeWaitImpl(400ms);
@@ -3249,7 +3251,7 @@ TEST_P(ExtProcIntegrationTest, RequestMessageNoMutationMultipleNewTimeout) {
                                  // Send the 2nd 10ms new timeout update.
                                  // The update is ignored by Envoy. No timeout event
                                  // happened and the traffic went through fine.
-                                 serverSendNewTimeout(10);
+                                 serverSendNewTimeout(10, /*expect_ignored=*/true);
                                  // Server wait for 300ms
                                  timeSystem().advanceTimeWaitImpl(300ms);
                                  return true;
@@ -5868,7 +5870,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
     auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
     processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
     processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
-    proto_config_1_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
                                "envoy.filters.http.ext_proc_1");
     // Filter-0
@@ -5877,7 +5878,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
     processing_mode->set_request_header_mode(ProcessingMode::SEND);
     processing_mode->set_response_header_mode(ProcessingMode::SKIP);
     processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
-    proto_config_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
                                "envoy.filters.http.ext_proc");
   });
@@ -5898,19 +5898,22 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 1);
   codec_client_->sendData(*request_encoder_, "sss", false);
   codec_client_->sendData(*request_encoder_, "xxx", true);
 
   processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 2);
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 3);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
 
@@ -5929,7 +5932,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
     processing_mode->set_response_header_mode(ProcessingMode::SEND);
     processing_mode->set_request_header_mode(ProcessingMode::SKIP);
     processing_mode->set_response_body_mode(ProcessingMode::STREAMED);
-    proto_config_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
                                "envoy.filters.http.ext_proc");
     // Filter-1
@@ -5937,7 +5939,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
     auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
     processing_mode_1->set_response_header_mode(ProcessingMode::SEND);
     processing_mode_1->set_request_header_mode(ProcessingMode::SKIP);
-    proto_config_1_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
                                "envoy.filters.http.ext_proc_1");
   });
@@ -5958,18 +5959,21 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp(true, true);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 1);
   upstream_request_->encodeData("mmmmm", false);
   upstream_request_->encodeData("nnnn", true);
 
   processResponseBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 2);
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request, true, true);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp(true, true);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 3);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   processResponseBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
   verifyDownstreamResponse(*response, 200);
@@ -5985,7 +5989,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithT
     processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
     processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
     processing_mode_1->set_request_body_mode(ProcessingMode::STREAMED);
-    proto_config_1_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
                                "envoy.filters.http.ext_proc_1");
     // Filter-0
@@ -5994,7 +5997,6 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithT
     processing_mode->set_request_header_mode(ProcessingMode::SEND);
     processing_mode->set_response_header_mode(ProcessingMode::SKIP);
     processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
-    proto_config_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
                                "envoy.filters.http.ext_proc");
   });
@@ -6015,7 +6017,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithT
   // The ext_proc_server_0 sends back the header response.
   serverSendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 1);
   codec_client_->sendData(*request_encoder_, "sss", false);
   codec_client_->sendData(*request_encoder_, "xxx", false);
   Http::TestRequestTrailerMapImpl request_trailers{{"x-request-trailer-foo", "yes"}};
@@ -6023,13 +6026,15 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithT
 
   processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(2));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 2);
   // The ext_proc_server_1 receives the headers.
   server1ReceiveHeaderReq(header_request);
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  test_server_->waitForCounter("http.config_test.ext_proc.stream_msgs_received", Ge(3));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", 3);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
 

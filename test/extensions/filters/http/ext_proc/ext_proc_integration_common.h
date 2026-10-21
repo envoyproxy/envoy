@@ -181,7 +181,7 @@ protected:
 
   // ext_proc server sends back a response to tell Envoy to stop the
   // original timer and start a new timer.
-  void serverSendNewTimeout(const uint64_t timeout_ms);
+  void serverSendNewTimeout(const uint64_t timeout_ms, bool expect_ignored = false);
 
   // The new timeout message is ignored by Envoy due to different reasons, like
   // new_timeout setting is out-of-range, or max_message_timeout is not configured.

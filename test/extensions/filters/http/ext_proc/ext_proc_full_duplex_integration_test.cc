@@ -590,7 +590,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp();
 
-  timeSystem().advanceTimeWaitImpl(20ms);
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", total_req_body_msg);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, false, "");
 
@@ -642,7 +643,8 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessing) {
   // The ext_proc_server_1 sends back the header response.
   server1SendHeaderResp(true, true);
 
-  timeSystem().advanceTimeWaitImpl(20ms);
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.stream_msgs_received", total_resp_body_msg);
   // The ext_proc_server_0 now sends back the last chunk of the body responses.
   serverSendBodyRespDuplexStreamed(1, processor_stream_, /*end_stream*/ true, /*response*/ true,
                                    "");
