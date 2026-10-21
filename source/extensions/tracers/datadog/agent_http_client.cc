@@ -1,5 +1,6 @@
 #include "source/extensions/tracers/datadog/agent_http_client.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -23,6 +24,20 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Datadog {
+namespace {
+
+datadog::tracing::Error deadlineExpiredError(std::chrono::milliseconds timeout) {
+  std::string message = "request deadline expired already";
+  if (timeout.count() < 0) {
+    message += ' ';
+    message += std::to_string(-timeout.count());
+    message += " milliseconds ago";
+  }
+  return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
+                                 std::move(message)};
+}
+
+} // namespace
 
 AgentHTTPClient::AgentHTTPClient(Upstream::ClusterManager& cluster_manager,
                                  const std::string& cluster, const std::string& reference_host,
@@ -57,15 +72,8 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   const auto timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
       deadline - time_source_.monotonicTime());
   if (timeout.count() <= 0) {
-    std::string error_message = "request deadline expired already";
-    if (timeout.count() < 0) {
-      error_message += ' ';
-      error_message += std::to_string(-timeout.count());
-      error_message += " milliseconds ago";
-    }
     stats_.reports_dropped_.inc();
-    return datadog::tracing::Error{datadog::tracing::Error::ENVOY_HTTP_CLIENT_FAILURE,
-                                   std::move(error_message)};
+    return deadlineExpiredError(timeout);
   }
 
   Upstream::ThreadLocalCluster* collector_cluster =
