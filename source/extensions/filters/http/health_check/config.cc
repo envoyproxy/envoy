@@ -31,7 +31,7 @@ absl::StatusOr<Http::FilterFactoryCb> HealthCheckFilterConfig::createFilterFacto
 
   if (!pass_through_mode && cache_time_ms) {
     return absl::InvalidArgumentError(
-        "cache_time_ms must not be set when path_through_mode is disabled");
+        "cache_time_ms must not be set when pass_through_mode is disabled");
   }
 
   HealthCheckCacheManagerSharedPtr cache_manager;
