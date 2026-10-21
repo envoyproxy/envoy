@@ -240,8 +240,7 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
   if (proto.filters_size() > 0 && !proto.has_request_handling()) {
     return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
   }
-  // Checked as a route's own entry is, so a binding that does not parse is a load error here
-  // too rather than a surprise on the first request.
+  // Validate and build `default_per_route` at config load time so invalid bindings fail early.
   std::unique_ptr<const RouteConfig> default_route_config;
   if (proto.has_default_per_route()) {
     absl::StatusOr<std::unique_ptr<RouteConfig>> created =
