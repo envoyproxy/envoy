@@ -222,6 +222,7 @@ envoy_cc_library(
     deps = [
         ":custom_config_validators_lib",
         ":dependent_type_pausing_subscription_lib",
+        ":singleton_subscription_adapter_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",
@@ -356,6 +357,7 @@ envoy_cc_library(
     hdrs = ["xds_manager_impl.h"],
     deps = [
         ":null_grpc_mux_lib",
+        ":singleton_subscription_adapter_lib",
         ":subscription_factory_lib",
         ":utility_lib",
         "//envoy/config:xds_manager_interface",
