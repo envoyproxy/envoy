@@ -669,9 +669,8 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
   return add_or_update_status;
 }
 
-absl::Status
-ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
-                                                   const ListenerImpl& existing_listener) {
+absl::Status ListenerManagerImpl::setupSocketFactoryForListener(
+    ListenerImpl& new_listener, const ListenerImpl& existing_listener, bool in_place_update) {
   if (new_listener.reusePort() != existing_listener.reusePort()) {
     return absl::InvalidArgumentError(fmt::format(
         "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
@@ -695,13 +694,29 @@ ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
       cloned_socket_factories.push_back(
           kept_socket_factory == nullptr ? drainingVersionSocketFactory(new_listener, i) : nullptr);
     }
-    return createListenSocketFactory(new_listener, kept_socket_factories, cloned_socket_factories);
-  }
-  if (!existing_listener.hasCompatibleAddress(new_listener)) {
+    RETURN_IF_NOT_OK(
+        createListenSocketFactory(new_listener, kept_socket_factories, cloned_socket_factories));
+  } else if (!existing_listener.hasCompatibleAddress(new_listener)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
   }
+
+  return initializeWorkerRoutingForUdpListener(new_listener, in_place_update);
+}
+
+absl::Status ListenerManagerImpl::initializeWorkerRoutingForUdpListener(ListenerImpl& new_listener,
+                                                                        bool in_place_update) {
+  if (in_place_update ||
+      !Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    return absl::OkStatus();
+  }
+
+  if (auto udp_listener_config = new_listener.udpListenerConfig()) {
+    RETURN_IF_NOT_OK(udp_listener_config->listenerFactory().initializeWorkerRouting(
+        new_listener.listenSocketFactories()));
+  }
+
   return absl::OkStatus();
 }
 
@@ -747,16 +762,18 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   ListenerImplPtr new_listener = nullptr;
 
   // In place filter chain update depends on the active listener at worker.
-  const ListenerImpl::InPlaceUpdate in_place_update =
+  const ListenerImpl::InPlaceUpdate in_place_update_kind =
       existing_active_listener != active_listeners_.end()
           ? (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_)
           : ListenerImpl::InPlaceUpdate::None;
-  if (in_place_update != ListenerImpl::InPlaceUpdate::None) {
+  const bool in_place_update = in_place_update_kind != ListenerImpl::InPlaceUpdate::None;
+  if (in_place_update) {
     ENVOY_LOG(debug, "use in place update filter chain update path for listener name={} hash={}",
               name, hash);
-    auto listener_or_error = (*existing_active_listener)
-                                 ->newListenerWithFilterChain(
-                                     config, version_info, workers_started_, hash, in_place_update);
+    auto listener_or_error =
+        (*existing_active_listener)
+            ->newListenerWithFilterChain(config, version_info, workers_started_, hash,
+                                         in_place_update_kind);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
     stats_.listener_in_place_updated_.inc();
@@ -786,11 +803,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
          (*existing_active_listener)->hasCompatibleAddress(*new_listener));
     RETURN_IF_NOT_OK(setupSocketFactoryForListener(
         *new_listener,
-        keeps_active_sockets ? **existing_active_listener : **existing_warming_listener));
+        keeps_active_sockets ? **existing_active_listener : **existing_warming_listener,
+        in_place_update));
     // In this case we can just replace inline.
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
-    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_active_listener));
+    RETURN_IF_NOT_OK(
+        setupSocketFactoryForListener(*new_listener, **existing_active_listener, in_place_update));
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not.
     if (workers_started_) {
@@ -804,6 +823,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not.
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(name, *new_listener));
+    // This can never be an in-place update
+    RETURN_IF_NOT_OK(
+        initializeWorkerRoutingForUdpListener(*new_listener, /*in_place_update=*/false));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -813,6 +835,13 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     }
 
     added = true;
+  }
+
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    // The listener init target must be registered with the server init manager after all of the
+    // listener's children have registered their targets with the listener's init manager. QUIC
+    // listeners also register targets in initializeWorkerRoutingForUdpListener().
+    new_listener_ref.registerInitTargetIfWorkersNotStarted();
   }
 
   updateWarmingActiveGauges();

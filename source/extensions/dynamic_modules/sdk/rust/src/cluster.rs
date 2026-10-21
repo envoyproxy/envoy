@@ -2900,7 +2900,7 @@ ffi_export! {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_lb_choose_host")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,

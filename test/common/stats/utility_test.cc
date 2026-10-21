@@ -52,7 +52,7 @@ protected:
     scope_.reset();
     pool_.clear();
     store_.reset();
-    EXPECT_EQ(0, symbol_table_->numSymbols());
+    EXPECT_EQ(num_base_symbols_, symbol_table_->numSymbols());
   }
 
   void init(MakeStatFn make_stat) {
@@ -160,6 +160,8 @@ protected:
   }
 
   SymbolTablePtr symbol_table_;
+  // Symbols pre-encoded by the table itself (the well-known stat names).
+  const uint64_t num_base_symbols_{symbol_table_->numSymbols()};
   StatNamePool pool_;
   std::unique_ptr<Allocator> alloc_;
   std::unique_ptr<Store> store_;
@@ -440,6 +442,36 @@ TEST_P(StatsUtilityTest, LiteScopeHelperStatNamePrefixOnly) {
   Counter& c = helper.counterFromStatName(pool_.add("requests"));
   EXPECT_EQ("scope.prefix.requests", c.name());
   EXPECT_EQ(&c, &scope_->counterFromString("prefix.requests"));
+}
+
+TEST_P(StatsUtilityTest, TaggedStatNames) {
+  StatNameDynamicPool dynamic_pool(*symbol_table_);
+  const StatName prefix = pool_.add("prefix");
+  const StatName total = pool_.add("total");
+  // The tag value is interleaved into the flat name as a dynamic StatName.
+  const StatName value = dynamic_pool.add("value1");
+  const StatNameTagVec tags{{pool_.add("tag1"), value}};
+
+  Counter& c =
+      Utility::counterFromTaggedStatNames(*scope_, {prefix, total}, tags, {prefix, value, total});
+  EXPECT_EQ("scope.prefix.value1.total", c.name());
+
+  Histogram& h = Utility::histogramFromTaggedStatNames(
+      *scope_, {prefix, total}, tags, {prefix, value, total}, Histogram::Unit::Milliseconds);
+  EXPECT_EQ("scope.prefix.value1.total", h.name());
+  EXPECT_EQ(Histogram::Unit::Milliseconds, h.unit());
+
+  // The isolated store always honors explicit tags.
+  if (GetParam() == StoreType::Isolated) {
+    EXPECT_EQ("scope.prefix.total", c.tagExtractedName());
+    EXPECT_THAT(c.tags(), testing::ElementsAre(Tag{"tag1", "value1"}));
+    EXPECT_EQ("scope.prefix.total", h.tagExtractedName());
+    EXPECT_THAT(h.tags(), testing::ElementsAre(Tag{"tag1", "value1"}));
+  }
+
+  // With empty tags, the base names alone name the stat and the tagged names are ignored.
+  Counter& c2 = Utility::counterFromTaggedStatNames(*scope_, {prefix, total}, {}, {});
+  EXPECT_EQ("scope.prefix.total", c2.name());
 }
 
 } // namespace

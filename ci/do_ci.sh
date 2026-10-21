@@ -524,13 +524,6 @@ case $CI_TARGET in
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
 
-        # Test execution_context build setting transition
-        echo "Building and testing execution_context_enabled tests..."
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -c fastbuild \
-            -- //test/common/common:execution_context_enabled_test
-
         if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
             echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
             bazel_with_collection \
@@ -832,6 +825,14 @@ case $CI_TARGET in
               @envoy//tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
         popd
+        ;;
+
+    execution_context)
+        # Test the execution_context build setting transition
+        # (see bazel/execution_context_transition.bzl)
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -- //test/common/common:execution_context_enabled_test
         ;;
 
     external)

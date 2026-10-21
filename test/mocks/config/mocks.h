@@ -100,9 +100,12 @@ public:
   MockOpaqueResourceDecoder();
   ~MockOpaqueResourceDecoder() override;
 
-  MOCK_METHOD(ArenaWrappedProto<Protobuf::Message>, decodeResource,
-              (const Protobuf::Any& resource));
+  MOCK_METHOD(Protobuf::Arena::UniquePtr<Protobuf::Message>, decodeResource,
+              (const Protobuf::Any& resource, Protobuf::Arena& arena));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
+  MOCK_METHOD(const Protobuf::ArenaOptions&, arenaOptions, (), (const));
+
+  Protobuf::ArenaOptions arena_options_;
 };
 
 class MockUntypedConfigUpdateCallbacks : public UntypedConfigUpdateCallbacks {
