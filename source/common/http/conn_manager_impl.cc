@@ -460,6 +460,11 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
+  if (stream.active_span_) {
+    Tracing::HttpTracerUtility::finalizeDownstreamSpan(
+        *stream.active_span_, stream.request_headers_.get(), stream.response_headers_.get(),
+        stream.response_trailers_.get(), stream.filter_manager_.streamInfo(), stream);
+  }
 
   // For HTTP/3, skip access logging here and add deferred logging info
   // to stream info for QuicStatsGatherer to use later.
@@ -1273,11 +1278,6 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     connection_manager_.config_->tracingStats().health_check_.inc();
   }
 
-  if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeDownstreamSpan(
-        *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-        filter_manager_.streamInfo(), *this);
-  }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
   }
