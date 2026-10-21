@@ -5868,6 +5868,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
     auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
     processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
     processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
+    proto_config_1_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
                                "envoy.filters.http.ext_proc_1");
     // Filter-0
@@ -5876,6 +5877,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamed) {
     processing_mode->set_request_header_mode(ProcessingMode::SEND);
     processing_mode->set_response_header_mode(ProcessingMode::SKIP);
     processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+    proto_config_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
                                "envoy.filters.http.ext_proc");
   });
@@ -5927,6 +5929,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
     processing_mode->set_response_header_mode(ProcessingMode::SEND);
     processing_mode->set_request_header_mode(ProcessingMode::SKIP);
     processing_mode->set_response_body_mode(ProcessingMode::STREAMED);
+    proto_config_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
                                "envoy.filters.http.ext_proc");
     // Filter-1
@@ -5934,6 +5937,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInResponseProcessingStreamed) {
     auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
     processing_mode_1->set_response_header_mode(ProcessingMode::SEND);
     processing_mode_1->set_request_header_mode(ProcessingMode::SKIP);
+    proto_config_1_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
                                "envoy.filters.http.ext_proc_1");
   });
@@ -5981,6 +5985,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithT
     processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
     processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
     processing_mode_1->set_request_body_mode(ProcessingMode::STREAMED);
+    proto_config_1_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
                                "envoy.filters.http.ext_proc_1");
     // Filter-0
@@ -5989,6 +5994,7 @@ TEST_P(ExtProcIntegrationTest, TwoExtProcFiltersInRequestProcessingStreamedWithT
     processing_mode->set_request_header_mode(ProcessingMode::SEND);
     processing_mode->set_response_header_mode(ProcessingMode::SKIP);
     processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+    proto_config_.mutable_message_timeout()->set_seconds(5);
     addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
                                "envoy.filters.http.ext_proc");
   });
