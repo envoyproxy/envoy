@@ -1822,6 +1822,38 @@ TEST_F(OtlpMetricsFlusherAggregationTests, ConversionWithoutMetricNameKeepsStatN
   EXPECT_EQ(1, metrics[1].sum().data_points(0).as_int());
 }
 
+TEST_F(OtlpMetricsFlusherAggregationTests, ConversionWithOnlyStaticLabelsKeepsStatNames) {
+  // The action has neither a metric name nor a resource conversion: the metrics are named after
+  // their stats, instead of having an empty name, and get the static label.
+  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
+                                             matcherList({conversionMatcher("test", R"pb(
+                                               static_metric_labels {
+                                                 key: "source"
+                                                 value { string_value: "envoy" }
+                                               }
+                                             )pb")})));
+  addCounterToSnapshot("test_counter", /*delta=*/1, /*value=*/1, true, {{"key", "val"}});
+  addGaugeToSnapshot("test_gauge", /*value=*/2, true, {{"key", "val"}});
+
+  auto request = flushToSingleRequest(flusher);
+  ASSERT_NE(request, nullptr);
+  ASSERT_EQ(1, request->resource_metrics_size());
+  auto& metrics =
+      *request->mutable_resource_metrics(0)->mutable_scope_metrics(0)->mutable_metrics();
+  sortMetrics(metrics);
+  ASSERT_EQ(2, metrics.size());
+  EXPECT_EQ(absl::StrCat("prefix.", getTagExtractedName("test_counter")), metrics[0].name());
+  ASSERT_EQ(1, metrics[0].sum().data_points_size());
+  EXPECT_EQ(1, metrics[0].sum().data_points(0).as_int());
+  EXPECT_EQ(attributesMap(metrics[0].sum().data_points(0).attributes()),
+            (std::map<std::string, std::string>{{"key", "val"}, {"source", "envoy"}}));
+  EXPECT_EQ(absl::StrCat("prefix.", getTagExtractedName("test_gauge")), metrics[1].name());
+  ASSERT_EQ(1, metrics[1].gauge().data_points_size());
+  EXPECT_EQ(2, metrics[1].gauge().data_points(0).as_int());
+  EXPECT_EQ(attributesMap(metrics[1].gauge().data_points(0).attributes()),
+            (std::map<std::string, std::string>{{"key", "val"}, {"source", "envoy"}}));
+}
+
 class ResourceConversionConfigTests : public OpenTelemetryStatsSinkTests {
 public:
   // Returns the status of creating the options of a sink with a conversion whose resource

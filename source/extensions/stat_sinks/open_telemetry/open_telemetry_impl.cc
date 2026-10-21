@@ -449,7 +449,8 @@ OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
 template <class StatType>
 std::string OtlpMetricsFlusherImpl::getMetricName(const StatType& stat,
                                                   const ConversionAction* conversion_action) const {
-  // An empty metric name in the conversion keeps the name of the stat.
+  // A conversion without a metric name keeps the default name of the stat, since an empty name is
+  // not a valid OTLP metric name.
   if (conversion_action != nullptr && !conversion_action->config()->metric_name().empty()) {
     return conversion_action->config()->metric_name();
   }

@@ -31,10 +31,13 @@ message SinkConfig {
   // used to create the metric. This can be used to rename a
   // stat, add static labels, and aggregate multiple stats into a single metric.
   message ConversionAction {
-    // The metric name to use for the stat. If empty, the stat keeps the name that it has without a
+    // The metric name to use for the stat. If empty, the metric is named as if the stat matched no
     // conversion, see :ref:`use_tag_extracted_name
     // <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.use_tag_extracted_name>`
-    // and :ref:`prefix <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.prefix>`.
+    // and :ref:`prefix <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.prefix>`,
+    // instead of with an empty name, which is not a valid OTLP metric name. This lets a conversion
+    // without a metric name apply to many stats, e.g. to report them under a resource of their own,
+    // without merging them into a single metric.
     string metric_name = 2;
 
     // Static metric labels to use for the metric.
