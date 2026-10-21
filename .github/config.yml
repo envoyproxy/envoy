@@ -191,8 +191,9 @@ run:
     - bazel/execution_context_transition.bzl
     - ci/do_ci.sh
     - ci/bazel_fun.sh
-    - source/common/common/**/*
-    - test/common/common/**/*
+    - envoy/**/*
+    - source/**/*
+    - test/**/*
   check-build-openssl:
     paths:
     - "**/*"
