@@ -82,6 +82,9 @@ void ExtProcIntegrationTest::initializeConfig(
       [&total_cluster_endpoints](const auto& item) { total_cluster_endpoints += item.second; });
   ASSERT_EQ(total_cluster_endpoints, grpc_upstream_count_);
 
+  if (!proto_config_.has_message_timeout()) {
+    proto_config_.mutable_message_timeout()->set_seconds(5);
+  }
   config_helper_.addConfigModifier([this, cluster_endpoints, config_option](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
@@ -240,6 +243,9 @@ void ExtProcIntegrationTest::initializeConfig(
 
 void ExtProcIntegrationTest::twoExtProcFiltersFullDuplexConfig() {
   two_ext_proc_filters_ = true;
+  if (!proto_config_.has_message_timeout()) {
+    proto_config_.mutable_message_timeout()->set_seconds(5);
+  }
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
     // Filter-1
     proto_config_1_.mutable_processing_mode()->Clear();
@@ -1073,6 +1079,9 @@ void ExtProcIntegrationTest::prependExtProcCompositeFilter(const Protobuf::Messa
 }
 
 void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
+  if (!proto_config_.has_message_timeout()) {
+    proto_config_.mutable_message_timeout()->set_seconds(5);
+  }
   config_helper_.addConfigModifier([&](ConfigHelper::HttpConnectionManager& cm) {
     auto* access_log = cm.add_access_log();
     access_log->set_name("accesslog");
