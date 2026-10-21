@@ -1076,7 +1076,7 @@ TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
   EXPECT_EQ(4L, counter->value());
   EXPECT_EQ(1, stats_store_.evictionCount());
 
-  // A 5s interval evicts on every flush.
+  // A 5s interval evicts on every flush. Stop at 28s to avoid racing the flush at 30s.
   {
     absl::Notification updated;
     server_->dispatcher().post([&] {
@@ -1085,7 +1085,7 @@ TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
     });
     updated.WaitForNotification();
   }
-  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  time_system_.advanceTimeWait(std::chrono::seconds(4));
   EXPECT_EQ(5L, counter->value());
   EXPECT_EQ(2, stats_store_.evictionCount());
 
