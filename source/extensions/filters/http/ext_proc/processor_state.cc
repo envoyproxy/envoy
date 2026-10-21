@@ -268,21 +268,6 @@ absl::Status ProcessorState::handleHeaderContinue() {
 }
 
 absl::Status ProcessorState::handleCompleteBodyAvailable() {
-  if (filter_.maxStreamedBodyChunkSize().has_value() &&
-      (body_mode_ == ProcessingMode::STREAMED ||
-       body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED)) {
-    // When max_streamed_body_chunk_size is configured in streamed modes, always split and send
-    // any buffered data via sendBufferedDataInStreamedMode (which respects
-    // max_streamed_body_chunk_size and uses StreamedBodyCallback).
-    sendBufferedDataInStreamedMode(trailers_ == nullptr);
-    if (callback_state_ == CallbackState::Idle) {
-      // No body chunks are in flight (e.g., headers followed directly by trailers with no body,
-      // or all body chunks already completed while send_body_without_waiting_for_header_response
-      // was enabled), so proceed to handle trailers and cleanup now.
-      return handleTrailersAndCleanup();
-    }
-    return absl::OkStatus();
-  }
   if (callback_state_ == CallbackState::Idle) {
     // If we get here, then all the body data came in before the header message
     // was complete, and the server wants the body. It doesn't matter whether the
@@ -292,8 +277,14 @@ absl::Status ProcessorState::handleCompleteBodyAvailable() {
       // flag of decodeData() can be determined by whether the trailers are received.
       // Also, bufferedData() is not nullptr means decodeData() is called, even though
       // the data can be an empty chunk.
-      auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
-      filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+      if (filter_.maxStreamedBodyChunkSize().has_value() &&
+          (body_mode_ == ProcessingMode::STREAMED ||
+           body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED)) {
+        sendBufferedDataInStreamedMode(trailers_ == nullptr);
+      } else {
+        auto req = filter_.setupBodyChunk(*this, *bufferedData(), trailers_ == nullptr);
+        filter_.sendBodyChunk(*this, ProcessorState::CallbackState::BufferedBodyCallback, req);
+      }
       clearWatermark();
     } else {
       return handleTrailersAndCleanup();
