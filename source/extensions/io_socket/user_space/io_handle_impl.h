@@ -124,6 +124,11 @@ public:
   void onPeerDestroy() override {
     peer_handle_ = nullptr;
     sent_eof_ = true;
+    if (user_file_event_) {
+      // A connection waiting to flush may only be listening for Write. Wake it so that it can
+      // detect the closed peer and release its pending write buffer.
+      user_file_event_->activateIfEnabled(Event::FileReadyType::Write);
+    }
   }
   void onPeerBufferLowWatermark() override {
     if (user_file_event_) {
