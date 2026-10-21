@@ -74,6 +74,7 @@ envoy_cc_library(
         "//source/common/common:statusor_lib",
         "//source/common/http:header_map_lib",
         "//source/common/tracing:trace_context_lib",
+        "//source/common/tracing:tracing_validation_lib",
         "@abseil-cpp//absl/status:statusor",
     ],
 )
