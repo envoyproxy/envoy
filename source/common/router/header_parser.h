@@ -139,6 +139,10 @@ public:
 
   static std::string translateMetadataFormat(const std::string& header_value);
   static std::string translatePerRequestState(const std::string& header_value);
+  static void
+  translateHeaderValueOption(envoy::config::core::v3::HeaderValueOption& header_value_option);
+  static void translateHeaderValueOptions(
+      Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& headers_to_add);
 
 protected:
   HeaderParser() = default;
