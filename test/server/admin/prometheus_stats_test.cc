@@ -222,6 +222,37 @@ TEST_F(PrometheusStatsFormatterTest, LargeFamilySpansChunks) {
   }
 }
 
+TEST_F(PrometheusStatsFormatterTest, StagingSpansFamiliesAndMetricTypes) {
+  Stats::CustomStatNamespacesImpl custom_namespaces;
+  addCounter("first", {});
+  counters_.back()->add(3);
+  addCounter("second", {});
+  counters_.back()->add(4);
+  addGauge("third", {});
+  gauges_.back()->set(5);
+  addTextReadout("fourth", std::string(8192, 'x'), {});
+  addTextReadout("zlast", "tail", {});
+  StatsParams params;
+  params.prometheus_text_readouts_ = true;
+  Buffer::OwnedImpl expected;
+  PrometheusStatsFormatter::statsAsPrometheusText(counters_, gauges_, histograms_, textReadouts_,
+                                                  endpoints_helper_->cm_, expected, params,
+                                                  custom_namespaces);
+
+  // Cross family/type boundaries, split a large metric, and finish on either side of an exact
+  // chunk boundary. A partially consumed oversized metric can share its last chunk with more data.
+  const std::array<uint64_t, 5> chunk_sizes = {1, 127, 4096, expected.length(),
+                                               expected.length() + 1};
+  for (const uint64_t chunk_size : chunk_sizes) {
+    auto request = PrometheusStatsFormatter::makeTextRequest(counters_, gauges_, histograms_,
+                                                             textReadouts_, endpoints_helper_->cm_,
+                                                             params, custom_namespaces, chunk_size);
+    Http::TestResponseHeaderMapImpl headers;
+    EXPECT_EQ(Http::Code::OK, request->start(headers));
+    EXPECT_EQ(expected.toString(), drainRequest(*request, chunk_size));
+  }
+}
+
 TEST_F(PrometheusStatsFormatterTest, MembershipAndOwnershipSurviveChangesBetweenChunks) {
   Stats::CustomStatNamespacesImpl custom_namespaces;
   Stats::ThreadLocalStoreImpl store(alloc_);

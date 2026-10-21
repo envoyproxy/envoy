@@ -131,18 +131,15 @@ public:
     quantiles_ = quantiles;
   }
 
-  void generateOutput(Buffer::Instance& output,
-                      const std::vector<const TextCounterSnapshot*>& metrics,
+  void generateOutput(Buffer::Instance& output, std::span<const TextCounterSnapshot* const> metrics,
                       const std::string& name) const {
-    generateNumericOutput(output, metrics, name);
+    generateNumericOutput<TextCounterSnapshot>(output, metrics, name);
   }
-  void generateOutput(Buffer::Instance& output,
-                      const std::vector<const TextGaugeSnapshot*>& metrics,
+  void generateOutput(Buffer::Instance& output, std::span<const TextGaugeSnapshot* const> metrics,
                       const std::string& name) const {
-    generateNumericOutput(output, metrics, name);
+    generateNumericOutput<TextGaugeSnapshot>(output, metrics, name);
   }
-  void generateOutput(Buffer::Instance& output,
-                      const std::vector<const TextReadoutSnapshot*>& metrics,
+  void generateOutput(Buffer::Instance& output, std::span<const TextReadoutSnapshot* const> metrics,
                       const std::string& name) const {
     generateTypeOutput(output, kGauge, name);
     for (const auto* metric : metrics) {
@@ -150,7 +147,7 @@ public:
     }
   }
   void generateOutput(Buffer::Instance& output,
-                      const std::vector<const TextHistogramSnapshot*>& metrics,
+                      std::span<const TextHistogramSnapshot* const> metrics,
                       const std::string& name) const {
     const bool summary = histogramType() == HistogramType::Summary;
     generateTypeOutput(output, summary ? kSummary : kHistogram, name);
@@ -170,24 +167,38 @@ public:
 
   void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Counter*>& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, counters, prefixed_tag_extracted_name);
+    generateNumericOutput<Stats::Counter>(output, counters, prefixed_tag_extracted_name);
   }
 
   void generateOutput(Buffer::Instance& output,
                       std::vector<Stats::PrimitiveCounterSnapshot*>&& counters,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, std::move(counters), prefixed_tag_extracted_name);
+    generateOutput(output, std::span<Stats::PrimitiveCounterSnapshot* const>(counters),
+                   prefixed_tag_extracted_name);
+  }
+
+  void generateOutput(Buffer::Instance& output,
+                      std::span<Stats::PrimitiveCounterSnapshot* const> counters,
+                      const std::string& name) const {
+    generateNumericOutput<Stats::PrimitiveCounterSnapshot>(output, counters, name);
   }
 
   void generateOutput(Buffer::Instance& output, const std::vector<const Stats::Gauge*>& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, gauges, prefixed_tag_extracted_name);
+    generateNumericOutput<Stats::Gauge>(output, gauges, prefixed_tag_extracted_name);
   }
 
   void generateOutput(Buffer::Instance& output,
                       std::vector<Stats::PrimitiveGaugeSnapshot*>&& gauges,
                       const std::string& prefixed_tag_extracted_name) const override {
-    generateNumericOutput(output, std::move(gauges), prefixed_tag_extracted_name);
+    generateOutput(output, std::span<Stats::PrimitiveGaugeSnapshot* const>(gauges),
+                   prefixed_tag_extracted_name);
+  }
+
+  void generateOutput(Buffer::Instance& output,
+                      std::span<Stats::PrimitiveGaugeSnapshot* const> gauges,
+                      const std::string& name) const {
+    generateNumericOutput<Stats::PrimitiveGaugeSnapshot>(output, gauges, name);
   }
 
   void generateOutput(Buffer::Instance& output,
@@ -240,7 +251,7 @@ private:
   }
 
   template <class StatType>
-  void generateNumericOutput(Buffer::Instance& output, const std::vector<const StatType*>& metrics,
+  void generateNumericOutput(Buffer::Instance& output, std::span<const StatType* const> metrics,
                              const std::string& prefixed_tag_extracted_name) const {
     absl::string_view type;
     if constexpr (std::is_same_v<Stats::Counter, StatType> ||
@@ -262,7 +273,7 @@ private:
   }
 
   template <class StatType>
-  void generateNumericOutput(Buffer::Instance& output, std::vector<StatType*>&& metrics,
+  void generateNumericOutput(Buffer::Instance& output, std::span<StatType* const> metrics,
                              const std::string& prefixed_tag_extracted_name) const {
     absl::string_view type;
     if constexpr (std::is_same_v<Stats::PrimitiveCounterSnapshot, StatType>) {
@@ -972,7 +983,8 @@ public:
     }
     const auto& family = families_[family_];
     format.setEmitType(metric_ == 0);
-    format.generateOutput(output, std::vector<StatType*>{family.metrics_[metric_++]}, family.name_);
+    auto* metric = family.metrics_[metric_++];
+    format.generateOutput(output, std::span<StatType* const>(&metric, 1), family.name_);
     if (metric_ == family.metrics_.size()) {
       metric_ = 0;
       ++family_;
@@ -1022,22 +1034,19 @@ public:
   Http::Code start(Http::ResponseHeaderMap&) override { return Http::Code::OK; }
 
   bool nextChunk(Buffer::Instance& response) override {
-    uint64_t remaining = chunk_size_;
-    while (remaining != 0) {
-      if (pending_.length() != 0) {
-        const uint64_t size = std::min(remaining, pending_.length());
-        response.move(pending_, size);
-        remaining -= size;
-        continue;
-      }
+    // Batch metrics before draining, so small metrics reuse the staging buffer's slices.
+    // An individual metric may exceed the chunk size and its remainder spans later chunks.
+    while (pending_.length() < chunk_size_) {
       if (cursor_ != nullptr && cursor_->next(pending_, format_)) {
         continue;
       }
       cursor_.reset();
       if (!nextPhase()) {
+        response.move(pending_);
         return false;
       }
     }
+    response.move(pending_, chunk_size_);
     return true;
   }
 
