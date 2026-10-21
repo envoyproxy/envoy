@@ -113,6 +113,7 @@ public:
         mutable_data = inline_;
         break;
       }
+      ABSL_FALLTHROUGH_INTENDED;
     case StorageLocation::Heap:
       if (capacity_ < size) {
         const uint32_t new_capacity = computeCapacity(size, capacity_);
