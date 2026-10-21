@@ -104,7 +104,8 @@ public:
 // These tests exercise the ext_proc filter through Envoy's integration test
 // environment by configuring an instance of the Envoy server and driving it
 // through the mock network stack.
-class ExtProcIntegrationTest : public HttpIntegrationTest,
+class ExtProcIntegrationTest : public Event::TestUsingSimulatedTime,
+                               public HttpIntegrationTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 protected:
   ExtProcIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}

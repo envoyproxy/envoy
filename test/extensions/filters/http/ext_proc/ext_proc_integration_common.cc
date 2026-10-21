@@ -611,6 +611,14 @@ void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
 // ext_proc server sends back a response to tell Envoy to stop the
 // original timer and start a new timer.
 void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
+  const auto get_timeout_msg_count = [this]() -> uint64_t {
+    auto received =
+        test_server_->counter("http.config_test.ext_proc.override_message_timeout_received");
+    auto ignored =
+        test_server_->counter("http.config_test.ext_proc.override_message_timeout_ignored");
+    return (received ? received->value() : 0) + (ignored ? ignored->value() : 0);
+  };
+  const uint64_t prev_count = get_timeout_msg_count();
   ProcessingResponse response;
   if (timeout_ms < 1000) {
     response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
@@ -618,6 +626,10 @@ void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
     response.mutable_override_message_timeout()->set_seconds(timeout_ms / 1000);
   }
   processor_stream_->sendGrpcMessage(response);
+  Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+  while (get_timeout_msg_count() <= prev_count && bound.withinBound()) {
+    absl::SleepFor(absl::Milliseconds(1));
+  }
 }
 
 void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms) {
