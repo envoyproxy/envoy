@@ -105,5 +105,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/mongo_proxy:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )

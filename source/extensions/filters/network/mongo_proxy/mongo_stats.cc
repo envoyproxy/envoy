@@ -8,19 +8,32 @@
 
 #include "source/common/config/well_known_names.h"
 #include "source/common/stats/symbol_table.h"
-
-#include "absl/strings/str_cat.h"
+#include "source/common/stats/well_known_stat_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
+namespace {
+
+// Creates the `mongo.<prefix>` scope with the prefix attached as an explicit tag. The names are
+// encoded as StatNames directly because the string-based scope API sanitizes the names and would
+// rewrite a prefix containing e.g. ':' even when explicit tags are disabled.
+Stats::ScopeSharedPtr createStatsScope(Stats::Scope& scope, absl::string_view prefix) {
+  const Stats::StatNameManagedStorage tag_value(prefix, scope.symbolTable());
+
+  const Stats::WellKnownStatNames& names = scope.symbolTable().wellKnownStatNames();
+  const Stats::StatNameTag tag{names.tag_mongo_prefix_, tag_value.statName()};
+  const Stats::StatNameJoiner tagged({names.mongo_, tag_value.statName()}, scope.symbolTable());
+  return scope.scopeFromTaggedName(names.mongo_, Stats::StatNameTagSpan{tag}, tagged.statName());
+}
+
+} // namespace
+
 MongoStats::MongoStats(Stats::Scope& scope, absl::string_view prefix,
                        const std::vector<std::string>& commands)
-    : scope_(scope.createScopeWithTaggedName(
-          "mongo", {Stats::TagStringView{Envoy::Config::TagNames::get().MONGO_PREFIX, prefix}},
-          absl::StrCat("mongo.", prefix))),
+    : scope_(createStatsScope(scope, prefix)),
       stat_name_set_(scope_->symbolTable().makeSet("Mongo")),
       callsite_(stat_name_set_->add("callsite")), cmd_(stat_name_set_->add("cmd")),
       collection_(stat_name_set_->add("collection")), multi_get_(stat_name_set_->add("multi_get")),

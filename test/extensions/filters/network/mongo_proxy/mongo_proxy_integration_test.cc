@@ -7,6 +7,8 @@
 
 #include "test/integration/integration.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace {
 
@@ -25,13 +27,15 @@ public:
   // names, tag-extracted names and tags for all the mongo stats.
   bool explicitTags() const { return version_ == Network::Address::IpVersion::v4; }
 
-  void initialize() override {
-    config_helper_.addNetworkFilter(R"EOF(
+  void initialize() override { initializeWithPrefix("mongo_stats"); }
+
+  void initializeWithPrefix(absl::string_view stat_prefix) {
+    config_helper_.addNetworkFilter(absl::StrCat(R"EOF(
 name: mongo
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.network.mongo_proxy.v3.MongoProxy
-  stat_prefix: mongo_stats
-)EOF");
+  stat_prefix: ")EOF",
+                                                 stat_prefix, "\"\n"));
     // Exercise both stats modes without doubling the test matrix: the two IP versions run the
     // server in different modes. The mode is read during server initialization, before the
     // runtime loader exists, so it has to be set directly rather than with addRuntimeOverride().
@@ -113,22 +117,26 @@ TEST_P(MongoProxyIntegrationTest, StatsTagsAndNamesAreIdenticalInBothModes) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  // A plain query with a callsite comment, answered by the upstream.
+  // A plain query with a callsite comment, answered by the upstream. Replies are forwarded
+  // downstream only after the filter has fully processed them, so waiting for the reply bytes on
+  // the client guarantees all the reply stats (including the histograms) have been created.
   const std::string query = encodeQuery(
       1, "db.testcol",
       Bson::DocumentImpl::create()->addString("$comment", R"({"callingFunction":"getByMongoId"})"));
+  const std::string reply1 = encodeReply(1);
   ASSERT_TRUE(tcp_client->write(query));
   ASSERT_TRUE(fake_upstream_connection->waitForData(query.size()));
-  ASSERT_TRUE(fake_upstream_connection->write(encodeReply(1)));
-  test_server_->waitForCounter("mongo.mongo_stats.op_reply", testing::Eq(1));
+  ASSERT_TRUE(fake_upstream_connection->write(reply1));
+  ASSERT_TRUE(tcp_client->waitForData(reply1.size()));
 
   // An "insert" command, answered by the upstream.
   const std::string command =
       encodeQuery(2, "db.$cmd", Bson::DocumentImpl::create()->addString("insert", "testcol"));
+  const std::string reply2 = encodeReply(2);
   ASSERT_TRUE(tcp_client->write(command));
   ASSERT_TRUE(fake_upstream_connection->waitForData(query.size() + command.size()));
-  ASSERT_TRUE(fake_upstream_connection->write(encodeReply(2)));
-  test_server_->waitForCounter("mongo.mongo_stats.op_reply", testing::Eq(2));
+  ASSERT_TRUE(fake_upstream_connection->write(reply2));
+  ASSERT_TRUE(tcp_client->waitForData(reply1.size() + reply2.size()));
 
   tcp_client->close();
 
@@ -150,6 +158,16 @@ TEST_P(MongoProxyIntegrationTest, StatsTagsAndNamesAreIdenticalInBothModes) {
                   "mongo.collection.query.reply_time_ms", {prefix, collection});
   expectHistogram("mongo.mongo_stats.cmd.insert.reply_time_ms", "mongo.cmd.reply_time_ms",
                   {prefix, cmd});
+}
+
+// A stat prefix containing ':' keeps its spelling in the flat stat names in both modes, like the
+// historical stat creation paths: the scope is created from StatNames, which are never sanitized.
+TEST_P(MongoProxyIntegrationTest, ColonInStatPrefixIsPreserved) {
+  initializeWithPrefix("db:27017");
+
+  // The fixed proxy stats are created at config load, so no traffic is needed.
+  expectCounter("mongo.db:27017.op_query", "mongo.op_query",
+                {{Config::TagNames::get().MONGO_PREFIX, "db:27017"}});
 }
 
 } // namespace
