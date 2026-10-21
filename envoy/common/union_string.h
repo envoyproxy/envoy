@@ -43,7 +43,7 @@ public:
 
   explicit UnionStringStorage(absl::string_view ref_value)
       : size_(static_cast<uint32_t>(ref_value.size())), capacity_(0), ref_(ref_value.data()) {
-    ASSERT(ref_value.size() <= std::numeric_limits<uint32_t>::max());
+    validateCapacity(ref_value.size());
   }
 
   UnionStringStorage(UnionStringStorage&& move_value) noexcept
@@ -93,7 +93,7 @@ public:
    * Point at data owned elsewhere, releasing any owned data.
    */
   void setReference(absl::string_view ref_value) {
-    ASSERT(ref_value.size() <= std::numeric_limits<uint32_t>::max());
+    validateCapacity(ref_value.size());
     freeIfHeap();
     size_ = static_cast<uint32_t>(ref_value.size());
     capacity_ = 0;
