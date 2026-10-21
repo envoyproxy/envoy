@@ -379,8 +379,10 @@ TEST_F(XdstpOdCdsApiImplTest, KnownMissingAfterRemoval) {
   )EOF",
                                                                               cluster_name));
   EXPECT_CALL(cm_, addOrUpdateCluster(ProtoEq(cluster), "v2", false));
+  Protobuf::Arena arena;
   Config::DecodedResourceImpl decoded_resource(
-      std::make_unique<envoy::config::cluster::v3::Cluster>(cluster), cluster_name, {}, "v2");
+      Protobuf::Arena::MakeUnique<envoy::config::cluster::v3::Cluster>(&arena, cluster),
+      cluster_name, {}, "v2");
   std::vector<Config::DecodedResourceRef> resources;
   resources.emplace_back(decoded_resource);
   EXPECT_OK(odcds_callbacks_->onConfigUpdate(resources, "v2"));
