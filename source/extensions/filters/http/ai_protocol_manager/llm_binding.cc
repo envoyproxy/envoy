@@ -21,15 +21,19 @@ namespace {
 constexpr absl::string_view ModelField = "model";
 constexpr absl::string_view StreamField = "stream";
 
-// Headers a binding may not write: the pseudo-headers are the connection's and the path is the
-// pattern's; the rest describe the body Envoy frames itself.
+// Checks whether an HTTP header name is a protected protocol/framing header that binding mutations
+// are not allowed to modify or remove.
 bool isReservedHeader(absl::string_view name) {
   return absl::StartsWith(name, ":") || name == "host" || name == "content-length" ||
          name == "transfer-encoding";
 }
 
-// Checks a header mutation as `create()` builds it: the name is one Envoy will send, lower-case
-// so it matches what the request carries, and the value, when set, is text.
+// Validates that a header mutation is well-formed by checking three rules:
+// - Not a reserved header: Rejects pseudo-headers (`:*`), `host`, `content-length`, and
+//   `transfer-encoding` via `isReservedHeader`.
+// - Lowercase without whitespace: Rejects header names containing uppercase letters or spaces.
+// - String value (if set): If `value` is provided (rather than unset/null to remove the header),
+//   verifies that the value is a string.
 absl::Status validateHeaderMutation(const LlmBinding::Mutation& mutation) {
   if (isReservedHeader(mutation.header)) {
     return absl::InvalidArgumentError(
@@ -126,8 +130,8 @@ std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& bindin
     read.model = std::move(match->model);
     read.path_variables = std::move(match->variables);
   }
-  // What the binding writes is the provider's, not the API's: taken out of the body here, and
-  // recorded for the caller to take out of the headers, so neither reaches another provider.
+  // Strip provider-specific body fields and record provider-specific headers for removal by the
+  // caller so they do not leak when routing to a different provider.
   for (const LlmBinding::Mutation& mutation : edits.mutations()) {
     if (!mutation.value.has_value()) {
       continue;
@@ -296,10 +300,7 @@ writeRequest(const LlmBinding& binding, const LlmBinding* api_binding,
 
   // The filter hands back the arrived binding itself when the request leaves in it.
   const bool same_binding = arrived != nullptr && arrived->binding.get() == &binding;
-  // Each mutation is decided before its placeholders are filled: one that keeps an existing field
-  // or restores the client's value needs none. Header edits are collected for the caller, which
-  // owns the headers; they are complete only once every mutation has been decided, so a failure
-  // part way through leaves `headers` untouched.
+  // Stage header edits locally so `headers` remains untouched if a mutation fails mid-loop.
   std::vector<HeaderMutation> header_edits;
   for (const LlmBinding::Mutation& mutation : editsOf(binding, api_binding).mutations()) {
     if (mutation.isHeader()) {

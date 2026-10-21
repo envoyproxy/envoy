@@ -82,8 +82,6 @@ message LLMBinding {
   // API's own path is used.
   string uri_pattern = 1;
 
-  // Edits to the request body and headers, applied in order. When empty, the API's own edits
-  // apply, such as removing ``model`` and ``stream`` for Gemini, or adding ``anthropic-version``
-  // for Anthropic.
+  // Ordered edits to the request body and headers. When empty, the API's default edits apply.
   repeated Mutation mutations = 2;
 }

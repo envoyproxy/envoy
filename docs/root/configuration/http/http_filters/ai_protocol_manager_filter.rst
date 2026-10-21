@@ -416,20 +416,18 @@ independent, and a key that is not set leaves today's behavior in place.
   Response token-usage extraction follows it too, so the two never disagree about the backend.
 
 ``envoy.ai.binding.request``
-  How the client's request carries its API on HTTP. The ``TO_IR`` leg reads the client's path,
-  body and headers under it; the path itself is not rewritten. Without it, the route's binding
-  applies, and without that, the client API's own binding and those Envoy knows for it are tried:
-  Gemini's ``/v1beta/models/{model}:generateContent`` and its Vertex AI form, Anthropic's
-  ``/v1/messages`` with its ``anthropic-version`` header, and Claude on Vertex AI's ``rawPredict``
-  and ``streamRawPredict``. A gateway that serves an API under its own prefix names the prefix
-  here.
+  How the client's request carries its API over HTTP. The ``TO_IR`` leg uses this binding to read
+  the client's path, body, and headers (without rewriting the path). If unset, Envoy falls back to
+  the route's binding, and then to the client API's built-in bindings (e.g., native Gemini or
+  Anthropic paths and their Vertex AI equivalents). Set this when the gateway exposes an API under
+  a custom path prefix.
 
 ``envoy.ai.binding.response``
-  How the backend expects its API on HTTP. The ``FROM_IR`` leg renders its path into ``:path``
-  and applies its edits to the body and headers, in place of the route's binding and the backend
-  API's own; a Gemini backend on Vertex AI, for example, names Vertex's path here. When neither it
-  nor the route names one and the backend speaks the client's API, the request leaves in the
-  binding it arrived in.
+  How the backend expects its API over HTTP. The ``FROM_IR`` leg uses this binding to render
+  ``:path`` and apply body and header edits, overriding the route's binding and the backend API's
+  default binding (for example, to target a Gemini backend on Vertex AI). If neither this nor the
+  route sets a binding, and the backend speaks the same API as the client, the request keeps the
+  binding it arrived with.
 
 ``envoy.ai.model.resolved``
   The model to send upstream in place of the one the client asked for. It reaches the body and
@@ -531,9 +529,8 @@ model in the path alone and the Vertex AI API version in the body:
     ]
   }
 
-The Anthropic API itself takes its version in a header, which is why Envoy's own binding of
-``ANTHROPIC_MESSAGES`` writes one, and why a request bound for Anthropic needs no route
-configuration for its path or that header:
+Envoy's built-in ``ANTHROPIC_MESSAGES`` binding sets the ``anthropic-version`` header
+automatically, so requests to Anthropic need no extra path or header configuration:
 
 .. code-block:: json
 
@@ -544,10 +541,8 @@ configuration for its path or that header:
     ]
   }
 
-A header mutation is for a header the provider's API requires alongside the body. Credentials
-stay with the route or a credential filter, for example through ``request_headers_to_add`` or
-:ref:`credential_injector <config_http_filters_credential_injector>`: a binding is
-configuration, not a secret.
+Use header mutations only for non-secret API headers; pass credentials via
+``request_headers_to_add`` or :ref:`credential_injector <config_http_filters_credential_injector>`.
 
 Response token-usage extraction
 -------------------------------

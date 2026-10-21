@@ -24,12 +24,10 @@ namespace AiProtocolManager {
 class LlmBinding;
 using LlmBindingConstSharedPtr = std::shared_ptr<const LlmBinding>;
 
-// The value of a request header by its lower-case name, or nullopt when the request has none. The
-// engine reads no headers itself; the caller supplies this where a binding needs them.
+// Looks up a request header by lowercase name, returning nullopt if absent.
 using HeaderLookup = std::function<std::optional<std::string>(absl::string_view name)>;
 
-// One edit to the request headers a binding asks for, which the caller applies: `value` set
-// writes the header, nullopt removes it.
+// A request header edit for the caller to apply (`value` sets the header; nullopt removes it).
 struct HeaderMutation {
   std::string name;
   std::optional<std::string> value;
