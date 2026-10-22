@@ -11,3 +11,15 @@ ignored_cves:
 # Envoy's wee8 exposes only the Wasm C-API (proxy-wasm-cpp-host src/v8/v8.cc); no JavaScript is parsed or executed,
 # so the JS JIT path and Array builtins are unreachable.
 - CVE-2026-85046
+
+# nghttpx-only: HTTP/1.1 Upgrade + Content-Length smuggling in the nghttpx proxy binary.
+# Envoy links libnghttp2 only; nghttpx is not built or shipped.
+- CVE-2026-58055
+
+# gRPC-Go only: `:path` leading-slash authz bypass in google.golang.org/grpc (fixed in grpc-go 1.79.3).
+# NVD files grpc-go under the same cpe:2.3:a:grpc:grpc as the C++ core that Envoy links.
+- CVE-2026-33186
+
+# Python-only: google.protobuf.json_format.ParseDict() recursion-depth bypass via nested Any.
+# NVD uses cpe:2.3:a:google:protobuf for all language runtimes; Envoy links protobuf C++.
+- CVE-2026-0994
