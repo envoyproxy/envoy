@@ -463,6 +463,7 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 }
 
 std::string getListenerDetails(Envoy::Server::Instance& server) {
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   const auto& cbs_maps = server.admin()->getConfigTracker().getCallbacksMap();
   ProtobufTypes::MessagePtr details = cbs_maps.at("listeners")(Matchers::UniversalStringMatcher());
   auto listener_info =
@@ -471,6 +472,10 @@ std::string getListenerDetails(Envoy::Server::Instance& server) {
   return MessageUtil::getYamlStringFromMessage(listener_info.dynamic_listeners(0).error_state());
 #else
   return listener_info.dynamic_listeners(0).error_state().DebugString();
+#endif
+#else
+  UNREFERENCED_PARAMETER(server);
+  return "(listener details unavailable: admin functionality disabled)";
 #endif
 }
 

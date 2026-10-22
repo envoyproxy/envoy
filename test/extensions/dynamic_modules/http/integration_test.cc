@@ -1577,6 +1577,15 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
   FAIL() << "Config was not updated in time";
 }
 
+// A scheduled event emits a metric through the filter config, with no stream involved.
+TEST_P(DynamicModulesIntegrationTest, ConfigSchedulerEmitsMetric) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the scheduled event metric is only in the rust test module";
+  }
+  initializeFilter("http_config_scheduler");
+  test_server_->waitForGauge("dynamicmodulescustom.config_scheduled_events", testing::Eq(1));
+}
+
 // Test buffer limit callbacks for non-terminal filters.
 TEST_P(DynamicModulesIntegrationTest, BufferLimitFilter) {
   initializeFilter("buffer_limit_filter");
