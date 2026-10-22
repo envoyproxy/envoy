@@ -1,5 +1,5 @@
 {
-  "checksum": "5b2732d6faf4872654fe43d84a7d3424c73c0bbd48835c02915ef6c4443adadc",
+  "checksum": "5eb5185128a11432fd4c2e80e09a2335c2a3a01aae1d5c00f50249582de59dd9",
   "crates": {
     "aho-corasick 1.1.4": {
       "name": "aho-corasick",
@@ -2954,7 +2954,7 @@
               "target": "url"
             },
             {
-              "id": "webpki-roots 1.0.6",
+              "id": "webpki-roots 1.0.10",
               "target": "webpki_roots"
             }
           ],
@@ -3213,7 +3213,7 @@
               "target": "tracing"
             },
             {
-              "id": "webpki-roots 1.0.6",
+              "id": "webpki-roots 1.0.10",
               "target": "webpki_roots"
             }
           ],
@@ -7365,7 +7365,7 @@
               "alias": "pki_types"
             },
             {
-              "id": "rustls-webpki 0.103.13",
+              "id": "rustls-webpki 0.103.16",
               "target": "webpki"
             },
             {
@@ -7466,14 +7466,14 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
-    "rustls-webpki 0.103.13": {
+    "rustls-webpki 0.103.16": {
       "name": "rustls-webpki",
-      "version": "0.103.13",
+      "version": "0.103.16",
       "package_url": "https://github.com/rustls/webpki",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/rustls-webpki/0.103.13/download",
-          "sha256": "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+          "url": "https://static.crates.io/crates/rustls-webpki/0.103.16/download",
+          "sha256": "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
         }
       },
       "targets": [
@@ -7522,7 +7522,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "0.103.13"
+        "version": "0.103.16"
       },
       "license": "ISC",
       "license_ids": [
@@ -10700,14 +10700,14 @@
       ],
       "license_file": null
     },
-    "webpki-roots 1.0.6": {
+    "webpki-roots 1.0.10": {
       "name": "webpki-roots",
-      "version": "1.0.6",
+      "version": "1.0.10",
       "package_url": "https://github.com/rustls/webpki-roots",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/webpki-roots/1.0.6/download",
-          "sha256": "22cfaf3c063993ff62e73cb4311efde4db1efb31ab78a3e5c457939ad5cc0bed"
+          "url": "https://static.crates.io/crates/webpki-roots/1.0.10/download",
+          "sha256": "1c1c8e20c8a38fc7d65abfe74eb7280e4aa667e8eec8bc84996d2874810748d9"
         }
       },
       "targets": [
@@ -10740,7 +10740,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "1.0.6"
+        "version": "1.0.10"
       },
       "license": "CDLA-Permissive-2.0",
       "license_ids": [
