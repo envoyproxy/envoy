@@ -56,8 +56,8 @@ public:
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
-  // Filter-level endpoint configuration (`default_per_route`) so routes can use AI Protocol
-  // Manager without requiring per-route `typed_per_filter_config` entries. Null when unset.
+  // The per-route configuration of a route that carries none (`default_per_route`); null when
+  // the filter declares none, and such a route is not an AI endpoint.
   const RouteConfig* defaultRouteConfig() const { return default_route_config_.get(); }
   bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }

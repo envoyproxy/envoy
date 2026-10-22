@@ -22,13 +22,17 @@ Request and response processing are enabled independently, by the presence of
 and :ref:`response_handling
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.response_handling>`.
 
-The filter only inspects routes configured as AI endpoints (via per-route config or
-:ref:`default_per_route
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.default_per_route>`),
-unless :ref:`parse_unconfigured_routes
+The filter acts only on requests it has a reason to inspect. A request on a
+route that is not a declared AI endpoint -- by an entry of its own or by the
+filter's :ref:`default_per_route
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.default_per_route>`
+-- and, unless
+:ref:`parse_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
-is enabled. All other requests pass straight through without holding headers, offloading the body,
-or allocating an external buffer.
+is set, every request -- passes straight through: its headers are not held, its
+body is not offloaded, and no external buffer is created for it. A filter chain
+carrying this filter therefore costs ordinary pass-through for the traffic it
+does not serve.
 
 For a request it does inspect, as the body arrives the filter offloads it into an external buffer
 rather than pinning it in the connection manager's in-memory buffers. Once the
@@ -168,13 +172,16 @@ does not parse is forwarded unchanged.
       request_handling:
         parse_unconfigured_routes: true
 
-To configure all routes on a listener as AI endpoints without setting ``typed_per_filter_config``
-on each route, set :ref:`default_per_route
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.default_per_route>`
-directly on the filter. Routes without their own entry use this configuration (with strict JSON
-parsing and AI filters enabled), while route- or virtual-host-level settings still take precedence.
-This is especially useful when an earlier filter selects the backend dynamically per request via
-filter state.
+A listener can instead declare every route an AI endpoint at once, with
+:ref:`default_per_route
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager.default_per_route>`:
+the per-route configuration a route without an entry of its own gets, held to
+the same standard as one it carries -- its payload is parsed strictly and the AI
+filters run. A route's own entry, or its virtual host's, still takes precedence,
+and a route that disables the filter is left alone. With it, a gateway whose
+backend a filter ahead of this one chooses per request needs no
+``typed_per_filter_config`` entry on any route: the client API here, and
+everything about the backend in filter state.
 
 .. code-block:: yaml
 
