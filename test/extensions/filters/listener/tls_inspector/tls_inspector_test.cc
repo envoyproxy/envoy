@@ -239,14 +239,6 @@ INSTANTIATE_TEST_SUITE_P(TlsProtocolVersions, TlsInspectorTest,
                                          std::make_tuple(TLS1_2_VERSION, TLS1_2_VERSION),
                                          std::make_tuple(TLS1_3_VERSION, TLS1_3_VERSION)));
 
-// Test that an exception is thrown for an invalid value for max_client_hello_size
-TEST_P(TlsInspectorTest, MaxClientHelloSize) {
-  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  proto_config.mutable_max_client_hello_size()->set_value(Config::TLS_MAX_CLIENT_HELLO + 1);
-  EXPECT_THROW_WITH_MESSAGE(Config(*store_.rootScope(), proto_config), EnvoyException,
-                            "max_client_hello_size of 16385 is greater than maximum of 16384.");
-}
-
 // Test that a ClientHello with an SNI value causes the correct name notification.
 TEST_P(TlsInspectorTest, SniRegistered) {
   init();

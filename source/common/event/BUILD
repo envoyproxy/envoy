@@ -37,6 +37,7 @@ envoy_cc_library(
         ":real_time_system_lib",
         ":scaled_range_timer_manager_lib",
         ":signal_lib",
+        ":worker_id_lib",
         "//envoy/common:scope_tracker_interface",
         "//envoy/common:time_interface",
         "//envoy/event:signal_interface",
@@ -48,6 +49,15 @@ envoy_cc_library(
         "//source/common/network:address_lib",
         "//source/common/network:default_client_connection_factory",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "worker_id_lib",
+    srcs = ["worker_id.cc"],
+    hdrs = ["worker_id.h"],
+    deps = [
+        "@abseil-cpp//absl/strings",
     ],
 )
 

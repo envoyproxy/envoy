@@ -649,6 +649,7 @@ alias(
         ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         "//conditions:default": "@envoy_toolshed//v8:wee8",
     }),
+    visibility = ["//visibility:public"],
 )
 
 bool_flag(

@@ -1,15 +1,18 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_dyn_module_test",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -21,6 +24,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_stop_iteration",
     ],
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
@@ -32,12 +36,13 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
     ],
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/udp/dynamic_modules:filter_lib",
@@ -48,7 +53,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
@@ -56,6 +61,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:udp_no_op",
         "//test/extensions/dynamic_modules/test_data/c:udp_null_config",
     ],
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
     deps = [
         "//source/common/stats:custom_stat_namespaces_lib",
         "//source/extensions/filters/udp/dynamic_modules:config",
@@ -67,7 +73,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_dyn_module_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
@@ -76,6 +82,7 @@ envoy_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/go:udp_listener_integration_test",
     ],
     env = {"GODEBUG": "cgocheck=0"},
+    extension_names = ["envoy.filters.udp_listener.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/dynamic_modules:abi_impl",
