@@ -559,6 +559,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
+    cds_pauses_.erase(cluster.info()->name());
     updateClusterCounts();
   }
   cluster_data = active_clusters_.find(cluster.info()->name());
@@ -863,7 +864,6 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
   ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
-  cds_pauses_.erase(cluster_name);
   // old_active is destroyed here, after both maps are consistent.
 }
 
