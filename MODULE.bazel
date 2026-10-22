@@ -417,7 +417,13 @@ rust.toolchain(
         "x86_64-unknown-linux-gnu",
         "aarch64-unknown-linux-gnu",
     ],
-    rustfmt_version = "1.97.1",
+    # rustfmt.toml relies on unstable options, which are nightly-only. This only
+    # affects the rustfmt binary - rustc stays on the stable version below.
+    rustfmt_version = "nightly/2026-10-01",
+    sha256s = {
+        "2026-10-01/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz": "1d954ab36bcf943913bda4dfee0174f1cac84060aed948e57b43df38790e2fee",
+        "2026-10-01/rustc-nightly-x86_64-unknown-linux-gnu.tar.xz": "e5be3443efda4a8e6fe3b9ab81cebff29a539cd12932faa37df8a6ad2d8684b2",
+    },
     versions = ["1.97.1"],
 )
 use_repo(rust, "rust_toolchains")
