@@ -200,6 +200,8 @@ areas:
     title: rds
   redis_proxy:
     title: redis_proxy
+  release:
+    title: release
   resource_monitors:
     title: resource_monitors
   reverse_tunnel:
