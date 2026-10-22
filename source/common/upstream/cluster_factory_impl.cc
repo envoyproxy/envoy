@@ -69,17 +69,14 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
 
   if (cluster.common_lb_config().has_consistent_hashing_lb_config() &&
       cluster.common_lb_config().consistent_hashing_lb_config().use_hostname_for_hashing()) {
-    // STATIC and EDS endpoints may carry an optional hostname; hosts without one fall back to
-    // hashing by resolved address.
-    const bool hostname_supported_cluster =
-        cluster.type() == envoy::config::cluster::v3::Cluster::STRICT_DNS ||
-        (!cluster.has_cluster_type() &&
-         (cluster.type() == envoy::config::cluster::v3::Cluster::STATIC ||
-          cluster.type() == envoy::config::cluster::v3::Cluster::EDS));
-    if (!hostname_supported_cluster) {
+    // STRICT_DNS hosts always carry a hostname. STATIC and EDS endpoints may carry an optional
+    // hostname; hosts without one fall back to hashing by resolved address.
+    const std::string factory_name = factory->name();
+    if (factory_name != "envoy.cluster.strict_dns" && factory_name != "envoy.cluster.static" &&
+        factory_name != "envoy.cluster.eds") {
       return absl::InvalidArgumentError(fmt::format(
           "Cannot use hostname for consistent hashing loadbalancing for cluster of type: '{}'",
-          cluster_name));
+          factory_name));
     }
   }
 

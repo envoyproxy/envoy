@@ -354,6 +354,27 @@ TEST_F(TestStaticClusterImplTest, HostnameForHashingLogicalDnsClusterRejected) {
                   "'envoy.cluster.logical_dns'"));
 }
 
+TEST_F(TestStaticClusterImplTest, HostnameForHashingEdsClusterByClusterTypeName) {
+  const std::string yaml = R"EOF(
+      name: edscluster
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      common_lb_config:
+        consistent_hashing_lb_config:
+          use_hostname_for_hashing: true
+      cluster_type:
+        name: envoy.cluster.eds
+    )EOF";
+
+  TestStaticClusterFactory factory("envoy.cluster.eds");
+  Registry::InjectFactory<ClusterFactory> registered_factory(factory);
+
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
+  EXPECT_TRUE(create_result.ok());
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
