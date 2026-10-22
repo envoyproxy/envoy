@@ -11,6 +11,7 @@
 #include "source/common/event/deferred_task.h"
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/event/timer_impl.h"
+#include "source/common/event/worker_id.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
@@ -1552,6 +1553,24 @@ TEST(EvwatchObserverTest, RegisterEvwatchObserver) {
   dispatcher->run(Dispatcher::RunType::NonBlock);
 
   dispatcher->unregisterEvwatchObserver(observer);
+}
+
+TEST(WorkerIdFromThreadNameTest, All) {
+  EXPECT_EQ(workerIdFromThreadName("worker_0"), 0);
+  EXPECT_EQ(workerIdFromThreadName("worker_12"), 12);
+  EXPECT_FALSE(workerIdFromThreadName("worker_").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("worker_1a").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("worker_-1").has_value());
+  // Out of uint32_t range.
+  EXPECT_FALSE(workerIdFromThreadName("worker_4294967296").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("main_thread").has_value());
+  EXPECT_FALSE(workerIdFromThreadName("").has_value());
+}
+
+TEST(DispatcherWorkerIdTest, ParsedFromNameOnce) {
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_EQ(api->allocateDispatcher("worker_3")->workerId(), 3);
+  EXPECT_FALSE(api->allocateDispatcher("main_thread")->workerId().has_value());
 }
 
 } // namespace

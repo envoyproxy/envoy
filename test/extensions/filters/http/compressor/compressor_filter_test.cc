@@ -2773,6 +2773,29 @@ TEST_F(CompressorFilterTest, ContentTypeMatcherRegexMatchesAnyContentType) {
   doResponseCompression(headers, false);
 }
 
+TEST_F(MultipleFiltersTest, WildcardWithQvalueTieDoesNotRegisterPhantomEncodings) {
+  setUpDefaultFilters();
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  filter1_->setDecoderFilterCallbacks(decoder_callbacks);
+  filter2_->setDecoderFilterCallbacks(decoder_callbacks);
+
+  // The q-value tie between "test1" and the first "*" must not insert a phantom "*" entry
+  // into the allowed compressors, otherwise the winning wildcard would resolve to the
+  // phantom instead of the first registered compressor and nothing would compress.
+  Http::TestRequestHeaderMapImpl req_headers{{":method", "get"},
+                                             {"accept-encoding", "test1;q=0.5,*;q=0.5,*;q=0.8"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->decodeHeaders(req_headers, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter2_->decodeHeaders(req_headers, false));
+  Http::TestResponseHeaderMapImpl headers1{{":method", "get"}, {"content-length", "256"}};
+  Http::TestResponseHeaderMapImpl headers2{{":method", "get"}, {"content-length", "256"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter1_->encodeHeaders(headers1, false));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter2_->encodeHeaders(headers2, false));
+  EXPECT_EQ(1, stats1_.counter("test1.compressor.test1.test.compressed").value());
+  EXPECT_EQ(0, stats2_.counter("test2.compressor.test2.test.compressed").value());
+  EXPECT_EQ(1, stats1_.counter("test1.compressor.test1.test.header_wildcard").value());
+  EXPECT_EQ(1, stats2_.counter("test2.compressor.test2.test.header_wildcard").value());
+}
+
 } // namespace
 } // namespace Compressor
 } // namespace HttpFilters

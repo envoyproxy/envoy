@@ -924,6 +924,27 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
             "Invalid TLS context has neither subject CN nor SAN names");
 }
 
+// A private key whose type differs from the certificate's is rejected rather than accepted
+// alongside it.
+TEST_F(SslContextImplTest, MismatchedCertificateAndPrivateKeyType) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  EXPECT_THAT(manager_.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
+                  .status()
+                  .message(),
+              testing::HasSubstr("Failed to load private key from "));
+}
+
 class SslServerContextImplOcspTest : public SslContextImplTest {
 public:
   Envoy::Ssl::ServerContextSharedPtr loadConfig(ServerContextConfigImpl& cfg) {

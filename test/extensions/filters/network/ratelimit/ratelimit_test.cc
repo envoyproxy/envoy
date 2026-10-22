@@ -20,6 +20,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -578,6 +579,25 @@ stat_prefix: name
   manager.onRead();
 
   connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(RateLimitFilterTest, StatsAreTagged) {
+  setUpTest(filter_config_);
+
+  const Stats::Counter& total = config_->stats().total_;
+  EXPECT_EQ("ratelimit.name.total", total.name());
+  EXPECT_EQ("ratelimit.total", total.tagExtractedName());
+  ASSERT_EQ(1U, total.tags().size());
+  EXPECT_EQ("envoy.ratelimit_prefix", total.tags()[0].name_);
+  EXPECT_EQ("name", total.tags()[0].value_);
+
+  const Stats::Gauge& active = config_->stats().active_;
+  EXPECT_EQ("ratelimit.name.active", active.name());
+  EXPECT_EQ("ratelimit.active", active.tagExtractedName());
+  ASSERT_EQ(1U, active.tags().size());
+  EXPECT_EQ("envoy.ratelimit_prefix", active.tags()[0].name_);
+  EXPECT_EQ("name", active.tags()[0].value_);
 }
 
 } // namespace RateLimitFilter

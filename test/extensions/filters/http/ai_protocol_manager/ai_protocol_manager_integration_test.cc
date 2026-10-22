@@ -468,6 +468,49 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, UpstreamFilterJsonTokenUsage) {
   EXPECT_EQ(sumCounters("ai_protocol_manager.token_usage_found"), 1);
 }
 
+// A response over the downstream buffer limit on an AI route completes: the
+// encode bridge must not pause replay on its own ingest pause.
+TEST_P(AiProtocolManagerResponseIntegrationTest, ResponseOverBufferLimitCompletes) {
+  // A large upstream limit lets one read exceed the ingest watermark.
+  config_helper_.setBufferLimits(1024 * 1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        envoy::config::route::v3::Route ai_route;
+        TestUtility::loadFromYaml(R"EOF(
+typed_per_filter_config:
+  envoy.filters.http.ai_protocol_manager:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
+    request:
+      llm_protocol: OPENAI_CHAT_COMPLETIONS
+)EOF",
+                                  ai_route);
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->MergeFrom(
+            ai_route);
+      });
+  config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.ai_protocol_manager
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  request_handling: {}
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      requestHeaders(), R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})");
+  waitForNextUpstreamRequest();
+
+  const std::string body = R"({"id":"chatcmpl-1","pad":")" + std::string(64 * 1024, 'x') + R"("})";
+  upstream_request_->encodeHeaders(responseHeaders("application/json"), false);
+  upstream_request_->encodeData(body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body, response->body());
+}
+
 // Retries with the upstream installation: each attempt runs its own filter
 // instance, but only the winning attempt's response streams to completion, so
 // the published usage comes from the winner only (the failed attempt is a

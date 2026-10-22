@@ -146,9 +146,10 @@ impl<ETS: EnvoyTransportSocket> TransportSocket<ETS> for XorTransportSocket {
       }
     };
     envoy.write_buffer_drain(written);
-    match action {
-      PostIoAction::KeepOpen => IoResult::keep_open(written, false),
-      PostIoAction::Close => IoResult::close(written, false),
+    IoResult {
+      action,
+      bytes_processed: written,
+      end_stream_read: false,
     }
   }
 

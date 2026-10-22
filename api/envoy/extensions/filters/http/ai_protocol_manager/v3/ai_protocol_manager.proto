@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.ai_protocol_manager.v3;
 
 import "envoy/config/core/v3/extension.proto";
+import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -50,6 +51,12 @@ message AiProtocolManager {
   // before it continues down the HTTP filter chain, and require ``request_handling``.
   // [#extension-category: envoy.http.ai_filters]
   repeated config.core.v3.TypedExtensionConfig filters = 3;
+
+  // External buffer implementation configuration. When unset, the
+  // :ref:`in-memory buffer <envoy_v3_api_msg_extensions.ai_protocol_manager.external_buffer.in_memory.v3.InMemory>`
+  // is used, which does not bound the size of the payload it holds.
+  // [#extension-category: envoy.ai_protocol_manager.external_buffer]
+  config.core.v3.TypedExtensionConfig external_buffer_config = 4;
 }
 
 // Request-side processing configuration. A route that carries a
@@ -252,6 +259,17 @@ message RequestPerRoute {
   // will be added here once the transformation and its output contract
   // exist.]
   type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // How clients on this route carry ``llm_protocol`` on HTTP: the
+  // :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>`
+  // the transcoder reads the client's path and body under. When unset, the
+  // client's path is read under the API's own binding and the bindings Envoy
+  // defines for it, so one route takes clients of the Anthropic API and of
+  // Claude on Vertex AI alike. It needs ``llm_protocol``, and lapses for a
+  // request that the ``envoy.ai.llm_protocol.request`` filter state object
+  // names another API for. The ``envoy.ai.binding.request`` filter state
+  // object replaces it for one request.
+  type.ai.v3.LLMBinding binding = 2;
 }
 
 // Per-route response-side behavior.
@@ -260,4 +278,15 @@ message ResponsePerRoute {
   // ``request.llm_protocol`` when the gateway performs protocol translation.
   // ``LLM_PROTOCOL_UNSPECIFIED`` falls through the precedence chain above.
   type.ai.v3.LLMProtocol llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // How the backend carries its API on HTTP: the
+  // :ref:`binding <config_http_filters_ai_protocol_manager_transcoder_instructions>`
+  // the transcoder renders the request's path from and applies to its body.
+  // When unset, a request whose backend speaks the client's API leaves in the
+  // binding it arrived in, and any other request in the backend API's own.
+  // It needs ``llm_protocol``, and lapses for a request that the
+  // ``envoy.ai.llm_protocol.response`` filter state object names another API
+  // for. The ``envoy.ai.binding.response`` filter state object replaces it for
+  // one request.
+  type.ai.v3.LLMBinding binding = 2;
 }

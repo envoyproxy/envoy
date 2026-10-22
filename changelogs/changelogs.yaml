@@ -98,6 +98,8 @@ areas:
   dynamic_modules:
     title: dynamic_modules
 
+  ecds:
+    title: ecds
   ext_authz:
     title: ext_authz
   ext_proc:
@@ -163,6 +165,8 @@ areas:
     title: mcp_router
   mcp_transcoder:
     title: mcp_transcoder
+  memory:
+    title: memory
   mysql_proxy:
     title: mysql_proxy
 

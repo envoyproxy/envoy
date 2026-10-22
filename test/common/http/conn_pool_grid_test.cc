@@ -198,7 +198,7 @@ public:
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, socket_options_,
         transport_socket_options_, state_, simTime(), alternate_protocols_, options_,
-        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_, registry_,
+        quic_stat_names_, *store_.rootScope(), quic_connection_persistent_info_, registry_,
         overload_manager_);
     grid_->cancel_ = &cancel_;
     grid_->info_ = &info_;
@@ -263,6 +263,8 @@ TEST_F(ConnectivityGridTest, HostnameFromTransportSocketFactory) {
   EXPECT_CALL(*transport_socket_matcher, resolve(_, _, _))
       .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(
           factory, transport_socket_matcher->stats_, "test")));
+  EXPECT_CALL(factory, clientContextConfig())
+      .WillOnce(Return(OptRef<const Ssl::ClientContextConfig>()));
   EXPECT_CALL(factory, defaultServerNameIndication)
       .WillRepeatedly(Return("transport_socket_hostname"));
   host_impl_hostname_ = "custom_hostname";
@@ -271,6 +273,26 @@ TEST_F(ConnectivityGridTest, HostnameFromTransportSocketFactory) {
   // Without "hostname" in the TransportSocketOptionsImpl, this fails over to
   // the host name in HostNameImpl
   EXPECT_EQ("transport_socket_hostname", grid_->getOriginHostname());
+}
+
+TEST_F(ConnectivityGridTest, HostnameFromAutoHostSni) {
+  Network::MockTransportSocketFactory factory;
+  StrictMock<Ssl::MockClientContextConfig> client_context_config;
+  EXPECT_CALL(client_context_config, autoHostServerNameIndication()).WillOnce(Return(true));
+  Upstream::MockTransportSocketMatcher* transport_socket_matcher =
+      dynamic_cast<Upstream::MockTransportSocketMatcher*>(
+          cluster_->transport_socket_matcher_.get());
+  EXPECT_CALL(*transport_socket_matcher, resolve(_, _, _))
+      .WillOnce(Return(Upstream::TransportSocketMatcher::MatchData(
+          factory, transport_socket_matcher->stats_, "test")));
+  EXPECT_CALL(factory, clientContextConfig())
+      .WillOnce(Return(makeOptRef<const Ssl::ClientContextConfig>(client_context_config)));
+  EXPECT_CALL(factory, defaultServerNameIndication)
+      .WillRepeatedly(Return("transport_socket_hostname"));
+  host_impl_hostname_ = "upstream.example.com";
+  transport_socket_options_ = std::make_shared<Network::TransportSocketOptionsImpl>();
+  initialize();
+  EXPECT_EQ("upstream.example.com", grid_->getOriginHostname());
 }
 
 TEST_F(ConnectivityGridTest, NoServerNameOverride) {
@@ -1767,7 +1789,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
       dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_, {}, overload_manager_);
+      quic_connection_persistent_info_, {}, overload_manager_);
   EXPECT_EQ("connection grid", grid.protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
@@ -1807,7 +1829,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
       dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_, {}, overload_manager_);
+      quic_connection_persistent_info_, {}, overload_manager_);
 
   // Create the HTTP/3 pool.
   auto pool = ConnectivityGridForTest::forceGetOrCreateHttp3Pool(grid);
@@ -1875,7 +1897,7 @@ TEST_F(ConnectivityGridTest, DestroyGridWithActiveH2Attempts) {
       dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_, OptRef<Quic::EnvoyQuicNetworkObserverRegistry>(),
+      quic_connection_persistent_info_, OptRef<Quic::EnvoyQuicNetworkObserverRegistry>(),
       overload_manager_);
 
   auto* connection = new NiceMock<Network::MockClientConnection>();

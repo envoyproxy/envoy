@@ -51,9 +51,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
                 return absl::OkStatus();
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
-      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_ &&
-                            Runtime::runtimeFeatureEnabled(
-                                "envoy.reloadable_features.xds_legacy_delta_skip_subsequent_node")),
+      skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
   AllMuxes::get().insert(this);
 }
@@ -341,18 +339,25 @@ void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
   }
 }
 
-void NewGrpcMuxImpl::appendWatch(const std::string& type_url, Watch* watch,
-                                 const absl::flat_hash_set<std::string>& resources,
+void NewGrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
+                                 const absl::flat_hash_set<std::string>& resources_to_add,
+                                 const absl::flat_hash_set<std::string>& resources_to_remove,
                                  const SubscriptionOptions& options) {
   ASSERT(watch != nullptr);
   auto sub = subscriptions_.find(type_url);
   RELEASE_ASSERT(sub != subscriptions_.end(),
                  fmt::format("Watch of {} has no subscription to update.", type_url));
-  // Additionally update the watch-map routing, then subscribe to whatever became newly interesting
+  // Additionally update the watch-map routing, then subscribe/unsubscribe to whatever changed
   // across the whole subscription. This keeps watch_interest_ and the subscription consistent.
-  auto added_removed =
-      sub->second->watch_map_.appendWatchInterest(watch, effectiveResources(resources, options));
-  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, {});
+  auto added_removed = sub->second->watch_map_.updateWatchInterest(
+      watch, effectiveResources(resources_to_add, options),
+      effectiveResources(resources_to_remove, options));
+  if (xds_config_tracker_.has_value() && !added_removed.removed_.empty()) {
+    for (absl::string_view resource : added_removed.removed_) {
+      xds_config_tracker_->onResourceUnsubscribed(type_url, resource);
+    }
+  }
+  sub->second->sub_state_.updateSubscriptionInterest(added_removed.added_, added_removed.removed_);
   if (sub->second->sub_state_.subscriptionUpdatePending()) {
     trySendDiscoveryRequests();
   }
