@@ -342,9 +342,14 @@ protected:
       ENVOY_LOG_MISC(debug, "connect count: {}", connect_count);
       if (++connect_count == 2) {
         // By default, the session is not created with session resumption. The
-        // client should see a session ID but the server should not.
+        // client should see a session ID but the server should not. TLS 1.3 has
+        // no session ID, so the client sees an empty one as well.
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
-        EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+        if (client_connection->ssl()->tlsVersion() == "TLSv1.3") {
+          EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->sessionId());
+        } else {
+          EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+        }
 
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
