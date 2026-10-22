@@ -158,7 +158,12 @@ xcodeproj(
         ),
         xcschemes.scheme(
             name = "Swift Library",
-            run = xcschemes.run(build_targets = ["//library/swift:ios_lib"]),
+            run = xcschemes.run(build_targets = [
+                xcschemes.top_level_anchor_target(
+                    "//examples/swift/hello_world:app",
+                    library_targets = ["//library/swift:ios_lib"],
+                ),
+            ]),
         ),
         xcschemes.scheme(
             name = "iOS Tests",
@@ -172,7 +177,12 @@ xcodeproj(
         ),
         xcschemes.scheme(
             name = "Objective-C Library",
-            run = xcschemes.run(build_targets = ["//library/objective-c:envoy_engine_objc_lib"]),
+            run = xcschemes.run(build_targets = [
+                xcschemes.top_level_anchor_target(
+                    "//examples/swift/hello_world:app",
+                    library_targets = ["//library/objective-c:envoy_engine_objc_lib"],
+                ),
+            ]),
             test = xcschemes.test(test_targets = ["//test/objective-c:envoy_bridge_utility_test"]),
         ),
     ],
