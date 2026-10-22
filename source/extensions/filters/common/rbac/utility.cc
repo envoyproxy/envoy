@@ -52,7 +52,7 @@ Stats::TaggedStatName makeTaggedPrefix(absl::string_view prefix, absl::string_vi
                                                    : Config::TagNames::get().RBAC_RULES_PREFIX;
     tags.push_back({tag_name, group_prefix});
   }
-  return {symbol_table, base, tags, flat};
+  return {symbol_table, base, tags, flat, /*sanitize=*/false};
 }
 
 } // namespace
