@@ -178,6 +178,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
     // Attempt to create custom router-specified filter chain.
     created = filter_manager_->createFilterChain(parent_.config()).created();
   }
+  has_upstream_http_filters_ = created;
   if (!created) {
     // Neither cluster nor router have a custom filter chain; add the default
     // cluster filter chain, which only consists of the codec filter.

@@ -626,6 +626,11 @@ private:
                        GenericConnPoolPtr generic_conn_pool);
   void updateStatsOnNoRetry(RetryStatus retry_status);
   void updateStatsOnDoRetry(RetryState::DoRetryType do_retry_type);
+  void maybeSaveRequestHeadersForRetry(const UpstreamRequest& upstream_request);
+  void resetRetryState() {
+    retry_state_.reset();
+    saved_request_headers_.reset();
+  }
 
   void runRetryOptionsPredicates(UpstreamRequest& retriable_request);
   // Returns the effective retry policy to use for this request.
@@ -686,6 +691,9 @@ private:
   // Inlined vector is used here under the assumption that most cases will have only single or
   // double stream, and this avoids heap allocation in that case.
   absl::InlinedVector<Http::AsyncClient::OngoingRequest*, 2> shadow_streams_;
+  // The request headers before the first upstream HTTP filter chain ran, restored before every
+  // retry so that no attempt starts from the changes another attempt made.
+  Http::RequestHeaderMapPtr saved_request_headers_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
@@ -714,6 +722,7 @@ private:
   // chunk.
   bool reject_early_connect_data_enabled_ : 1 = false;
   bool saw_local_reply_ : 1 = false;
+  bool may_save_request_headers_ : 1 = false;
 };
 
 class ProdFilter : public Filter {

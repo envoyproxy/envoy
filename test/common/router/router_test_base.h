@@ -48,6 +48,9 @@ public:
       ON_CALL(*retry_state_, wouldRetryFromRetriableStatusCode(Http::Code::TooEarly))
           .WillByDefault(Return(true));
     }
+    if (auto_configured_for_http3_) {
+      ON_CALL(*retry_state_, isAutomaticallyConfiguredForHttp3()).WillByDefault(Return(true));
+    }
     return RetryStatePtr{retry_state_};
   }
 
@@ -59,6 +62,7 @@ public:
   MockRetryState* retry_state_{};
   bool reject_all_hosts_ = false;
   bool retry_425_response_ = false;
+  bool auto_configured_for_http3_ = false;
 };
 
 class RouterTestBase : public testing::Test {

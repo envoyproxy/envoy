@@ -173,6 +173,9 @@ public:
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }
+  // Whether the cluster or the router configured the upstream HTTP filter chain, rather than the
+  // default chain with only the codec filter.
+  bool hasUpstreamHttpFilters() const { return has_upstream_http_filters_; }
   // Disable per-try timeouts for websocket upgrades after successful handshake
   void disablePerTryTimeoutForWebsocketUpgrade();
 
@@ -267,6 +270,7 @@ private:
   // Track if one time clean up has been performed.
   bool cleaned_up_ : 1 = false;
   bool had_upstream_ : 1 = false;
+  bool has_upstream_http_filters_ : 1 = false;
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   bool grpc_rq_success_deferred_ : 1 = false;
   bool enable_half_close_ : 1;

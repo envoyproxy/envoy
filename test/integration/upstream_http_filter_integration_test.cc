@@ -176,6 +176,45 @@ class StaticRouterOrClusterFiltersIntegrationTest
 public:
   StaticRouterOrClusterFiltersIntegrationTest()
       : UpstreamHttpFilterIntegrationTestBase(std::get<0>(GetParam()), std::get<1>(GetParam())) {}
+
+  // Retries a request once after a 503 and returns the add-header filter's header value that each
+  // attempt sent upstream.
+  std::vector<std::string> retryAfter503AndGetHeaderValues() {
+    autonomous_upstream_ = false;
+    addStaticFilter("envoy.test.add_header_upstream", default_header_key_, default_header_value_);
+    addCodecFilter();
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* retry_policy = hcm.mutable_route_config()
+                                   ->mutable_virtual_hosts(0)
+                                   ->mutable_routes(0)
+                                   ->mutable_route()
+                                   ->mutable_retry_policy();
+          retry_policy->set_retry_on("5xx");
+          retry_policy->mutable_num_retries()->set_value(1);
+        });
+    initialize();
+
+    std::vector<std::string> values;
+    auto record_value = [&]() {
+      auto header = upstream_request_->headers().get(Http::LowerCaseString(default_header_key_));
+      values.emplace_back(header.empty() ? "" : header[0]->value().getStringView());
+    };
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    record_value();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+
+    EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    EXPECT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    record_value();
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    EXPECT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return values;
+  }
 };
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, BasicSuccess) {
@@ -320,6 +359,21 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, OnHostSelectedLocalReplyNoRe
   EXPECT_TRUE(upstream_headers == nullptr);
 
   cleanupUpstreamAndDownstream();
+}
+
+// The upstream filter appends a value to its header. Retries start from the request headers as they
+// were before the first attempt's upstream filters ran, so every attempt carries one value.
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, RetryStartsFromTheOriginalRequestHeaders) {
+  EXPECT_THAT(retryAfter503AndGetHeaderValues(),
+              testing::ElementsAre(default_header_value_, default_header_value_));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, RetryKeepsTheLastAttemptsHeadersWithGuardOff) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.restore_request_headers_on_retry",
+                                    "false");
+  EXPECT_THAT(retryAfter503AndGetHeaderValues(),
+              testing::ElementsAre(default_header_value_, absl::StrCat(default_header_value_, ",",
+                                                                       default_header_value_)));
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -861,6 +861,10 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     cross_cluster_retry_ = effective_retry_policy->refreshClusterOnRetry() &&
                            !hedging_params_.hedge_on_per_try_timeout_ &&
                            callbacks_->downstreamCallbacks().has_value();
+    // Hedged attempts share the request headers concurrently and AsyncClient callers own theirs,
+    // so only sequential retries of downstream requests restore them.
+    may_save_request_headers_ =
+        !hedging_params_.hedge_on_per_try_timeout_ && callbacks_->downstreamCallbacks().has_value();
   }
 
   absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies;
@@ -906,6 +910,7 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
+  maybeSaveRequestHeadersForRetry(*upstream_request);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
 
@@ -1151,7 +1156,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
               "Giving up on buffering.",
               payload_length, effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
-    retry_state_.reset();
+    resetRetryState();
     ENVOY_LOG(debug, "retry or redirect buffer overflow: skipping buffering");
     buffering = false;
     request_buffer_overflowed_ = true;
@@ -1289,7 +1294,7 @@ void Filter::cleanup() {
   ASSERT(upstream_requests_.empty());
 
   ENVOY_LOG(debug, "Executing cleanup(): resetting retry_state_ and disabling timers");
-  retry_state_.reset();
+  resetRetryState();
   if (response_timeout_) {
     response_timeout_->disableTimer();
     response_timeout_.reset();
@@ -1867,7 +1872,7 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // retry, assume the next upstream would also send an 100-Continue and swallow the second one
   // but it's sketchy (as the subsequent upstream might not send a 100-Continue) and not worth
   // the complexity until someone asks for it.
-  retry_state_.reset();
+  resetRetryState();
 
   // Apply response_headers_to_remove to informational (1xx) responses so
   // upstream-internal headers are stripped before forwarding downstream.
@@ -2051,7 +2056,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // Make sure any retry timers are destroyed since we may not call cleanup() if end_stream is
   // false.
   if (retry_state_) {
-    retry_state_.reset();
+    resetRetryState();
   }
 
   // Only send upstream service time if we received the complete request and this is not a
@@ -2518,6 +2523,10 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
                              TimeoutRetry is_timeout_retry, GenericConnPoolPtr generic_conn_pool) {
   ASSERT(generic_conn_pool != nullptr);
+  if (saved_request_headers_ != nullptr) {
+    downstream_headers_->clear();
+    Http::RequestHeaderMapImpl::copyFrom(*downstream_headers_, *saved_request_headers_);
+  }
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
@@ -2545,6 +2554,7 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
                                    *downstream_headers_, !config_->suppress_envoy_headers_,
                                    grpc_request_, hedging_params_.hedge_on_per_try_timeout_);
 
+  maybeSaveRequestHeadersForRetry(*upstream_request);
   UpstreamRequest* upstream_request_tmp = upstream_request.get();
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(
@@ -2563,6 +2573,22 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
     if (downstream_trailers_) {
       upstream_requests_.front()->acceptTrailersFromRouter(*downstream_trailers_);
     }
+  }
+}
+
+void Filter::maybeSaveRequestHeadersForRetry(const UpstreamRequest& upstream_request) {
+  if (!may_save_request_headers_ || !upstream_request.hasUpstreamHttpFilters()) {
+    return;
+  }
+  // Decided once, at the first attempt that runs upstream HTTP filters: no filter has changed the
+  // headers before it. Automatic HTTP/3 retry states, created for every safe request, are left out
+  // to keep the copy off that path.
+  may_save_request_headers_ = false;
+  if (retry_state_ != nullptr && !retry_state_->isAutomaticallyConfiguredForHttp3() &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.restore_request_headers_on_retry")) {
+    saved_request_headers_ =
+        Http::createHeaderMap<Http::RequestHeaderMapImpl>(*downstream_headers_);
   }
 }
 
