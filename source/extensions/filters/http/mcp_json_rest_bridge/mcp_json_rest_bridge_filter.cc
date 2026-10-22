@@ -774,7 +774,12 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
         path = "/mcp";
       }
       EndpointKey key{host, path};
-      auto& endpoint_config = endpoint_configs_[key];
+      auto [it, inserted] = endpoint_configs_.try_emplace(key, EndpointConfig());
+      if (!inserted) {
+        return absl::InvalidArgumentError(
+            fmt::format("Duplicate endpoint config for host/path: {}, {}", host, path));
+      }
+      EndpointConfig& endpoint_config = it->second;
       for (const auto& tool : tool_config.tools()) {
         absl::StatusOr<std::vector<McpParamHeaderMapping>> mcp_param_headers =
             buildMcpParamHeaderMappings(tool);
@@ -798,13 +803,9 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
           return absl::InvalidArgumentError(
               "tool_list_http_rule must be a GET request with an empty body");
         }
-        if (!endpoint_config.tool_list_http_rule.has_value()) {
-          endpoint_config.tool_list_http_rule = rule;
-        }
+        endpoint_config.tool_list_http_rule = rule;
       }
-      if (tool_config.has_tool_list_local()) {
-        endpoint_config.tool_list_local = true;
-      }
+      endpoint_config.tool_list_local = tool_config.has_tool_list_local();
     }
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",

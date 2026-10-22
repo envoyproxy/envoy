@@ -476,12 +476,11 @@ private:
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cluster_manager_;
 
+  absl::flat_hash_map<uint64_t, ActiveStream*> frame_handlers_;
+  std::list<ActiveStreamPtr> active_streams_;
   ServerCodecPtr server_codec_;
 
   Buffer::OwnedImpl response_buffer_;
-
-  std::list<ActiveStreamPtr> active_streams_;
-  absl::flat_hash_map<uint64_t, ActiveStream*> frame_handlers_;
 };
 
 } // namespace GenericProxy

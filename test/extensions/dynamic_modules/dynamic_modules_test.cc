@@ -6,6 +6,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -256,6 +257,49 @@ TEST(StaticModule, MultipleLoads) {
   absl::StatusOr<DynamicModulePtr> c_module_2 =
       newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
   EXPECT_OK(c_module_2);
+}
+
+TEST(StaticModule, MultipleRustModules) {
+  auto http_module = newDynamicModuleByName("no_op_static", /*do_not_close=*/true);
+  ASSERT_OK(http_module);
+  auto listener_module = newDynamicModuleByName("listener_no_op_static", /*do_not_close=*/true);
+  ASSERT_OK(listener_module);
+
+  // These hooks live in the SDK, not in the module crates. Each module must have
+  // its own SDK hooks and factory state, while sharing the Rust runtime.
+  using NewHttpConfig = decltype(&envoy_dynamic_module_on_http_filter_config_new);
+  const auto http_config_new = http_module.value()->getFunctionPointer<NewHttpConfig>(
+      "envoy_dynamic_module_on_http_filter_config_new");
+  ASSERT_OK(http_config_new);
+  const auto other_http_config_new = listener_module.value()->getFunctionPointer<NewHttpConfig>(
+      "envoy_dynamic_module_on_http_filter_config_new");
+  ASSERT_OK(other_http_config_new);
+  EXPECT_NE(http_config_new.value(), other_http_config_new.value());
+
+  const envoy_dynamic_module_type_envoy_buffer name = {"foo", 3};
+  const envoy_dynamic_module_type_envoy_buffer config = {"bar", 3};
+  auto http_config = http_config_new.value()(nullptr, name, config);
+  ASSERT_NE(http_config, nullptr);
+  const auto http_config_destroy =
+      http_module.value()
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_config_destroy)>(
+              "envoy_dynamic_module_on_http_filter_config_destroy");
+  ASSERT_OK(http_config_destroy);
+  http_config_destroy.value()(http_config);
+
+  const auto listener_config_new =
+      listener_module.value()
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_listener_filter_config_new)>(
+              "envoy_dynamic_module_on_listener_filter_config_new");
+  ASSERT_OK(listener_config_new);
+  auto listener_config = listener_config_new.value()(nullptr, name, config);
+  ASSERT_NE(listener_config, nullptr);
+  const auto listener_config_destroy =
+      listener_module.value()
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_listener_filter_config_destroy)>(
+              "envoy_dynamic_module_on_listener_filter_config_destroy");
+  ASSERT_OK(listener_config_destroy);
+  listener_config_destroy.value()(listener_config);
 }
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {

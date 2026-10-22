@@ -322,6 +322,7 @@ convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
                                 const std::optional<envoy::config::core::v3::Locality> locality) {
   absl::string_view instance, namespace_name, owner, workload, cluster, identity, canonical_name,
       canonical_revision, app_name, app_version, region, zone;
+  absl::string_view raw_app, qualified_app, raw_version, qualified_version;
   std::vector<std::pair<std::string, std::string>> labels;
   for (const auto& it : metadata.fields()) {
     if (it.first == InstanceMetadataField) {
@@ -351,13 +352,13 @@ convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
         } else if (labels_it.first == CanonicalRevisionLabel) {
           canonical_revision = labels_it.second.string_value();
         } else if (labels_it.first == AppNameQualifiedLabel) {
-          app_name = labels_it.second.string_value();
-        } else if (labels_it.first == AppNameLabel && app_name.empty()) {
-          app_name = labels_it.second.string_value();
+          qualified_app = labels_it.second.string_value();
+        } else if (labels_it.first == AppNameLabel) {
+          raw_app = labels_it.second.string_value();
         } else if (labels_it.first == AppVersionQualifiedLabel) {
-          app_version = labels_it.second.string_value();
-        } else if (labels_it.first == AppVersionLabel && app_version.empty()) {
-          app_version = labels_it.second.string_value();
+          qualified_version = labels_it.second.string_value();
+        } else if (labels_it.first == AppVersionLabel) {
+          raw_version = labels_it.second.string_value();
         } else if (!additional_labels.empty() &&
                    additional_labels.contains(std::string(labels_it.first))) {
           labels.push_back(
@@ -366,6 +367,9 @@ convertStructToWorkloadMetadata(const Envoy::Protobuf::Struct& metadata,
       }
     }
   }
+  // Raw app/version labels take precedence; app.kubernetes.io/* labels are fallbacks.
+  app_name = !raw_app.empty() ? raw_app : qualified_app;
+  app_version = !raw_version.empty() ? raw_version : qualified_version;
   std::string locality_region = std::string(region);
   std::string locality_zone = std::string(zone);
   if (locality.has_value()) {

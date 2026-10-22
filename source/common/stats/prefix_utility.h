@@ -33,10 +33,15 @@ namespace Stats {
  *        `name` is ignored and `base_name` is used for both forms.
  * @param name the tagged own name (own tag values interleaved). Combined with `prefix` this must
  *        equal the legacy flat prefix. Ignored when `tags` is empty.
+ * @param sanitize whether the merged names and tags are sanitized while they are encoded.
+ *        `false` exists only for backward compatibility: callers whose stats predate the tagged
+ *        helpers and were created from raw strings (e.g. POOL_*_PREFIX) pass it to keep their
+ *        historical flat names unchanged. Callers whose legacy stats were created from a scope,
+ *        and all new stats, must keep the default.
  */
 TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
                                absl::string_view base_name, TagStringViewSpan tags = {},
-                               absl::string_view name = {});
+                               absl::string_view name = {}, bool sanitize = true);
 
 } // namespace Stats
 } // namespace Envoy

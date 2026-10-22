@@ -5,7 +5,11 @@ IP Geolocation Filter
 This filter decorates HTTP requests with the geolocation data.
 Filter uses client address to lookup information (e.g., client's city, country) in the geolocation provider database.
 Upon a successful lookup request will be enriched with the configured geolocation header and the value from the database.
-In case the configured geolocation headers are present in the incoming request, they will be overridden by the filter.
+The configured geolocation headers are removed from the incoming request before the lookup, so a value a client
+sent is never forwarded as if the lookup had produced it: after the filter, a geolocation header is present only
+if the lookup populated it. This removal can be disabled by setting the runtime guard
+``envoy.reloadable_features.geoip_sanitize_geo_headers`` to ``false``, in which case a client-supplied header is
+kept whenever the lookup has no value for it.
 Geolocation filter emits stats for the number of the successful lookups and the number of total lookups.
 English language is used for the geolocation lookups, the result of the lookup will be UTF-8 encoded.
 Please note that Geolocation filter and providers are not yet supported on Windows.

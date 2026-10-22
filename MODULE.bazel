@@ -16,7 +16,7 @@ bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
 bazel_dep(name = "bazel_features", version = "1.51.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boringssl", version = "0.20260929.0")
-bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy")
+bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy.1")
 bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy")
 bazel_dep(name = "brotli", version = "1.2.0-260930-42a2ed4.envoy")
@@ -79,7 +79,7 @@ bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.5")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
 bazel_dep(name = "qatzip", version = "2.0.0.envoy")
-bazel_dep(name = "quiche", version = "0.0.0-261013-132bfd9.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-261019-67bce2e.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_apple", version = "5.1.0")
@@ -195,9 +195,9 @@ grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grc
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
 
-# Prebuilt wee8 (V8) static library, selected via the //bazel:v8_engine flag.
+# Prebuilt wee8 (V8) static library, selected via the //bazel:wee8_engine alias.
 wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_extension")
-wee8_ext.setup()
+wee8_ext.setup(source = "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression")
 use_repo(wee8_ext, "wee8_prebuilt_aarch64", "wee8_prebuilt_x86_64", "wee8_prebuilt_x86_64_libstdcxx")
 
 # These (cmake/ninja) should be kept to latest stable for FIPS
@@ -364,13 +364,13 @@ go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency 
 go_sdk.download(
     name = "go_sdk",
     sdks = {
-        "linux_amd64": ("go1.27.1.linux-amd64.tar.gz", "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"),
-        "linux_arm64": ("go1.27.1.linux-arm64.tar.gz", "3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec"),
-        "darwin_arm64": ("go1.27.1.darwin-arm64.tar.gz", "ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12"),
-        "darwin_amd64": ("go1.27.1.darwin-amd64.tar.gz", "8f8f52c6649542cf027bbc9b9c68d1ec042f9f34808a40413f0b8b3f66f3caa4"),
-        "windows_amd64": ("go1.27.1.windows-amd64.zip", "a3911b5e0e1b1053f25ed0675f4c1c6aad1e2bfcf253df2b9be4caabd2edd95d"),
+        "linux_amd64": ("go1.27.3.linux-amd64.tar.gz", "65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40"),
+        "linux_arm64": ("go1.27.3.linux-arm64.tar.gz", "a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49"),
+        "darwin_arm64": ("go1.27.3.darwin-arm64.tar.gz", "dd3908cf20959d798c1e06ebe5b72213f0505ce01373b40ce3110975a6cd99c2"),
+        "darwin_amd64": ("go1.27.3.darwin-amd64.tar.gz", "b6f8e931e4ab497fcde6da8ae4499a58f9d258e55c8a80824a516eae5950a750"),
+        "windows_amd64": ("go1.27.3.windows-amd64.zip", "f26081f438319757f8a1b46d7d0b2c5ec7583d4038e485e0aa725cfde7885fff"),
     },
-    version = "1.27.1",
+    version = "1.27.3",
 )
 use_repo(
     go_sdk,
@@ -501,7 +501,10 @@ quiche_dev.deps(
 )
 
 proxy_wasm_cpp_host = use_extension("@proxy-wasm-cpp-host//:extensions.bzl", "proxy_wasm_cpp_host")
-proxy_wasm_cpp_host.deps(crypto_lib = "@envoy//bazel:crypto")
+proxy_wasm_cpp_host.deps(
+    crypto_lib = "@envoy//bazel:crypto",
+    v8_engine = "@envoy//bazel:wee8_engine",
+)
 
 libsxg = use_extension("@libsxg//:extensions.bzl", "libsxg")
 libsxg.deps(crypto_lib = "@envoy//bazel:crypto")
