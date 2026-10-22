@@ -269,6 +269,7 @@
     "https://bcr.bazel.build/modules/googleurl/0.0.0-221103-dd4080f.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/gperftools/2.18.1/MODULE.bazel": "2bfde64989ae531d9fd9da9c2ccfff1212eafcfcb26b0594b59667d0190b6252",
     "https://bcr.bazel.build/modules/gperftools/2.18.1/source.json": "3425124f51a743ab03b3145f55bff4c0d255b5311b4ca54886db79ea461ebedb",
+    "https://bcr.bazel.build/modules/grpc-httpjson-transcoding/0.0.0-20250507-a6e226f.envoy.1/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/grpc-httpjson-transcoding/0.0.0-20250507-a6e226f.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/grpc-java/1.62.2/MODULE.bazel": "99b8771e8c7cacb130170fed2a10c9e8fed26334a93e73b42d2953250885a158",
     "https://bcr.bazel.build/modules/grpc-java/1.66.0/MODULE.bazel": "86ff26209fac846adb89db11f3714b3dc0090fb2fb81575673cc74880cda4e7e",
@@ -801,8 +802,9 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/go-fips/1.27.1.envoy/source.json": "fba033c8421e118dade86d72a3b6a082a7834885448a4b2b74aa895911f6d6e3",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/googleurl/0.0.0-221103-dd4080f.envoy/MODULE.bazel": "dc049475e14a1c77a8e306cfaede9208f6df16dfb6b75c22990c19d9113fe6b9",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/googleurl/0.0.0-221103-dd4080f.envoy/source.json": "d8f2befb8dc7e2e891dcbe5d8be118497277dc8ee60cf3ddda087da34fa3b74d",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/grpc-httpjson-transcoding/0.0.0-20250507-a6e226f.envoy.1/MODULE.bazel": "0363799e12eea32b2161d773abff5708a76b3901f80c0a4f4f6a582637a6ffe9",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/grpc-httpjson-transcoding/0.0.0-20250507-a6e226f.envoy.1/source.json": "52e6ad8d19195c99bbdce09f7e9a50dd104efb2eb819dccc44f3aa273a8b8968",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/grpc-httpjson-transcoding/0.0.0-20250507-a6e226f.envoy/MODULE.bazel": "a68a5f38f92a8665798fa3eb6bd9af9d1c87b7341332874261f5c4ee9eeec469",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/grpc-httpjson-transcoding/0.0.0-20250507-a6e226f.envoy/source.json": "37ef413a76717db2ab97571f4d4380240016f7217bc8078a878faabb12678714",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/grpc/1.83.0.envoy/MODULE.bazel": "71ff92df79911a0975a09c1482791fd3983696383d4652277684e67884ac9d40",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/grpc/1.83.0.envoy/source.json": "39d70fd55602db781fc793f0417b7ecce8f2427e9fdaf6c18938e33acdc4d549",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91/modules/hessian2-codec/0.0.0-250114-6f5a647.envoy/MODULE.bazel": "2444f17603d30883fcca2aa40c6379307e1ee28ca716da981d5acd2071fe3ff5",
@@ -1614,7 +1616,7 @@
     "@@grpc-httpjson-transcoding+//:extensions.bzl%non_module_deps": {
       "general": {
         "bzlTransitiveDigest": "uHh/mUuFwB6Voj6CEKd0d2223B3VA6HTKMzGoGJxfjg=",
-        "usagesDigest": "12HwAa+jGkwAa6tGGKn6vop8VOPfANQP2FiMnhV71ns=",
+        "usagesDigest": "oVWJd6S5cphvAtoXkvW+b2x4G9Rf1sPSQLjKaopbqak=",
         "recordedInputs": [
           "REPO_MAPPING:grpc-httpjson-transcoding+,bazel_tools bazel_tools"
         ],
@@ -1632,8 +1634,8 @@
     },
     "@@grpc-httpjson-transcoding+//:googleapis_ext.bzl%googleapis_ext": {
       "general": {
-        "bzlTransitiveDigest": "n+E0pdKhXBNEdjfE/AGncepD7Eh9xX07wWf4cO5og6w=",
-        "usagesDigest": "Fc3I6XGHAyLwbQotH5z/MZl1mX7S7/kLiVXrDi7smjA=",
+        "bzlTransitiveDigest": "sD14xQYn7Pgiz9+5CNHwqpHDZzAXas+gbAD68H9GyVI=",
+        "usagesDigest": "9/RQB2uMORJdPaxDgzW6OCvaHr18FBwqhUDLXCFcQPE=",
         "recordedInputs": [
           "REPO_MAPPING:grpc-httpjson-transcoding+,com_google_googleapis grpc-httpjson-transcoding++non_module_deps+com_google_googleapis"
         ],
@@ -1719,7 +1721,7 @@
                   ""
                 ],
                 "cc_proto_library": [
-                  "native.cc_proto_library",
+                  "@com_google_protobuf//bazel:cc_proto_library.bzl",
                   ""
                 ],
                 "cc_grpc_library": [
