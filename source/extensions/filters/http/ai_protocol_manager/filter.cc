@@ -193,8 +193,7 @@ absl::StatusOr<std::unique_ptr<RouteConfig>> RouteConfig::create(const PerRouteP
 FilterConfig::FilterConfig(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
     Stats::Scope& scope, AiFilterFactories ai_filter_factories,
-    ExternalBufferFactorySharedPtr buffer_factory,
-    std::unique_ptr<const RouteConfig> default_route_config)
+    ExternalBufferFactorySharedPtr buffer_factory)
     : stats_(AiProtocolManagerStats{
           ALL_AI_PROTOCOL_MANAGER_STATS(POOL_COUNTER_PREFIX(scope, "ai_protocol_manager."))}),
       request_handling_enabled_(proto.has_request_handling()),
@@ -226,12 +225,9 @@ FilterConfig::FilterConfig(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto.response_handling().token_usage().limits(),
                                           max_parsed_sse_events, DefaultMaxParsedSseEvents)),
       ai_filter_factories_(std::move(ai_filter_factories)),
-      buffer_factory_(std::move(buffer_factory)),
-      default_route_config_(std::move(default_route_config)) {
+      buffer_factory_(std::move(buffer_factory)) {
   ASSERT(buffer_factory_ != nullptr);
 }
-
-FilterConfig::~FilterConfig() = default;
 
 absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
@@ -239,18 +235,6 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     ExternalBufferFactorySharedPtr buffer_factory) {
   if (proto.filters_size() > 0 && !proto.has_request_handling()) {
     return absl::InvalidArgumentError("ai_protocol_manager: filters require request_handling");
-  }
-  // Checked as a route's own entry is, so a binding that does not parse is a load error here
-  // too rather than a surprise on the first request.
-  std::unique_ptr<const RouteConfig> default_route_config;
-  if (proto.has_default_per_route()) {
-    absl::StatusOr<std::unique_ptr<RouteConfig>> created =
-        RouteConfig::create(proto.default_per_route());
-    if (!created.ok()) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("ai_protocol_manager: default_per_route: ", created.status().message()));
-    }
-    default_route_config = *std::move(created);
   }
   AiFilterFactories factories;
   for (const auto& entry : proto.filters()) {
@@ -269,8 +253,7 @@ absl::StatusOr<FilterConfigSharedPtr> FilterConfig::create(
     factories.push_back(std::move(cb.value()));
   }
   return std::make_shared<const FilterConfig>(proto, scope, std::move(factories),
-                                              std::move(buffer_factory),
-                                              std::move(default_route_config));
+                                              std::move(buffer_factory));
 }
 
 void AiProtocolManagerFilter::onDestroy() {
@@ -311,7 +294,9 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
 
   // Copy what the route declared; see the note on route_has_request_ for why the
   // config is not held by pointer.
-  if (const RouteConfig* route_config = routeConfig(*decoder_callbacks_); route_config != nullptr) {
+  if (const RouteConfig* route_config =
+          Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(decoder_callbacks_);
+      route_config != nullptr) {
     route_has_request_ = route_config->hasRequest();
     request_protocol_ = route_config->requestProtocol();
     route_response_protocol_ = route_config->responseProtocol();
@@ -364,16 +349,6 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
   // for an empty/trailer-only body, when the manager continues iteration).
   ENVOY_LOG(trace, "ai_protocol_manager: holding headers until payload is offloaded");
   return Http::FilterHeadersStatus::StopIteration;
-}
-
-const RouteConfig*
-AiProtocolManagerFilter::routeConfig(const Http::StreamFilterCallbacks& callbacks) const {
-  if (const RouteConfig* own =
-          Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(&callbacks);
-      own != nullptr) {
-    return own;
-  }
-  return config_->defaultRouteConfig();
 }
 
 uint32_t AiProtocolManagerFilter::inlineStringThresholdBytes() const {
@@ -592,7 +567,8 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::encodeHeaders(Http::ResponseH
   // a later decode filter may refresh the route (clearRouteCache), and by
   // response time the route is frozen as the one that actually routed the
   // request.
-  const RouteConfig* route_config = routeConfig(*encoder_callbacks_);
+  const RouteConfig* route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<RouteConfig>(encoder_callbacks_);
   const bool want_token_usage = config_->tokenUsageEnabled() &&
                                 (route_config != nullptr || config_->includeUnconfiguredRoutes());
 

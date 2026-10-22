@@ -36,17 +36,13 @@ using PerRouteProto =
 
 class FilterConfig;
 using FilterConfigSharedPtr = std::shared_ptr<const FilterConfig>;
-class RouteConfig;
 
 class FilterConfig {
 public:
   FilterConfig(
       const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
       Stats::Scope& scope, AiFilterFactories ai_filter_factories,
-      ExternalBufferFactorySharedPtr buffer_factory,
-      std::unique_ptr<const RouteConfig> default_route_config = nullptr);
-  // Out of line: `RouteConfig` is complete only below.
-  ~FilterConfig();
+      ExternalBufferFactorySharedPtr buffer_factory);
 
   static absl::StatusOr<FilterConfigSharedPtr>
   create(const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager& proto,
@@ -56,9 +52,6 @@ public:
   bool requestHandlingEnabled() const { return request_handling_enabled_; }
   const AiFilterFactories& aiFilterFactories() const { return ai_filter_factories_; }
   bool parseUnconfiguredRoutes() const { return parse_unconfigured_routes_; }
-  // The per-route configuration of a route that carries none (`default_per_route`); null when
-  // the filter declares none, and such a route is not an AI endpoint.
-  const RouteConfig* defaultRouteConfig() const { return default_route_config_.get(); }
   bool alwaysSerializeRequest() const { return always_serialize_request_; }
   uint32_t inlineStringThresholdBytes() const { return inline_string_threshold_bytes_; }
   bool tokenUsageEnabled() const { return token_usage_enabled_; }
@@ -90,7 +83,6 @@ private:
   const uint32_t max_parsed_sse_events_ = 0;
   const AiFilterFactories ai_filter_factories_;
   const ExternalBufferFactorySharedPtr buffer_factory_;
-  const std::unique_ptr<const RouteConfig> default_route_config_;
 };
 
 // Per-route configuration. Its presence declares the route an AI endpoint.
@@ -224,11 +216,6 @@ private:
   // Whether the route handed its request payload to the filter, which is also
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
-
-  // The per-route configuration in effect for the stream: the most specific one the route
-  // carries, or the filter's `default_per_route` when it carries none. Null when there is
-  // neither, which is not an AI endpoint.
-  const RouteConfig* routeConfig(const Http::StreamFilterCallbacks& callbacks) const;
 
   // The inline-string threshold for this stream: the route's payload schema
   // when it pins one, otherwise the filter's configured default.

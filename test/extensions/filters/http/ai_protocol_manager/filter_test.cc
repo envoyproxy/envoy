@@ -194,22 +194,15 @@ public:
       AiFilterFactories ai_filter_factories,
       envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
           BodyReserialization reserialize_body =
-              envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS,
-      const PerRouteProto* default_per_route = nullptr) {
+              envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
     proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
     proto.mutable_request_handling()->set_reserialize_body(reserialize_body);
-    std::unique_ptr<const RouteConfig> default_route_config;
-    if (default_per_route != nullptr) {
-      proto.mutable_default_per_route()->CopyFrom(*default_per_route);
-      default_route_config = RouteConfig::create(*default_per_route).value();
-    }
     filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
-        proto, *stats_store_.rootScope(), std::move(ai_filter_factories), factory_,
-        std::move(default_route_config)));
+        proto, *stats_store_.rootScope(), std::move(ai_filter_factories), factory_));
     filter_->setDecoderFilterCallbacks(callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
@@ -1420,7 +1413,6 @@ public:
     uint64_t payload_bytes;
     LlmBindingConstSharedPtr request_binding;
     LlmBindingConstSharedPtr response_binding;
-    LLMProtocol response_protocol;
   };
 
   ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen,
@@ -1436,7 +1428,7 @@ public:
     seen_.push_back({context_.request_protocol, request->protocol(),
                      std::string(context_.request_headers.getPathValue()), &context_.stream_info,
                      context_.request_payload_bytes, context_.request_binding,
-                     context_.response_binding, context_.response_protocol});
+                     context_.response_binding});
     request->json()["model"] = "rewritten";
     co_return co_await std::move(propagate_request)(std::move(request));
   }
@@ -1619,72 +1611,6 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
   EXPECT_TRUE(seen.empty());
   EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "gpt-4");
   EXPECT_TRUE(injected_end_stream_);
-}
-
-// `default_per_route` makes a route without an entry of its own an AI endpoint: the AI filters
-// run, with the default's APIs, and the filter state a filter ahead left is read.
-TEST_F(AiProtocolManagerFilterTest, DefaultPerRouteDeclaresAnUnconfiguredRouteAnAiEndpoint) {
-  std::vector<ContextRecordingAiFilter::Seen> seen;
-  PerRouteProto default_per_route = chatRoute();
-  default_per_route.mutable_response()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
-  createFilterWithAiFilters(
-      {[&](const AiFilterContext& context) -> AiFilterSharedPtr {
-        return std::make_unique<ContextRecordingAiFilter>(context, seen);
-      }},
-      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS,
-      &default_per_route);
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 0);
-  ASSERT_EQ(seen.size(), 1);
-  EXPECT_EQ(seen[0].protocol, LLMProtocol::OpenAiChatCompletions);
-  EXPECT_EQ(seen[0].response_protocol, LLMProtocol::AnthropicMessages);
-  EXPECT_TRUE(injected_end_stream_);
-}
-
-// A route's own entry still wins over the filter's default.
-TEST_F(AiProtocolManagerFilterTest, ARoutesOwnEntryOutranksDefaultPerRoute) {
-  std::vector<ContextRecordingAiFilter::Seen> seen;
-  PerRouteProto default_per_route = chatRoute();
-  default_per_route.mutable_response()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
-  createFilterWithAiFilters(
-      {[&](const AiFilterContext& context) -> AiFilterSharedPtr {
-        return std::make_unique<ContextRecordingAiFilter>(context, seen);
-      }},
-      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS,
-      &default_per_route);
-  PerRouteProto own = chatRoute();
-  own.mutable_response()->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
-  setRouteConfig(own);
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  ASSERT_EQ(seen.size(), 1);
-  EXPECT_EQ(seen[0].response_protocol, LLMProtocol::GeminiGenerateContent);
-}
-
-// The default is held to a declared endpoint's standard: a malformed body is rejected, as it
-// would be on a route with its own entry, rather than forwarded as best-effort parsing does.
-TEST_F(AiProtocolManagerFilterTest, DefaultPerRouteParsesStrictly) {
-  PerRouteProto default_per_route = chatRoute();
-  createFilterWithAiFilters(
-      {}, envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS,
-      &default_per_route);
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
-
-  Buffer::OwnedImpl body(R"({"model":)");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 1);
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
 }
 
 TEST_F(AiProtocolManagerFilterTest, NullAiFilterIsSkipped) {
