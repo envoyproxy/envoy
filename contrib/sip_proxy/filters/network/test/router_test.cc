@@ -1045,8 +1045,8 @@ TEST_F(SipRouterTest, UpstreamRequestLeftByTransactionDoesNotReachIt) {
   auto pool = context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcpConnPool(
       Upstream::ResourcePriority::Default, nullptr);
   ASSERT_TRUE(pool.has_value());
-  auto second =
-      std::make_shared<UpstreamRequest>(std::make_shared<Upstream::TcpPoolData>(*pool), transaction_info);
+  auto second = std::make_shared<UpstreamRequest>(std::make_shared<Upstream::TcpPoolData>(*pool),
+                                                  transaction_info);
   second->setConnectionState(ConnectionState::Connected);
   transaction_info->insertUpstreamRequest("10.0.0.1", second);
   metadata_->resetAffinityIteration();
