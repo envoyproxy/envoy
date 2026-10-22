@@ -284,14 +284,8 @@ generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
       scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
           stats_matcher_proto, stats.symbolTable(), server.serverFactoryContext());
     } else {
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::config), warn,
-                          "Failed to unpack stats matcher for listener {}: {}", config.name(),
-                          status.message());
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.strict_stats_matcher_unpacked")) {
-        return absl::InvalidArgumentError(fmt::format(
-            "Failed to unpack stats matcher for listener {}: {}", config.name(), status.message()));
-      }
+      return absl::InvalidArgumentError(fmt::format(
+          "Failed to unpack stats matcher for listener {}: {}", config.name(), status.message()));
     }
   }
 
