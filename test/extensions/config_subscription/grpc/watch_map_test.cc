@@ -947,6 +947,196 @@ TEST(WatchMapTest, AcceptOtherResourcesWildcard) {
   doDeltaUpdate(watch_map, updated_resources, {}, "version1");
 }
 
+TEST(WatchMapTest, AliasResolutionAndCanonicalUpdates) {
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  NiceMock<MockCustomConfigValidators> config_validators;
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  watch_map.updateWatchInterest(watch, {"alias_1"});
+
+  // 1. Server responds with canonical_1 and aliases={"alias_1", "unwatched_alias"}.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla1;
+    cla1.set_cluster_name("canonical_1");
+    envoy::service::discovery::v3::Resource r1;
+    r1.set_name("canonical_1");
+    r1.set_version("v1");
+    r1.add_aliases("alias_1");
+    r1.add_aliases("unwatched_alias");
+    std::ignore = r1.mutable_resource()->PackFrom(cla1);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r1};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectDeltaUpdate(callbacks, {cla1}, {}, "v1");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v1");
+  }
+
+  // 2. Subsequent update to canonical_1 without aliases still routes to the watch on alias_1.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla1_v2;
+    cla1_v2.set_cluster_name("canonical_1");
+    envoy::service::discovery::v3::Resource r1_v2;
+    r1_v2.set_name("canonical_1");
+    r1_v2.set_version("v2");
+    std::ignore = r1_v2.mutable_resource()->PackFrom(cla1_v2);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r1_v2};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectDeltaUpdate(callbacks, {cla1_v2}, {}, "v2");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v2");
+  }
+
+  // 3. Rebinding alias_1 to canonical_2 replaces the old binding to canonical_1.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla2;
+    cla2.set_cluster_name("canonical_2");
+    envoy::service::discovery::v3::Resource r2;
+    r2.set_name("canonical_2");
+    r2.set_version("v3");
+    r2.add_aliases("alias_1");
+    std::ignore = r2.mutable_resource()->PackFrom(cla2);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r2};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectDeltaUpdate(callbacks, {cla2}, {}, "v3");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v3");
+  }
+
+  // Updates to the old canonical_1 are no longer routed to the watch.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla1_v4;
+    cla1_v4.set_cluster_name("canonical_1");
+    envoy::service::discovery::v3::Resource r1_v4;
+    r1_v4.set_name("canonical_1");
+    r1_v4.set_version("v4");
+    std::ignore = r1_v4.mutable_resource()->PackFrom(cla1_v4);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r1_v4};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectNoUpdate(callbacks, "v4");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v4");
+  }
+
+  // 4. Removing canonical_2 notifies the watch and clears the binding.
+  {
+    Protobuf::RepeatedPtrField<std::string> removed;
+    *removed.Add() = "canonical_2";
+    expectDeltaUpdate(callbacks, {}, {"canonical_2"}, "v5");
+    watch_map.onConfigUpdate({}, removed, "v5");
+  }
+
+  // Subsequent updates to canonical_2 without aliases are not routed.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla2_v6;
+    cla2_v6.set_cluster_name("canonical_2");
+    envoy::service::discovery::v3::Resource r2_v6;
+    r2_v6.set_name("canonical_2");
+    r2_v6.set_version("v6");
+    std::ignore = r2_v6.mutable_resource()->PackFrom(cla2_v6);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r2_v6};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectNoUpdate(callbacks, "v6");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v6");
+  }
+}
+
+TEST(WatchMapTest, AliasDeduplicationUnresolvedAndUnsubscribeCleanup) {
+  MockSubscriptionCallbacks callbacks;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  NiceMock<MockCustomConfigValidators> config_validators;
+  WatchMap watch_map("ClusterLoadAssignmentType", &config_validators, {});
+  Watch* watch = watch_map.addWatch(callbacks, resource_decoder);
+  watch_map.updateWatchInterest(watch, {"alias_1", "alias_2"});
+
+  // 1. Both watched aliases resolve to canonical_1 in a single resource: watch receives it once.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla1;
+    cla1.set_cluster_name("canonical_1");
+    envoy::service::discovery::v3::Resource r1;
+    r1.set_name("canonical_1");
+    r1.set_version("v1");
+    r1.add_aliases("alias_1");
+    r1.add_aliases("alias_2");
+    std::ignore = r1.mutable_resource()->PackFrom(cla1);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r1};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectDeltaUpdate(callbacks, {cla1}, {}, "v1");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v1");
+  }
+
+  // 2. Unresolved alias response for alias_1 unbinds alias_1 while keeping alias_2 bound.
+  {
+    envoy::service::discovery::v3::Resource unresolved;
+    unresolved.set_name("alias_1");
+    unresolved.set_version("v2");
+    unresolved.add_aliases("alias_1");
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&unresolved};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    EXPECT_CALL(callbacks, onConfigUpdate(_, _, "v2"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& gotten_resources,
+                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+          EXPECT_EQ(1, gotten_resources.size());
+          EXPECT_FALSE(gotten_resources[0].get().hasResource());
+          return absl::OkStatus();
+        }));
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v2");
+  }
+
+  // 3. Unresolved update for canonical_1 itself notifies watch via alias_2 and unbinds canonical_1.
+  {
+    envoy::service::discovery::v3::Resource unresolved_canonical;
+    unresolved_canonical.set_name("canonical_1");
+    unresolved_canonical.set_version("v3");
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&unresolved_canonical};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    EXPECT_CALL(callbacks, onConfigUpdate(_, _, "v3"))
+        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& gotten_resources,
+                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+          EXPECT_EQ(1, gotten_resources.size());
+          EXPECT_FALSE(gotten_resources[0].get().hasResource());
+          return absl::OkStatus();
+        }));
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v3");
+  }
+
+  // 4. Rebind alias_1 and alias_2 to canonical_1, then remove alias_1 via removed_resources and
+  // unsubscribe alias_2 via updateWatchInterest.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla1;
+    cla1.set_cluster_name("canonical_1");
+    envoy::service::discovery::v3::Resource r1;
+    r1.set_name("canonical_1");
+    r1.set_version("v4");
+    r1.add_aliases("alias_1");
+    r1.add_aliases("alias_2");
+    std::ignore = r1.mutable_resource()->PackFrom(cla1);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r1};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectDeltaUpdate(callbacks, {cla1}, {}, "v4");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v4");
+  }
+  {
+    Protobuf::RepeatedPtrField<std::string> removed;
+    *removed.Add() = "alias_1";
+    expectDeltaUpdate(callbacks, {}, {"alias_1"}, "v5");
+    watch_map.onConfigUpdate({}, removed, "v5");
+  }
+  watch_map.updateWatchInterest(watch, {"alias_1"});
+
+  // Now neither alias_1 nor alias_2 is bound to canonical_1.
+  {
+    envoy::config::endpoint::v3::ClusterLoadAssignment cla1;
+    cla1.set_cluster_name("canonical_1");
+    envoy::service::discovery::v3::Resource r1;
+    r1.set_name("canonical_1");
+    r1.set_version("v6");
+    std::ignore = r1.mutable_resource()->PackFrom(cla1);
+    std::vector<const envoy::service::discovery::v3::Resource*> added{&r1};
+    Protobuf::RepeatedPtrField<std::string> removed;
+    expectNoUpdate(callbacks, "v6");
+    watch_map.onConfigUpdate(absl::MakeConstSpan(added), removed, "v6");
+  }
+}
+
 // TODO(adip): Add tests that use the eds cache.
 // Needs to test the following function onConfigUpdate (sotw&delta) and
 // updateWatchInterest

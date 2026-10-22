@@ -79,6 +79,10 @@ private:
   OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);
   OptRef<const ResourceState> getRequestedResourceState(absl::string_view resource_name) const;
 
+  void bindAlias(absl::string_view alias, absl::string_view canonical_name);
+  void unbindAlias(absl::string_view alias);
+  void unbindCanonicalName(absl::string_view canonical_name);
+
   bool isInitialRequestForLegacyWildcard();
 
   // Not all xDS resources support heartbeats due to there being specific information encoded in
@@ -97,6 +101,11 @@ private:
   // Used for storing resources that we lost interest in, but could
   // also be a part of wildcard subscription.
   absl::node_hash_map<std::string, std::string> ambiguous_resource_state_;
+
+  // Dynamic 1-to-1 alias -> canonical resource name bindings learned from Resource.aliases for
+  // requested aliases, along with the reverse index from canonical name to bound aliases.
+  absl::flat_hash_map<std::string, std::string> alias_to_canonical_name_;
+  absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> canonical_name_to_aliases_;
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};

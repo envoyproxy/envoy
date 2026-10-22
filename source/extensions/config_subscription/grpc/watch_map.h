@@ -178,6 +178,13 @@ private:
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
 
+  // Binds 'alias' to 'canonical_name', replacing any previous canonical binding for 'alias'.
+  void bindAlias(absl::string_view alias, absl::string_view canonical_name);
+  // Removes the alias binding for 'alias', if any.
+  void unbindAlias(absl::string_view alias);
+  // Removes all alias bindings pointing to 'canonical_name'.
+  void unbindCanonicalName(absl::string_view canonical_name);
+
   absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
 
   // Watches whose interest set is currently empty, which is interpreted as "everything".
@@ -192,6 +199,12 @@ private:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
+
+  // Dynamic 1-to-1 alias -> canonical resource name bindings learned from Delta xDS
+  // Resource.aliases for watched aliases, along with the reverse index from canonical name to bound
+  // aliases.
+  absl::flat_hash_map<std::string, std::string> alias_to_canonical_name_;
+  absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> canonical_name_to_aliases_;
 
   // Glob interest registered via accept(). Unlike wildcard_watches_/watch_interest_
   // above, these affect routing only and never contribute to the subscription. Parallel to
