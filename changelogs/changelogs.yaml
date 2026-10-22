@@ -125,6 +125,8 @@ areas:
 
   happy_eyeballs:
     title: happy_eyeballs
+  header_mutation:
+    title: header_mutation
   http:
     title: http
   http2:
