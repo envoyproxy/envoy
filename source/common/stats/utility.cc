@@ -44,25 +44,36 @@ absl::string_view Utility::sanitizeStatsName(absl::string_view name, std::string
   return name;
 }
 
+namespace {
+struct StatNameSanitizer {
+  StatNameSanitizer(bool sanitize) : sanitize_(sanitize) {}
+  absl::string_view sanitize(absl::string_view name) {
+    return sanitize_ ? Utility::sanitizeStatsName(name, buffer) : name;
+  }
+  std::string buffer;
+  bool sanitize_{};
+};
+} // namespace
+
 TaggedStatName::TaggedStatName(SymbolTable& symbol_table, absl::string_view base_name,
-                               TagStringViewSpan tags, absl::string_view name)
+                               TagStringViewSpan tags, absl::string_view name, bool sanitize)
     : tag_pool_(symbol_table) {
   tag_pool_.reserve(tags.size() * 2 + 2);
 
-  std::string buffer;
-  base_name_ = tag_pool_.add(Utility::sanitizeStatsName(base_name, buffer));
+  StatNameSanitizer sanitizer(sanitize);
+  base_name_ = tag_pool_.add(sanitizer.sanitize(base_name));
   if (tags.empty()) {
     name_ = base_name_;
   } else {
     ASSERT(!name.empty(), "When tags are supplied, the caller must supply the tagged name with the "
                           "tag values interleaved.");
-    name_ = tag_pool_.add(Utility::sanitizeStatsName(name, buffer));
+    name_ = tag_pool_.add(sanitizer.sanitize(name));
   }
 
   tags_.reserve(tags.size());
   for (const TagStringView& tag : tags) {
-    tags_.push_back({tag_pool_.add(Utility::sanitizeStatsName(tag.first, buffer)),
-                     tag_pool_.add(Utility::sanitizeStatsName(tag.second, buffer))});
+    tags_.push_back({tag_pool_.add(sanitizer.sanitize(tag.first)),
+                     tag_pool_.add(sanitizer.sanitize(tag.second))});
   }
 }
 
