@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "envoy/common/platform.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
@@ -30,6 +31,22 @@ using testing::Ge;
 namespace Quic {
 
 namespace {
+
+bool dualStackUdpIsBindable() {
+  const auto address = Network::Test::getAnyAddress(Network::Address::IpVersion::v6, true);
+  auto& syscalls = Api::OsSysCallsSingleton::get();
+  const auto fd = syscalls.socket(AF_INET6, SOCK_DGRAM, 0).return_value_;
+  if (!SOCKET_VALID(fd)) {
+    return false;
+  }
+  const int v6only = 0;
+  const bool supported =
+      syscalls.setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)).return_value_ ==
+          0 &&
+      syscalls.bind(fd, address->sockAddr(), address->sockAddrLen()).return_value_ == 0;
+  syscalls.close(fd);
+  return supported;
+}
 
 // Returns true if a socket can bind() to `address`.
 [[maybe_unused]] bool addressIsBindable(const std::string& address) {
@@ -94,6 +111,39 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   testRouterHeaderOnlyRequestAndResponse();
   std::string log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(log, testing::MatchesRegex("TLSv1.3 TLS_(AES_128_GCM|CHACHA20_POLY1305)_SHA256 -"));
+}
+
+TEST_P(QuicHttpIntegrationTest, DualStackListenerServesIpv4ClientUsingDefaultWriter) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "This regression requires an IPv4 client.";
+  }
+  if (!dualStackUdpIsBindable()) {
+    GTEST_SKIP() << "An IPv6 UDP socket with IPV6_V6ONLY=0 cannot bind [::]:0.";
+  }
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_address()->mutable_socket_address()->set_address("::");
+    listener->mutable_address()->mutable_socket_address()->set_ipv4_compat(true);
+    // Force the sendmsg path on Linux too, where automatic writer selection may use GSO.
+    auto* writer =
+        listener->mutable_udp_listener_config()->mutable_udp_packet_packet_writer_config();
+    writer->set_name("envoy.udp_packet_writer.default");
+    std::ignore = writer->mutable_typed_config()->PackFrom(
+        envoy::extensions::udp_packet_writer::v3::UdpDefaultWriterFactory());
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(5, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("aaaaa", response->body());
+  EXPECT_EQ("127.0.0.1", quic_connection_->peer_address().host().ToString());
+  codec_client_->close();
 }
 
 TEST_P(QuicHttpIntegrationTest, GetPeerAndLocalCertsInfo) {
