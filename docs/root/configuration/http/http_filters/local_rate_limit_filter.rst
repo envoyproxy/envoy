@@ -129,6 +129,75 @@ path, then 10 req/min are allowed. But if they come from a downstream service
 cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
 1000 req/min are allowed.
 
+Accounting for usage when a stream completes
+-------------------------------------------
+
+Set :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>`
+on an embedded ``rate_limits`` action to update local descriptor token buckets when the stream completes.
+This allows :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` in the
+filter's ``rate_limits`` to use response headers or final stream information.
+
+Use embedded ``rate_limits`` for ``hits_addend`` costs such as ``%RESP(x-usage)%`` or ``%BYTES_SENT%``.
+Route and virtual-host policies do not populate ``hits_addend``. Their descriptor-value formatters
+receive request headers and stream information only, so ``%RESP()%`` resolves empty there.
+
+Example using embedded ``rate_limits``:
+
+.. code-block:: yaml
+
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_key: usage
+        descriptor_value: service
+  - actions:
+    - generic_key:
+        descriptor_key: usage
+        descriptor_value: service
+    apply_on_stream_done: true
+    hits_addend:
+      format: "%RESP(x-usage)%"
+
+The first action enforces the budget and consumes one token on the request path. The second
+charges additional usage reported in the ``x-usage`` response header when the stream completes.
+Both actions must match a configured local descriptor. Completion actions update every matching
+descriptor bucket without blocking the completed request. Usage exceeding the remaining budget
+drains the bucket to zero. The default token bucket is consumed only on the request path.
+Missing or empty formatted usage is skipped quietly. Invalid nonempty usage does not generate a
+descriptor and logs a warning. Negative hits addends refund tokens using the existing local
+descriptor behavior.
+
+With ``local_cluster_rate_limit``, positive charges are divided by the local cluster's token share
+factor, while refunds add the specified token count without scaling. This matches request-path
+refund behavior. A charge and refund with the same addend do not cancel when the share factor is
+less than one.
+
+Request and completion actions share the same bounded cache for wildcard descriptors. A value
+first seen at completion creates a bucket and can evict another bucket, including one used for
+request enforcement. Revisiting an evicted value creates a fresh bucket with its initial budget.
+Size ``max_dynamic_descriptors`` for the combined cardinality of request and completion values.
+
+Completion accounting works with process-wide and per-connection buckets. Request counters and
+rate limit response headers reflect the request-path decision; completion accounting does not
+change the response or increment request counters again.
+
+As with the global rate limit filter, completion actions also run when the request was rejected
+by the rate limit filter. Stream information such as ``%BYTES_SENT%`` includes usage from a local
+rate limit response. To account for upstream-reported usage, use a response header such as
+``%RESP(x-usage)%`` that is present only when the upstream reports a cost. A missing header is
+skipped without logging a warning.
+
+For route and virtual-host policies, set the runtime guard
+``envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done`` to ``true``
+to honor ``apply_on_stream_done``. The default ``false`` preserves request-path enforcement for those
+entries regardless of ``apply_on_stream_done``. The guard is latched when enabled streams with
+descriptors decode request headers. It does not affect embedded ``rate_limits``: their completion
+actions always run at stream completion and remain skipped on the request path.
+
+For policies shared by global and local filters, enabling the guard moves flagged entries from
+local request enforcement to completion accounting. Add request-path actions for descriptors
+that must continue enforcing a local limit.
+
 Statistics
 ----------
 

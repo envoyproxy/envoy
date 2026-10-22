@@ -18,6 +18,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
@@ -2767,9 +2768,7 @@ TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDoneResponseHeader
                                nullptr);
 }
 
-// When the response header referenced by %RESP()% is absent, the stream-done descriptor is dropped
-// (the empty substitution is not a valid number), matching the pre-existing behavior for an
-// unresolved hits_addend format.
+// Missing %RESP()% usage drops the completion descriptor quietly.
 TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDoneResponseHeaderMissing) {
   setUpTest(inlined_rate_limit_response_hits_addend_config_);
   request_headers_.addCopy("x-header-name", "header-value");
@@ -2788,13 +2787,59 @@ TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDoneResponseHeader
                                std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
                                nullptr);
 
-  // No x-actual-cost header on the response: the stream-done descriptor resolves to an empty
-  // string, is not a valid number, and is dropped -- so no stream-done limit() call is made.
+  // No x-actual-cost header: skip the completion call quietly.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
 
   EXPECT_CALL(*client_, limit(_, _, _, _, _, _)).Times(0);
   EXPECT_CALL(*client_, detach()).Times(0);
-  filter_->onDestroy();
+  EXPECT_LOG_NOT_CONTAINS("warning", "Invalid hits_addend", filter_->onDestroy());
+}
+
+TEST_F(HttpRateLimitFilterTest, EmptyCompletionUsageDoesNotSkipLaterPolicy) {
+  setUpTest(R"EOF(
+domain: bar
+rate_limits:
+- actions:
+  - generic_key:
+      descriptor_value: empty-cost
+  hits_addend:
+    format: "%RESP(x-empty-cost)%"
+  apply_on_stream_done: true
+- actions:
+  - generic_key:
+      descriptor_value: valid-cost
+  hits_addend:
+    format: "%RESP(x-actual-cost)%"
+  apply_on_stream_done: true
+)EOF");
+
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  testing::Mock::VerifyAndClearExpectations(client_);
+
+  response_headers_.addCopy("x-empty-cost", "");
+  response_headers_.addCopy("x-actual-cost", "3");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          Invoke([this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string&,
+                        const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                        Tracing::Span&, OptRef<const StreamInfo::StreamInfo>, uint32_t) -> void {
+            request_callbacks_ = &callbacks;
+            ASSERT_EQ(1, descriptors.size());
+            ASSERT_EQ(1, descriptors[0].entries_.size());
+            EXPECT_EQ("generic_key", descriptors[0].entries_[0].key_);
+            EXPECT_EQ("valid-cost", descriptors[0].entries_[0].value_);
+            ASSERT_TRUE(descriptors[0].hits_addend_.has_value());
+            EXPECT_EQ(3, descriptors[0].hits_addend_.value());
+          }));
+  EXPECT_CALL(*client_, detach());
+  EXPECT_LOG_NOT_CONTAINS("warning", "Invalid hits_addend", filter_->onDestroy());
+
+  ASSERT_NE(nullptr, request_callbacks_);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr,
+                               std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
+                               nullptr);
 }
 
 } // namespace

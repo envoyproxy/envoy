@@ -13,6 +13,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
 #include "absl/strings/str_cat.h"
@@ -58,6 +59,9 @@ FilterConfig::FilterConfig(
               : std::nullopt),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
+      has_stream_done_actions_(
+          std::any_of(config.rate_limits().begin(), config.rate_limits().end(),
+                      [](const auto& rate_limit) { return rate_limit.apply_on_stream_done(); })),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
       enable_retry_after_header_(config.enable_retry_after_header() &&
@@ -154,6 +158,9 @@ bool FilterConfig::enforced() const {
   return filter_enforced_.has_value() ? filter_enforced_->enabled() : false;
 }
 
+Filter::Filter(FilterConfigSharedPtr config)
+    : config_(std::move(config)), used_config_(config_.get()) {}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
@@ -170,15 +177,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
 
+  if (used_config_->hasDescriptors()) {
+    route_apply_on_stream_done_ =
+        !used_config_->hasRateLimitConfigs() &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done");
+    has_stream_done_actions_ = used_config_->hasStreamDoneActions();
+  }
   used_config_->stats().enabled_.inc();
+  request_headers_ = &headers;
 
   std::vector<RateLimit::Descriptor> descriptors;
-  if (used_config_->hasDescriptors()) {
-    if (used_config_->hasRateLimitConfigs()) {
-      used_config_->populateDescriptors(headers, decoder_callbacks_->streamInfo(), descriptors);
-    } else {
-      populateDescriptors(descriptors, headers);
-    }
+  populateDescriptors(descriptors, headers);
+  if (has_stream_done_actions_) {
+    route_ = decoder_callbacks_->routeSharedPtr();
   }
 
   if (ENVOY_LOG_CHECK_LEVEL(debug)) {
@@ -235,6 +247,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+  // Stream-owned headers outlive onDestroy(), as in the global rate limit filter.
+  response_headers_ = &headers;
   // We can never assume the decodeHeaders() was called before encodeHeaders().
   if (!token_bucket_context_) {
     return Http::FilterHeadersStatus::Continue;
@@ -253,6 +267,22 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+void Filter::onDestroy() {
+  if (request_headers_ == nullptr || !has_stream_done_actions_) {
+    return;
+  }
+  std::vector<RateLimit::Descriptor> descriptors;
+  populateDescriptors(descriptors, *request_headers_, true);
+  if (descriptors.empty()) {
+    return;
+  }
+  if (used_config_->rateLimitPerConnection()) {
+    getPerConnectionRateLimiter().consumeDescriptors(descriptors);
+  } else {
+    used_config_->consumeDescriptors(descriptors);
+  }
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
@@ -284,26 +314,37 @@ Filters::Common::LocalRateLimit::LocalRateLimiterImpl& Filter::getPerConnectionR
 }
 
 void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
-                                 Http::RequestHeaderMap& headers) {
-  const auto route = decoder_callbacks_->route();
+                                 const Http::RequestHeaderMap& headers, bool on_stream_done) {
+  if (!used_config_->hasDescriptors()) {
+    return;
+  }
+  if (used_config_->hasRateLimitConfigs()) {
+    used_config_->populateDescriptors(headers, on_stream_done ? response_headers_ : nullptr,
+                                      decoder_callbacks_->streamInfo(), descriptors,
+                                      on_stream_done);
+    return;
+  }
+  const auto route = on_stream_done ? makeOptRefFromPtr(route_.get()) : decoder_callbacks_->route();
   if (!route || !route->routeEntry()) {
     return;
   }
 
   const Router::RouteEntry* route_entry = route->routeEntry();
   // Get all applicable rate limit policy entries for the route.
-  populateDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
+  populateDescriptors(route_entry->rateLimitPolicy(), descriptors, headers, on_stream_done);
   VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
 
   switch (vh_rate_limit_option) {
   case VhRateLimitOptions::Ignore:
     return;
   case VhRateLimitOptions::Include:
-    populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+    populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers,
+                        on_stream_done);
     return;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers);
+      populateDescriptors(route->virtualHost().rateLimitPolicy(), descriptors, headers,
+                          on_stream_done);
     }
     return;
   }
@@ -312,12 +353,18 @@ void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors
 
 void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                  std::vector<RateLimit::Descriptor>& descriptors,
-                                 Http::RequestHeaderMap& headers) {
+                                 const Http::RequestHeaderMap& headers, bool on_stream_done) {
   for (const Router::RateLimitPolicyEntry& rate_limit :
        rate_limit_policy.getApplicableRateLimit(used_config_->stage())) {
     const std::string& disable_key = rate_limit.disableKey();
 
     if (!disable_key.empty()) {
+      continue;
+    }
+    if (route_apply_on_stream_done_ && rate_limit.applyOnStreamDone() != on_stream_done) {
+      if (!on_stream_done) {
+        has_stream_done_actions_ = true;
+      }
       continue;
     }
     rate_limit.populateDescriptors(descriptors, used_config_->localInfo().clusterName(), headers,
