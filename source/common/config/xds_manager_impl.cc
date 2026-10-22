@@ -29,6 +29,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/null_grpc_mux_impl.h"
+#include "source/common/config/singleton_subscription_adapter.h"
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
@@ -362,6 +363,20 @@ absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingletonResource(
   // No actual config source was found, return an error.
   return absl::NotFoundError(
       fmt::format("No valid authority was found for the given xDS-TP resource {}.", resource_name));
+}
+
+absl::StatusOr<std::unique_ptr<SingletonSubscription>> XdsManagerImpl::subscribeToSingletonResource(
+    absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
+    absl::string_view type_url, Stats::Scope& scope, SingletonSubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
+  auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks);
+  absl::StatusOr<SubscriptionPtr> sub_or_error = subscribeToSingletonResource(
+      resource_name, config, type_url, scope, *adapter, resource_decoder, options);
+  if (!sub_or_error.ok()) {
+    return sub_or_error.status();
+  }
+  return std::make_unique<SingletonSubscriptionImpl>(std::move(sub_or_error.value()), resource_name,
+                                                     std::move(adapter));
 }
 
 ScopedResume XdsManagerImpl::pause(const std::vector<std::string>& type_urls) {

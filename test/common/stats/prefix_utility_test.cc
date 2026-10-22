@@ -164,6 +164,17 @@ TEST_F(MergeStatPrefixTest, EmptySelfWithParent) {
   EXPECT_THAT(tags(p), testing::ElementsAre(std::make_pair(hcm_tag_, "ingress")));
 }
 
+// sanitize=false keeps a ':' in the merged names and tag values, matching the legacy
+// POOL_*_PREFIX-based stat creation that never sanitized.
+TEST_F(MergeStatPrefixTest, VerbatimNamesKeepColon) {
+  const auto p =
+      mergeStatPrefix(symbol_table_, "redis.db:6379.", "splitter", {}, {}, /*sanitize=*/false);
+  EXPECT_EQ(prefix(p), "redis.db:6379.splitter");
+  EXPECT_EQ(base(p), "redis.splitter");
+  EXPECT_THAT(tags(p), testing::ElementsAre(std::make_pair(
+                           std::string(Envoy::Config::TagNames::get().REDIS_PREFIX), "db:6379")));
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy

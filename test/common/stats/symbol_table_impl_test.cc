@@ -1256,6 +1256,7 @@ TEST(WellKnownStatNamesTest, TagStringsMatchConfigTagNames) {
   EXPECT_EQ(tags.HEALTH_CHECK_NAME, table.toString(names.tag_health_check_name_));
   EXPECT_EQ(tags.HTTP_CONN_MANAGER_PREFIX, table.toString(names.tag_http_conn_manager_prefix_));
   EXPECT_EQ(tags.LISTENER_ADDRESS, table.toString(names.tag_listener_address_));
+  EXPECT_EQ(tags.MONGO_PREFIX, table.toString(names.tag_mongo_prefix_));
   EXPECT_EQ(tags.RDS_ROUTE_CONFIG, table.toString(names.tag_rds_route_config_));
   EXPECT_EQ(tags.RESPONSE_CODE, table.toString(names.tag_response_code_));
   EXPECT_EQ(tags.RESPONSE_CODE_CLASS, table.toString(names.tag_response_code_class_));

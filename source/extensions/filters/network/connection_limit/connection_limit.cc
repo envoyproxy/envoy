@@ -25,7 +25,8 @@ ConnectionLimitStats Config::generateStats(const std::string& prefix, Stats::Sco
   // connection_limit.(<stat_prefix>.)*: the stat prefix is the tag of every stat.
   const Stats::TagStringView tag{Envoy::Config::TagNames::get().CONNECTION_LIMIT_PREFIX, prefix};
   Stats::LiteScopeHelper helper(scope, "connection_limit", {tag},
-                                absl::StrCat("connection_limit.", prefix));
+                                absl::StrCat("connection_limit.", prefix),
+                                /*sanitize=*/false);
   return {ALL_CONNECTION_LIMIT_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
