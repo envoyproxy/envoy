@@ -7,6 +7,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/router/router.h"
 
+#include "source/common/common/hash.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/load_balancing_policies/ring_hash/ring_hash_lb.h"
@@ -1471,6 +1472,33 @@ TEST_P(RingHashLoadBalancerTest, ValidateEndpointsSkipsNullPriorityEntries) {
   ASSERT_OK(creation_status);
 
   EXPECT_OK(typed_config.validateEndpoints(priorities));
+}
+
+TEST_P(RingHashLoadBalancerTest, HostnameFallbackToAddress) {
+  hostSet().hosts_ = {makeTestHost(info_, "foo.example.com", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "tcp://127.0.0.1:91")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_.mutable_minimum_ring_size()->set_value(2);
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+
+  init();
+  EXPECT_EQ(2, lb_->stats().size_.value());
+  EXPECT_EQ(1, lb_->stats().min_hashes_per_host_.value());
+  EXPECT_EQ(1, lb_->stats().max_hashes_per_host_.value());
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  {
+    // Ring position built from the hostname.
+    TestLoadBalancerContext context(HashUtil::xxHash64("foo.example.com_0"));
+    EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(&context).host);
+  }
+  {
+    // The second host has no hostname: its ring position is built from the address.
+    TestLoadBalancerContext context(HashUtil::xxHash64("127.0.0.1:91_0"));
+    EXPECT_EQ(hostSet().hosts_[1], lb->chooseHost(&context).host);
+  }
 }
 
 } // namespace

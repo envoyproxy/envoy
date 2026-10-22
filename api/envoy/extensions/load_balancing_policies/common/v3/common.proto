@@ -131,7 +131,11 @@ message SlowStartConfig {
 // Common Configuration for all consistent hashing load balancers (MaglevLb, RingHashLb, etc.)
 message ConsistentHashingLbConfig {
   // If set to ``true``, the cluster will use hostname instead of the resolved
-  // address as the key to consistently hash to an upstream host. Only valid for StrictDNS clusters with hostnames which resolve to a single IP address.
+  // address as the key to consistently hash to an upstream host. The hostname of a host is set
+  // automatically for ``STRICT_DNS`` clusters (the configured endpoint address, which should
+  // resolve to a single IP address) and may optionally be set for ``STATIC`` and ``EDS`` clusters
+  // via the :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` endpoint
+  // field. Hosts without a hostname fall back to hashing by the resolved address.
   bool use_hostname_for_hashing = 1;
 
   // Configures percentage of average cluster load to bound per upstream host. For example, with a value of 150

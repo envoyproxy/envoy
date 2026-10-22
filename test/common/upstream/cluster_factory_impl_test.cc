@@ -39,7 +39,8 @@ class TestStaticClusterFactory : public Event::TestUsingSimulatedTime,
                                  public ClusterFactoryImplBase {
 
 public:
-  TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") {}
+  TestStaticClusterFactory() : TestStaticClusterFactory("envoy.clusters.test_static") {}
+  explicit TestStaticClusterFactory(const std::string& name) : ClusterFactoryImplBase(name) {}
 
   absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
   createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
@@ -271,6 +272,86 @@ TEST_F(TestStaticClusterImplTest, HostnameWithoutDNS) {
               HasStatusMessage(
                   "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
                   "'envoy.clusters.custom_static'"));
+}
+
+TEST_F(TestStaticClusterImplTest, HostnameForHashingStaticCluster) {
+  const std::string yaml = R"EOF(
+      name: staticcluster
+      type: STATIC
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      common_lb_config:
+        consistent_hashing_lb_config:
+          use_hostname_for_hashing: true
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                hostname: foo.example.com
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 443
+    )EOF";
+
+  TestStaticClusterFactory factory("envoy.cluster.static");
+  Registry::InjectFactory<ClusterFactory> registered_factory(factory);
+
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
+  EXPECT_TRUE(create_result.ok());
+}
+
+TEST_F(TestStaticClusterImplTest, HostnameForHashingEdsCluster) {
+  const std::string yaml = R"EOF(
+      name: edscluster
+      type: EDS
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      common_lb_config:
+        consistent_hashing_lb_config:
+          use_hostname_for_hashing: true
+    )EOF";
+
+  TestStaticClusterFactory factory("envoy.cluster.eds");
+  Registry::InjectFactory<ClusterFactory> registered_factory(factory);
+
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
+  EXPECT_TRUE(create_result.ok());
+}
+
+TEST_F(TestStaticClusterImplTest, HostnameForHashingLogicalDnsClusterRejected) {
+  const std::string yaml = R"EOF(
+      name: logicaldnscluster
+      type: LOGICAL_DNS
+      connect_timeout: 0.25s
+      lb_policy: ROUND_ROBIN
+      common_lb_config:
+        consistent_hashing_lb_config:
+          use_hostname_for_hashing: true
+      load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.example.com
+                    port_value: 443
+    )EOF";
+
+  TestStaticClusterFactory factory("envoy.cluster.logical_dns");
+  Registry::InjectFactory<ClusterFactory> registered_factory(factory);
+
+  const envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  auto create_result = ClusterFactoryImplBase::create(
+      cluster_config, server_context_, dns_resolver_fn_, std::move(outlier_event_logger_), false);
+  EXPECT_THAT(create_result,
+              HasStatusMessage(
+                  "Cannot use hostname for consistent hashing loadbalancing for cluster of type: "
+                  "'envoy.cluster.logical_dns'"));
 }
 
 } // namespace
