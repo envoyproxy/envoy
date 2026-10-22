@@ -5,6 +5,7 @@
 #include "source/extensions/upstreams/http/dynamic_modules/upstream_request.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -42,8 +43,8 @@ absl::StatusOr<BridgeConfigSharedPtr> getOrCreateBridgeConfig(
   if (proto_config.has_bridge_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.bridge_config());
     if (!config_or_error.ok()) {
-      return absl::InvalidArgumentError("failed to parse bridge_config: " +
-                                        std::string(config_or_error.status().message()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("failed to parse bridge_config: ", config_or_error.status().message()));
     }
     bridge_config_bytes = std::move(config_or_error.value());
   }

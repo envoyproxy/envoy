@@ -37,7 +37,7 @@ public:
     });
   }
   std::optional<absl::string_view> get(absl::string_view key) const override {
-    Http::LowerCaseString lower_key{std::string(key)};
+    Http::LowerCaseString lower_key{key};
     const auto entry = request_headers_.get(lower_key);
     if (!entry.empty()) {
       return entry[0]->value().getStringView();
@@ -62,10 +62,10 @@ public:
   using HttpTraceContextBase::HttpTraceContextBase;
 
   void set(absl::string_view key, absl::string_view value) override {
-    request_headers_.setCopy(Http::LowerCaseString(std::string(key)), value);
+    request_headers_.setCopy(Http::LowerCaseString(key), value);
   }
   void remove(absl::string_view key) override {
-    request_headers_.remove(Http::LowerCaseString(std::string(key)));
+    request_headers_.remove(Http::LowerCaseString(key));
   }
   OptRef<const Http::RequestHeaderMap> requestHeaders() const override { return request_headers_; };
   OptRef<Http::RequestHeaderMap> requestHeaders() override { return request_headers_; };

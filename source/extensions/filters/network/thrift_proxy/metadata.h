@@ -37,7 +37,7 @@ public:
   void processKey(absl::string_view key) override {
     std::string s = absl::StrReplaceAll(key, {{std::string(1, '\0'), ""}, {"\n", ""}, {"\r", ""}});
     std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
-    original_header_keys_.try_emplace(std::move(s), std::string(key));
+    original_header_keys_.try_emplace(std::move(s), key);
   }
   void setReasonPhrase(absl::string_view) override {}
   absl::string_view getReasonPhrase() const override { return ""; }

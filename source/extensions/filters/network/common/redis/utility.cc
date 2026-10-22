@@ -45,7 +45,7 @@ RespValuePtr makeError(const std::string& error) {
 RespValue makeBulkString(absl::string_view value) {
   RespValue v;
   v.type(RespType::BulkString);
-  v.asString() = std::string(value);
+  v.asString() = value;
   return v;
 }
 
@@ -61,7 +61,7 @@ RespValue makeRequest(absl::string_view command, const std::vector<std::string>&
   request.type(RespType::Array);
   std::vector<RespValue> values(args.size() + 1);
   values[0].type(RespType::BulkString);
-  values[0].asString() = std::string(command);
+  values[0].asString() = command;
   for (size_t i = 0; i < args.size(); i++) {
     values[i + 1].type(RespType::BulkString);
     values[i + 1].asString() = args[i];

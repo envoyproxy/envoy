@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/udp/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

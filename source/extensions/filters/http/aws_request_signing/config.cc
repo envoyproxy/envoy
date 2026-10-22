@@ -33,7 +33,7 @@ AwsRequestSigningFilterFactory::createFilterFactoryFromProtoHelper(
 
   auto signer = createSigner(config, server_context);
   if (!signer.ok()) {
-    return absl::InvalidArgumentError(std::string(signer.status().message()));
+    return absl::InvalidArgumentError(signer.status().message());
   }
   auto filter_config = std::make_shared<FilterConfigImpl>(
       std::move(signer.value()), stats_prefix, scope, config.host_rewrite(),
@@ -61,7 +61,7 @@ AwsRequestSigningFilterFactory::createRouteSpecificFilterConfigTyped(
 
   auto signer = createSigner(per_route_config.aws_request_signing(), server_context);
   if (!signer.ok()) {
-    return absl::InvalidArgumentError(std::string(signer.status().message()));
+    return absl::InvalidArgumentError(signer.status().message());
   }
 
   return std::make_shared<const FilterConfigImpl>(
@@ -131,7 +131,7 @@ AwsRequestSigningFilterFactory::createSigner(
   }
 
   if (!credentials_provider.ok()) {
-    return absl::InvalidArgumentError(std::string(credentials_provider.status().message()));
+    return absl::InvalidArgumentError(credentials_provider.status().message());
   }
 
   const auto include_matcher_config = Extensions::Common::Aws::AwsSigningHeaderMatcherVector(

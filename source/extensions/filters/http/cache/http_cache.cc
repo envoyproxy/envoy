@@ -45,8 +45,8 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 
   // TODO(toddmgreer): get cluster name.
   key_.set_cluster_name("cluster_name_goes_here");
-  key_.set_host(std::string(request_headers.getHostValue()));
-  key_.set_path(std::string(request_headers.getPathValue()));
+  key_.set_host(request_headers.getHostValue());
+  key_.set_path(request_headers.getPathValue());
   if (Http::Utility::schemeIsHttp(scheme)) {
     key_.set_scheme(Key::HTTP);
   } else if (Http::Utility::schemeIsHttps(scheme)) {

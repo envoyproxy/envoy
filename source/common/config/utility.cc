@@ -33,7 +33,7 @@ absl::StatusOr<Upstream::ClusterConstOptRef> Utility::checkCluster(absl::string_
                                                                    absl::string_view cluster_name,
                                                                    Upstream::ClusterManager& cm,
                                                                    bool allow_added_via_api) {
-  const auto cluster = cm.getActiveOrWarmingCluster(std::string(cluster_name));
+  const auto cluster = cm.getActiveOrWarmingCluster(cluster_name);
   if (!cluster) {
     return absl::InvalidArgumentError(
         fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));

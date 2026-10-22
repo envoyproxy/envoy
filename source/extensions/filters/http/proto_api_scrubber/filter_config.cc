@@ -332,7 +332,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodFieldRestrictions(
 
 absl::StatusOr<absl::string_view>
 ProtoApiScrubberFilterConfig::getEnumName(absl::string_view enum_type_name, int enum_value) const {
-  const auto* enum_desc = descriptor_pool_->FindEnumTypeByName(std::string(enum_type_name));
+  const auto* enum_desc = descriptor_pool_->FindEnumTypeByName(enum_type_name);
   if (enum_desc == nullptr) {
     return absl::NotFoundError(
         absl::StrCat("Enum type '", enum_type_name, "' not found in descriptor pool."));

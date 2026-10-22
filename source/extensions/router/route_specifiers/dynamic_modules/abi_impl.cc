@@ -83,8 +83,7 @@ Protobuf::Value& mutableRouteMetadataValue(RouteSpecifierContext& context,
                                            envoy_dynamic_module_type_module_buffer ns,
                                            envoy_dynamic_module_type_module_buffer key) {
   return Envoy::Config::Metadata::mutableMetadataValue(context.overrides.route_metadata,
-                                                       std::string(toStringView(ns)),
-                                                       std::string(toStringView(key)));
+                                                       toStringView(ns), toStringView(key));
 }
 
 bool knownAppendAction(envoy_dynamic_module_type_route_specifier_header_append_action action) {
