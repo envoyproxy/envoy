@@ -18,11 +18,12 @@ option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extens
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Istio HBONE origination shim]
+// [#protodoc-title: Istio HBONE CONNECT wait]
 
-// Terminal filter for a single-HBONE origination internal listener. Use together
-// with UpstreamConfig on the cluster connecting to this listener. The upstream
-// cluster must use HTTP/2 and configure the required HBONE mutual TLS context.
+// Terminal filter for an HBONE origination internal listener. Use together with
+// UpstreamConfig on the cluster connecting to this listener and ConnectionPoolConfig
+// on the application cluster.
+// The upstream cluster must use HTTP/2 and configure the required HBONE mutual TLS context.
 // [#extension: envoy.filters.network.istio_hbone]
 message Config {
   // TCP proxy settings. HTTP CONNECT tunneling and immediate upstream connection
@@ -34,7 +35,8 @@ message Config {
 
 // Transport socket for clusters whose endpoints are HBONE origination internal
 // listeners using Config. Holds connection readiness and all application bytes
-// until the peer filter receives a successful CONNECT response.
+// until the peer filter receives a successful CONNECT response. Use together with
+// ConnectionPoolConfig on application clusters.
 // [#extension: envoy.transport_sockets.istio_hbone]
 message UpstreamConfig {
   // Metadata to pass to the internal listener, including original destination
@@ -48,7 +50,7 @@ message UpstreamConfig {
   envoy.config.core.v3.TransportSocket transport_socket = 2;
 }
 
-// Cluster upstream_config for application clusters using the shim. Handles
+// Required cluster upstream_config for application clusters using CONNECT wait. Handles
 // permanent CONNECT rejections before router retry and outlier accounting.
 // HTTP callers receive the rejected 4xx status (502 for other non-5xx statuses);
 // TCP callers are closed. Successful connections and transient failures retain
