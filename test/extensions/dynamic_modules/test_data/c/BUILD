@@ -25,6 +25,7 @@ package(default_visibility = [
     "//test/extensions/router/route_specifiers/dynamic_modules:__pkg__",
     "//test/extensions/tracers/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/dynamic_modules:__pkg__",
+    "//test/extensions/transport_sockets/tls/cert_selectors/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/cert_validator/dynamic_modules:__pkg__",
     "//test/extensions/transport_sockets/tls/handshakers/dynamic_modules:__pkg__",
     "//test/extensions/upstreams/http/dynamic_modules:__pkg__",
@@ -327,6 +328,24 @@ test_program(name = "tls_handshaker_no_config_destroy")
 test_program(name = "tls_handshaker_new_fail")
 
 test_program(name = "tls_handshaker_new_without_destroy")
+
+test_program(name = "tls_certificate_selector_by_server_name")
+
+test_program(name = "tls_certificate_selector_dynamic")
+
+test_program(name = "tls_certificate_selector_dynamic_without_hooks")
+
+test_program(name = "tls_certificate_selector_missing_config_destroy")
+
+test_program(name = "tls_certificate_selector_missing_destroy")
+
+test_program(name = "tls_certificate_selector_missing_new")
+
+test_program(name = "tls_certificate_selector_missing_select")
+
+test_program(name = "tls_certificate_selector_new_fail")
+
+test_program(name = "tls_certificate_selector_out_of_range")
 
 test_program(name = "upstream_bridge_no_op")
 

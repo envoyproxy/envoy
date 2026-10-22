@@ -110,13 +110,6 @@ tool_config:
     default_server_info:
       path: "/mcp"
     tool_list_local: {}
-  - tools:
-      - name: tool_global
-        http_rule:
-          get: "/global"
-        tool_list_config:
-          description: "Global"
-    tool_list_local: {}
                               )yaml"));
 
   // Case 1: Exact match request (a.com, /mcp)
@@ -131,12 +124,11 @@ tool_config:
         .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
           auto resp = nlohmann::json::parse(body);
           auto tools = resp["result"]["tools"];
-          EXPECT_EQ(tools.size(), 4);
+          EXPECT_EQ(tools.size(), 3);
 
           EXPECT_EQ(tools[0]["name"], "tool_exact");
           EXPECT_EQ(tools[1]["name"], "tool_host_only");
           EXPECT_EQ(tools[2]["name"], "tool_path_only");
-          EXPECT_EQ(tools[3]["name"], "tool_global");
         }));
 
     Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":1,"method":"tools/list"})json");
@@ -157,14 +149,69 @@ tool_config:
         .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
           auto resp = nlohmann::json::parse(body);
           auto tools = resp["result"]["tools"];
-          EXPECT_EQ(tools.size(), 2);
+          EXPECT_EQ(tools.size(), 1);
           EXPECT_EQ(tools[0]["name"], "tool_path_only");
-          EXPECT_EQ(tools[1]["name"], "tool_global");
         }));
 
     Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":2,"method":"tools/list"})json");
     filter_->decodeData(body, true);
   }
+}
+
+TEST_F(EndpointKeyedFilteringTest, DuplicateEndpointConfigReturnsError) {
+  EXPECT_THAT(setupRouteConfig(R"yaml(
+tool_config:
+  - tools:
+      - name: tool_one
+        http_rule:
+          get: "/one"
+    default_server_info:
+      host: "a.com"
+      path: "/mcp"
+  - tools:
+      - name: tool_two
+        http_rule:
+          get: "/two"
+    default_server_info:
+      host: "a.com"
+      path: "/mcp"
+)yaml"),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Duplicate endpoint config for host/path: a.com, /mcp")));
+
+  // An empty default_server_info defaults to ("", "/mcp"), which collides with
+  // an explicit path: "/mcp" entry.
+  EXPECT_THAT(setupRouteConfig(R"yaml(
+tool_config:
+  - tools:
+      - name: tool_path_only
+        http_rule:
+          get: "/path_only"
+    default_server_info:
+      path: "/mcp"
+  - tools:
+      - name: tool_default
+        http_rule:
+          get: "/default"
+)yaml"),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Duplicate endpoint config for host/path: , /mcp")));
+
+  // Two entries with empty default_server_info both default to ("", "/mcp")
+  // and collide with each other.
+  EXPECT_THAT(setupRouteConfig(R"yaml(
+tool_config:
+  - tools:
+      - name: tool_default_one
+        http_rule:
+          get: "/default_one"
+  - tools:
+      - name: tool_default_two
+        http_rule:
+          get: "/default_two"
+)yaml"),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Duplicate endpoint config for host/path: , /mcp")));
 }
 
 TEST_F(EndpointKeyedFilteringTest, ToolCallUsesPrecedenceMatching) {

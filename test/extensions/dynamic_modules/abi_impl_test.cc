@@ -705,6 +705,57 @@ WEAK_STUB(CertValidatorGetFilterState,
           envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, {nullptr, 0},
                                                                         nullptr))
 
+WEAK_STUB(TlsCertificateSelectorGetRequestedServerName,
+          envoy_dynamic_module_callback_tls_certificate_selector_get_requested_server_name(nullptr,
+                                                                                           nullptr))
+WEAK_STUB(TlsCertificateSelectorGetClientHelloExtension,
+          envoy_dynamic_module_callback_tls_certificate_selector_get_client_hello_extension(
+              nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorGetFilterState,
+          envoy_dynamic_module_callback_tls_certificate_selector_get_filter_state(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigSetCertificate,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(TlsCertificateSelectorConfigRemoveCertificate,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(nullptr,
+                                                                                           {nullptr,
+                                                                                            0}))
+WEAK_STUB(TlsCertificateSelectorConfigDefineCounter,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigIncrementCounter,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_increment_counter(
+              nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TlsCertificateSelectorConfigDefineGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_gauge(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigSetGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_set_gauge(nullptr, 0,
+                                                                                  nullptr, 0, 0))
+WEAK_STUB(TlsCertificateSelectorConfigIncrementGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_increment_gauge(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        0))
+WEAK_STUB(TlsCertificateSelectorConfigDecrementGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_decrement_gauge(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        0))
+WEAK_STUB(TlsCertificateSelectorConfigDefineHistogram,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_histogram(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_record_histogram_value(
+              nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TlsCertificateSelectorConfigSchedulerNew,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigSchedulerCommit,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit(nullptr,
+                                                                                         0))
+WEAK_STUB(TlsCertificateSelectorConfigSchedulerDelete,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete(nullptr))
+
 WEAK_STUB(ConfigValidatorSetRejectionMessage,
           envoy_dynamic_module_callback_config_validator_set_rejection_message(nullptr,
                                                                                {nullptr, 0}))
