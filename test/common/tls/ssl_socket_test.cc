@@ -929,13 +929,15 @@ void testUtil(const TestUtilOptions& options) {
       std::string ocsp_response{reinterpret_cast<const char*>(response_head), response_len};
       EXPECT_EQ(options.expectedOcspResponse(), ocsp_response);
 
-      // By default, the session is not created with session resumption. The
-      // client should see a session ID but the server should not. TLS 1.3 has
-      // no session ID, so the client sees an empty one as well.
-      EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+      // By default, the session is not created with session resumption. With TLS 1.2, the client
+      // sees a session ID but the server doesn't. TLS 1.3 has no session ID on the client. A
+      // TLS 1.3 server has no session ID with BoringSSL, but OpenSSL creates one when it sends a
+      // ticket.
       if (client_connection->ssl()->tlsVersion() == "TLSv1.3") {
         EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->sessionId());
+        EXPECT_EQ(SSL_SELECT(true, false), server_connection->ssl()->sessionId().empty());
       } else {
+        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
         EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
       }
 
@@ -5537,8 +5539,9 @@ void testTicketSessionResumptionWithTlsVersion(
     connect_count++;
     if (connect_count == 2) {
       if (client_tls_version == TlsParameters::TLSv1_3) {
-        // TLS 1.3 has no session ID, even when the session is resumed.
-        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+        // TLS 1.3 has no session ID with BoringSSL, even when the session is resumed. OpenSSL
+        // creates one for the server's session when it sends a ticket.
+        EXPECT_EQ(SSL_SELECT(true, false), server_connection->ssl()->sessionId().empty());
       } else if (expect_reuse) {
         EXPECT_NE(EMPTY_STRING, server_connection->ssl()->sessionId());
         EXPECT_EQ(server_connection->ssl()->sessionId(), client_connection->ssl()->sessionId());
