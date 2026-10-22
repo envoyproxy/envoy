@@ -16,14 +16,6 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class MockSingletonSubscriptionCallbacks : public SingletonSubscriptionCallbacks {
-public:
-  MOCK_METHOD(absl::Status, onResourceUpdate,
-              (const DecodedResource& resource, const std::string& version_info));
-  MOCK_METHOD(void, onResourceRemoved, ());
-  MOCK_METHOD(void, onFailure, (ConfigUpdateFailureReason reason, const EnvoyException* e));
-};
-
 TEST(SingletonSubscriptionAdapterTest, SotWEmptyResources) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);
@@ -36,7 +28,8 @@ TEST(SingletonSubscriptionAdapterTest, SotWWithResource) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);
 
-  auto message = std::make_unique<Protobuf::Empty>();
+  Protobuf::Arena arena;
+  auto message = Protobuf::Arena::MakeUnique<Protobuf::Empty>(&arena);
   DecodedResourceImpl decoded_resource(std::move(message), "my_resource", {}, "v1");
   std::vector<DecodedResourceRef> resources{decoded_resource};
 
@@ -60,7 +53,8 @@ TEST(SingletonSubscriptionAdapterTest, DeltaAddedResources) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);
 
-  auto message = std::make_unique<Protobuf::Empty>();
+  Protobuf::Arena arena;
+  auto message = Protobuf::Arena::MakeUnique<Protobuf::Empty>(&arena);
   DecodedResourceImpl decoded_resource(std::move(message), "my_resource", {}, "v1");
   std::vector<DecodedResourceRef> added_resources{decoded_resource};
   Protobuf::RepeatedPtrField<std::string> removed_resources;
@@ -74,9 +68,10 @@ TEST(SingletonSubscriptionAdapterTest, SotWMultipleResources) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);
 
-  auto message1 = std::make_unique<Protobuf::Empty>();
+  Protobuf::Arena arena;
+  auto message1 = Protobuf::Arena::MakeUnique<Protobuf::Empty>(&arena);
   DecodedResourceImpl decoded_resource1(std::move(message1), "my_resource1", {}, "v1");
-  auto message2 = std::make_unique<Protobuf::Empty>();
+  auto message2 = Protobuf::Arena::MakeUnique<Protobuf::Empty>(&arena);
   DecodedResourceImpl decoded_resource2(std::move(message2), "my_resource2", {}, "v1");
   std::vector<DecodedResourceRef> resources{decoded_resource1, decoded_resource2};
 
@@ -88,9 +83,10 @@ TEST(SingletonSubscriptionAdapterTest, DeltaMultipleResources) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);
 
-  auto message1 = std::make_unique<Protobuf::Empty>();
+  Protobuf::Arena arena;
+  auto message1 = Protobuf::Arena::MakeUnique<Protobuf::Empty>(&arena);
   DecodedResourceImpl decoded_resource1(std::move(message1), "my_resource1", {}, "v1");
-  auto message2 = std::make_unique<Protobuf::Empty>();
+  auto message2 = Protobuf::Arena::MakeUnique<Protobuf::Empty>(&arena);
   DecodedResourceImpl decoded_resource2(std::move(message2), "my_resource2", {}, "v1");
   std::vector<DecodedResourceRef> added_resources{decoded_resource1, decoded_resource2};
   Protobuf::RepeatedPtrField<std::string> removed_resources;

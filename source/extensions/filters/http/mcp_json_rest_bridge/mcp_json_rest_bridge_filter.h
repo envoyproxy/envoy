@@ -231,6 +231,13 @@ private:
                                                 absl::string_view method,
                                                 Http::RequestHeaderMapOptConstRef request_headers);
 
+  // Validates that a stateless (2026-07-28) request carries the required
+  // params._meta["io.modelcontextprotocol/clientCapabilities"] field and that it is a JSON object.
+  // Individual capability contents are not validated. Must only be called for stateless requests,
+  // whose params._meta is guaranteed to be an object. Returns true when the field is valid.
+  // Otherwise sends a local error response and returns false.
+  bool validateClientCapabilitiesMeta(const nlohmann::json& json_rpc, absl::string_view method);
+
   // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
   // field. Returns true when the header is valid. Otherwise sends a local error response and
   // returns false.

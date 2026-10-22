@@ -131,15 +131,17 @@ private:
 
   using ActiveQueryPtr = std::unique_ptr<ActiveQuery>;
 
-  // Increment counters related to queries. 'names' is passed by non-const
-  // reference so the implementation can mutate it without copying, though it
-  // always restores it to its prior state prior to return.
-  void chargeQueryStats(Stats::ElementVec& names, QueryMessageInfo::QueryType query_type);
+  // Increment counters related to queries. 'base_names' and 'names' are passed by non-const
+  // reference so the implementation can mutate them without copying, though it
+  // always restores them to their prior state prior to return.
+  void chargeQueryStats(Stats::StatNameVec& base_names, Stats::StatNameTagSpan tags,
+                        Stats::StatNameVec& names, QueryMessageInfo::QueryType query_type);
 
-  // Add samples to histograms related to replies. 'names' is passed by
-  // non-const reference so the implementation can mutate it without copying,
-  // though it always restores it to its prior state prior to return.
-  void chargeReplyStats(ActiveQuery& active_query, Stats::ElementVec& names,
+  // Add samples to histograms related to replies. 'base_names' and 'names' are passed by non-const
+  // reference so the implementation can mutate them without copying, though it
+  // always restores them to their prior state prior to return.
+  void chargeReplyStats(ActiveQuery& active_query, Stats::StatNameVec& base_names,
+                        Stats::StatNameTagSpan tags, Stats::StatNameVec& names,
                         const ReplyMessage& message);
 
   void doDecode(Buffer::Instance& buffer);

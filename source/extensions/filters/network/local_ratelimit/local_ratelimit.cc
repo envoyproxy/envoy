@@ -98,7 +98,8 @@ LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scop
   const Stats::TagStringView tag{Envoy::Config::TagNames::get().LOCAL_NETWORK_RATELIMIT_PREFIX,
                                  prefix};
   Stats::LiteScopeHelper helper(scope, "local_rate_limit", {tag},
-                                absl::StrCat("local_rate_limit.", prefix));
+                                absl::StrCat("local_rate_limit.", prefix),
+                                /*sanitize=*/false);
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER(helper))};
 }
 
