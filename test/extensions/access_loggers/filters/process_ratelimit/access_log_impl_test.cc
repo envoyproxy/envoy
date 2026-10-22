@@ -79,6 +79,7 @@ public:
                    Config::OpaqueResourceDecoderSharedPtr, const Config::SubscriptionOptions&)
                 -> absl::StatusOr<std::unique_ptr<Config::SingletonSubscription>> {
               auto ret = std::make_unique<testing::NiceMock<Config::MockSingletonSubscription>>();
+              EXPECT_CALL(*ret, start());
               subscriptions_[resource_name] = ret.get();
               callbackss_[resource_name] = &callbacks;
               return ret;
@@ -215,12 +216,18 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
 
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 1);
 
+  // Sending the same config again should be a no-op and not reset the token bucket.
+  EXPECT_OK(
+      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+  expectWritesAndLog(log, /*expect_write_times=*/0, /*log_call_times=*/1);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
+
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
-  // Third log is written, fourth is rate limited.
+  // Next log is written, following one is rate limited.
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 2);
 
-  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
+  EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 3);
 }
 
 TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {

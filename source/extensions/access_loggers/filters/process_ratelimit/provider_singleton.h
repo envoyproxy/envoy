@@ -3,7 +3,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/type/v3/token_bucket.pb.h"
 #include "envoy/type/v3/token_bucket.pb.validate.h"
