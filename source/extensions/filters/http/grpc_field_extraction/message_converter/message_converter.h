@@ -85,7 +85,7 @@ public:
   // `data`.
   //
   // A caller that stops invoking `accumulateMessages` before the
-  // stream ends must drain these bytes otherwise they will renain
+  // stream ends must drain these bytes otherwise they will remain
   // in this `MessageConverter` while the remainder of that message
   // flows on without them.
   void drainLeftoverData(Envoy::Buffer::Instance& data);
