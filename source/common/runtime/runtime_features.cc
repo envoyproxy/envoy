@@ -51,7 +51,6 @@ RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_re
 // address are drained. Disable to restore the previous behavior of mutating the existing host's
 // address in place, which keeps already-established connections to the old address alive.
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_replace_host_on_address_change);
-RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_path_match_policy);
