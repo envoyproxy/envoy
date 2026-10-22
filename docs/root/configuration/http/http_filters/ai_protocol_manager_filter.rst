@@ -148,36 +148,19 @@ logs read it with
           text_format_source:
             inline_string: "%REQ(x-llm-api)%"
 
-The example reads a request header, which is only safe for a header the edge
-strips from client requests: a caller that can set it picks the API its own
-payload is read and validated as.
+Only read headers stripped at the edge, or clients can pick their own validation
+schema.
 
-The object also declares the endpoint by itself. A request it names an API for
-is an AI endpoint of that API whether or not its route carries a per-route
-entry, so a deployment in which a filter ahead decides per request what the
-traffic is -- a model router, say -- need not also say so on its routes. (To
-declare every route of a route configuration statically instead, put the
-per-route entry in the :ref:`RouteConfiguration's typed_per_filter_config
-<envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config>`.)
-One difference remains: a per-route entry is written against traffic the
-operator knows, so a declared route's requests are held unconditionally, while
-filter state is set against a request whose framing its writer may not have
-looked at. So it declares only a request that can be held to end of stream
-without stalling it -- one with a JSON body that is not a gRPC or Connect
-stream, an upgrade, or a CONNECT; any other passes through untouched.
+Setting this filter state marks a request as an AI endpoint without per-route
+config (for a static default, use :ref:`RouteConfiguration.typed_per_filter_config
+<envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config>`).
+Unlike per-route config, it only buffers non-streaming JSON requests so streams
+and upgrades never stall. Conversely, route-declared endpoints populate this
+object when unset so upstream filter chains can read the client's API.
 
-A route-declared endpoint publishes its request API to the same object when no
-filter ahead set it, so a second instance of this filter -- in the cluster's
-upstream HTTP filter chain, where no per-route entry reaches -- learns the
-client's API the same way whichever of the two declared it.
-
-The filter-level configuration decides what happens on every other route. By
-default those requests are passed through untouched -- not parsed, and not
-offloaded; setting
-:ref:`parse_unconfigured_routes
+Other routes pass through untouched unless :ref:`parse_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
-offloads and parses them too, but never fails a request over it -- a payload that
-does not parse is forwarded unchanged.
+is set, which parses them best-effort and forwards unparseable payloads unchanged.
 
 .. code-block:: yaml
 

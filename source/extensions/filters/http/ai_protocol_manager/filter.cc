@@ -304,18 +304,16 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     route_response_binding_ = route_config->responseBinding();
   }
 
-  // The request API a filter ahead named in filter state. On a route-declared endpoint it
-  // outranks the route; on any other route it declares the endpoint by itself (below).
+  // Check if an earlier filter set the request API in filter state. It overrides a
+  // route-level API, or marks the request as an AI endpoint on unconfigured routes.
   StreamInfo::FilterState& filter_state = *decoder_callbacks_->streamInfo().filterState();
   const LLMProtocol named = RequestLlmProtocol::fromFilterState(filter_state);
   if (route_has_request_) {
     if (named != LLMProtocol::Unspecified) {
       request_protocol_ = named;
     } else if (request_protocol_ != LLMProtocol::Unspecified) {
-      // Publish the route's API where a filter ahead would have put it, so a later reader
-      // that has no route to consult -- a second instance of this filter in the cluster's
-      // upstream filter chain, where no per-route entry reaches -- learns the client's API
-      // the same way whichever of the two declared it.
+      // Write the route's API to filter state so an upstream filter chain instance
+      // (which cannot access per-route config) can still read the client's API.
       filter_state.setData(FilterStateKeys::LlmProtocolRequest,
                            std::make_shared<RequestLlmProtocol>(request_protocol_),
                            StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -327,25 +325,18 @@ Http::FilterHeadersStatus AiProtocolManagerFilter::decodeHeaders(Http::RequestHe
     ENVOY_LOG(debug, "ai_protocol_manager: AI endpoint with request API {}",
               llmProtocolName(request_protocol_));
   } else if (named != LLMProtocol::Unspecified && canHoldRequest(headers)) {
-    // A filter ahead named the client's API, which is all a per-route entry would have said,
-    // so the request is an AI endpoint of that API without one: a deployment in which a
-    // filter ahead decides per request what the traffic is need not also say so on the route,
-    // and an upstream instance can act on what the downstream one published above. Unlike a
-    // per-route entry, written against known traffic, filter state is set against a request
-    // whose framing the writer may not have looked at; one that cannot be held to end of
-    // stream would stall, so it passes through instead.
+    // Filter state alone marks the request as an AI endpoint (for dynamic classifiers
+    // or upstream filter chains), provided the request can be buffered without stalling.
     route_has_request_ = true;
     request_protocol_ = named;
     ENVOY_LOG(debug, "ai_protocol_manager: AI endpoint with request API {} from filter state",
               llmProtocolName(request_protocol_));
   }
 
-  // A declared AI endpoint is parsed strictly. Any other route is parsed only if
-  // the filter opted into parsing unconfigured routes, and only for a request
-  // that can be held to end of stream without stalling it.
-  // TODO(penguingao): on a best-effort parse failure, release the held headers
-  // and buffered body immediately and pass the remainder through unbuffered,
-  // rather than buffering to end-of-stream.
+  // Declared AI endpoints are parsed strictly; other routes are only parsed if
+  // parse_unconfigured_routes is enabled and the request can be buffered without stalling.
+  // TODO(penguingao): on best-effort parse failure, flush buffered headers/body immediately
+  // and stream the rest through instead of buffering until end-of-stream.
   if (!isAiEndpoint() && (!config_->parseUnconfiguredRoutes() || !canHoldRequest(headers))) {
     ENVOY_LOG(trace, "ai_protocol_manager: route has no payload to inspect, passing through");
     return Http::FilterHeadersStatus::Continue;
