@@ -816,6 +816,13 @@ public:
     return bufferViewToOptionalStringView(value, found);
   }
 
+  std::optional<std::string_view> getDownstreamDirectRemoteAddress() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+        host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
   std::vector<std::string_view> getUpstreamHostsAttempted() override {
     const size_t count =
         envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(host_plugin_ptr_);

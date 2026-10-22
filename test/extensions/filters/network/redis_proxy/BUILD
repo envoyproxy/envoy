@@ -33,6 +33,7 @@ envoy_extension_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
@@ -209,6 +210,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/load_balancing_policies/ring_hash:config",

@@ -10,6 +10,45 @@
 namespace Envoy {
 namespace DynamicModules {
 
+class DownstreamDirectRemoteAddressFilter : public HttpFilter {
+public:
+  DownstreamDirectRemoteAddressFilter(HttpFilterHandle& handle) : handle_(handle) {}
+
+  HeadersStatus onRequestHeaders(HeaderMap& headers, bool) override {
+    headers.set("x-downstream-peer",
+                handle_.getDownstreamDirectRemoteAddress().value_or("unavailable"));
+    return HeadersStatus::Continue;
+  }
+
+  BodyStatus onRequestBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onRequestTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  HeadersStatus onResponseHeaders(HeaderMap&, bool) override { return HeadersStatus::Continue; }
+  BodyStatus onResponseBody(BodyBuffer&, bool) override { return BodyStatus::Continue; }
+  TrailersStatus onResponseTrailers(HeaderMap&) override { return TrailersStatus::Continue; }
+  void onStreamComplete() override {}
+  void onDestroy() override {}
+
+private:
+  HttpFilterHandle& handle_;
+};
+
+class DownstreamDirectRemoteAddressFilterFactory : public HttpFilterFactory {
+public:
+  std::unique_ptr<HttpFilter> create(HttpFilterHandle& handle) override {
+    return std::make_unique<DownstreamDirectRemoteAddressFilter>(handle);
+  }
+};
+
+class DownstreamDirectRemoteAddressConfigFactory : public HttpFilterConfigFactory {
+public:
+  std::unique_ptr<HttpFilterFactory> create(HttpFilterConfigHandle&, std::string_view) override {
+    return std::make_unique<DownstreamDirectRemoteAddressFilterFactory>();
+  }
+};
+
+REGISTER_HTTP_FILTER_CONFIG_FACTORY(DownstreamDirectRemoteAddressConfigFactory,
+                                    "downstream_direct_remote_address");
+
 // --- config_init_failure ---
 
 class ConfigInitFailureConfigFactory : public HttpFilterConfigFactory {

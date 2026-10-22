@@ -407,6 +407,11 @@ type HttpFilterHandle interface {
 	// event hook returns.
 	GetUpstreamRemoteAddress() (UnsafeEnvoyBuffer, bool)
 
+	// GetDownstreamDirectRemoteAddress returns the downstream socket peer address, including
+	// the port, before XFF processing. Returns an empty buffer and false if unavailable.
+	// The buffer is owned by Envoy and is valid until the current event hook returns.
+	GetDownstreamDirectRemoteAddress() (UnsafeEnvoyBuffer, bool)
+
 	// GetUpstreamHostsAttempted returns the upstream host addresses in attempt order. The buffers
 	// are owned by Envoy and are valid until the current event hook returns.
 	GetUpstreamHostsAttempted() []UnsafeEnvoyBuffer

@@ -849,6 +849,12 @@ public:
   virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
 
   /**
+   * Retrieves the downstream socket peer address, including the port, before XFF processing.
+   * Returns std::nullopt if unavailable. The buffer is valid until the current event hook returns.
+   */
+  virtual std::optional<std::string_view> getDownstreamDirectRemoteAddress() = 0;
+
+  /**
    * Retrieves the upstream host addresses attempted for the current request in attempt order.
    */
   virtual std::vector<std::string_view> getUpstreamHostsAttempted() = 0;

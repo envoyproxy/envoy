@@ -54,20 +54,20 @@ encryptionParamaters(uint8_t version_int = 0, std::string key_str = "0123456789a
 // correct functionality of the BPF program.
 class KernelBpfTester {
 public:
-  KernelBpfTester(uint32_t concurrency, EnvoyQuicConnectionIdGeneratorFactory& factory) {
-    auto bpf_socket_option = factory.createCompatibleLinuxBpfSocketOption(concurrency);
-    if (bpf_socket_option == nullptr) {
-      ENVOY_LOG_MISC(error, "Cannot test BPF filter on this OS/kernel");
-      non_default_host_ = (concurrency / 2);
-      return;
-    }
+  static absl::StatusOr<KernelBpfTester> create(uint32_t concurrency,
+                                                EnvoyQuicConnectionIdGeneratorFactory& factory) {
+    auto opt_or_error = factory.createCompatibleLinuxBpfSocketOption(concurrency);
+    RETURN_IF_NOT_OK_REF(opt_or_error.status());
+    return KernelBpfTester(concurrency, std::move(opt_or_error.value()));
+  }
 
+  KernelBpfTester(uint32_t concurrency, Network::Socket::OptionConstSharedPtr option) {
     sockets_.resize(1);
 
     // Create the first socket on an unused address.
     std::tie(address_, sockets_[0]) = Network::Test::bindFreeLoopbackPort(
         Network::Address::IpVersion::v4, Network::Socket::Type::Datagram, true);
-    sockets_[0]->addOption(bpf_socket_option);
+    sockets_[0]->addOption(option);
     Network::Socket::applyOptions(sockets_[0]->options(), *sockets_[0],
                                   envoy::config::core::v3::SocketOption::STATE_BOUND);
 
@@ -127,9 +127,6 @@ public:
 
     return recipient;
   }
-
-  // True if a BPF filter was available on this platform; false if not.
-  bool initialized() const { return !sockets_.empty(); }
 
   // The host that the client is directed to if there isn't a valid QUIC header.
   uint32_t defaultHost() const {
@@ -363,25 +360,33 @@ TEST(QuicLbTest, WorkerSelector) {
       encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
+  ASSERT_OK(factory_or_status.status());
   constexpr uint32_t concurrency = 8;
   QuicConnectionIdWorkerSelector selector =
       factory_or_status.value()->getCompatibleConnectionIdWorkerSelector(concurrency);
 
-  KernelBpfTester bpf_tester(concurrency, *(factory_or_status.value()));
+  auto bpf_tester = KernelBpfTester::create(concurrency, *factory_or_status.value());
+  if (absl::IsUnimplemented(bpf_tester.status())) {
+    ENVOY_LOG_MISC(error, "Cannot test BPF filter on this OS/kernel");
+  } else {
+    ASSERT_OK(bpf_tester);
+  }
+  const uint32_t default_host = bpf_tester.ok() ? bpf_tester->defaultHost() : UINT32_MAX / 2;
+  const uint32_t non_default_host =
+      bpf_tester.ok() ? bpf_tester->nonDefaultHost() : (default_host + 1) % concurrency;
 
   Buffer::OwnedImpl buffer;
 
   // Define a macro so that failure line numbers are useful.
 #define BPF_EXPECT_EQ(a, b)                                                                        \
-  if (bpf_tester.initialized()) {                                                                  \
+  if (bpf_tester.ok()) {                                                                           \
     EXPECT_EQ(a, b);                                                                               \
   }
 
   // Packet too short.
   buffer.add(std::string(8, 0));
-  const uint32_t default_value = bpf_tester.defaultHost();
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Long header too short.
   buffer = Buffer::OwnedImpl();
@@ -389,13 +394,13 @@ TEST(QuicLbTest, WorkerSelector) {
   uint8_t* buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
   buf[0] = 0x80; // Long header
   buf[5] = 20;   // `DCID` length
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Long header: packet shorter than encoded CID length.
   buffer.add(std::string(5, 0));
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Long header: success.
   buffer = Buffer::OwnedImpl();
@@ -403,9 +408,9 @@ TEST(QuicLbTest, WorkerSelector) {
   buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
   buf[0] = 0x80; // Long header
   buf[5] = 8;    // `DCID` length
-  buf[5 + 8] = (4 * concurrency) + bpf_tester.nonDefaultHost();
-  EXPECT_EQ(bpf_tester.nonDefaultHost(), selector(buffer, default_value));
-  BPF_EXPECT_EQ(bpf_tester.nonDefaultHost(), bpf_tester.sendAndGetRecipient(buffer));
+  buf[5 + 8] = (4 * concurrency) + non_default_host;
+  EXPECT_EQ(non_default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(non_default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Short header: too short.
   buffer = Buffer::OwnedImpl();
@@ -413,8 +418,8 @@ TEST(QuicLbTest, WorkerSelector) {
   buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
   buf[0] = 0x00; // Short header
   buf[1] = 12;   // Encoded length.
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Short header: invalid concurrency.
   buffer = Buffer::OwnedImpl();
@@ -423,18 +428,18 @@ TEST(QuicLbTest, WorkerSelector) {
   buf[0] = 0x00;                // Short header
   buf[1] = 8;                   // Encoded length.
   buf[1 + 8 + 1] = concurrency; // Worker ID suffix.
-  EXPECT_EQ(default_value, selector(buffer, default_value));
-  BPF_EXPECT_EQ(default_value, bpf_tester.sendAndGetRecipient(buffer));
+  EXPECT_EQ(default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(default_host, bpf_tester->sendAndGetRecipient(buffer));
 
   // Short header: valid.
   buffer = Buffer::OwnedImpl();
   buffer.add(std::string(12, 0));
   buf = reinterpret_cast<uint8_t*>(buffer.linearize(buffer.length()));
-  buf[0] = 0x00;                                // Short header
-  buf[1] = 8;                                   // Encoded length.
-  buf[1 + 8 + 1] = bpf_tester.nonDefaultHost(); // Worker ID suffix.
-  EXPECT_EQ(bpf_tester.nonDefaultHost(), selector(buffer, default_value));
-  BPF_EXPECT_EQ(bpf_tester.nonDefaultHost(), bpf_tester.sendAndGetRecipient(buffer));
+  buf[0] = 0x00;                     // Short header
+  buf[1] = 8;                        // Encoded length.
+  buf[1 + 8 + 1] = non_default_host; // Worker ID suffix.
+  EXPECT_EQ(non_default_host, selector(buffer, default_host));
+  BPF_EXPECT_EQ(non_default_host, bpf_tester->sendAndGetRecipient(buffer));
 }
 
 TEST(QuicLbTest, EmptySecretCallback) {

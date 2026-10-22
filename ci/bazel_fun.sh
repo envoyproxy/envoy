@@ -19,6 +19,8 @@ readonly -a REGISTRY_BAZELRC_FILES=(
 readonly -a MODULE_DIRS=(. "$ENVOY_DOCS_PATH" api mobile bazel/tests/codeql bazel/tests/external)
 # shellcheck disable=SC2034
 readonly -a REGISTRY_MODULE_DIRS=(. api bazel/tests/codeql bazel/tests/external)
+# In-repo modules whose versions track VERSION.txt.
+readonly -a VERSIONED_MODULES=(envoy envoy_api envoy-docs envoy_mobile envoy_build_config)
 
 run_in_mods() {
     local -n _mod_dirs="$1"
@@ -120,6 +122,28 @@ _lockfiles_generate_mod() {
     bazel mod "${BAZEL_GLOBAL_OPTIONS[@]}" deps --config=ci --lockfile_mode=update
 }
 
+# Set the `module()` version, and the `bazel_dep` versions of in-repo modules, in every
+# MODULE.bazel file to match VERSION.txt.
+module_versions_update() {
+    local module_file modules version
+
+    version="$(cat VERSION.txt)"
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-dev)?$ ]]; then
+        echo "FAIL: Unexpected version in VERSION.txt: ${version}" >&2
+        return 1
+    fi
+    modules="$(IFS='|'; echo "${VERSIONED_MODULES[*]}")"
+    while read -r module_file; do
+        sed -i -E \
+            -e "/^module\($/,/^\)$/ s/^(    version = )\"[^\"]*\"/\1\"${version}\"/" \
+            -e "s/^(bazel_dep\(name = \"(${modules})\", version = )\"[^\"]*\"/\1\"${version}\"/" \
+            "$module_file"
+        if ! git diff --quiet -- "$module_file"; then
+            echo "${module_file}: ${version}"
+        fi
+    done < <(git ls-files ':(glob)**/MODULE.bazel')
+}
+
 registry_current_hash() {
     local bazelrc
     local hash
@@ -176,7 +200,10 @@ _registry_check_mod() {
     workspace_bazel_run "$module_dir" update_registry.check "$@" -- \
         "--json-out=${status_path}" \
         "--markdown-out=${markdown_path}" \
-        "--sha-out=${sha_path}" || return
+        "--sha-out=${sha_path}" || {
+        echo "FAIL: ${workspace}: bazel registry check failed" >&2
+        return 1
+    }
 
     sha="$(cat "${sha_path}")"
     tags="$(jq -r '.tags | join(" ")' "${status_path}")"

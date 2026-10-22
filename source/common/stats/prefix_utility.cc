@@ -17,10 +17,13 @@ namespace {
 
 constexpr absl::string_view HTTP_PREFIX = "http.";
 constexpr absl::string_view CLUSTER_PREFIX = "cluster.";
+constexpr absl::string_view THRIFT_PREFIX = "thrift.";
+constexpr absl::string_view REDIS_PREFIX = "redis.";
 
 // Extracts the parent prefix's single tag: "http.<x>." -> {HTTP_CONN_MANAGER_PREFIX, x},
-// "cluster.<x>." -> {CLUSTER_NAME, x}, anything else -> none. The trailing dot is stripped first.
-// `prefix` must outlive the returned value.
+// "cluster.<x>." -> {CLUSTER_NAME, x}, "thrift.<x>." -> {THRIFT_PREFIX, x}, "redis.<x>." ->
+// {REDIS_PREFIX, x}, anything else -> none. The trailing dot is stripped first. `prefix` must
+// outlive the returned value.
 std::optional<TagStringView> extractParentTag(absl::string_view prefix) {
   if (!absl::EndsWith(prefix, ".")) {
     return std::nullopt;
@@ -35,6 +38,14 @@ std::optional<TagStringView> extractParentTag(absl::string_view prefix) {
     return TagStringView{Envoy::Config::TagNames::get().CLUSTER_NAME,
                          prefix.substr(CLUSTER_PREFIX.size())};
   }
+  if (absl::StartsWith(prefix, REDIS_PREFIX)) {
+    return TagStringView{Envoy::Config::TagNames::get().REDIS_PREFIX,
+                         prefix.substr(REDIS_PREFIX.size())};
+  }
+  if (absl::StartsWith(prefix, THRIFT_PREFIX)) {
+    return TagStringView{Envoy::Config::TagNames::get().THRIFT_PREFIX,
+                         prefix.substr(THRIFT_PREFIX.size())};
+  }
   return std::nullopt;
 }
 
@@ -42,7 +53,7 @@ std::optional<TagStringView> extractParentTag(absl::string_view prefix) {
 
 TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
                                absl::string_view base_name, TagStringViewSpan tags,
-                               absl::string_view name) {
+                               absl::string_view name, bool sanitize) {
   // With no own tags the own prefix has no variable segment, so its tagged and tag-extracted forms
   // are identical; callers need only supply base_name.
   if (tags.empty()) {
@@ -68,8 +79,8 @@ TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view pref
   merged_tags.insert(merged_tags.end(), tags.begin(), tags.end());
 
   // This helper function assumes the caller has already handled the dot correctly and then we can
-  // concatenate the two prefixes directly. The TaggedStatName then sanitizes the name, base, and
-  // tags to remove any leading or trailing dot.
+  // concatenate the two prefixes directly. When sanitizing, the TaggedStatName also removes any
+  // leading or trailing dot of the name, base, and tags.
   const std::string tagged = absl::StrCat(prefix, name);
 
   // When no tag is contributed (neither the parent prefix nor the input tags), base_prefix is the
@@ -77,10 +88,10 @@ TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view pref
   // the tagged name instead of building an identical base string.
   if (merged_tags.empty()) {
     ASSERT(tagged == absl::StrCat(base_prefix, base_name));
-    return {symbol_table, tagged, merged_tags, tagged};
+    return {symbol_table, tagged, merged_tags, tagged, sanitize};
   }
   const std::string base = absl::StrCat(base_prefix, base_name);
-  return {symbol_table, base, merged_tags, tagged};
+  return {symbol_table, base, merged_tags, tagged, sanitize};
 }
 
 } // namespace Stats

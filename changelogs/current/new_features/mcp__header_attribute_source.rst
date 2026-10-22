@@ -1,3 +1,0 @@
-Added ``attribute_source`` support for extracting MCP request attributes from the request body,
-verifying request headers against the body, or using ``Mcp-Method`` and ``Mcp-Name`` headers for a
-body-free fast path.

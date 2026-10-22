@@ -4721,6 +4721,55 @@ TEST_F(DynamicModuleHttpFilterTest, GetUpstreamRemoteAddressUsesConnectedSocket)
   EXPECT_EQ("10.0.0.2:8443", std::string(address.ptr, address.length));
 }
 
+TEST_F(DynamicModuleHttpFilterTest, GetDownstreamDirectRemoteAddressIgnoresForwardedSource) {
+  testing::StrictMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0));
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
+      std::make_shared<Network::Address::Ipv6Instance>("2001:db8::40", 54321));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillOnce(testing::ReturnRef(*stream_info.downstream_connection_info_provider_));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(filter_.get(),
+                                                                                      &address));
+  EXPECT_EQ("[2001:db8::40]:54321", std::string(address.ptr, address.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetDownstreamDirectRemoteAddressIpv4) {
+  testing::StrictMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(
+      std::make_shared<Network::Address::Ipv4Instance>("192.0.2.40", 54321));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillOnce(testing::ReturnRef(*stream_info.downstream_connection_info_provider_));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(filter_.get(),
+                                                                                      &address));
+  EXPECT_EQ("192.0.2.40:54321", std::string(address.ptr, address.length));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetDownstreamDirectRemoteAddressMissing) {
+  testing::StrictMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(nullptr);
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillOnce(testing::ReturnRef(*stream_info.downstream_connection_info_provider_));
+
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+      filter_.get(), &address));
+}
+
+TEST_F(DynamicModuleHttpFilterTest, GetDownstreamDirectRemoteAddressNoStreamInfo) {
+  DynamicModuleHttpFilter filter(nullptr, symbol_table_, 3);
+  envoy_dynamic_module_type_envoy_buffer address{nullptr, 0};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(&filter, &address));
+}
+
 TEST_F(DynamicModuleHttpFilterTest, GetUpstreamConnectionAttemptHistories) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();

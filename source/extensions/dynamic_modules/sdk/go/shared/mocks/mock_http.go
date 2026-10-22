@@ -854,6 +854,21 @@ func (mr *MockHttpFilterHandleMockRecorder) GetData(key any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetData", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetData), key)
 }
 
+// GetDownstreamDirectRemoteAddress mocks base method.
+func (m *MockHttpFilterHandle) GetDownstreamDirectRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDownstreamDirectRemoteAddress")
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetDownstreamDirectRemoteAddress indicates an expected call of GetDownstreamDirectRemoteAddress.
+func (mr *MockHttpFilterHandleMockRecorder) GetDownstreamDirectRemoteAddress() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDownstreamDirectRemoteAddress", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetDownstreamDirectRemoteAddress))
+}
+
 // GetFilterState mocks base method.
 func (m *MockHttpFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuffer, bool) {
 	m.ctrl.T.Helper()
@@ -1046,22 +1061,6 @@ func (mr *MockHttpFilterHandleMockRecorder) GetMetadataString(source, metadataNa
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMetadataString", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetMetadataString), source, metadataNamespace, key)
 }
 
-// GetTypedMetadata mocks base method.
-func (m *MockHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTypedMetadata", source, metadataNamespace)
-	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
-	ret1, _ := ret[1].(shared.UnsafeEnvoyBuffer)
-	ret2, _ := ret[2].(bool)
-	return ret0, ret1, ret2
-}
-
-// GetTypedMetadata indicates an expected call of GetTypedMetadata.
-func (mr *MockHttpFilterHandleMockRecorder) GetTypedMetadata(source, metadataNamespace any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTypedMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTypedMetadata), source, metadataNamespace)
-}
-
 // GetMostSpecificConfig mocks base method.
 func (m *MockHttpFilterHandle) GetMostSpecificConfig() any {
 	m.ctrl.T.Helper()
@@ -1132,6 +1131,22 @@ func (m *MockHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
 func (mr *MockHttpFilterHandleMockRecorder) GetTimingInfo() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTimingInfo", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTimingInfo))
+}
+
+// GetTypedMetadata mocks base method.
+func (m *MockHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTypedMetadata", source, metadataNamespace)
+	ret0, _ := ret[0].(shared.UnsafeEnvoyBuffer)
+	ret1, _ := ret[1].(shared.UnsafeEnvoyBuffer)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
+}
+
+// GetTypedMetadata indicates an expected call of GetTypedMetadata.
+func (mr *MockHttpFilterHandleMockRecorder) GetTypedMetadata(source, metadataNamespace any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTypedMetadata", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetTypedMetadata), source, metadataNamespace)
 }
 
 // GetUpstreamConnectionIDsAttempted mocks base method.
@@ -1606,20 +1621,6 @@ func (mr *MockHttpFilterHandleMockRecorder) SetFilterState(key, value any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterState", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterState), key, value)
 }
 
-// SetFilterStateValue mocks base method.
-func (m *MockHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetFilterStateValue", key, value, lifeSpan, streamSharing)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// SetFilterStateValue indicates an expected call of SetFilterStateValue.
-func (mr *MockHttpFilterHandleMockRecorder) SetFilterStateValue(key, value, lifeSpan, streamSharing any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterStateValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterStateValue), key, value, lifeSpan, streamSharing)
-}
-
 // SetFilterStateTyped mocks base method.
 func (m *MockHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool {
 	m.ctrl.T.Helper()
@@ -1632,6 +1633,20 @@ func (m *MockHttpFilterHandle) SetFilterStateTyped(key string, value []byte) boo
 func (mr *MockHttpFilterHandleMockRecorder) SetFilterStateTyped(key, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterStateTyped", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterStateTyped), key, value)
+}
+
+// SetFilterStateValue mocks base method.
+func (m *MockHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetFilterStateValue", key, value, lifeSpan, streamSharing)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetFilterStateValue indicates an expected call of SetFilterStateValue.
+func (mr *MockHttpFilterHandleMockRecorder) SetFilterStateValue(key, value, lifeSpan, streamSharing any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterStateValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterStateValue), key, value, lifeSpan, streamSharing)
 }
 
 // SetGaugeValue mocks base method.

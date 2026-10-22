@@ -441,19 +441,19 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   worker_id.value_ = "123";
 
   regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
-                         "listener_manager.worker_dispatcher.loop_duration_us", {worker_id});
+                         "listener_manager.worker.dispatcher.loop_duration_us", {worker_id});
 
   // Listener worker id
   listener_address.value_ = "127.0.0.1_3012";
   regex_tester.testRegex("listener.127.0.0.1_3012.worker_123.downstream_cx_active",
-                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker.downstream_cx_active", {listener_address, worker_id});
 
   listener_address.value_ = "myprefix";
   regex_tester.testRegex("listener.myprefix.worker_123.downstream_cx_active",
-                         "listener.worker_downstream_cx_active", {listener_address, worker_id});
+                         "listener.worker.downstream_cx_active", {listener_address, worker_id});
 
   // Server worker id
-  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker_watchdog_miss",
+  regex_tester.testRegex("server.worker_123.watchdog_miss", "server.worker.watchdog_miss",
                          {worker_id});
 
   // Thrift Proxy Prefix
@@ -515,6 +515,28 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
                          "http.rbac.policy.shadow_denied",
                          {rbac_http_hcm_prefix, rbac_http_prefix, rbac_policy_name});
 
+  // RBAC Network Filter Rules Prefix and Per-Policy Prefix
+  Tag rbac_rules_prefix;
+  rbac_rules_prefix.name_ = tag_names.RBAC_RULES_PREFIX;
+  rbac_rules_prefix.value_ = "shadow_prefix";
+  regex_tester.testRegex("my_rbac_prefix.rbac.shadow_prefix.shadow_allowed", "rbac.shadow_allowed",
+                         {rbac_prefix, rbac_rules_prefix});
+  regex_tester.testRegex("my_rbac_prefix.rbac.policy.my_rbac_policy.denied", "rbac.policy.denied",
+                         {rbac_prefix, rbac_policy_name});
+  regex_tester.testRegex("my_rbac_prefix.rbac.shadow_prefix.policy.my_rbac_policy.shadow_denied",
+                         "rbac.policy.shadow_denied",
+                         {rbac_prefix, rbac_rules_prefix, rbac_policy_name});
+
+  // RBAC Upstream HTTP Filter Per-Policy Prefix
+  Tag rbac_cluster_name;
+  rbac_cluster_name.name_ = tag_names.CLUSTER_NAME;
+  rbac_cluster_name.value_ = "fake_cluster";
+  regex_tester.testRegex("cluster.fake_cluster.rbac.policy.my_rbac_policy.denied",
+                         "cluster.rbac.policy.denied", {rbac_cluster_name, rbac_policy_name});
+  regex_tester.testRegex("cluster.fake_cluster.rbac.prefix.policy.my_rbac_policy.shadow_denied",
+                         "cluster.rbac.prefix.policy.shadow_denied",
+                         {rbac_cluster_name, rbac_policy_name});
+
   // Proxy Protocol stat prefix
   Tag proxy_protocol_prefix;
   proxy_protocol_prefix.name_ = tag_names.PROXY_PROTOCOL_PREFIX;
@@ -558,6 +580,23 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   sds_resource.name_ = tag_names.XDS_RESOURCE_NAME;
   sds_resource.value_ = "xds_trusted_ca";
   regex_tester.testRegex("sds.xds_trusted_ca.update_attempt", "sds.update_attempt", {sds_resource});
+
+  // Upstream per-zone stats
+  Tag from_zone;
+  from_zone.name_ = tag_names.UPSTREAM_FROM_ZONE;
+  from_zone.value_ = "zone_a";
+  Tag to_zone;
+  to_zone.name_ = tag_names.UPSTREAM_TO_ZONE;
+  to_zone.value_ = "zone_b";
+  regex_tester.testRegex("cluster.test_cluster.zone.zone_a.zone_b.upstream_rq_200",
+                         "cluster.zone.upstream_rq",
+                         {test_cluster, from_zone, to_zone, response_code});
+  regex_tester.testRegex("cluster.test_cluster.alt_prefix.zone.zone_a.zone_b.upstream_rq_time",
+                         "cluster.alt_prefix.zone.upstream_rq_time",
+                         {test_cluster, from_zone, to_zone});
+  regex_tester.testRegex("cluster.test_cluster.zone.zone_a.zone_b.thrift.upstream_resp_success",
+                         "cluster.zone.thrift.upstream_resp_success",
+                         {test_cluster, from_zone, to_zone});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

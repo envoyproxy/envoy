@@ -2804,6 +2804,11 @@ TEST_F(ConnectionHandlerTest, HotRestartShutdownUdpListenerKeepsListening) {
   callbacks->onData(std::move(data));
 }
 
+TEST_F(ConnectionHandlerTest, WorkerId) {
+  EXPECT_EQ(handler_->workerId(), 0);
+  EXPECT_FALSE(MockConnectionHandlerImpl(dispatcher_, std::nullopt).workerId().has_value());
+}
+
 } // namespace
 } // namespace Server
 } // namespace Envoy
