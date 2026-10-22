@@ -115,24 +115,34 @@ class TranscoderIntegrationTest : public testing::TestWithParam<Network::Address
 public:
   TranscoderIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
+  // What the route says about the endpoint; whatever it leaves out comes from filter state.
+  enum class RouteDeclares {
+    // The client's and the backend's APIs and the backend's binding.
+    Everything,
+    // The client's API only; the backend's API and binding come from filter state.
+    ClientApi,
+    // Nothing: no per-route entry at all. The client's API comes from filter state too.
+    Nothing,
+  };
+
   // Gemini's own edits apply to a binding with only a pattern: `model` and `stream` leave the body.
   void initializeForGemini() {
     initializeRoute(envoy::type::ai::v3::ANTHROPIC_MESSAGES,
                     envoy::type::ai::v3::GEMINI_GENERATE_CONTENT,
                     "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
                     "{model}:{generateContent|streamGenerateContent?alt=sse}",
-                    GeminiModel, /*binding_on_route=*/true);
+                    GeminiModel, RouteDeclares::Everything);
   }
 
   // Claude on Vertex AI needs edits of its own, so the binding is spelled out in JSON.
-  void initializeForClaude() {
+  void initializeForClaude(RouteDeclares route_declares = RouteDeclares::ClientApi) {
     initializeRoute(
         envoy::type::ai::v3::GEMINI_GENERATE_CONTENT, envoy::type::ai::v3::ANTHROPIC_MESSAGES,
         R"({"uri_pattern": "/{version}/projects/{project}/locations/{location}/publishers/)"
         R"(anthropic/models/{model}:{rawPredict|streamRawPredict}", "mutations": [)"
         R"({"body_field": "model"}, {"body_field": "anthropic_version", )"
         R"("value": "vertex-2023-10-16", "keep_existing": true}]})",
-        ClaudeModel, /*binding_on_route=*/false);
+        ClaudeModel, route_declares);
   }
 
   IntegrationStreamDecoderPtr sendClientRequest(absl::string_view path,
@@ -190,26 +200,29 @@ public:
   }
 
 private:
-  // The backend's API and its binding, a URI pattern when on the route, go on the route when
-  // `binding_on_route`, and otherwise in filter state beside the resolved model.
+  // What `route_declares` puts on the route goes there; the rest -- the backend's API and its
+  // binding, a URI pattern when on the route, and if nothing is on the route the client's API
+  // -- goes in filter state beside the resolved model.
   void initializeRoute(envoy::type::ai::v3::LLMProtocol client_api,
                        envoy::type::ai::v3::LLMProtocol backend_api,
                        absl::string_view response_binding, absl::string_view resolved_model,
-                       bool binding_on_route) {
+                       RouteDeclares route_declares) {
     config_helper_.addConfigModifier([client_api, backend_api, response_binding,
-                                      binding_on_route](ConfigHelper::HttpConnectionManager& hcm) {
-      envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
-          per_route;
-      per_route.mutable_request()->set_llm_protocol(client_api);
-      if (binding_on_route) {
-        per_route.mutable_response()->set_llm_protocol(backend_api);
-        per_route.mutable_response()->mutable_binding()->set_uri_pattern(
-            std::string(response_binding));
-      }
+                                      route_declares](ConfigHelper::HttpConnectionManager& hcm) {
       auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
-      std::ignore =
-          (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
-              .PackFrom(per_route);
+      if (route_declares != RouteDeclares::Nothing) {
+        envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
+            per_route;
+        per_route.mutable_request()->set_llm_protocol(client_api);
+        if (route_declares == RouteDeclares::Everything) {
+          per_route.mutable_response()->set_llm_protocol(backend_api);
+          per_route.mutable_response()->mutable_binding()->set_uri_pattern(
+              std::string(response_binding));
+        }
+        std::ignore =
+            (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
+                .PackFrom(per_route);
+      }
       auto* authorization = route->mutable_request_headers_to_add()->Add();
       authorization->mutable_header()->set_key("authorization");
       authorization->mutable_header()->set_value(std::string(AccessToken));
@@ -247,7 +260,7 @@ typed_config:
         inline_string: '$0'
 )EOF",
                                                 resolved_model);
-    if (!binding_on_route) {
+    if (route_declares != RouteDeclares::Everything) {
       absl::StrAppend(&instructions,
                       absl::Substitute(R"EOF(
   - object_key: envoy.ai.llm_protocol.response
@@ -261,6 +274,16 @@ typed_config:
 )EOF",
                                        envoy::type::ai::v3::LLMProtocol_Name(backend_api),
                                        response_binding));
+    }
+    if (route_declares == RouteDeclares::Nothing) {
+      absl::StrAppend(&instructions,
+                      absl::Substitute(R"EOF(
+  - object_key: envoy.ai.llm_protocol.request
+    format_string:
+      text_format_source:
+        inline_string: $0
+)EOF",
+                                       envoy::type::ai::v3::LLMProtocol_Name(client_api)));
     }
     config_helper_.prependFilter(absl::StrCat(R"EOF(
 name: envoy.filters.http.set_filter_state
@@ -394,6 +417,33 @@ TEST_P(TranscoderIntegrationTest, VertexGeminiGenerateContentReachesClaudeRawPre
   EXPECT_EQ(reply["modelVersion"], GeminiModel);
   EXPECT_EQ(reply["usageMetadata"]["promptTokenCount"], 12);
   EXPECT_EQ(reply["usageMetadata"]["candidatesTokenCount"], 6);
+  test_server_->waitForCounter("ai_protocol_manager.transcoder.transcoded", testing::Eq(4));
+  EXPECT_EQ(test_server_->counter("ai_protocol_manager.transcoder.failed")->value(), 0);
+}
+
+// The same translation with nothing on the route: the filter ahead names the client's API in
+// filter state along with everything else, and that alone makes the request an AI endpoint.
+TEST_P(TranscoderIntegrationTest, FilterStateAloneDeclaresTheEndpoint) {
+  initializeForClaude(RouteDeclares::Nothing);
+  IntegrationStreamDecoderPtr response =
+      sendClientRequest(absl::StrCat(VertexGeminiPath, ":generateContent"),
+                        {{"contents", {{{"role", "user"}, {"parts", {{{"text", Question}}}}}}},
+                         {"generationConfig", {{"maxOutputTokens", 1024}}}});
+  serveAsVertexClaude(/*stream=*/false);
+  expectUpstreamRequest(absl::StrCat(VertexClaudePath, ":rawPredict"),
+                        {{"anthropic_version", "vertex-2023-10-16"},
+                         {"max_tokens", 1024},
+                         {"stream", false},
+                         {"messages", {{{"role", "user"}, {"content", Question}}}}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_EQ(response->headers().getStatusValue(), "200") << response->body();
+  const nlohmann::json reply = nlohmann::json::parse(response->body());
+  ASSERT_EQ(reply["candidates"].size(), 1);
+  EXPECT_EQ(
+      reply["candidates"][0]["content"],
+      nlohmann::json::parse(R"({"role": "model", "parts": [{"text": "Hello from Claude."}]})"));
+  EXPECT_EQ(reply["modelVersion"], GeminiModel);
   test_server_->waitForCounter("ai_protocol_manager.transcoder.transcoded", testing::Eq(4));
   EXPECT_EQ(test_server_->counter("ai_protocol_manager.transcoder.failed")->value(), 0);
 }
