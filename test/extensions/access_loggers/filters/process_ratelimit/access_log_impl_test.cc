@@ -81,7 +81,7 @@ public:
               auto ret = std::make_unique<testing::NiceMock<Config::MockSingletonSubscription>>();
               EXPECT_CALL(*ret, start());
               subscriptions_[resource_name] = ret.get();
-              callbackss_[resource_name] = &callbacks;
+              callbacks_[resource_name] = &callbacks;
               return ret;
             }));
 
@@ -146,7 +146,7 @@ fill_interval:
   Envoy::Event::SimulatedTimeSystem* time_system_;
 
   absl::flat_hash_map<std::string, Config::MockSingletonSubscription*> subscriptions_;
-  absl::flat_hash_map<std::string, Config::SingletonSubscriptionCallbacks*> callbackss_;
+  absl::flat_hash_map<std::string, Config::SingletonSubscriptionCallbacks*> callbacks_;
   std::vector<Init::TargetHandlePtr> init_target_handles_;
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
@@ -177,7 +177,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
   // Destruct the log object, which destructs the filter.
   log1.reset();
@@ -188,7 +188,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {
   const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
 
   // No crash should occur. The main thing we are testing is that the callback
   // doesn't try to access any members of the destructed filter.
@@ -199,16 +199,16 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
-  callbackss_["token_bucket_name"]->onFailure(Config::ConfigUpdateFailureReason::ConnectionFailure,
-                                              nullptr);
+  callbacks_["token_bucket_name"]->onFailure(Config::ConfigUpdateFailureReason::ConnectionFailure,
+                                             nullptr);
 
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
 
   // First log is written, second is rate limited.
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
@@ -218,7 +218,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
 
   // Sending the same config again should be a no-op and not reset the token bucket.
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log, /*expect_write_times=*/0, /*log_call_times=*/1);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
 
@@ -236,12 +236,12 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
   const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
 
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
   expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
@@ -256,13 +256,13 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
 
   // Init the second log with the same token bucket.
@@ -280,13 +280,13 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketUpdatedUnderSameResource
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
   const auto decoded_resources_2 = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
@@ -297,7 +297,7 @@ fill_interval:
   seconds: 1
 )EOF")}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources_2.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources_2.refvec_[0].get(), ""));
   // Init the second log with the same token bucket.
   AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
@@ -311,20 +311,20 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, RemoveAndAddResource) {
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
   // 1. Add the resource
   EXPECT_CALL(init_watcher_, ready());
   auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
 
   // 2. Remove the token bucket.
-  callbackss_["token_bucket_name"]->onResourceRemoved();
+  callbacks_["token_bucket_name"]->onResourceRemoved();
   // The rate limiter should always deny.
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 
@@ -338,7 +338,7 @@ fill_interval:
   decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", new_token_bucket}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   // The rate limiter should be working with the new config.
   // time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
   expectWritesAndLog(log1, /*expect_write_times=*/3, /*log_call_times=*/4);
@@ -360,20 +360,20 @@ TEST_F(AccessLogImplTestWithRateLimitFilter,
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
   // 1. Add the resource
   EXPECT_CALL(init_watcher_, ready());
   auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
 
   // 2. Remove the token bucket.
-  callbackss_["token_bucket_name"]->onResourceRemoved();
+  callbacks_["token_bucket_name"]->onResourceRemoved();
   // The rate limiter should always deny.
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 
@@ -395,7 +395,7 @@ fill_interval:
   decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", new_token_bucket}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   // The rate limiter should be working with the new config.
   expectWritesAndLog(log1, /*expect_write_times=*/3, /*log_call_times=*/4);
   // It shares the same token bucket, so it's rate limited.
@@ -410,14 +410,14 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketUpdatedUsingExistingSubs
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.init_manager_.initialize(init_watcher_);
   ASSERT_EQ(subscriptions_.size(), 1);
-  ASSERT_EQ(callbackss_.size(), 1);
+  ASSERT_EQ(callbacks_.size(), 1);
 
   // 1. Initial config update.
   EXPECT_CALL(init_watcher_, ready());
   const auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
       {{"token_bucket_name", token_bucket_resource_}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources.refvec_[0].get(), ""));
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
   // 2. Add log2. It should reuse the subscription and the limiter.
@@ -441,7 +441,7 @@ fill_interval:
   seconds: 1
 )EOF")}});
   EXPECT_OK(
-      callbackss_["token_bucket_name"]->onResourceUpdate(decoded_resources_2.refvec_[0].get(), ""));
+      callbacks_["token_bucket_name"]->onResourceUpdate(decoded_resources_2.refvec_[0].get(), ""));
 
   // Verify log2 works with new config.
   // New bucket has 2 tokens.
