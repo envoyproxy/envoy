@@ -56,7 +56,10 @@ public:
       : cfg_(std::make_shared<Config>(*store_.rootScope())),
         io_handle_(
             Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})),
-        parser_impl_(GetParam()) {}
+        parser_impl_(GetParam()) {
+    // Do not try to close fake socket descriptor.
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
+  }
 
   void init() {
     if (parser_impl_ == Http1ParserImpl::BalsaParser) {
