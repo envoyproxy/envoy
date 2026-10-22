@@ -319,7 +319,7 @@ private:
     Stats::LiteScopeHelper helper(scope, absl::StrCat(prefix, "ext_authz."),
                                   filter_stats_prefix.empty() ? Stats::TagStringViewSpan()
                                                               : Stats::TagStringViewSpan{tag},
-                                  final_prefix);
+                                  final_prefix, /*sanitize=*/false);
     return {ALL_EXT_AUTHZ_FILTER_STATS(POOL_COUNTER(helper))};
   }
 
@@ -342,7 +342,7 @@ private:
     return {scope_.symbolTable(), createPoolStatName(EMPTY_STRING, name),
             filter_stats_prefix.empty() ? Stats::TagStringViewSpan()
                                         : Stats::TagStringViewSpan{tag},
-            createPoolStatName(filter_stats_prefix, name)};
+            createPoolStatName(filter_stats_prefix, name), /*sanitize=*/false};
   }
 
   const bool allow_partial_message_;

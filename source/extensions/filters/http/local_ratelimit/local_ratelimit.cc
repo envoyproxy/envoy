@@ -151,7 +151,8 @@ LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
   Stats::LiteScopeHelper helper(scope, "http_local_rate_limit",
                                 prefix.empty() ? Stats::TagStringViewSpan()
                                                : Stats::TagStringViewSpan{tag},
-                                absl::StrCat(prefix, ".http_local_rate_limit"));
+                                absl::StrCat(prefix, ".http_local_rate_limit"),
+                                /*sanitize=*/false);
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER(helper))};
 }
 
