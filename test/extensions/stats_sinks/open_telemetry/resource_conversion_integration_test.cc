@@ -149,12 +149,15 @@ TEST_P(ResourceConversionIntegrationTest, ReportsMetricsUnderEachPodResource) {
 
   FakeHttpConnectionPtr otlp_connection;
   ASSERT_TRUE(fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, otlp_connection));
+  // The streams are only destroyed after the connection is closed, since the thread of the fake
+  // upstream may still use a stream after the test sends the response on it.
+  std::vector<FakeStreamPtr> otlp_streams;
   absl::flat_hash_map<std::string, uint64_t> requests_by_pod;
   uint64_t requests_without_pod = 0;
   bool saw_proxy_metric = false;
   while (requests_by_pod["pod-a"] < 2 || requests_by_pod["pod-b"] < 1 || requests_without_pod < 1 ||
          !saw_proxy_metric) {
-    FakeStreamPtr stream;
+    FakeStreamPtr& stream = otlp_streams.emplace_back();
     ASSERT_TRUE(otlp_connection->waitForNewStream(*dispatcher_, stream));
     ExportMetricsServiceRequest request;
     ASSERT_TRUE(stream->waitForGrpcMessage(*dispatcher_, request));
