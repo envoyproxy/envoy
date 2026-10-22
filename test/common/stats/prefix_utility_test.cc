@@ -104,6 +104,16 @@ TEST_F(MergeStatPrefixTest, ClusterParentWithSelfTag) {
                            std::make_pair(Envoy::Config::TagNames::get().EXT_AUTHZ_PREFIX, "waf")));
 }
 
+// Redis-scoped parent "redis.<prefix>." extracted as REDIS_PREFIX tag.
+TEST_F(MergeStatPrefixTest, RedisParent) {
+  const auto p = mergeStatPrefix(symbol_table_, "redis.foo.", "splitter", {}, "splitter");
+  EXPECT_EQ(taggedName(p), "redis.foo.splitter.name");
+  EXPECT_EQ(taggedName(p), legacyName("redis.foo.splitter."));
+  EXPECT_EQ(base(p), "redis.splitter");
+  EXPECT_THAT(tags(p), testing::ElementsAre(
+                           std::make_pair(Envoy::Config::TagNames::get().REDIS_PREFIX, "foo")));
+}
+
 // A parent passed without a trailing dot will not be recognized as a tag because we assume
 // the caller should handle the dot correctly.
 TEST_F(MergeStatPrefixTest, ParentWithoutTrailingDot) {
@@ -191,6 +201,17 @@ TEST_F(MergeStatPrefixTest, WorkerStatPrefixNotAWorker) {
   EXPECT_EQ(taggedName(no_thread), legacyName("server.dispatcher."));
   EXPECT_EQ(base(no_thread), "server.dispatcher");
   EXPECT_TRUE(tags(no_thread).empty());
+}
+
+// sanitize=false keeps a ':' in the merged names and tag values, matching the legacy
+// POOL_*_PREFIX-based stat creation that never sanitized.
+TEST_F(MergeStatPrefixTest, VerbatimNamesKeepColon) {
+  const auto p =
+      mergeStatPrefix(symbol_table_, "redis.db:6379.", "splitter", {}, {}, /*sanitize=*/false);
+  EXPECT_EQ(prefix(p), "redis.db:6379.splitter");
+  EXPECT_EQ(base(p), "redis.splitter");
+  EXPECT_THAT(tags(p), testing::ElementsAre(std::make_pair(
+                           std::string(Envoy::Config::TagNames::get().REDIS_PREFIX), "db:6379")));
 }
 
 } // namespace

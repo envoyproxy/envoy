@@ -133,12 +133,21 @@ void BufferManager::onDestroy() {
   }
 }
 
-void BufferManager::onData(Buffer::Instance& data) {
+void BufferManager::onData(Buffer::Instance& data, bool end_stream) {
+  if (end_stream_seen_) {
+    IS_ENVOY_BUG("ai_protocol_manager: data after end of stream");
+    data.drain(data.length());
+    return;
+  }
   const uint64_t accepted = data.length();
   // Queue the bytes, taking ownership now so the filter chain's buffer reference does not dangle
   // across the asynchronous offload. This ownership/serialization is storage-agnostic, so it lives
   // here once rather than in every ExternalBuffer.
   pending_.move(data);
+  if (end_stream) {
+    // Set before flushing, so this frame's write carries end_stream.
+    end_stream_seen_ = true;
+  }
 
   if (buffer_ == nullptr) {
     if (pending_.length() <= config_.max_in_memory_bytes) {
@@ -245,7 +254,13 @@ void BufferManager::maybeIssueWrite() {
   //
   // Honor the buffer's single-writer contract: only one write outstanding. The
   // rest of the backlog stays in pending_ until this one completes.
-  if (buffer_ == nullptr || write_in_flight_ || pending_.length() == 0) {
+  if (buffer_ == nullptr || write_in_flight_) {
+    return;
+  }
+  const bool has_pending_data = pending_.length() > 0;
+  const bool needs_terminal_write = end_stream_seen_ && !end_stream_flushed_;
+  // Nothing to write if there is no pending data and no terminal write is needed.
+  if (!has_pending_data && !needs_terminal_write) {
     return;
   }
   // Batch small frames into a chunk-sized write instead of writing each one: with
@@ -263,6 +278,7 @@ void BufferManager::maybeIssueWrite() {
   in_flight_write_size_ = pending_.length();
   owned->move(pending_);
   write_in_flight_ = true;
+  end_stream_flushed_ = end_stream_seen_;
   buffer_->write(std::move(owned), end_stream_seen_,
                  [this](ExternalBufferStatus status) { onWriteComplete(status); });
 }

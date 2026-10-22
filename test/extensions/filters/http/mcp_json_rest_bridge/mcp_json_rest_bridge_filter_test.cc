@@ -511,7 +511,7 @@ TEST_F(McpJsonRestBridgeFilterTest, StatelessInitializeIsRejectedAsUnsupportedMe
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(
-          Eq(Http::Code::OK),
+          Eq(Http::Code::NotFound),
           StrEq(R"json({"code":-32601,"message":"MCP method initialize is not supported"})json"), _,
           _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
 
@@ -556,7 +556,7 @@ TEST_F(McpJsonRestBridgeFilterTest,
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(
-          Eq(Http::Code::OK),
+          Eq(Http::Code::NotFound),
           StrEq(
               R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json"),
           _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));

@@ -305,11 +305,13 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<Protobuf::Any>& r
     return;
   }
 
+  OpaqueResourceDecoder& resource_decoder = (*watches_.begin())->resource_decoder_;
+  Protobuf::Arena batch_arena(resource_decoder.arenaOptions());
   std::vector<DecodedResourcePtr> decoded_resources;
   decoded_resources.reserve(resources.size());
   for (const auto& r : resources) {
     decoded_resources.emplace_back(THROW_OR_RETURN_VALUE(
-        DecodedResourceImpl::fromResource((*watches_.begin())->resource_decoder_, r, version_info),
+        DecodedResourceImpl::fromResource(resource_decoder, r, version_info, batch_arena),
         DecodedResourceImplPtr));
   }
 
@@ -327,6 +329,9 @@ void WatchMap::onConfigUpdate(
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
+  Protobuf::Arena batch_arena(watches_.empty()
+                                  ? Protobuf::ArenaOptions{}
+                                  : (*watches_.begin())->resource_decoder_.arenaOptions());
   std::vector<DecodedResourcePtr> decoded_resources;
   absl::flat_hash_map<Watch*, std::vector<DecodedResourceRef>> per_watch_added;
   // If the server behaves according to the protocol, it will only send the
@@ -341,7 +346,7 @@ void WatchMap::onConfigUpdate(
       continue;
     }
     decoded_resources.emplace_back(
-        new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, *r));
+        new DecodedResourceImpl((*interested_in_r.begin())->resource_decoder_, *r, batch_arena));
     for (const auto& interested_watch : interested_in_r) {
       per_watch_added[interested_watch].emplace_back(*decoded_resources.back());
     }

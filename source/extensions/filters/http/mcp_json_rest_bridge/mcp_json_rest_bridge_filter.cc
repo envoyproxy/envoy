@@ -774,7 +774,12 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
         path = "/mcp";
       }
       EndpointKey key{host, path};
-      auto& endpoint_config = endpoint_configs_[key];
+      auto [it, inserted] = endpoint_configs_.try_emplace(key, EndpointConfig());
+      if (!inserted) {
+        return absl::InvalidArgumentError(
+            fmt::format("Duplicate endpoint config for host/path: {}, {}", host, path));
+      }
+      EndpointConfig& endpoint_config = it->second;
       for (const auto& tool : tool_config.tools()) {
         absl::StatusOr<std::vector<McpParamHeaderMapping>> mcp_param_headers =
             buildMcpParamHeaderMappings(tool);
@@ -798,13 +803,9 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
           return absl::InvalidArgumentError(
               "tool_list_http_rule must be a GET request with an empty body");
         }
-        if (!endpoint_config.tool_list_http_rule.has_value()) {
-          endpoint_config.tool_list_http_rule = rule;
-        }
+        endpoint_config.tool_list_http_rule = rule;
       }
-      if (tool_config.has_tool_list_local()) {
-        endpoint_config.tool_list_local = true;
-      }
+      endpoint_config.tool_list_local = tool_config.has_tool_list_local();
     }
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",
@@ -1575,8 +1576,12 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         },
         Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover");
   } else {
+    // MCP 2026-07-28 Streamable HTTP requires 404 Not Found together with -32601 (Method not found)
+    // for methods the server does not implement. Legacy (2025-11-25 and earlier) requests keep
+    // 200 OK; see sendErrorResponse().
+    const Http::Code response_code = is_stateless_request_ ? Http::Code::NotFound : Http::Code::OK;
     sendErrorResponse(
-        Http::Code::OK, BridgeStatus::RequestMcpMethodNotSupported,
+        response_code, BridgeStatus::RequestMcpMethodNotSupported,
         generateErrorJsonResponse(-32601, absl::StrCat("MCP method ", method, " is not supported"))
             .dump(),
         nullptr, method,

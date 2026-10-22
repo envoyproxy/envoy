@@ -30,6 +30,25 @@ ConnectionHandlerImpl::ConnectionHandlerImpl(Event::Dispatcher& dispatcher,
       null_overload_manager_(null_overload_manager),
       per_handler_stat_prefix_(dispatcher.name() + "."), disable_listeners_(false) {}
 
+ConnectionHandlerImpl::~ConnectionHandlerImpl() {
+  // Destroying the active listeners closes all of their remaining connections. Closing those
+  // connections can re-enter this handler, e.g. an upstream connection pool that tries to reconnect
+  // to an internal listener goes through findByAddress(). With the implicit destructor the address
+  // maps, which are declared after listener_map_by_tag_, would already be destroyed at that point,
+  // and a lookup into them is a use-after-free (which can spin forever in the hash table probe).
+  //
+  // Drop the address maps first, so that any re-entrant lookup finds no listener. This does not
+  // destroy the listeners because they are also owned by listener_map_by_tag_. Then destroy the
+  // listeners while every other member of the handler is still alive. The listeners are moved out
+  // of listener_map_by_tag_ first so that re-entrant lookups by tag see an empty map instead of a
+  // map that is in the middle of being destroyed.
+  tcp_listener_map_by_address_.clear();
+  internal_listener_map_by_address_.clear();
+  absl::flat_hash_map<uint64_t, std::unique_ptr<ActiveListenerDetails>> listeners;
+  listeners.swap(listener_map_by_tag_);
+  listeners.clear();
+}
+
 void ConnectionHandlerImpl::incNumConnections() { ++num_handler_connections_; }
 
 void ConnectionHandlerImpl::decNumConnections() {

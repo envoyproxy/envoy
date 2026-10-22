@@ -362,9 +362,11 @@ public:
         {"listener.tcp_listener.downstream_cx_total",
          "listener.downstream_cx_total",
          {{listener_address, "tcp_listener"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         // The admin listener is deliberately excluded from listener address tagging, in both the
         // legacy extraction rules and the explicit-tags scope.
         {"listener.admin.downstream_cx_total", "listener.admin.downstream_cx_total", {}},
+#endif
         // TCP proxy scope, `source/common/tcp_proxy/tcp_proxy.cc`.
         {"tcp.tcp_stats.downstream_cx_total",
          "tcp.downstream_cx_total",
@@ -400,21 +402,25 @@ public:
          {{listener_address, mainListenerScope()},
           {hcm_prefix, "config_test"},
           {response_code_class, "2"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         {"listener.admin.http.admin.downstream_rq_2xx",
          "listener.admin.http.downstream_rq_xx",
          {{hcm_prefix, "admin"}, {response_code_class, "2"}}},
+#endif
         // The router filter, `source/extensions/filters/http/router/config.cc`. It creates its
         // stats in the server's scope with the connection manager's prefix in the name, rather
         // than in the connection manager's scope, because its virtual host and route level stats
         // are documented to live at the root. So the prefix tag comes from name extraction here.
         {"http.config_test.no_route", "http.no_route", {{hcm_prefix, "config_test"}}},
         {"http.config_test.rq_total", "http.rq_total", {{hcm_prefix, "config_test"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         // The admin listener runs a connection manager too, with 'admin' as its stat prefix. As
         // with the listener address, the admin listener scope itself is not tagged.
         {"http.admin.downstream_rq_total", "http.downstream_rq_total", {{hcm_prefix, "admin"}}},
         {"listener.admin.http.admin.downstream_rq_completed",
          "listener.admin.http.downstream_rq_completed",
          {{hcm_prefix, "admin"}}},
+#endif
         // Per-thread scopes of the worker id migration: a worker thread's 'worker_<id>' segment
         // carries the envoy.worker_id tag and tag-extracts to a literal 'worker', while the main
         // thread's name stays a plain, untagged segment.
@@ -435,9 +441,11 @@ public:
         {absl::StrCat("listener.", mainListenerScope(), ".worker_0.downstream_cx_total"),
          "listener.worker.downstream_cx_total",
          {{listener_address, mainListenerScope()}, {worker_id, "0"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         {"listener.admin.main_thread.downstream_cx_total",
          "listener.admin.main_thread.downstream_cx_total",
          {}},
+#endif
         // Per-thread watchdog counters, `source/server/guarddog_impl.cc`.
         {"server.main_thread.watchdog_miss", "server.main_thread.watchdog_miss", {}},
         {"server.worker_0.watchdog_miss", "server.worker.watchdog_miss", {{worker_id, "0"}}},

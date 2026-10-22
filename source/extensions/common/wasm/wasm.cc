@@ -340,12 +340,17 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
       it->second.use_time = now;
       if (it->second.in_progress) {
         stats_handler.onEvent(WasmEvent::RemoteLoadCacheMiss);
-        ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
-                            "createWasm: failed to load (in progress) from {}", source);
-        cb(nullptr);
-      }
-      code = it->second.code;
-      if (code.empty()) {
+        if (vm_config.nack_on_code_cache_miss()) {
+          ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::wasm), warn,
+                              "createWasm: failed to load (in progress) from {}", source);
+          cb(nullptr);
+          return false;
+        }
+        // Another config is already fetching this code. Fetch it as well, gated by our own init
+        // manager, but leave the shared cache entry alone: the fetch callback never overwrites
+        // code that is already cached, so a failure here cannot poison the cache.
+        fetch = true;
+      } else if (code = it->second.code; code.empty()) {
         if (now - it->second.fetch_time <
             std::chrono::seconds(CODE_CACHE_SECONDS_NEGATIVE_CACHING)) {
           stats_handler.onEvent(WasmEvent::RemoteLoadCacheNegativeHit);
@@ -417,17 +422,21 @@ bool createWasm(const PluginSharedPtr& plugin, const Stats::ScopeSharedPtr& scop
   if (fetch) {
     auto holder = std::make_shared<std::unique_ptr<Event::DeferredDeletable>>();
     auto fetch_callback = [vm_config, complete_cb, source, &dispatcher, scope, holder, plugin,
-                           &stats_handler](const std::string& code) {
+                           &stats_handler](const std::string& fetched_code) {
+      std::string code = fetched_code;
       {
         std::lock_guard<std::mutex> guard(code_cache_mutex);
         auto& e = (*code_cache)[vm_config.code().remote().sha256()];
         e.in_progress = false;
-        e.code = code;
         Stats::ScopeSharedPtr create_wasm_stats_scope = stats_handler.lockAndCreateStats(scope);
-        if (code.empty()) {
+        if (fetched_code.empty()) {
           stats_handler.onEvent(WasmEvent::RemoteLoadCacheFetchFailure);
+          // A concurrent fetch of the same code may already have succeeded; use it rather than
+          // overwriting it with a negative entry.
+          code = e.code;
         } else {
           stats_handler.onEvent(WasmEvent::RemoteLoadCacheFetchSuccess);
+          e.code = fetched_code;
         }
         stats_handler.onRemoteCacheEntriesChanged(code_cache->size());
       }

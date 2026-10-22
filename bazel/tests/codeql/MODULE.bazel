@@ -2,10 +2,10 @@ module(name = "envoy_codeql")
 
 bazel_dep(name = "envoy", version = "1.41.0-dev")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.3.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.4.envoy")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "protobuf", version = "35.1.bcr.envoy")
-bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy")
+bazel_dep(name = "proxy-wasm-cpp-host", version = "0.0.0-260704-f2db56a.envoy.1")
 bazel_dep(name = "rules_python", version = "2.3.3")
 
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", dev_dependency = True, repo_name = "buildifier")

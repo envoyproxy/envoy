@@ -190,6 +190,27 @@ message ServerInfo {
   // up to ``2025-11-25`` and does not support downgrading below that baseline.
   // If not provided: Defaults to ``2025-11-25``.
   //
+  // If set to ``2026-07-28``, requests with ``io.modelcontextprotocol/protocolVersion`` in
+  // ``params._meta`` are handled as stateless MCP ``2026-07-28`` requests. Their headers are
+  // validated before the method is dispatched:
+  //
+  // - A missing, duplicated or mismatched ``MCP-Protocol-Version`` or ``Mcp-Method`` header is
+  //   rejected with HTTP ``400`` and a JSON-RPC ``-32020`` (``HeaderMismatch``) error, and a
+  //   protocol version that is not supported for stateless requests is rejected with HTTP ``400``
+  //   and a JSON-RPC ``-32022`` (``UnsupportedProtocolVersion``) error.
+  // - A method that this filter does not implement is rejected with HTTP ``404`` and a JSON-RPC
+  //   ``-32601`` (``Method not found``) error only after header validation succeeds. A request
+  //   with both a header validation error and an unsupported method is rejected with HTTP ``400``.
+  //
+  // This filter does not validate ``io.modelcontextprotocol/clientCapabilities``. To reject
+  // requests that are missing it with HTTP ``400``, configure the
+  // :ref:`MCP filter <config_http_filters_mcp>` with ``traffic_mode: REJECT_NO_MCP`` before this
+  // filter.
+  //
+  // All other (legacy) requests keep their existing behavior: the header validation above does
+  // not apply, and an unsupported method is rejected with HTTP ``200`` and a JSON-RPC ``-32601``
+  // error.
+  //
   // Example value: "2026-07-28"
   google.protobuf.StringValue max_supported_protocol_version = 1
       [(validate.rules).string = {in: "2025-11-25" in: "2026-07-28"}];

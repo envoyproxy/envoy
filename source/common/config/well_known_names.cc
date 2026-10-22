@@ -224,17 +224,22 @@ TagNameValues::TagNameValues() {
   // connection_limit.(<stat_prefix>.)*
   addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
 
-  // http.[<stat_prefix>.]rbac.[<optional stat_prefix>]policy.(<policy
+  // [http.|cluster.]<stat_prefix>.rbac.[<optional rules stat_prefix>.]policy.(<policy
   // name>.).(allowed|shadow_allowed|denied|shadow_denied)
   addRe2(
       RBAC_POLICY_NAME,
-      R"(^http\.<TAG_VALUE>\.rbac\.(?:<TAG_VALUE>\.)?policy\.((<TAG_VALUE>)\.)(allowed|shadow_allowed|denied|shadow_denied)$)");
+      R"(^(?:(?:http|cluster)\.)?<TAG_VALUE>\.rbac\.(?:<TAG_VALUE>\.)?policy\.((<TAG_VALUE>)\.)(allowed|shadow_allowed|denied|shadow_denied)$)");
 
   // (<stat_prefix>.).rbac.**
   addTokenized(RBAC_PREFIX, "$.rbac.**");
 
   // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)* but excluding policy
   addRe2(RBAC_HTTP_PREFIX, R"(^http\.<TAG_VALUE>\.rbac\.((<TAG_VALUE>)\.).*?)", "", "policy");
+
+  // <stat_prefix>.rbac.(<rules_stat_prefix>.)* but excluding policy, for the RBAC network filter.
+  // The leading segment never matches "http." stats: the HTTP filter's prefix has a second
+  // segment ahead of "rbac".
+  addRe2(RBAC_RULES_PREFIX, R"(^<TAG_VALUE>\.rbac\.((<TAG_VALUE>)\.).*?)", "", "policy");
 
   // proxy_proto.(<stat_prefix>.)**
   addRe2(PROXY_PROTOCOL_PREFIX, R"(^proxy_proto\.((<TAG_VALUE>)\.).+$)", "", "versions");

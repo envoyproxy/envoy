@@ -28,9 +28,18 @@ public:
       typename U = ProtoT, typename... Args,
       typename = std::enable_if_t<!std::is_abstract_v<U> && std::is_constructible_v<U, Args...>>>
   explicit ArenaWrappedProto(Args&&... args)
-      : arena_(std::make_unique<google::protobuf::Arena>()),
-        proto_(google::protobuf::Arena::Create<ProtoT>(arena_.get(), std::forward<Args>(args)...)) {
-  }
+      : arena_(std::make_unique<Protobuf::Arena>()),
+        proto_(Protobuf::Arena::Create<ProtoT>(arena_.get(), std::forward<Args>(args)...)) {}
+
+  // Constructor: Creates the arena with options and allocates the proto on it.
+  // Perfect forwards any remaining arguments to the ProtoT constructor.
+  // Enabled only if ProtoT is not abstract.
+  template <
+      typename U = ProtoT, typename... Args,
+      typename = std::enable_if_t<!std::is_abstract_v<U> && std::is_constructible_v<U, Args...>>>
+  explicit ArenaWrappedProto(const Protobuf::ArenaOptions& options, Args&&... args)
+      : arena_(std::make_unique<Protobuf::Arena>(options)),
+        proto_(Protobuf::Arena::Create<ProtoT>(arena_.get(), std::forward<Args>(args)...)) {}
 
   // Default constructor for abstract types: Initializes to nullptr.
   // Enabled only if ProtoT is abstract.
@@ -83,13 +92,37 @@ public:
             typename = std::enable_if_t<std::is_convertible_v<OtherProtoT*, ProtoT*>>>
   ArenaWrappedProto(std::unique_ptr<OtherProtoT>&& heap_proto) {
     if (heap_proto) {
-      arena_ = std::make_unique<google::protobuf::Arena>();
+      arena_ = std::make_unique<Protobuf::Arena>();
       ProtoT* new_proto = nullptr;
       if constexpr (std::is_abstract_v<OtherProtoT> || !std::is_constructible_v<OtherProtoT>) {
         new_proto = static_cast<ProtoT*>(heap_proto->New(arena_.get()));
         new_proto->CheckTypeAndMergeFrom(*heap_proto);
       } else {
-        OtherProtoT* typed_new_proto = google::protobuf::Arena::Create<OtherProtoT>(arena_.get());
+        OtherProtoT* typed_new_proto = Protobuf::Arena::Create<OtherProtoT>(arena_.get());
+        typed_new_proto->Swap(heap_proto.get());
+        new_proto = typed_new_proto;
+      }
+      proto_ = new_proto;
+      heap_proto.reset();
+    } else {
+      arena_ = nullptr;
+      proto_ = nullptr;
+    }
+  }
+
+  // Constructor from std::unique_ptr with custom ArenaOptions.
+  template <typename OtherProtoT,
+            typename = std::enable_if_t<std::is_convertible_v<OtherProtoT*, ProtoT*>>>
+  ArenaWrappedProto(const Protobuf::ArenaOptions& options,
+                    std::unique_ptr<OtherProtoT>&& heap_proto) {
+    if (heap_proto) {
+      arena_ = std::make_unique<Protobuf::Arena>(options);
+      ProtoT* new_proto = nullptr;
+      if constexpr (std::is_abstract_v<OtherProtoT> || !std::is_constructible_v<OtherProtoT>) {
+        new_proto = static_cast<ProtoT*>(heap_proto->New(arena_.get()));
+        new_proto->CheckTypeAndMergeFrom(*heap_proto);
+      } else {
+        OtherProtoT* typed_new_proto = Protobuf::Arena::Create<OtherProtoT>(arena_.get());
         typed_new_proto->Swap(heap_proto.get());
         new_proto = typed_new_proto;
       }
@@ -130,12 +163,12 @@ public:
   // Explicit accessors
   ProtoT* get() { return proto_; }
   const ProtoT* get() const { return proto_; }
-  google::protobuf::Arena* arena() { return arena_.get(); }
+  Protobuf::Arena* arena() { return arena_.get(); }
 
   template <typename U> friend class ArenaWrappedProto;
 
 private:
-  std::unique_ptr<google::protobuf::Arena> arena_;
+  std::unique_ptr<Protobuf::Arena> arena_;
   ProtoT* proto_; // Points to memory owned by arena_
 };
 

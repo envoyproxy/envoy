@@ -326,6 +326,7 @@ envoy_cc_library(
     hdrs = ["null_overload_manager.h"],
     deps = [
         "//envoy/server/overload:overload_manager_interface",
+        "//source/common/common:assert_lib",
         "//source/common/event:scaled_range_timer_manager_lib",
     ],
 )
@@ -453,6 +454,7 @@ envoy_cc_library(
         "//source/common/common:notification_lib",
         "//source/common/common:perf_tracing_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:dependent_type_urls_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_manager_lib",
         "//source/common/config:xds_resource_lib",
@@ -480,6 +482,7 @@ envoy_cc_library(
         "@abseil-cpp//absl/container:node_hash_map",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

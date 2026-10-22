@@ -471,6 +471,46 @@ TEST_F(ConnectionHandlerTest, InternalListenerInplaceUpdate) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+// Destroying the connection handler closes the connections that are still open. Closing a
+// connection can re-enter the handler, e.g. an upstream connection pool that reconnects to an
+// internal listener calls findByAddress(). Verify that such a lookup is safe and finds no listener
+// instead of accessing the already destroyed address map.
+TEST_F(ConnectionHandlerTest, FindByAddressWhileDestroyingHandler) {
+  Network::Address::InstanceConstSharedPtr local_address{
+      new Network::Address::EnvoyInternalInstance("server_internal_address")};
+
+  TestListener* internal_listener =
+      addInternalListener(1, "test_internal_listener", std::chrono::milliseconds(), false, nullptr);
+  EXPECT_CALL(*static_cast<Network::MockListenSocketFactory*>(
+                  internal_listener->socket_factories_[0].get()),
+              localAddress())
+      .WillRepeatedly(ReturnRef(local_address));
+  handler_->addListener(std::nullopt, *internal_listener, runtime_, random_);
+  auto internal_listener_cb = handler_->findByAddress(local_address);
+  ASSERT_TRUE(internal_listener_cb.has_value());
+
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  internal_listener_cb.value().get().onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  // handler_ is already null while the handler is being destroyed by reset().
+  Server::ConnectionHandlerImpl* raw_handler = handler_.get();
+  bool looked_up_during_destruction = false;
+  EXPECT_CALL(*connection, close(_, _))
+      .WillOnce(Invoke([&](Network::ConnectionCloseType, absl::string_view) {
+        EXPECT_FALSE(raw_handler->findByAddress(local_address).has_value());
+        looked_up_during_destruction = true;
+        connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+      }));
+  EXPECT_CALL(*access_log_, log(_, _));
+  handler_.reset();
+  EXPECT_TRUE(looked_up_during_destruction);
+}
+
 } // namespace
 } // namespace InternalListener
 } // namespace Bootstrap
