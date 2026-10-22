@@ -5455,16 +5455,17 @@ void testTicketSessionResumptionWithTlsVersion(
     }
   };
 
+  size_t first_connect_count = 0;
+  auto close_from_server = [&]() {
+    if (++first_connect_count == 2) {
+      server_connection->close(Network::ConnectionCloseType::NoFlush);
+    }
+  };
+
   if (client_tls_version == TlsParameters::TLSv1_3) {
     // With TLS 1.3, the server sends session tickets after the handshake, and the client stores
     // them in its session cache. Close the connection from the server once both sides are
     // connected, so that the client reads the tickets before it sees the close.
-    size_t first_connect_count = 0;
-    auto close_from_server = [&]() {
-      if (++first_connect_count == 2) {
-        server_connection->close(Network::ConnectionCloseType::NoFlush);
-      }
-    };
     EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_from_server(); }));
     EXPECT_CALL(first_server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
@@ -6362,16 +6363,17 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
         }));
     EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
+    size_t connect_count = 0;
+    auto close_from_server = [&]() {
+      if (++connect_count == 2) {
+        server_connection->close(Network::ConnectionCloseType::NoFlush);
+      }
+    };
+
     if (tls_version == TlsParameters::TLSv1_3) {
       // With TLS 1.3, the server sends session tickets after the handshake, and the client stores
       // them in its session cache. Close the connection from the server once both sides are
       // connected, so that the client reads the tickets before it sees the close.
-      size_t connect_count = 0;
-      auto close_from_server = [&]() {
-        if (++connect_count == 2) {
-          server_connection->close(Network::ConnectionCloseType::NoFlush);
-        }
-      };
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
           .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_from_server(); }));
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
