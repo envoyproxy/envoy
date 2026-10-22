@@ -208,19 +208,8 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
-    if (requested_resource_state_.contains(Wildcard)) {
-      for (const auto& resource : message.resources()) {
-        addResourceStateFromServer(resource);
-      }
-    } else {
-      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
-      // and ignore the others.
-      // NOTE: This is not gonna work for xdstp resources with glob resource matching.
-      for (const auto& resource : message.resources()) {
-        if (requested_resource_state_.contains(resource.name())) {
-          addResourceStateFromServer(resource);
-        }
-      }
+    for (const auto& resource : message.resources()) {
+      addResourceStateFromServer(resource);
     }
   }
 
@@ -235,13 +224,7 @@ void DeltaSubscriptionState::handleGoodResponse(
   // received as a part of the wildcard subscription or resources we already lost interest in, we
   // just drop them.
   for (const auto& resource_name : message.removed_resources()) {
-    if (auto maybe_resource = getRequestedResourceState(resource_name);
-        maybe_resource.has_value()) {
-      maybe_resource->setAsWaitingForServer();
-    } else if (const auto erased_count = ambiguous_resource_state_.erase(resource_name);
-               erased_count == 0) {
-      wildcard_resource_state_.erase(resource_name);
-    }
+    removeResourceStateFromServer(resource_name);
   }
   ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", typeUrl(),
             message.resources().size(), message.removed_resources().size());
@@ -331,25 +314,31 @@ bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
 
 void DeltaSubscriptionState::addResourceStateFromServer(
     const envoy::service::discovery::v3::Resource& resource) {
-  setResourceTtl(resource);
-
   if (auto maybe_resource = getRequestedResourceState(resource.name());
       maybe_resource.has_value()) {
-    // It is a resource that we requested.
+    // It is a resource that we requested explicitly.
     maybe_resource->setVersion(resource.version());
-    ASSERT(requested_resource_state_.contains(resource.name()));
-    ASSERT(!wildcard_resource_state_.contains(resource.name()));
-    ASSERT(!ambiguous_resource_state_.contains(resource.name()));
-  } else {
+    setResourceTtl(resource);
+    ASSERT(wildcard_resource_state_.find(resource.name()) == wildcard_resource_state_.end());
+    ASSERT(ambiguous_resource_state_.find(resource.name()) == ambiguous_resource_state_.end());
+  } else if (requested_resource_state_.contains(Wildcard)) {
     // It is a resource that is a part of our wildcard request.
     wildcard_resource_state_.insert_or_assign(resource.name(), resource.version());
-    // The resource could be ambiguous before, but now the ambiguity
-    // is resolved.
+    setResourceTtl(resource);
+    ASSERT(getRequestedResourceState(resource.name()) == std::nullopt);
     ambiguous_resource_state_.erase(resource.name());
-    ASSERT(!requested_resource_state_.contains(resource.name()));
-    ASSERT(wildcard_resource_state_.contains(resource.name()));
-    ASSERT(!ambiguous_resource_state_.contains(resource.name()));
   }
+}
+
+bool DeltaSubscriptionState::removeResourceStateFromServer(absl::string_view resource_name) {
+  // What to do when a resource is removed depends on whether it is a resource that we explicitly
+  // requested or reaches us via the wildcard subscription.
+  if (auto maybe_resource = getRequestedResourceState(resource_name); maybe_resource.has_value()) {
+    maybe_resource->setAsWaitingForServer();
+    return true;
+  }
+  return (wildcard_resource_state_.erase(resource_name) +
+          ambiguous_resource_state_.erase(resource_name)) > 0;
 }
 
 void DeltaSubscriptionState::setResourceTtl(
@@ -365,12 +354,7 @@ void DeltaSubscriptionState::setResourceTtl(
 void DeltaSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& expired) {
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   for (const auto& resource : expired) {
-    if (auto maybe_resource = getRequestedResourceState(resource); maybe_resource.has_value()) {
-      maybe_resource->setAsWaitingForServer();
-      removed_resources.Add(std::string(resource));
-    } else if (const auto erased_count = wildcard_resource_state_.erase(resource) +
-                                         ambiguous_resource_state_.erase(resource);
-               erased_count > 0) {
+    if (removeResourceStateFromServer(resource)) {
       removed_resources.Add(std::string(resource));
     }
   }

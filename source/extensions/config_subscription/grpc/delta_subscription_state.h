@@ -143,7 +143,9 @@ private:
     std::optional<std::string> version_;
   };
 
+  void setResourceTtl(const envoy::service::discovery::v3::Resource& resource);
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
+  bool removeResourceStateFromServer(absl::string_view resource_name);
   OptRef<ResourceState> getRequestedResourceState(absl::string_view resource_name);
   OptRef<const ResourceState> getRequestedResourceState(absl::string_view resource_name) const;
 
