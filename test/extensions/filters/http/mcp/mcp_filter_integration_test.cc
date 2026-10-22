@@ -1070,7 +1070,7 @@ TEST_P(McpFilterIntegrationTest, PerRouteRejectDuplicateKeysOverride) {
         route->mutable_match()->set_path("/api/mcp");
 
         envoy::extensions::filters::http::mcp::v3::McpOverride mcp_override;
-        mcp_override.set_reject_duplicate_keys(true);
+        mcp_override.mutable_reject_duplicate_keys()->set_value(true);
         mcp_override.set_traffic_mode(
             envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
         std::ignore =

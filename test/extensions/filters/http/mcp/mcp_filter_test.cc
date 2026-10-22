@@ -3042,7 +3042,7 @@ TEST_F(McpFilterTest, PerRouteClearRouteCache) {
 
   // Per-route config overrides clear route cache = true
   envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
-  override_config.set_clear_route_cache(true);
+  override_config.mutable_clear_route_cache()->set_value(true);
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
   EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
@@ -3078,7 +3078,7 @@ TEST_F(McpFilterTest, PerRouteRejectDuplicateKeys) {
 
   // Per-route config overrides reject duplicate keys = true and traffic mode = REJECT_NO_MCP
   envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
-  override_config.set_reject_duplicate_keys(true);
+  override_config.mutable_reject_duplicate_keys()->set_value(true);
   override_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
   auto route_config = std::make_shared<McpOverrideConfig>(override_config);
 
@@ -3327,6 +3327,68 @@ TEST_F(McpFilterTest, PerRouteOverrideInheritsParserConfig) {
                                        UnorderedElementsAre(IsStructString("custom_val", "hello"))),
                         IsStructString("method_group", "custom_global_group"))));
       }));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that a per-route clear_route_cache = false overrides a global clear_route_cache = true
+TEST_F(McpFilterTest, PerRouteClearRouteCacheDisabled) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_clear_route_cache(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.mutable_clear_route_cache()->set_value(false);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "params": {"key": "value"}, "id": 1})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+}
+
+// Test that a per-route reject_duplicate_keys = false overrides a global
+// reject_duplicate_keys = true
+TEST_F(McpFilterTest, PerRouteRejectDuplicateKeysDisabled) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.mutable_reject_duplicate_keys()->set_value(true);
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+  envoy::extensions::filters::http::mcp::v3::McpOverride override_config;
+  override_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  override_config.mutable_reject_duplicate_keys()->set_value(false);
+  auto route_config = std::make_shared<McpOverrideConfig>(override_config);
+
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillRepeatedly(Return(route_config.get()));
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"}};
+
+  filter_->decodeHeaders(headers, false);
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "test", "id": 1, "id": 2})";
+  Buffer::OwnedImpl buffer(json);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }

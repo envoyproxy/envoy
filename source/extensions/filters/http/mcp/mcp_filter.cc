@@ -314,8 +314,8 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 bool McpFilter::clearRouteCache() const {
   const auto* override_config = routeOverride();
 
-  if (override_config && override_config->clearRouteCache()) {
-    return true;
+  if (override_config && override_config->clearRouteCache().has_value()) {
+    return *override_config->clearRouteCache();
   }
 
   return config_->clearRouteCache();
@@ -362,8 +362,8 @@ bool McpFilter::shouldStoreToFilterState() const {
 bool McpFilter::rejectDuplicateKeys() const {
   const auto* override_config = routeOverride();
 
-  if (override_config && override_config->rejectDuplicateKeys()) {
-    return true;
+  if (override_config && override_config->rejectDuplicateKeys().has_value()) {
+    return *override_config->rejectDuplicateKeys();
   }
 
   return config_->rejectDuplicateKeys();
