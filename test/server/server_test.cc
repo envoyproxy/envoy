@@ -1308,7 +1308,7 @@ TEST_P(ServerInstanceImplTest, RtdsOverAdsShutdown) {
   options_.service_node_name_ = "some_node_name";
   auto server_thread =
       startTestServer("test/server/test_data/server/runtime_bootstrap_rtds_ads.yaml", false);
-  server_->shutdown();
+  server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
 
