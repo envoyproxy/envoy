@@ -46,10 +46,10 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
 
   ModelRouterFilterConfig::ModelMap model_map;
   for (const Config::RoutingEntry& entry : proto.routes()) {
-    envoy::data::ai::v3::LlmRoutes& routes = model_map[entry.requested_model()];
+    envoy::type::ai::v3::LlmRoutes& routes = model_map[entry.requested_model()];
 
     for (const Config::RoutingTarget& target : entry.targets()) {
-      envoy::data::ai::v3::LlmRoute* route = routes.add_routes();
+      envoy::type::ai::v3::LlmRoute* route = routes.add_routes();
 
       auto model_it = models.find(target.model());
       if (model_it == models.end()) {

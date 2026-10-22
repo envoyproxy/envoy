@@ -22,43 +22,92 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <config_http_filters_ai_protocol_manager_ai_filters>`.
 // [#extension: envoy.http.ai_filters.model_router]
 
+// Represents an upstream LLM service provider or API endpoint host.
+//
+// A provider defines the wire protocol, destination address, and HTTP binding characteristics
+// common to all models hosted by that provider.
 message Provider {
+  // Unique name for this provider definition, referenced by :ref:`provider
+  // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.Model.provider>`.
   string name = 1;
 
+  // The wire API spoken by this provider (e.g., ``OPENAI_CHAT_COMPLETIONS``,
+  // ``ANTHROPIC_MESSAGES``, or ``GEMINI_GENERATE_CONTENT``).
   type.ai.v3.LLMProtocol llm_protocol = 2 [(validate.rules).enum = {defined_only: true}];
 
+  // Upstream target host and optional port for the provider endpoint (e.g.,
+  // ``api.openai.com`` or ``primary.llm.example.com:8443``).
   string host_and_port = 3;
 
+  // How this provider carries the :ref:`llm_protocol
+  // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.Provider.llm_protocol>`
+  // on HTTP: describes the request URI pattern and request body mutations. When unset, standard
+  // URI paths and mutations for the wire protocol are used.
   type.ai.v3.LLMBinding binding = 4;
 }
 
+// Represents a concrete LLM model offered by a :ref:`Provider
+// <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.Provider>`.
+//
+// Associates an upstream model identifier and authentication credentials with a specific backend
+// provider.
 message Model {
+  // Unique name for this model definition, referenced by :ref:`RoutingTarget.model
+  // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.RoutingTarget.model>`.
   string name = 1;
 
-  // Refers to the Provider.name
+  // The name of the :ref:`Provider
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.Provider>` hosting this model.
   string provider = 2;
 
+  // Upstream model identifier sent to the provider (e.g., ``gpt-4o``,
+  // ``claude-3-5-sonnet-20241022``, or ``gemini-1.5-pro``).
   string model = 3;
 
+  // The authorization credential or token used to authenticate requests for this model
+  // (e.g., ``Bearer sk-...``). When set, Envoy populates the HTTP ``Authorization`` header
+  // when routing to this model.
   string api_key = 4;
 }
 
+// A single candidate destination model within a :ref:`RoutingEntry
+// <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RoutingEntry>`.
 message RoutingTarget {
-  // Refers to the Model.name
+  // References a :ref:`Model.name
+  // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.Model.name>` to target.
   string model = 1;
 }
 
+// Maps an incoming requested model name to an ordered list of candidate routing targets.
 message RoutingEntry {
-  // Refers to the model name in the user request.
+  // The model name as specified in the client request (matching the ``envoy.ai.model.request``
+  // filter state object).
   string requested_model = 1;
 
+  // Ordered list of candidate routing targets for this requested model.
+  //
+  // Attempt 1 uses the first target. Subsequent targets are attempted in order upon retries if the
+  // previous attempt fails, enabling automatic multi-model and multi-provider fallback.
   repeated RoutingTarget targets = 2;
 }
 
+// Configuration for the Model Router AI filter.
+//
+// The Model Router AI filter maps the client's requested model (from ``envoy.ai.model.request``
+// filter state) to an ordered list of resolved upstream routes (:ref:`LlmRoutes
+// <envoy_v3_api_msg_type.ai.v3.LlmRoutes>`).
+//
+// The resolved routes combine provider endpoints, model parameters, bindings, and credentials,
+// and are published to the ``envoy.ai.routes`` filter state object for consumption by the
+// :ref:`Route Selector AI filter
+// <envoy_v3_api_msg_extensions.http.ai_filters.route_selector.v3.RouteSelector>`.
 message ModelRouter {
+  // Configured LLM backend providers.
   repeated Provider providers = 1;
 
+  // Configured concrete models associated with providers.
   repeated Model models = 2;
 
+  // Routing rules mapping incoming requested model names to candidate targets.
   repeated RoutingEntry routes = 3;
 }

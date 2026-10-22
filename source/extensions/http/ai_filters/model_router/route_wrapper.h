@@ -1,16 +1,16 @@
 #pragma once
 
-#include "envoy/data/ai/v3/routes.pb.h"
 #include "envoy/stream_info/filter_state.h"
+#include "envoy/type/ai/v3/routes.pb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace AiFilters {
 namespace ModelRouter {
 
-class LlmRoutesFilterStateObject : public Envoy::StreamInfo::FilterState::Object {
+class LlmRoutesFilterStateObject : public StreamInfo::FilterState::Object {
 public:
-  using LlmRoutes = envoy::data::ai::v3::LlmRoutes;
+  using LlmRoutes = envoy::type::ai::v3::LlmRoutes;
 
   LlmRoutesFilterStateObject(const LlmRoutes& routes) : routes_(routes) {}
 

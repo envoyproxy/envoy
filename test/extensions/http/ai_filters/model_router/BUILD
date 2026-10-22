@@ -53,7 +53,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/ai_protocol_manager:fake_bridge_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ai_filters/request_info/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",

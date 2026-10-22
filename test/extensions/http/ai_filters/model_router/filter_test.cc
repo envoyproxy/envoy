@@ -4,7 +4,6 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/data/ai/v3/routes.pb.h"
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 #include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
 #include "envoy/type/ai/v3/llm_binding.pb.h"

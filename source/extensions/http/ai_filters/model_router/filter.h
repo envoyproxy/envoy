@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/data/ai/v3/routes.pb.h"
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/type/ai/v3/routes.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
@@ -33,7 +33,7 @@ public:
   create(const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
          Stats::Scope& scope);
 
-  using ModelMap = absl::flat_hash_map<std::string, envoy::data::ai::v3::LlmRoutes>;
+  using ModelMap = absl::flat_hash_map<std::string, envoy::type::ai::v3::LlmRoutes>;
 
   ModelRouterFilterConfig(ModelMap&& routes, Stats::Scope& scope);
   const ModelMap& routes() const { return routes_; }

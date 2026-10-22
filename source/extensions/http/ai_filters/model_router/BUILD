@@ -14,7 +14,7 @@ envoy_cc_library(
     hdrs = ["route_wrapper.h"],
     deps = [
         "//envoy/stream_info:filter_state_interface",
-        "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
     ],
 )
 
@@ -38,8 +38,8 @@ envoy_cc_library(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
-        "@envoy_api//envoy/data/ai/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
     ],
 )

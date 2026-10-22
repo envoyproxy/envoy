@@ -4,10 +4,10 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/data/ai/v3/routes.pb.h"
 #include "envoy/extensions/http/ai_filters/route_selector/v3/route_selector.pb.h"
 #include "envoy/type/ai/v3/llm_binding.pb.h"
 #include "envoy/type/ai/v3/llm_protocol.pb.h"
+#include "envoy/type/ai/v3/routes.pb.h"
 
 #include "source/common/http/headers.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -60,7 +60,7 @@ public:
   ~RouteSelectorFilterTest() override { buffer_manager_.onDestroy(); }
 
   void populateRoutesInFilterState() {
-    envoy::data::ai::v3::LlmRoutes routes;
+    envoy::type::ai::v3::LlmRoutes routes;
 
     auto* r1 = routes.add_routes();
     r1->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);

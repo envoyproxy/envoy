@@ -101,7 +101,6 @@ public:
 class LlmBindingObject : public Router::StringAccessor {
 public:
   explicit LlmBindingObject(absl::string_view value);
-  explicit LlmBindingObject(LlmBindingConstSharedPtr binding) : binding_(std::move(binding)) {}
 
   // The binding at `key`: null when no object is set, or the error of one that does not parse. Any
   // other object, such as a string set without the key's object factory, is an error.
