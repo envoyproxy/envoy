@@ -58,6 +58,11 @@ void ExtProcIntegrationTest::TearDown() {
     ASSERT_TRUE(processor_connection_1_->waitForDisconnect());
   }
 
+  if (processor_connection_2_) {
+    ASSERT_TRUE(processor_connection_2_->close());
+    ASSERT_TRUE(processor_connection_2_->waitForDisconnect());
+  }
+
   cleanupUpstreamAndDownstream();
 }
 
