@@ -37,7 +37,9 @@ public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     bool enable_multishot_receive, uint32_t read_buffer_size,
                     uint32_t write_timeout_ms, uint32_t write_high_watermark_bytes,
-                    uint32_t write_low_watermark_bytes, Event::Dispatcher& dispatcher);
+                    uint32_t write_low_watermark_bytes, Event::Dispatcher& dispatcher,
+                    uint32_t provided_buffer_count = 0, bool enable_deferred_taskrun = false,
+                    bool enable_receive_batching = false);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
                     uint32_t write_high_watermark_bytes, uint32_t write_low_watermark_bytes,
                     Event::Dispatcher& dispatcher);
@@ -130,6 +132,8 @@ public:
     status_ = Closed;
     on_closed_cb_ = cb;
   }
+  // Cancel pending writes without relying on dispatcher timers during worker destruction.
+  virtual void cancelWriteOnWorkerShutdown() {}
   void enableRead() override { status_ = ReadEnabled; }
   void disableRead() override { status_ = ReadDisabled; }
   void enableCloseEvent(bool enable) override { enable_close_event_ = enable; }
@@ -208,6 +212,8 @@ protected:
   Event::FileReadyCb cb_;
 };
 
+class IoUringPausedCloseWatch;
+
 class IoUringServerSocket : public IoUringSocketEntry {
 public:
   IoUringServerSocket(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
@@ -221,8 +227,10 @@ public:
 
   // IoUringSocket
   void close(bool keep_fd_open, IoUringSocketOnClosedCb cb = nullptr) override;
+  void cancelWriteOnWorkerShutdown() override;
   void enableRead() override;
   void disableRead() override;
+  void enableCloseEvent(bool enable) override;
   void write(Buffer::Instance& data) override;
   uint64_t write(const Buffer::RawSlice* slices, uint64_t num_slice) override;
   void shutdown(int how) override;
@@ -282,11 +290,17 @@ protected:
   Request* read_cancel_req_{nullptr};
   // This is used for tracking the write or shutdown's cancel request.
   Request* write_or_shutdown_cancel_req_{nullptr};
+  // A successful partial completion can race with cancellation. Do not submit the remaining data
+  // after cancellation was requested, even if the cancel completion has already been processed.
+  bool write_cancellation_requested_{false};
   // This is used for tracking the close request.
   Request* close_req_{nullptr};
   // Whether the write buffer is above the high watermark and backpressure is being applied.
   bool above_write_high_watermark_{false};
 
+  std::shared_ptr<IoUringPausedCloseWatch> paused_close_watch_;
+
+  void armPausedCloseWatch();
   void closeInternal();
   void submitReadRequest();
   void submitWriteOrShutdownRequest();
