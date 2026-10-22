@@ -129,8 +129,6 @@ protected:
   };
   void initialize(std::string&& yaml, bool is_upstream_filter = false) {
     scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
-    scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.ext_proc_not_send_empty_data_with_false_eos", "true"}});
