@@ -114,7 +114,8 @@ IoUringWorkerImpl::~IoUringWorkerImpl() {
     if (socket->getStatus() != Closed) {
       socket->close(false);
     }
-    // The dispatcher has stopped, so write timeout timers cannot cancel pending operations.
+    // This synchronous drain processes completions and deferred deletes, but does not run timers.
+    // Cancel pending writes directly rather than waiting for their timeout timers.
     socket->cancelWriteOnWorkerShutdown();
   }
 
@@ -516,10 +517,7 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
   if (write_or_shutdown_cancel_req_ == req) {
     write_or_shutdown_cancel_req_ = nullptr;
   }
-  if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_req_ == nullptr &&
-      read_cancel_req_ == nullptr && write_or_shutdown_cancel_req_ == nullptr) {
-    closeInternal();
-  }
+  maybeCloseIfReady();
 }
 
 void IoUringServerSocket::moveReadDataToBuffer(Request* req, size_t data_length) {
@@ -729,6 +727,7 @@ void IoUringServerSocket::onWrite(Request* req, int32_t result, bool injected) {
     ENVOY_LOG(trace, "drain write buf, drain size = {}, fd = {}", result, fd_);
     checkWriteWatermarks();
   } else {
+    ENVOY_LOG(trace, "discard write buf, size = {}, fd = {}", write_buf_.length(), fd_);
     // A cancellation can race with a successful partial write. Discard the remaining data now that
     // the request no longer references it, rather than submitting another write while closing.
     write_buf_.drain(write_buf_.length());
@@ -757,6 +756,13 @@ void IoUringServerSocket::onShutdown(Request* req, int32_t result, bool injected
   shutdown_ = true;
 
   submitWriteOrShutdownRequest();
+}
+
+void IoUringServerSocket::maybeCloseIfReady() {
+  if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_req_ == nullptr &&
+      read_cancel_req_ == nullptr && write_or_shutdown_cancel_req_ == nullptr) {
+    closeInternal();
+  }
 }
 
 void IoUringServerSocket::closeInternal() {
@@ -812,9 +818,8 @@ void IoUringServerSocket::submitWriteOrShutdownRequest() {
       write_or_shutdown_req_ = parent_.submitWriteRequest(*this, slices);
     } else if (shutdown_.has_value() && !shutdown_.value() && !write_cancellation_requested_) {
       write_or_shutdown_req_ = parent_.submitShutdownRequest(*this, SHUT_WR);
-    } else if (status_ == Closed && read_req_ == nullptr && read_cancel_req_ == nullptr &&
-               write_or_shutdown_cancel_req_ == nullptr) {
-      closeInternal();
+    } else {
+      maybeCloseIfReady();
     }
   }
 }
@@ -859,10 +864,7 @@ void IoUringClientSocket::onConnect(Request* req, int32_t result, bool injected)
   // Socket may be closed on connecting like binding error. In this situation we may not callback
   // on connecting completion.
   if (status_ == Closed) {
-    if (write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
-        write_or_shutdown_cancel_req_ == nullptr) {
-      closeInternal();
-    }
+    maybeCloseIfReady();
     return;
   }
 

@@ -293,6 +293,7 @@ protected:
   // Whether the write buffer is above the high watermark and backpressure is being applied.
   bool above_write_high_watermark_{false};
 
+  void maybeCloseIfReady();
   void closeInternal();
   void submitReadRequest();
   void submitWriteOrShutdownRequest();
