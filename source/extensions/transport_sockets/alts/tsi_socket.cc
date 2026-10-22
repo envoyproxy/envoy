@@ -148,6 +148,15 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     frame_protector_ = std::move(handshake_result->frame_protector);
 
     handshake_complete_ = true;
+    // The handshaker, and the gRPC stream it holds to the handshaker service,
+    // is not needed once the handshake is complete. Release it now rather than
+    // in closeSocket(): keeping the stream for the lifetime of the connection
+    // pins one handshaker service stream per open connection, and gRPC clients
+    // that enforce MAX_CONCURRENT_STREAMS per connection (gRFC A105) then stop
+    // starting new handshakes once that many connections are open.
+    if (handshaker_) {
+      handshaker_.release()->deferredDelete();
+    }
     if (raw_write_buffer_.length() == 0) {
       callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
     }

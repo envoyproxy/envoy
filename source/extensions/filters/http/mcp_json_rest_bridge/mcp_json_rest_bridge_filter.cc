@@ -774,7 +774,12 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
         path = "/mcp";
       }
       EndpointKey key{host, path};
-      auto& endpoint_config = endpoint_configs_[key];
+      auto [it, inserted] = endpoint_configs_.try_emplace(key, EndpointConfig());
+      if (!inserted) {
+        return absl::InvalidArgumentError(
+            fmt::format("Duplicate endpoint config for host/path: {}, {}", host, path));
+      }
+      EndpointConfig& endpoint_config = it->second;
       for (const auto& tool : tool_config.tools()) {
         absl::StatusOr<std::vector<McpParamHeaderMapping>> mcp_param_headers =
             buildMcpParamHeaderMappings(tool);
@@ -798,13 +803,9 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
           return absl::InvalidArgumentError(
               "tool_list_http_rule must be a GET request with an empty body");
         }
-        if (!endpoint_config.tool_list_http_rule.has_value()) {
-          endpoint_config.tool_list_http_rule = rule;
-        }
+        endpoint_config.tool_list_http_rule = rule;
       }
-      if (tool_config.has_tool_list_local()) {
-        endpoint_config.tool_list_local = true;
-      }
+      endpoint_config.tool_list_local = tool_config.has_tool_list_local();
     }
   }
   ENVOY_LOG(debug, "Received MCP JSON REST Bridge per-route config: {}",
@@ -1359,6 +1360,31 @@ absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
   return absl::OkStatus();
 }
 
+bool McpJsonRestBridgeFilter::validateClientCapabilitiesMeta(const nlohmann::json& json_rpc,
+                                                             absl::string_view method) {
+  const nlohmann::json& params = json_rpc[McpConstants::PARAMS_FIELD];
+  const nlohmann::json& meta = params[McpConstants::META_FIELD];
+  const auto client_capabilities = meta.find(McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD);
+  if (client_capabilities != meta.end() && client_capabilities->is_object()) {
+    return true;
+  }
+
+  const std::string error_message =
+      client_capabilities == meta.end()
+          ? absl::StrCat("Missing required params._meta field: ",
+                         McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD)
+          : absl::StrCat("Invalid params._meta field: ",
+                         McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD, " must be an object");
+  ENVOY_STREAM_LOG(debug, "Rejecting stateless MCP request: {}", *decoder_callbacks_,
+                   error_message);
+  sendErrorResponse(
+      Http::Code::BadRequest, BridgeStatus::RequestMcpClientCapabilitiesInvalid,
+      generateErrorJsonResponse(McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE, error_message)
+          .dump(),
+      nullptr, method, params);
+  return false;
+}
+
 bool McpJsonRestBridgeFilter::validateMcpMethodHeader(
     const nlohmann::json& json_rpc, absl::string_view method,
     Http::RequestHeaderMapOptRef request_headers) {
@@ -1457,6 +1483,10 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
 
   if (is_stateless_request_ && method == McpConstants::Methods::TOOLS_CALL &&
       !validateMcpNameHeader(json_rpc, method, request_headers)) {
+    return;
+  }
+
+  if (is_stateless_request_ && !validateClientCapabilitiesMeta(json_rpc, method)) {
     return;
   }
 
@@ -1575,8 +1605,12 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         },
         Grpc::Status::WellKnownGrpcStatus::Ok, "mcp_json_rest_bridge_filter_server_discover");
   } else {
+    // MCP 2026-07-28 Streamable HTTP requires 404 Not Found together with -32601 (Method not found)
+    // for methods the server does not implement. Legacy (2025-11-25 and earlier) requests keep
+    // 200 OK; see sendErrorResponse().
+    const Http::Code response_code = is_stateless_request_ ? Http::Code::NotFound : Http::Code::OK;
     sendErrorResponse(
-        Http::Code::OK, BridgeStatus::RequestMcpMethodNotSupported,
+        response_code, BridgeStatus::RequestMcpMethodNotSupported,
         generateErrorJsonResponse(-32601, absl::StrCat("MCP method ", method, " is not supported"))
             .dump(),
         nullptr, method,

@@ -1110,7 +1110,9 @@ public:
 // Basic test of delta's passthrough call to the state-of-the-world variant, to
 // increase coverage.
 TEST_F(SdsApiTest, Delta) {
-  auto secret = std::make_unique<envoy::extensions::transport_sockets::tls::v3::Secret>();
+  Protobuf::Arena arena;
+  auto secret =
+      Protobuf::Arena::MakeUnique<envoy::extensions::transport_sockets::tls::v3::Secret>(&arena);
   secret->set_name("secret_1");
   Config::DecodedResourceImpl resource(std::move(secret), "name", {}, "version1");
   std::vector<Config::DecodedResourceRef> resources{resource};
@@ -1125,7 +1127,8 @@ TEST_F(SdsApiTest, Delta) {
   EXPECT_OK(subscription_factory_.callbacks_->onConfigUpdate(resources, {}, "ignored"));
 
   // An attempt to remove a resource while adding a resource should not error.
-  auto secret_again = std::make_unique<envoy::extensions::transport_sockets::tls::v3::Secret>();
+  auto secret_again =
+      Protobuf::Arena::MakeUnique<envoy::extensions::transport_sockets::tls::v3::Secret>(&arena);
   secret_again->set_name("secret_1");
   Config::DecodedResourceImpl resource_v2(std::move(secret_again), "name", {}, "version2");
   std::vector<Config::DecodedResourceRef> resources_v2{resource_v2};

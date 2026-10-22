@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/sse/sse_event.h"
 #include "source/extensions/filters/http/ai_protocol_manager/transcoding_engine.h"
@@ -19,7 +20,14 @@ namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
 
+using StatusHelpers::HasStatusCode;
 using StatusHelpers::IsOk;
+
+LlmBindingConstSharedPtr parseBinding(absl::string_view text) {
+  absl::StatusOr<LlmBindingConstSharedPtr> binding = LlmBinding::parse(text);
+  EXPECT_TRUE(binding.ok()) << binding.status();
+  return binding.ok() ? *binding : nullptr;
+}
 
 // Runs a request leg of `dialect` in `direction` on `json`, with no request path. A `ToIr` leg
 // then has no path to lift what the dialect names there from, and a `FromIr` leg moves it out of
@@ -1132,7 +1140,7 @@ TEST(TranscodingEngineTest, TranscodeRejectsStreamEventAndUnregisteredLegs) {
 }
 
 // ---------------------------------------------------------------------------
-// Request envelopes: what a dialect names in the request path rather than the body.
+// Request bindings: what a dialect names in the request path rather than the body.
 
 constexpr TranscodeLeg kGeminiRequestToIr{PayloadKind::Request, TranscodeDirection::ToIr,
                                           LLMProtocol::GeminiGenerateContent};
@@ -1140,7 +1148,7 @@ constexpr TranscodeLeg kIrRequestToGemini{PayloadKind::Request, TranscodeDirecti
                                           LLMProtocol::GeminiGenerateContent};
 
 // A Gemini request names its model and streaming mode in the path, and the IR needs both in the
-// body. What the body names itself wins.
+// body. The path wins: Gemini's API takes neither in the body.
 TEST(TranscodingEngineTest, GeminiRequestToIrLiftsTheModelAndStreamFromThePath) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
@@ -1163,15 +1171,68 @@ TEST(TranscodingEngineTest, GeminiRequestToIrLiftsTheModelAndStreamFromThePath) 
                      "gemini-2.5-pro:generateContent";
   ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, unary), IsOk());
   EXPECT_EQ(unary["model"], "gemini-2.5-pro");
-  EXPECT_FALSE(unary.contains("stream"));
+  EXPECT_EQ(unary["stream"], false);
+  ASSERT_TRUE(ctx.read.has_value());
+  EXPECT_EQ(ctx.read->path_variables.at("project"), "p");
+  EXPECT_EQ(ctx.read->path_variables.at("location"), "us-central1");
 
   nlohmann::json named = body;
   named["model"] = "gemini-named-in-body";
   named["stream"] = false;
   ctx.request_path = "/v1beta/models/gemini-2.5-flash:streamGenerateContent";
   ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, named), IsOk());
-  EXPECT_EQ(named["model"], "gemini-named-in-body");
-  EXPECT_EQ(named["stream"], false);
+  EXPECT_EQ(named["model"], "gemini-2.5-flash");
+  EXPECT_EQ(named["stream"], true);
+}
+
+// Claude on Vertex AI is a client binding of Anthropic Messages: the path names the model, which
+// wins over the body, and `anthropic_version` leaves the body, kept on the read for the way out.
+TEST(TranscodingEngineTest, AnthropicRequestToIrReadsVertexAiPaths) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+  const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
+                           LLMProtocol::AnthropicMessages};
+
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "anthropic_version": "vertex-2023-10-16", "max_tokens": 16, "stream": true,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ctx.request_path = "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+                     "claude-sonnet-4-5@20250929:streamRawPredict";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, doc), IsOk());
+  EXPECT_EQ(doc["model"], "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(doc["stream"], true);
+  EXPECT_EQ(doc["max_completion_tokens"], 16);
+  EXPECT_FALSE(doc.contains("anthropic_version"));
+  ASSERT_TRUE(ctx.read.has_value());
+  EXPECT_EQ(ctx.read->model, "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(ctx.read->path_variables,
+            (absl::flat_hash_map<std::string, std::string>{
+                {"version", "v1"}, {"project", "acme"}, {"location", "us-east5"}}));
+  EXPECT_EQ(ctx.read->written_fields.at("anthropic_version"), "vertex-2023-10-16");
+
+  // The unary method leaves the streaming mode to the body, which Vertex AI keeps.
+  nlohmann::json named = nlohmann::json::parse(R"({
+    "model": "claude-named-in-body", "max_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ctx.request_path = "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+                     "claude-sonnet-4-5@20250929:rawPredict";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, named), IsOk());
+  EXPECT_EQ(named["model"], "claude-sonnet-4-5@20250929");
+  EXPECT_FALSE(named.contains("stream"));
+  EXPECT_TRUE(ctx.read->written_fields.empty());
+
+  // The Anthropic API's own path names nothing.
+  nlohmann::json own = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5", "max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  ctx.request_path = "/v1/messages";
+  ASSERT_THAT(engine.transcode(to_ir, ctx, own), IsOk());
+  EXPECT_FALSE(ctx.read.has_value());
+  EXPECT_EQ(own["model"], "claude-sonnet-4-5");
 }
 
 // Only Gemini's model methods name anything, and a dialect that names nothing in the path reads
@@ -1323,16 +1384,17 @@ TEST(TranscodingEngineTest, IrRequestToGeminiRefusesAModelThatIsNotAModelId) {
             absl::StatusCode::kInvalidArgument);
 }
 
-// The envelope is data in the pack: another dialect that names its model in the path gets the same
+// The binding is data in the pack: another dialect that names its model in the path gets the same
 // treatment, with its own layout.
-TEST(TranscodingEngineTest, RequestEnvelopeIsDataInThePack) {
+TEST(TranscodingEngineTest, RequestBindingIsDataInThePack) {
   TranscodingEngine engine;
-  ASSERT_THAT(
-      engine.registerPack(DialectTranscodePack{
-          .protocol = LLMProtocol::OpenAiResponses,
-          .envelope = *UriPattern::parse("/v2/engines/{model}:{predict|streamPredict?stream=1}"),
-      }),
-      IsOk());
+  ASSERT_THAT(engine.registerPack(DialectTranscodePack{
+                  .protocol = LLMProtocol::OpenAiResponses,
+                  .binding = parseBinding(
+                      R"({"uri_pattern": "/v2/engines/{model}:{predict|streamPredict?stream=1}",)"
+                      R"( "mutations": [{"body_field": "model"}, {"body_field": "stream"}]})"),
+              }),
+              IsOk());
   const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
                            LLMProtocol::OpenAiResponses};
   const TranscodeLeg from_ir{PayloadKind::Request, TranscodeDirection::FromIr,
@@ -1359,7 +1421,7 @@ TEST(TranscodingEngineTest, RequestEnvelopeIsDataInThePack) {
   EXPECT_EQ(doc, nlohmann::json::parse(R"({"input": "Hi"})"));
 }
 
-TEST(TranscodingEngineTest, ModelFromRequestPathReadsTheDialectsEnvelope) {
+TEST(TranscodingEngineTest, ModelFromRequestPathReadsTheDialectsBindings) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
@@ -1373,10 +1435,15 @@ TEST(TranscodingEngineTest, ModelFromRequestPathReadsTheDialectsEnvelope) {
             "gemini-2.5-flash");
   EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::GeminiGenerateContent, "/v1/chat/completions"),
             "");
-  // Anthropic names its model in the body, and `OpenAiResponses` has no pack at all.
+  // Anthropic names its model in the body, but in the path on Vertex AI. `OpenAiResponses` has no
+  // pack at all.
   EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages,
                                         "/v1beta/models/gemini-2.5-pro:generateContent"),
             "");
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages,
+                                        "/v1/projects/p/locations/l/publishers/anthropic/models/"
+                                        "claude-sonnet-4-5:rawPredict"),
+            "claude-sonnet-4-5");
   EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::OpenAiResponses,
                                         "/v1beta/models/gemini-2.5-pro:generateContent"),
             "");
@@ -1384,53 +1451,49 @@ TEST(TranscodingEngineTest, ModelFromRequestPathReadsTheDialectsEnvelope) {
 
 // ---------------------------------------------------------------------------
 // Transcoding instructions: what a filter ahead of the transcoder sets through `TranscodeContext`
-// takes the place of the dialect's own layout for one request.
+// takes the place of the dialect's own bindings for one request.
 
 constexpr TranscodeLeg kAnthropicRequestToIr{PayloadKind::Request, TranscodeDirection::ToIr,
                                              LLMProtocol::AnthropicMessages};
 constexpr TranscodeLeg kIrRequestToAnthropic{PayloadKind::Request, TranscodeDirection::FromIr,
                                              LLMProtocol::AnthropicMessages};
 
-// A request pattern says where the client's path names the model and streaming mode, for a
-// dialect that names them in the path (Gemini, in place of its own layout) and for one that names
-// them in the body (Anthropic, which otherwise never reads the path).
-TEST(TranscodingEngineTest, RequestUriPatternLiftsFromTheClientsPath) {
+// A request binding says where the client's path names the model and streaming mode, for a
+// dialect that names them in the path (Gemini, in place of its own bindings) and for one that names
+// them in the body (Anthropic). A pattern alone keeps the dialect's own body edits.
+TEST(TranscodingEngineTest, RequestBindingReadsTheClientsPath) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  const absl::StatusOr<UriPattern> gateway =
-      UriPattern::parse("/gateway/{model}/{chat|chat-stream}");
-  ASSERT_THAT(gateway.status(), IsOk());
   nlohmann::json gemini =
       nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
   TranscodeContext ctx;
   ctx.request_path = "/gateway/gemini-2.5-flash/chat-stream?key=x";
-  ctx.request_uri_pattern = &*gateway;
+  ctx.request_binding = parseBinding("/gateway/{model}/{chat|chat-stream}");
   ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, gemini), IsOk());
-  EXPECT_TRUE(ctx.request_path_matched);
+  EXPECT_TRUE(ctx.read.has_value());
   EXPECT_EQ(gemini["model"], "gemini-2.5-flash");
   EXPECT_EQ(gemini["stream"], true);
   EXPECT_EQ(ctx.ir_model, "gemini-2.5-flash");
 
-  // The dialect's own layout no longer applies to that request.
+  // The dialect's own bindings no longer apply to that request.
   nlohmann::json own_layout =
       nlohmann::json::parse(R"({"contents": [{"role": "user", "parts": [{"text": "Hi"}]}]})");
   ctx.request_path = "/v1beta/models/gemini-2.5-flash:generateContent";
   ASSERT_THAT(engine.transcode(kGeminiRequestToIr, ctx, own_layout), IsOk());
-  EXPECT_FALSE(ctx.request_path_matched);
+  EXPECT_FALSE(ctx.read.has_value());
   EXPECT_FALSE(own_layout.contains("model"));
 
-  const absl::StatusOr<UriPattern> vertex =
-      UriPattern::parse("/v1/projects/p/locations/l/publishers/anthropic/models/"
-                        "{model}:{rawPredict|streamRawPredict}");
-  ASSERT_THAT(vertex.status(), IsOk());
+  const LlmBindingConstSharedPtr vertex =
+      parseBinding("/v1/projects/p/locations/l/publishers/anthropic/models/"
+                   "{model}:{rawPredict|streamRawPredict}");
   nlohmann::json anthropic = nlohmann::json::parse(R"({
     "max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
   })");
   ctx.request_path =
       "/v1/projects/p/locations/l/publishers/anthropic/models/claude-sonnet-4-5:streamRawPredict";
-  ctx.request_uri_pattern = &*vertex;
+  ctx.request_binding = vertex;
   ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, ctx, anthropic), IsOk());
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
   EXPECT_EQ(anthropic["stream"], true);
@@ -1443,62 +1506,59 @@ TEST(TranscodingEngineTest, RequestUriPatternLiftsFromTheClientsPath) {
   ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, ctx, named), IsOk());
   EXPECT_EQ(named["model"], "claude-opus-4-1");
 
-  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages, ctx.request_path, &*vertex),
+  EXPECT_EQ(engine.modelFromRequestPath(LLMProtocol::AnthropicMessages, ctx.request_path, vertex),
             "claude-sonnet-4-5");
 }
 
-// A response pattern says what path the upstream expects. A dialect that names the model in the
-// body keeps it there, and only gains the path; one that names it in the path loses it from the
-// body as it always does.
-TEST(TranscodingEngineTest, ResponseUriPatternRendersTheUpstreamPath) {
+// A response binding says what path the upstream expects. With a pattern alone, a dialect that
+// names the model in the body keeps it there, and only gains the path; one that names it in the
+// path loses it from the body as its own binding does.
+TEST(TranscodingEngineTest, ResponseBindingRendersTheUpstreamPath) {
   auto engine_or = TranscodingEngine::createDefault();
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  const absl::StatusOr<UriPattern> gateway_claude =
-      UriPattern::parse("/gateway/anthropic/{model}/{messages|messages-stream}");
-  ASSERT_THAT(gateway_claude.status(), IsOk());
+  const LlmBindingConstSharedPtr gateway_claude =
+      parseBinding("/gateway/anthropic/{model}/{messages|messages-stream}");
   nlohmann::json anthropic = nlohmann::json::parse(R"({
     "model": "claude-sonnet-4-5", "stream": true, "max_completion_tokens": 16,
     "messages": [{"role": "user", "content": "Hi"}]
   })");
   TranscodeContext ctx;
-  ctx.response_uri_pattern = &*gateway_claude;
+  ctx.response_binding = gateway_claude.get();
   ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, anthropic), IsOk());
   EXPECT_THAT(ctx.rewritten_path, testing::Optional(std::string(
                                       "/gateway/anthropic/claude-sonnet-4-5/messages-stream")));
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5");
   EXPECT_EQ(anthropic["stream"], true);
 
-  // A pattern that names the model needs one in the body, like the dialect's own layout would.
+  // A pattern that names the model needs one in the body; Anthropic's schema asks first.
   nlohmann::json no_model = nlohmann::json::parse(R"({
     "max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
   })");
   const absl::Status status = engine.transcode(kIrRequestToAnthropic, ctx, no_model);
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(status.message(), testing::HasSubstr("model id"));
+  EXPECT_THAT(status.message(), testing::HasSubstr("model"));
   EXPECT_FALSE(ctx.rewritten_path.has_value());
 
   // A fixed path has nothing to take from the body.
-  const absl::StatusOr<UriPattern> fixed = UriPattern::parse("/anthropic/v1/messages");
-  ASSERT_THAT(fixed.status(), IsOk());
+  const LlmBindingConstSharedPtr fixed = parseBinding("/anthropic/v1/messages");
   nlohmann::json unary = nlohmann::json::parse(R"({
     "model": "claude-sonnet-4-5", "max_completion_tokens": 16,
     "messages": [{"role": "user", "content": "Hi"}]
   })");
-  ctx.response_uri_pattern = &*fixed;
+  ctx.response_binding = fixed.get();
   ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, unary), IsOk());
   EXPECT_THAT(ctx.rewritten_path, testing::Optional(std::string("/anthropic/v1/messages")));
   EXPECT_EQ(unary["model"], "claude-sonnet-4-5");
 
-  const absl::StatusOr<UriPattern> vertex_gemini =
-      UriPattern::parse("/v1/projects/p/locations/l/publishers/google/models/"
-                        "{model}:{generateContent|streamGenerateContent?alt=sse}");
-  ASSERT_THAT(vertex_gemini.status(), IsOk());
+  const LlmBindingConstSharedPtr vertex_gemini =
+      parseBinding("/v1/projects/p/locations/l/publishers/google/models/"
+                   "{model}:{generateContent|streamGenerateContent?alt=sse}");
   nlohmann::json gemini = nlohmann::json::parse(R"({
     "model": "gemini-2.5-flash", "stream": false, "messages": [{"role": "user", "content": "Hi"}]
   })");
-  ctx.response_uri_pattern = &*vertex_gemini;
+  ctx.response_binding = vertex_gemini.get();
   ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, gemini), IsOk());
   EXPECT_THAT(ctx.rewritten_path,
               testing::Optional(std::string("/v1/projects/p/locations/l/publishers/google/models/"
@@ -1515,16 +1575,15 @@ TEST(TranscodingEngineTest, ResolvedModelReplacesTheRequestedOne) {
   ASSERT_THAT(engine_or.status(), IsOk());
   const TranscodingEngine& engine = *engine_or;
 
-  const absl::StatusOr<UriPattern> gateway_claude =
-      UriPattern::parse("/gateway/anthropic/{model}/{messages|messages-stream}");
-  ASSERT_THAT(gateway_claude.status(), IsOk());
+  const LlmBindingConstSharedPtr gateway_claude =
+      parseBinding("/gateway/anthropic/{model}/{messages|messages-stream}");
   nlohmann::json anthropic = nlohmann::json::parse(R"({
     "model": "claude-sonnet", "max_completion_tokens": 16,
     "messages": [{"role": "user", "content": "Hi"}]
   })");
   TranscodeContext ctx;
   ctx.resolved_model = "claude-sonnet-4-5@20250929";
-  ctx.response_uri_pattern = &*gateway_claude;
+  ctx.response_binding = gateway_claude.get();
   ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, anthropic), IsOk());
   EXPECT_EQ(anthropic["model"], "claude-sonnet-4-5@20250929");
   EXPECT_EQ(ctx.ir_model, "claude-sonnet");
@@ -1534,7 +1593,7 @@ TEST(TranscodingEngineTest, ResolvedModelReplacesTheRequestedOne) {
   // It fills in a model the request never named, too.
   nlohmann::json gemini =
       nlohmann::json::parse(R"({"stream": true, "messages": [{"role": "user", "content": "Hi"}]})");
-  ctx.response_uri_pattern = nullptr;
+  ctx.response_binding = nullptr;
   ctx.resolved_model = "gemini-2.5-pro";
   ASSERT_THAT(engine.transcode(kIrRequestToGemini, ctx, gemini), IsOk());
   EXPECT_THAT(ctx.rewritten_path,
@@ -1549,6 +1608,130 @@ TEST(TranscodingEngineTest, ResolvedModelReplacesTheRequestedOne) {
   ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, ctx, to_ir), IsOk());
   EXPECT_EQ(to_ir["model"], "claude-sonnet");
   EXPECT_EQ(ctx.ir_model, "claude-sonnet");
+}
+
+// A Vertex AI client sent to Gemini on Vertex AI: the response binding's other variables take the
+// values the client's path held, and Gemini's own edits apply to a binding without any.
+TEST(TranscodingEngineTest, ResponseBindingRendersTheClientsPathVariables) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json anthropic = nlohmann::json::parse(R"({
+    "anthropic_version": "vertex-2023-10-16", "max_tokens": 16, "stream": true,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext to_ir;
+  to_ir.request_path = "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+                       "claude-sonnet-4-5@20250929:streamRawPredict";
+  ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, to_ir, anthropic), IsOk());
+  ASSERT_TRUE(to_ir.read.has_value());
+
+  const LlmBindingConstSharedPtr vertex_gemini =
+      parseBinding("/{version}/projects/{project}/locations/{location}/publishers/google/models/"
+                   "{model}:{generateContent|streamGenerateContent?alt=sse}");
+  TranscodeContext from_ir;
+  from_ir.response_binding = vertex_gemini.get();
+  from_ir.arrived = &*to_ir.read;
+  from_ir.resolved_model = "gemini-2.5-flash";
+  ASSERT_THAT(engine.transcode(kIrRequestToGemini, from_ir, anthropic), IsOk());
+  EXPECT_THAT(from_ir.rewritten_path,
+              testing::Optional(std::string("/v1/projects/acme/locations/us-east5/publishers/"
+                                            "google/models/gemini-2.5-flash:"
+                                            "streamGenerateContent?alt=sse")));
+  EXPECT_EQ(from_ir.ir_model, "claude-sonnet-4-5@20250929");
+  EXPECT_EQ(anthropic, nlohmann::json::parse(R"({
+    "contents": [{"role": "user", "parts": [{"text": "Hi"}]}],
+    "generationConfig": {"maxOutputTokens": 16}
+  })"));
+}
+
+// A variable that neither the body nor the client's path fills is the proxy's configuration at
+// fault, and no path is rendered.
+TEST(TranscodingEngineTest, ResponseBindingVariableWithoutAValueIsUnresolved) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const LlmBindingConstSharedPtr vertex_gemini =
+      parseBinding("/v1/projects/{project}/locations/us-central1/publishers/google/models/"
+                   "{model}:{generateContent|streamGenerateContent?alt=sse}");
+  nlohmann::json doc = nlohmann::json::parse(
+      R"({"model": "gemini-2.5-flash", "messages": [{"role": "user", "content": "Hi"}]})");
+  TranscodeContext ctx;
+  ctx.response_binding = vertex_gemini.get();
+  EXPECT_FALSE(engine.transcode(kIrRequestToGemini, ctx, doc).ok());
+  EXPECT_TRUE(ctx.unresolved);
+  EXPECT_FALSE(ctx.rewritten_path.has_value());
+  EXPECT_EQ(doc["model"], "gemini-2.5-flash");
+}
+
+// Claude on Vertex AI as a backend: the body is validated with `model` still in it, as Anthropic's
+// schema requires, and only then edited.
+TEST(TranscodingEngineTest, ResponseBindingEditsTheBodyAfterValidation) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  const LlmBindingConstSharedPtr vertex_claude = parseBinding(R"({
+    "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
+    "mutations": [
+      {"body_field": "model"},
+      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    ]
+  })");
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "model": "claude-sonnet-4-5@20250929", "stream": true, "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext ctx;
+  ctx.response_binding = vertex_claude.get();
+  ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, doc), IsOk());
+  EXPECT_THAT(ctx.rewritten_path,
+              testing::Optional(std::string("/v1/projects/acme/locations/us-east5/publishers/"
+                                            "anthropic/models/claude-sonnet-4-5@20250929:"
+                                            "streamRawPredict")));
+  EXPECT_FALSE(doc.contains("model"));
+  EXPECT_EQ(doc["anthropic_version"], "vertex-2023-10-16");
+  EXPECT_EQ(doc["stream"], true);
+  EXPECT_EQ(doc["max_tokens"], 16);
+
+  // Without `model` the body fails the schema before the binding would have dropped it.
+  nlohmann::json no_model = nlohmann::json::parse(
+      R"({"max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})");
+  EXPECT_THAT(engine.transcode(kIrRequestToAnthropic, ctx, no_model),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
+  EXPECT_FALSE(ctx.unresolved);
+  EXPECT_FALSE(ctx.rewritten_path.has_value());
+}
+
+// A request that leaves in the binding it arrived in is rendered from the client's path and gets
+// the body fields that binding writes back as the client sent them.
+TEST(TranscodingEngineTest, SameBindingRestoresWhatTheClientSent) {
+  auto engine_or = TranscodingEngine::createDefault();
+  ASSERT_THAT(engine_or.status(), IsOk());
+  const TranscodingEngine& engine = *engine_or;
+
+  nlohmann::json doc = nlohmann::json::parse(R"({
+    "anthropic_version": "vertex-2099-01-01", "max_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })");
+  TranscodeContext to_ir;
+  to_ir.request_path = "/v1/projects/acme/locations/europe-west1/publishers/anthropic/models/"
+                       "claude-haiku-4-5@20251001:rawPredict";
+  ASSERT_THAT(engine.transcode(kAnthropicRequestToIr, to_ir, doc), IsOk());
+  ASSERT_TRUE(to_ir.read.has_value());
+
+  TranscodeContext from_ir;
+  from_ir.arrived = &*to_ir.read;
+  from_ir.response_binding = to_ir.read->binding.get();
+  ASSERT_THAT(engine.transcode(kIrRequestToAnthropic, from_ir, doc), IsOk());
+  EXPECT_THAT(from_ir.rewritten_path,
+              testing::Optional(std::string("/v1/projects/acme/locations/europe-west1/publishers/"
+                                            "anthropic/models/claude-haiku-4-5@20251001:"
+                                            "rawPredict")));
+  EXPECT_FALSE(doc.contains("model"));
+  EXPECT_EQ(doc["anthropic_version"], "vertex-2099-01-01");
 }
 
 // ---------------------------------------------------------------------------

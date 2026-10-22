@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/extensions/http/ai_filters/transcoder/v3/transcoder.pb.h"
+#include "envoy/registry/registry.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -58,6 +59,11 @@ using HttpFilters::AiProtocolManager::FlatteningJsonDecoder;
 using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
+using HttpFilters::AiProtocolManager::LlmBinding;
+using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
+using HttpFilters::AiProtocolManager::LlmBindingObject;
+using HttpFilters::AiProtocolManager::LlmBindingRead;
+using HttpFilters::AiProtocolManager::LlmBindingReadObject;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::ResponseLlmProtocol;
@@ -141,7 +147,10 @@ public:
   TranscoderFilterTest()
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
         bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
-        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
+        connection_filter_state_(std::make_shared<StreamInfo::FilterStateImpl>(
+            StreamInfo::FilterState::LifeSpan::Connection)),
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain,
+                     connection_filter_state_) {}
 
   ~TranscoderFilterTest() override { buffer_manager_.onDestroy(); }
 
@@ -163,7 +172,9 @@ public:
     return AiFilterContext{.stream_info = stream_info_,
                            .request_headers = request_headers_,
                            .request_protocol = source_protocol,
-                           .response_protocol = target_protocol_};
+                           .response_protocol = target_protocol_,
+                           .request_binding = route_request_binding_,
+                           .response_binding = route_response_binding_};
   }
 
   void runDecodeChain(std::vector<AiFilterSharedPtr> filters, const std::string& payload) {
@@ -252,6 +263,14 @@ public:
     stream_info_.filterState()->setData(key, std::make_shared<Router::StringAccessorImpl>(value),
                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
+  // Leaves the object the key's factory builds from `value`, as `set_filter_state` does.
+  void setBinding(absl::string_view key, absl::string_view value) {
+    const auto* factory =
+        Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
+    ASSERT_NE(factory, nullptr);
+    stream_info_.filterState()->setData(key, factory->createFromBytes(value),
+                                        StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
   void setResponseProtocolInstruction(LLMProtocol protocol) {
     stream_info_.filterState()->setData(FilterStateKeys::LlmProtocolResponse,
                                         std::make_shared<ResponseLlmProtocol>(protocol),
@@ -263,11 +282,16 @@ public:
   InMemoryExternalBufferFactory factory_;
   FakeBridge bridge_;
   BufferManager buffer_manager_;
+  // The downstream connection's filter state, which every stream on the connection shares.
+  StreamInfo::FilterStateSharedPtr connection_filter_state_;
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Http::TestRequestHeaderMapImpl request_headers_;
   // The backend's dialect, as the route declares it for the filters `makeContext()` builds.
   LLMProtocol target_protocol_{LLMProtocol::Unspecified};
+  // The bindings the route declares for those filters.
+  LlmBindingConstSharedPtr route_request_binding_;
+  LlmBindingConstSharedPtr route_response_binding_;
 
   absl::Status status_;
   bool completed_{false};
@@ -518,8 +542,7 @@ TEST_F(TranscoderFilterTest, UnsetRequestHandlingPassesRequestThroughUntouched) 
 // An OpenAI client, a route that declares Gemini, and a model router that chose Claude behind a
 // gateway instead: it leaves the backend's dialect, the path the gateway expects, and the resolved
 // model in filter state, and the request goes out as Anthropic Messages to that path, naming that
-// model in the body as the dialect does. (Claude on Vertex AI additionally drops `model` from the
-// body and adds `anthropic_version`; that provider adaptation is not expressed yet.)
+// model in the body as the dialect does.
 // The response then comes back through the same instance as Anthropic, not Gemini, and names the
 // model the client asked for, not the one the router chose.
 TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChose) {
@@ -527,8 +550,8 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
   request_headers_ =
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
   setResponseProtocolInstruction(LLMProtocol::AnthropicMessages);
-  setInstruction(FilterStateKeys::UriPatternResponse,
-                 "/gateway/anthropic/{model}/{messages|messages-stream}");
+  setBinding(FilterStateKeys::BindingResponse,
+             "/gateway/anthropic/{model}/{messages|messages-stream}");
   setInstruction(FilterStateKeys::ModelResolved, "claude-sonnet-4-5@20250929");
 
   FilterManager manager({std::make_shared<TranscoderFilter>(
@@ -565,10 +588,10 @@ TEST_F(TranscoderFilterTest, InstructionsSendTheRequestToTheBackendTheRouterChos
   EXPECT_EQ(counterValue("unresolved"), 0);
 }
 
-// A request pattern tells the `TO_IR` leg where the client's path names the model and streaming
-// mode, for a dialect whose own layout says nothing about the path.
-TEST_F(TranscoderFilterTest, RequestUriPatternLiftsTheModelFromTheClientsPath) {
-  setInstruction(FilterStateKeys::UriPatternRequest, "/anthropic/{model}/{messages|stream}");
+// A request binding tells the `TO_IR` leg where the client's path names the model and streaming
+// mode, for a dialect whose own bindings say nothing about the path.
+TEST_F(TranscoderFilterTest, RequestBindingLiftsTheModelFromTheClientsPath) {
+  setBinding(FilterStateKeys::BindingRequest, "/anthropic/{model}/{messages|stream}");
 
   runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
                   R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
@@ -580,6 +603,115 @@ TEST_F(TranscoderFilterTest, RequestUriPatternLiftsTheModelFromTheClientsPath) {
   EXPECT_EQ(out["model"], "claude-sonnet-4-5");
   EXPECT_EQ(out["stream"], true);
   EXPECT_EQ(counterValue("transcoded"), 1);
+  const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(*stream_info_.filterState());
+  ASSERT_NE(read, nullptr);
+  EXPECT_EQ(read->model, "claude-sonnet-4-5");
+}
+
+// The bindings an instance applies follow its request leg, so the AI Protocol Manager can count a
+// route binding no instance applies.
+TEST_F(TranscoderFilterTest, AppliesTheBindingsOfItsRequestLeg) {
+  const auto use = [this](TranscoderProto::Direction request_handling) {
+    return TranscoderFilter(makeConfig(request_handling, TranscoderProto::TO_IR),
+                            makeContext(LLMProtocol::OpenAiChatCompletions))
+        .bindingUse();
+  };
+  EXPECT_TRUE(use(TranscoderProto::TO_IR).request);
+  EXPECT_FALSE(use(TranscoderProto::TO_IR).response);
+  EXPECT_FALSE(use(TranscoderProto::FROM_IR).request);
+  EXPECT_TRUE(use(TranscoderProto::FROM_IR).response);
+  // Without a request leg, the instance still reads the client's path for its response's model.
+  EXPECT_TRUE(use(TranscoderProto::DIRECTION_UNSPECIFIED).request);
+  EXPECT_FALSE(use(TranscoderProto::DIRECTION_UNSPECIFIED).response);
+}
+
+// The route's request binding reads the client's path when filter state names none.
+TEST_F(TranscoderFilterTest, RouteRequestBindingLiftsTheModelFromTheClientsPath) {
+  route_request_binding_ = *LlmBinding::parse("/anthropic/{model}/{messages|stream}");
+
+  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
+                  R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
+                  "/anthropic/claude-sonnet-4-5/stream");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  const nlohmann::json out = forwarded();
+  EXPECT_EQ(out["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(out["stream"], true);
+}
+
+constexpr absl::string_view ChatToClaude =
+    R"({"model": "claude-sonnet-4-5", "max_completion_tokens": 16,)"
+    R"( "messages": [{"role": "user", "content": "Hi"}]})";
+
+// The route's response binding renders the path the request leaves on.
+TEST_F(TranscoderFilterTest, RouteResponseBindingSendsTheRequest) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{messages|messages-stream}");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  std::string(ChatToClaude));
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/gateway/claude-sonnet-4-5/messages");
+}
+
+TEST_F(TranscoderFilterTest, FilterStateBindingReplacesTheRoutes) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{messages|messages-stream}");
+  setBinding(FilterStateKeys::BindingResponse, "/override/{model}/{messages|messages-stream}");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  std::string(ChatToClaude));
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/override/claude-sonnet-4-5/messages");
+}
+
+// The route's response binding is how the route's backend carries its API, so a backend that
+// filter state names instead leaves in its own API's binding.
+TEST_F(TranscoderFilterTest, RouteResponseBindingLapsesForAnotherBackendApi) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{messages|messages-stream}");
+  setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  std::string(ChatToClaude));
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1beta/models/claude-sonnet-4-5:generateContent");
+}
+
+// A binding set once per connection is shared by every stream on it, so what one stream's path
+// held is kept on that stream alone.
+TEST_F(TranscoderFilterTest, ReadOfABindingSharedByStreamsStaysWithTheStream) {
+  connection_filter_state_->setData(FilterStateKeys::BindingRequest,
+                                    std::make_shared<LlmBindingObject>("/tenants/{tenant}/{model}"),
+                                    StreamInfo::FilterState::LifeSpan::Connection);
+
+  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::OpenAiChatCompletions,
+                  R"({"messages": [{"role": "user", "content": "Hi"}]})", "/tenants/t-1/gpt-4o");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(forwarded()["model"], "gpt-4o");
+  const LlmBindingRead* read = LlmBindingReadObject::fromFilterState(*stream_info_.filterState());
+  ASSERT_NE(read, nullptr);
+  EXPECT_EQ(read->path_variables.at("tenant"), "t-1");
+  EXPECT_FALSE(connection_filter_state_->hasDataWithName(FilterStateKeys::BindingRead));
+}
+
+// A request binding that does not match the path reads nothing from it; the request still goes
+// through on what the body says.
+TEST_F(TranscoderFilterTest, RequestBindingThatMissesThePathReadsNothing) {
+  setBinding(FilterStateKeys::BindingRequest, "/anthropic/{model}/{messages|stream}");
+
+  runSingleDecode(TranscoderProto::TO_IR, LLMProtocol::AnthropicMessages,
+                  R"({"max_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]})",
+                  "/v1/messages");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_FALSE(forwarded().contains("model"));
+  EXPECT_EQ(LlmBindingReadObject::fromFilterState(*stream_info_.filterState()), nullptr);
+  EXPECT_EQ(counterValue("transcoded"), 1);
 }
 
 // An instance that transcodes no request still reads the instructions: the backend's dialect
@@ -590,7 +722,7 @@ TEST_F(TranscoderFilterTest, ResponseOnlyInstanceFollowsTheInstructionsToo) {
   request_headers_ = Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                                     {":path", "/gateway/gemini-2.5-pro/chat"}};
   setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
-  setInstruction(FilterStateKeys::UriPatternRequest, "/gateway/{model}/{chat|chat-stream}");
+  setBinding(FilterStateKeys::BindingRequest, "/gateway/{model}/{chat|chat-stream}");
 
   FilterManager manager({std::make_shared<TranscoderFilter>(
       makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
@@ -611,17 +743,197 @@ TEST_F(TranscoderFilterTest, ResponseOnlyInstanceFollowsTheInstructionsToo) {
   EXPECT_EQ(counterValue("transcoded"), 1);
 }
 
-// A pattern that does not parse is the proxy's configuration at fault, so the request fails with
+// The model a request leg ahead of the instance read wins over the path, which a backend-side
+// instance may have rewritten since.
+TEST_F(TranscoderFilterTest, ResponseOnlyInstanceTakesTheModelARequestLegRead) {
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/gateway/rewritten/chat"}};
+  setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
+  setBinding(FilterStateKeys::BindingRequest, "/gateway/{model}/{chat|chat-stream}");
+  stream_info_.filterState()->setData(
+      FilterStateKeys::BindingRead,
+      std::make_shared<LlmBindingReadObject>(LlmBindingRead{nullptr, "gemini-2.5-pro", {}, {}}),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  FilterManager manager({std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::DIRECTION_UNSPECIFIED, TranscoderProto::TO_IR),
+      makeContext(LLMProtocol::OpenAiChatCompletions))});
+  runDecodeChain(manager, R"({"messages": [{"role": "user", "content": "Hi"}]})");
+  ASSERT_TRUE(status_.ok()) << status_;
+
+  const std::string wire =
+      runResponse(manager,
+                  R"({"candidates":[{"content":{"role":"model","parts":[{"text":"Hello back!"}]},)"
+                  R"("finishReason":"STOP"}]})",
+                  /*sse=*/false);
+  EXPECT_EQ(nlohmann::json::parse(wire)["model"], "gemini-2.5-pro");
+}
+
+// A binding that does not parse is the proxy's configuration at fault, so the request fails with
 // a 500, counted as `unresolved`, before anything is transcoded.
-TEST_F(TranscoderFilterTest, UnparseablePatternInstructionFailsTheRequest) {
+TEST_F(TranscoderFilterTest, UnparseableBindingInstructionFailsTheRequest) {
   target_protocol_ = LLMProtocol::AnthropicMessages;
-  setInstruction(FilterStateKeys::UriPatternResponse, "/v1/{model/messages");
+  setBinding(FilterStateKeys::BindingResponse, "/v1/{model/messages");
 
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
                   R"({"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]})");
 
   EXPECT_EQ(local_reply_code_, Http::Code::InternalServerError);
-  EXPECT_THAT(local_reply_details_, testing::HasSubstr("envoy.ai.uri_pattern.response"));
+  EXPECT_THAT(local_reply_details_, testing::HasSubstr("envoy.ai.binding.response"));
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  EXPECT_EQ(counterValue("unresolved"), 1);
+  EXPECT_EQ(counterValue("failed"), 0);
+  EXPECT_EQ(counterValue("transcoded"), 0);
+}
+
+// A Vertex AI client of Claude sent to Gemini on Vertex AI, in the project and region it addressed:
+// the client-side instance reads the client's path, and the backend-side one renders the Gemini
+// path from what it read.
+TEST_F(TranscoderFilterTest, VertexClaudeClientReachesGeminiOnVertexAi) {
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/v1/projects/acme/locations/us-east5/publishers/"
+                                               "anthropic/models/claude-sonnet-4-5@20250929:"
+                                               "streamRawPredict"}};
+  setResponseProtocolInstruction(LLMProtocol::GeminiGenerateContent);
+  setBinding(FilterStateKeys::BindingResponse,
+             "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
+             "{model}:{generateContent|streamGenerateContent?alt=sse}");
+  setInstruction(FilterStateKeys::ModelResolved, "gemini-2.5-flash");
+
+  const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
+  FilterManager manager(
+      {std::make_shared<TranscoderFilter>(
+           makeConfig(TranscoderProto::TO_IR, TranscoderProto::FROM_IR), context),
+       std::make_shared<TranscoderFilter>(
+           makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR), context)});
+  runDecodeChain(manager, R"({
+    "anthropic_version": "vertex-2023-10-16", "max_tokens": 64, "stream": true,
+    "system": "Be brief.", "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(local_reply_code_, Http::Code::OK);
+  EXPECT_EQ(request_headers_.getPathValue(),
+            "/v1/projects/acme/locations/us-east5/publishers/google/models/gemini-2.5-flash:"
+            "streamGenerateContent?alt=sse");
+  EXPECT_EQ(forwarded(), nlohmann::json::parse(R"({
+    "systemInstruction": {"parts": [{"text": "Be brief."}]},
+    "contents": [{"role": "user", "parts": [{"text": "Hi"}]}],
+    "generationConfig": {"maxOutputTokens": 64}
+  })"));
+  EXPECT_EQ(counterValue("transcoded"), 2);
+
+  // What the client's path held is kept for the stream, for filters and access logs.
+  const auto* read = stream_info_.filterState()->getDataReadOnly<LlmBindingReadObject>(
+      FilterStateKeys::BindingRead);
+  ASSERT_NE(read, nullptr);
+  EXPECT_EQ(absl::get<absl::string_view>(read->getField("location")), "us-east5");
+  EXPECT_EQ(absl::get<absl::string_view>(read->getField("model")), "claude-sonnet-4-5@20250929");
+
+  // Gemini's stream comes back as Anthropic's, naming the model the client asked for.
+  const std::string wire = runResponse(
+      manager,
+      R"(data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Hello"}]}}],)"
+      R"("modelVersion":"gemini-2.5-flash"})"
+      "\r\n\r\n"
+      R"(data: {"candidates":[{"content":{"role":"model","parts":[{"text":" back!"}]},)"
+      R"("finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":9,)"
+      R"("candidatesTokenCount":3,"totalTokenCount":12},"modelVersion":"gemini-2.5-flash"})"
+      "\r\n\r\n",
+      /*sse=*/true);
+  EXPECT_THAT(wire, testing::HasSubstr("event: message_start"));
+  EXPECT_THAT(wire, testing::HasSubstr(R"("model":"claude-sonnet-4-5@20250929")"));
+  EXPECT_THAT(wire, testing::HasSubstr(R"("text":" back!")"));
+  EXPECT_THAT(wire, testing::HasSubstr("event: message_stop"));
+  EXPECT_EQ(counterValue("failed"), 0);
+}
+
+// With its API unchanged, a Vertex AI client's request leaves in the binding it arrived in: its
+// path and its `anthropic_version` survive the round trip through the IR, and only the resolved
+// model changes.
+TEST_F(TranscoderFilterTest, RequestWithItsApiUnchangedLeavesInTheBindingItArrivedIn) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/v1/projects/acme/locations/europe-west1/"
+                                               "publishers/anthropic/models/"
+                                               "claude-sonnet-4-5@20250929:rawPredict"}};
+  setInstruction(FilterStateKeys::ModelResolved, "claude-haiku-4-5@20251001");
+
+  const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
+  runDecodeChain(
+      {std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context),
+       std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR), context)},
+      R"({"anthropic_version": "vertex-2099-01-01", "max_tokens": 16,
+          "messages": [{"role": "user", "content": "Hi"}]})");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(),
+            "/v1/projects/acme/locations/europe-west1/publishers/anthropic/models/"
+            "claude-haiku-4-5@20251001:rawPredict");
+  const nlohmann::json out = forwarded();
+  EXPECT_FALSE(out.contains("model"));
+  EXPECT_EQ(out["anthropic_version"], "vertex-2099-01-01");
+  EXPECT_EQ(out["max_tokens"], 16);
+}
+
+// A binding spelled out in JSON carries what a URI pattern cannot: Claude on Vertex AI takes the
+// model in the path alone and `anthropic_version` in the body.
+TEST_F(TranscoderFilterTest, JsonBindingSendsTheRequestToClaudeOnVertexAi) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  request_headers_ =
+      Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+  setBinding(FilterStateKeys::BindingResponse, R"({
+    "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
+    "mutations": [
+      {"body_field": "model"},
+      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    ]
+  })");
+  setInstruction(FilterStateKeys::ModelResolved, "claude-sonnet-4-5@20250929");
+
+  FilterManager manager({std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::FROM_IR, TranscoderProto::TO_IR),
+      makeContext(LLMProtocol::OpenAiChatCompletions))});
+  runDecodeChain(manager, R"({
+    "model": "claude", "max_completion_tokens": 16, "messages": [{"role": "user", "content": "Hi"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(),
+            "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/"
+            "claude-sonnet-4-5@20250929:rawPredict");
+  EXPECT_EQ(forwarded(), nlohmann::json::parse(R"({
+    "anthropic_version": "vertex-2023-10-16", "max_tokens": 16,
+    "messages": [{"role": "user", "content": "Hi"}]
+  })"));
+
+  const std::string wire = runResponse(
+      manager,
+      R"({"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-5@20250929",)"
+      R"("content":[{"type":"text","text":"Hello back!"}],"stop_reason":"end_turn",)"
+      R"("usage":{"input_tokens":12,"output_tokens":30}})",
+      /*sse=*/false);
+  const nlohmann::json response = nlohmann::json::parse(wire);
+  EXPECT_EQ(response["object"], "chat.completion");
+  EXPECT_EQ(response["model"], "claude");
+  EXPECT_EQ(response["choices"][0]["message"]["content"], "Hello back!");
+}
+
+// A variable that neither the body nor the client's path fills is the proxy's configuration at
+// fault: the request fails with a 500, counted as `unresolved`, and its path is left alone.
+TEST_F(TranscoderFilterTest, BindingVariableWithoutAValueFailsTheRequest) {
+  target_protocol_ = LLMProtocol::GeminiGenerateContent;
+  setBinding(FilterStateKeys::BindingResponse,
+             "/v1/projects/{project}/locations/us-central1/publishers/google/models/"
+             "{model}:generateContent");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  R"({"model":"gemini-2.5-flash","messages":[{"role":"user","content":"hi"}]})");
+
+  EXPECT_EQ(local_reply_code_, Http::Code::InternalServerError);
+  EXPECT_THAT(local_reply_details_, testing::HasSubstr("{project}"));
   EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
   EXPECT_EQ(counterValue("unresolved"), 1);
   EXPECT_EQ(counterValue("failed"), 0);

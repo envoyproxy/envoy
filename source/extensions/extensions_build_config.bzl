@@ -220,6 +220,7 @@ EXTENSIONS = {
     "envoy.filters.http.oauth2":                        "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
     "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
+    "envoy.filters.http.priority_load_shed":            "//source/extensions/filters/http/priority_load_shed:config",
     "envoy.filters.http.proto_message_extraction":      "//source/extensions/filters/http/proto_message_extraction:config",
     "envoy.filters.http.proto_api_scrubber":            "//source/extensions/filters/http/proto_api_scrubber:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
@@ -690,6 +691,7 @@ EXTENSIONS = {
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
 
     # Certificate selectors
+    "envoy.tls.certificate_selectors.dynamic_modules":                   "//source/extensions/transport_sockets/tls/cert_selectors/dynamic_modules:config",
     "envoy.tls.certificate_selectors.on_demand_secret":                  "//source/extensions/transport_sockets/tls/cert_selectors/on_demand:config",
 
     # Certificate mappers

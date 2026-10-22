@@ -1,0 +1,106 @@
+name: Release chain
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID:
+        required: true
+      ENVOY_CI_PUBLISH_APP_KEY:
+        required: true
+    inputs:
+      target-branch:
+        description: Released branch (`main` or `release/vX.Y`)
+        type: string
+        required: true
+      version:
+        description: Released version (`X.Y.Z`, without `v`)
+        type: string
+        required: true
+
+
+jobs:
+  # Reopen the released branch and create a synced release PR on the next
+  # younger stable branch, skipping ENVOY_RELEASE_SKIP_VERSIONS.
+  plan:
+    runs-on: ubuntu-24.04
+    name: Plan post-release
+    outputs:
+      released-branch: ${{ steps.plan.outputs.released-branch }}
+      next-branch: ${{ steps.plan.outputs.next-branch }}
+    steps:
+    - name: Checkout repository
+      uses: envoyproxy/toolshed/actions/github/checkout@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
+      with:
+        branch: main
+        config: |
+          fetch-depth: 0
+    - id: project
+      name: Project data
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        bazel run --config=ci @envoy_repo//:get_project_json -- "$PWD" > "${RUNNER_TEMP}/project.json"
+        jq '.stable_versions' "${RUNNER_TEMP}/project.json"
+    - id: plan
+      name: Plan
+      env:
+        VERSION: ${{ inputs.version }}
+        TARGET_BRANCH: ${{ inputs.target-branch }}
+        SKIP: ${{ vars.ENVOY_RELEASE_SKIP_VERSIONS }}
+      run: |
+        if [[ ! "$VERSION" =~ ^([0-9]+\.[0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::Invalid release version: ${VERSION} (expected X.Y.Z)"
+            exit 1
+        fi
+        minor="${BASH_REMATCH[1]}"
+        patch="${BASH_REMATCH[2]}"
+        released_branch="release/v${minor}"
+        if [[ "$patch" == "0" ]]; then
+            released_branch=main
+        fi
+        if [[ "$released_branch" != "$TARGET_BRANCH" ]]; then
+            echo "::error::Release ${VERSION} expects ${released_branch}, not ${TARGET_BRANCH}"
+            exit 1
+        fi
+        echo "released-branch=${released_branch}" >> "$GITHUB_OUTPUT"
+        if [[ "$patch" == "0" ]]; then
+            echo "Released ${VERSION}: reopen main"
+            exit 0
+        fi
+        next=$({ jq -r '.stable_versions[]' "${RUNNER_TEMP}/project.json"; echo "$minor"; } \
+               | sort -Vu \
+               | awk -v cur="$minor" -v skip="$SKIP" '
+                   BEGIN { n = split(skip, s, " "); for (i = 1; i <= n; i++) skipped[s[i]] = 1 }
+                   found && !($0 in skipped) { print; exit }
+                   $0 == cur { found = 1 }')
+        echo "next-branch=${next:+release/v$next}" >> "$GITHUB_OUTPUT"
+        echo "Released ${VERSION}: reopen ${released_branch}, next: ${next:-none}"
+
+  reopen_released:
+    needs: plan
+    if: needs.plan.outputs.released-branch
+    name: Re-open released branch
+    uses: ./.github/workflows/_release_task.yml
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    with:
+      task: reopen-branch
+      branch: ${{ needs.plan.outputs.released-branch }}
+      recreate: true
+
+  release_next:
+    needs: plan
+    if: needs.plan.outputs.next-branch
+    name: Create next release
+    uses: ./.github/workflows/_release_task.yml
+    secrets:
+      ENVOY_CI_PUBLISH_APP_ID: ${{ secrets.ENVOY_CI_PUBLISH_APP_ID }}
+      ENVOY_CI_PUBLISH_APP_KEY: ${{ secrets.ENVOY_CI_PUBLISH_APP_KEY }}
+    with:
+      task: create-release
+      branch: ${{ needs.plan.outputs.next-branch }}
+      recreate: true
