@@ -314,8 +314,8 @@ uint32_t McpFilter::getMaxRequestBodySize() const {
 bool McpFilter::clearRouteCache() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
-    return override_config->clearRouteCache();
+  if (override_config && override_config->clearRouteCache()) {
+    return true;
   }
 
   return config_->clearRouteCache();
@@ -324,8 +324,8 @@ bool McpFilter::clearRouteCache() const {
 const ParserConfig& McpFilter::parserConfig() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
-    return override_config->parserConfig();
+  if (override_config && override_config->parserConfig().has_value()) {
+    return *override_config->parserConfig();
   }
 
   return config_->parserConfig();
@@ -334,10 +334,10 @@ const ParserConfig& McpFilter::parserConfig() const {
 bool McpFilter::shouldStoreToDynamicMetadata() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
+  if (override_config && override_config->requestStorageMode() !=
+                             envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED) {
     const auto mode = override_config->requestStorageMode();
-    return mode == envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED ||
-           mode == envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA ||
+    return mode == envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA ||
            mode ==
                envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE;
   }
@@ -348,7 +348,8 @@ bool McpFilter::shouldStoreToDynamicMetadata() const {
 bool McpFilter::shouldStoreToFilterState() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
+  if (override_config && override_config->requestStorageMode() !=
+                             envoy::extensions::filters::http::mcp::v3::Mcp::MODE_UNSPECIFIED) {
     const auto mode = override_config->requestStorageMode();
     return mode == envoy::extensions::filters::http::mcp::v3::Mcp::FILTER_STATE ||
            mode ==
@@ -361,8 +362,8 @@ bool McpFilter::shouldStoreToFilterState() const {
 bool McpFilter::rejectDuplicateKeys() const {
   const auto* override_config = routeOverride();
 
-  if (override_config) {
-    return override_config->rejectDuplicateKeys();
+  if (override_config && override_config->rejectDuplicateKeys()) {
+    return true;
   }
 
   return config_->rejectDuplicateKeys();
