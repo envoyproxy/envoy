@@ -14,13 +14,17 @@ envoy_cc_test(
     srcs = ["hbone_integration_test.cc"],
     deps = [
         "//contrib/istio/filters/network/hbone/source:config",
+        "//contrib/istio/filters/network/hbone/source:pool_config",
+        "//contrib/istio/filters/network/peer_metadata/source:config",
         "//source/extensions/bootstrap/internal_listener:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/retry/host/previous_hosts:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/internal_listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/retry/host/previous_hosts/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 

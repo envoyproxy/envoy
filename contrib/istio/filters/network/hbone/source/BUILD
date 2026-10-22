@@ -17,13 +17,32 @@ envoy_cc_contrib_extension(
 )
 
 envoy_cc_contrib_extension(
+    name = "pool_config",
+    srcs = ["pool.cc"],
+    hdrs = ["pool.h"],
+    deps = [
+        ":hbone_lib",
+        "//envoy/router:router_filter_interface",
+        "//envoy/router:router_interface",
+        "//envoy/tcp:upstream_interface",
+        "//source/common/config:utility_lib",
+        "//source/extensions/upstreams/http/generic:config",
+        "//source/extensions/upstreams/tcp/generic:config",
+        "@envoy_api//contrib/envoy/extensions/filters/network/istio_hbone/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
         ":hbone_lib",
+        ":pool_config",
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/transport_sockets/internal_upstream:config",
@@ -43,5 +62,6 @@ envoy_cc_library(
         "//source/common/tcp_proxy",
         "//source/extensions/io_socket/user_space:io_handle_lib",
         "//source/extensions/transport_sockets/internal_upstream",
+        "@abseil-cpp//absl/strings",
     ],
 )

@@ -200,6 +200,13 @@ envoy.transport_sockets.istio_hbone:
   status: wip
   type_urls:
   - envoy.extensions.filters.network.istio_hbone.v3alpha.UpstreamConfig
+envoy.upstreams.istio_hbone:
+  categories:
+  - envoy.upstreams
+  security_posture: requires_trusted_downstream_and_upstream
+  status: wip
+  type_urls:
+  - envoy.extensions.filters.network.istio_hbone.v3alpha.ConnectionPoolConfig
 envoy.filters.network.metadata_exchange:
   categories:
   - envoy.filters.network

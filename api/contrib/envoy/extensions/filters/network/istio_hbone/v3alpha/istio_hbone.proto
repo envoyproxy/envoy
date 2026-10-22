@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.istio_hbone.v3alpha;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto";
 import "envoy/extensions/transport_sockets/internal_upstream/v3/internal_upstream.proto";
 
@@ -40,4 +41,18 @@ message UpstreamConfig {
   // metadata when required by the listener's original destination filter.
   repeated envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
       .MetadataValueSource passthrough_metadata = 1;
+
+  // Optional wrapped transport, started only after CONNECT acceptance. Defaults
+  // to raw buffer. Use TLS here on the inner HTTP/2 cluster of double HBONE, with
+  // a paired shim filter on the outer origination listener.
+  envoy.config.core.v3.TransportSocket transport_socket = 2;
+}
+
+// Cluster upstream_config for application clusters using the shim. Handles
+// permanent CONNECT rejections before router retry and outlier accounting.
+// HTTP callers receive the rejected 4xx status (502 for other non-5xx statuses);
+// TCP callers are closed. Successful connections and transient failures retain
+// the standard pool behavior. Must be deployed together with the shim sockets.
+// [#extension: envoy.upstreams.istio_hbone]
+message ConnectionPoolConfig {
 }

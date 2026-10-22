@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/event/dispatcher.h"
@@ -14,6 +15,10 @@ namespace Envoy {
 namespace Extensions {
 namespace Istio {
 namespace Hbone {
+
+// Only shim-generated failures use this marker across connection pool boundaries.
+// Ordinary transport errors and application response codes are never classified here.
+std::optional<uint32_t> permanentConnectRejection(absl::string_view reason);
 
 // Shared only across one internal socket pair, on its worker thread. This object
 // must not be propagated into the outer HTTP/2 pool or affect its pool key.
@@ -42,7 +47,8 @@ class UpstreamSocket : public TransportSockets::InternalUpstream::InternalSocket
 public:
   UpstreamSocket(ConnectStateSharedPtr state,
                  std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                 StreamInfo::FilterState::Objects objects);
+                 StreamInfo::FilterState::Objects objects,
+                 Network::TransportSocketPtr inner_socket = nullptr);
   ~UpstreamSocket() override;
 
   // Network::TransportSocket
@@ -52,7 +58,7 @@ public:
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   bool canFlushClose() override;
-  absl::string_view failureReason() const override { return state_->failureReason(); }
+  absl::string_view failureReason() const override;
   void closeSocket(Network::ConnectionEvent event, bool abort_reset) override;
 
 private:
@@ -105,6 +111,7 @@ private:
 
   ConnectStateSharedPtr state_;
   std::string failure_reason_;
+  void rejectConnect(absl::string_view reason, Upstream::HostDescriptionConstSharedPtr host);
 };
 
 } // namespace Hbone

@@ -26,14 +26,13 @@ private:
                                     Server::Configuration::FactoryContext& context) override;
 };
 
-class UpstreamSocketFactory : public Network::CommonUpstreamTransportSocketFactory {
+class UpstreamSocketFactory : public TransportSockets::PassthroughFactory {
 public:
-  UpstreamSocketFactory(const SocketConfig& config, Stats::Scope& scope);
+  UpstreamSocketFactory(const SocketConfig& config, Stats::Scope& scope,
+                        Network::UpstreamTransportSocketFactoryPtr inner_factory);
   Network::TransportSocketPtr
   createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
                         Upstream::HostDescriptionConstSharedPtr host) const override;
-  bool implementsSecureTransport() const override { return false; }
-  absl::string_view defaultServerNameIndication() const override { return ""; }
 
 private:
   const TransportSockets::InternalUpstream::Config metadata_config_;

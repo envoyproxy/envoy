@@ -23,6 +23,21 @@ namespace {
 using testing::_;
 using testing::StrictMock;
 
+TEST(ConnectFailureTest, OnlyShimRejectionsArePermanent) {
+  for (const auto reason :
+       {"tunnel_response:403", "TLS_error:403", "", "istio_hbone_connect_rejected:200",
+        "istio_hbone_connect_rejected:500", "istio_hbone_connect_rejected:599",
+        "istio_hbone_connect_rejected:099", "istio_hbone_connect_rejected:403 trailing",
+        "istio_hbone_connect_rejected:abc"}) {
+    EXPECT_FALSE(permanentConnectRejection(reason).has_value()) << reason;
+  }
+  EXPECT_EQ(403, permanentConnectRejection("istio_hbone_connect_rejected:403"));
+  EXPECT_EQ(429, permanentConnectRejection("istio_hbone_connect_rejected:429"));
+  EXPECT_EQ(302, permanentConnectRejection("istio_hbone_connect_rejected:302"));
+  EXPECT_EQ(600, permanentConnectRejection("istio_hbone_connect_rejected:600"));
+  EXPECT_EQ(999, permanentConnectRejection("istio_hbone_connect_rejected:999"));
+}
+
 class HboneSocketTest : public testing::Test {
 protected:
   HboneSocketTest()

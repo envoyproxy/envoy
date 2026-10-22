@@ -41,6 +41,7 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.transport_sockets.istio_hbone":                      "//contrib/istio/filters/network/hbone/source:upstream_config",
+    "envoy.upstreams.istio_hbone":                             "//contrib/istio/filters/network/hbone/source:pool_config",
 
     #
     # Listener filters

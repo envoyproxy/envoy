@@ -5,11 +5,30 @@
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
 
+#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Istio {
 namespace Hbone {
 namespace {
+
+constexpr absl::string_view RejectionPrefix = "istio_hbone_connect_rejected:";
+
+std::optional<uint32_t> rejectedStatus(absl::string_view reason, absl::string_view prefix) {
+  if (!absl::StartsWith(reason, prefix)) {
+    return std::nullopt;
+  }
+  reason.remove_prefix(prefix.size());
+  uint32_t status;
+  if (reason.size() != 3 || !absl::SimpleAtoi(reason, &status) || status < 100 ||
+      (status >= 500 && status < 600) || status == 200) {
+    return std::nullopt;
+  }
+  return status;
+}
 
 StreamInfo::FilterState::Objects withConnectState(StreamInfo::FilterState::Objects objects,
                                                   const ConnectStateSharedPtr& state) {
@@ -19,6 +38,10 @@ StreamInfo::FilterState::Objects withConnectState(StreamInfo::FilterState::Objec
 }
 
 } // namespace
+
+std::optional<uint32_t> permanentConnectRejection(absl::string_view reason) {
+  return rejectedStatus(reason, RejectionPrefix);
+}
 
 void ConnectState::notify() {
   if (callback_) {
@@ -51,12 +74,20 @@ void ConnectState::connected() {
 
 UpstreamSocket::UpstreamSocket(ConnectStateSharedPtr state,
                                std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                               StreamInfo::FilterState::Objects objects)
-    : InternalSocket(std::make_unique<Network::RawBufferSocket>(), std::move(metadata),
-                     withConnectState(std::move(objects), state)),
+                               StreamInfo::FilterState::Objects objects,
+                               Network::TransportSocketPtr inner_socket)
+    : InternalSocket(inner_socket ? std::move(inner_socket)
+                                  : std::make_unique<Network::RawBufferSocket>(),
+                     std::move(metadata), withConnectState(std::move(objects), state)),
       state_(std::move(state)) {}
 
 UpstreamSocket::~UpstreamSocket() { cancel(); }
+
+absl::string_view UpstreamSocket::failureReason() const {
+  // Keep nested TLS diagnostics when CONNECT itself succeeded.
+  return state_->failureReason().empty() ? InternalSocket::failureReason()
+                                         : state_->failureReason();
+}
 
 void UpstreamSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   InternalSocket::setTransportSocketCallbacks(callbacks);
@@ -131,7 +162,9 @@ Network::IoResult UpstreamSocket::doWrite(Buffer::Instance& buffer, bool end_str
   return InternalSocket::doWrite(buffer, end_stream);
 }
 
-bool UpstreamSocket::canFlushClose() { return state_->phase() == ConnectState::Phase::Connected; }
+bool UpstreamSocket::canFlushClose() {
+  return state_->phase() == ConnectState::Phase::Connected && InternalSocket::canFlushClose();
+}
 
 void UpstreamSocket::cancel() {
   state_->setCallback(nullptr);
@@ -167,6 +200,21 @@ void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbac
 }
 
 void Filter::ConnectCallbacks::onEvent(Network::ConnectionEvent event) {
+  // The newer TCP proxy pool reports pre-CONNECT transport failures through
+  // UpstreamCallbacks instead of onGenericPoolFailure. Its upstream StreamInfo
+  // still carries the reason, including an outer-HBONE rejection.
+  if (state_ && state_->phase() == ConnectState::Phase::Pending &&
+      (event == Network::ConnectionEvent::LocalClose ||
+       event == Network::ConnectionEvent::RemoteClose)) {
+    auto& info = parent_->getStreamInfo();
+    if (info.upstreamInfo() &&
+        permanentConnectRejection(info.upstreamInfo()->upstreamTransportFailureReason())) {
+      static_cast<Filter*>(parent_)->rejectConnect(
+          info.upstreamInfo()->upstreamTransportFailureReason(),
+          info.upstreamInfo()->upstreamHost());
+      return;
+    }
+  }
   if (state_ && state_->phase() == ConnectState::Phase::Accepted &&
       (event == Network::ConnectionEvent::LocalClose ||
        event == Network::ConnectionEvent::RemoteClose)) {
@@ -212,8 +260,32 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
 void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                                   absl::string_view failure_reason,
                                   Upstream::HostDescriptionConstSharedPtr host) {
+  if (const auto status = rejectedStatus(failure_reason, "tunnel_response:")) {
+    rejectConnect(absl::StrCat(RejectionPrefix, *status), std::move(host));
+    return;
+  }
+  if (permanentConnectRejection(failure_reason)) {
+    rejectConnect(failure_reason, std::move(host));
+    return;
+  }
   failure_reason_ = std::string(failure_reason);
   TcpProxy::Filter::onGenericPoolFailure(reason, failure_reason, std::move(host));
+}
+
+void Filter::rejectConnect(absl::string_view reason, Upstream::HostDescriptionConstSharedPtr host) {
+  // Copy before deleting the pool: reason may refer to its upstream StreamInfo.
+  failure_reason_ = std::string(reason);
+  state_->fail(failure_reason_);
+  connecting_ = false;
+  read_callbacks_->upstreamHost(host);
+  getStreamInfo().upstreamInfo()->setUpstreamHost(host);
+  getStreamInfo().upstreamInfo()->setUpstreamTransportFailureReason(failure_reason_);
+  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+  getStreamInfo().setResponseCodeDetails(failure_reason_);
+  // A CONNECT decoder may still be on the stack. Do not run the base failure
+  // callback: it reports an outlier failure and schedules TCP proxy retries.
+  read_callbacks_->connection().dispatcher().deferredDelete(std::move(generic_conn_pool_));
+  TcpProxy::Filter::onInitFailure(UpstreamFailureReason::ConnectFailed);
 }
 
 void Filter::onInitFailure(UpstreamFailureReason reason) {
