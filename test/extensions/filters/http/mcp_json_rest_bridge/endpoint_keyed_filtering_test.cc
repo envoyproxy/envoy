@@ -411,6 +411,23 @@ tool_config:
       host: "no_local.com"
       path: "/mcp"
   - tools:
+      - name: tool_exact_inherit
+        http_rule:
+          get: "/exact_inherit"
+    default_server_info:
+      host: "inherit.com"
+      path: "/mcp"
+    tool_list_local: {}
+  - tools:
+      - name: tool_exact_reset
+        http_rule:
+          get: "/exact_reset"
+    default_server_info:
+      host: "reset.com"
+      path: "/mcp"
+    tool_list_local:
+      cache_config: {}
+  - tools:
       - name: tool_exact
         http_rule:
           get: "/exact"
@@ -463,6 +480,16 @@ tool_config:
   // When exact tier (no_local.com, /mcp) does not have tool_list_local, falls back to ("", /mcp).
   EXPECT_EQ(per_route_config->toolListLocalCacheConfig("no_local.com", "/mcp").ttl_ms, 30000);
   EXPECT_EQ(per_route_config->toolListLocalCacheConfig("no_local.com", "/mcp").scope, "private");
+
+  // When exact tier (inherit.com, /mcp) has tool_list_local without cache_config, inherits from
+  // ("", /mcp).
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("inherit.com", "/mcp").ttl_ms, 30000);
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("inherit.com", "/mcp").scope, "private");
+
+  // When exact tier (reset.com, /mcp) explicitly sets an empty cache_config: {}, overrides
+  // ("", /mcp) and resets to defaults.
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("reset.com", "/mcp").ttl_ms, 0);
+  EXPECT_EQ(per_route_config->toolListLocalCacheConfig("reset.com", "/mcp").scope, "public");
 
   // When no matching tier has tool_list_local, returns 0 and "public".
   EXPECT_EQ(per_route_config->toolListLocalCacheConfig("unmatched.com", "/unmatched").ttl_ms, 0);

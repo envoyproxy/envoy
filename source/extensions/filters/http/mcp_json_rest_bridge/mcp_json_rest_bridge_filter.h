@@ -93,8 +93,11 @@ public:
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
 
-  // Returns the tools/list cache config for the matching endpoint. Returns defaults if local
-  // serving of tools/list is not configured, or if it is configured without a cache_config.
+  // Returns the endpoint-level tools/list cache config for the complete merged response by
+  // selecting the first matching tool_list_local tier (in (host, path) > (host, "") > ("", path) >
+  // ("", "") precedence order) that explicitly sets cache_config. Tiers with tool_list_local that
+  // omit cache_config inherit from the next matching tier; returns defaults if no matching tier
+  // sets cache_config.
   ToolListCacheConfig toolListLocalCacheConfig(absl::string_view host,
                                                absl::string_view path) const;
 
@@ -144,7 +147,7 @@ private:
     std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
-    ToolListCacheConfig tool_list_cache_config;
+    std::optional<ToolListCacheConfig> tool_list_cache_config;
   };
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
@@ -177,8 +180,11 @@ public:
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
 
-  // Returns the tools/list cache config for the matching endpoint. Returns defaults if local
-  // serving of tools/list is not configured, or if it is configured without a cache_config.
+  // Returns the endpoint-level tools/list cache config for the complete merged response by
+  // selecting the first matching tool_list_local tier (in (host, path) > (host, "") > ("", path) >
+  // ("", "") precedence order) that explicitly sets cache_config. Tiers with tool_list_local that
+  // omit cache_config inherit from the next matching tier; returns defaults if no matching tier
+  // sets cache_config.
   ToolListCacheConfig toolListLocalCacheConfig(absl::string_view host,
                                                absl::string_view path) const;
 
@@ -212,7 +218,7 @@ private:
     std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
-    ToolListCacheConfig tool_list_cache_config;
+    std::optional<ToolListCacheConfig> tool_list_cache_config;
   };
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute

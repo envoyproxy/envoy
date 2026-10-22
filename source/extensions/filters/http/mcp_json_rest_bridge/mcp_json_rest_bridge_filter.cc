@@ -566,13 +566,13 @@ std::array<EndpointKey, 4> getEndpointLookupKeys(absl::string_view host, absl::s
   }};
 }
 
-absl::StatusOr<ToolListCacheConfig> parseToolListCacheConfig(
+absl::StatusOr<std::optional<ToolListCacheConfig>> parseToolListCacheConfig(
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolsListLocal&
         tool_list_local) {
-  ToolListCacheConfig result;
   if (!tool_list_local.has_cache_config()) {
-    return result;
+    return std::nullopt;
   }
+  ToolListCacheConfig result;
   const auto& cache_config = tool_list_local.cache_config();
   if (cache_config.has_ttl()) {
     absl::StatusOr<uint64_t> ttl_ms =
@@ -658,7 +658,7 @@ absl::Status McpJsonRestBridgeFilterConfig::initialize() {
   }
   if (tool_config.has_tool_list_local()) {
     endpoint_config.tool_list_local = true;
-    absl::StatusOr<ToolListCacheConfig> cache_config =
+    absl::StatusOr<std::optional<ToolListCacheConfig>> cache_config =
         parseToolListCacheConfig(tool_config.tool_list_local());
     if (!cache_config.ok()) {
       return cache_config.status();
@@ -766,8 +766,9 @@ McpJsonRestBridgeFilterConfig::toolListLocalCacheConfig(absl::string_view host,
                                                         absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
-    if (it != endpoint_configs_.end() && it->second.tool_list_local) {
-      return it->second.tool_list_cache_config;
+    if (it != endpoint_configs_.end() && it->second.tool_list_local &&
+        it->second.tool_list_cache_config.has_value()) {
+      return *it->second.tool_list_cache_config;
     }
   }
   return {};
@@ -846,7 +847,7 @@ absl::Status McpJsonRestBridgePerRouteConfig::initialize() {
         endpoint_config.tool_list_http_rule = rule;
       }
       if (tool_config.has_tool_list_local()) {
-        absl::StatusOr<ToolListCacheConfig> cache_config =
+        absl::StatusOr<std::optional<ToolListCacheConfig>> cache_config =
             parseToolListCacheConfig(tool_config.tool_list_local());
         if (!cache_config.ok()) {
           return cache_config.status();
@@ -956,8 +957,9 @@ McpJsonRestBridgePerRouteConfig::toolListLocalCacheConfig(absl::string_view host
                                                           absl::string_view path) const {
   for (const auto& key : getEndpointLookupKeys(host, path)) {
     auto it = endpoint_configs_.find(key);
-    if (it != endpoint_configs_.end() && it->second.tool_list_local) {
-      return it->second.tool_list_cache_config;
+    if (it != endpoint_configs_.end() && it->second.tool_list_local &&
+        it->second.tool_list_cache_config.has_value()) {
+      return *it->second.tool_list_cache_config;
     }
   }
   return {};
