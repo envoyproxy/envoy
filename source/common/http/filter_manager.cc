@@ -58,6 +58,10 @@ void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& 
 
 } // namespace
 
+bool ActiveStreamFilterBase::observedEndStream() const {
+  return parent_.per_filter_observed_end_stream_ ? observed_end_stream_ : streamObservedEndStream();
+}
+
 void ActiveStreamFilterBase::commonContinue() {
   if (!canContinue()) {
     ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
@@ -434,6 +438,10 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
+bool ActiveStreamDecoderFilter::streamObservedEndStream() const {
+  return parent_.decoderObservedEndStream();
+}
+
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
 }
@@ -492,11 +500,13 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
   injectDecodedHeadersToFilterChain(false);
-  // The end-of-stream marker originates (or is retracted) at this filter's position. The
-  // stream-level observed_decode_end_stream_ is deliberately left untouched: it records what the
-  // downstream client actually sent and drives lifecycle decisions (stream recreation,
-  // independent half-close), while resume end_stream computation uses the positional markers.
+  // The end-of-stream marker originates (or is retracted) at this filter's position.
   observed_end_stream_ = end_stream;
+  // With per-filter observed end stream, the stream-level flag is left untouched: it records
+  // what the downstream client actually sent and drives lifecycle decisions.
+  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
+    parent_.state().observed_decode_end_stream_ = end_stream;
+  }
   ENVOY_STREAM_LOG(trace, "injectDecodedDataToFilterChain with end_stream: {}", parent_,
                    end_stream);
   parent_.decodeData(this, data, end_stream,
@@ -2010,6 +2020,9 @@ Buffer::InstancePtr ActiveStreamEncoderFilter::createBuffer() {
 Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
+bool ActiveStreamEncoderFilter::streamObservedEndStream() const {
+  return parent_.state_.observed_encode_end_stream_;
+}
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
 }
@@ -2071,11 +2084,13 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
   injectEncodedHeadersToFilterChain(false);
-  // The end-of-stream marker originates (or is retracted) at this filter's position. The
-  // stream-level observed_encode_end_stream_ is deliberately left untouched: it records what the
-  // upstream actually sent and drives lifecycle decisions, while resume end_stream computation
-  // uses the positional markers.
+  // The end-of-stream marker originates (or is retracted) at this filter's position.
   observed_end_stream_ = end_stream;
+  // With per-filter observed end stream, the stream-level flag is left untouched: it records
+  // what the upstream actually sent and drives lifecycle decisions.
+  if (!parent_.per_filter_observed_end_stream_ && parent_.inject_data_with_state_update_) {
+    parent_.state_.observed_encode_end_stream_ = end_stream;
+  }
   ENVOY_STREAM_LOG(trace, "injectEncodedDataToFilterChain with end_stream: {}", parent_,
                    end_stream);
   parent_.encodeData(this, data, end_stream,
