@@ -137,11 +137,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
-  // Whether the end-of-stream marker has reached this filter's position: an end-stream-carrying
-  // frame was either delivered to this filter or parked at this position while iteration is
-  // stopped. Unlike the stream-level observed_[de|en]code_end_stream_ flags, this is positional:
-  // the marker travels with the last frame of the stream and parks wherever that frame parks.
-  bool observedEndStream() const { return observed_end_stream_; }
+  // Whether the end of the stream has been observed, used for the end_stream flag when resuming
+  // iteration. With per-filter observed end stream enabled, this is whether the end-of-stream
+  // marker has reached this filter's position: an end-stream-carrying frame was either delivered
+  // to this filter or parked at this position while iteration is stopped. Otherwise it is the
+  // stream-level observed_[de|en]code_end_stream_ flag.
+  bool observedEndStream() const;
+  virtual bool streamObservedEndStream() const PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
@@ -267,6 +269,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -360,6 +363,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -718,7 +722,12 @@ public:
                 uint64_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
-        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
+        proxy_100_continue_(proxy_100_continue),
+        per_filter_observed_end_stream_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.filter_manager_per_filter_observed_end_stream")),
+        inject_data_with_state_update_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
+        buffer_limit_(buffer_limit) {}
 
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -1172,6 +1181,10 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  // Runtime flags latched when the filter manager is created, so the end_stream handling stays
+  // consistent for the lifetime of the stream.
+  const bool per_filter_observed_end_stream_;
+  const bool inject_data_with_state_update_;
 
   StreamDecoderFilters decoder_filters_;
   StreamEncoderFilters encoder_filters_;
