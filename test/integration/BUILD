@@ -2748,6 +2748,7 @@ envoy_cc_test(
         "//test/config:v2_link_hacks",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -3028,6 +3029,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
         "//test/test_common:logging_lib",
+        "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
     ]),
 )
 

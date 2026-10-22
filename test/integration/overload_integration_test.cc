@@ -309,6 +309,54 @@ TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
   codec_client_->close();
 }
 
+TEST_P(OverloadIntegrationTest, MultipleResourceMonitorsOfSameTypeDifferentNames) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* overload_manager = bootstrap.mutable_overload_manager();
+    overload_manager->mutable_refresh_interval()->set_seconds(0);
+    overload_manager->mutable_refresh_interval()->set_nanos(1000000);
+
+    auto* m1 = overload_manager->add_resource_monitors();
+    m1->set_name("custom_monitor_alpha");
+    m1->mutable_typed_config()->set_type_url("type.googleapis.com/test.common.config.DummyConfig");
+
+    auto* m2 = overload_manager->add_resource_monitors();
+    m2->set_name("custom_monitor_beta");
+    m2->mutable_typed_config()->set_type_url("type.googleapis.com/test.common.config.DummyConfig");
+
+    auto* action = overload_manager->add_actions();
+    action->set_name("envoy.overload_actions.stop_accepting_requests");
+    auto* trigger = action->add_triggers();
+    trigger->set_name("custom_monitor_beta");
+    trigger->mutable_threshold()->set_value(0.5);
+  });
+
+  initialize();
+
+  ASSERT_GE(fake_resource_monitor_factory_.monitors().size(), 2);
+  auto* monitor_alpha = fake_resource_monitor_factory_.monitors()[0];
+  auto* monitor_beta = fake_resource_monitor_factory_.monitors()[1];
+
+  // Set pressure on monitor_alpha to 0.9 and monitor_beta to 0.2.
+  monitor_alpha->setResourcePressure(0.9);
+  monitor_beta->setResourcePressure(0.2);
+
+  test_server_->waitForGauge("overload.custom_monitor_alpha.pressure", Eq(90));
+  test_server_->waitForGauge("overload.custom_monitor_beta.pressure", Eq(20));
+
+  // Action stop_accepting_requests is bound to custom_monitor_beta (threshold
+  // 0.5), so it should be inactive (0).
+  test_server_->waitForGauge("overload.envoy.overload_actions.stop_accepting_requests.active",
+                             Eq(0));
+
+  // Now set monitor_beta pressure to 0.8 (> 0.5 threshold).
+  monitor_beta->setResourcePressure(0.8);
+  test_server_->waitForGauge("overload.custom_monitor_beta.pressure", Eq(80));
+
+  // Action stop_accepting_requests should now become active (1).
+  test_server_->waitForGauge("overload.envoy.overload_actions.stop_accepting_requests.active",
+                             Eq(1));
+}
+
 // TODO: add another test for HTTP2
 TEST_P(OverloadIntegrationTest, CloseIdleQuicConnectionsWhenOverloaded) {
   if (downstreamProtocol() != Http::CodecType::HTTP3) {

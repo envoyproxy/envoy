@@ -7,8 +7,16 @@
 
 pub use crate::cluster_specifier::ResourcePriority;
 use crate::{
-  abi, ffi_export, ClusterHostCount, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId,
-  EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  abi,
+  ffi_export,
+  ClusterHostCount,
+  EnvoyBuffer,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
 };
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;
@@ -1174,9 +1182,9 @@ pub trait EnvoyRouteSpecifierConfig: Send + Sync {
   ///
   /// Envoy builds and validates it while the configuration is created, and the module selects it
   /// later with [`RouteSpecifierContext::select_template`]. Returns `false` when called outside
-  /// configuration creation, when the route specifier is configured on a route configuration with no
-  /// virtual host to build routes in, when the identifier is empty or already used, when the bytes do
-  /// not parse, or when the route is invalid.
+  /// configuration creation, when the route specifier is configured on a route configuration with
+  /// no virtual host to build routes in, when the identifier is empty or already used, when the
+  /// bytes do not parse, or when the route is invalid.
   fn register_route_template(&self, template_id: &str, serialized_route: &[u8]) -> bool;
 
   /// The specifier_instance_id of this configuration, empty when it is unset.
@@ -1321,7 +1329,7 @@ impl EnvoyRouteSpecifierConfig for EnvoyRouteSpecifierConfigImpl {
       abi::envoy_dynamic_module_callback_route_specifier_config_get_template_count(self.raw)
     };
     let mut ids = Vec::with_capacity(count);
-    for index in 0..count {
+    for index in 0 .. count {
       let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: ptr::null_mut(),
         length: 0,

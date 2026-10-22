@@ -2748,8 +2748,9 @@ RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Server::Configuration::CommonFactoryContext& context,
                                            Event::Dispatcher& dispatcher,
                                            Upstream::ResourcePriority priority) {
-  std::unique_ptr<RetryStateImpl> retry_state =
-      RetryStateImpl::create(policy, request_headers, cluster, context, dispatcher, priority);
+  RetryStatePtr retry_state = policy.createRetryState(
+      request_headers, cluster, context, dispatcher, priority,
+      makeOptRefFromPtr(callbacks() ? &callbacks()->streamInfo() : nullptr));
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the buffer limit to 0 so that we don't retry or
