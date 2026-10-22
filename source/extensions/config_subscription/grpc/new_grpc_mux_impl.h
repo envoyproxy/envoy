@@ -15,11 +15,11 @@
 #include "source/common/config/resource_name.h"
 #include "source/common/grpc/common.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.h"
 
 namespace Envoy {
 namespace Config {
@@ -117,7 +117,7 @@ public:
     }
 
     WatchMap watch_map_;
-    DeltaSubscriptionState sub_state_;
+    XdsMux::DeltaSubscriptionState sub_state_;
     std::string control_plane_identifier_;
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;

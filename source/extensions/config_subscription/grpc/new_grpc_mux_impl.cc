@@ -178,12 +178,6 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   }
 
   auto ack = sub->second->sub_state_.handleResponse(*message);
-
-  // Processing point to record error if there is any failure after the response is processed.
-  if (xds_config_tracker_.has_value() &&
-      ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    xds_config_tracker_->onConfigRejected(*message, ack.error_detail_.message());
-  }
   kickOffAck(ack);
   Memory::Utils::tryShrinkHeap();
 }
@@ -204,8 +198,8 @@ void NewGrpcMuxImpl::onEstablishmentFailure(bool next_attempt_may_send_initial_r
   // crash, the iteration needs to dance around a little: collect pointers to all
   // SubscriptionStates, call on all those pointers we haven't yet called on, repeat if there are
   // now more SubscriptionStates.
-  absl::flat_hash_map<std::string, DeltaSubscriptionState*> all_subscribed;
-  absl::flat_hash_map<std::string, DeltaSubscriptionState*> already_called;
+  absl::flat_hash_map<std::string, XdsMux::DeltaSubscriptionState*> all_subscribed;
+  absl::flat_hash_map<std::string, XdsMux::DeltaSubscriptionState*> already_called;
   do {
     for (auto& [type_url, subscription] : subscriptions_) {
       all_subscribed[type_url] = &subscription->sub_state_;
@@ -422,7 +416,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
     }
-    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest> request;
     // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
@@ -435,10 +429,10 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
                           !skip_subsequent_node_ || first_request_on_stream_;
     if (set_node) {
       first_request_on_stream_ = false;
-      *request.mutable_node() = local_info_.node();
+      *request->mutable_node() = local_info_.node();
     }
     sub->second->sub_state_.clearDynamicContextChanged();
-    grpc_stream_->sendMessage(request);
+    grpc_stream_->sendMessage(*request);
   }
   grpc_stream_->maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
 }
