@@ -1,6 +1,6 @@
 """Bazel rules for building Envoy dynamic modules."""
 
-load("@rules_cc//cc:defs.bzl", "cc_import")
+load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
 load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_rust//rust:defs.bzl", "rust_library")
@@ -81,7 +81,8 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
     stays in sync automatically as new hooks are added. The renamed symbols are
     exported via the `*_envoy_dynamic_module_on_*` pattern in
     bazel/exported_symbols.txt, making them available for dlsym(RTLD_DEFAULT, ...)
-    lookup.
+    lookup. On Windows, the renamed symbols are exported via `/EXPORT` linker
+    directives instead, making them available for GetProcAddress lookup.
 
     Use this rule for C/C++ archives. Rust modules must use envoy_rust_static_module
     instead so they share the toolchain's Rust runtime with other Rust code.
@@ -91,7 +92,7 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
         module_name: The module name used to prefix symbols. Must be a valid C identifier.
         archive: Label of the static archive target to rename symbols in.
         tags: Bazel tags forwarded to the underlying targets.
-        **kwargs: Extra arguments forwarded to cc_import (e.g. visibility).
+        **kwargs: Extra arguments forwarded to cc_library (e.g. visibility).
     """
     redefine_syms_name = "_" + name + "_redefine_syms"
     renamed_name = "_" + name + "_renamed"
@@ -151,9 +152,46 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
         tags = tags,
     )
 
+    import_name = "_" + name + "_import"
     cc_import(
-        name = name,
+        name = import_name,
         static_library = ":" + renamed_name,
+        alwayslink = True,
+        tags = tags,
+    )
+
+    # On Windows, an executable only exports the symbols named on the linker command line, and a
+    # module definition file cannot express the `*_envoy_dynamic_module_on_*` pattern. Instead,
+    # generate a source file with an `/EXPORT` linker directive for every renamed hook the
+    # archive defines, so that any binary linking this module exports its hooks for lookup with
+    # GetProcAddress. Only defined symbols are listed since exporting an undefined one fails the
+    # link.
+    windows_exports_name = "_" + name + "_windows_exports"
+    native.genrule(
+        name = windows_exports_name,
+        srcs = [":" + renamed_name],
+        outs = [name + "_windows_exports.c"],
+        cmd = (
+            "($(location @llvm_toolchain_llvm//:nm) --defined-only --format=just-symbols " +
+            "$(location :" + renamed_name + ") | " +
+            "grep -E '^" + module_name + "_envoy_dynamic_module_on_[a-z_]+$$' || true) | " +
+            "sort -u | " +
+            "sed 's|.*|#pragma comment(linker, \"/EXPORT:&\")|' > $@; " +
+            "echo 'typedef int " + module_name + "_windows_exports_unused;' >> $@"
+        ),
+        tools = ["@llvm_toolchain_llvm//:nm"],
+        target_compatible_with = ["@platforms//os:windows"],
+        tags = tags,
+    )
+
+    cc_library(
+        name = name,
+        srcs = select({
+            "@platforms//os:windows": [":" + windows_exports_name],
+            "//conditions:default": [],
+        }),
+        deps = [":" + import_name],
+        # The generated source only carries linker directives, so it must always be linked.
         alwayslink = True,
         tags = tags,
         **kwargs
