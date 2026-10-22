@@ -137,7 +137,11 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
-  virtual bool observedEndStream() PURE;
+  // Whether the end-of-stream marker has reached this filter's position: an end-stream-carrying
+  // frame was either delivered to this filter or parked at this position while iteration is
+  // stopped. Unlike the stream-level observed_[de|en]code_end_stream_ flags, this is positional:
+  // the marker travels with the last frame of the stream and parks wherever that frame parks.
+  bool observedEndStream() const { return observed_end_stream_; }
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
@@ -240,6 +244,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool end_stream_{};
   // If true, the filter has processed headers.
   bool processed_headers_{};
+  // True once the end-of-stream marker has reached this filter's position. Unlike end_stream_,
+  // which is set only when the terminal frame is actually delivered to the filter's callback,
+  // this is also set when that frame parks at this position without the filter being invoked.
+  // Frame deliveries latch this flag (|=) and never clear it; only the data injection APIs,
+  // which author the marker rather than record its arrival, may retract it.
+  bool observed_end_stream_{};
 };
 
 /**
@@ -257,7 +267,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -351,7 +360,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -1136,7 +1144,7 @@ private:
   // filter_streaming is the variable to indicate if stream is streaming, and its value may be
   // changed by the function.
   bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
-                           bool& filter_streaming);
+                           bool& filter_streaming, bool end_stream);
 
   MetadataMapVector* getRequestMetadataMapVector() {
     if (request_metadata_map_vector_ == nullptr) {

@@ -70,8 +70,6 @@ static constexpr uint32_t BufferSize = 100000;
 
 void HttpFilterTest::initialize(std::string&& yaml, bool is_upstream_filter) {
   scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.ext_proc_inject_data_with_state_update", "true"}});
-  scoped_runtime_.mergeValues(
       {{"envoy.reloadable_features.ext_proc_return_stop_iteration", "true"}});
   client_ = std::make_unique<MockClient>();
   route_ = std::make_shared<NiceMock<Router::MockRoute>>();
