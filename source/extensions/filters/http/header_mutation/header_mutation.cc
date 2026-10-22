@@ -6,7 +6,6 @@
 #include "source/common/formatter/substitution_format_string.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,12 +13,8 @@ namespace HttpFilters {
 namespace HeaderMutation {
 
 namespace {
-std::string maybeUrlEncode(const std::string& value) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.header_mutation_url_encode_query_params")) {
-    return Http::Utility::PercentEncoding::urlEncode(value);
-  }
-  return value;
+std::string urlEncode(const std::string& value) {
+  return Http::Utility::PercentEncoding::urlEncode(value);
 }
 } // namespace
 
@@ -30,24 +25,24 @@ void QueryParameterMutationAppend::mutateQueryParameter(
   switch (action_) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case ParameterAppendProto::APPEND_IF_EXISTS_OR_ADD:
-    params.add(key_, maybeUrlEncode(formatter_->format(context, stream_info)));
+    params.add(key_, urlEncode(formatter_->format(context, stream_info)));
     return;
   case ParameterAppendProto::ADD_IF_ABSENT: {
     auto iter = params.data().find(key_);
     if (iter == params.data().end()) {
-      params.add(key_, maybeUrlEncode(formatter_->format(context, stream_info)));
+      params.add(key_, urlEncode(formatter_->format(context, stream_info)));
     }
     break;
   }
   case ParameterAppendProto::OVERWRITE_IF_EXISTS: {
     auto iter = params.data().find(key_);
     if (iter != params.data().end()) {
-      params.overwrite(key_, maybeUrlEncode(formatter_->format(context, stream_info)));
+      params.overwrite(key_, urlEncode(formatter_->format(context, stream_info)));
     }
     break;
   }
   case ParameterAppendProto::OVERWRITE_IF_EXISTS_OR_ADD:
-    params.overwrite(key_, maybeUrlEncode(formatter_->format(context, stream_info)));
+    params.overwrite(key_, urlEncode(formatter_->format(context, stream_info)));
     break;
   }
 }
