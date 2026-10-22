@@ -68,7 +68,8 @@ Config::applySubstitutionFormatter(StreamInfo::StreamInfo& stream_info) {
 InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope) {
   // ratelimit.(<stat_prefix>.)*: the stat prefix is the tag of every stat.
   const Stats::TagStringView tag{Envoy::Config::TagNames::get().RATELIMIT_PREFIX, name};
-  Stats::LiteScopeHelper helper(scope, "ratelimit", {tag}, absl::StrCat("ratelimit.", name));
+  Stats::LiteScopeHelper helper(scope, "ratelimit", {tag}, absl::StrCat("ratelimit.", name),
+                                /*sanitize=*/false);
   return {ALL_TCP_RATE_LIMIT_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
