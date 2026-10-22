@@ -56,13 +56,17 @@ message IoUringOptions {
   // The starting size in bytes of the buffer for each ``readv``-based ``io_uring`` read. Envoy
   // grows the next read up to 16 times this size while reads keep filling the buffer and resets it
   // otherwise, so large transfers use fewer reads. When ``enable_multishot_receive`` is set, this
-  // is also the size of each kernel-provided buffer. If not specified, defaults to 8192.
+  // is also the size of each kernel-provided buffer. This value also bounds how much data is read
+  // into the buffer while a connection is read-disabled, so that the kernel receive window applies
+  // backpressure to the peer. If not specified, defaults to 8192.
   google.protobuf.UInt32Value read_buffer_size = 3;
 
-  // The timeout in milliseconds to wait for pending write operations to complete when closing
-  // a socket. ``io_uring`` writes are asynchronous. If the remote peer stops reading, a write
-  // may never complete. After this timeout, pending writes are canceled and the socket is
-  // closed. If not specified, defaults to 1000.
+  // The timeout in milliseconds to wait for pending write operations to make progress when closing
+  // a socket. ``io_uring`` writes are asynchronous. If the remote peer stops reading, a write may
+  // never complete. The timeout is restarted whenever a write makes progress, so a peer that keeps
+  // reading continues to receive the response; it fires only after this period with no progress, at
+  // which point pending writes are canceled and the socket is closed. If not specified, defaults to
+  // 1000.
   google.protobuf.UInt32Value write_timeout_ms = 4;
 
   // The high watermark in bytes for the write buffer. When the amount of pending write data

@@ -52,7 +52,7 @@ public:
   IoUringResult prepareShutdown(os_fd_t fd, int how, Request* user_data) override;
   IoUringResult submit() override;
   void injectCompletion(os_fd_t fd, Request* user_data, int32_t result) override;
-  void removeInjectedCompletion(os_fd_t fd) override;
+  void removeInjectedCompletion(IoUringSocket& socket) override;
 
 private:
   // Logs a warning when the completion queue has overflowed. The kernel parks the extra completions

@@ -34,22 +34,24 @@ IoUringSocketHandleImpl::~IoUringSocketHandleImpl() {
     return;
   }
 
-  // If the socket is owned by the main thread like a listener, it may outlive the IoUringWorker.
-  // We have to ensure that the current thread has been registered and the io_uring in the thread
-  // is still available.
-  // TODO(zhxie): for current usage of server socket and client socket, the check may be
-  // redundant.
+  // When an IoUringSocket owns this fd it is the sole closer, via `IORING_OP_CLOSE`. The fd number,
+  // which `IORING_OP_CLOSE` frees inline at submit, must not also be closed by this handle or the
+  // base class, otherwise it could be closed twice and a reused number belonging to another socket
+  // could be closed by mistake.
   if (io_uring_socket_type_ != IoUringSocketType::Unknown &&
-      io_uring_socket_type_ != IoUringSocketType::Accept &&
-      io_uring_worker_factory_.currentThreadRegistered() && io_uring_socket_.has_value()) {
-    if (io_uring_socket_->getStatus() != Io::IoUringSocketStatus::Closed) {
+      io_uring_socket_type_ != IoUringSocketType::Accept && io_uring_socket_.has_value()) {
+    // Only reach into the io_uring socket while its worker thread is still registered. During
+    // worker teardown the worker destructor closes every remaining socket, so leaving the fd to it
+    // closes it exactly once. Dereferencing the socket here would race that teardown.
+    if (io_uring_worker_factory_.currentThreadRegistered() &&
+        io_uring_socket_->getStatus() != Io::IoUringSocketStatus::Closed) {
       io_uring_socket_.ref().close(false);
     }
-  } else {
-    // The TLS slot has been shut down by this moment with io_uring wiped out, thus use the
-    // POSIX system call instead of IoUringSocketHandleImpl::close().
-    ::close(fd_);
+    // Mark the fd invalid so the base class destructor does not close it again.
+    SET_SOCKET_INVALID(fd_);
   }
+  // Otherwise the base class destructor closes the fd with the POSIX system call, for a listener or
+  // a socket whose file event was never initialized.
 }
 
 void IoUringSocketHandleImpl::setAbortiveClose() {
@@ -242,10 +244,11 @@ Api::SysCallIntResult IoUringSocketHandleImpl::connect(Address::InstanceConstSha
 Api::SysCallIntResult IoUringSocketHandleImpl::getOption(int level, int optname, void* optval,
                                                          socklen_t* optlen) {
   // io_uring socket does not populate connect error in getsockopt. Instead, the connect error is
-  // returned in onConnect() handling. We will imitate the default socket behavior here for client
-  // socket with optname SO_ERROR, which is only used to check connect error.
+  // delivered through the write event raised by onConnect(). We imitate the default socket
+  // behavior for a client socket with optname SO_ERROR while that event is running. Outside of a
+  // write event, for example when a TLS read probes for a reset after EOF, the kernel answers.
   if (io_uring_socket_type_ == IoUringSocketType::Client && optname == SO_ERROR &&
-      io_uring_socket_.has_value()) {
+      io_uring_socket_.has_value() && io_uring_socket_->getWriteParam().has_value()) {
     int* intval = static_cast<int*>(optval);
     *intval = -io_uring_socket_->getWriteParam()->result_;
     *optlen = sizeof(int);
@@ -373,6 +376,11 @@ void IoUringSocketHandleImpl::resetFileEvents() {
 
   io_uring_socket_->disableRead();
   io_uring_socket_->enableCloseEvent(false);
+  // The epoll handle destroys its file event here so no callback can fire afterwards. The io_uring
+  // socket outlives this reset, so detach the handler callback to match that contract. Otherwise a
+  // completion after the reset, for example a FIN while the socket is handed to another worker,
+  // would call into an owner that is being torn down.
+  io_uring_socket_->setFileReadyCb([](uint32_t) { return absl::OkStatus(); });
 }
 
 Api::SysCallIntResult IoUringSocketHandleImpl::shutdown(int how) {

@@ -2,6 +2,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface.h"
 
+#include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -196,6 +197,61 @@ TEST_P(IoUringSocketInterfaceIntegrationTest, Basic) {
       });
   ASSERT_TRUE(connection->run());
   EXPECT_EQ("hello", response);
+}
+
+class IoUringUpstreamTlsIntegrationTest
+    : public HttpIntegrationTest,
+      public testing::TestWithParam<Network::Address::IpVersion> {
+public:
+  IoUringUpstreamTlsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()),
+        should_skip_(!Io::isIoUringSupported()) {}
+
+  void SetUp() override {
+    if (should_skip_) {
+      GTEST_SKIP();
+    }
+  }
+
+  void initialize() override {
+    config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.extensions.network.socket_interface.default_socket_interface
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.network.socket_interface.v3.DefaultSocketInterface
+  io_uring_options: {}
+)EOF");
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.set_default_socket_interface(
+          "envoy.extensions.network.socket_interface.default_socket_interface");
+    });
+    setUpstreamProtocol(Http::CodecType::HTTP1);
+    config_helper_.configureUpstreamTls();
+    HttpIntegrationTest::initialize();
+  }
+
+  const bool should_skip_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, IoUringUpstreamTlsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// The upstream closes the TCP connection without a TLS handshake, so the TLS read sees EOF and
+// probes SO_ERROR on the io_uring client socket outside of a write event.
+TEST_P(IoUringUpstreamTlsIntegrationTest, UpstreamClosesDuringTlsHandshake) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  // Wait for the ClientHello so the close lands on an in-progress handshake.
+  ASSERT_TRUE(fake_upstream_connection->waitForData(
+      [](const std::string& data) -> bool { return !data.empty(); }));
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 #endif
 

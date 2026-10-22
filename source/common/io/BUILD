@@ -46,6 +46,8 @@ envoy_cc_library(
         "//envoy/event:file_event_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:linked_object",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

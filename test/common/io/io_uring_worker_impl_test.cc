@@ -1,7 +1,9 @@
 #include <sys/socket.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
+#include <tuple>
 #include <vector>
 
 #include "source/common/io/io_uring_worker_impl.h"
@@ -51,6 +53,62 @@ public:
 
   void submitForTest() { submit(); }
 };
+
+class IoUringSubmitRetryTest : public testing::TestWithParam<bool> {};
+
+TEST_P(IoUringSubmitRetryTest, RetainsRequestWhenSubmissionQueueIsFull) {
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto io_uring_instance = std::make_unique<testing::StrictMock<MockIoUring>>();
+  auto& mock_io_uring = *io_uring_instance;
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  testing::StrictMock<MockIoUringSocket> socket;
+  EXPECT_CALL(socket, fd()).WillRepeatedly(Return(11));
+  const Network::Address::InstanceConstSharedPtr address =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  Request* first_attempt = nullptr;
+  const bool multishot = GetParam();
+  {
+    testing::InSequence sequence;
+    if (multishot) {
+      EXPECT_CALL(mock_io_uring, prepareReadMultishot(11, _))
+          .WillOnce(DoAll(SaveArg<1>(&first_attempt), Return(IoUringResult::Failed)));
+    } else {
+      EXPECT_CALL(mock_io_uring, prepareConnect(11, address, _))
+          .WillOnce(DoAll(SaveArg<2>(&first_attempt), Return(IoUringResult::Failed)));
+    }
+    // Flush the full submission queue before retrying the same operation and request.
+    EXPECT_CALL(mock_io_uring, submit()).WillOnce(Return(IoUringResult::Ok));
+    if (multishot) {
+      EXPECT_CALL(mock_io_uring, prepareReadMultishot(11, _))
+          .WillOnce(Invoke([&](os_fd_t, Request* request) {
+            EXPECT_EQ(first_attempt, request);
+            return IoUringResult::Ok;
+          }));
+    } else {
+      EXPECT_CALL(mock_io_uring, prepareConnect(11, address, _))
+          .WillOnce(Invoke(
+              [&](os_fd_t, const Network::Address::InstanceConstSharedPtr&, Request* request) {
+                EXPECT_EQ(first_attempt, request);
+                return IoUringResult::Ok;
+              }));
+    }
+    EXPECT_CALL(mock_io_uring, submit()).WillOnce(Return(IoUringResult::Ok));
+  }
+  std::unique_ptr<Request> request(multishot ? worker.submitReadMultishotRequest(socket)
+                                             : worker.submitConnectRequest(socket, address));
+  ASSERT_NE(nullptr, request);
+  EXPECT_EQ(first_attempt, request.get());
+  EXPECT_EQ(multishot ? Request::RequestType::Read : Request::RequestType::Connect,
+            request->type());
+  EXPECT_EQ(&socket, &request->socket());
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
+INSTANTIATE_TEST_SUITE_P(ConnectAndMultishot, IoUringSubmitRetryTest, testing::Values(false, true));
 
 // TODO (soulxu): This is only for test coverage, we suppose to have correct
 // implementation to handle the request submit failed.
@@ -122,7 +180,7 @@ TEST(IoUringWorkerImplTest, SubmitRequestsFailed) {
 
   EXPECT_EQ(fd, io_uring_socket.fd());
   EXPECT_EQ(1, worker.getSockets().size());
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   dynamic_cast<IoUringSocketTestImpl*>(worker.getSockets().front().get())->cleanupForTest();
   EXPECT_EQ(0, worker.getNumOfSockets());
@@ -145,7 +203,7 @@ TEST(IoUringWorkerImplTest, CleanupSocket) {
 
   EXPECT_EQ(fd, io_uring_socket.fd());
   EXPECT_EQ(1, worker.getSockets().size());
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   dynamic_cast<IoUringSocketTestImpl*>(worker.getSockets().front().get())->cleanupForTest();
   EXPECT_EQ(0, worker.getNumOfSockets());
@@ -178,11 +236,62 @@ TEST(IoUringWorkerImplTest, DelaySubmit) {
   }));
   ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
 
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   dynamic_cast<IoUringSocketTestImpl*>(worker.getSockets().front().get())->cleanupForTest();
   EXPECT_EQ(0, worker.getNumOfSockets());
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
+// A completion callback can find the submission queue full while submission is delayed for the
+// completion loop. The kernel frees entries only when they are submitted, so the retry must
+// submit even though submission is delayed.
+TEST(IoUringWorkerImplTest, FullSubmissionQueueIsSubmittedInsideCompletionLoop) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  const os_fd_t fd = 11;
+  Request* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  IoUringServerSocket socket(
+      fd, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
+  socket.enableRead();
+
+  // The submission queue stays full until it is submitted.
+  bool submission_queue_full = true;
+  Request* rearmed_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .Times(2)
+      .WillRepeatedly(Invoke([&](os_fd_t, const struct iovec*, unsigned, off_t, Request* req) {
+        rearmed_req = req;
+        return submission_queue_full ? IoUringResult::Failed : IoUringResult::Ok;
+      }));
+  // One submit frees the queue inside the completion loop and one ends the loop.
+  EXPECT_CALL(mock_io_uring, submit()).Times(2).WillRepeatedly(Invoke([&]() {
+    submission_queue_full = false;
+    return IoUringResult::Ok;
+  }));
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_)).WillOnce(Invoke([&](const CompletionCb& cb) {
+    // The read completion re-arms the read.
+    cb(read_req, 5, false);
+  }));
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
+  EXPECT_NE(nullptr, rearmed_req);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete rearmed_req;
 }
 
 // When the completion queue still holds entries after a reap batch, the worker re-arms the read
@@ -313,7 +422,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterWrite) {
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&close_req](const CompletionCb& cb) { cb(close_req, 0, false); }));
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
@@ -381,7 +490,7 @@ TEST(IoUringWorkerImplTest, ServerSocketInjectAfterRead) {
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&close_req](const CompletionCb& cb) { cb(close_req, 0, false); }));
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
@@ -432,7 +541,7 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
             .RetiresOnSaturation();
         EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
 
-        EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+        EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
 
         // Fake the read request cancel completion.
         cb(read_req, -ECANCELED, false);
@@ -448,6 +557,188 @@ TEST(IoUringWorkerImplTest, CloseAllSocketsWhenDestruction) {
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   worker.reset();
 }
+
+class IoUringWorkerShutdownTest
+    : public testing::TestWithParam<std::tuple<bool, bool, bool, bool>> {};
+
+TEST_P(IoUringWorkerShutdownTest, CancelsPendingOperationWithoutRunningDispatcher) {
+  const auto [already_closed, shutdown, already_canceling, partial_write] = GetParam();
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto io_uring_instance = std::make_unique<testing::StrictMock<MockIoUring>>();
+  MockIoUring& mock_io_uring = *io_uring_instance;
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(ReturnNew<testing::StrictMock<Event::MockFileEvent>>());
+  auto worker = std::make_unique<IoUringWorkerTestImpl>(std::move(io_uring_instance), dispatcher);
+
+  // A client socket has no read request before connect completes, isolating the blocked operation.
+  const os_fd_t fd = 11;
+  auto& socket = worker->addClientSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+  Request* pending_req = nullptr;
+  if (shutdown) {
+    EXPECT_CALL(mock_io_uring, prepareShutdown(fd, SHUT_WR, _))
+        .WillOnce(DoAll(SaveArg<2>(&pending_req), Return(IoUringResult::Ok)));
+    EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+    socket.shutdown(SHUT_WR);
+  } else {
+    EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+        .WillOnce(DoAll(SaveArg<4>(&pending_req), Return(IoUringResult::Ok)));
+    EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+    Buffer::OwnedImpl data("blocked write");
+    socket.write(data);
+  }
+
+  auto* timer = new testing::StrictMock<Event::MockTimer>();
+  Event::TimerCb timeout_cb;
+  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(DoAll(SaveArg<0>(&timeout_cb), Return(timer)));
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1000), _));
+  EXPECT_CALL(*timer, disableTimer()).Times(2);
+
+  Request* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(pending_req, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  if (already_closed) {
+    socket.close(false);
+    if (already_canceling) {
+      timeout_cb();
+    }
+  }
+
+  Request* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(fd, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  Request* unexpected_write_req = nullptr;
+  if (partial_write) {
+    ON_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+        .WillByDefault(DoAll(SaveArg<4>(&unexpected_write_req), Return(IoUringResult::Ok)));
+    EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _)).Times(0);
+  }
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_)).WillOnce(Invoke([&](const CompletionCb& cb) {
+    // Fail deterministically on the original code, without hanging the test in its drain loop.
+    EXPECT_NE(cancel_req, nullptr);
+    if (partial_write && cancel_req != nullptr) {
+      // The cancel completion can arrive before a positive completion that won the cancellation
+      // race.
+      cb(cancel_req, -ENOENT, false);
+    }
+    cb(pending_req, partial_write ? 1 : -ECANCELED, false);
+    EXPECT_EQ(unexpected_write_req, nullptr);
+    if (unexpected_write_req != nullptr) {
+      // Drain a wrongly resubmitted request so the regression fails without hanging teardown.
+      cb(unexpected_write_req, -ECANCELED, false);
+    }
+    if (!partial_write && cancel_req != nullptr) {
+      cb(cancel_req, 0, false);
+    }
+    ASSERT_NE(close_req, nullptr);
+    cb(close_req, 0, false);
+  }));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  worker.reset();
+}
+
+INSTANTIATE_TEST_SUITE_P(PendingWritesAndShutdowns, IoUringWorkerShutdownTest,
+                         testing::Values(std::make_tuple(false, false, false, false),
+                                         std::make_tuple(false, true, false, false),
+                                         std::make_tuple(true, false, false, false),
+                                         std::make_tuple(true, true, false, false),
+                                         std::make_tuple(true, false, true, false),
+                                         std::make_tuple(true, true, true, false),
+                                         std::make_tuple(false, false, false, true),
+                                         std::make_tuple(true, false, false, true),
+                                         std::make_tuple(true, false, true, true)));
+
+class IoUringCancelOrderTest
+    : public testing::TestWithParam<std::tuple<std::array<uint32_t, 4>, bool>> {};
+
+std::vector<std::array<uint32_t, 4>> cancellationCompletionOrders() {
+  std::vector<std::array<uint32_t, 4>> orders;
+  std::array<uint32_t, 4> order{0, 1, 2, 3};
+  do {
+    orders.push_back(order);
+  } while (std::next_permutation(order.begin(), order.end()));
+  return orders;
+}
+
+TEST_P(IoUringCancelOrderTest, WaitsForBothCancellationCompletionsBeforeClosing) {
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  auto io_uring_instance = std::make_unique<testing::StrictMock<MockIoUring>>();
+  MockIoUring& mock_io_uring = *io_uring_instance;
+  Event::FileReadyCb file_event_callback;
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(DoAll(SaveArg<1>(&file_event_callback),
+                      ReturnNew<testing::StrictMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  const os_fd_t fd = 11;
+  Request* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  auto& socket = worker.addServerSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  Buffer::OwnedImpl data("blocked write");
+  socket.write(data);
+
+  Request* read_cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(read_req, _))
+      .WillOnce(DoAll(SaveArg<1>(&read_cancel_req), Return(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  Event::TimerCb timeout_cb;
+  EXPECT_CALL(dispatcher, createTimer_(_))
+      .WillOnce(DoAll(SaveArg<0>(&timeout_cb), ReturnNew<NiceMock<Event::MockTimer>>()));
+  socket.close(false);
+  Request* write_cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(write_req, _))
+      .WillOnce(DoAll(SaveArg<1>(&write_cancel_req), Return(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  timeout_cb();
+
+  Request* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(fd, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return(IoUringResult::Ok)));
+  Request* unexpected_write_req = nullptr;
+  ON_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+      .WillByDefault(DoAll(SaveArg<4>(&unexpected_write_req), Return(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _)).Times(0);
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_)).WillOnce(Invoke([&](const CompletionCb& cb) {
+    const std::array<Request*, 4> requests{read_req, write_req, read_cancel_req, write_cancel_req};
+    const auto& [order, partial_write] = GetParam();
+    for (uint32_t i = 0; i < order.size(); ++i) {
+      const uint32_t operation = order[i];
+      const int32_t result = operation == 1 && partial_write ? 1 : operation < 2 ? -ECANCELED : 0;
+      cb(requests[operation], result, false);
+      if (i + 1 < order.size()) {
+        EXPECT_EQ(close_req, nullptr);
+      }
+    }
+    EXPECT_EQ(unexpected_write_req, nullptr);
+    if (unexpected_write_req != nullptr) {
+      cb(unexpected_write_req, -ECANCELED, false);
+    }
+    ASSERT_NE(close_req, nullptr);
+    cb(close_req, 0, false);
+  }));
+  EXPECT_CALL(mock_io_uring, submit()).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  ASSERT_OK(file_event_callback(Event::FileReadyType::Read));
+  EXPECT_EQ(worker.getNumOfSockets(), 0);
+}
+
+INSTANTIATE_TEST_SUITE_P(CancellationOrders, IoUringCancelOrderTest,
+                         testing::Combine(testing::ValuesIn(cancellationCompletionOrders()),
+                                          testing::Bool()));
 
 TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   Event::MockDispatcher dispatcher;
@@ -510,7 +801,7 @@ TEST(IoUringWorkerImplTest, ServerCloseWithWriteRequestOnly) {
   // After the close request finished, the socket will be cleanup.
   EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
       .WillOnce(Invoke([&close_req](const CompletionCb& cb) { cb(close_req, 0, false); }));
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   EXPECT_CALL(dispatcher, clearDeferredDeleteList());
   EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
@@ -679,7 +970,7 @@ TEST(IoUringWorkerImplTest, CloseKeepFdOpenAndSaveData) {
   socket.onCancel(cancel_req, 0, false);
 
   // Consumes the read request.
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(0));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   socket.onRead(read_req, 1, false);
   EXPECT_TRUE(is_closed);
@@ -805,6 +1096,51 @@ TEST(IoUringWorkerImplTest, WriteResumesBelowLowWatermark) {
   delete write_req;
   delete write_req2;
   delete injected_req;
+}
+
+// A write that makes progress while the socket is closing restarts the write timeout, matching the
+// epoll delayed close timer which is inactivity based. A peer that keeps reading does not lose the
+// tail of a response that takes longer than one write timeout to flush.
+TEST(IoUringWorkerImplTest, WriteTimeoutRestartsOnProgressWhileClosing) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(ReturnNew<NiceMock<Event::MockFileEvent>>());
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  // A one second write timeout and no watermark interference.
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 1000, 131072, 16384, false);
+
+  // Write enough that one completion only drains part of it, leaving data to flush.
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(testing::AnyNumber());
+  Buffer::OwnedImpl buf;
+  buf.add(std::string(1000, 'x'));
+  socket.write(buf);
+
+  // Closing with a write in flight arms the one shot write timeout.
+  auto* timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1000), _));
+  socket.close(false);
+
+  // A partial write keeps data buffered, so the timeout is restarted and the next write is armed.
+  Request* write_req2 = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(_, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req2), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1000), _));
+  socket.onWrite(write_req, 400, false);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete write_req;
+  delete write_req2;
 }
 
 // A failed write drains the buffer and clears backpressure, so a later write before close is
@@ -1163,6 +1499,89 @@ TEST(IoUringWorkerImplTest, ServerSocketAdaptiveReadSize) {
   }
 }
 
+// While the handler is not reading, the socket stops arming new readv reads once the buffered data
+// reaches the read buffer size, so the kernel receive buffer applies backpressure instead of
+// read_buf_ growing without bound.
+TEST(IoUringWorkerImplTest, ReadDisabledStopsReadvAtBufferCap) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  const uint32_t base = worker.readBufferSize();
+
+  // The handler never drains, modeling a read-disabled connection whose peer keeps sending.
+  std::vector<Request*> reqs;
+  EXPECT_CALL(mock_io_uring, prepareReadv(_, _, _, _, _))
+      .WillRepeatedly(DoAll(Invoke([&reqs](os_fd_t, const struct iovec*, unsigned, off_t,
+                                           Request* req) { reqs.push_back(req); }),
+                            Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(testing::AnyNumber());
+
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
+  socket.enableRead();
+  ASSERT_EQ(1, reqs.size());
+  socket.disableRead();
+
+  // A read that leaves the buffer below the cap re-arms a monitoring read.
+  socket.onRead(reqs.back(), 1, false);
+  ASSERT_EQ(2, reqs.size());
+
+  // A read that fills the buffer to the cap does not re-arm, so the kernel applies backpressure.
+  socket.onRead(reqs.back(), static_cast<int32_t>(base), false);
+  EXPECT_EQ(2, reqs.size());
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  for (Request* req : reqs) {
+    delete req;
+  }
+}
+
+// While the handler is not reading, a kernel-armed `multishot` read is canceled once the buffered
+// data reaches the read buffer size, so one hot connection cannot pin the shared buffer pool.
+TEST(IoUringWorkerImplTest, ReadDisabledCancelsMultishotAtBufferCap) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  const uint32_t base = 8192;
+  auto buffer_pool = std::make_shared<FakeIoUringBufferPool>(2, base);
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(mock_io_uring, isMultishotEnabled()).WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_io_uring, bufferPool()).WillRepeatedly(Return(buffer_pool));
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+  ASSERT_EQ(base, worker.readBufferSize());
+
+  Request* multishot_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadMultishot(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&multishot_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(testing::AnyNumber());
+  IoUringServerSocket socket(
+      0, worker, [](uint32_t) { return absl::OkStatus(); }, 0, 131072, 16384, false);
+  socket.enableRead();
+  socket.disableRead();
+
+  // A `multishot` completion that fills the buffer to the cap triggers a cancel of the armed read.
+  Request* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(multishot_req, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)));
+  multishot_req->setBufferId(0);
+  multishot_req->setMoreCompletions(true);
+  socket.onRead(multishot_req, static_cast<int32_t>(base), false);
+  EXPECT_NE(nullptr, cancel_req);
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete multishot_req;
+  delete cancel_req;
+}
+
 // A kernel that registers the buffer ring but rejects `multishot` recv with the given error
 // disables `multishot` for the socket, which then uses readv for every read.
 void multishotDisabledOnUnsupportedKernel(int32_t reject_error) {
@@ -1264,7 +1683,7 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseDiscardsAndReleasesBuffer)
   EXPECT_EQ(std::vector<uint32_t>({2}), buffer_pool->released_buffers_);
 
   // The close completion cleans up the socket.
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(0));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   socket.onClose(close_req, 0, false);
 
@@ -1318,7 +1737,7 @@ TEST(IoUringWorkerImplTest, ServerSocketMultishotCloseKeepFdOpenCopiesData) {
 
   // The terminal `multishot` completion delivers data, which is copied to the callback before
   // cleanup.
-  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(0));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(_));
   EXPECT_CALL(dispatcher, deferredDelete_);
   multishot_req->setBufferId(0);
   multishot_req->setMoreCompletions(false);

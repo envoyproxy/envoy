@@ -45,7 +45,7 @@ public:
   MOCK_METHOD(IoUringResult, prepareShutdown, (os_fd_t fd, int how, Request* user_data));
   MOCK_METHOD(IoUringResult, submit, ());
   MOCK_METHOD(void, injectCompletion, (os_fd_t fd, Request* user_data, int32_t result));
-  MOCK_METHOD(void, removeInjectedCompletion, (os_fd_t fd));
+  MOCK_METHOD(void, removeInjectedCompletion, (IoUringSocket & socket));
 };
 
 class MockIoUringSocket : public IoUringSocket {
