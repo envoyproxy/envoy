@@ -82,7 +82,8 @@ absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactor
 
   auto filter_settings = std::make_shared<FilterSettingsImpl>(
       *arn, getInvocationMode(proto_config), proto_config.payload_passthrough(),
-      proto_config.host_rewrite(), std::move(signer), server_context.mainThreadDispatcher());
+      proto_config.host_rewrite(), proto_config.preserve_original_path_and_method(),
+      std::move(signer), server_context.mainThreadDispatcher());
 
   FilterStats stats = generateStats(stats_prefix, scope);
   return [stats, filter_settings, is_upstream](Http::FilterChainFactoryCallbacks& cb) -> void {
@@ -121,7 +122,8 @@ AwsLambdaFilterFactory::createRouteSpecificFilterConfigTyped(
   auto filter_settings = std::make_shared<FilterSettingsImpl>(
       *arn, getInvocationMode(per_route_config.invoke_config()),
       per_route_config.invoke_config().payload_passthrough(),
-      per_route_config.invoke_config().host_rewrite(), std::move(signer),
+      per_route_config.invoke_config().host_rewrite(),
+      per_route_config.invoke_config().preserve_original_path_and_method(), std::move(signer),
       server_context.mainThreadDispatcher());
 
   return filter_settings;

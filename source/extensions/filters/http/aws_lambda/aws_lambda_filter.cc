@@ -51,7 +51,18 @@ constexpr auto filter_metadata_key = "com.amazonaws.lambda";
 constexpr auto egress_gateway_metadata_key = "egress_gateway";
 
 void setLambdaHeaders(Http::RequestHeaderMap& headers, const std::optional<Arn>& arn,
-                      InvocationMode mode, const std::string& host_rewrite) {
+                      InvocationMode mode, const std::string& host_rewrite,
+                      bool preserve_original_path_and_method) {
+  if (preserve_original_path_and_method) {
+    // Only record what we are about to overwrite. An earlier rewrite (the router, or another
+    // filter) already recorded the value it replaced, and that one is closer to the original.
+    if (headers.EnvoyOriginalPath() == nullptr) {
+      headers.setEnvoyOriginalPath(headers.getPathValue());
+    }
+    if (headers.get(Http::Headers::get().EnvoyOriginalMethod).empty()) {
+      headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod, headers.getMethodValue());
+    }
+  }
   headers.setMethod(Http::Headers::get().MethodValues.Post);
   headers.setPath(fmt::format("/2015-03-31/functions/{}/invocations", arn->arn()));
   if (mode == InvocationMode::Synchronous) {
@@ -178,7 +189,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 void Filter::continueDecodeHeaders(FilterSettings& settings) {
   if (settings.payloadPassthrough()) {
     setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
-                     settings.hostRewrite());
+                     settings.hostRewrite(), settings.preserveOriginalPathAndMethod());
     auto status = settings.signer().signEmptyPayload(*request_headers_, settings.arn().region());
     if (!status.ok()) {
       ENVOY_LOG(debug, "signing failed: {}", status.message());
@@ -191,7 +202,7 @@ void Filter::continueDecodeHeaders(FilterSettings& settings) {
   // We must call setLambdaHeaders *after* the JSON transformation of the request. That way we
   // reflect the actual incoming request headers instead of the overwritten ones.
   setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
-                   settings.hostRewrite());
+                   settings.hostRewrite(), settings.preserveOriginalPathAndMethod());
   request_headers_->setContentLength(json_buf.length());
   request_headers_->setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
@@ -279,7 +290,7 @@ void Filter::continueDecodeData(FilterSettings& settings) {
   }
 
   setLambdaHeaders(*request_headers_, settings.arn(), settings.invocationMode(),
-                   settings.hostRewrite());
+                   settings.hostRewrite(), settings.preserveOriginalPathAndMethod());
   auto& hashing_util = Envoy::Common::Crypto::UtilitySingleton::get();
 
   const auto hash = Hex::encode(hashing_util.getSha256Digest(decoding_buffer));

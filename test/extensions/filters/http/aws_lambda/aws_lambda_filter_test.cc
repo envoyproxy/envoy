@@ -32,20 +32,24 @@ using ::testing::UnorderedElementsAre;
 
 class FilterSettingsMock : public FilterSettings {
 public:
-  FilterSettingsMock(InvocationMode mode, bool payload_passthrough, const std::string& host_rewrite)
+  FilterSettingsMock(InvocationMode mode, bool payload_passthrough, const std::string& host_rewrite,
+                     bool preserve_original_path_and_method = false)
       : invocation_mode_(mode), payload_passthrough_(payload_passthrough),
-        host_rewrite_(host_rewrite) {}
+        host_rewrite_(host_rewrite),
+        preserve_original_path_and_method_(preserve_original_path_and_method) {}
 
   const Arn& arn() const override { return arn_; }
   bool payloadPassthrough() const override { return payload_passthrough_; }
   InvocationMode invocationMode() const override { return invocation_mode_; }
   const std::string& hostRewrite() const override { return host_rewrite_; }
+  bool preserveOriginalPathAndMethod() const override { return preserve_original_path_and_method_; }
   Extensions::Common::Aws::Signer& signer() override { return *signer_; }
 
   Arn arn_{parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value()};
   InvocationMode invocation_mode_;
   bool payload_passthrough_;
   const std::string host_rewrite_;
+  const bool preserve_original_path_and_method_;
   std::shared_ptr<NiceMock<MockSigner>> signer_{std::make_shared<NiceMock<MockSigner>>()};
 };
 
@@ -59,9 +63,11 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  std::shared_ptr<FilterSettingsMock> setupDownstreamFilter(InvocationMode mode, bool passthrough,
-                                                            const std::string& host_rewrite) {
-    auto filter_settings = std::make_shared<FilterSettingsMock>(mode, passthrough, host_rewrite);
+  std::shared_ptr<FilterSettingsMock>
+  setupDownstreamFilter(InvocationMode mode, bool passthrough, const std::string& host_rewrite,
+                        bool preserve_original_path_and_method = false) {
+    auto filter_settings = std::make_shared<FilterSettingsMock>(mode, passthrough, host_rewrite,
+                                                                preserve_original_path_and_method);
     setupFilter(filter_settings, false);
     setupClusterMetadata();
     return filter_settings;
@@ -850,6 +856,98 @@ TEST_F(AwsLambdaFilterTest, SignWithHostRewritePerRoute) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, result);
 }
 
+// With preserve_original_path_and_method off, the rewritten path and method are the only record
+// of the request, which is the pre-existing behaviour.
+TEST_F(AwsLambdaFilterTest, OriginalPathAndMethodNotRecordedByDefault) {
+  setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/resource?proxy=envoy");
+  headers.setMethod("GET");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  EXPECT_EQ(nullptr, headers.EnvoyOriginalPath());
+  EXPECT_TRUE(headers.get(Http::Headers::get().EnvoyOriginalMethod).empty());
+}
+
+// A header-only request records the downstream path and method before they are rewritten.
+TEST_F(AwsLambdaFilterTest, OriginalPathAndMethodRecordedOnHeaderOnlyRequest) {
+  setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "",
+                        true /*preserve_original_path_and_method*/);
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/resource?proxy=envoy");
+  headers.setMethod("GET");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  EXPECT_EQ("/resource?proxy=envoy", headers.getEnvoyOriginalPathValue());
+  EXPECT_EQ("GET", headers.get_(Http::Headers::get().EnvoyOriginalMethod));
+  EXPECT_EQ("/2015-03-31/functions/arn:aws:lambda:us-west-2:1337:function:fun/invocations",
+            headers.getPathValue());
+  EXPECT_EQ("POST", headers.getMethodValue());
+}
+
+// The headers are recorded on the decodeData path as well, which is where a request with a body
+// is rewritten.
+TEST_F(AwsLambdaFilterTest, OriginalPathAndMethodRecordedOnRequestWithBody) {
+  setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "",
+                        true /*preserve_original_path_and_method*/);
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/resource?proxy=envoy");
+  headers.setMethod("PUT");
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buf("body");
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buf));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buf, true /*end_stream*/));
+
+  EXPECT_EQ("/resource?proxy=envoy", headers.getEnvoyOriginalPathValue());
+  EXPECT_EQ("PUT", headers.get_(Http::Headers::get().EnvoyOriginalMethod));
+}
+
+// In JSON mode the headers are recorded too, but after the payload has been built, so they are not
+// part of the request the function sees.
+TEST_F(AwsLambdaFilterTest, OriginalPathAndMethodRecordedWithJsonOn) {
+  using source::extensions::filters::http::aws_lambda::Request;
+  setupDownstreamFilter(InvocationMode::Synchronous, false /*passthrough*/, "",
+                        true /*preserve_original_path_and_method*/);
+
+  Buffer::OwnedImpl json_buf;
+  auto on_add_decoded_data = [&json_buf](Buffer::Instance& buf, bool) { json_buf.move(buf); };
+  ON_CALL(decoder_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke(on_add_decoded_data));
+
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setContentLength(0);
+  headers.setPath("/resource?proxy=envoy");
+  headers.setMethod("GET");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  EXPECT_EQ("/resource?proxy=envoy", headers.getEnvoyOriginalPathValue());
+  EXPECT_EQ("GET", headers.get_(Http::Headers::get().EnvoyOriginalMethod));
+
+  Request req;
+  TestUtility::loadFromJson(json_buf.toString(), req);
+  EXPECT_THAT(req.headers(), UnorderedElementsAre(Pair("content-length", "0")));
+}
+
+// A value recorded by an earlier rewrite is closer to the original than the one this filter would
+// write, so it is left alone.
+TEST_F(AwsLambdaFilterTest, OriginalPathAndMethodAlreadyRecordedAreNotOverwritten) {
+  setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "",
+                        true /*preserve_original_path_and_method*/);
+  Http::TestRequestHeaderMapImpl headers;
+  headers.setPath("/rewritten");
+  headers.setMethod("GET");
+  headers.setEnvoyOriginalPath("/original");
+  headers.setCopy(Http::Headers::get().EnvoyOriginalMethod, "HEAD");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+
+  EXPECT_EQ("/original", headers.getEnvoyOriginalPathValue());
+  EXPECT_EQ("HEAD", headers.get_(Http::Headers::get().EnvoyOriginalMethod));
+}
+
 // Verify filter decodeData functionality when credentials are pending.
 TEST_F(AwsLambdaFilterTest, DecodeHeadersCredentialsPending) {
   auto filter_settings =
@@ -918,7 +1016,7 @@ TEST_F(AwsLambdaFilterTest, SettingsReleasedOffMainThreadArePostedToMainDispatch
   bool signer_destroyed = false;
   auto settings = std::make_unique<FilterSettingsImpl>(
       parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value(), InvocationMode::Synchronous,
-      true /*payload_passthrough*/, "",
+      true /*payload_passthrough*/, "", false /*preserve_original_path_and_method*/,
       std::make_unique<DestructionTrackingSigner>(signer_destroyed), main_dispatcher);
 
   Event::PostCb posted;
@@ -944,7 +1042,7 @@ TEST_F(AwsLambdaFilterTest, SettingsReleasedOnMainThreadAreDestroyedInPlace) {
   bool signer_destroyed = false;
   auto settings = std::make_unique<FilterSettingsImpl>(
       parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value(), InvocationMode::Synchronous,
-      true /*payload_passthrough*/, "",
+      true /*payload_passthrough*/, "", false /*preserve_original_path_and_method*/,
       std::make_unique<DestructionTrackingSigner>(signer_destroyed), main_dispatcher);
 
   EXPECT_CALL(main_dispatcher, post(_)).Times(0);
