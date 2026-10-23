@@ -737,6 +737,18 @@ func (mr *MockHttpFilterHandleMockRecorder) DecrementGaugeValue(id, value any, t
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecrementGaugeValue", reflect.TypeOf((*MockHttpFilterHandle)(nil).DecrementGaugeValue), varargs...)
 }
 
+// DrainConnectionUponCompletion mocks base method.
+func (m *MockHttpFilterHandle) DrainConnectionUponCompletion() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DrainConnectionUponCompletion")
+}
+
+// DrainConnectionUponCompletion indicates an expected call of DrainConnectionUponCompletion.
+func (mr *MockHttpFilterHandleMockRecorder) DrainConnectionUponCompletion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DrainConnectionUponCompletion", reflect.TypeOf((*MockHttpFilterHandle)(nil).DrainConnectionUponCompletion))
+}
+
 // GetActiveSpan mocks base method.
 func (m *MockHttpFilterHandle) GetActiveSpan() shared.Span {
 	m.ctrl.T.Helper()

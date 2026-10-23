@@ -3876,6 +3876,18 @@ bool envoy_dynamic_module_callback_http_filter_recreate_stream(
 void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_http_drain_connection_upon_completion marks the downstream
+ * connection to be drained once the current HTTP stream completes. For HTTP/1.1 this adds a
+ * "Connection: close" header; for HTTP/2 and HTTP/3 this triggers a GOAWAY frame after the
+ * response is sent.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
 // =============================================================================
 // ============================= Network Filter ================================
 // =============================================================================
