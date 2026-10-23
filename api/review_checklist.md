@@ -4,7 +4,29 @@ This checklist is intended to be used when reviewing xDS API changes.
 Users who wish to contribute API changes should read this and proactively
 consider the answers to these questions before sending a PR.
 
+## Necessity
+- Does this need to be an API change at all? Should the new behavior simply be
+  the correct default, with a runtime guard to manage rollout risk? Every
+  field is a permanent commitment.
+- Can an existing generic mechanism be used instead? For example, the
+  `disabled` flag in `config.route.v3.FilterConfig` rather than a new
+  per-filter disable field.
+- Is the field working around a bug in one client's implementation? If so,
+  fix the bug rather than extending the API.
+
+## Compatibility
+- Does the change alter the number, type, name, JSON name, cardinality or
+  `oneof` membership of an existing field, or tighten its validation rules?
+  These are breaking changes (see [API versioning](API_VERSIONING.md)).
+- If a new field supersedes an existing one, can a management server set both
+  so that old and new clients accept the same resource? The new field should
+  take precedence, and setting both should not be rejected.
+- Conversely, are there combinations of fields with genuinely contradictory
+  meanings, as opposed to old and new spellings of the same setting?
+  These should be rejected at config load rather than silently ignored.
+
 ## Feature Enablement
+- If the new field is unset, is the previous behavior preserved exactly?
 - Are the default values going to cause behavior changes for existing users
   who do not know about the change and have not updated the resources being
   served by their control plane?
@@ -56,6 +78,9 @@ consider the answers to these questions before sending a PR.
   ask one of the API shepherds.
 - Is this deprecated field documented in a way that points to the preferred
   newer method of configuration?
+- Is the deprecation worth the migration cost to users? Widely used fields
+  should not be deprecated only for tidiness. Avoid "will be deprecated"
+  TODOs; either deprecate the field or leave it.
 
 ## Extensibility
 - Is this feature being directly added into the API itself, or is it being
@@ -67,8 +92,9 @@ consider the answers to these questions before sending a PR.
 - Do we have good documentation showing what to plug into the extension point?
   (At minimum, it should have a comment pointing to the common protos to
   be plugged into the extension point.)
-- If an enum is being introduced, should this be a oneof with empty messages
-  for future API growth?
+- If an enum is being introduced, would a message or an extension point be
+  better for future API growth? Note that new `oneof` fields are discouraged
+  (see the [style guide](STYLE.md)).
 - When a new field is introduced for a distinct purpose, should this be a
   message to allow for future API growth?
 
@@ -76,13 +102,19 @@ consider the answers to these questions before sending a PR.
 - Can the proposed API reuse part or all of other APIs?
   - Can some other API be refactored to be part of it, or vice versa?
   - Example: Can it use common types such as matcher or number?
-- Are there similar structures that already exist?
+- Are there similar structures that already exist? For example
+  `StringMatcher`, `HttpService`, `HttpUri` or `HttpStatus`.
 - Is the naming convention consistent with other APIs?
 - If there are new proto messages being added, are they in the right
   place in the tree? Consider not just the current users of this proto
   but also other possible uses in the future. Would it make more sense
   to make the proto a generic type and put it in a common location, so
-  that it can be used in other places in the future?
+  that it can be used in other places in the future? Conversely, avoid
+  moving a proto to a common location until there is a second user.
+- Is the field at the right scope? Protocol specific settings belong in
+  protocol options (e.g. `HttpProtocolOptions`), and extension specific
+  settings in the extension's config, rather than on `Cluster`,
+  `HttpConnectionManager` or widely shared messages such as `GrpcService`.
 
 ## Interactions With Other Features
 - Will this feature interact in strange ways with other features, either
@@ -101,6 +133,8 @@ consider the answers to these questions before sending a PR.
 ## Genericness
 - Is this an Envoy-specific or proxy-specific feature? How will it apply to
   xDS clients other than Envoy (e.g., gRPC)?
+- Do the comments describe behavior in terms of "the client" rather than
+  "Envoy", and avoid Envoy implementation details?
 
 ## Dependencies
 - Does this feature pull in any new dependencies for clients?
@@ -139,6 +173,10 @@ consider the answers to these questions before sending a PR.
 ## Documentation
 - Can a user look at the docs and understand it without a bunch of extra
   context?
+- Does each new field document its default, the meaning of zero or empty
+  values, units, format, failure behavior and interactions with other fields,
+  as described in the [style guide](STYLE.md#documenting-fields)?
+- Is any notable performance cost (buffering, latency) called out?
 - Pay special attention to documentation around extensions and `typed_config`.
   Users generally find this extremely confusing. There should be examples
   showing how to configure extension points and optimally all known public
