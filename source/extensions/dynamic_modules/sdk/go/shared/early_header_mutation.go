@@ -1,3 +1,4 @@
+//go:generate mockgen -source=early_header_mutation.go -destination=mocks/mock_early_header_mutation.go -package=mocks
 package shared
 
 // EarlyHeaderMutationHandle is the per-request handle passed to

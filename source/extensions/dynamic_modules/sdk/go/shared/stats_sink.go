@@ -1,3 +1,4 @@
+//go:generate mockgen -source=stats_sink.go -destination=mocks/mock_stats_sink.go -package=mocks
 package shared
 
 // CounterValue holds the values of a counter returned by
