@@ -110,8 +110,9 @@ public:
       current_upstream_log->CopyFrom(upstream_log.value());
     }
 
-    Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
-    config_ = *FilterConfig::create(prefix.statName(), context_,
+    const std::string stats_prefix = "prefix.";
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context_, stats_prefix);
+    config_ = *FilterConfig::create(context_.server_factory_context_, extra_context,
                                     ShadowWriterPtr(new MockShadowWriter()), router_proto);
     mock_upstream_log_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
     config_->upstream_logs_.push_back(mock_upstream_log_);
