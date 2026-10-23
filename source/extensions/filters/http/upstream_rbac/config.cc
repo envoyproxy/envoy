@@ -17,17 +17,17 @@ UpstreamRoleBasedAccessControlFilterConfigFactory::createHttpFilterFactoryFromPr
     const envoy::extensions::filters::http::rbac::v3::RBAC& typed_config,
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
-  // stats_prefix carries the parent's namespace ("http.<stat_prefix>." from a router,
-  // "cluster.<name>." from a cluster) so RBAC counters land in the right place. This is a behavior
-  // change, so it is guarded by the runtime flag; when disabled we fall back to the previous empty
-  // prefix.
+  // The parent's namespace ("http.<stat_prefix>." from a router, "cluster.<name>." from a
+  // cluster) is either the prefixed scope or the stats prefix, so RBAC counters land in the right
+  // place. This is a behavior change, so it is guarded by the runtime flag; when disabled we fall
+  // back to the previous empty prefix.
   const std::string& rbac_stats_prefix =
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
-          ? extra_context.stats_prefix
+          ? extra_context.statsPrefixOr()
           : EMPTY_STRING;
   auto config = std::make_shared<RBACFilter::RoleBasedAccessControlFilterConfig>(
-      typed_config, rbac_stats_prefix, extra_context.scopeOr(context), context,
+      typed_config, rbac_stats_prefix, extra_context.statsPrefixScopeOr(context), context,
       extra_context.visitor);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

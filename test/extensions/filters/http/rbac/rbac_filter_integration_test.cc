@@ -1867,6 +1867,16 @@ typed_config:
                 exact: "GET"
         principals:
           - any: true
+  shadow_rules:
+    policies:
+      foo:
+        permissions:
+          - header:
+              name: ":method"
+              string_match:
+                exact: "GET"
+        principals:
+          - any: true
 )EOF");
   initialize();
 
@@ -1912,6 +1922,12 @@ typed_config:
               {{"envoy.http_conn_manager_prefix", "config_test"},
                {"envoy.rbac_http_prefix", "rules_prefix_"},
                {"envoy.rbac_policy_name", "foo"}});
+  // The shadow rules have an empty stat prefix.
+  expect_stat("http.config_test.rbac.shadow_allowed", "http.rbac.shadow_allowed",
+              {{"envoy.http_conn_manager_prefix", "config_test"}});
+  expect_stat(
+      "http.config_test.rbac.policy.foo.shadow_allowed", "http.rbac.policy.shadow_allowed",
+      {{"envoy.http_conn_manager_prefix", "config_test"}, {"envoy.rbac_policy_name", "foo"}});
 }
 
 } // namespace

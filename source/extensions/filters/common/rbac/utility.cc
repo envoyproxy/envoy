@@ -37,13 +37,16 @@ Stats::TaggedStatName makeTaggedPrefix(absl::string_view prefix, absl::string_vi
   prefix = absl::StripSuffix(prefix, ".");
   group_prefix = absl::StripSuffix(group_prefix, ".");
 
-  const std::string flat = dotJoin({prefix, "rbac", group_prefix, per_policy ? "policy" : ""});
-  const absl::string_view base = per_policy ? "rbac.policy" : "rbac";
+  const bool non_tagged_prefix = http_filter || prefix.empty();
 
-  // A non-empty prefix is the network filter's own stat_prefix and becomes a tag; the HTTP
-  // filter's prefix is empty (its parent's prefix lives in the prefixed scope).
+  const std::string flat = dotJoin({prefix, "rbac", group_prefix, per_policy ? "policy" : ""});
+  const std::string base =
+      dotJoin({non_tagged_prefix ? prefix : "", per_policy ? "rbac.policy" : "rbac"});
+
+  // Only the network filter's own stat_prefix becomes a tag. The HTTP filter's parent prefix
+  // normally lives in the prefixed scope; when it is a flat prefix instead it is left untagged.
   absl::InlinedVector<Stats::TagStringView, 2> tags;
-  if (!prefix.empty()) {
+  if (!non_tagged_prefix) {
     tags.push_back({Config::TagNames::get().RBAC_PREFIX, prefix});
   }
   if (!group_prefix.empty()) {
