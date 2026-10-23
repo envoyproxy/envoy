@@ -155,10 +155,29 @@ genrule(
     tools = ["//tools/windows:gen_dynamic_modules_exports"],
 )
 
+config_setting(
+    name = "linux_asan_build",
+    constraint_values = ["@platforms//os:linux"],
+    values = {"define": "ENVOY_CONFIG_ASAN=1"},
+)
+
+# Non-ASAN Linux builds use the toolchain's libunwind.a, selected by -unwindlib=libunwind
+# in MODULE.bazel's extra_link_flags. Clang reuses -static-libgcc to link the unwinder
+# statically even when it is LLVM libunwind, not libgcc; the misleading name is intentional.
+# ASAN disables that unwinder with -unwindlib=none and uses @unwind_libs//:libunwind from
+# envoy_toolshed's unwind_extension instead. ASAN's dlsym(RTLD_NEXT) lookup cannot see a
+# static unwinder, risking mixed LLVM/libgcc_s unwinders and broken Rust dynamic-module panics.
+# The toolshed build supports our sysroot's older glibc; LLVM's shipped .so requires newer glibc.
+# See https://github.com/envoyproxy/toolshed/blob/bazel-v0.5.6/bazel/compile/README.md#L88-L99
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        "//bazel:linux": ["-static-libgcc"],
+        ":linux_asan_build": ["-unwindlib=none"],
+        ":linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        ":linux_asan_build": ["@unwind_libs//:libunwind"],
         "//conditions:default": [],
     }),
 )

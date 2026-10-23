@@ -1591,6 +1591,22 @@
         }
       }
     },
+    "@@envoy_toolshed+//compile:extensions.bzl%unwind_extension": {
+      "general": {
+        "bzlTransitiveDigest": "uRTDlu70Or2ppfdRo03pk5uJHM0SVBIGuUbOQ3hZjcY=",
+        "usagesDigest": "AmuY/ETQhOLFgNCbJZco/Mm+WCAoQ0ayqsFdYp4W4FE=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "unwind_libs": {
+            "repoRuleId": "@@envoy_toolshed+//compile:unwind_libs.bzl%unwind_libs",
+            "attributes": {
+              "version": "0.2.27",
+              "sha256": "f8f031cd252cdfd59308d2f50dd0e4cea8952e6769fb348d8293d33e19647bee"
+            }
+          }
+        }
+      }
+    },
     "@@envoy_toolshed+//coverage/grcov:extensions.bzl%grcov_extension": {
       "general": {
         "bzlTransitiveDigest": "QUP/WzigwonW/hjUKRYfJjp0K1WE0xufDbWc7EHFTVc=",
@@ -1684,10 +1700,28 @@
     "@@envoy_toolshed+//sysroot:extensions.bzl%sysroot_extension": {
       "general": {
         "bzlTransitiveDigest": "ghN2vojrvHPXX9jT55mEAOInej5vS56P6A+C7ZuYg3U=",
-        "usagesDigest": "AGamOkxSuSgRKOiCWePcbHPJLI4zxzmM09ZM/xpLdEY=",
+        "usagesDigest": "e9hKVAuPQVpobSZeEgnRzRcysLlpIbizpVk2U9ANUig=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "sysroot_linux_amd64": {
+            "repoRuleId": "@@envoy_toolshed+//sysroot:sysroot.bzl%sysroot",
+            "attributes": {
+              "version": "0.2.27",
+              "sha256": "c027659e4ed93c2f53ca29cc611962790cde21289cbedcfd3419354d6a50767e",
+              "arch": "amd64",
+              "glibc_version": "2.31"
+            }
+          },
+          "sysroot_linux_arm64": {
+            "repoRuleId": "@@envoy_toolshed+//sysroot:sysroot.bzl%sysroot",
+            "attributes": {
+              "version": "0.2.27",
+              "sha256": "33fb571b3b9b5edb9854fa4444719fae01c0c08825b3051357fcd4ab3721749a",
+              "arch": "arm64",
+              "glibc_version": "2.31"
+            }
+          },
+          "libstdcxx_sysroot_linux_amd64": {
             "repoRuleId": "@@envoy_toolshed+//sysroot:sysroot.bzl%sysroot",
             "attributes": {
               "version": "0.2.27",
@@ -1697,7 +1731,7 @@
               "stdcc_version": "13"
             }
           },
-          "sysroot_linux_arm64": {
+          "libstdcxx_sysroot_linux_arm64": {
             "repoRuleId": "@@envoy_toolshed+//sysroot:sysroot.bzl%sysroot",
             "attributes": {
               "version": "0.2.27",
