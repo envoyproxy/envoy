@@ -12,11 +12,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderMutation {
 
-namespace {
-std::string urlEncode(const std::string& value) {
-  return Http::Utility::PercentEncoding::urlEncode(value);
-}
-} // namespace
+using Http::Utility::PercentEncoding;
 
 void QueryParameterMutationAppend::mutateQueryParameter(
     Http::Utility::QueryParamsMulti& params, const Formatter::Context& context,
@@ -25,24 +21,24 @@ void QueryParameterMutationAppend::mutateQueryParameter(
   switch (action_) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case ParameterAppendProto::APPEND_IF_EXISTS_OR_ADD:
-    params.add(key_, urlEncode(formatter_->format(context, stream_info)));
+    params.add(key_, PercentEncoding::urlEncode(formatter_->format(context, stream_info)));
     return;
   case ParameterAppendProto::ADD_IF_ABSENT: {
     auto iter = params.data().find(key_);
     if (iter == params.data().end()) {
-      params.add(key_, urlEncode(formatter_->format(context, stream_info)));
+      params.add(key_, PercentEncoding::urlEncode(formatter_->format(context, stream_info)));
     }
     break;
   }
   case ParameterAppendProto::OVERWRITE_IF_EXISTS: {
     auto iter = params.data().find(key_);
     if (iter != params.data().end()) {
-      params.overwrite(key_, urlEncode(formatter_->format(context, stream_info)));
+      params.overwrite(key_, PercentEncoding::urlEncode(formatter_->format(context, stream_info)));
     }
     break;
   }
   case ParameterAppendProto::OVERWRITE_IF_EXISTS_OR_ADD:
-    params.overwrite(key_, urlEncode(formatter_->format(context, stream_info)));
+    params.overwrite(key_, PercentEncoding::urlEncode(formatter_->format(context, stream_info)));
     break;
   }
 }
