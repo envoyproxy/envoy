@@ -54,6 +54,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
+#include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -826,6 +827,23 @@ Host::CreateConnectionData HostImplBase::createConnection(
   std::optional<Network::Address::InstanceConstSharedPtr> proxy_address =
       maybeGetProxyRedirectAddress(transport_socket_options, host, socket_factory);
 
+  Network::TransportSocketOptionsConstSharedPtr connection_transport_socket_options =
+      transport_socket_options;
+  if (proxy_address.has_value() &&
+      (!transport_socket_options || !transport_socket_options->http11ProxyInfo()) &&
+      socket_factory.defaultHttp11ProxyInfo().has_value() &&
+      *proxy_address.value() == *socket_factory.defaultHttp11ProxyInfo()->proxy_address) {
+    const std::string hostname = host->hostname().empty()
+                                     ? host->address()->asString()
+                                     : absl::StrCat(host->hostname(), ":",
+                                                   host->address()->ip()->port());
+    connection_transport_socket_options =
+      std::make_shared<Network::Http11ProxyDecoratingTransportSocketOptions>(
+        Network::TransportSocketOptions::Http11ProxyInfo(
+          hostname, socket_factory.defaultHttp11ProxyInfo()->proxy_address),
+        transport_socket_options);
+  }
+
   Network::ClientConnectionPtr connection;
   // If the transport socket options or endpoint/locality metadata indicate the connection should
   // be redirected to a proxy, create the TCP connection to the proxy's address not the host's
@@ -837,8 +855,8 @@ Host::CreateConnectionData HostImplBase::createConnection(
               proxy_address.value()->asString());
     connection = dispatcher.createClientConnection(
         proxy_address.value(), upstream_local_address.address_,
-        socket_factory.createTransportSocket(transport_socket_options, host),
-        upstream_local_address.socket_options_, transport_socket_options);
+        socket_factory.createTransportSocket(connection_transport_socket_options, host),
+        upstream_local_address.socket_options_, connection_transport_socket_options);
   } else if (sorted_address_list != nullptr && sorted_address_list->size() > 1) {
     ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
