@@ -1676,6 +1676,7 @@ vanishingly
 varchar
 variadic
 varint
+Vcluster
 vec
 vectorize
 VBC
