@@ -26,7 +26,7 @@ common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/b1cba19104bc62dc70d04cf2f08e84d1c3809f48
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/748821cc28a6c105d906fe893ba05bb4b7063e91
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -40,7 +40,6 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --experimental_repository_downloader_retries=2
 build --experimental_cc_static_library
 build --enable_platform_specific_config
-build --incompatible_merge_fixed_and_default_shell_env
 # A workaround for slow ICU download.
 build --http_timeout_scaling=6.0
 

@@ -53,8 +53,9 @@ public:
   AsyncClientImplTest()
       : http_context_(stats_store_.symbolTable()), router_context_(stats_store_.symbolTable()),
         router_config_(std::make_shared<Router::FilterConfig>(
-            factory_context_, http_context_.asyncClientStatPrefix(), *stats_store_.rootScope(), cm_,
-            factory_context_.runtime(), factory_context_.api().randomGenerator(),
+            factory_context_, *stats_store_.rootScope(), http_context_.asyncClientStatPrefix(),
+            *stats_store_.rootScope(), cm_, factory_context_.runtime(),
+            factory_context_.api().randomGenerator(),
             Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, true, false, false,
             false, false, false, false, Protobuf::RepeatedPtrField<std::string>{},
             dispatcher_.timeSource(), http_context_, router_context_)),

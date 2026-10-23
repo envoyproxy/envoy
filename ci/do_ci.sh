@@ -518,7 +518,7 @@ case $CI_TARGET in
         bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
         ;;
 
-    compile_time_options)
+    compile_time_options|cto)
         # See `compile-time-options` in `.bazelrc`
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
@@ -534,7 +534,7 @@ case $CI_TARGET in
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
-        if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
+        if [[ -n "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
         echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"

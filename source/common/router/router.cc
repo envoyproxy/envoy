@@ -19,6 +19,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
+#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
@@ -39,6 +40,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/upstream/host_utility.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/numbers.h"
@@ -66,38 +68,43 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 } // namespace
 
 absl::StatusOr<std::unique_ptr<FilterConfig>>
-FilterConfig::create(Stats::StatName stat_prefix,
-                     Server::Configuration::GenericFactoryContext& context,
+FilterConfig::create(Server::Configuration::ServerFactoryContext& context,
+                     Server::Configuration::ExtraFactoryContext& extra_context,
                      ShadowWriterPtr&& shadow_writer,
                      const envoy::extensions::filters::http::router::v3::Router& config) {
+  Stats::Scope& stats_prefix_scope = extra_context.statsPrefixScopeOr(context);
+  Stats::StatNameManagedStorage stat_prefix(extra_context.statsPrefixOr(),
+                                            stats_prefix_scope.symbolTable());
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<FilterConfig>(
-      new FilterConfig(stat_prefix, context, std::move(shadow_writer), config, creation_status));
+      new FilterConfig(context, extra_context, stat_prefix.statName(), stats_prefix_scope,
+                       std::move(shadow_writer), config, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-FilterConfig::FilterConfig(Stats::StatName stat_prefix,
-                           Server::Configuration::GenericFactoryContext& context,
+FilterConfig::FilterConfig(Server::Configuration::ServerFactoryContext& context,
+                           Server::Configuration::ExtraFactoryContext& extra_context,
+                           Stats::StatName stat_prefix, Stats::Scope& stats_prefix_scope,
                            ShadowWriterPtr&& shadow_writer,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)
     : FilterConfig(
-          context.serverFactoryContext(), stat_prefix, context.scope(),
-          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
-          context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
-          config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
-          config.suppress_grpc_request_failure_code_stats(),
+          context, extra_context.scopeOr(context), stat_prefix, stats_prefix_scope,
+          context.clusterManager(), context.runtime(), context.api().randomGenerator(),
+          std::move(shadow_writer), PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
+          config.start_child_span(), config.suppress_envoy_headers(),
+          config.respect_expected_rq_timeout(), config.suppress_grpc_request_failure_code_stats(),
           config.has_upstream_log_options()
               ? config.upstream_log_options().flush_upstream_log_on_upstream_stream()
               : false,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reject_connect_request_early_data, false),
-          config.strict_check_headers(), context.serverFactoryContext().api().timeSource(),
-          context.serverFactoryContext().httpContext(),
-          context.serverFactoryContext().routerContext()) {
+          config.strict_check_headers(), context.api().timeSource(), context.httpContext(),
+          context.routerContext()) {
+  Server::GenericFactoryContextImpl generic_context(context, scope_, extra_context.visitor,
+                                                    extra_context.init_manager);
   for (const auto& upstream_log : config.upstream_log()) {
-    upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
+    upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, generic_context));
   }
 
   if (config.has_upstream_log_options() &&
@@ -108,27 +115,22 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
 
   if (!config.upstream_http_filters().empty()) {
     // TODO(wbpcode): To validate the terminal filter is upstream codec filter by the proto.
-    Server::Configuration::ServerFactoryContext& server_factory_ctx =
-        context.serverFactoryContext();
     // Retained as a member: the manager is an unpinned singleton, and the ECDS subscriptions
     // created below hold a raw reference to it that they dereference on destruction.
     upstream_filter_config_provider_manager_ =
-        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
-            server_factory_ctx);
-    // With the correct-stats-prefix flag enabled (default), pass the HCM stat_prefix as the
-    // stats_prefix string so upstream filters emit stats under "http.<stat_prefix>.rbac.*".
-    // With the flag disabled (legacy behavior), the scope's prefix string is used instead;
-    // since the router scope has an empty prefix this produced unnamespaced stats.
-    std::string prefix = Runtime::runtimeFeatureEnabled(
-                             "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
-                             ? context.scope().symbolTable().toString(stat_prefix)
-                             : "";
+        Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(context);
+    const std::string prefix =
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.upstream_http_filters_correct_stats_prefix")
+            ? extra_context.stats_prefix
+            : EMPTY_STRING;
     upstream_ctx_ = std::make_unique<Upstream::UpstreamFactoryContextImpl>(
-        server_factory_ctx, context.initManager(), context.scope());
+        context, generic_context.initManager(), scope_, extra_context.stats_prefix_scope,
+        extra_context.stats_prefix);
     Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                             Server::Configuration::UpstreamHttpFilterConfigFactory>
-        helper(*upstream_filter_config_provider_manager_, server_factory_ctx,
-               context.serverFactoryContext().clusterManager(), *upstream_ctx_, prefix);
+        helper(*upstream_filter_config_provider_manager_, context, context.clusterManager(),
+               *upstream_ctx_, prefix);
     SET_AND_RETURN_IF_NOT_OK(helper.processFilters(config.upstream_http_filters(),
                                                    "router upstream http", "router upstream http",
                                                    upstream_http_filter_factories_),
@@ -699,16 +701,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     const auto parsed_authority = Http::Utility::parseAuthority(header_value);
 
     if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options->auto_sni() &&
-        !filter_state->hasDataWithName(Network::UpstreamServerName::key())) {
-      filter_state->setData(Network::UpstreamServerName::key(),
-                            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_));
+        !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamServerName)) {
+      filter_state->setIndexedData(
+          StreamInfo::FilterStateIndex::UpstreamServerName,
+          std::make_shared<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
 
     if (upstream_http_protocol_options->auto_san_validation() &&
-        !filter_state->hasDataWithName(Network::UpstreamSubjectAltNames::key())) {
-      filter_state->setData(Network::UpstreamSubjectAltNames::key(),
-                            std::make_unique<Network::UpstreamSubjectAltNames>(
-                                std::vector<std::string>{std::string(parsed_authority.host_)}));
+        !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamSubjectAltNames)) {
+      filter_state->setIndexedData(
+          StreamInfo::FilterStateIndex::UpstreamSubjectAltNames,
+          std::make_shared<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(parsed_authority.host_)}),
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
   }
 
@@ -2748,8 +2754,9 @@ RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Server::Configuration::CommonFactoryContext& context,
                                            Event::Dispatcher& dispatcher,
                                            Upstream::ResourcePriority priority) {
-  std::unique_ptr<RetryStateImpl> retry_state =
-      RetryStateImpl::create(policy, request_headers, cluster, context, dispatcher, priority);
+  RetryStatePtr retry_state = policy.createRetryState(
+      request_headers, cluster, context, dispatcher, priority,
+      makeOptRefFromPtr(callbacks() ? &callbacks()->streamInfo() : nullptr));
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the buffer limit to 0 so that we don't retry or
