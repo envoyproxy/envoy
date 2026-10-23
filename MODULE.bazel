@@ -223,6 +223,17 @@ llvm.toolchain(
     name = "llvm_toolchain",
     cxx_standard = {"": "c++20"},
     exec_os = "linux",
+    # The pinned runtime build settings do not cover cxx_cross_lib's explicit libc++/libc modes.
+    extra_link_flags = {
+        target: [
+            "-rtlib=compiler-rt",
+            "-unwindlib=libunwind",
+            "-static-libgcc",
+            "-lpthread",
+            "-ldl",
+        ]
+        for target in ["linux-aarch64", "linux-x86_64"]
+    },
     llvm_version = "22.1.8",
 )
 llvm.toolchain_root(

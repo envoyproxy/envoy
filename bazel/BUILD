@@ -158,6 +158,8 @@ genrule(
 cc_library(
     name = "static_stdlib",
     linkopts = select({
+        # With Clang's -unwindlib=libunwind this selects libunwind.a, not libgcc_eh.a.
+        # GCC retains its static libgcc runtime.
         "//bazel:linux": ["-static-libgcc"],
         "//conditions:default": [],
     }),
