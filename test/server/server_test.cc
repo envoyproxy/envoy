@@ -1043,6 +1043,56 @@ TEST_P(ServerInstanceImplTest, EvictStats) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_evict_runtime_bootstrap.yaml", true);
+  EXPECT_EQ(2, server_->statsConfig().evictOnFlush());
+  EXPECT_EQ("stats.eviction_interval_ms", server_->statsConfig().evictionIntervalRuntimeKey());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  // Runtime sets a 10s interval with a 5s flush: evict every second flush.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+  EXPECT_EQ(0, stats_store_.evictionCount());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(2L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  // A value that is not a multiple of the flush interval falls back to the 10s default.
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "7500"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(4L, counter->value());
+  EXPECT_EQ(2, stats_store_.evictionCount());
+
+  // A 5s interval evicts on every flush. Stop at 28s to avoid racing the flush at 30s.
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "5000"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
+  time_system_.advanceTimeWait(std::chrono::seconds(4));
+  EXPECT_EQ(5L, counter->value());
+  EXPECT_EQ(3, stats_store_.evictionCount());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
