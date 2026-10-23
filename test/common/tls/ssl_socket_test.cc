@@ -1390,7 +1390,14 @@ void testUtilV2(const TestUtilOptionsV2& options) {
   }
 
   if (!options.expectedClientStats().empty()) {
-    EXPECT_EQ(1UL, client_stats_store.counter(options.expectedClientStats()).value());
+    // When the client's handshake completes before the server rejects it, closing the socket calls
+    // SSL_shutdown(). OpenSSL fails that call after the fatal alert, counting a second error.
+    const uint64_t expected_client_count =
+        !options.expectSuccess() && options.expectClientConnectedBeforeFailure()
+            ? SSL_SELECT(1UL, 2UL)
+            : 1UL;
+    EXPECT_EQ(expected_client_count,
+              client_stats_store.counter(options.expectedClientStats()).value());
   }
 
   if (options.expectSuccess()) {
@@ -6450,7 +6457,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
 
-    EXPECT_EQ(1UL, client_stats_store.counter("ssl.connection_error").value());
+    // With TLS 1.3, closing the connected client calls SSL_shutdown(). OpenSSL fails that call
+    // after the fatal alert, counting a second error.
+    EXPECT_EQ(tls_version == TlsParameters::TLSv1_3 ? SSL_SELECT(1UL, 2UL) : 1UL,
+              client_stats_store.counter("ssl.connection_error").value());
     EXPECT_EQ(0UL, server_stats_store.counter("ssl.session_reused").value());
     EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
   }
