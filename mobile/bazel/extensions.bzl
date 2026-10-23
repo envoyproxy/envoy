@@ -4,6 +4,8 @@ def _default_extra_swift_sources_impl(ctx):
     ctx.file("WORKSPACE", "")
     ctx.file("empty.swift", "")
     ctx.file("BUILD.bazel", """
+load("@rules_cc//cc:objc_library.bzl", "objc_library")
+
 filegroup(
     name = "extra_swift_srcs",
     srcs = ["empty.swift"],
@@ -23,6 +25,8 @@ default_extra_swift_sources = repository_rule(
 def _default_extra_jni_deps_impl(ctx):
     ctx.file("WORKSPACE", "")
     ctx.file("BUILD.bazel", """
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 cc_library(
     name = "extra_jni_dep",
     visibility = ["//visibility:public"],
