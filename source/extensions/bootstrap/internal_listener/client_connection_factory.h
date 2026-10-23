@@ -26,15 +26,12 @@ public:
       Network::TransportSocketPtr&& transport_socket,
       const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_options) override;
-  // The slot is owned by the internal listener registry extension. Once that extension is
-  // initialized, this slot is available. The ClientConnectionFactory has two potential user cases.
+  // The ClientConnectionFactory has two potential user cases.
   // 1. The per worker thread connection handler populates the per worker listener registry.
   // 2. A envoy thread local cluster lookup the per thread internal listener by listener name.
   // Since the population and the lookup is supposed to be executed in the same worker thread,
   // neither need to hold a lock.
   // TODO(lambdai): make it friend to only bootstrap extension.
-  static ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
-      registry_tls_slot_;
   // The buffer size of the internal client connection. It has to be static because of:
   // Client factory establishes the buffer while internal listener registry accepts the
   // client connection. Thus the ownership is not followed - client factory needs to
