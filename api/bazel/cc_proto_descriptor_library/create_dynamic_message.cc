@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "absl/log/absl_check.h"
 #include "absl/memory/memory.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
@@ -22,7 +23,8 @@ createDynamicMessage(const TextFormatTranscoder& transcoder,
       transcoder.createEmptyDynamicMessage(message.GetTypeName(), error_collector);
 
   if (dynamic_message) {
-    dynamic_message->ParsePartialFromString(message.SerializePartialAsString());
+    ABSL_CHECK(dynamic_message->ParsePartialFromString(message.SerializePartialAsString()))
+        << "Failed to parse dynamic message for " << message.GetTypeName();
   }
 
   return dynamic_message;
