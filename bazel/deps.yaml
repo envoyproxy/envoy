@@ -424,6 +424,19 @@ gazelle:
   license: "Apache-2.0"
   license_url: "https://github.com/bazelbuild/bazel-gazelle/blob/v{version}/LICENSE"
 
+gcc_toolchain:
+  project_name: "GCC toolchain for Bazel"
+  project_desc: "Hermetic prebuilt GCC toolchains for Bazel"
+  project_url: "https://github.com/f0rmiga/gcc-toolchain"
+  release_date: "2026-10-01"
+  use_category:
+  - build
+  - controlplane
+  - dataplane_core
+  - dataplane_ext
+  license: "Apache-2.0"
+  license_url: "https://github.com/f0rmiga/gcc-toolchain/blob/{version}/LICENSE"
+
 googletest:
   project_name: "Google Test"
   project_desc: "Google's C++ test framework"

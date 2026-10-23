@@ -237,6 +237,212 @@ envoy_llvm_extension = module_extension(
     tag_classes = {"host": _host_llvm},
 )
 
+def _gcc_execute(repository_ctx, arguments):
+    result = repository_ctx.execute(arguments, environment = {"LC_ALL": "C"})
+    if result.return_code != 0:
+        fail("Host GCC command %r failed (exit code %s): %s" % (arguments, result.return_code, result.stderr))
+    return result
+
+def _detect_gcc_version(repository_ctx, gcc, declared_version):
+    banner = _gcc_execute(repository_ctx, [gcc, "--version"]).stdout
+    if "clang" in banner.lower():
+        fail("Host GCC must be GCC, not clang: %s" % gcc)
+    version = _gcc_execute(repository_ctx, [gcc, "-dumpfullversion", "-dumpversion"]).stdout.strip()
+    components = version.split(".")
+    if not version or not all([component.isdigit() for component in components]):
+        fail("Could not parse the installed GCC version: %r" % version)
+    if declared_version and declared_version.split(".")[0] != components[0]:
+        fail("envoy_gcc.host(gcc_version = %r) does not match the installed GCC version %s" % (declared_version, version))
+    return version
+
+def _gcc_builtin_include_directories(repository_ctx, gxx):
+    repository_ctx.file("include_probe.cc", "")
+    result = _gcc_execute(repository_ctx, [
+        gxx,
+        "-E",
+        "-x",
+        "c++",
+        str(repository_ctx.path("include_probe.cc")),
+        "-v",
+    ])
+    directories = []
+    in_search_list = False
+    complete = False
+    for line in result.stderr.split("\n"):
+        line = line.strip()
+        if line == "#include <...> search starts here:":
+            in_search_list = True
+        elif in_search_list and line == "End of search list.":
+            complete = True
+            break
+        elif in_search_list:
+            directory = repository_ctx.path(line)
+            if not line.startswith("/") or not directory.exists:
+                fail("Invalid host GCC builtin include directory: %r" % line)
+            directories.append(str(directory.realpath))
+    repository_ctx.delete("include_probe.cc")
+    if not complete or not directories:
+        fail("Could not detect host GCC builtin C++ include directories: %s" % result.stderr)
+    return directories
+
+def _gcc_tool_path(repository_ctx, gcc_root, gcc, tool):
+    candidate = gcc_root.get_child("bin/" + tool)
+    if candidate.exists:
+        return str(candidate)
+    value = _gcc_execute(repository_ctx, [gcc, "-print-prog-name=" + tool]).stdout.strip()
+    if value.startswith("/") and repository_ctx.path(value).exists:
+        return value
+    if value and "/" not in value:
+        resolved = repository_ctx.which(value)
+        if resolved:
+            return str(resolved)
+    fail("Could not resolve host GCC tool %r under %s or through %s -print-prog-name" % (tool, gcc_root, gcc))
+
+def _host_gcc_repo_impl(repository_ctx):
+    repository_ctx.file("BUILD.bazel", 'package(default_visibility = ["//visibility:public"])\n')
+    if not repository_ctx.attr.path:
+        return
+    if not repository_ctx.os.name.lower().startswith("linux"):
+        fail("envoy_gcc.host supports only native Linux hosts")
+    arch = repository_ctx.os.arch.lower()
+    if arch in ["x86_64", "amd64"]:
+        cpu = "k8"
+        platform_cpu = "x86_64"
+    elif arch in ["aarch64", "arm64"]:
+        cpu = "aarch64"
+        platform_cpu = "aarch64"
+    else:
+        fail("Unsupported host GCC architecture: %s" % arch)
+    if not repository_ctx.attr.path.startswith("/"):
+        fail("envoy_gcc.host path must be an absolute GCC installation prefix")
+    gcc_root = repository_ctx.path(repository_ctx.attr.path)
+    gcc = str(gcc_root.get_child("bin/gcc"))
+    gxx = str(gcc_root.get_child("bin/g++"))
+    version = _detect_gcc_version(repository_ctx, gcc, repository_ctx.attr.gcc_version)
+    target = _gcc_execute(repository_ctx, [gcc, "-dumpmachine"]).stdout.strip()
+    if target.split("-")[0] != platform_cpu or "linux" not in target:
+        fail("Host GCC target %r does not match the native Linux %s host" % (target, platform_cpu))
+    includes = _gcc_builtin_include_directories(repository_ctx, gxx)
+    tool_paths = {"gcc": gcc}
+    for tool in ["ar", "as", "cpp", "dwp", "gcov", "nm", "objcopy", "objdump", "strip"]:
+        tool_paths[tool] = _gcc_tool_path(repository_ctx, gcc_root, gcc, tool)
+    tool_paths["ld"] = _gcc_tool_path(repository_ctx, gcc_root, gcc, "ld.bfd")
+    linker_directory = str(repository_ctx.path(tool_paths["ld"]).dirname)
+    repository_ctx.file("BUILD.bazel", """
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+# buildifier: disable=bzl-visibility
+load("@rules_cc//cc/private/toolchain:unix_cc_toolchain_config.bzl", "cc_toolchain_config")
+
+package(default_visibility = ["//visibility:public"])
+
+# Host tools and headers are intentionally external to the sandbox; this is not an RBE toolchain.
+filegroup(name = "empty")
+
+cc_toolchain_config(
+    name = "config",
+    abi_libc_version = "local",
+    abi_version = "local",
+    compile_flags = ["-fstack-protector", "-Wall", "-fno-omit-frame-pointer"],
+    compiler = "gcc",
+    coverage_compile_flags = ["--coverage"],
+    coverage_link_flags = ["--coverage"],
+    cpu = %r,
+    cxx_builtin_include_directories = %r,
+    cxx_flags = ["-std=c++20"],
+    dbg_compile_flags = ["-g"],
+    host_system_name = "local",
+    link_flags = [%r, "-fuse-ld=bfd", "-Wl,-z,relro,-z,now", "-pass-exit-codes"],
+    link_libs = ["-l:libstdc++.a", "-lm"],
+    opt_compile_flags = ["-g0", "-O2", "-D_FORTIFY_SOURCE=1", "-DNDEBUG", "-ffunction-sections", "-fdata-sections"],
+    opt_link_flags = ["-Wl,--gc-sections"],
+    supports_start_end_lib = False,
+    target_libc = "local",
+    target_system_name = %r,
+    tool_paths = %r,
+    toolchain_identifier = %r,
+    unfiltered_compile_flags = [
+        "-no-canonical-prefixes",
+        "-fno-canonical-system-headers",
+        "-Wno-builtin-macro-redefined",
+        "-D__DATE__=\\"redacted\\"",
+        "-D__TIME__=\\"redacted\\"",
+        "-D__TIMESTAMP__=\\"redacted\\"",
+    ],
+)
+
+cc_toolchain(
+    name = "compiler",
+    all_files = ":empty",
+    ar_files = ":empty",
+    as_files = ":empty",
+    compiler_files = ":empty",
+    dwp_files = ":empty",
+    linker_files = ":empty",
+    objcopy_files = ":empty",
+    strip_files = ":empty",
+    supports_param_files = True,
+    toolchain_config = ":config",
+    toolchain_identifier = %r,
+)
+
+toolchain(
+    name = "cc_toolchain",
+    exec_compatible_with = ["@platforms//os:linux", "@platforms//cpu:%s"],
+    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:%s"],
+    target_settings = ["@envoy//bazel:gcc_requested"],
+    toolchain = ":compiler",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+""" % (
+        cpu,
+        includes,
+        "-B" + linker_directory + "/",
+        target,
+        tool_paths,
+        "envoy-host-gcc-" + version,
+        "envoy-host-gcc-" + version,
+        platform_cpu,
+        platform_cpu,
+    ))
+
+_host_gcc_repo = repository_rule(
+    implementation = _host_gcc_repo_impl,
+    local = True,
+    attrs = {
+        "gcc_version": attr.string(default = ""),
+        "path": attr.string(default = ""),
+    },
+)
+
+def _envoy_gcc_impl(module_ctx):
+    host = None
+    for module in module_ctx.modules:
+        for tag in module.tags.host:
+            if not module.is_root:
+                fail("envoy_gcc_extension.host may only be specified by the root module")
+            if host != None:
+                fail("envoy_gcc_extension.host may only be specified once")
+            if not tag.path:
+                fail("envoy_gcc.host path must be an absolute GCC installation prefix")
+            host = tag
+    _host_gcc_repo(
+        name = "envoy_gcc_host",
+        gcc_version = host.gcc_version if host else "",
+        path = host.path if host else "",
+    )
+
+_host_gcc = tag_class(
+    attrs = {
+        "gcc_version": attr.string(default = ""),
+        "path": attr.string(mandatory = True),
+    },
+)
+
+envoy_gcc_extension = module_extension(
+    implementation = _envoy_gcc_impl,
+    tag_classes = {"host": _host_gcc},
+)
+
 def _module_dep_from_lock_entry(url):
     if not url.endswith(_SOURCE_JSON_SUFFIX):
         return None

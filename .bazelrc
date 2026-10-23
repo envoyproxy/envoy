@@ -137,11 +137,9 @@ build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 # compiler
 #############################################################################
 
-# Use gold linker for gcc compiler.
-build:gcc --config=libstdc++
+# Select the opt-in GCC toolchain for target and execution configurations.
+build:gcc --@envoy//bazel:use_gcc
 build:gcc --test_env=HEAPCHECK=
-build:gcc --action_env=BAZEL_COMPILER=gcc
-build:gcc --action_env=CC=gcc --action_env=CXX=g++
 # This is to work around a bug in GCC that makes debug-types-section
 # option not play well with fission:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
@@ -155,9 +153,6 @@ build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --cxxopt=-Wno-trigraphs
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
-build:gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:gcc --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # libc++ - default for clang
 common:libc++ --action_env=CXXFLAGS=-stdlib=libc++
@@ -165,11 +160,6 @@ common:libc++ --action_env=LDFLAGS="-stdlib=libc++ -fuse-ld=lld"
 common:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 common:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
-
-# libstdc++ - currently only used for gcc
-build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
-
 
 #############################################################################
 # tests
