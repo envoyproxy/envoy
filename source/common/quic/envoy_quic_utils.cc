@@ -426,6 +426,9 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
   if (config.has_enable_scone()) {
     quic_config.set_parse_scone_packets(config.enable_scone().value());
   }
+  if (config.has_enable_reliable_stream_reset()) {
+    quic_config.SetReliableStreamReset(config.enable_reliable_stream_reset().value());
+  }
 }
 
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
