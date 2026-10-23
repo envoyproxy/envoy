@@ -34,6 +34,17 @@ _realpath() {
 # shellcheck source=ci/bazel_fun.sh
 . "${CURRENT_SCRIPT_DIR}"/bazel_fun.sh
 
+# Register exit trap to collect all Bazel JUnit XML test reports before the script exits.
+collect_junit_reports() {
+  if [[ -d "${ENVOY_SRCDIR}/bazel-testlogs" && -n "${ENVOY_TEST_RESULTS}" ]]; then
+    echo "Collecting JUnit XML test reports..."
+    pushd "${ENVOY_SRCDIR}/bazel-testlogs" >/dev/null
+    find . -name "test.xml" -exec cp --parents -f {} "${ENVOY_TEST_RESULTS}" \; 2>/dev/null || true
+    popd >/dev/null
+  fi
+}
+trap collect_junit_reports EXIT
+
 echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
