@@ -1133,9 +1133,6 @@ TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointCanCloseConnecti
               getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
-              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
-      .WillOnce(Return(nullptr));
-  EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
