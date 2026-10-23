@@ -15,6 +15,9 @@
 namespace Envoy {
 namespace Upstream {
 
+constexpr std::array<absl::string_view, 3> SupportedConsistentHashingClusterTypes = {
+    "envoy.cluster.strict_dns", "envoy.cluster.static", "envoy.cluster.eds"};
+
 absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                Server::Configuration::ServerFactoryContext& server_context,
@@ -67,8 +70,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
     }
   }
 
-  if (cluster.common_lb_config().has_consistent_hashing_lb_config() &&
-      cluster.common_lb_config().consistent_hashing_lb_config().use_hostname_for_hashing()) {
+  if (cluster.common_lb_config().consistent_hashing_lb_config().use_hostname_for_hashing()) {
     // STRICT_DNS hosts always carry a hostname. STATIC and EDS endpoints may carry an optional
     // hostname; hosts without one fall back to hashing by resolved address.
     const std::string factory_name = factory->name();
