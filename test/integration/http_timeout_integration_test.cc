@@ -54,6 +54,45 @@ TEST_P(HttpTimeoutIntegrationTest, GlobalTimeout) {
             "envoy; error=http_response_timeout; details=\"response_timeout; UT\"");
 }
 
+// Sends a request on a route that configures both a route timeout and a longer
+// max_stream_duration, and ensures that the router's route timeout fires.
+TEST_P(HttpTimeoutIntegrationTest, RouteTimeoutWithMaxStreamDuration) {
+  config_helper_.addConfigModifier(configureProxyStatus());
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3::HttpConnectionManager& hcm) -> void {
+    auto* route =
+        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
+    route->mutable_timeout()->set_nanos(500 * 1000 * 1000);
+    route->mutable_max_stream_duration()->mutable_max_stream_duration()->set_seconds(10);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"}});
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Trigger the route timeout, well before max_stream_duration.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(501));
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(upstream_request_->waitForReset(std::chrono::seconds(15)));
+  codec_client_->close();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("504", response->headers().getStatusValue());
+  EXPECT_THAT(response->headers().getProxyStatusValue(), HasSubstr("response_timeout"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.downstream_rq_max_duration_reached")->value());
+}
+
 // Testing that `x-envoy-expected-timeout-ms` header, set by egress envoy, is respected by ingress
 // envoy when `respect_expected_rq_timeout` field is enabled. Sends a request with a global timeout
 // specified, sleeps for longer than the timeout, and ensures that a timeout is received.

@@ -7685,6 +7685,39 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
 }
 
+// With max_stream_duration set, the route timeout is used as the global timeout for non-gRPC
+// requests.
+TEST(RouterFilterUtilityTest, FinalTimeoutWithMaxStreamDuration) {
+  {
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, usingNewTimeouts()).WillRepeatedly(Return(true));
+    EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
+    Http::TestRequestHeaderMapImpl headers;
+    TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false, false);
+    EXPECT_EQ(std::chrono::milliseconds(10), timeout.global_timeout_);
+  }
+  {
+    // gRPC requests keep max_stream_duration semantics.
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, usingNewTimeouts()).WillRepeatedly(Return(true));
+    EXPECT_CALL(route, timeout()).Times(0);
+    Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"}};
+    TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, true, false, false);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
+  }
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.route_timeout_with_max_stream_duration", "false"}});
+    NiceMock<MockRouteEntry> route;
+    EXPECT_CALL(route, usingNewTimeouts()).WillRepeatedly(Return(true));
+    EXPECT_CALL(route, timeout()).Times(0);
+    Http::TestRequestHeaderMapImpl headers;
+    TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false, false);
+    EXPECT_EQ(std::chrono::milliseconds(0), timeout.global_timeout_);
+  }
+}
+
 TEST(RouterFilterUtilityTest, FinalTimeoutSupressEnvoyHeaders) {
   {
     NiceMock<MockRouteEntry> route;

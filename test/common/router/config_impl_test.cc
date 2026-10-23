@@ -4353,6 +4353,40 @@ virtual_hosts:
   }
 }
 
+// With max_stream_duration set, the route timeout defaults to disabled.
+TEST_F(RouteMatcherTest, TimeoutWithMaxStreamDuration) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: local_service
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: "/explicit"
+    route:
+      timeout: 2s
+      max_stream_duration:
+        max_stream_duration: 10s
+      cluster: local_service
+  - match:
+      prefix: "/"
+    route:
+      max_stream_duration:
+        max_stream_duration: 10s
+      cluster: local_service
+      )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"local_service"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+
+  EXPECT_EQ(
+      std::chrono::milliseconds(2000),
+      config.route(genHeaders("www.lyft.com", "/explicit", "GET"), 0)->routeEntry()->timeout());
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)->routeEntry()->timeout());
+}
+
 TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(GrpcTimeoutOffset)) {
   const std::string yaml = R"EOF(
 virtual_hosts:

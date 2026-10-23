@@ -224,6 +224,12 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
     } else {
       timeout.global_timeout_ = route.timeout();
     }
+  } else if (!grpc_request &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.route_timeout_with_max_stream_duration")) {
+    // With max_stream_duration set, an explicitly configured route timeout still applies to
+    // non-gRPC requests. gRPC requests keep the max_stream_duration semantics.
+    timeout.global_timeout_ = route.timeout();
   }
   timeout.per_try_timeout_ = route.retryPolicy()->perTryTimeout();
   timeout.per_try_idle_timeout_ = route.retryPolicy()->perTryIdleTimeout();

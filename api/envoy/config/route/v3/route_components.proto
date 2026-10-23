@@ -1422,6 +1422,10 @@ message RouteAction {
   //   :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`,
   //   :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   //   :ref:`retry overview <arch_overview_http_routing_retry>`.
+  //
+  // If :ref:`max_stream_duration <envoy_v3_api_field_config.route.v3.RouteAction.max_stream_duration>`
+  // is set, this timeout is disabled unless explicitly configured, and does not apply to gRPC
+  // requests.
   google.protobuf.Duration timeout = 8;
 
   // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,

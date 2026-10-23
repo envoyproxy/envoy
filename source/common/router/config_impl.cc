@@ -539,7 +539,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
       vhost_(vhost), cluster_name_(route.route().cluster()),
-      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
+      // With max_stream_duration set, the route timeout is disabled unless explicitly configured.
+      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+          route.route(), timeout,
+          route.route().has_max_stream_duration() ? 0 : DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
       redirect_config_(
