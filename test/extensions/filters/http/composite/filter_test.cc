@@ -104,7 +104,8 @@ public:
   testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Stats::MockCounter error_counter_;
   Stats::MockCounter success_counter_;
-  FilterStats stats_{error_counter_, success_counter_};
+  FilterStatsSharedPtr stats_{
+      std::make_shared<FilterStats>(FilterStats{error_counter_, success_counter_})};
   Filter filter_;
 
   Http::TestRequestHeaderMapImpl default_request_headers_{
@@ -1762,7 +1763,7 @@ TEST(ConfigTest, CompileNamedFilterChainsFailsOnFactoryError) {
 TEST(FilterCallbacksWrapperTest, SingleModeRejectsMultipleFiltersAndExposesDispatcher) {
   Stats::MockCounter error_counter;
   Stats::MockCounter success_counter;
-  FilterStats stats{error_counter, success_counter};
+  auto stats = std::make_shared<FilterStats>(FilterStats{error_counter, success_counter});
   testing::NiceMock<Event::MockDispatcher> dispatcher;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
@@ -1793,7 +1794,7 @@ TEST(FilterCallbacksWrapperTest, SingleModeRejectsMultipleFiltersAndExposesDispa
 TEST(FilterCallbacksWrapperTest, ChainModeAcceptsMultipleFilters) {
   Stats::MockCounter error_counter;
   Stats::MockCounter success_counter;
-  FilterStats stats{error_counter, success_counter};
+  auto stats = std::make_shared<FilterStats>(FilterStats{error_counter, success_counter});
   testing::NiceMock<Event::MockDispatcher> dispatcher;
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
@@ -2302,8 +2303,7 @@ public:
   // a new stream.
   Http::StreamFilterSharedPtr createFilter(const Http::FilterFactoryCb& callback) {
     Http::StreamFilterSharedPtr filter;
-    EXPECT_CALL(filter_chain_callbacks_, addStreamFilter(_))
-        .WillOnce(testing::SaveArg<0>(&filter));
+    EXPECT_CALL(filter_chain_callbacks_, addStreamFilter(_)).WillOnce(testing::SaveArg<0>(&filter));
     EXPECT_CALL(filter_chain_callbacks_, addAccessLogHandler(_));
     callback(filter_chain_callbacks_);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);

@@ -1368,14 +1368,14 @@ resources:
       code: 403)EOF",
                                               false);
     const auto initial_config = compositeConfig(TestEnvironment::substitute(R"EOF(
-                dynamic_config:
-                  name: set-response-code
-                  config_discovery:
-                    config_source:
-                      path_config_source:
-                        path: "{{ test_tmpdir }}/set_response_code.yaml"
-                    type_urls:
-                    - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                    dynamic_config:
+                      name: set-response-code
+                      config_discovery:
+                        config_source:
+                          path_config_source:
+                            path: "{{ test_tmpdir }}/set_response_code.yaml"
+                        type_urls:
+                        - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
 )EOF"));
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -1385,28 +1385,27 @@ resources:
       ecds_cluster->mutable_load_assignment()->set_cluster_name("ecds_cluster");
       ConfigHelper::setHttp2(*ecds_cluster);
     });
-    config_helper_.addConfigModifier(
-        [initial_config](ConfigHelper::HttpConnectionManager& hcm) {
-          auto* filter = hcm.add_http_filters();
-          filter->set_name("composite");
-          auto* discovery = filter->mutable_config_discovery();
-          discovery->add_type_urls(
-              "type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite");
-          // Serve the initial configuration as the default configuration, so that the listener
-          // does not have to wait for ECDS.
-          std::ignore = discovery->mutable_default_config()->PackFrom(initial_config);
-          discovery->set_apply_default_config_without_warming(true);
-          auto* config_source = discovery->mutable_config_source();
-          config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-          auto* api_config_source = config_source->mutable_api_config_source();
-          api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
-          api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
-          api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
-              "ecds_cluster");
-          // Keep the router last.
-          const int size = hcm.http_filters_size();
-          hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
-        });
+    config_helper_.addConfigModifier([initial_config](ConfigHelper::HttpConnectionManager& hcm) {
+      auto* filter = hcm.add_http_filters();
+      filter->set_name("composite");
+      auto* discovery = filter->mutable_config_discovery();
+      discovery->add_type_urls(
+          "type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite");
+      // Serve the initial configuration as the default configuration, so that the listener
+      // does not have to wait for ECDS.
+      std::ignore = discovery->mutable_default_config()->PackFrom(initial_config);
+      discovery->set_apply_default_config_without_warming(true);
+      auto* config_source = discovery->mutable_config_source();
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* api_config_source = config_source->mutable_api_config_source();
+      api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+          "ecds_cluster");
+      // Keep the router last.
+      const int size = hcm.http_filters_size();
+      hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+    });
     // This is applied right away, ahead of the config modifiers, so it lands before the composite
     // filter.
     config_helper_.prependFilter(R"EOF(
@@ -1487,11 +1486,11 @@ TEST_P(CompositeFilterEcdsIntegrationTest, UpdateWhileStreamIsPausedBeforeCompos
   // Replace the composite filter configuration. The update is complete once the workers and the
   // main thread have all dropped their reference to the initial configuration.
   sendCompositeConfig(compositeConfig(R"EOF(
-                typed_config:
-                  name: set-response-code
-                  typed_config:
-                    "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
-                    code: 401
+                    typed_config:
+                      name: set-response-code
+                      typed_config:
+                        "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                        code: 401
 )EOF"),
                       "1");
   test_server_->waitForCounter("extension_config_discovery.http_filter.composite.config_reload",
@@ -1504,7 +1503,10 @@ TEST_P(CompositeFilterEcdsIntegrationTest, UpdateWhileStreamIsPausedBeforeCompos
   test_server_->waitForCounter("http.config_test.composite.filter_delegation_success",
                                testing::Eq(1));
 
-  // New streams use the updated configuration.
+  // New streams use the updated configuration. The local reply may be sent before the end of the
+  // request has been read, in which case the connection is closed, so use a new one.
+  codec_client_->close();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
   response = codec_client_->makeRequestWithBody(match_request_headers_, 10);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("401"));
