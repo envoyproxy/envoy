@@ -1104,9 +1104,10 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
 
 Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& data,
                                                            bool end_stream) {
-  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal
-  // and ServerDiscover are local responses, and the response body is already encoded.
-  if (mcp_operation_ == McpOperation::Unspecified ||
+  // No need to encode the response body for Initialization and InitializationAck. ToolsListLocal,
+  // ServerDiscover, and Undecided (e.g. local replies before body decoding) are local responses,
+  // and the response body is already encoded.
+  if (mcp_operation_ == McpOperation::Unspecified || mcp_operation_ == McpOperation::Undecided ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
       mcp_operation_ == McpOperation::ServerDiscover ||
@@ -1875,7 +1876,9 @@ void McpJsonRestBridgeFilter::sendErrorResponse(
   ENVOY_STREAM_LOG(error, "Sending error response with status: {}", *decoder_callbacks_,
                    bridgeStatusToString(status));
   status_ = status;
-  mcp_operation_ = McpOperation::OperationFailed;
+  if (status != BridgeStatus::HttpRequestMethodNotPost) {
+    mcp_operation_ = McpOperation::OperationFailed;
+  }
   setParsingMetadata(method, params);
 
   decoder_callbacks_->sendLocalReply(response_code, response_body, modify_headers, grpc_status,

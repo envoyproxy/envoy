@@ -18,6 +18,7 @@ namespace Envoy {
 namespace {
 
 using ::testing::IsEmpty;
+using ::testing::SizeIs;
 using ::testing::StrEq;
 
 class McpJsonRestBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -137,11 +138,13 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MethodNotAllowed) {
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/mcp"}, {":scheme", "http"}, {":authority", "host"}});
 
-  // Since the filter calls sendLocalReply and stops iteration early in decodeHeaders,
-  // the stream might be reset rather than ending cleanly. We use waitForAnyTermination
-  // to ensure we wait for the response headers regardless of how the stream terminates.
-  ASSERT_TRUE(response->waitForAnyTermination());
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("405"));
+  ASSERT_THAT(response->headers().get(Http::LowerCaseString("allow")), SizeIs(1));
+  EXPECT_THAT(response->headers().get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
+              StrEq("POST"));
+  EXPECT_THAT(response->headers().getContentLengthValue(), StrEq("23"));
+  EXPECT_THAT(response->body(), StrEq("HTTP Method Not Allowed"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, InvalidJsonBody) {
