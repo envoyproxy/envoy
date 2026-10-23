@@ -1702,8 +1702,6 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
 // behavior in the DNS resolution processing loop.
 TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts", "true");
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "true");
   upstream_tls_ = false;
   autonomous_upstream_ = true;
   // Add DFP filter even if async DNS resolution is enabled.
