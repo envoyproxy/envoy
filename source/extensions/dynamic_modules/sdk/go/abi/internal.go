@@ -979,17 +979,6 @@ func (h *dymHttpFilterHandle) GetAttributeBool(
 	return bool(value), true
 }
 
-func (h *dymHttpFilterHandle) SetAttributeBool(
-	attributeID shared.AttributeID,
-	value bool,
-) bool {
-	return bool(C.envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-		h.hostPluginPtr,
-		(C.envoy_dynamic_module_type_attribute_id)(attributeID),
-		C.bool(value),
-	))
-}
-
 func (h *dymHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
 	var info C.envoy_dynamic_module_type_timing_info_v2
 	C.envoy_dynamic_module_callback_http_get_timing_info(h.hostPluginPtr, &info)

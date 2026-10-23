@@ -188,17 +188,6 @@ public:
     if (auto val = handle_.getAttributeString(AttributeID::SourceAddress); !val) {
       assert(false && "source address not found");
     }
-    if (auto val = handle_.getAttributeBool(AttributeID::ShouldDrainConnectionUponCompletion);
-        !val || *val) {
-      assert(false && "should drain connection upon completion initial value mismatch");
-    }
-    if (!handle_.setAttributeBool(AttributeID::ShouldDrainConnectionUponCompletion, true)) {
-      assert(false && "failed to set should drain connection upon completion");
-    }
-    if (auto val = handle_.getAttributeBool(AttributeID::ShouldDrainConnectionUponCompletion);
-        !val || !*val) {
-      assert(false && "should drain connection upon completion updated value mismatch");
-    }
 
     return HeadersStatus::Continue;
   }

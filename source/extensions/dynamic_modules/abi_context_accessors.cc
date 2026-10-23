@@ -628,31 +628,9 @@ bool ContextAccessor::getAttributeBool(const StreamInfo::StreamInfo& stream_info
     *result = stream_info.healthCheck();
     ok = true;
     break;
-  case envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion:
-    *result = stream_info.shouldDrainConnectionUponCompletion();
-    ok = true;
-    break;
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
                         "Unsupported attribute ID {} as bool.", static_cast<int64_t>(attribute_id));
-    break;
-  }
-  return ok;
-}
-
-bool ContextAccessor::setAttributeBool(StreamInfo::StreamInfo& stream_info,
-                                       envoy_dynamic_module_type_attribute_id attribute_id,
-                                       bool value) {
-  bool ok = false;
-  switch (attribute_id) {
-  case envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion:
-    stream_info.setShouldDrainConnectionUponCompletion(value);
-    ok = true;
-    break;
-  default:
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "Unsupported attribute ID {} as mutable bool.",
-                        static_cast<int64_t>(attribute_id));
     break;
   }
   return ok;

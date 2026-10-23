@@ -1808,39 +1808,9 @@ TEST(ABIImpl, attribute_bool) {
       &filter, envoy_dynamic_module_type_attribute_id_HealthCheck, &result));
   EXPECT_TRUE(result);
 
-  // ShouldDrainConnectionUponCompletion is readable and writable via ContextAccessor.
-  EXPECT_CALL(stream_info, shouldDrainConnectionUponCompletion()).WillOnce(testing::Return(false));
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
-      &filter, envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion,
-      &result));
-  EXPECT_FALSE(result);
-
-  EXPECT_CALL(stream_info, setShouldDrainConnectionUponCompletion(true));
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-      &filter, envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion, true));
-
-  EXPECT_CALL(stream_info, shouldDrainConnectionUponCompletion()).WillOnce(testing::Return(true));
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
-      &filter, envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion,
-      &result));
-  EXPECT_TRUE(result);
-
   // Unsupported attribute.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-      &filter, envoy_dynamic_module_type_attribute_id_RequestPath, true));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-      &filter, envoy_dynamic_module_type_attribute_id_HealthCheck, true));
-
-  // Without stream info (no callbacks), get and set return false.
-  DynamicModuleHttpFilter filter_no_callbacks{nullptr, symbol_table, 0};
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_bool(
-      &filter_no_callbacks,
-      envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion, &result));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-      &filter_no_callbacks,
-      envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion, true));
 }
 
 TEST(ABIImpl, filter_state) {

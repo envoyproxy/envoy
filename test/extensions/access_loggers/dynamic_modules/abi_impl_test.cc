@@ -2571,31 +2571,6 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolHealthCheckFalse) {
   EXPECT_FALSE(result);
 }
 
-TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolShouldDrainConnectionUponCompletion) {
-  ON_CALL(stream_info_, shouldDrainConnectionUponCompletion()).WillByDefault(testing::Return(true));
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  bool result = false;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
-      env_ptr, envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion,
-      &result));
-  EXPECT_TRUE(result);
-}
-
-TEST_F(DynamicModuleAccessLogAbiTest, GetAttributeBoolShouldDrainConnectionUponCompletionFalse) {
-  ON_CALL(stream_info_, shouldDrainConnectionUponCompletion())
-      .WillByDefault(testing::Return(false));
-  Formatter::Context log_context(nullptr, nullptr, nullptr);
-  void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
-
-  bool result = true;
-  EXPECT_TRUE(envoy_dynamic_module_callback_access_logger_get_attribute_bool(
-      env_ptr, envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion,
-      &result));
-  EXPECT_FALSE(result);
-}
-
 // =============================================================================
 // Generic Attribute Accessor Coverage Tests
 // =============================================================================

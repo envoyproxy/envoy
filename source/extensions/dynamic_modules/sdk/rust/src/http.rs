@@ -1719,15 +1719,6 @@ pub trait EnvoyHttpFilter {
     attribute_id: abi::envoy_dynamic_module_type_attribute_id,
   ) -> Option<bool>;
 
-  /// Set the value of the attribute with the given ID as a boolean.
-  ///
-  /// If the attribute is not mutable, not supported or is the wrong type, this returns `false`.
-  fn set_attribute_bool(
-    &mut self,
-    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-    value: bool,
-  ) -> bool;
-
   /// Get a snapshot of the current stream timing information.
   ///
   /// Unavailable fields are `None` at the current event hook. See [`TimingInfo`] for units and
@@ -3765,20 +3756,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Some(result)
     } else {
       None
-    }
-  }
-
-  fn set_attribute_bool(
-    &mut self,
-    attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-    value: bool,
-  ) -> bool {
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-        self.raw_ptr,
-        attribute_id,
-        value,
-      )
     }
   }
 

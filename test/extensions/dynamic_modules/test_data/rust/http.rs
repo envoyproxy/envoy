@@ -380,19 +380,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
       envoy_filter.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::ConnectionMtls);
     assert!(mtls.is_none());
 
-    let should_drain = envoy_filter.get_attribute_bool(
-      abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion,
-    );
-    assert_eq!(should_drain, Some(false));
-    assert!(envoy_filter.set_attribute_bool(
-      abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion,
-      true,
-    ));
-    let should_drain = envoy_filter.get_attribute_bool(
-      abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion,
-    );
-    assert_eq!(should_drain, Some(true));
-
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 

@@ -640,11 +640,6 @@ public:
     return value;
   }
 
-  bool setAttributeBool(AttributeID id, bool value) override {
-    return envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-        host_plugin_ptr_, static_cast<envoy_dynamic_module_type_attribute_id>(id), value);
-  }
-
   TimingInfo getTimingInfo() override {
     envoy_dynamic_module_type_timing_info_v2 info{};
     envoy_dynamic_module_callback_http_get_timing_info(host_plugin_ptr_, &info);

@@ -252,8 +252,7 @@ enum class AttributeID : uint32_t {
   HealthCheck,
   UpstreamRequestedServerName,
   XdsVirtualClusterName,
-  UpstreamProtocol,
-  ShouldDrainConnectionUponCompletion
+  UpstreamProtocol
 };
 
 enum class LogLevel : uint32_t { Trace, Debug, Info, Warn, Error, Critical, Off };
@@ -696,14 +695,6 @@ public:
    * @return The bool value if found, otherwise nullopt.
    */
   virtual std::optional<bool> getAttributeBool(AttributeID id) = 0;
-
-  /**
-   * Sets a boolean attribute value.
-   * @param id The attribute ID.
-   * @param value The boolean value to set.
-   * @return True if the attribute was set, false if not supported or not mutable.
-   */
-  virtual bool setAttributeBool(AttributeID id, bool value) = 0;
 
   /**
    * Returns a snapshot of the current stream timing information.

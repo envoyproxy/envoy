@@ -13,7 +13,6 @@ func TestAttributeIDOrdering(t *testing.T) {
 		{AttributeIDUpstreamRequestedServerName, 68},
 		{AttributeIDXdsVirtualClusterName, 69},
 		{AttributeIDUpstreamProtocol, 70},
-		{AttributeIDShouldDrainConnectionUponCompletion, 71},
 	}
 	for _, test := range tests {
 		if test.id != test.want {

@@ -292,10 +292,6 @@ type HttpFilterHandle interface {
 	// Returns attribute value and true if found, otherwise false.
 	GetAttributeBool(attributeID AttributeID) (bool, bool)
 
-	// SetAttributeBool sets the bool attribute value of the stream.
-	// Returns true if the attribute was set, false if not supported or not mutable.
-	SetAttributeBool(attributeID AttributeID, value bool) bool
-
 	// GetTimingInfo returns a snapshot of the current stream timing information.
 	GetTimingInfo() TimingInfo
 

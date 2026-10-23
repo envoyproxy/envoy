@@ -5803,30 +5803,6 @@ fn test_http_set_filter_state_value() {
   ));
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
-  attribute_id: abi::envoy_dynamic_module_type_attribute_id,
-  _value: bool,
-) -> bool {
-  attribute_id == abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion
-}
-
-#[test]
-fn test_http_set_attribute_bool() {
-  let mut envoy_filter = http::EnvoyHttpFilterImpl {
-    raw_ptr: std::ptr::null_mut(),
-  };
-  assert!(envoy_filter.set_attribute_bool(
-    abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion,
-    true,
-  ));
-  assert!(!envoy_filter.set_attribute_bool(
-    abi::envoy_dynamic_module_type_attribute_id::HealthCheck,
-    true,
-  ));
-}
-
 // Single-slot store backing the has_filter_state FFI stub below.
 static HAS_FILTER_STATE_RESULT: std::sync::atomic::AtomicBool =
   std::sync::atomic::AtomicBool::new(false);
@@ -12106,10 +12082,6 @@ fn test_attribute_id_ordering() {
   assert_eq!(
     70,
     abi::envoy_dynamic_module_type_attribute_id::UpstreamProtocol as u32
-  );
-  assert_eq!(
-    71,
-    abi::envoy_dynamic_module_type_attribute_id::ShouldDrainConnectionUponCompletion as u32
   );
 }
 

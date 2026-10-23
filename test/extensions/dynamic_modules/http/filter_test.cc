@@ -439,12 +439,6 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   info.downstream_connection_info_provider_->setRemoteAddress(addr);
   info.downstream_connection_info_provider_->setRequestedServerName("example.com");
 
-  bool should_drain = false;
-  EXPECT_CALL(stream_info, shouldDrainConnectionUponCompletion())
-      .WillRepeatedly(testing::ReturnPointee(&should_drain));
-  EXPECT_CALL(stream_info, setShouldDrainConnectionUponCompletion(_))
-      .WillRepeatedly(testing::Invoke([&should_drain](bool val) { should_drain = val; }));
-
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}, {"to-be-deleted", "value"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
@@ -460,7 +454,6 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   EXPECT_CALL(encoder_callbacks, responseTrailers())
       .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
-  EXPECT_TRUE(should_drain);
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));

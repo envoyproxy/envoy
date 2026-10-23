@@ -529,8 +529,6 @@ typedef enum envoy_dynamic_module_type_attribute_id {
   envoy_dynamic_module_type_attribute_id_XdsVirtualClusterName,
   // upstream.protocol
   envoy_dynamic_module_type_attribute_id_UpstreamProtocol,
-  // should_drain_connection_upon_completion
-  envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion,
 } envoy_dynamic_module_type_attribute_id;
 
 /**
@@ -3106,24 +3104,6 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
 bool envoy_dynamic_module_callback_http_filter_get_attribute_bool(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
-
-/**
- * envoy_dynamic_module_callback_http_filter_set_attribute_bool is called by the module to set
- * a boolean attribute value. If the attribute is not mutable or the value is not a boolean,
- * this returns false.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- * @param attribute_id is the ID of the attribute.
- * @param value is the boolean value to set for the attribute.
- * @return true if the operation is successful, false otherwise.
- *
- * Note: currently, only envoy_dynamic_module_type_attribute_id_ShouldDrainConnectionUponCompletion
- * is supported.
- */
-bool envoy_dynamic_module_callback_http_filter_set_attribute_bool(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_attribute_id attribute_id, bool value);
 
 /**
  * Get a snapshot of the current stream timing information.

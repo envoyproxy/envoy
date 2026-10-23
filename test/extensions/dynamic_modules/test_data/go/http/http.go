@@ -178,15 +178,6 @@ func (p *headerCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	if workerIndex := p.handle.GetWorkerIndex(); workerIndex != 0 {
 		panic(fmt.Sprintf("worker index mismatch: %d", workerIndex))
 	}
-	if val, ok := p.handle.GetAttributeBool(shared.AttributeIDShouldDrainConnectionUponCompletion); !ok || val {
-		panic(fmt.Sprintf("should drain connection upon completion initial value mismatch: ok=%v val=%v", ok, val))
-	}
-	if !p.handle.SetAttributeBool(shared.AttributeIDShouldDrainConnectionUponCompletion, true) {
-		panic("failed to set should drain connection upon completion")
-	}
-	if val, ok := p.handle.GetAttributeBool(shared.AttributeIDShouldDrainConnectionUponCompletion); !ok || !val {
-		panic(fmt.Sprintf("should drain connection upon completion updated value mismatch: ok=%v val=%v", ok, val))
-	}
 
 	return shared.HeadersStatusContinue
 }
