@@ -3,7 +3,9 @@
 
 #include <string>
 
+#include "absl/strings/escaping.h"
 #include "absl/strings/substitute.h"
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test-extension.pb.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test-extension_descriptor.pb.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test.pb.h"
@@ -74,6 +76,31 @@ bar: "hello world"
                                      &concrete_message));
 
   ASSERT_THAT(concrete_message.bar(), Eq("hello world"));
+}
+
+TEST(TextFormatTranscoderTest, InvalidDescriptorsAreNotRegistered) {
+  const auto& original =
+      protobuf::reflection::bazel_cc_proto_descriptor_library_testdata_test::kFileDescriptorInfo;
+  std::string descriptor_bytes;
+  ASSERT_TRUE(absl::Base64Unescape(original.file_descriptor_bytes_base64, &descriptor_bytes));
+  for (const auto& invalid_bytes : {std::string(original.file_descriptor_bytes_base64) + "!",
+                                    absl::Base64Escape(descriptor_bytes + "\x80")}) {
+    cc_proto_descriptor_library::TextFormatTranscoder reserializer(false);
+    const cc_proto_descriptor_library::internal::FileDescriptorInfo invalid_descriptor{
+        original.file_name, invalid_bytes, original.deps};
+    reserializer.loadFileDescriptors(invalid_descriptor);
+
+    testdata::dynamic_descriptors::Foo concrete_message;
+    std::string error_text;
+    StringErrorCollector error_collector(error_text);
+    EXPECT_FALSE(reserializer.parseInto("bar: 'hello world'", &concrete_message, &error_collector));
+    EXPECT_EQ(error_text,
+              "0(0): Could not find descriptor for: testdata.dynamic_descriptors.Foo\n");
+
+    reserializer.loadFileDescriptors(original);
+    ASSERT_TRUE(reserializer.parseInto("bar: 'hello world'", &concrete_message));
+    EXPECT_EQ(concrete_message.bar(), "hello world");
+  }
 }
 
 TEST(TextToBinaryReserializerTest, TextFormatWithExtensionWorks) {
