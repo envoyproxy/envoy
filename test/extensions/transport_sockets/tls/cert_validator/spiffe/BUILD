@@ -71,6 +71,7 @@ envoy_extension_cc_test(
         "//source/common/network:transport_socket_options_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:filter_state_lib",
+        "//source/common/tls:ssl_handshaker_lib",
         "//source/extensions/filters/listener/set_filter_state:config",
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/integration:http_integration_lib",
