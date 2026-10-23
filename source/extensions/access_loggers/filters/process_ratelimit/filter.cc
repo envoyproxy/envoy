@@ -21,23 +21,33 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       stats_({ALL_PROCESS_RATELIMIT_FILTER_STATS(POOL_COUNTER_PREFIX(
           context.serverFactoryContext().scope(), "access_log.process_ratelimit."))}) {
-  auto setter =
-      [this, cancel_cb = cancel_cb_](
-          Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
-      -> void {
-    if (!cancel_cb->load()) {
-      ENVOY_BUG(limiter != nullptr, "limiter shouldn't be null if the `limiter` is set from "
-                                    "callback.");
-      rate_limiter_->setLimiter(limiter);
-    }
-  };
-
-  if (!config.has_dynamic_config()) {
-    ExceptionUtil::throwEnvoyException("`dynamic_config` is required.");
+  if (config.has_token_bucket() && config.has_dynamic_config()) {
+    ExceptionUtil::throwEnvoyException(
+        "Only one of `token_bucket` or `dynamic_config` can be set.");
+  } else if (config.has_token_bucket()) {
+    auto limiter = Envoy::Extensions::Filters::Common::LocalRateLimit::createRateLimiterImpl(
+        config.token_bucket(), context.serverFactoryContext().mainThreadDispatcher());
+    rate_limiter_ = std::make_unique<Envoy::Extensions::Filters::Common::LocalRateLimit::
+                                         RateLimiterProviderSingleton::RateLimiterWrapper>(
+        context.serverFactoryContext().threadLocal(), nullptr, nullptr, limiter, nullptr);
+  } else if (config.has_dynamic_config()) {
+    auto setter =
+        [this, cancel_cb = cancel_cb_](
+            Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
+        -> void {
+      if (!cancel_cb->load()) {
+        ENVOY_BUG(limiter != nullptr, "limiter shouldn't be null if the `limiter` is set from "
+                                      "callback.");
+        rate_limiter_->setLimiter(limiter);
+      }
+    };
+    rate_limiter_ =
+        Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
+            getRateLimiter(context, config.dynamic_config().resource_name(),
+                           config.dynamic_config().config_source(), setter_key_, std::move(setter));
+  } else {
+    ExceptionUtil::throwEnvoyException("One of `token_bucket` or `dynamic_config` is required.");
   }
-  rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
-      getRateLimiter(context, config.dynamic_config().resource_name(),
-                     config.dynamic_config().config_source(), setter_key_, std::move(setter));
 }
 
 ProcessRateLimitFilter::~ProcessRateLimitFilter() {
@@ -45,18 +55,20 @@ ProcessRateLimitFilter::~ProcessRateLimitFilter() {
   // The `cancel_cb_` is set to true to prevent the `limiter` from being set in
   // the `setter` from the main thread.
   cancel_cb_->store(true);
-  main_thread_dispatcher_.post([limiter = std::move(rate_limiter_), setter_key = setter_key_] {
-    // remove the setter for this filter.
-    limiter->getSubscription()->removeSetter(setter_key);
-  });
+  if (rate_limiter_ && rate_limiter_->getSubscription()) {
+    main_thread_dispatcher_.post([limiter = std::move(rate_limiter_), setter_key = setter_key_] {
+      // remove the setter for this filter.
+      limiter->getSubscription()->removeSetter(setter_key);
+    });
+  }
 }
 
 bool ProcessRateLimitFilter::evaluate(const Formatter::Context&,
                                       const StreamInfo::StreamInfo&) const {
+  Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter;
   ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
             "rate_limiter_.limiter_ should be already set in init callback.");
-  Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter =
-      rate_limiter_->getLimiter();
+  limiter = rate_limiter_->getLimiter();
   auto result = limiter->requestAllowed({});
   if (!result.allowed) {
     stats_.denied_.inc();
