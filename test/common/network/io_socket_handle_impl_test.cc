@@ -200,6 +200,8 @@ TEST(IoSocketHandleImpl, ErrnoIfaddrs) {
   EXPECT_FALSE(maybe_interface_name.has_value());
 }
 
+// These control-message tests require the platform's receive-queue overflow option.
+#ifdef SO_RXQ_OVFL
 TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   auto os_calls =
@@ -302,6 +304,8 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
   EXPECT_EQ(dropped_packets, 5);
 }
 
+#endif
+
 TEST(IoSocketHandleImpl, SendEmptyPayloadCallsSend) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
@@ -340,6 +344,114 @@ TEST(IoSocketHandleImpl, SendmsgEmptyPayloadUsesDummyIovec) {
   const Api::IoCallUint64Result result = io_handle.sendmsg(nullptr, 0, 0, nullptr, peer_address);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(0, result.return_value_);
+}
+
+class SendmsgAddressTest : public testing::Test {
+protected:
+  void checkDestination(std::optional<int> domain, bool v6only, const Address::InstanceBase& peer,
+                        bool mapped, const Address::Ip* source = nullptr, bool empty = false) {
+    testing::StrictMock<Api::MockOsSysCalls> syscalls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&syscalls);
+    EXPECT_CALL(syscalls, sendmsg(_, _, 0))
+        .WillOnce(Invoke([&](os_fd_t, const msghdr* message, int) -> Api::SysCallSizeResult {
+          const auto* destination = static_cast<const sockaddr*>(message->msg_name);
+          EXPECT_EQ(mapped ? AF_INET6 : peer.sockAddr()->sa_family, destination->sa_family);
+          if (mapped) {
+            EXPECT_EQ(sizeof(sockaddr_in6), message->msg_namelen);
+            // A regression must fail the contract without reading an IPv4 buffer as IPv6.
+            if (destination->sa_family != AF_INET6 ||
+                message->msg_namelen != sizeof(sockaddr_in6)) {
+              return {empty ? 0 : 1, 0};
+            }
+            const auto* v6 = reinterpret_cast<const sockaddr_in6*>(destination);
+            const auto expected = Network::Test::getV6SockAddr("::ffff:127.0.0.1", 1234);
+            const auto* expected_v6 = reinterpret_cast<const sockaddr_in6*>(&expected);
+            EXPECT_EQ(0, memcmp(&v6->sin6_addr, &expected_v6->sin6_addr, sizeof(in6_addr)));
+            EXPECT_EQ(expected_v6->sin6_port, v6->sin6_port);
+            EXPECT_EQ(0, v6->sin6_flowinfo);
+            EXPECT_EQ(0, v6->sin6_scope_id);
+          } else {
+            EXPECT_EQ(peer.sockAddrLen(), message->msg_namelen);
+            EXPECT_EQ(0, memcmp(peer.sockAddr(), destination, peer.sockAddrLen()));
+          }
+          EXPECT_EQ(1, message->msg_iovlen);
+          EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
+          EXPECT_EQ(empty ? 0 : 1, message->msg_iov[0].iov_len);
+          if (source != nullptr) {
+            const auto* cmsg = CMSG_FIRSTHDR(message);
+            EXPECT_NE(nullptr, cmsg);
+            if (cmsg != nullptr) {
+              EXPECT_EQ(IPPROTO_IP, cmsg->cmsg_level);
+#ifdef IP_SENDSRCADDR
+              EXPECT_EQ(IP_SENDSRCADDR, cmsg->cmsg_type);
+              EXPECT_EQ(CMSG_LEN(sizeof(in_addr)), cmsg->cmsg_len);
+              EXPECT_EQ(source->ipv4()->address(),
+                        reinterpret_cast<const in_addr*>(CMSG_DATA(cmsg))->s_addr);
+#else
+              EXPECT_EQ(IP_PKTINFO, cmsg->cmsg_type);
+              EXPECT_EQ(CMSG_LEN(sizeof(in_pktinfo)), cmsg->cmsg_len);
+              const auto* info = reinterpret_cast<const in_pktinfo*>(CMSG_DATA(cmsg));
+              EXPECT_EQ(0, info->ipi_ifindex);
+#ifdef WIN32
+              EXPECT_EQ(source->ipv4()->address(), info->ipi_addr.s_addr);
+#else
+              EXPECT_EQ(source->ipv4()->address(), info->ipi_spec_dst.s_addr);
+#endif
+#endif
+            }
+          } else {
+            EXPECT_EQ(nullptr, message->msg_control);
+            EXPECT_EQ(0, message->msg_controllen);
+          }
+          return {empty ? 0 : 1, 0};
+        }));
+    IoSocketHandleImpl handle(INVALID_SOCKET, v6only, domain);
+    char payload = 'x';
+    Buffer::RawSlice slice{&payload, 1};
+    const auto result = handle.sendmsg(empty ? nullptr : &slice, empty ? 0 : 1, 0, source, peer);
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ(empty ? 0 : 1, result.return_value_);
+    // Conversion must not change the address used by session lookup and logging.
+    EXPECT_EQ(peer.ip()->version() == Address::IpVersion::v4 ? AF_INET : AF_INET6,
+              peer.sockAddr()->sa_family);
+  }
+
+#if defined(__APPLE__)
+  static constexpr bool MapsIpv4 = true;
+#else
+  static constexpr bool MapsIpv4 = false;
+#endif
+  const Address::Ipv4Instance ipv4_peer_{"127.0.0.1", 1234};
+};
+
+TEST_F(SendmsgAddressTest, DualStackIpv4DestinationMatchesPlatformContract) {
+  checkDestination(AF_INET6, false, ipv4_peer_, MapsIpv4);
+}
+
+TEST_F(SendmsgAddressTest, Ipv4SocketKeepsIpv4Destination) {
+  checkDestination(AF_INET, false, ipv4_peer_, false);
+}
+
+TEST_F(SendmsgAddressTest, Ipv6SocketKeepsIpv6Destination) {
+  const Address::Ipv6Instance peer("::1", 1234);
+  checkDestination(AF_INET6, false, peer, false);
+}
+
+TEST_F(SendmsgAddressTest, V6OnlySocketDoesNotMapIpv4Destination) {
+  checkDestination(AF_INET6, true, ipv4_peer_, false);
+}
+
+TEST_F(SendmsgAddressTest, UnknownDomainDoesNotMapIpv4Destination) {
+  checkDestination(std::nullopt, false, ipv4_peer_, false);
+}
+
+TEST_F(SendmsgAddressTest, DualStackIpv4ReplyPreservesSourcePacketInfo) {
+  const Address::Ipv4Instance source("127.0.0.1");
+  checkDestination(AF_INET6, false, ipv4_peer_, MapsIpv4, source.ip());
+}
+
+TEST_F(SendmsgAddressTest, DualStackIpv4EmptyDatagramUsesDummyIovec) {
+  checkDestination(AF_INET6, false, ipv4_peer_, MapsIpv4, nullptr, true);
 }
 
 TEST(IoSocketHandleImpl, WritevEmptyPayloadRemainsNoOp) {

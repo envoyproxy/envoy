@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
@@ -32,6 +33,43 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
+
+// Wraps the in-memory store and records each write's size and end_stream flag.
+class RecordingExternalBufferFactory : public ExternalBufferFactory {
+public:
+  struct Write {
+    uint64_t size;
+    bool end_stream;
+  };
+
+  using ExternalBufferFactory::createBuffer;
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
+    return std::make_unique<RecordingBuffer>(inner_.createBuffer(dispatcher), writes_);
+  }
+
+  std::vector<Write> writes_;
+
+private:
+  class RecordingBuffer : public ExternalBuffer {
+  public:
+    RecordingBuffer(ExternalBufferPtr inner, std::vector<Write>& writes)
+        : inner_(std::move(inner)), writes_(writes) {}
+    void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) override {
+      writes_.push_back({data->length(), end_stream});
+      inner_->write(std::move(data), end_stream, std::move(cb));
+    }
+    void read(uint64_t offset, uint64_t length, ReadCallback cb) override {
+      inner_->read(offset, length, std::move(cb));
+    }
+    uint64_t length() const override { return inner_->length(); }
+
+  private:
+    ExternalBufferPtr inner_;
+    std::vector<Write>& writes_;
+  };
+
+  InMemoryExternalBufferFactory inner_;
+};
 
 class AiProtocolManagerFilterTest : public testing::Test {
 public:
@@ -359,6 +397,24 @@ TEST_F(AiProtocolManagerFilterTest, LargePayloadReplayedInChunks) {
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), big.size());
   EXPECT_EQ(injected_.toString(), big);
+}
+
+// A last frame with end_stream reaches the store as one write carrying end_stream.
+TEST_F(AiProtocolManagerFilterTest, FinalFrameEndStreamReachesStoreInOneWrite) {
+  auto recording = std::make_shared<RecordingExternalBufferFactory>();
+  factory_ = recording;
+  engageIgnoringPayload();
+
+  const std::string chunk(64 * 1024, 'x'); // At the write flush threshold.
+  Buffer::OwnedImpl body(chunk);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  ASSERT_EQ(recording->writes_.size(), 1);
+  EXPECT_EQ(recording->writes_[0].size, chunk.size());
+  EXPECT_TRUE(recording->writes_[0].end_stream);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(injected_.toString(), chunk);
 }
 
 // Destroying the filter mid-flight cancels pending callbacks; no replay occurs.

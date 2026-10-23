@@ -45,14 +45,6 @@ public:
 class RouteConfigUpdateReceiver : public Rds::RouteConfigUpdateReceiver {
 public:
   /**
-   * Same purpose as Rds::RouteConfigUpdateReceiver::protobufConfiguration()
-   * but the return is downcasted to proper type.
-   * @return current RouteConfiguration downcasted from Protobuf::Message&
-   */
-  virtual const envoy::config::route::v3::RouteConfiguration&
-  protobufConfigurationCast() const PURE;
-
-  /**
    * Requests an on-demand VHDS update for the given alias. Does nothing if the current route
    * configuration doesn't configure VHDS.
    * @param alias supplies the alias of the virtual host to fetch.
