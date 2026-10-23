@@ -6,9 +6,12 @@ on:
   pull_request:
     paths:
     - .bazelrc
+    - MODULE.bazel
     - .github/workflows/toolchain-test.yml
+    - bazel/BUILD
+    - bazel/extensions.bzl
     - ci/matrix/**
-    - tools/toolchain
+    - tools/toolchain/**
 concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true

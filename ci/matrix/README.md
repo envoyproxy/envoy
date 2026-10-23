@@ -11,13 +11,26 @@ The test suite validates toolchain behavior in the following scenarios:
 - **Default build**: Testing what toolchain is selected with no explicit configuration
 - **Config-based selection**: Testing the default toolchain (clang + libc++) and `--config=gcc` (gcc + libstdc++)
 - **Environment-based selection**: Testing `CC`/`CXX` environment variable overrides
-- **Compiler availability**: Testing behavior when only specific compilers are available
+- **Compiler availability**: Both LLVM and GCC work hermetically, regardless of installed compilers
+- **Resolution identity**: Checking the resolved compiler, toolchain identifier, and hermetic compiler path
+- **GCC configuration**: Checking that `//bazel:gcc_build` matches only with `--config=gcc`
+- **Host GCC override**: A module fixture opts into `/usr` explicitly, with and without
+  `gcc_version`, and rejects a version that does not match the installed compiler
+- **Alternate GCC version**: The fixture also selects GCC 14.3.0 instead of the
+  main module's default, checking both resolution and the compiled compiler version
 
 The tests run against different Docker environments:
-- `gcc`: Only GCC available
-- `llvm`: Only LLVM/Clang available
-- `all`: Both compilers available
-- `none`: No compilers available (tests hermetic toolchain fallback)
+- `gcc`: Host GCC installed
+- `llvm`: LLVM runtime prerequisites installed, without host GCC
+- `all`: Both sets of host prerequisites installed
+- `none`: No host compilers installed
+
+Every environment must use hermetic LLVM by default and hermetic GCC with `--config=gcc`.
+Setting `CC`/`CXX` does not change that selection.
+The `gcc` and `all` environments also test the explicit host override and alternate GCC
+version using a temporary module copy inside `ci/matrix`. Source directories are symlinked
+into the fixture, and it is removed when the test finishes. Envoy remains the root module
+because the upstream compiler extensions do not support being configured transitively.
 
 ## Running Tests Locally
 
@@ -67,4 +80,3 @@ Failed tests will show which configuration didn't match expectations:
 
 - If you get permission errors, ensure `UID` and `GID` environment variables are set correctly
 - If tests fail unexpectedly, check that no local Bazel configuration files are interfering
-- The `none` configuration is expected to fail until hermetic toolchains are fully implemented

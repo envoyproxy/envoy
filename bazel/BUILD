@@ -296,6 +296,16 @@ config_setting(
 )
 
 config_setting(
+    name = "gcc_requested",
+    flag_values = {":use_gcc": "true"},
+)
+
+bool_flag(
+    name = "use_gcc",
+    build_setting_default = False,
+)
+
+config_setting(
     name = "gcc_build",
     flag_values = {
         "@bazel_tools//tools/cpp:compiler": "gcc",
@@ -656,7 +666,6 @@ label_flag(
 alias(
     name = "wee8_engine",
     actual = select({
-        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
