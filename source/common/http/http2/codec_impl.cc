@@ -2195,6 +2195,11 @@ ConnectionImpl::Http2Options::Http2Options(
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
     og_options_.enforce_max_header_list_bytes = true;
   }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_oghttp2_cap_data_frame_payload")) {
+    // Use the same value as nghttp2 to avoid window update frame flooding.
+    og_options_.max_outbound_data_frame_payload = 16u * 1024u;
+  }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
       og_options_.compression_option = http2::adapter::OgHttp2Session::Options::DISABLE_COMPRESSION;
