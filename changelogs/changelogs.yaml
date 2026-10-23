@@ -87,6 +87,8 @@ areas:
   credential_injector:
     title: credential_injector
 
+  decompression:
+    title: decompression
   dns:
     title: dns
   dns_resolver:
