@@ -4,6 +4,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/http/matching/data_impl.h"
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/http/common/factory_base.h"
@@ -2220,6 +2221,181 @@ TEST(CompositePerRouteConfigTest, ReleasedOnMainThreadIsDestroyedInPlace) {
 
   EXPECT_CALL(dispatcher, post(_)).Times(0);
   config.reset();
+}
+
+// A filter factory used to observe how a composite filter configuration uses, and releases, the
+// delegated filter factories it owns. Every callback it creates adds `filter_count` (default 1)
+// pass-through filters, and `live_callbacks_` counts the callbacks that are still alive.
+class TrackingFilterFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  std::string name() const override { return "envoy.filters.http.test.tracking"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+  bool isUnifiedFilter() override { return true; }
+  absl::StatusOr<Http::FilterFactoryCb>
+  createHttpFilterFactoryFromProto(const Protobuf::Message& config,
+                                   Server::Configuration::ServerFactoryContext&,
+                                   Server::Configuration::ExtraFactoryContext&) override {
+    const auto& fields = dynamic_cast<const Protobuf::Struct&>(config).fields();
+    const auto it = fields.find("filter_count");
+    const int filter_count = it == fields.end() ? 1 : static_cast<int>(it->second.number_value());
+    ++live_callbacks_;
+    auto cleanup = std::make_shared<Cleanup>([this]() { --live_callbacks_; });
+    return [cleanup, filter_count](Http::FilterChainFactoryCallbacks& callbacks) {
+      for (int i = 0; i < filter_count; ++i) {
+        callbacks.addStreamFilter(std::make_shared<Http::PassThroughFilter>());
+      }
+    };
+  }
+
+  int live_callbacks_{};
+};
+
+// When the composite filter is delivered through ECDS, its factory callback is owned by the
+// dynamic filter config provider only. The filter manager creates the composite filter together
+// with the rest of the stream's filter chain, but the composite filter evaluates its match tree
+// only once decodeHeaders() runs. An ECDS update can destroy the factory callback in between, for
+// instance while an earlier filter has paused the stream, so the filter must not depend on state
+// that the callback owns.
+class CompositeFilterFactoryLifetimeTest : public ::testing::Test {
+public:
+  CompositeFilterFactoryLifetimeTest() {
+    ON_CALL(filter_chain_callbacks_, dispatcher())
+        .WillByDefault(testing::ReturnRef(worker_dispatcher_));
+  }
+
+  // Creates a composite filter factory callback whose inline matcher always delegates to
+  // `filter_count` tracking filters, and which also has a named filter chain of a tracking filter.
+  Http::FilterFactoryCb createFactoryCallback(int filter_count) {
+    const std::string yaml = fmt::format(R"EOF(
+      named_filter_chains:
+        tracking-chain:
+          typed_config:
+          - name: envoy.filters.http.test.tracking
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.Struct
+      matcher:
+        on_no_match:
+          action:
+            name: composite-action
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+              typed_config:
+                name: envoy.filters.http.test.tracking
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.Struct
+                  value:
+                    filter_count: {}
+    )EOF",
+                                         filter_count);
+    envoy::extensions::filters::http::composite::v3::Composite config;
+    TestUtility::loadFromYaml(yaml, config);
+
+    CompositeFilterFactory factory;
+    auto callback_or_error = factory.createFilterFactoryFromProto(config, "", factory_context_);
+    EXPECT_TRUE(callback_or_error.ok());
+    return std::move(callback_or_error.value());
+  }
+
+  // Runs the factory callback the way the filter manager does when it creates the filter chain of
+  // a new stream.
+  Http::StreamFilterSharedPtr createFilter(const Http::FilterFactoryCb& callback) {
+    Http::StreamFilterSharedPtr filter;
+    EXPECT_CALL(filter_chain_callbacks_, addStreamFilter(_))
+        .WillOnce(testing::SaveArg<0>(&filter));
+    EXPECT_CALL(filter_chain_callbacks_, addAccessLogHandler(_));
+    callback(filter_chain_callbacks_);
+    filter->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter->setEncoderFilterCallbacks(encoder_callbacks_);
+    return filter;
+  }
+
+  uint64_t counterValue(const std::string& name) {
+    return factory_context_.store_.counter(name).value();
+  }
+
+  TrackingFilterFactory tracking_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration_{
+      tracking_factory_};
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  Event::MockDispatcher& main_dispatcher_{factory_context_.server_factory_context_.dispatcher_};
+  testing::NiceMock<Event::MockDispatcher> worker_dispatcher_;
+  testing::NiceMock<Http::MockFilterChainFactoryCallbacks> filter_chain_callbacks_;
+  testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
+};
+
+// A filter whose factory callback has been destroyed still matches, delegates and records the
+// delegation in its stats.
+TEST_F(CompositeFilterFactoryLifetimeTest, DelegationSucceedsAfterFactoryCallbackIsDestroyed) {
+  Http::FilterFactoryCb callback = createFactoryCallback(1);
+  Http::StreamFilterSharedPtr filter = createFilter(callback);
+  callback = nullptr;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(1, counterValue("composite.filter_delegation_success"));
+  EXPECT_EQ(0, counterValue("composite.filter_delegation_error"));
+  filter->onDestroy();
+}
+
+// A filter whose factory callback has been destroyed still records a failed delegation in its
+// stats.
+TEST_F(CompositeFilterFactoryLifetimeTest, DelegationFailsAfterFactoryCallbackIsDestroyed) {
+  // Delegating to more than one filter is an error unless the action is a filter chain.
+  Http::FilterFactoryCb callback = createFactoryCallback(2);
+  Http::StreamFilterSharedPtr filter = createFilter(callback);
+  callback = nullptr;
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers_, true));
+  EXPECT_EQ(0, counterValue("composite.filter_delegation_success"));
+  EXPECT_EQ(1, counterValue("composite.filter_delegation_error"));
+  filter->onDestroy();
+}
+
+// A filter that outlives its factory callback and is then released on a worker thread hands the
+// match tree and the named filter chains to the main dispatcher, because the delegated filter
+// factories they own are not safe to destroy on a worker thread.
+TEST_F(CompositeFilterFactoryLifetimeTest, FilterReleasedOffMainThreadIsPostedToMainDispatcher) {
+  Http::FilterFactoryCb callback = createFactoryCallback(1);
+  Http::StreamFilterSharedPtr filter = createFilter(callback);
+  callback = nullptr;
+  // The match tree action and the named filter chain each own a tracking factory callback.
+  EXPECT_EQ(2, tracking_factory_.live_callbacks_);
+
+  ON_CALL(main_dispatcher_, isThreadSafe()).WillByDefault(testing::Return(false));
+  std::vector<Event::PostCb> posted;
+  EXPECT_CALL(main_dispatcher_, post(_)).WillRepeatedly([&posted](Event::PostCb callback) {
+    posted.push_back(std::move(callback));
+  });
+  filter->onDestroy();
+  filter.reset();
+  EXPECT_FALSE(posted.empty());
+  EXPECT_EQ(2, tracking_factory_.live_callbacks_);
+
+  // Running the posted callbacks releases the delegated filter factories on the main thread.
+  ON_CALL(main_dispatcher_, isThreadSafe()).WillByDefault(testing::Return(true));
+  for (auto& posted_callback : posted) {
+    posted_callback();
+  }
+  EXPECT_EQ(0, tracking_factory_.live_callbacks_);
+}
+
+// When the last reference to the configuration is released on the main thread, it is destroyed in
+// place, with nothing posted to the dispatcher.
+TEST_F(CompositeFilterFactoryLifetimeTest, ReleasedOnMainThreadIsDestroyedInPlace) {
+  Http::FilterFactoryCb callback = createFactoryCallback(1);
+  Http::StreamFilterSharedPtr filter = createFilter(callback);
+  filter->onDestroy();
+  filter.reset();
+  EXPECT_EQ(2, tracking_factory_.live_callbacks_);
+
+  ON_CALL(main_dispatcher_, isThreadSafe()).WillByDefault(testing::Return(true));
+  EXPECT_CALL(main_dispatcher_, post(_)).Times(0);
+  callback = nullptr;
+  EXPECT_EQ(0, tracking_factory_.live_callbacks_);
 }
 
 } // namespace
