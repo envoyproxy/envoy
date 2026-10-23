@@ -23,7 +23,7 @@ if OUTPUT_NO_ARGS=$(bazel run --verbose_failures -s //tools/toolchain:detect 2>&
 fi
 
 echo "Testing --config=gcc"
-if OUTPUT_GCC=$(bazel run --verbose_failures -s  --config=gcc //tools/toolchain:detect 2>&1); then
+if OUTPUT_GCC=$(bazel run --verbose_failures -s --config=gcc //tools/toolchain:detect 2>&1); then
     COMPILER=$(echo "$OUTPUT_GCC" | grep "Compiler:" | awk '{print $2}' | tr -d '\r\n')
     LIBRARY=$(echo "$OUTPUT_GCC" | grep "Standard Library:" | awk '{print $3}' | tr -d '\r\n')
     if [[ -n "$COMPILER" && -n "$LIBRARY" ]]; then
@@ -75,9 +75,145 @@ for key in NO_ARGS GCC GCC_ENV CLANG_ENV; do
     elif [[ "$actual" == "fail" ]]; then
         echo "✅ $key failed as expected"
     else
-        echo "✅ $key passed as expected"
+        expected_gcc_build=false
+        if [[ "$key" == "GCC" ]]; then
+            expected_gcc_build=true
+        fi
+        if ! grep -qx "GCC build: $expected_gcc_build" <<< "$output"; then
+            echo "❌ $key: //bazel:gcc_build should match $expected_gcc_build"
+            echo "$output"
+            FAILED=1
+        else
+            echo "✅ $key passed as expected"
+        fi
     fi
 done
+
+check_resolution() {
+    local expected_compiler="$1"
+    local expected_origin="$2"
+    shift 2
+    local output identity compiler identifier executable
+    echo "Testing $expected_compiler toolchain resolution"
+    if ! output=$(bazel cquery "$@" @rules_cc//cc:current_cc_toolchain \
+        --output=starlark \
+        --starlark:expr='"Toolchain: %s|%s|%s" % (providers(target)["ToolchainInfo"].cc.compiler, providers(target)["ToolchainInfo"].cc.toolchain_id, providers(target)["ToolchainInfo"].cc.compiler_executable)' \
+        2>&1); then
+        echo "$output"
+        FAILED=1
+        return
+    fi
+    identity=$(grep '^Toolchain: ' <<< "$output" | cut -d ' ' -f 2-) || true
+    IFS='|' read -r compiler identifier executable <<< "$identity"
+    if [[ "$compiler" != "$expected_compiler" || -z "$identifier" ]]; then
+        echo "❌ Expected $expected_compiler toolchain, got: $identity"
+        echo "$output"
+        FAILED=1
+    elif [[ "$expected_origin" == hermetic && "$executable" != external/* ]]; then
+        echo "❌ Expected a hermetic compiler path, got: $identity"
+        FAILED=1
+    elif [[ "$expected_origin" == host &&
+            ( "$executable" != /usr/bin/gcc || "$identifier" != envoy-host-gcc-* ) ]]; then
+        echo "❌ Expected the explicit host GCC override, got: $identity"
+        FAILED=1
+    elif [[ "$expected_compiler" == clang && "$executable" != *llvm_toolchain* ]]; then
+        echo "❌ Expected the default LLVM repository, got: $identity"
+        FAILED=1
+    else
+        echo "✅ $identity"
+    fi
+}
+
+check_resolution clang hermetic
+check_resolution gcc hermetic --config=gcc
+
+check_gcc_sysroot() {
+    local output
+    echo "Testing hermetic GCC sysroot paths"
+    if ! output=$(bazel aquery --config=gcc \
+        'mnemonic("Cpp(Compile|Link)", //tools/toolchain:detect)' --output=text 2>&1); then
+        echo "$output"
+        FAILED=1
+        return
+    fi
+    if ! grep -q -- '--sysroot' <<< "$output" ||
+        ! grep -q 'sysroot_linux_amd64/sysroot' <<< "$output" ||
+        ! grep -q -- '-nostdinc++' <<< "$output" ||
+        ! grep -Eq -- '-isystemexternal/[^ /]*gcc_toolchain[^ /]*/include/c\+\+/' <<< "$output" ||
+        ! grep -q -- '-l:libstdc++.a' <<< "$output" ||
+        grep -Eq 'gcc_toolchain[^ /]*/sysroot|sysroot_linux_amd64/sysroot/usr/include/c\+\+' <<< "$output"; then
+        echo "❌ GCC must use the shared sysroot and its own libstdc++ only"
+        echo "$output"
+        FAILED=1
+    else
+        echo "✅ GCC uses the shared sysroot and its own libstdc++"
+    fi
+}
+
+check_gcc_sysroot
+
+check_host_gcc() (
+    local root fixture output version entry name
+    root="$PWD"
+    fixture="$root/ci/matrix/.host-gcc-test-$$"
+    mkdir "$fixture"
+    trap 'rm -rf "$fixture"' EXIT
+    cp MODULE.bazel "$fixture/"
+    # Keep Envoy as the root module: upstream LLVM and GCC extensions require it.
+    shopt -s dotglob nullglob
+    for entry in "$root"/*; do
+        name="${entry##*/}"
+        case "$name" in
+            .git|ci|MODULE.bazel|MODULE.bazel.lock|user.bazelrc|ci.bazelrc|bazel-*)
+                continue
+                ;;
+        esac
+        ln -s "$entry" "$fixture/$name"
+    done
+    echo 'envoy_gcc_ext.host(path = "/usr")' >> "$fixture/MODULE.bazel"
+    version=$(/usr/bin/gcc -dumpfullversion)
+    cd "$fixture"
+
+    check_resolution clang hermetic
+    check_resolution gcc host --@envoy//bazel:use_gcc
+    if ! output=$(bazel run --@envoy//bazel:use_gcc //tools/toolchain:detect 2>&1) ||
+        ! grep -qx 'Compiler: gcc' <<< "$output" ||
+        ! grep -qx 'Standard Library: libstdc++' <<< "$output" ||
+        ! grep -qx 'GCC build: true' <<< "$output"; then
+        echo "❌ Host GCC build failed"
+        echo "$output"
+        FAILED=1
+    fi
+
+    sed -i "s/envoy_gcc_ext.host(path = \"\\/usr\")/envoy_gcc_ext.host(path = \"\\/usr\", gcc_version = \"$version\")/" MODULE.bazel
+    check_resolution gcc host --@envoy//bazel:use_gcc
+    sed -i "s/gcc_version = \"$version\"/gcc_version = \"0.0.0\"/" MODULE.bazel
+    if output=$(bazel cquery --@envoy//bazel:use_gcc @envoy_gcc_host//:cc_toolchain 2>&1); then
+        echo "❌ Mismatched host gcc_version unexpectedly succeeded"
+        FAILED=1
+    elif ! grep -q 'does not match the installed GCC version' <<< "$output"; then
+        echo "❌ Host gcc_version failed for an unexpected reason"
+        echo "$output"
+        FAILED=1
+    fi
+
+    sed -i '/^envoy_gcc_ext.host(/d; s/gcc_version = "13.4.0"/gcc_version = "14.3.0"/' MODULE.bazel
+    check_resolution gcc hermetic --@envoy//bazel:use_gcc
+    if ! output=$(bazel run --@envoy//bazel:use_gcc //tools/toolchain:detect 2>&1) ||
+        ! grep -qx 'Compiler: gcc' <<< "$output" ||
+        ! grep -qx 'Compiler version: 14.3.0' <<< "$output" ||
+        ! grep -qx 'GCC build: true' <<< "$output"; then
+        echo "❌ Alternate hermetic GCC version build failed"
+        echo "$output"
+        FAILED=1
+    fi
+    [[ "$FAILED" -eq 0 ]]
+)
+
+if [[ "${TEST_HOST_GCC:-false}" == true ]] && ! check_host_gcc; then
+    FAILED=1
+fi
+
 if [[ "$FAILED" -ne 0 ]]; then
     echo "Some test configs did not match expectations"
     exit 1

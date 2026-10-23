@@ -1,13 +1,7 @@
 # Bazel Toolchains
 
-This directory contains toolchains config generated for Bazel [RBE](https://docs.bazel.build/versions/master/remote-execution.html) and
-[Docker sandbox](https://docs.bazel.build/versions/master/remote-execution-sandbox.html).
+This directory defines execution platforms for Bazel RBE and Docker sandbox builds.
 
-To regenerate toolchain configs, update the docker image information in `rbe_toolchains_config.bzl` and run following command in an
-environment with the latest Bazel and Docker installed:
-
-```
-toolchains/regenerate.sh
-```
-
-This will generate configs in `toolchains/configs`, check in those files so they can be used in CI.
+Both Clang and GCC use downloaded toolchains registered in `MODULE.bazel`, not compilers installed
+in the worker image. The GCC platform uses the same worker image as Clang. See
+[`bazel/README.md`](../../README.md) for compiler selection and host-toolchain overrides.

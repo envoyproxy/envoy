@@ -11,8 +11,7 @@ SHA_WORKER = "{sha_worker}"
 TAG = "{tag}"
 
 def image_gcc():
-    return "%s@sha256:%s" % (
-        REPO_GCR, SHA_GCC)
+    return image_worker()
 
 def image_mobile():
     return "%s@sha256:%s" % (

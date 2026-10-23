@@ -120,7 +120,8 @@
     "https://bcr.bazel.build/modules/bazel_lib/3.1.0/MODULE.bazel": "6809765c14e3c766a9b9286c7b0ec56ed87a73326e48fe01749f0c0fdcfe3287",
     "https://bcr.bazel.build/modules/bazel_lib/3.2.0/MODULE.bazel": "39b50d94b9be6bda507862254e20c263f9b950e3160112348d10a938be9ce2c2",
     "https://bcr.bazel.build/modules/bazel_lib/3.2.2/MODULE.bazel": "e2c890c8a515d6bca9c66d47718aa9e44b458fde64ec7204b8030bf2d349058c",
-    "https://bcr.bazel.build/modules/bazel_lib/3.2.2/source.json": "9e84e115c20e14652c5c21401ae85ff4daa8702e265b5c0b3bf89353f17aa212",
+    "https://bcr.bazel.build/modules/bazel_lib/3.3.1/MODULE.bazel": "732a0d516cf6400d9b3136e4356258aef1bf91de8d5240f87f0112f098920c1d",
+    "https://bcr.bazel.build/modules/bazel_lib/3.3.1/source.json": "8e5175d7b4125a39b8941d01e38039934d058e03804f46a2b8fd7ae6316b1ce2",
     "https://bcr.bazel.build/modules/bazel_linux_packages/0.4.1/MODULE.bazel": "9bcd612b78aa98db07f01ca7edc3129148aced24d3726884bba1f321031e724d",
     "https://bcr.bazel.build/modules/bazel_linux_packages/0.4.1/source.json": "f3bbbf0f046fbc692b5e00f317088c6163b1874213027f1047bf505a1b9c647b",
     "https://bcr.bazel.build/modules/bazel_skylib/1.0.3/MODULE.bazel": "bcb0fd896384802d1ad283b4e4eb4d718eebd8cb820b0a2c3a347fb971afd9d8",
@@ -230,6 +231,8 @@
     "https://bcr.bazel.build/modules/gazelle/0.51.3/MODULE.bazel": "618a729142f66de1e2cb776d026413763be5b80d5e3d29ffb9d3d90c5defde90",
     "https://bcr.bazel.build/modules/gazelle/0.54.0/MODULE.bazel": "10620287bdf57c55c2321ed5a387ade11c7187aba444fdec583c9f21c3263f45",
     "https://bcr.bazel.build/modules/gazelle/0.54.0/source.json": "6c9639ac87508c7edea37bd9d5380581c96defde056ca26518d201a8816805e4",
+    "https://bcr.bazel.build/modules/gcc_toolchain/0.13.0/MODULE.bazel": "8912be8684729c2814e922aa3555d163d1c6e7dbf620e72753fe44f3761250e4",
+    "https://bcr.bazel.build/modules/gcc_toolchain/0.13.0/source.json": "41e8693ad56244dde548f7711126deda72eeff630f66f5e2d8403227d4a78097",
     "https://bcr.bazel.build/modules/gloop/20260708.rc1/MODULE.bazel": "279ffe031c3e905d6c175ccbc10cf8f7e4418a39eaf2bbc950f385e8adad64e2",
     "https://bcr.bazel.build/modules/gloop/20260708.rc1/source.json": "5479fb0b525efab73f527cf0267a55c29123e8e59b8e8c6b693d80d18704b206",
     "https://bcr.bazel.build/modules/go-fips/1.27.1.envoy/MODULE.bazel": "not found",
@@ -913,7 +916,7 @@
   "moduleExtensions": {
     "//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "sCVydkDd8LckJo8CYfDOzrO9o0zpjPo7ceNJTshvh90=",
+        "bzlTransitiveDigest": "BURb8UuhVOxtl0fO72txBXGuDMwheBlHhTacgiP8kYQ=",
         "usagesDigest": "eA9F7Sp3VWzMPr64I4OqdYTS7aJ/vD1NCUzz0/uIPRU=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -931,9 +934,32 @@
         }
       }
     },
+    "//bazel:extensions.bzl%envoy_gcc_extension": {
+      "general": {
+        "bzlTransitiveDigest": "BURb8UuhVOxtl0fO72txBXGuDMwheBlHhTacgiP8kYQ=",
+        "usagesDigest": "HYxucNbKe+00Dn0z35EgF/gSOUyW+wKzcpBWIj2pNBA=",
+        "recordedInputs": [
+          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:,bazel_tools bazel_tools",
+          "REPO_MAPPING:,cu +wasm_cargo+cu",
+          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
+          "REPO_MAPPING:,rules_rust rules_rust+",
+          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "envoy_gcc_host": {
+            "repoRuleId": "@@//bazel:extensions.bzl%_host_gcc_repo",
+            "attributes": {
+              "gcc_version": "",
+              "path": ""
+            }
+          }
+        }
+      }
+    },
     "//bazel:extensions.bzl%envoy_llvm_extension": {
       "general": {
-        "bzlTransitiveDigest": "sCVydkDd8LckJo8CYfDOzrO9o0zpjPo7ceNJTshvh90=",
+        "bzlTransitiveDigest": "BURb8UuhVOxtl0fO72txBXGuDMwheBlHhTacgiP8kYQ=",
         "usagesDigest": "YQ7ti7su77gDb2yLHHvzQFM+qx5NOelptMhJS8OldLk=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -960,7 +986,7 @@
     },
     "//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "sCVydkDd8LckJo8CYfDOzrO9o0zpjPo7ceNJTshvh90=",
+        "bzlTransitiveDigest": "BURb8UuhVOxtl0fO72txBXGuDMwheBlHhTacgiP8kYQ=",
         "usagesDigest": "a20U+l72r//DsxddmI97juCc5OVovDKHTOodwyV6/14=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -982,7 +1008,7 @@
     },
     "//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "sCVydkDd8LckJo8CYfDOzrO9o0zpjPo7ceNJTshvh90=",
+        "bzlTransitiveDigest": "BURb8UuhVOxtl0fO72txBXGuDMwheBlHhTacgiP8kYQ=",
         "usagesDigest": "qNXh2UFb6L5FDqCDmXlJCEwkQwnTEu3pouMvLd9F+7c=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -1002,7 +1028,7 @@
     },
     "//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "sCVydkDd8LckJo8CYfDOzrO9o0zpjPo7ceNJTshvh90=",
+        "bzlTransitiveDigest": "BURb8UuhVOxtl0fO72txBXGuDMwheBlHhTacgiP8kYQ=",
         "usagesDigest": "ifdSiIilypITFQkblz2y1m1dehqM/rv2dVdAfl2nBI8=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -1586,6 +1612,48 @@
               "arch": "arm64",
               "glibc_version": "2.31",
               "stdcc_version": "13"
+            }
+          }
+        }
+      }
+    },
+    "@@gcc_toolchain+//:internal.bzl%non_bazel_dependencies": {
+      "general": {
+        "bzlTransitiveDigest": "2lJ032c8fOuugvP5l8O9QCbfJ0bax+IIqOgaFwlNDec=",
+        "usagesDigest": "sKYmx+ooOsbnANJqjmba+8IeuYjA9CbwKfQETYhyNuU=",
+        "recordedInputs": [
+          "REPO_MAPPING:gcc_toolchain+,bazel_tools bazel_tools",
+          "REPO_MAPPING:gcc_toolchain+,lapack gcc_toolchain++non_bazel_dependencies+lapack"
+        ],
+        "generatedRepoSpecs": {
+          "openssl": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file_content": "filegroup(\n    name = \"srcs\",\n    srcs = glob(\n        include = [\"**\"],\n        exclude = [\"**/* *\"],\n    ),\n    visibility = [\"//visibility:public\"],\n)\n",
+              "sha256": "40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a",
+              "strip_prefix": "openssl-1.1.1n",
+              "url": "https://www.openssl.org/source/openssl-1.1.1n.tar.gz"
+            }
+          },
+          "lapack": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file_content": "filegroup(\n    name = \"srcs\",\n    srcs = glob(\n        include = [\"**\"],\n        exclude = [\"**/* *\"],\n    ),\n    visibility = [\"//visibility:public\"],\n)\n",
+              "patch_cmds": [
+                "cat > make.inc <<EOF\n####################################################################\n#  LAPACK make include file.                                       #\n####################################################################\n\nSHELL = $0\n\nCC ?=\n\nFC ?=\nFFLAGS ?=\nFFLAGS_DRV ?=\nFFLAGS_NOOPT ?=\n\nLDFLAGS ?=\n\nAR ?=\nARFLAGS = cr\nRANLIB = echo\n\nBLASLIB ?=\nCBLASLIB ?=\nLAPACKLIB ?=\nTMGLIB ?=\nLAPACKELIB ?=\n\nDOCSDIR ?=\n\nTIMER ?=\nEOF\n"
+              ],
+              "sha256": "eac9570f8e0ad6f30ce4b963f4f033f0f643e7c3912fc9ee6cd99120675ad48b",
+              "strip_prefix": "lapack-3.12.0",
+              "url": "https://github.com/Reference-LAPACK/lapack/archive/refs/tags/v3.12.0.tar.gz"
+            }
+          },
+          "avl": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "build_file": "@@gcc_toolchain+//:examples/avl/avl.BUILD.bazel",
+              "sha256": "6d62e563578b79795a84958cfe4e221a4c9847fbeb4a821d45bc049934fc6a90",
+              "strip_prefix": "Avl",
+              "url": "https://web.mit.edu/drela/Public/web/avl/avl3.40b.tgz"
             }
           }
         }

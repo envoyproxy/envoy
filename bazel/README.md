@@ -107,11 +107,29 @@ for how to update or override dependencies.
     Envoy supports the following compiler toolchains:
 
     - No config flag (recommended): Uses the hermetic `clang` compiler with `libc++` (LLVM standard library)
-    - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
+    - `--config=gcc`: Uses hermetic GCC 13.4.0 with static `libstdc++` (GNU standard library).
+      No host GCC or binutils installation is needed. The prebuilt compiler executes on Linux
+      x86_64; native aarch64 GCC builds require a host-toolchain override.
+
+    GCC versions provided by [gcc_toolchain](https://github.com/f0rmiga/gcc-toolchain) can be selected
+    without changing the default in `MODULE.bazel`:
+    ```console
+    bazel build --config=gcc --@gcc_toolchain//toolchain:gcc_version=14.3.0 //source/exe:envoy-static
+    ```
+
+    GCC 13.4.0 uses its bundled BFD linker (its archive contains neither LLD nor gold). BFD does not
+    support `--start-lib`/`--end-lib`, so Bazel uses static archives instead; parameter files remain
+    enabled for long command lines. GCC uses the same toolshed sysroot as Clang, standardising
+    the headers and libraries we build against and constraining both compilers to Envoy's intended
+    libc environment. Envoy's wrapper reuses upstream's archive metadata and compiler configuration,
+    but removes the archive's bundled sysroot entirely. The shared sysroot is an explicit compile/link
+    action input; GCC retains its own compiler headers, libstdc++ headers and static `libstdc++.a`,
+    ahead of any libstdc++ shipped in the shared sysroot.
 
     Note: The C++ standard library is derived from the compiler: clang (the default) and Apple builds use `libc++`, `--config=gcc` uses `libstdc++`. Other combinations such as clang with `libstdc++` are not supported or tested; if you need one, you will need to set up your own `cc_toolchain`.
 
-    The `--config=libc++` and `--config=libstdc++` configs are used internally (e.g. by `--config=gcc` and `bazel/setup_local_tsan.sh`) and are not intended for direct use.
+    The `--config=libc++` config is used internally (e.g. by `bazel/setup_local_tsan.sh`) and is
+    not intended for direct use.
 
 
     ### macOS
@@ -233,6 +251,36 @@ The `envoy_llvm.host(path = ...)` extension detects the installed LLVM version b
 `bin/clang --version`. Its optional `llvm_version` attribute can be set to cross-check the detected
 major version. This mechanism supports host LLVM versions other than 22; the separate
 `toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
+
+For host GCC, add the following to the root module's `MODULE.bazel`:
+
+```starlark
+envoy_gcc = use_extension("@envoy//bazel:extensions.bzl", "envoy_gcc_extension")
+envoy_gcc.host(path = "/usr")
+use_repo(envoy_gcc, "envoy_gcc_host")
+register_toolchains("@envoy_gcc_host//:all")
+```
+
+The prefix must contain `bin/gcc`, `bin/g++`, binutils, C/C++ headers and a static `libstdc++`.
+The extension detects the installed GCC version; optional `gcc_version = "13"` cross-checks its
+major version. With `--config=gcc` (or `--@envoy//bazel:use_gcc=true` outside this workspace), the
+host compiler takes precedence over prebuilt GCC. Without that flag, Clang remains the default.
+Host GCC uses host libc/headers and is not a hermetic or remote-execution configuration.
+
+Envoy's `gcc_toolchains` extension processes only root-module tags. Downstream root modules
+that want prebuilt GCC instead of host GCC must declare and register it with the shared sysroot:
+
+```starlark
+bazel_dep(name = "gcc_toolchain", version = "0.13.0")
+gcc_toolchains = use_extension("@envoy//bazel:gcc_toolchain.bzl", "gcc_toolchains")
+gcc_toolchains.toolchain(
+    name = "gcc_toolchain_x86_64",
+    gcc_version = "13.4.0",
+    sysroot = "@sysroot_linux_amd64//sysroot",
+)
+use_repo(gcc_toolchains, "gcc_toolchain_x86_64")
+register_toolchains("@gcc_toolchain_x86_64//:all")
+```
 
 **Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
 hermetic toolchain remains the supported default. Other host tools may fail depending on the build

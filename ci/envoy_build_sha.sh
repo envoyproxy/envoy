@@ -8,7 +8,6 @@ BUILD_SHA=$(awk '/^[ ]*sha: /{print $2}' "$CONFIG_FILE")
 BUILD_SHA_CI=$(awk '/^[ ]*sha-ci: /{print $2}' "$CONFIG_FILE")
 BUILD_SHA_DEVTOOLS=$(awk '/^[ ]*sha-devtools: /{print $2}' "$CONFIG_FILE")
 BUILD_SHA_DOCKER=$(awk '/^[ ]*sha-docker: /{print $2}' "$CONFIG_FILE")
-BUILD_SHA_GCC=$(awk '/^[ ]*sha-gcc: /{print $2}' "$CONFIG_FILE")
 BUILD_SHA_MOBILE=$(awk '/^[ ]*sha-mobile: /{print $2}' "$CONFIG_FILE")
 BUILD_SHA_WORKER=$(awk '/^[ ]*sha-worker: /{print $2}' "$CONFIG_FILE")
 
@@ -26,7 +25,7 @@ case $ENVOY_BUILD_VARIANT in
         BUILD_SHA="$BUILD_SHA_DOCKER"
         ;;
     gcc)
-        BUILD_SHA="$BUILD_SHA_GCC"
+        BUILD_SHA="$BUILD_SHA_WORKER"
         ;;
     mobile)
         BUILD_SHA="$BUILD_SHA_MOBILE"
