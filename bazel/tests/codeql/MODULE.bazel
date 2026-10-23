@@ -25,6 +25,14 @@ local_path_override(
     path = "../../../api",
 )
 
+# TODO(phlax): remove once toolshed with https://github.com/envoyproxy/toolshed/pull/5453 is released
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "e66215d9aeade1be4306ddacd1de19ccd02c827e",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
 LLVM_PREFIX = "/usr/lib/llvm-22"
 
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
@@ -42,5 +50,6 @@ use_repo(llvm, "llvm_toolchain")
 
 register_toolchains("@llvm_toolchain//:all")
 
-envoy_llvm = use_extension("@envoy//bazel:extensions.bzl", "envoy_llvm_extension")
-envoy_llvm.host(path = LLVM_PREFIX)
+llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
+llvm_toolchain_alias_ext.host(path = LLVM_PREFIX)
+use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")

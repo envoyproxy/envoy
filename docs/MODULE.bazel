@@ -36,6 +36,14 @@ local_path_override(
     path = "../api",
 )
 
+# TODO(phlax): remove once toolshed with https://github.com/envoyproxy/toolshed/pull/5453 is released
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "e66215d9aeade1be4306ddacd1de19ccd02c827e",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     is_default = True,
@@ -61,5 +69,10 @@ use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
 compat = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
 use_repo(compat, "cc_compatibility_proxy")
 
-envoy_toolchains_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_toolchains_extension")
-use_repo(envoy_toolchains_ext, "clang_platform")
+arch_alias_ext = use_extension("@envoy_toolshed//repository:extensions.bzl", "arch_alias_extension")
+arch_alias_ext.alias(
+    name = "clang_platform",
+    aarch64 = "@envoy//bazel/platforms/rbe:linux_arm64",
+    amd64 = "@envoy//bazel/platforms/rbe:linux_x64",
+)
+use_repo(arch_alias_ext, "clang_platform")

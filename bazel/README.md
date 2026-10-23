@@ -225,11 +225,11 @@ by registering host toolchains so that they take precedence over Envoy's hermeti
 
 The CI-tested example in [`bazel/tests/codeql`](tests/codeql) shows how a downstream root module can
 select a host-installed Clang, libc++, and lld under bzlmod. It registers a `toolchains_llvm`
-toolchain rooted at the host installation and calls `envoy_llvm.host(...)` so Envoy targets that
-directly reference LLVM tools and libraries use the same installation. No Envoy `.bazelrc`
-compiler configuration is required.
+toolchain rooted at the host installation and calls toolshed's `llvm_toolchain_alias_ext.host(...)`
+so Envoy targets that directly reference LLVM tools and libraries use the same installation. No
+Envoy `.bazelrc` compiler configuration is required.
 
-The `envoy_llvm.host(path = ...)` extension detects the installed LLVM version by running
+The `llvm_toolchain_alias_extension.host(path = ...)` tag detects the installed LLVM version by running
 `bin/clang --version`. Its optional `llvm_version` attribute can be set to cross-check the detected
 major version. This mechanism supports host LLVM versions other than 22; the separate
 `toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
