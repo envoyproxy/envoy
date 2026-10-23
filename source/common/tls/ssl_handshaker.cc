@@ -108,6 +108,16 @@ void SslExtendedSocketInfoImpl::setValidatedCertChain(std::vector<bssl::UniquePt
   ssl_handshaker_.setValidatedCertChain(std::move(chain));
 }
 
+absl::Span<const bssl::UniquePtr<X509>>
+SslExtendedSocketInfoImpl::validatedCertChainForSessionTicket() const {
+  return ssl_handshaker_.validatedCertChainForSessionTicket();
+}
+
+void SslExtendedSocketInfoImpl::setResumedValidatedCertChain(
+    std::vector<bssl::UniquePtr<X509>> chain) {
+  ssl_handshaker_.setResumedValidatedCertChain(std::move(chain));
+}
+
 Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidationStatus() const {
   return certificate_validation_status_;
 }
@@ -198,6 +208,17 @@ bool SslHandshakerImpl::peerCertificateValidated() const {
          Envoy::Ssl::ClientValidationStatus::Validated;
 }
 
+absl::Span<const bssl::UniquePtr<X509>>
+SslHandshakerImpl::validatedCertChainForSessionTicket() const {
+  if (SSL_session_reused(ssl())) {
+    // TLS 1.2 can renew a ticket before doHandshake() returns and commits the restored chain.
+    return validated_chain_.empty() ? absl::MakeConstSpan(resumed_validated_chain_)
+                                    : absl::MakeConstSpan(validated_chain_);
+  }
+  return peerCertificateValidated() ? absl::MakeConstSpan(validated_chain_)
+                                    : absl::Span<const bssl::UniquePtr<X509>>{};
+}
+
 namespace {
 bool sawBytesFromDownstream(SSL* ssl) {
   if (ssl == nullptr) {
@@ -227,6 +248,15 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
   }
 
   if (rc == 1) {
+    if (SSL_is_server(ssl()) && SSL_session_reused(ssl()) && !resumed_validated_chain_.empty()) {
+      bssl::UniquePtr<X509> peer(SSL_get_peer_certificate(ssl()));
+      if (!peer || X509_cmp(peer.get(), resumed_validated_chain_.front().get()) != 0) {
+        handshake_callbacks_->onFailure();
+        return PostIoAction::Close;
+      }
+      validated_chain_ = std::move(resumed_validated_chain_);
+    }
+    resumed_validated_chain_.clear();
     state_ = Ssl::SocketState::HandshakeComplete;
     handshake_callbacks_->onSuccess(ssl());
 

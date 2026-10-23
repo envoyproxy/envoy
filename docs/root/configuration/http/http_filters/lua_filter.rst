@@ -1726,6 +1726,31 @@ successfully validated (e.g., mTLS with ``require_client_certificate: true`` and
 ``validation_context``). Returns ``""`` if there is no validated peer certificate chain or
 the validated chain contains fewer than two certificates.
 
+.. warning::
+
+   By default, client certificate validation is not performed upon downstream TLS session
+   resumption, so this method returns ``""`` on resumed downstream connections even if the
+   peer certificate chain was successfully validated in the original connection. See
+   ``peerCertificateValidated()`` above for the session resumption workaround.
+
+.. note::
+
+   The experimental runtime feature
+   ``envoy.reloadable_features.preserve_verified_peer_chain_in_session_ticket`` (disabled by
+   default) preserves the complete originally validated peer chain in authenticated TLS session
+   tickets. When enabled with BoringSSL, these issuer accessors can use the restored chain after
+   successful downstream TLS 1.2 or TLS 1.3 ticket resumption. Enabling it with AWS-LC or the OpenSSL compatibility layer is
+   unsupported and fails TLS context creation. This does not perform a new
+   certificate validation or change ``peerCertificateValidated()`` on resumed connections.
+
+   This feature currently covers stateless tickets, not stateful session-ID caching. Custom
+   validators must supply a validated chain for it to be preserved. The runtime value is read when
+   the TLS context is created. The ticket envelope differs from the default ticket format;
+   changing the feature setting causes incompatible tickets to fall back to a full handshake.
+   The configured ticket key ring is reused; without configured keys, random keys are generated
+   per server context. Chains exceeding 48 KiB of encoded certificate data (including length
+   prefixes) or 64 certificates are not truncated; no ticket is issued for those connections.
+
 ``serialNumberPeerCertificateIssuer()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1739,6 +1764,13 @@ directly signed the peer leaf certificate), as determined by BoringSSL during th
 Requires the peer certificate chain to have been successfully validated (e.g., mTLS with
 ``require_client_certificate: true`` and a ``validation_context``). Returns ``""`` if there is
 no validated peer certificate chain or the validated chain contains fewer than two certificates.
+
+.. warning::
+
+   By default, client certificate validation is not performed upon downstream TLS session
+   resumption, so this method returns ``""`` on resumed downstream connections even if the
+   peer certificate chain was successfully validated in the original connection. See
+   ``peerCertificateValidated()`` above for the session resumption workaround.
 
 ``subjectPeerCertificate()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
