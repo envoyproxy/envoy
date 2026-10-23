@@ -116,6 +116,7 @@ public:
   MOCK_METHOD(bool, validationContextConfigured, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
+  MOCK_METHOD(uint32_t, readAheadBufferSize, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));
 
@@ -164,6 +165,7 @@ public:
   MOCK_METHOD(bool, validationContextConfigured, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
+  MOCK_METHOD(uint32_t, readAheadBufferSize, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
   MOCK_METHOD(std::optional<std::chrono::seconds>, sessionTimeout, (), (const));
   MOCK_METHOD(void, setSecretUpdateCallback, (std::function<absl::Status()> callback));

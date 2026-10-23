@@ -47,7 +47,11 @@ SslSocket::create(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
 SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
                      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options)
     : transport_socket_options_(transport_socket_options),
-      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)) {}
+      ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)),
+      read_ahead_buffer_size_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.tls_io_handle_read_ahead")
+              ? ctx_->readAheadBufferSize()
+              : 0) {}
 
 absl::Status SslSocket::initialize(InitialState state,
                                    Ssl::HandshakerFactoryCb handshaker_factory_cb,
@@ -135,6 +139,11 @@ Network::IoResult SslSocket::doRead(Buffer::Instance& read_buffer) {
                        Utility::getErrorDescription(err));
         switch (err) {
         case SSL_ERROR_WANT_READ:
+          // TLS may yield after a control record while ciphertext remains in our BIO. The socket
+          // need not become readable again, so arrange another callback without spinning here.
+          if (read_ahead_enabled_ && BIO_pending(SSL_get_rbio(rawSsl())) > 0) {
+            callbacks_->setTransportSocketIsReadable();
+          }
           break;
         case SSL_ERROR_ZERO_RETURN:
           // Graceful shutdown using close_notify TLS alert.
@@ -191,6 +200,11 @@ void SslSocket::resumeHandshake() {
 Network::Connection& SslSocket::connection() const { return callbacks_->connection(); }
 
 void SslSocket::onSuccess(SSL* ssl) {
+  if (read_ahead_buffer_size_ > 0) {
+    // Do not prefetch while certificate selection/verification or private-key work can suspend
+    // the handshake.
+    read_ahead_enabled_ = enableIoHandleBioReadAhead(SSL_get_rbio(ssl), read_ahead_buffer_size_);
+  }
   ctx_->logHandshake(ssl);
   if (callbacks_->connection().streamInfo().upstreamInfo()) {
     callbacks_->connection()
