@@ -35,6 +35,8 @@ public:
   HttpServerPropertiesCacheSharedPtr
   getCache(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options,
            Event::Dispatcher& dispatcher) override;
+  absl::Status
+  validateOptions(const envoy::config::core::v3::AlternateProtocolsCacheOptions& options) override;
 
   void forEachThreadLocalCache(CacheFn cache_fn) override;
 

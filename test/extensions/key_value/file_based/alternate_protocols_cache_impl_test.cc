@@ -41,6 +41,7 @@ TEST_F(HttpServerPropertiesCacheManagerTest, GetCacheWithFlushingAndConcurrency)
   std::ignore =
       options_.mutable_key_value_store_config()->mutable_typed_config()->PackFrom(kv_config);
   initialize();
+  ASSERT_TRUE(manager_->validateOptions(options_).ok());
   manager_->getCache(options_, dispatcher_);
 }
 
