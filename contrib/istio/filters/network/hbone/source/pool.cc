@@ -27,16 +27,7 @@ void recordRejection(StreamInfo::StreamInfo& info, absl::string_view reason,
 class HttpPool : public Router::GenericConnPool, public Router::GenericConnectionPoolCallbacks {
 public:
   HttpPool(Router::GenericConnPoolPtr inner, Http::StreamDecoderFilterCallbacks& downstream)
-      : inner_(std::move(inner)), downstream_(downstream),
-        reject_(downstream.dispatcher().createSchedulableCallback([this]() {
-          const std::string reason = failure_reason_;
-          const auto status = *permanentConnectRejection(reason);
-          // Other invalid CONNECT responses (e.g. 302) are gateway protocol
-          // failures, not redirects or successful application responses.
-          const auto code = status >= 400 && status < 500 ? static_cast<Http::Code>(status)
-                                                          : Http::Code::BadGateway;
-          downstream_.sendLocalReply(code, "HBONE CONNECT rejected", nullptr, std::nullopt, reason);
-        })) {}
+      : inner_(std::move(inner)), downstream_(downstream) {}
   ~HttpPool() override { cancelAnyPendingStream(); }
 
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override {
@@ -44,8 +35,10 @@ public:
     inner_->newStream(this);
   }
   bool cancelAnyPendingStream() override {
-    const bool rejecting = reject_->enabled();
-    reject_->cancel();
+    const bool rejecting = reject_ && reject_->enabled();
+    if (reject_) {
+      reject_->cancel();
+    }
     return inner_->cancelAnyPendingStream() || rejecting;
   }
   bool valid() const override { return inner_->valid(); }
@@ -67,6 +60,19 @@ public:
     }
     failure_reason_ = std::string(failure_reason);
     recordRejection(downstream_.streamInfo(), failure_reason_, host);
+    // Most request attempts reuse an accepted connection. Allocate the deferred
+    // reply only when CONNECT is permanently rejected.
+    if (!reject_) {
+      reject_ = downstream_.dispatcher().createSchedulableCallback([this]() {
+        const std::string reason = failure_reason_;
+        const auto status = *permanentConnectRejection(reason);
+        // Other invalid CONNECT responses (e.g. 302) are gateway protocol
+        // failures, not redirects or successful application responses.
+        const auto code = status >= 400 && status < 500 ? static_cast<Http::Code>(status)
+                                                        : Http::Code::BadGateway;
+        downstream_.sendLocalReply(code, "HBONE CONNECT rejected", nullptr, std::nullopt, reason);
+      });
+    }
     // Do not synthesize a ready connection or an upstream HTTP response. Both
     // would enter router accounting and could enable application forwarding or
     // response-code retries. The local reply terminates all pending attempts.
@@ -85,13 +91,12 @@ class TcpPool : public TcpProxy::GenericConnPool, public TcpProxy::GenericConnec
 public:
   TcpPool(TcpProxy::GenericConnPoolPtr inner, Network::Connection& downstream,
           StreamInfo::StreamInfo& info)
-      : inner_(std::move(inner)), downstream_(downstream), info_(info),
-        reject_(downstream.dispatcher().createSchedulableCallback([this]() {
-          // Closing can destroy this pool. Keep the detail alive until close returns.
-          const std::string reason = failure_reason_;
-          downstream_.close(Network::ConnectionCloseType::NoFlush, reason);
-        })) {}
-  ~TcpPool() override { reject_->cancel(); }
+      : inner_(std::move(inner)), downstream_(downstream), info_(info) {}
+  ~TcpPool() override {
+    if (reject_) {
+      reject_->cancel();
+    }
+  }
   void newStream(TcpProxy::GenericConnectionPoolCallbacks& callbacks) override {
     callbacks_ = &callbacks;
     inner_->newStream(*this);
@@ -112,6 +117,13 @@ public:
     }
     failure_reason_ = std::string(failure_reason);
     recordRejection(info_, failure_reason_, host);
+    if (!reject_) {
+      reject_ = downstream_.dispatcher().createSchedulableCallback([this]() {
+        // Closing can destroy this pool. Keep the detail alive until close returns.
+        const std::string reason = failure_reason_;
+        downstream_.close(Network::ConnectionCloseType::NoFlush, reason);
+      });
+    }
     // In particular, do not call TCP proxy's stub HTTP sendLocalReply callback.
     reject_->scheduleCallbackNextIteration();
   }

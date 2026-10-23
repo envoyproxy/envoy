@@ -53,6 +53,9 @@ public:
         tcp.set_stat_prefix("tcp");
         tcp.set_cluster("service");
         tcp.mutable_max_connect_attempts()->set_value(3);
+        if (tcp_early_data_) {
+          tcp.mutable_max_early_data_bytes()->set_value(1024);
+        }
         ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(tcp));
       }
       auto* service = resources->add_clusters();
@@ -241,6 +244,7 @@ value:
   bool retry_{false};
   bool outlier_detection_{false};
   bool tcp_downstream_{false};
+  bool tcp_early_data_{false};
   bool nested_{false};
   uint32_t tunnel_attempts_{1};
   std::string retry_on_{"connect-failure"};
@@ -411,6 +415,32 @@ TEST_P(HboneIntegrationTest, RawTcpTransientFailureRetriesAndForwards) {
   client->waitForData("reply");
   EXPECT_EQ(0, rejected->bodyLength());
   client->close();
+}
+
+TEST_P(HboneIntegrationTest, RawTcpCancelPendingConnectThenRejectAnotherConnection) {
+  tcp_downstream_ = true;
+  // Keep downstream reads enabled so TCP proxy observes the reset while CONNECT
+  // is pending, instead of waiting until upstream establishment finishes.
+  tcp_early_data_ = true;
+  initialize();
+  auto cancelled = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(cancelled->write("cancelled"));
+  waitForConnect(upstream_request_);
+  cancelled->close(Network::ConnectionCloseType::AbortReset);
+  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_destroy", Eq(1));
+  // A late CONNECT rejection must not call the destroyed downstream connection.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "403"}}, true);
+  ASSERT_TRUE(upstream_request_->waitForReset());
+  EXPECT_EQ(0, upstream_request_->bodyLength());
+
+  auto client = makeTcpConnection(lookupPort("tcp"));
+  ASSERT_TRUE(client->write("payload"));
+  FakeStreamPtr denied;
+  waitForConnect(denied);
+  denied->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "403"}}, true);
+  client->waitForDisconnect();
+  EXPECT_EQ(0, denied->bodyLength());
+  EXPECT_EQ(2, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
 }
 
 TEST_P(HboneIntegrationTest, Http2PermanentRejectionDoesNotCancelOtherRequest) {
