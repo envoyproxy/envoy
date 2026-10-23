@@ -499,7 +499,10 @@ public:
     EXPECT_EQ("200", response->headers().getStatusValue());
     if (expect_close) {
       EXPECT_EQ("close", response->headers().getConnectionValue());
-
+      // Consume the remote close before starting another operation on the shared dispatcher.
+      // Otherwise, this client's close callback can exit the dispatcher's run loop while a new
+      // client is still waiting for its TLS handshake to complete.
+      ASSERT_TRUE(codec_client.waitForDisconnect());
     } else {
       EXPECT_EQ(nullptr, response->headers().Connection());
     }
