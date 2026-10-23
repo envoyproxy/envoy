@@ -30,6 +30,12 @@ MaxMind provider is supported.
 
 * :ref:`MaxMind provider configuration <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
 
+By default, Envoy rejects the configuration when a configured MaxMind database cannot be opened at
+startup. Set :ref:`allow_missing_database
+<envoy_v3_api_field_extensions.geoip_providers.maxmind.v3.MaxMindConfig.allow_missing_database>` to
+allow startup without an unavailable database. Lookups return no data from that database until the
+file appears and the provider's file watcher loads it.
+
 The provider configuration specifies which geolocation fields to look up and what keys to use when
 storing the results. Use the ``geo_field_keys`` field in the provider configuration to define the
 field names for each geolocation attribute.
@@ -159,4 +165,5 @@ describe in the statistic name, so two files of the same database type remain di
 
    ``<db_type>.<db_name>.db_reload_success``, Counter, Total number of times when the geolocation database file was reloaded successfully.
    ``<db_type>.<db_name>.db_reload_error``, Counter, Total number of times when the geolocation database file failed to reload.
+   ``<db_type>.<db_name>.db_load_error``, Counter, Total number of times when the geolocation database file was unavailable during provider startup.
    ``<db_type>.<db_name>.db_build_epoch``, Gauge, The build timestamp of the geolocation database file represented as a Unix epoch value.

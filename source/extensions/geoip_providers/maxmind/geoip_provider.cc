@@ -139,7 +139,8 @@ absl::string_view dbTypeName(GeoDbType db_type) { return DB_TYPE_NAMES[enumToInt
 GeoipProviderConfig::GeoipProviderConfig(
     const envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig& config,
     const std::string& stat_prefix, Stats::Scope& scope)
-    : stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
+    : allow_missing_database_(config.allow_missing_database()),
+      stats_scope_(scope.createScope(absl::StrCat(stat_prefix, "maxmind."))),
       stat_name_set_(stats_scope_->symbolTable().makeSet("Maxmind")) {
   const auto& common_config = config.common_provider_config();
 
@@ -215,17 +216,24 @@ DbFileStats generateDbFileStats(Stats::Scope& scope, GeoDbType db_type,
 } // namespace
 
 DbFileProvider::DbFileProvider(Event::Dispatcher& dispatcher, Stats::ScopeSharedPtr scope,
-                               GeoDbType db_type, const std::string& db_path)
+                               GeoDbType db_type, const std::string& db_path,
+                               bool allow_missing_database)
     : stats_scope_(std::move(scope)), db_type_(db_type),
       stats_(generateDbFileStats(*stats_scope_, db_type, db_path)) {
   ASSERT(!db_path.empty());
-  // A database that cannot be opened at startup is a configuration error: the provider would have
-  // nothing to serve lookups from. Reject the configuration rather than run without it.
   absl::StatusOr<MaxmindDbSharedPtr> db_or_error = initMaxmindDb(db_path);
   ENVOY_BUG(!absl::IsResourceExhausted(db_or_error.status()),
             "Cannot open Maxmind database due to resource exhaustion");
-  THROW_IF_NOT_OK_REF(db_or_error.status());
-  db_ = std::move(db_or_error.value());
+  if (!db_or_error.ok()) {
+    if (!allow_missing_database || !absl::IsNotFound(db_or_error.status())) {
+      THROW_IF_NOT_OK_REF(db_or_error.status());
+    }
+    ENVOY_LOG(warn, "Starting without Maxmind database {} from file {}: {}", dbTypeName(db_type_),
+              db_path, db_or_error.status().message());
+    incDbLoadError();
+  } else {
+    db_ = std::move(db_or_error.value());
+  }
 
   mmdb_watcher_ = dispatcher.createFilesystemWatcher();
   THROW_IF_NOT_OK(
@@ -249,8 +257,11 @@ absl::StatusOr<MaxmindDbSharedPtr> DbFileProvider::initMaxmindDb(const std::stri
   if (MMDB_SUCCESS != result_code) {
     const std::string error_msg = fmt::format("Unable to open Maxmind database file {}. Error {}",
                                               db_path, MMDB_strerror(result_code));
-    return result_code == MMDB_OUT_OF_MEMORY_ERROR ? absl::ResourceExhaustedError(error_msg)
-                                                   : absl::InvalidArgumentError(error_msg);
+    if (result_code == MMDB_OUT_OF_MEMORY_ERROR) {
+      return absl::ResourceExhaustedError(error_msg);
+    }
+    return result_code == MMDB_FILE_OPEN_ERROR ? absl::NotFoundError(error_msg)
+                                               : absl::InvalidArgumentError(error_msg);
   }
 
   setDbBuildEpoch(maxmind_db.metadata.build_epoch);
@@ -308,6 +319,11 @@ void GeoipProvider::lookupInCityDb(
     // Used for testing.
     synchronizer_.syncPoint(std::string(CITY_DB_TYPE).append("_lookup_pre_complete"));
     if (!city_db_ptr) {
+      if (config_->allowMissingDatabase()) {
+        config_->incLookupError(CITY_DB_TYPE);
+        config_->incTotal(CITY_DB_TYPE);
+        return;
+      }
       IS_ENVOY_BUG("Maxmind city database must be initialised for performing lookups");
       return;
     }
@@ -352,6 +368,11 @@ void GeoipProvider::lookupInAsnDb(
         // throw an error if is not set.
         return;
       }
+      if (config_->allowMissingDatabase()) {
+        config_->incLookupError(ASN_DB_TYPE);
+        config_->incTotal(ASN_DB_TYPE);
+        return;
+      }
       IS_ENVOY_BUG("Maxmind asn database must be initialised for performing lookups");
       return;
     }
@@ -385,6 +406,11 @@ void GeoipProvider::lookupInAnonDb(
     // Used for testing.
     synchronizer_.syncPoint(std::string(ANON_DB_TYPE).append("_lookup_pre_complete"));
     if (!anon_db_ptr) {
+      if (config_->allowMissingDatabase()) {
+        config_->incLookupError(ANON_DB_TYPE);
+        config_->incTotal(ANON_DB_TYPE);
+        return;
+      }
       IS_ENVOY_BUG("Maxmind anon database must be initialised for performing lookups");
       return;
     }
@@ -420,6 +446,11 @@ void GeoipProvider::lookupInIspDb(
     // Used for testing.
     synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
     if (!isp_db_ptr) {
+      if (config_->allowMissingDatabase()) {
+        config_->incLookupError(ISP_DB_TYPE);
+        config_->incTotal(ISP_DB_TYPE);
+        return;
+      }
       IS_ENVOY_BUG("Maxmind isp database must be initialised for performing lookups");
       return;
     }
@@ -465,6 +496,11 @@ void GeoipProvider::lookupInCountryDb(
       if (isCityDbSet()) {
         // Country information can be looked up from City database as well, so we don't need to
         // throw an error if it is not set.
+        return;
+      }
+      if (config_->allowMissingDatabase()) {
+        config_->incLookupError(COUNTRY_DB_TYPE);
+        config_->incTotal(COUNTRY_DB_TYPE);
         return;
       }
       IS_ENVOY_BUG("Maxmind country database must be initialised for performing lookups");
