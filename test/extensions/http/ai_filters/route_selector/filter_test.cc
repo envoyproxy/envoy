@@ -59,6 +59,13 @@ public:
 
   ~RouteSelectorFilterTest() override { buffer_manager_.onDestroy(); }
 
+  void setRoutesInFilterState(const envoy::type::ai::v3::LlmRoutes& routes) {
+    stream_info_.filterState()->setData(
+        FilterStateKeys::ResolvedRoutes,
+        std::make_shared<ModelRouter::LlmRoutesFilterStateObject>(routes),
+        StreamInfo::FilterState::LifeSpan::Request);
+  }
+
   void populateRoutesInFilterState() {
     envoy::type::ai::v3::LlmRoutes routes;
 
@@ -72,7 +79,6 @@ public:
     auto* r2 = routes.add_routes();
     r2->set_llm_protocol(envoy::type::ai::v3::OPENAI_RESPONSES);
     r2->set_model("gpt-4.1");
-    r2->set_host_and_port("api.openai.com");
 
     auto* r3 = routes.add_routes();
     r3->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
@@ -84,9 +90,10 @@ public:
     auto* r4 = routes.add_routes();
     r4->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
     r4->set_model("gemini-2.5-pro");
-    r4->set_host_and_port("generativelanguage.googleapis.com");
+    r4->set_host_and_port("generativelanguage.googleapis.com:443");
     r4->mutable_binding()->set_uri_pattern(
         "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
+    r4->set_api_key("gemini-key-123");
 
     auto* r5 = routes.add_routes();
     r5->set_llm_protocol(envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED);
@@ -99,22 +106,22 @@ public:
     r6->set_host_and_port("api.openai.com");
     r6->mutable_binding()->set_uri_pattern("invalid_uri_pattern_without_leading_slash");
 
-    stream_info_.filterState()->setData(
-        FilterStateKeys::ResolvedRoutes,
-        std::make_shared<ModelRouter::LlmRoutesFilterStateObject>(routes),
-        StreamInfo::FilterState::LifeSpan::Request,
-        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+    setRoutesInFilterState(routes);
   }
 
   void run(std::optional<std::string> attempt_count = "1",
-           const std::string& payload = R"({"model":"requested","messages":[]})") {
+           const std::string& payload = R"({"model":"requested","messages":[]})",
+           const std::vector<std::pair<std::string, std::string>>& extra_headers = {}) {
     status_.reset();
     reply_code_.reset();
     reply_details_.clear();
     bridge_.injected_.drain(bridge_.injected_.length());
 
-    request_headers_ =
-        Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
+    request_headers_ = Http::TestRequestHeaderMapImpl{
+        {":method", "POST"}, {":path", "/v1/chat/completions"}, {":authority", "original.host"}};
+    for (const auto& [key, val] : extra_headers) {
+      request_headers_.addCopy(Http::LowerCaseString(key), val);
+    }
     if (attempt_count.has_value()) {
       request_headers_.setEnvoyAttemptCount(*attempt_count);
     }
@@ -259,16 +266,18 @@ TEST_F(RouteSelectorFilterTest, SelectsOpenAiChatCompletionsOnFirstAttempt) {
   ASSERT_TRUE((*responseBindingObject()->binding())->pattern().has_value());
   EXPECT_EQ((*responseBindingObject()->binding())->pattern()->source(), "/v1/chat/completions");
 
+  EXPECT_EQ(request_headers_.getHostValue(), "api.openai.com");
   const auto auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
   ASSERT_EQ(auth.size(), 1);
   EXPECT_EQ(auth[0]->value().getStringView(), "Bearer sk-openai-1");
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
 
   EXPECT_EQ(counterValue("success"), 1);
   EXPECT_EQ(counterValue("invalid_route_data"), 0);
 }
 
-TEST_F(RouteSelectorFilterTest, SelectsOpenAiResponsesWithoutBindingOrApiKeyOnSecondAttempt) {
+TEST_F(RouteSelectorFilterTest, SelectsOpenAiResponsesWithoutOptionalFieldsOnSecondAttempt) {
   populateRoutesInFilterState();
   run("2");
   expectForwarded();
@@ -277,7 +286,11 @@ TEST_F(RouteSelectorFilterTest, SelectsOpenAiResponsesWithoutBindingOrApiKeyOnSe
   EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::OpenAiResponses);
   EXPECT_EQ(resolvedModel(), "gpt-4.1");
   EXPECT_EQ(responseBindingObject(), nullptr);
-  EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_EQ(request_headers_.getHostValue(), "");
+  const auto auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
+  ASSERT_EQ(auth.size(), 1);
+  EXPECT_EQ(auth[0]->value().getStringView(), "");
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
 
   EXPECT_EQ(counterValue("success"), 1);
@@ -296,6 +309,7 @@ TEST_F(RouteSelectorFilterTest, SelectsAnthropicMessagesAndAddsVersionHeaderOnTh
   ASSERT_TRUE((*responseBindingObject()->binding())->pattern().has_value());
   EXPECT_EQ((*responseBindingObject()->binding())->pattern()->source(), "/v1/messages");
 
+  EXPECT_EQ(request_headers_.getHostValue(), "api.anthropic.com");
   const auto anthropic_version = request_headers_.get(Http::LowerCaseString("anthropic-version"));
   ASSERT_EQ(anthropic_version.size(), 1);
   EXPECT_EQ(anthropic_version[0]->value().getStringView(), "2023-06-01");
@@ -303,6 +317,7 @@ TEST_F(RouteSelectorFilterTest, SelectsAnthropicMessagesAndAddsVersionHeaderOnTh
   const auto auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
   ASSERT_EQ(auth.size(), 1);
   EXPECT_EQ(auth[0]->value().getStringView(), "Bearer sk-anthropic");
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
 
   EXPECT_EQ(counterValue("success"), 1);
 }
@@ -320,17 +335,105 @@ TEST_F(RouteSelectorFilterTest, SelectsGeminiGenerateContentOnFourthAttempt) {
   ASSERT_TRUE((*responseBindingObject()->binding())->pattern().has_value());
   EXPECT_EQ((*responseBindingObject()->binding())->pattern()->source(),
             "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
+
+  EXPECT_EQ(request_headers_.getHostValue(), "generativelanguage.googleapis.com:443");
+  const auto google_key = request_headers_.get(Http::LowerCaseString("x-goog-api-key"));
+  ASSERT_EQ(google_key.size(), 1);
+  EXPECT_EQ(google_key[0]->value().getStringView(), "gemini-key-123");
+  EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
 
   EXPECT_EQ(counterValue("success"), 1);
 }
 
+TEST_F(RouteSelectorFilterTest, CleansUpPreExistingManagedHeaders) {
+  envoy::type::ai::v3::LlmRoutes routes;
+
+  // Attempt 1: Gemini replaces x-goog-api-key and strips Authorization / anthropic-version.
+  auto* gemini_with_key = routes.add_routes();
+  gemini_with_key->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  gemini_with_key->set_model("gemini-2.5-flash");
+  gemini_with_key->set_host_and_port("generativelanguage.googleapis.com");
+  gemini_with_key->set_api_key("new-gemini-key");
+
+  // Attempt 2: Gemini without api_key or host_and_port sets x-goog-api-key and :authority to ""
+  // and strips Authorization / anthropic-version.
+  auto* gemini_no_key = routes.add_routes();
+  gemini_no_key->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  gemini_no_key->set_model("gemini-2.5-flash");
+
+  // Attempt 3: Anthropic strips x-goog-api-key and sets anthropic-version, Authorization, and
+  // :authority.
+  auto* anthropic_no_key = routes.add_routes();
+  anthropic_no_key->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  anthropic_no_key->set_model("claude-sonnet-4-5");
+  anthropic_no_key->set_host_and_port("api.anthropic.com");
+
+  // Attempt 4: OpenAI strips x-goog-api-key / anthropic-version and replaces Authorization and
+  // :authority.
+  auto* openai_with_key = routes.add_routes();
+  openai_with_key->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  openai_with_key->set_model("gpt-4o-mini");
+  openai_with_key->set_host_and_port("api.openai.com");
+  openai_with_key->set_api_key("Bearer new-openai-key");
+
+  setRoutesInFilterState(routes);
+
+  const std::vector<std::pair<std::string, std::string>> stale_headers = {
+      {"authorization", "Bearer stale-client-token"},
+      {"x-goog-api-key", "stale-google-key"},
+      {"anthropic-version", "2023-01-01"},
+  };
+
+  run("1", R"({"model":"requested","messages":[]})", stale_headers);
+  expectForwarded();
+  EXPECT_EQ(request_headers_.getHostValue(), "generativelanguage.googleapis.com");
+  EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
+  auto google_key = request_headers_.get(Http::LowerCaseString("x-goog-api-key"));
+  ASSERT_EQ(google_key.size(), 1);
+  EXPECT_EQ(google_key[0]->value().getStringView(), "new-gemini-key");
+
+  run("2", R"({"model":"requested","messages":[]})", stale_headers);
+  expectForwarded();
+  EXPECT_EQ(request_headers_.getHostValue(), "");
+  EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
+  google_key = request_headers_.get(Http::LowerCaseString("x-goog-api-key"));
+  ASSERT_EQ(google_key.size(), 1);
+  EXPECT_EQ(google_key[0]->value().getStringView(), "");
+
+  run("3", R"({"model":"requested","messages":[]})", stale_headers);
+  expectForwarded();
+  EXPECT_EQ(request_headers_.getHostValue(), "api.anthropic.com");
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
+  auto auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
+  ASSERT_EQ(auth.size(), 1);
+  EXPECT_EQ(auth[0]->value().getStringView(), "");
+  auto anthropic_version = request_headers_.get(Http::LowerCaseString("anthropic-version"));
+  ASSERT_EQ(anthropic_version.size(), 1);
+  EXPECT_EQ(anthropic_version[0]->value().getStringView(), "2023-06-01");
+
+  run("4", R"({"model":"requested","messages":[]})", stale_headers);
+  expectForwarded();
+  EXPECT_EQ(request_headers_.getHostValue(), "api.openai.com");
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
+  auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
+  ASSERT_EQ(auth.size(), 1);
+  EXPECT_EQ(auth[0]->value().getStringView(), "Bearer new-openai-key");
+}
+
 TEST_F(RouteSelectorFilterTest, RejectsUnspecifiedProtocolOnFifthAttempt) {
   populateRoutesInFilterState();
-  run("5");
+  run("5", R"({"model":"requested","messages":[]})", {{"authorization", "Bearer client-token"}});
 
   expectLocalReply(Http::Code::InternalServerError, "Invalid LLM protocol");
   expectNoOutputFilterState();
+  EXPECT_EQ(request_headers_.getHostValue(), "original.host");
+  const auto auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
+  ASSERT_EQ(auth.size(), 1);
+  EXPECT_EQ(auth[0]->value().getStringView(), "Bearer client-token");
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
 
   EXPECT_EQ(counterValue("invalid_route_data"), 1);
@@ -339,13 +442,17 @@ TEST_F(RouteSelectorFilterTest, RejectsUnspecifiedProtocolOnFifthAttempt) {
 
 TEST_F(RouteSelectorFilterTest, RejectsInvalidLlmBindingOnSixthAttempt) {
   populateRoutesInFilterState();
-  run("6");
+  run("6", R"({"model":"requested","messages":[]})", {{"authorization", "Bearer client-token"}});
 
   EXPECT_TRUE(absl::IsCancelled(*status_)) << *status_;
   EXPECT_EQ(reply_code_, Http::Code::InternalServerError);
   EXPECT_THAT(reply_details_, testing::StartsWith("Invalid LLM binding: "));
   EXPECT_EQ(bridge_.injected_.length(), 0);
-  EXPECT_EQ(responseBindingObject(), nullptr);
+  expectNoOutputFilterState();
+  EXPECT_EQ(request_headers_.getHostValue(), "original.host");
+  const auto auth = request_headers_.get(Http::CustomHeaders::get().Authorization);
+  ASSERT_EQ(auth.size(), 1);
+  EXPECT_EQ(auth[0]->value().getStringView(), "Bearer client-token");
 
   EXPECT_EQ(counterValue("invalid_route_data"), 1);
   EXPECT_EQ(counterValue("success"), 0);

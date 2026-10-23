@@ -9,7 +9,6 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
-#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/http/ai_filters/common/sync_filter.h"
 
 #include "absl/status/status.h"

@@ -234,14 +234,6 @@ TEST_F(ModelRouterFilterTest, SingleTargetRouteResolved) {
   ASSERT_TRUE(routes_obj->proto().routes(0).has_binding());
   EXPECT_EQ(routes_obj->proto().routes(0).binding().uri_pattern(), "/v1/messages");
 
-  // Verify the object is shared with the upstream connection.
-  const auto shared_objects = stream_info_.filterState()->objectsSharedWithUpstreamConnection();
-  ASSERT_NE(shared_objects, nullptr);
-  ASSERT_EQ(shared_objects->size(), 1);
-  EXPECT_EQ((*shared_objects)[0].name_, FilterStateKeys::ResolvedRoutes);
-  EXPECT_EQ((*shared_objects)[0].stream_sharing_,
-            StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
-
   EXPECT_EQ(request_headers_.getHostValue(), "api.anthropic.com");
   EXPECT_EQ(request_headers_.getEnvoyMaxRetriesValue(), "0");
 

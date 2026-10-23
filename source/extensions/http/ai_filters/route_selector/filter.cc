@@ -23,11 +23,13 @@ const Http::LowerCaseString& anthropicVersionHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "anthropic-version");
 }
 
+const Http::LowerCaseString& googleApiKeyHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-goog-api-key");
+}
+
 } // namespace
 
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
-using HttpFilters::AiProtocolManager::LlmBinding;
-using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
 using HttpFilters::AiProtocolManager::LlmBindingObject;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LlmProtocolFilterState;
@@ -49,7 +51,6 @@ RouteSelectorFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
                                 HttpFilters::AiProtocolManager::LocalReplier reply_locally) {
   const StreamInfo::FilterStateSharedPtr& filter_state = context_.stream_info.filterState();
 
-  StreamInfo::FilterState::ObjectsPtr shared = filter_state->objectsSharedWithUpstreamConnection();
   auto routes = filter_state->getDataReadOnly<ModelRouter::LlmRoutesFilterStateObject>(
       FilterStateKeys::ResolvedRoutes);
 
@@ -70,18 +71,46 @@ RouteSelectorFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
 
   const envoy::type::ai::v3::LlmRoute& route = routes->proto().routes(current_retry - 1);
   LLMProtocol protocol = protocolFromProto(route.llm_protocol());
-
-  switch (protocol) {
-  case LLMProtocol::Unspecified:
+  if (protocol == LLMProtocol::Unspecified) {
     std::move(reply_locally)(Http::Code::InternalServerError, "Invalid LLM protocol");
     config_->stats().invalid_route_data_.inc();
     return absl::OkStatus();
+  }
+
+  std::shared_ptr<LlmBindingObject> binding_object;
+  if (route.has_binding()) {
+    absl::StatusOr<std::shared_ptr<LlmBindingObject>> binding = createBinding(route.binding());
+    if (!binding.ok()) {
+      std::move(reply_locally)(Http::Code::InternalServerError,
+                               fmt::format("Invalid LLM binding: {}", binding.status().message()));
+      config_->stats().invalid_route_data_.inc();
+      return absl::OkStatus();
+    }
+    binding_object = *std::move(binding);
+  }
+
+  // Cleanup headers we manage in this filter.
+  context_.request_headers.remove(Http::CustomHeaders::get().Authorization);
+  context_.request_headers.remove(googleApiKeyHeader());
+  context_.request_headers.remove(anthropicVersionHeader());
+
+  switch (protocol) {
   case LLMProtocol::AnthropicMessages:
-    context_.request_headers.addReference(anthropicVersionHeader(), "2023-06-01");
+    context_.request_headers.setReference(anthropicVersionHeader(), "2023-06-01");
+    context_.request_headers.setReferenceKey(Http::CustomHeaders::get().Authorization,
+                                             route.api_key());
+    break;
+  case LLMProtocol::GeminiGenerateContent:
+    context_.request_headers.setReferenceKey(googleApiKeyHeader(), route.api_key());
     break;
   default:
+    context_.request_headers.setReferenceKey(Http::CustomHeaders::get().Authorization,
+                                             route.api_key());
     break;
   }
+
+  Envoy::Http::Utility::updateAuthority(context_.request_headers, route.host_and_port(), false,
+                                        false);
 
   filter_state->setData(FilterStateKeys::LlmProtocolResponse,
                         std::make_shared<LlmProtocolFilterState>(protocol),
@@ -91,23 +120,9 @@ RouteSelectorFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
                         std::make_shared<Router::StringAccessorImpl>(route.model()),
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
-  if (route.has_binding()) {
-    absl::StatusOr<std::shared_ptr<LlmBindingObject>> binding = createBinding(route.binding());
-
-    if (!binding.ok()) {
-      std::move(reply_locally)(Http::Code::InternalServerError,
-                               fmt::format("Invalid LLM binding: {}", binding.status().message()));
-      config_->stats().invalid_route_data_.inc();
-      return absl::OkStatus();
-    }
-
-    filter_state->setData(FilterStateKeys::BindingResponse, *binding,
+  if (binding_object != nullptr) {
+    filter_state->setData(FilterStateKeys::BindingResponse, std::move(binding_object),
                           StreamInfo::FilterState::LifeSpan::FilterChain);
-  }
-
-  if (!route.api_key().empty()) {
-    context_.request_headers.setReference(Http::CustomHeaders::get().Authorization,
-                                          route.api_key());
   }
 
   config_->stats().success_.inc();
