@@ -11,6 +11,7 @@
 #include "envoy/common/regex.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/runtime/extensible_runtime.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
@@ -409,6 +410,7 @@ private:
   Singleton::ManagerImpl singleton_manager_;
   Network::ConnectionHandlerPtr handler_;
   std::unique_ptr<Runtime::Loader> runtime_;
+  ExtensibleRuntime::ProviderPtr extensible_runtime_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;

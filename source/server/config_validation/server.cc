@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/runtime/extensible_runtime.h"
 
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
@@ -11,6 +12,7 @@
 #include "source/common/listener_manager/listener_info_impl.h"
 #include "source/common/local_info/local_info_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/extensible_runtime.h"
 #include "source/common/stats/tag_producer_impl.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/version/version.h"
@@ -151,6 +153,20 @@ void ValidationInstance::initialize(const Options& options,
             "Component factory should not return nullptr from createRuntime()");
   validation_context_.setRuntime(runtime());
 
+  if (bootstrap_.layered_runtime().has_extensible_runtime()) {
+    const auto& extensible_runtime = bootstrap_.layered_runtime().extensible_runtime();
+    auto& factory =
+        Config::Utility::getAndCheckFactory<ExtensibleRuntime::ProviderFactory>(extensible_runtime);
+    auto config = Config::Utility::translateAnyToFactoryConfig(
+        extensible_runtime.typed_config(), messageValidationContext().staticValidationVisitor(),
+        factory);
+    extensible_runtime_ = factory.createProvider(*config);
+    if (extensible_runtime_ != nullptr) {
+      ExtensibleRuntime::ProviderSingleton::clear();
+      ExtensibleRuntime::ProviderSingleton::initialize(extensible_runtime_.get());
+    }
+  }
+
   overload_manager_ = THROW_OR_RETURN_VALUE(
       OverloadManagerImpl::create(
           dispatcher(), *stats().rootScope(), threadLocal(), bootstrap_.overload_manager(),
@@ -202,6 +218,7 @@ void ValidationInstance::shutdown() {
   }
   thread_local_.shutdownThread();
   dispatcher_->shutdown();
+  ExtensibleRuntime::ProviderSingleton::clear();
 }
 
 Network::DnsResolverSharedPtr ValidationInstance::dnsResolver() {

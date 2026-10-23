@@ -45,6 +45,9 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/common:logger",
+        "//envoy/runtime:extensible_runtime_interface",
+        "//source/common/protobuf",
+        "//source/common/runtime:extensible_runtime_lib",
         "//source/extensions/access_loggers/stream:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
@@ -59,6 +62,7 @@ envoy_cc_test(
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:integration_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:options_mocks",
         "//test/mocks/stats:stats_mocks",
