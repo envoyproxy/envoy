@@ -1573,6 +1573,35 @@ TEST_F(FaultFilterSettingsTest, CheckOverrideRuntimeKeys) {
             settings.responseRateLimitPercentRuntime());
 }
 
+TEST_F(FaultFilterTest, StatsAreTagged) {
+  NiceMock<Stats::MockIsolatedStatsStore> store;
+  FaultFilterConfig config(convertYamlStrToProtoConfig(fixed_delay_only_yaml), "prefix.",
+                           *store.rootScope(), context_);
+
+  // The plain filter stats carry no tags of their own.
+  EXPECT_EQ("prefix.fault.aborts_injected", config.stats().aborts_injected_.name());
+  EXPECT_EQ("prefix.fault.aborts_injected", config.stats().aborts_injected_.tagExtractedName());
+  EXPECT_TRUE(config.stats().aborts_injected_.tags().empty());
+
+  // The per-downstream-cluster stats carry the cluster as a tag and drop it from the
+  // tag-extracted name.
+  Stats::StatNameDynamicStorage cluster("cluster", store.symbolTable());
+  config.incAborts(cluster.statName());
+  config.incDelays(cluster.statName());
+  const Stats::CounterSharedPtr aborts =
+      TestUtility::findCounter(store, "prefix.fault.cluster.aborts_injected");
+  ASSERT_NE(aborts, nullptr);
+  EXPECT_EQ(1U, aborts->value());
+  EXPECT_EQ("prefix.fault.aborts_injected", aborts->tagExtractedName());
+  ASSERT_EQ(1U, aborts->tags().size());
+  EXPECT_EQ("envoy.fault_downstream_cluster", aborts->tags()[0].name_);
+  EXPECT_EQ("cluster", aborts->tags()[0].value_);
+  const Stats::CounterSharedPtr delays =
+      TestUtility::findCounter(store, "prefix.fault.cluster.delays_injected");
+  ASSERT_NE(delays, nullptr);
+  EXPECT_EQ("prefix.fault.delays_injected", delays->tagExtractedName());
+}
+
 } // namespace
 } // namespace Fault
 } // namespace HttpFilters
