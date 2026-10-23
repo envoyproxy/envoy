@@ -126,6 +126,7 @@ USE_LIBSTDCPP = %s
 load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_python//python:defs.bzl", "py_library")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//:path.bzl", "PATH")
 
 bool_flag(
