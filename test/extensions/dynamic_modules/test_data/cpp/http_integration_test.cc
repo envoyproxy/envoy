@@ -262,6 +262,13 @@ public:
     // Test remove
     headers.remove("new");
     assertEq(std::string(headers.getOne("new")), "", "new header removed");
+
+    // Test empty values: they must be kept, not treated as a removal. A default-constructed
+    // string_view has a null data pointer.
+    headers.set("x-empty-set", std::string_view{});
+    assertEq(headers.get("x-empty-set").size(), 1, "x-empty-set header count");
+    headers.add("x-empty-add", "");
+    assertEq(headers.get("x-empty-add").size(), 1, "x-empty-add header count");
     return HeadersStatus::Continue;
   }
 
