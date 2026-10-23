@@ -44,7 +44,7 @@ public:
   void SetUp() override {
     HttpProtocolIntegrationTest::SetUp();
 
-    config_helper_.prependFilter(filter());
+    config_helper_.prependFilter(grpcFieldExtractionFilterConfig());
     useAccessLog("%DYNAMIC_METADATA(envoy.filters.http.grpc_field_extraction)%");
 
     initialize();
@@ -60,8 +60,6 @@ public:
     upstream_request_->encodeData("response_body", true);
     ASSERT_TRUE(response->waitForEndStream());
   }
-
-  std::string filter() { return grpcFieldExtractionFilterConfig(); }
 };
 
 CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
@@ -164,11 +162,9 @@ public:
   RawFrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam()) {}
 
   void SetUp() override {
-    config_helper_.prependFilter(filter());
+    config_helper_.prependFilter(grpcFieldExtractionFilterConfig());
     useAccessLog("%DYNAMIC_METADATA(envoy.filters.http.grpc_field_extraction)%");
   }
-
-  std::string filter() { return grpcFieldExtractionFilterConfig(); }
 };
 
 // The DATA frame completing message 1 also carries the head of pipelined
