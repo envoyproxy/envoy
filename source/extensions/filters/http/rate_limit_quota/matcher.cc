@@ -10,35 +10,41 @@ namespace RateLimitQuota {
 using ValueSpecifierCase = ::envoy::extensions::filters::http::rate_limit_quota::v3::
     RateLimitQuotaBucketSettings_BucketIdBuilder_ValueBuilder::ValueSpecifierCase;
 
-absl::StatusOr<BucketId>
-RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                         ProtobufMessage::ValidationVisitor& validation_visitor,
-                                         RateLimitQuotaValidationVisitor& visitor) const {
-  BucketId bucket_id;
-  std::unique_ptr<Matcher::MatchInputFactory<Http::HttpMatchingData>> input_factory_ptr = nullptr;
-  // Generate the `BucketId` based on the bucked id builder from the configuration.
-  for (const auto& id_builder : setting_.bucket_id_builder().bucket_id_builder()) {
-    std::string bucket_id_key = id_builder.first;
-    auto builder_method = id_builder.second;
+RateLimitOnMatchAction::CustomValueInputs RateLimitOnMatchAction::createCustomValueInputs(
+    const RateLimitQuotaBucketSettings& settings,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
+  RateLimitQuotaValidationVisitor matcher_validation_visitor;
+  Matcher::MatchInputFactory<Http::HttpMatchingData> input_factory(validation_visitor,
+                                                                   matcher_validation_visitor);
+  CustomValueInputs inputs;
+  for (const auto& [bucket_id_key, builder_method] :
+       settings.bucket_id_builder().bucket_id_builder()) {
+    if (builder_method.value_specifier_case() == ValueSpecifierCase::kCustomValue) {
+      inputs.emplace(bucket_id_key, input_factory.createDataInput(builder_method.custom_value())());
+    }
+  }
+  return inputs;
+}
 
+absl::StatusOr<BucketId>
+RateLimitOnMatchAction::generateBucketId(const Http::Matching::HttpMatchingDataImpl& data) const {
+  BucketId bucket_id;
+  // Generate the `BucketId` based on the bucked id builder from the configuration.
+  for (const auto& [bucket_id_key, builder_method] :
+       setting_.bucket_id_builder().bucket_id_builder()) {
     // Generate the bucket id based on builder method type.
     switch (builder_method.value_specifier_case()) {
     // Retrieve the string value directly from the config (static method).
     case ValueSpecifierCase::kStringValue:
       bucket_id.mutable_bucket()->insert({bucket_id_key, builder_method.string_value()});
       break;
-    // Retrieve the value from the `custom_value` typed extension config (dynamic method).
+    // Retrieve the value from the `custom_value` typed extension config (dynamic method), using
+    // the data input created for it when the action was created.
     case ValueSpecifierCase::kCustomValue: {
-      // Initialize the pointer to input factory on first use.
-      if (input_factory_ptr == nullptr) {
-        input_factory_ptr = std::make_unique<Matcher::MatchInputFactory<Http::HttpMatchingData>>(
-            validation_visitor, visitor);
-      }
-      // Create `DataInput` factory callback from the config.
-      Matcher::DataInputFactoryCb<Http::HttpMatchingData> data_input_cb =
-          input_factory_ptr->createDataInput(builder_method.custom_value());
-      auto input = data_input_cb()->get(data);
-      auto result = input.stringData();
+      const auto input = custom_value_inputs_.find(bucket_id_key);
+      ASSERT(input != custom_value_inputs_.end());
+      const Matcher::DataInputGetResult input_result = input->second->get(data);
+      const std::optional<absl::string_view> result = input_result.stringData();
       // If result has data.
       if (!result) {
         return absl::InternalError("Failed to generate the id from custom value config.");
