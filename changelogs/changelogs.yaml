@@ -127,6 +127,8 @@ areas:
 
   happy_eyeballs:
     title: happy_eyeballs
+  health_check:
+    title: health_check
   http:
     title: http
   http2:
