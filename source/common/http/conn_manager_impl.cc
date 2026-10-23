@@ -213,6 +213,8 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       overload_state_(overload_manager.getThreadLocalOverloadState()),
       accept_new_http_stream_(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders)),
+      http1_decode_headers_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H1ServerDecodeHeaders)),
       hcm_ondata_creating_codec_(
           overload_manager.getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation)),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
@@ -238,6 +240,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "
       "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(trace, http1_decode_headers_ == nullptr,
+                    "LoadShedPoint envoy.load_shed_points.http1_server_decode_headers is not "
+                    "found. Is it configured?");
   ENVOY_LOG_ONCE_IF(trace, hcm_ondata_creating_codec_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.hcm_ondata_creating_codec is not found. "
                     "Is it configured?");
@@ -1642,6 +1647,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   const bool drop_request_due_to_overload =
       (connection_manager_.accept_new_http_stream_ != nullptr &&
        connection_manager_.accept_new_http_stream_->shouldShedLoad()) ||
+      (connection_manager_.http1_decode_headers_ != nullptr &&
+       connection_manager_.codec_->protocol() < Protocol::Http2 &&
+       connection_manager_.http1_decode_headers_->shouldShedLoad()) ||
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_stop_accepting_requests_ref_.value());
 

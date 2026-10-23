@@ -1130,6 +1130,12 @@ TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointCanCloseConnecti
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
@@ -1157,6 +1163,9 @@ TEST_F(HttpConnectionManagerImplTest, CodecCreationLoadShedPointBypasscheck) {
       .WillOnce(Return(&close_connection_creating_codec_point));
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
@@ -1191,6 +1200,9 @@ TEST_F(HttpConnectionManagerImplTest, DecodeHeaderLoadShedPointCanRejectNewStrea
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
       .WillOnce(Return(&accept_new_stream_point));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
+      .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
       .WillOnce(Return(nullptr));
@@ -1247,6 +1259,9 @@ TEST_F(HttpConnectionManagerImplTest, GoAwayLoadShedPoint) {
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
@@ -1293,6 +1308,9 @@ TEST_F(HttpConnectionManagerImplTest, GoAwayAndCloseLoadShedPoint) {
               getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
               getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(overload_manager_,
@@ -1320,6 +1338,87 @@ TEST_F(HttpConnectionManagerImplTest, GoAwayAndCloseLoadShedPoint) {
   conn_manager_->onData(fake_input, false);
 
   // No cleanup because the filter chain is not even created.
+}
+
+TEST_F(HttpConnectionManagerImplTest,
+       OverloadClosesDownstreamStreamForHttp1WithHttp1DecodeHeadersLoadShedPoint) {
+  Server::MockLoadShedPoint http1_decode_headers_point;
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
+      .WillOnce(Return(&http1_decode_headers_point));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch))
+      .WillOnce(Return(nullptr));
+
+  setup();
+
+  // When codec_->protocol_ is HTTP/1 and shouldShedLoad() returns true,
+  // it sends a 503 local reply ("envoy overloaded") and increments downstream_rq_overload_close_.
+  EXPECT_CALL(http1_decode_headers_point, shouldShedLoad()).WillOnce(Return(true));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("503", headers.getStatusValue());
+      }));
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  startRequest();
+
+  EXPECT_EQ("envoy overloaded", response_body);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, Http1DecodeHeadersLoadShedPointIgnoredForHttp2) {
+  Server::MockLoadShedPoint http1_decode_headers_point;
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmDecodeHeaders))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H1ServerDecodeHeaders))
+      .WillOnce(Return(&http1_decode_headers_point));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HcmCodecCreation))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().HttpDownstreamFilterCheck))
+      .WillRepeatedly(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch))
+      .WillOnce(Return(nullptr));
+  EXPECT_CALL(overload_manager_,
+              getLoadShedPoint(Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch))
+      .WillOnce(Return(nullptr));
+
+  codec_->protocol_ = Protocol::Http2;
+  setup();
+  setupFilterChain(1, 0);
+
+  // When protocol is HTTP/2, http1_decode_headers_point is never checked.
+  EXPECT_CALL(http1_decode_headers_point, shouldShedLoad()).Times(0);
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  startRequest(true);
+
+  // Clean up.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 }
 
 TEST_F(HttpConnectionManagerImplTest, TestStopAllIterationAndBufferOnDecodingPathFirstFilter) {
