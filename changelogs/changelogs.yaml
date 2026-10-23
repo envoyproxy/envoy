@@ -129,6 +129,8 @@ areas:
 
   happy_eyeballs:
     title: happy_eyeballs
+  header_mutation:
+    title: header_mutation
   health_check:
     title: health_check
   http:
