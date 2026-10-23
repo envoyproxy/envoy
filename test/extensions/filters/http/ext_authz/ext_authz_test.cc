@@ -1217,6 +1217,65 @@ TEST_P(HttpFilterTestParam, OkResponse) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 }
 
+// With strip_query_params enabled, the path in the CheckRequest sent to the authorization
+// service excludes the query string, for both gRPC and HTTP services.
+TEST_P(HttpFilterTestParam, StripQueryParams) {
+  const bool http_client = std::get<1>(GetParam());
+  auto proto_config = getFilterConfig(/*failure_mode_allow=*/false, http_client);
+  proto_config.set_strip_query_params(true);
+  initialize(proto_config);
+
+  request_headers_ = Http::TestRequestHeaderMapImpl{{":path", "/path?secret=1&foo=bar"}};
+
+  prepareCheck();
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_param,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        check_request = check_param;
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+
+  // Both the path field and the forwarded headers entry carry the stripped path.
+  EXPECT_EQ("/path", check_request.attributes().request().http().path());
+  EXPECT_EQ("/path", check_request.attributes().request().http().headers().at(":path"));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+}
+
+// Without strip_query_params, the full path including query string is sent.
+TEST_P(HttpFilterTestParam, RetainQueryParamsByDefault) {
+  const bool http_client = std::get<1>(GetParam());
+  initialize(getFilterConfig(/*failure_mode_allow=*/false, http_client));
+
+  request_headers_ = Http::TestRequestHeaderMapImpl{{":path", "/path?secret=1&foo=bar"}};
+
+  prepareCheck();
+
+  envoy::service::auth::v3::CheckRequest check_request;
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_param,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        check_request = check_param;
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, true));
+
+  EXPECT_EQ("/path?secret=1&foo=bar", check_request.attributes().request().http().path());
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+}
+
 TEST_P(HttpFilterTestParam, RequestHeaderMatchersForGrpcService) {
   initialize(R"EOF(
     grpc_service:

@@ -33,7 +33,7 @@ std::optional<std::string> ReqWithoutQuery::format(const Envoy::Formatter::Conte
     return std::nullopt;
   }
 
-  absl::string_view val = Http::Utility::stripQueryStringView(header->value().getStringView());
+  absl::string_view val = Http::Utility::stripQueryString(header->value().getStringView());
   val = truncate(val, max_length_);
 
   return std::string(val);
@@ -46,7 +46,7 @@ Protobuf::Value ReqWithoutQuery::formatValue(const Envoy::Formatter::Context& co
     return ValueUtil::nullValue();
   }
 
-  absl::string_view val = Http::Utility::stripQueryStringView(header->value().getStringView());
+  absl::string_view val = Http::Utility::stripQueryString(header->value().getStringView());
   val = truncate(val, max_length_);
   return ValueUtil::stringValue(val);
 }
@@ -57,7 +57,7 @@ bool ReqWithoutQuery::formatTo(std::string& sink, const Envoy::Formatter::Contex
   if (!header) {
     return false;
   }
-  absl::string_view val = Http::Utility::stripQueryStringView(header->value().getStringView());
+  absl::string_view val = Http::Utility::stripQueryString(header->value().getStringView());
   sink.append(truncate(val, max_length_));
   return true;
 }
@@ -70,7 +70,7 @@ void ReqWithoutQuery::formatValueTo(Envoy::Formatter::ValueSink& sink,
     // Keep the sink unmodified so the caller can decide how to handle the missing value.
     return;
   }
-  absl::string_view val = Http::Utility::stripQueryStringView(header->value().getStringView());
+  absl::string_view val = Http::Utility::stripQueryString(header->value().getStringView());
   sink.addString(truncate(val, max_length_));
 }
 
