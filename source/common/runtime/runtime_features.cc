@@ -127,6 +127,9 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
 // Sentinel and test flag.
+// TODO: Enable after the experimental verified-chain ticket format has been reviewed.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_preserve_verified_peer_chain_in_session_ticket);
+
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 // TODO: Flip to true after sufficient testing to enable formatter support for rate limit action
 // descriptor_value fields by default.

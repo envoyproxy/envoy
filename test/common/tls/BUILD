@@ -112,6 +112,7 @@ envoy_cc_test(
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
+        "//source/common/tls:session_ticket_codec_lib",
         "//source/common/tls:ssl_socket_lib",
         "//source/common/tls:utility_lib",
         "//source/common/tls/private_key:private_key_manager_lib",

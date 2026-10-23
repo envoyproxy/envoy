@@ -215,6 +215,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "session_ticket_codec_lib",
+    srcs = ["session_ticket_codec.cc"],
+    hdrs = ["session_ticket_codec.h"],
+    external_deps = ["ssl"],
+    deps = [
+        ":context_lib",
+        ":ssl_handshaker_lib",
+        "//envoy/ssl:context_config_interface",
+        "@abseil-cpp//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
     name = "server_context_lib",
     srcs = [
         "default_tls_certificate_selector.cc",
@@ -226,6 +239,7 @@ envoy_cc_library(
     ],
     deps = [
         ":context_lib",
+        ":session_ticket_codec_lib",
         "//source/common/tls/ocsp:ocsp_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",

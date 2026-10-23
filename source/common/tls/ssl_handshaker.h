@@ -103,6 +103,8 @@ public:
   absl::string_view certificateValidationError() const override { return cert_validation_error_; }
 
   void setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) override;
+  absl::Span<const bssl::UniquePtr<X509>> validatedCertChainForSessionTicket() const;
+  void setResumedValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain);
 
 private:
   Envoy::Ssl::ClientValidationStatus certificate_validation_status_{
@@ -159,12 +161,20 @@ public:
 
   bssl::UniquePtr<SSL> ssl_;
 
+  absl::Span<const bssl::UniquePtr<X509>> validatedCertChain() const { return validated_chain_; }
+  absl::Span<const bssl::UniquePtr<X509>> validatedCertChainForSessionTicket() const;
+  void setResumedValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) {
+    resumed_validated_chain_ = std::move(chain);
+  }
+
 private:
   Ssl::HandshakeCallbacks* handshake_callbacks_;
 
   Ssl::SocketState state_{Ssl::SocketState::PreHandshake};
   mutable SslExtendedSocketInfoImpl extended_socket_info_;
   std::vector<bssl::UniquePtr<X509>> validated_chain_;
+  // Authenticated ticket metadata, pending BoringSSL's resumption decision.
+  std::vector<bssl::UniquePtr<X509>> resumed_validated_chain_;
 };
 
 using SslHandshakerImplSharedPtr = std::shared_ptr<SslHandshakerImpl>;

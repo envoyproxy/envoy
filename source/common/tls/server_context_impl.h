@@ -25,6 +25,7 @@
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
 #include "source/common/tls/ocsp/ocsp.h"
+#include "source/common/tls/session_ticket_codec.h"
 #include "source/common/tls/stats.h"
 
 #include "absl/synchronization/mutex.h"
@@ -92,6 +93,7 @@ private:
 
   Ssl::TlsCertificateSelectorPtr tls_certificate_selector_;
   const std::vector<Envoy::Ssl::ServerContextConfig::SessionTicketKey> session_ticket_keys_;
+  std::unique_ptr<SessionTicketCodec> session_ticket_codec_;
 
 protected:
   const Ssl::ServerContextConfig::OcspStaplePolicy ocsp_staple_policy_;
