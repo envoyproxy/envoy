@@ -1249,6 +1249,16 @@ TEST_F(FilterTest, RequestRateLimitedWithoutRetryAfterHeaderForNon429Status) {
             filter_2_->decodeHeaders(request_headers, false));
 }
 
+TEST_F(FilterTest, StatsAreTagged) {
+  setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\"", "false", "429"));
+  const Stats::Counter& enabled = config_->stats().enabled_;
+  EXPECT_EQ("test.http_local_rate_limit.enabled", enabled.name());
+  EXPECT_EQ("http_local_rate_limit.enabled", enabled.tagExtractedName());
+  ASSERT_EQ(1U, enabled.tags().size());
+  EXPECT_EQ("envoy.local_http_ratelimit_prefix", enabled.tags()[0].name_);
+  EXPECT_EQ("test", enabled.tags()[0].value_);
+}
+
 } // namespace LocalRateLimitFilter
 } // namespace HttpFilters
 } // namespace Extensions
