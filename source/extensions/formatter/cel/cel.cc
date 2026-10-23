@@ -1,5 +1,6 @@
 #include "source/extensions/formatter/cel/cel.h"
 
+#include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/utility.h"
@@ -119,6 +120,12 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
                                  std::optional<size_t> max_length) const {
 #if defined(USE_CEL_PARSER)
   if (command == "CEL" || command == "TYPED_CEL") {
+    // The default expression builder comes from the singleton manager, and the server factory
+    // context is only available on the main thread.
+    if (!Thread::MainThread::isMainOrTestThread()) {
+      return absl::FailedPreconditionError(
+          absl::StrCat("%", command, "()% can only be parsed on the main thread"));
+    }
     auto parse_status = google::api::expr::parser::Parse(subcommand);
     if (!parse_status.ok()) {
       return absl::InvalidArgumentError(

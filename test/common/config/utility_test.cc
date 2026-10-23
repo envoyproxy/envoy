@@ -226,7 +226,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
+                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false, _));
     EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
                                                      false, 0, false));
   }
@@ -237,7 +237,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(
         async_client_manager,
-        factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
+        factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true, _));
     EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
                                                      true, 0, false));
   }
@@ -338,7 +338,7 @@ TEST(UtilityTest, AggregatedFactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
+                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false, _));
     EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
                                                      false, 0, true));
   }
@@ -349,7 +349,7 @@ TEST(UtilityTest, AggregatedFactoryForGrpcApiConfigSource) {
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(
         async_client_manager,
-        factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true));
+        factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), true, _));
     EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
                                                      true, 0, true));
   }
@@ -418,7 +418,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSourceWithFailover) {
     envoy::config::core::v3::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false));
+                factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), false, _));
     EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
                                                      false, 0, false));
   }
@@ -433,14 +433,14 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSourceWithFailover) {
     envoy::config::core::v3::GrpcService expected_grpc_service_foo;
     expected_grpc_service_foo.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(expected_grpc_service_foo), Ref(scope), false));
+                factoryForGrpcService(ProtoEq(expected_grpc_service_foo), Ref(scope), false, _));
     EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
                                                      false, 0, false));
 
     envoy::config::core::v3::GrpcService expected_grpc_service_bar;
     expected_grpc_service_bar.mutable_envoy_grpc()->set_cluster_name("bar");
     EXPECT_CALL(async_client_manager,
-                factoryForGrpcService(ProtoEq(expected_grpc_service_bar), Ref(scope), false));
+                factoryForGrpcService(ProtoEq(expected_grpc_service_bar), Ref(scope), false, _));
     EXPECT_OK(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
                                                      false, 1, false));
   }

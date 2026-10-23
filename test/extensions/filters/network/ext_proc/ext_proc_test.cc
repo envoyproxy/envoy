@@ -1,3 +1,5 @@
+#include "envoy/http/header_evaluator.h"
+
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/network/ext_proc/ext_proc.h"
@@ -80,7 +82,7 @@ public:
     auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
     auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
     client_ = client.get();
-    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -100,7 +102,7 @@ public:
     auto filter_config = std::make_shared<Config>(createConfig(failure_mode_allow), scope_);
     auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
     client_ = client.get();
-    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -134,7 +136,7 @@ public:
         createConfigWithMetadataOptions(untyped_namespaces, typed_namespaces), scope_);
     auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
     client_ = client.get();
-    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+    filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
     filter_->initializeReadFilterCallbacks(read_callbacks_);
     filter_->initializeWriteFilterCallbacks(write_callbacks_);
   }
@@ -277,6 +279,39 @@ TEST_F(NetworkExtProcFilterTest, StreamCreationFailureWithFailureModeAllow) {
   EXPECT_EQ(data.length(), 4);
   // Check failure counters
   EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.stream_open_failures"));
+}
+
+// Stands in for a gRPC service's initial metadata parsed by parseGrpcServiceInitialMetadata().
+class NoopHeaderEvaluator : public Http::HeaderEvaluator {
+public:
+  void evaluateHeaders(Http::HeaderMap&, const Formatter::Context&,
+                       const StreamInfo::StreamInfo&) const override {}
+};
+
+// The gRPC service's parsed initial metadata given to the filter is passed along with the service
+// when opening the stream.
+TEST_F(NetworkExtProcFilterTest, ParsedGrpcInitialMetadataPassedToClient) {
+  auto parsed_grpc_initial_metadata = std::make_shared<const NoopHeaderEvaluator>();
+  auto filter_config = std::make_shared<Config>(createConfig(true), scope_);
+  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
+  client_ = client.get();
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client),
+                                                   parsed_grpc_initial_metadata);
+  filter_->initializeReadFilterCallbacks(read_callbacks_);
+  filter_->initializeWriteFilterCallbacks(write_callbacks_);
+
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce(testing::Invoke(
+          [&parsed_grpc_initial_metadata](
+              ExternalProcessorCallbacks&,
+              const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+              Http::AsyncClient::StreamOptions&,
+              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+            EXPECT_EQ(parsed_grpc_initial_metadata, config_with_hash_key.initialMetadata());
+            return nullptr;
+          }));
+  Buffer::OwnedImpl data("test");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 }
 
 // Test failure mode disallow behavior when stream creation fails
@@ -497,7 +532,7 @@ TEST_F(NetworkExtProcFilterTest, SendRequestWithNullStream) {
   auto filter_config = std::make_shared<Config>(createConfig(false), scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -610,7 +645,7 @@ TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -630,7 +665,7 @@ TEST_F(NetworkExtProcFilterTest, ProcessingModeConfigurations) {
   filter_config = std::make_shared<Config>(config, scope_);
   client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -876,7 +911,7 @@ TEST_F(NetworkExtProcFilterTest, MessageTimeoutWithFailureModeAllow) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -922,7 +957,7 @@ TEST_F(NetworkExtProcFilterTest, WriteMessageTimeout) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -966,7 +1001,7 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1014,7 +1049,7 @@ TEST_F(NetworkExtProcFilterTest, TimerStopsOnResponse) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1066,7 +1101,7 @@ TEST_F(NetworkExtProcFilterTest, WriteTimerStopsOnWriteResponse) {
       .WillOnce(Return(read_timer))
       .WillOnce(Return(write_timer));
 
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1110,7 +1145,7 @@ TEST_F(NetworkExtProcFilterTest, TimeoutCleanupOnGrpcError) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1153,7 +1188,7 @@ TEST_F(NetworkExtProcFilterTest, ZeroTimeoutDisabled) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1600,7 +1635,7 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataAllowed) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1628,7 +1663,7 @@ TEST_F(NetworkExtProcFilterTest, ReceiveDynamicMetadataNotAllowed) {
   auto filter_config = std::make_shared<Config>(config, scope_);
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1660,7 +1695,7 @@ TEST_F(NetworkExtProcFilterTest, SendRequestWithConnectionAttributes) {
 
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1704,7 +1739,7 @@ TEST_F(NetworkExtProcFilterTest, SendRequestWithFilterStateStringAccessor) {
 
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 
@@ -1748,7 +1783,7 @@ TEST_F(NetworkExtProcFilterTest, ConnectionAttributesSentOnlyOnce) {
 
   auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
   client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
+  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client), nullptr);
   filter_->initializeReadFilterCallbacks(read_callbacks_);
   filter_->initializeWriteFilterCallbacks(write_callbacks_);
 

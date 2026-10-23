@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -25,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
 // <envoy_v3_api_msg_config.core.v3.ApiConfigSource>` and filter configurations.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message GrpcService {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
 
@@ -337,6 +338,10 @@ message GrpcService {
   // be injected. For more information, including details on header value syntax, see the
   // documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
+  //
+  // Substitution formatters are supported for the header values, and the
+  // :ref:`formatters <envoy_v3_api_field_config.core.v3.GrpcService.formatters>` field below can be
+  // used to enable extension formatters.
   repeated HeaderValue initial_metadata = 5;
 
   // Optional default retry policy for RPCs or streams initiated toward this gRPC service.
@@ -352,4 +357,10 @@ message GrpcService {
   // If not specified, no default retry policy is applied at the client level and retries only occur
   // when explicitly configured in per‑stream options.
   RetryPolicy retry_policy = 6;
+
+  // Specifies a collection of Formatter plugins that can be used in substitution formatters in
+  // ``initial_metadata`` header values.
+  // See the formatters extensions documentation for details.
+  // [#extension-category: envoy.formatter]
+  repeated TypedExtensionConfig formatters = 7;
 }

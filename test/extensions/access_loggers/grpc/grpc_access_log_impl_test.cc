@@ -134,8 +134,9 @@ public:
       : async_client_(new Grpc::MockAsyncClient), factory_(new Grpc::MockAsyncClientFactory),
         logger_cache_(async_client_manager_, scope_, tls_, local_info_),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
-    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+    EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true, _))
+        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                                Grpc::GrpcServiceInitialMetadataSharedPtr) {
           EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
           }));
@@ -163,7 +164,7 @@ TEST_F(GrpcAccessLoggerCacheImplTest, LoggerCreation) {
   config.mutable_buffer_size_bytes()->set_value(BUFFER_SIZE_BYTES);
 
   GrpcAccessLoggerSharedPtr logger =
-      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP);
+      logger_cache_.getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP, nullptr);
   // Note that the local info node() method is mocked, so the node is not really configurable.
   grpc_access_logger_impl_test_helper_.expectStreamMessage(R"EOF(
   identifier:

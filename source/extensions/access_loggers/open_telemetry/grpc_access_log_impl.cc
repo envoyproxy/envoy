@@ -92,13 +92,14 @@ GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(
 GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
-    Event::Dispatcher& dispatcher) {
+    Event::Dispatcher& dispatcher,
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata) {
   // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
   // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
   // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
   // the main thread if necessary to ensure it does not throw here.
-  auto factory_or_error =
-      async_client_manager_.factoryForGrpcService(getGrpcService(config), scope_, true);
+  auto factory_or_error = async_client_manager_.factoryForGrpcService(
+      getGrpcService(config), scope_, true, std::move(parsed_grpc_initial_metadata));
   THROW_IF_NOT_OK_REF(factory_or_error.status());
   auto client = THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
                                       Grpc::RawAsyncClientPtr);

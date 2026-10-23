@@ -9,6 +9,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "fmt/format.h"
@@ -313,6 +314,19 @@ TEST_F(CELFormatterTest, TestParseFail) {
   EXPECT_EQ(
       nullptr,
       cel_parser->parse("INVALID_CMD", "requests.headers['missing_headers']", max_length).value());
+}
+
+// The expression builder and the server factory context are only available on the main thread, so
+// parsing a CEL command off the main thread fails.
+TEST_F(CELFormatterTest, TestParseOffMainThreadFails) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::StatusOr<Envoy::Formatter::FormatterProviderPtr> provider;
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread(
+      [&]() { provider = cel_parser->parse("CEL", "request.path", std::nullopt); });
+  thread->join();
+
+  EXPECT_THAT(provider, HasStatus(absl::StatusCode::kFailedPrecondition,
+                                  HasSubstr("can only be parsed on the main thread")));
 }
 
 TEST_F(CELFormatterTest, TestNullFormatValue) {

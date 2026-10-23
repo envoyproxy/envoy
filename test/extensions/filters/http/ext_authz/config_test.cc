@@ -47,7 +47,7 @@ namespace {
 FilterConfigPerRoute
 makePerRoute(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config) {
   absl::Status creation_status = absl::OkStatus();
-  FilterConfigPerRoute per_route(config, creation_status);
+  FilterConfigPerRoute per_route(config, /*initial_metadata=*/nullptr, creation_status);
   EXPECT_OK(creation_status);
   return per_route;
 }
@@ -56,11 +56,12 @@ makePerRoute(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerR
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
   TestAsyncClientManagerImpl(const Bootstrap::GrpcAsyncClientManagerConfig& config,
-                             Server::Configuration::CommonFactoryContext& context,
+                             Server::Configuration::ServerFactoryContext& context,
                              const Grpc::StatNames& stat_names)
       : Grpc::AsyncClientManagerImpl(config, context, stat_names) {}
   absl::StatusOr<Grpc::AsyncClientFactoryPtr>
-  factoryForGrpcService(const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) override {
+  factoryForGrpcService(const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool,
+                        Grpc::GrpcServiceInitialMetadataSharedPtr) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
   }
 };
@@ -843,7 +844,7 @@ private:
       const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& ext_authz_config,
       int requests_sent_per_thread) {
     Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
-        Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service());
+        Envoy::Grpc::GrpcServiceConfigWithHashKey(ext_authz_config.grpc_service(), nullptr);
     Grpc::RawAsyncClientSharedPtr async_client =
         async_client_manager_
             ->getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context_.scope(), false)

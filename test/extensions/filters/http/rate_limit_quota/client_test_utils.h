@@ -70,7 +70,7 @@ class RateLimitTestClient {
 public:
   RateLimitTestClient() {
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
-    config_with_hash_key_ = Grpc::GrpcServiceConfigWithHashKey(grpc_service_);
+    config_with_hash_key_ = Grpc::GrpcServiceConfigWithHashKey(grpc_service_, nullptr);
   }
 
   void expectClientReset() {
@@ -90,21 +90,21 @@ public:
 
   void expectClientCreationWithFactory() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
+                factoryForGrpcService(_, _, _, _))
         .Times(testing::AtLeast(1))
         .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClientFactory));
   }
 
   void failClientCreation() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
+                factoryForGrpcService(_, _, _, _))
         .Times(testing::AtLeast(1))
         .WillRepeatedly([]() { return absl::InternalError("Mock client creation failure"); });
   }
 
   void failClientCreationWithFactory() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                factoryForGrpcService(_, _, _))
+                factoryForGrpcService(_, _, _, _))
         .Times(testing::AtLeast(1))
         .WillRepeatedly([]() { return absl::InternalError("Mock client creation failure"); });
   }
@@ -180,7 +180,7 @@ public:
 
   void expectTimeSource() {}
 
-  Grpc::AsyncClientFactoryPtr mockCreateAsyncClientFactory(Unused, Unused, Unused) {
+  Grpc::AsyncClientFactoryPtr mockCreateAsyncClientFactory(Unused, Unused, Unused, Unused) {
     std::unique_ptr<MockAsyncClientWithReset> async_client =
         std::make_unique<MockAsyncClientWithReset>();
     async_client_ = async_client.get();

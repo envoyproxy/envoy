@@ -37,17 +37,20 @@ AccessLog::AccessLog(
     ::Envoy::AccessLog::FilterPtr&& filter,
     envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config,
     ThreadLocal::SlotAllocator& tls, GrpcAccessLoggerCacheSharedPtr access_logger_cache,
-    const std::vector<Formatter::CommandParserPtr>& commands)
+    const std::vector<Formatter::CommandParserPtr>& commands,
+    Grpc::GrpcServiceInitialMetadataSharedPtr parsed_grpc_initial_metadata)
     : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)),
       filter_state_objects_to_log_(getFilterStateObjectsToLog(config)),
       custom_tags_(getCustomTags(config, commands)) {
 
   THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(config.common_config()));
-  tls_slot_->set([this, config](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalLogger>(
-        access_logger_cache_->getOrCreateLogger(config, Common::GrpcAccessLoggerType::HTTP));
-  });
+  tls_slot_->set(
+      [this, config,
+       parsed_grpc_initial_metadata = std::move(parsed_grpc_initial_metadata)](Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalLogger>(access_logger_cache_->getOrCreateLogger(
+            config, Common::GrpcAccessLoggerType::HTTP, parsed_grpc_initial_metadata));
+      });
 
   // Packing the body "AnyValue" to a "KeyValueList" only if it's not empty, otherwise the
   // formatter would fail to parse it.

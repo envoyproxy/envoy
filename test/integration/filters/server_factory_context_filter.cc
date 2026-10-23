@@ -8,6 +8,7 @@
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/server/generic_factory_context.h"
 
 #include "test/integration/filters/server_factory_context_filter_config.pb.h"
 #include "test/integration/filters/server_factory_context_filter_config.pb.validate.h"
@@ -16,8 +17,6 @@
 namespace Envoy {
 
 using ResponsePtr = Grpc::ResponsePtr<helloworld::HelloReply>;
-using FilterConfigSharedPtr =
-    std::shared_ptr<const test::integration::filters::ServerFactoryContextFilterConfig>;
 
 class FilterCallbacks {
 public:
@@ -28,10 +27,12 @@ public:
 class TestGrpcClient : public Grpc::AsyncStreamCallbacks<helloworld::HelloReply> {
 public:
   TestGrpcClient(Server::Configuration::ServerFactoryContext& context,
-                 const envoy::config::core::v3::GrpcService& grpc_service)
+                 const envoy::config::core::v3::GrpcService& grpc_service,
+                 Grpc::GrpcServiceInitialMetadataSharedPtr initial_metadata)
       : client_(context.clusterManager()
                     .grpcAsyncClientManager()
-                    .getOrCreateRawAsyncClient(grpc_service, context.scope(), true)
+                    .getOrCreateRawAsyncClient(grpc_service, context.scope(), true,
+                                               std::move(initial_metadata))
                     .value()),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
 
@@ -85,9 +86,11 @@ private:
 class ServerFactoryContextFilter : public Http::PassThroughFilter, public FilterCallbacks {
 public:
   ServerFactoryContextFilter(const envoy::config::core::v3::GrpcService& grpc_service,
+                             Grpc::GrpcServiceInitialMetadataSharedPtr initial_metadata,
                              Server::Configuration::ServerFactoryContext& context)
       : grpc_service_(grpc_service), context_(context),
-        test_client_(std::make_unique<TestGrpcClient>(context_, grpc_service_)) {}
+        test_client_(std::make_unique<TestGrpcClient>(context_, grpc_service_,
+                                                      std::move(initial_metadata))) {}
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
@@ -120,6 +123,21 @@ private:
   bool filter_chain_continued_ = false;
 };
 
+absl::StatusOr<Http::FilterFactoryCb>
+createServerFactoryContextFilterFactory(const envoy::config::core::v3::GrpcService& grpc_service,
+                                        Server::Configuration::GenericFactoryContext& context) {
+  Server::Configuration::ServerFactoryContext& server_context = context.serverFactoryContext();
+  auto initial_metadata_or_error =
+      server_context.clusterManager().grpcAsyncClientManager().parseGrpcServiceInitialMetadata(
+          grpc_service, context);
+  RETURN_IF_NOT_OK_REF(initial_metadata_or_error.status());
+  return [&server_context, grpc_service, initial_metadata = std::move(*initial_metadata_or_error)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
+        grpc_service, initial_metadata, server_context));
+  };
+}
+
 // Downstream only filter factory.
 class ServerFactoryContextFilterFactory
     : public Extensions::HttpFilters::Common::FactoryBase<
@@ -139,15 +157,10 @@ private:
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
       Server::Configuration::ServerFactoryContext& server_context,
-      Server::Configuration::ExtraFactoryContext&) override {
-    FilterConfigSharedPtr filter_config =
-        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfig>(
-            proto_config);
-    return [&server_context, filter_config = std::move(filter_config)](
-               Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
-          filter_config->grpc_service(), server_context));
-    };
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    Server::GenericFactoryContextImpl generic_context(
+        server_context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), generic_context);
   }
 };
 
@@ -164,30 +177,20 @@ public:
 private:
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
-      const std::string&, DualInfo,
+      const std::string&, DualInfo info,
       Server::Configuration::ServerFactoryContext& server_context) override {
-    auto filter_config =
-        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfigDual>(
-            proto_config);
-    return [&server_context, filter_config = std::move(filter_config)](
-               Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
-          filter_config->grpc_service(), server_context));
-    };
+    Server::GenericFactoryContextImpl generic_context(
+        server_context, info.scope, server_context.messageValidationVisitor(), info.init_manager);
+    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), generic_context);
   }
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
       Server::Configuration::ServerFactoryContext& server_context,
-      Server::Configuration::ExtraFactoryContext&) override {
-    auto filter_config =
-        std::make_shared<test::integration::filters::ServerFactoryContextFilterConfigDual>(
-            proto_config);
-    return [&server_context, filter_config = std::move(filter_config)](
-               Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      callbacks.addStreamFilter(std::make_shared<ServerFactoryContextFilter>(
-          filter_config->grpc_service(), server_context));
-    };
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    Server::GenericFactoryContextImpl generic_context(
+        server_context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+    return createServerFactoryContextFilterFactory(proto_config.grpc_service(), generic_context);
   }
 };
 

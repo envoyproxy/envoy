@@ -126,11 +126,17 @@ HeaderParser::configure(const Protobuf::RepeatedPtrField<HeaderValueOption>& hea
 absl::StatusOr<HeaderParserPtr> HeaderParser::configure(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
     HeaderAppendAction append_action) {
+  return configure(headers_to_add, append_action, Formatter::CommandParserPtrVector{});
+}
+
+absl::StatusOr<HeaderParserPtr> HeaderParser::configure(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue>& headers_to_add,
+    HeaderAppendAction append_action, const Formatter::CommandParserPtrVector& command_parsers) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   header_parser->headers_to_add_.reserve(headers_to_add.size());
   for (const auto& header_value : headers_to_add) {
-    auto entry_or_error = HeadersToAddEntry::create(header_value, append_action);
+    auto entry_or_error = HeadersToAddEntry::create(header_value, append_action, command_parsers);
     RETURN_IF_NOT_OK_REF(entry_or_error.status());
     header_parser->headers_to_add_.emplace_back(Http::LowerCaseString(header_value.key()),
                                                 std::move(entry_or_error.value()));

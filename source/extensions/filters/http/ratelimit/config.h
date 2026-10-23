@@ -28,10 +28,11 @@ private:
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 
   // Shared factory creation used by the listener/cluster and route/vhost-level paths. The
-  // FilterConfig stats are scoped to the given scope.
+  // FilterConfig stats are scoped to the scope of `generic_context`.
   absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
-      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::GenericFactoryContext& generic_context);
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(

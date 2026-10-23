@@ -9,8 +9,11 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/grpc/stat_names.h"
 #include "source/common/protobuf/utility.h"
+
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -19,39 +22,45 @@ class AsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   AsyncClientFactoryImpl(const envoy::config::core::v3::GrpcService& config,
                          bool skip_cluster_check,
-                         Server::Configuration::CommonFactoryContext& context,
+                         Server::Configuration::ServerFactoryContext& context,
+                         GrpcServiceInitialMetadataSharedPtr initial_metadata,
                          absl::Status& creation_status);
   absl::StatusOr<RawAsyncClientPtr> createUncachedRawAsyncClient() override;
 
 private:
   const envoy::config::core::v3::GrpcService config_;
-  Server::Configuration::CommonFactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
+  const GrpcServiceInitialMetadataSharedPtr initial_metadata_;
 };
 
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   GoogleAsyncClientFactoryImpl(const envoy::config::core::v3::GrpcService& config,
                                ThreadLocal::Slot* google_tls_slot, Stats::Scope& scope,
-                               Server::Configuration::CommonFactoryContext& context,
-                               const StatNames& stat_names, absl::Status& creation_status);
+                               Server::Configuration::ServerFactoryContext& context,
+                               const StatNames& stat_names,
+                               GrpcServiceInitialMetadataSharedPtr initial_metadata,
+                               absl::Status& creation_status);
   absl::StatusOr<RawAsyncClientPtr> createUncachedRawAsyncClient() override;
 
 private:
   ThreadLocal::Slot* google_tls_slot_;
   Stats::ScopeSharedPtr scope_;
   const envoy::config::core::v3::GrpcService config_;
-  Server::Configuration::CommonFactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   const StatNames& stat_names_;
+  const GrpcServiceInitialMetadataSharedPtr initial_metadata_;
 };
 
-class AsyncClientManagerImpl : public AsyncClientManager {
+class AsyncClientManagerImpl : public AsyncClientManager, Logger::Loggable<Logger::Id::grpc> {
 public:
   AsyncClientManagerImpl(
       const envoy::config::bootstrap::v3::Bootstrap::GrpcAsyncClientManagerConfig& config,
-      Server::Configuration::CommonFactoryContext& context, const StatNames& stat_names);
+      Server::Configuration::ServerFactoryContext& context, const StatNames& stat_names);
   absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClient(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
-                            bool skip_cluster_check) override;
+                            bool skip_cluster_check,
+                            GrpcServiceInitialMetadataSharedPtr initial_metadata) override;
 
   absl::StatusOr<RawAsyncClientSharedPtr>
   getOrCreateRawAsyncClientWithHashKey(const GrpcServiceConfigWithHashKey& config_with_hash_key,
@@ -59,7 +68,14 @@ public:
 
   absl::StatusOr<AsyncClientFactoryPtr>
   factoryForGrpcService(const envoy::config::core::v3::GrpcService& config, Stats::Scope& scope,
-                        bool skip_cluster_check) override;
+                        bool skip_cluster_check,
+                        GrpcServiceInitialMetadataSharedPtr initial_metadata) override;
+
+  absl::StatusOr<GrpcServiceInitialMetadataSharedPtr>
+  parseGrpcServiceInitialMetadata(const envoy::config::core::v3::GrpcService& config,
+                                  Server::Configuration::GenericFactoryContext& context) override;
+  absl::StatusOr<GrpcServiceInitialMetadataSharedPtr> parseGrpcServiceInitialMetadataForServer(
+      const envoy::config::core::v3::GrpcService& config) override;
   class RawAsyncClientCache : public ThreadLocal::ThreadLocalObject {
   public:
     explicit RawAsyncClientCache(Event::Dispatcher& dispatcher,
@@ -89,7 +105,7 @@ public:
   };
 
 private:
-  Server::Configuration::CommonFactoryContext& context_;
+  Server::Configuration::ServerFactoryContext& context_;
   ThreadLocal::SlotSharedPtr google_tls_slot_;
   const StatNames& stat_names_;
   ThreadLocal::TypedSlot<RawAsyncClientCache> raw_async_client_cache_;
