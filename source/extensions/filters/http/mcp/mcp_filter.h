@@ -200,9 +200,15 @@ private:
   bool headerAttributesMatch() const;
   bool verifyHeaderAttributes() const;
   bool hasRequiredClientCapabilities() const;
+  // Result of validating params._meta["io.modelcontextprotocol/protocolVersion"] for a 2026-07-28
+  // request.
   enum class ProtocolVersionValidationResult {
     Ok,
+    // The field is absent, including when params or params._meta is absent or not an object.
     Missing,
+    // The field is present but is not a string.
+    Invalid,
+    // The field is a string that does not match the MCP-Protocol-Version header.
     Mismatch,
   };
   ProtocolVersionValidationResult validateProtocolVersion() const;

@@ -865,7 +865,7 @@ McpFilter::ProtocolVersionValidationResult McpFilter::validateProtocolVersion() 
   }
 
   if (it->second.kind_case() != Protobuf::Value::kStringValue) {
-    return ProtocolVersionValidationResult::Mismatch;
+    return ProtocolVersionValidationResult::Invalid;
   }
 
   if (it->second.string_value() != *protocol_version_) {
@@ -916,6 +916,26 @@ Http::FilterDataStatus McpFilter::completeParsing() {
     if (shouldRejectRequest()) {
       sendHeaderMismatchReply("MCP header attributes do not match request body");
 
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+  }
+
+  if (shouldRejectRequest()) {
+    if (version_validation == ProtocolVersionValidationResult::Invalid) {
+      sendJsonRpcErrorReply(
+          Filters::Common::Mcp::McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
+          absl::StrCat("Invalid params._meta field: ",
+                       Filters::Common::Mcp::McpConstants::MCP_META_PROTOCOL_VERSION_FIELD,
+                       " must be a string"));
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    if (version_validation == ProtocolVersionValidationResult::Missing && !parser_->isResponse() &&
+        parser_->getNestedValue(Filters::Common::Mcp::McpConstants::ID_FIELD) != nullptr) {
+      sendJsonRpcErrorReply(
+          Filters::Common::Mcp::McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
+          absl::StrCat("Missing required params._meta field: ",
+                       Filters::Common::Mcp::McpConstants::MCP_META_PROTOCOL_VERSION_FIELD));
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
