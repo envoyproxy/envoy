@@ -1,0 +1,7 @@
+sensitive {
+  sensitive_typed_struct {
+    type_url: "type.googleapis.com/google.protobuf.Duration"
+    value {
+    }
+  }
+}

@@ -482,12 +482,13 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
   const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
   const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
   ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr);
-  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor) &&
-      !reflection->HasField(*reflectable_message, value_field_descriptor)) {
+  // No payload to reify or to redact. Continuing would hand the message to the generic pass,
+  // which would write "[redacted]" over the type url.
+  if (!reflection->HasField(*reflectable_message, value_field_descriptor)) {
     return true;
   }
-  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor) ||
-      !reflection->HasField(*reflectable_message, value_field_descriptor)) {
+  // A payload with no type url cannot be reified.
+  if (!reflection->HasField(*reflectable_message, type_url_field_descriptor)) {
     return false;
   }
 
@@ -520,7 +521,12 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
     return false;
   });
   redact(typed_message.get(), ancestor_is_sensitive);
-  repack(typed_message.get(), reflection, value_field_descriptor);
+  TRY_ASSERT_MAIN_THREAD { repack(typed_message.get(), reflection, value_field_descriptor); }
+  END_TRY CATCH(const EnvoyException& e, {
+    ENVOY_LOG_MISC(warn, "Could not repack {} with type URL {}: {}", opaque_type_name, type_url,
+                   e.what());
+    return false;
+  });
   return true;
 }
 
@@ -593,8 +599,13 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     const auto* field_descriptor = descriptor->field(i);
 
     // Redact if this field or any of its ancestors have the `sensitive` option set.
-    const bool sensitive = ancestor_is_sensitive ||
-                           field_descriptor->options().GetExtension(udpa::annotations::sensitive);
+    const bool sensitive =
+        ancestor_is_sensitive || MessageUtil::isSensitiveField(*field_descriptor);
+
+    if (sensitive && field_descriptor->name() == "type_url" &&
+        MessageUtil::isTypedStruct(*descriptor)) {
+      continue;
+    }
 
     if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
@@ -644,12 +655,33 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
       }
     }
   }
+
+  // TODO(filipcacky): Remove this when protobuf stops aborting
+  // Protobuf aborts printing a Value with no kind, so null takes the place of a cleared one.
+  if (ancestor_is_sensitive && descriptor->full_name() == "google.protobuf.Value" &&
+      reflection->GetOneofFieldDescriptor(*reflectable_message, descriptor->oneof_decl(0)) ==
+          nullptr) {
+    reflection->SetEnumValue(&(*reflectable_message), descriptor->FindFieldByName("null_value"), 0);
+  }
 }
 
 } // namespace
 
 void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
+}
+
+void MessageUtil::redactAll(Protobuf::Message& message) {
+  ::Envoy::redact(&message, /* ancestor_is_sensitive = */ true);
+}
+
+bool MessageUtil::isSensitiveField(const Protobuf::FieldDescriptor& field) {
+  return field.options().GetExtension(udpa::annotations::sensitive);
+}
+
+bool MessageUtil::isTypedStruct(const Protobuf::Descriptor& descriptor) {
+  const absl::string_view name = descriptor.full_name();
+  return name == "xds.type.v3.TypedStruct" || name == "udpa.type.v1.TypedStruct";
 }
 
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
