@@ -1817,6 +1817,41 @@ TEST_F(NetworkExtProcFilterTest, ConnectionAttributesSentOnlyOnce) {
 
 TEST_F(NetworkExtProcFilterTest, MetadataForwardingSentOnlyOnce) {
   recreateFilterWithMetadataOptions({"untyped-ns"}, {}, true);
+  addDynamicMetadata("untyped-ns", "key1", "value1");
+
+  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
+  auto* stream_ptr = stream.get();
+  EXPECT_CALL(*client_, start(_, _, _, _))
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
+
+  // First chunk should include the metadata.
+  Buffer::OwnedImpl data1("chunk1");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_TRUE(req.has_metadata());
+    EXPECT_THAT(
+        req.metadata().filter_metadata(),
+        Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
+  });
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data1, false));
+
+  auto response1 = std::make_unique<ProcessingResponse>();
+  response1->mutable_read_data()->set_data("chunk1");
+  filter_->onReceiveMessage(std::move(response1));
+
+  // Subsequent chunk should NOT include metadata since it was already sent on the first request.
+  Buffer::OwnedImpl data2("chunk2");
+  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
+    EXPECT_FALSE(req.has_metadata());
+  });
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
+}
+
+TEST_F(NetworkExtProcFilterTest, MetadataForwardingSentOnlyOnceWhenFirstRequestHasNoMetadata) {
+  recreateFilterWithMetadataOptions({"untyped-ns"}, {}, true);
 
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   auto* stream_ptr = stream.get();
@@ -1841,26 +1876,13 @@ TEST_F(NetworkExtProcFilterTest, MetadataForwardingSentOnlyOnce) {
   // Populate dynamic metadata before the second chunk.
   addDynamicMetadata("untyped-ns", "key1", "value1");
 
-  // Second chunk should include the metadata since it has not been sent yet.
+  // Second chunk should still NOT include metadata because send_once only checks on the first
+  // ProcessingRequest.
   Buffer::OwnedImpl data2("chunk2");
-  EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
-    EXPECT_TRUE(req.has_metadata());
-    EXPECT_THAT(
-        req.metadata().filter_metadata(),
-        Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
-  });
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
-
-  auto response2 = std::make_unique<ProcessingResponse>();
-  response2->mutable_read_data()->set_data("chunk2");
-  filter_->onReceiveMessage(std::move(response2));
-
-  // Subsequent chunk should NOT include metadata since it was already sent once.
-  Buffer::OwnedImpl data3("chunk3");
   EXPECT_CALL(*stream_ptr, send(_, false)).WillOnce([](ProcessingRequest&& req, bool) {
     EXPECT_FALSE(req.has_metadata());
   });
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data3, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
 }
 
 } // namespace

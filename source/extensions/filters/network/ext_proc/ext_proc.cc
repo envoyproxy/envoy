@@ -615,8 +615,8 @@ void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {
   if (!forwarding_metadata.filter_metadata().empty() ||
       !forwarding_metadata.typed_filter_metadata().empty()) {
     *req.mutable_metadata() = std::move(forwarding_metadata);
-    metadata_sent_ = true;
   }
+  metadata_sent_ = true;
 }
 
 void NetworkExtProcFilter::addAttributes(ProcessingRequest& req) {
