@@ -33,5 +33,7 @@ build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
 build --copt=--system-header-prefix=envoy/config/route/v3/route_components.pb.h
 build --per_file_copt=external/envoy_api.*/route_components\.pb\.cc@-Wno-deprecated-declarations
 
+build --features=system_include_paths --host_features=system_include_paths
+
 try-import %workspace%/../../../ci.bazelrc
 try-import %workspace%/../../../user.bazelrc
