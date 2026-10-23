@@ -44,9 +44,11 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:macros",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -248,6 +250,7 @@ envoy_cc_library(
     deps = [
         ":context_lib",
         ":session_ticket_codec_lib",
+        ":ssl_handshaker_lib",
         "//source/common/tls/ocsp:ocsp_lib",
         "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

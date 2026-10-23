@@ -3,5 +3,7 @@ peer certificate chain across downstream TLS 1.2 and TLS 1.3 ticket resumption w
 Enable ``envoy.reloadable_features.preserve_verified_peer_chain_in_session_ticket`` before
 creating TLS contexts. Verified issuer serial and digest accessors can use the restored chain;
 ``peerCertificateValidated()`` continues to describe validation on the current connection.
-Stateful session-ID caching is not covered. Changing the feature setting changes the ticket
+For stateful session-ID caching, enable the separate
+``envoy.reloadable_features.preserve_verified_peer_chain_in_session_cache`` feature.
+Changing the ticket feature setting changes the ticket
 format and causes incompatible tickets to fall back to a full handshake.

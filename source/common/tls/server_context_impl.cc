@@ -27,6 +27,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 #include "source/common/tls/cert_validator/factory.h"
+#include "source/common/tls/ssl_handshaker.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -243,6 +244,40 @@ ServerContextImpl::ServerContextImpl(
 
     if (config.disableStatefulSessionResumption()) {
       SSL_CTX_set_session_cache_mode(ctx.ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
+    } else if (!config.capabilities().handles_session_resumption &&
+               Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.preserve_verified_peer_chain_in_session_cache")) {
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+      // Publish only after attaching immutable metadata. BoringSSL's default automatic store
+      // runs before new_session_cb, which would otherwise expose a metadata-free cached session.
+      SSL_CTX_set_session_cache_mode(ctx.ssl_ctx_.get(),
+                                     SSL_CTX_get_session_cache_mode(ctx.ssl_ctx_.get()) |
+                                         SSL_SESS_CACHE_NO_INTERNAL_STORE);
+      SSL_CTX_sess_set_new_cb(ctx.ssl_ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
+        unsigned int id_length;
+        SSL_SESSION_get_id(session, &id_length);
+        if (SSL_version(ssl) > TLS1_2_VERSION || id_length == 0 ||
+            !SslHandshakerImpl::saveValidatedCertChainToSession(ssl, session)) {
+          return 0;
+        }
+        auto* context = static_cast<ServerContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+        // newSsl() starts on context 0. SSL_set_SSL_CTX() may subsequently select another
+        // certificate context, but BoringSSL's session cache remains on the original context.
+        SSL_CTX* cache = context->tls_contexts_[0].ssl_ctx_.get();
+        SSL_CTX_add_session(cache, session);
+        if (!(SSL_CTX_get_session_cache_mode(cache) & SSL_SESS_CACHE_NO_AUTO_CLEAR) &&
+            (context->stateful_sessions_since_flush_.fetch_add(1, std::memory_order_relaxed) + 1) %
+                    255 ==
+                0) {
+          SSL_CTX_flush_sessions(cache, SSL_SESSION_get_time(session));
+        }
+        return 0; // The internal cache takes its own reference; retain no callback reference.
+      });
+#else
+      creation_status =
+          absl::UnimplementedError("Verified-chain stateful sessions require BoringSSL");
+      return;
+#endif
     }
 
     if (config.sessionTimeout() && !config.capabilities().handles_session_resumption) {

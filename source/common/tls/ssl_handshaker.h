@@ -21,6 +21,7 @@
 #include "source/common/tls/utility.h"
 
 #include "absl/container/node_hash_map.h"
+#include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 
@@ -140,6 +141,9 @@ public:
 
   // Ssl::ConnectionInfo
   bool peerCertificateValidated() const override;
+
+  // Called before a newly established server session is published to the internal cache.
+  static bool saveValidatedCertChainToSession(SSL* ssl, SSL_SESSION* session);
 
   // ConnectionInfoImplBase
   SSL* ssl() const override { return ssl_.get(); }
