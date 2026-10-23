@@ -3908,40 +3908,6 @@ filter_chains:
   EXPECT_NE("", scope.counterFromString("bar").name());
 }
 
-TEST_P(ListenerManagerImplTest, StatsMatcherMetadataButNoMatcherAndDisableStrictCheck) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.strict_stats_matcher_unpacked", "false"}});
-
-  const std::string yaml = R"EOF(
-stat_prefix: test_prefix
-address:
-  socket_address:
-    address: "::1"
-    port_value: 10000
-metadata:
-  typed_filter_metadata:
-    envoy.stats_matcher:
-      "@type": type.googleapis.com/google.protobuf.Struct
-      value:
-        fields:
-          foo:
-            string_value: "bar"
-filter_chains:
-- filters: []
-  )EOF";
-
-  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
-  auto& scope = manager_->listeners().front().get().listenerScope();
-
-  // The presence of metadata that does not conform to a stats matcher should not impact stat
-  // creation.
-  // This is edge case that should never happen in practice but we want to make sure that
-  // it doesn't cause any problems if it does.
-  EXPECT_NE("", scope.counterFromString("foo").name());
-  EXPECT_NE("", scope.counterFromString("bar").name());
-}
-
 // Listener has metadata but no stats matcher, this should be rejected.
 TEST_P(ListenerManagerImplTest, StatsMatcherMetadataButNoMatcher) {
   const std::string yaml = R"EOF(

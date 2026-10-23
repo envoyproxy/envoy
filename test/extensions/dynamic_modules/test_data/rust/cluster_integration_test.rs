@@ -718,14 +718,14 @@ impl ClusterLb for WorkerLocalRebuildLb {
     num_hosts_removed: usize,
   ) {
     // Drop removed hosts resolved directly from the member update.
-    for i in 0..num_hosts_removed {
+    for i in 0 .. num_hosts_removed {
       if let Some(host) = envoy_lb.get_member_update_host(i, false) {
         let addr = host as usize;
         self.hosts.retain(|&existing| existing != addr);
       }
     }
     // Learn added hosts directly from the member update so routing uses the pointer it returns.
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       if let Some(host) = envoy_lb.get_member_update_host(i, true) {
         self.hosts.push(host as usize);
       }
@@ -940,7 +940,7 @@ impl ClusterLb for MemberUpdatePackedAddressLb {
     num_hosts_added: usize,
     _num_hosts_removed: usize,
   ) {
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       // The packed bytes must agree with the formatted address for the same host.
       let verified = match (
         envoy_lb.get_member_update_host_packed_address(i, true),

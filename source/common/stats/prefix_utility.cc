@@ -1,5 +1,6 @@
 #include "source/common/stats/prefix_utility.h"
 
+#include <initializer_list>
 #include <optional>
 #include <string>
 
@@ -53,7 +54,7 @@ std::optional<TagStringView> extractParentTag(absl::string_view prefix) {
 
 TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
                                absl::string_view base_name, TagStringViewSpan tags,
-                               absl::string_view name) {
+                               absl::string_view name, bool sanitize) {
   // With no own tags the own prefix has no variable segment, so its tagged and tag-extracted forms
   // are identical; callers need only supply base_name.
   if (tags.empty()) {
@@ -79,8 +80,8 @@ TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view pref
   merged_tags.insert(merged_tags.end(), tags.begin(), tags.end());
 
   // This helper function assumes the caller has already handled the dot correctly and then we can
-  // concatenate the two prefixes directly. The TaggedStatName then sanitizes the name, base, and
-  // tags to remove any leading or trailing dot.
+  // concatenate the two prefixes directly. When sanitizing, the TaggedStatName also removes any
+  // leading or trailing dot of the name, base, and tags.
   const std::string tagged = absl::StrCat(prefix, name);
 
   // When no tag is contributed (neither the parent prefix nor the input tags), base_prefix is the
@@ -88,10 +89,29 @@ TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view pref
   // the tagged name instead of building an identical base string.
   if (merged_tags.empty()) {
     ASSERT(tagged == absl::StrCat(base_prefix, base_name));
-    return {symbol_table, tagged, merged_tags, tagged};
+    return {symbol_table, tagged, merged_tags, tagged, sanitize};
   }
   const std::string base = absl::StrCat(base_prefix, base_name);
-  return {symbol_table, base, merged_tags, tagged};
+  return {symbol_table, base, merged_tags, tagged, sanitize};
+}
+
+TaggedStatName workerStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
+                                absl::string_view name, absl::string_view suffix) {
+  static constexpr absl::string_view worker_prefix = "worker_";
+  if (!absl::StartsWith(name, worker_prefix)) {
+    // Not a worker thread: the name stays a plain segment of the untagged prefix.
+    return {symbol_table,
+            name.empty() ? absl::StrCat(prefix, suffix) : absl::StrCat(prefix, name, ".", suffix),
+            {},
+            {}};
+  }
+
+  absl::string_view worker_id_value = name.substr(worker_prefix.size());
+  const TagStringView tag{Envoy::Config::TagNames::get().WORKER_ID, worker_id_value};
+  return {symbol_table,
+          absl::StrCat(prefix, "worker", ".", suffix),
+          {tag},
+          absl::StrCat(prefix, name, ".", suffix)};
 }
 
 } // namespace Stats
