@@ -48,9 +48,6 @@ public:
 };
 
 bool isProxying(StreamInfo::StreamInfo* stream_info) {
-  // Should not hit this call unless the flag is enabled.
-  ASSERT(Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"));
   return stream_info && stream_info->filterState() &&
          stream_info->filterState()->hasData<Network::Http11ProxyInfoFilterState>(
              Network::Http11ProxyInfoFilterState::key());

@@ -87,6 +87,8 @@ areas:
   credential_injector:
     title: credential_injector
 
+  decompression:
+    title: decompression
   dns:
     title: dns
   dns_resolver:
@@ -127,6 +129,8 @@ areas:
     title: happy_eyeballs
   header_mutation:
     title: header_mutation
+  health_check:
+    title: health_check
   http:
     title: http
   http2:

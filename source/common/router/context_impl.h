@@ -56,7 +56,7 @@ private:
 
 class RouteStatsContextImpl : public RouteStatsContext {
 public:
-  RouteStatsContextImpl(Stats::Scope& scope, const RouteStatNames& route_stat_names,
+  RouteStatsContextImpl(Stats::ScopeSharedPtr scope, const RouteStatNames& route_stat_names,
                         const Stats::StatName& vhost_stat_name, const std::string& stat_prefix);
 
   ~RouteStatsContextImpl() override = default;
@@ -66,7 +66,9 @@ public:
 
 private:
   const Stats::StatNameManagedStorage route_stat_name_storage_;
-  Stats::ScopeSharedPtr route_stats_scope_;
+  // The shared scope that owns the stats, retained because a route can outlive the route
+  // configuration across a config swap.
+  Stats::ScopeSharedPtr scope_;
   Stats::StatName route_stat_name_;
   RouteStats route_stats_;
 };

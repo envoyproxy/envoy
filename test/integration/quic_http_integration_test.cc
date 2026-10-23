@@ -903,33 +903,27 @@ typed_config:
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
 
-  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setExpectedPeerAddress(fmt::format(
-          "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
-  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  // Defer cert validation with a generous timeout so it remains pending until after disconnect.
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
+  cert_validator.setExpectedPeerAddress(fmt::format(
+      "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
+  // Once cert validation starts, shorten the handshake timeout so the handshake fails while cert
   // validation is pending.
-  quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
-  auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
-  persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
-  persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
+  cert_validator.setOnValidationStartedCallback([this]() {
+    quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(1);
+    quic_connection_->SetNetworkTimeouts(connect_timeout, connect_timeout);
+  });
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -945,31 +939,26 @@ typed_config:
   )EOF"),
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
-  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
-  auto cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
-  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  // Defer cert validation with a generous timeout so it remains pending until after teardown.
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
+  // Once cert validation starts, shorten the handshake timeout so the handshake fails while cert
   // validation is pending.
-  quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
-  auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
-  persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
-  persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
+  cert_validator.setOnValidationStartedCallback([this]() {
+    quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(1);
+    quic_connection_->SetNetworkTimeouts(connect_timeout, connect_timeout);
+  });
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
   codec_client_.reset();
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
