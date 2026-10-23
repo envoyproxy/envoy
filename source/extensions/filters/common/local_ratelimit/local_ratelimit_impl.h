@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <chrono>
 #include <ratio>
 
@@ -119,7 +120,8 @@ public:
   bool shadowMode() const override { return shadow_mode_; }
   uint64_t maxTokens() const override { return static_cast<uint64_t>(token_bucket_.maxTokens()); }
   uint64_t remainingTokens() const override {
-    return static_cast<uint64_t>(token_bucket_.remainingTokens());
+    // The bucket can go below zero when a shared request consumes future tokens.
+    return static_cast<uint64_t>(std::max(0.0, token_bucket_.remainingTokens()));
   }
   uint64_t resetSeconds() const override {
     return static_cast<uint64_t>(
@@ -130,6 +132,7 @@ private:
   AtomicTokenBucketImpl token_bucket_;
   const std::chrono::milliseconds fill_interval_;
   const bool shadow_mode_{false};
+  const bool preserve_one_request_;
 };
 using RateLimitTokenBucketSharedPtr = std::shared_ptr<RateLimitTokenBucket>;
 
