@@ -5,14 +5,14 @@
 #include <vector>
 
 #include "envoy/config/core/v3/base.pb.h"
-#include "envoy/extensions/load_balancing_policies/quota_aware/v3/quota_aware.pb.h"
+#include "envoy/extensions/load_balancing_policies/host_allowlist/v3/host_allowlist.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/config/metadata.h"
-#include "source/extensions/load_balancing_policies/quota_aware/config.h"
-#include "source/extensions/load_balancing_policies/quota_aware/load_balancer.h"
+#include "source/extensions/load_balancing_policies/host_allowlist/config.h"
+#include "source/extensions/load_balancing_policies/host_allowlist/load_balancer.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #include "test/common/upstream/utility.h"
@@ -32,10 +32,10 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
-namespace QuotaAware {
+namespace HostAllowlist {
 namespace {
 
-using ::envoy::extensions::load_balancing_policies::quota_aware::v3::QuotaAware;
+using ::envoy::extensions::load_balancing_policies::host_allowlist::v3::HostAllowlist;
 using ::envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
 using ::Envoy::Upstream::HostConstSharedPtr;
 using ::Envoy::Upstream::HostSharedPtr;
@@ -145,7 +145,7 @@ InspectingFallbackLb::InspectingFallbackLb(std::shared_ptr<InspectingFallbackSta
                                            bool recreate_on_host_change)
     : factory_(std::make_shared<WorkerFactory>(std::move(state), recreate_on_host_change)) {}
 
-class QuotaAwareLoadBalancerTest : public ::testing::Test {
+class HostAllowlistLoadBalancerTest : public ::testing::Test {
 public:
   void SetUp() override {
     ON_CALL(load_balancer_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
@@ -159,18 +159,22 @@ public:
   }
 
 protected:
-  QuotaAware makeConfig(bool fail_closed = false) {
-    QuotaAware config;
+  HostAllowlist makeConfig(bool fail_closed = false) {
+    HostAllowlist config;
+    config.set_metadata_namespace("envoy.filters.http.ratelimit");
+    config.set_metadata_key("candidates");
+    config.add_host_metadata_keys("id");
+    config.add_host_metadata_keys("secondary_id");
     config.set_fail_closed_on_missing_metadata(fail_closed);
     auto* typed_extension_config =
-        config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+        config.mutable_child_policy()->add_policies()->mutable_typed_extension_config();
     typed_extension_config->set_name("envoy.load_balancing_policies.round_robin");
     RoundRobin rr;
     std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(rr);
     return config;
   }
 
-  void createLoadBalancer(const QuotaAware& config) {
+  void createLoadBalancer(const HostAllowlist& config) {
     lb_config_ = factory_.loadConfig(server_factory_context_, config).value();
     thread_aware_lb_ =
         factory_.create(*lb_config_, *cluster_info_, main_thread_priority_set_,
@@ -183,12 +187,12 @@ protected:
     }
   }
 
-  void createLoadBalancerWithFallback(const QuotaAware& config,
+  void createLoadBalancerWithFallback(const HostAllowlist& config,
                                       Upstream::ThreadAwareLoadBalancerPtr fallback) {
     lb_config_ = factory_.loadConfig(server_factory_context_, config).value();
-    const auto& quota_config = dynamic_cast<const QuotaAwareLbConfig&>(*lb_config_);
-    thread_aware_lb_ = std::make_unique<QuotaAwareLoadBalancer>(quota_config, std::move(fallback),
-                                                                cluster_info_->statsScope());
+    const auto& quota_config = dynamic_cast<const HostAllowlistLbConfig&>(*lb_config_);
+    thread_aware_lb_ = std::make_unique<HostAllowlistLoadBalancer>(
+        quota_config, std::move(fallback), cluster_info_->statsScope());
     ASSERT_OK(thread_aware_lb_->initialize());
     load_balancer_ = thread_aware_lb_->factory()->create(lb_params_);
   }
@@ -260,7 +264,7 @@ protected:
           .mutable_fields())["candidates"] = list;
   }
 
-  QuotaAwareLoadBalancerFactory factory_;
+  HostAllowlistLoadBalancerFactory factory_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
       std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
@@ -274,7 +278,7 @@ protected:
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
-TEST_F(QuotaAwareLoadBalancerTest, MissingMetadataFailOpenPicksInner) {
+TEST_F(HostAllowlistLoadBalancerTest, MissingMetadataFailOpenPicksInner) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east});
@@ -288,22 +292,22 @@ TEST_F(QuotaAwareLoadBalancerTest, MissingMetadataFailOpenPicksInner) {
   EXPECT_EQ(east, load_balancer_->peekAnotherHost(&load_balancer_context_));
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, MissingMetadataFailClosedReturns429) {
+TEST_F(HostAllowlistLoadBalancerTest, MissingMetadataFailClosedReturns429) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   setHosts(0, {east});
   createLoadBalancer(makeConfig(true));
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
   EXPECT_EQ(nullptr, response.host);
-  EXPECT_EQ("quota_metadata_missing", response.details);
+  EXPECT_EQ("lb_metadata_missing", response.details);
   ASSERT_TRUE(response.failure_status.has_value());
   EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
-  EXPECT_EQ(1, counterValue("quota_aware.rq_metadata_missing"));
-  EXPECT_EQ(0, counterValue("quota_aware.rq_exhausted"));
+  EXPECT_EQ(1, counterValue("host_allowlist.rq_metadata_missing"));
+  EXPECT_EQ(0, counterValue("host_allowlist.rq_lb_attempt_exhausted"));
   EXPECT_EQ(nullptr, load_balancer_->peekAnotherHost(&load_balancer_context_));
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, HierarchicalIdMatchesCandidatePrefix) {
+TEST_F(HostAllowlistLoadBalancerTest, HierarchicalIdMatchesCandidatePrefix) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
@@ -316,7 +320,7 @@ TEST_F(QuotaAwareLoadBalancerTest, HierarchicalIdMatchesCandidatePrefix) {
   EXPECT_EQ(west.get(), response.host.get());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, HierarchicalIdDoesNotMatchSiblingPrefix) {
+TEST_F(HostAllowlistLoadBalancerTest, HierarchicalIdDoesNotMatchSiblingPrefix) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a-west/shard/0/member/0");
   setHosts(0, {east});
   setCandidates({{"dc1/svc-a", ""}});
@@ -324,13 +328,13 @@ TEST_F(QuotaAwareLoadBalancerTest, HierarchicalIdDoesNotMatchSiblingPrefix) {
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
   EXPECT_EQ(nullptr, response.host);
-  EXPECT_EQ("quota_exhausted", response.details);
+  EXPECT_EQ("lb_attempt_exhausted", response.details);
   ASSERT_TRUE(response.failure_status.has_value());
   EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
-  EXPECT_EQ(1, counterValue("quota_aware.rq_exhausted"));
+  EXPECT_EQ(1, counterValue("host_allowlist.rq_lb_attempt_exhausted"));
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, MixedP0SkipsExhaustedHost) {
+TEST_F(HostAllowlistLoadBalancerTest, MixedP0SkipsExhaustedHost) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
@@ -344,7 +348,7 @@ TEST_F(QuotaAwareLoadBalancerTest, MixedP0SkipsExhaustedHost) {
   }
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, P0ExhaustedPicksP1) {
+TEST_F(HostAllowlistLoadBalancerTest, P0ExhaustedPicksP1) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east});
@@ -357,7 +361,7 @@ TEST_F(QuotaAwareLoadBalancerTest, P0ExhaustedPicksP1) {
   EXPECT_EQ(west.get(), response.host.get());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, AllExhaustedReturns429) {
+TEST_F(HostAllowlistLoadBalancerTest, AllExhaustedReturns429) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east});
@@ -367,13 +371,13 @@ TEST_F(QuotaAwareLoadBalancerTest, AllExhaustedReturns429) {
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
   EXPECT_EQ(nullptr, response.host);
-  EXPECT_EQ("quota_exhausted", response.details);
+  EXPECT_EQ("lb_attempt_exhausted", response.details);
   ASSERT_TRUE(response.failure_status.has_value());
   EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
-  EXPECT_EQ(1, counterValue("quota_aware.rq_exhausted"));
+  EXPECT_EQ(1, counterValue("host_allowlist.rq_lb_attempt_exhausted"));
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, UnknownHostMetadataNotSkipped) {
+TEST_F(HostAllowlistLoadBalancerTest, UnknownHostMetadataNotSkipped) {
   auto unknown = makeHostNoMetadata("tcp://127.0.0.1:80");
   auto east = makeHost("tcp://127.0.0.1:81", "dc1/svc-a/shard/0/member/0");
   setHosts(0, {unknown, east});
@@ -385,7 +389,7 @@ TEST_F(QuotaAwareLoadBalancerTest, UnknownHostMetadataNotSkipped) {
   EXPECT_EQ(unknown.get(), response.host.get());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, InnerRetryPredicateStillFires) {
+TEST_F(HostAllowlistLoadBalancerTest, InnerRetryPredicateStillFires) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
@@ -399,7 +403,7 @@ TEST_F(QuotaAwareLoadBalancerTest, InnerRetryPredicateStillFires) {
   EXPECT_EQ(west.get(), response.host.get());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, StringListCandidates) {
+TEST_F(HostAllowlistLoadBalancerTest, StringListCandidatesAreIgnored) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
   setHosts(0, {east, west});
@@ -407,11 +411,11 @@ TEST_F(QuotaAwareLoadBalancerTest, StringListCandidates) {
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
-  ASSERT_NE(nullptr, response.host);
-  EXPECT_EQ(west.get(), response.host.get());
+  EXPECT_EQ(nullptr, response.host);
+  EXPECT_EQ("lb_attempt_exhausted", response.details);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, NoContextFailOpen) {
+TEST_F(HostAllowlistLoadBalancerTest, NoContextFailOpen) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   setHosts(0, {east});
   createLoadBalancer(makeConfig());
@@ -421,19 +425,19 @@ TEST_F(QuotaAwareLoadBalancerTest, NoContextFailOpen) {
   EXPECT_EQ(east, load_balancer_->peekAnotherHost(nullptr));
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, NoContextFailClosed) {
+TEST_F(HostAllowlistLoadBalancerTest, NoContextFailClosed) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
   setHosts(0, {east});
   createLoadBalancer(makeConfig(true));
 
   auto response = load_balancer_->chooseHost(nullptr);
   EXPECT_EQ(nullptr, response.host);
-  EXPECT_EQ("quota_metadata_missing", response.details);
+  EXPECT_EQ("lb_metadata_missing", response.details);
   EXPECT_EQ(nullptr, load_balancer_->peekAnotherHost(nullptr));
-  EXPECT_EQ(1, counterValue("quota_aware.rq_metadata_missing"));
+  EXPECT_EQ(1, counterValue("host_allowlist.rq_metadata_missing"));
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, SamePrimaryDifferentSecondaryPicksLiveMember) {
+TEST_F(HostAllowlistLoadBalancerTest, SamePrimaryDifferentSecondaryPicksLiveMember) {
   auto sku5 = makeHost("tcp://127.0.0.1:80", "prod/svc-x/shard/0/member/0", "sku-5");
   auto sku4 = makeHost("tcp://127.0.0.1:81", "prod/svc-x/shard/0/member/1", "sku-4");
   auto sku3 = makeHost("tcp://127.0.0.1:82", "prod/svc-x/shard/0/member/2", "sku-3");
@@ -448,7 +452,7 @@ TEST_F(QuotaAwareLoadBalancerTest, SamePrimaryDifferentSecondaryPicksLiveMember)
   }
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, StampedSecondaryIgnoresEmptySecondaryCandidate) {
+TEST_F(HostAllowlistLoadBalancerTest, StampedSecondaryIgnoresEmptySecondaryCandidate) {
   auto sku5 = makeHost("tcp://127.0.0.1:80", "prod/svc-x/shard/0/member/0", "sku-5");
   auto sku4 = makeHost("tcp://127.0.0.1:81", "prod/svc-x/shard/0/member/1", "sku-4");
   setHosts(0, {sku5, sku4});
@@ -457,12 +461,12 @@ TEST_F(QuotaAwareLoadBalancerTest, StampedSecondaryIgnoresEmptySecondaryCandidat
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
   EXPECT_EQ(nullptr, response.host);
-  EXPECT_EQ("quota_exhausted", response.details);
+  EXPECT_EQ("lb_attempt_exhausted", response.details);
   ASSERT_TRUE(response.failure_status.has_value());
   EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, UnstampedHostsMatchAnyLivePairOnPrimary) {
+TEST_F(HostAllowlistLoadBalancerTest, UnstampedHostsMatchAnyLivePairOnPrimary) {
   auto member0 = makeHost("tcp://127.0.0.1:80", "prod/svc-x/shard/0/member/0");
   auto member1 = makeHost("tcp://127.0.0.1:81", "prod/svc-x/shard/0/member/1");
   setHosts(0, {member0, member1});
@@ -473,7 +477,7 @@ TEST_F(QuotaAwareLoadBalancerTest, UnstampedHostsMatchAnyLivePairOnPrimary) {
   ASSERT_NE(nullptr, response.host);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, DifferentPrimariesSameSecondary) {
+TEST_F(HostAllowlistLoadBalancerTest, DifferentPrimariesSameSecondary) {
   auto east = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0", "sku-shared");
   auto west = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1", "sku-shared");
   setHosts(0, {east, west});
@@ -487,14 +491,13 @@ TEST_F(QuotaAwareLoadBalancerTest, DifferentPrimariesSameSecondary) {
 
 // Control plane binds RLS/host wire names onto the generic proto. Same join as
 // HierarchicalIdMatchesCandidatePrefix + pair match.
-TEST_F(QuotaAwareLoadBalancerTest, ConfiguredWireNamesStillJoin) {
-  QuotaAware config = makeConfig();
-  config.set_candidates_key("passedBackends");
+TEST_F(HostAllowlistLoadBalancerTest, ConfiguredWireNamesStillJoin) {
+  HostAllowlist config = makeConfig();
+  config.set_metadata_key("passedBackends");
   config.set_host_metadata_namespace("ext.host");
-  config.set_host_id_key("primary_name");
-  config.set_host_secondary_id_key("variant");
-  config.set_candidate_id_field("primary_name");
-  config.set_candidate_secondary_id_field("variant");
+  config.clear_host_metadata_keys();
+  config.add_host_metadata_keys("primary_name");
+  config.add_host_metadata_keys("variant");
 
   auto live = Upstream::makeTestHost(
       cluster_info_, "tcp://127.0.0.1:80",
@@ -517,7 +520,7 @@ TEST_F(QuotaAwareLoadBalancerTest, ConfiguredWireNamesStillJoin) {
   EXPECT_EQ(live.get(), response.host.get());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, MalformedCandidatesAreIgnored) {
+TEST_F(HostAllowlistLoadBalancerTest, MalformedCandidatesAreIgnored) {
   auto live = makeHost("tcp://127.0.0.1:80", "dc1/svc-b/member/0");
   setHosts(0, {live});
 
@@ -533,7 +536,7 @@ TEST_F(QuotaAwareLoadBalancerTest, MalformedCandidatesAreIgnored) {
   EXPECT_EQ(live, load_balancer_->chooseHost(&load_balancer_context_).host);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, EmptyHostIdIsNotQuotaFiltered) {
+TEST_F(HostAllowlistLoadBalancerTest, EmptyHostIdIsNotQuotaFiltered) {
   auto unstamped = makeHost("tcp://127.0.0.1:80", "");
   setHosts(0, {unstamped});
   setCandidates({{"dc1/svc-b", ""}});
@@ -542,7 +545,7 @@ TEST_F(QuotaAwareLoadBalancerTest, EmptyHostIdIsNotQuotaFiltered) {
   EXPECT_EQ(unstamped, load_balancer_->chooseHost(&load_balancer_context_).host);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, CandidateLongerThanHostDoesNotMatch) {
+TEST_F(HostAllowlistLoadBalancerTest, CandidateLongerThanHostDoesNotMatch) {
   auto host = makeHost("tcp://127.0.0.1:80", "dc1/svc-a");
   setHosts(0, {host});
   setCandidates({{"dc1/svc-a/member/0", ""}});
@@ -550,10 +553,10 @@ TEST_F(QuotaAwareLoadBalancerTest, CandidateLongerThanHostDoesNotMatch) {
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
   EXPECT_EQ(nullptr, response.host);
-  EXPECT_EQ("quota_exhausted", response.details);
+  EXPECT_EQ("lb_attempt_exhausted", response.details);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, EmptyClusterReturnsNoHost) {
+TEST_F(HostAllowlistLoadBalancerTest, EmptyClusterReturnsNoHost) {
   setHosts(0, {});
   setCandidates({{"dc1/svc-a", ""}});
   auto state = std::make_shared<InspectingFallbackState>();
@@ -565,7 +568,7 @@ TEST_F(QuotaAwareLoadBalancerTest, EmptyClusterReturnsNoHost) {
   EXPECT_FALSE(response.failure_status.has_value());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, ForwardsLoadBalancerContextAndConnectionHooks) {
+TEST_F(HostAllowlistLoadBalancerTest, ForwardsLoadBalancerContextAndConnectionHooks) {
   auto host = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/member/0");
   setHosts(0, {host});
   setCandidates({{"dc1/svc-a", ""}});
@@ -596,7 +599,26 @@ TEST_F(QuotaAwareLoadBalancerTest, ForwardsLoadBalancerContextAndConnectionHooks
                    .has_value());
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, RecreatesLegacyFallbackOnHostUpdate) {
+TEST_F(HostAllowlistLoadBalancerTest, ChildPickRejectedIfNotOnAllowlist) {
+  auto dead = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/shard/0/member/0");
+  auto live = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/shard/0/member/1");
+  setHosts(0, {dead, live});
+  setCandidates({{"dc1/svc-b", ""}});
+
+  auto state = std::make_shared<InspectingFallbackState>();
+  state->selected_host = dead;
+  createLoadBalancerWithFallback(makeConfig(),
+                                 std::make_unique<InspectingFallbackLb>(state, false));
+
+  auto response = load_balancer_->chooseHost(&load_balancer_context_);
+  EXPECT_EQ(nullptr, response.host);
+  EXPECT_EQ("lb_attempt_exhausted", response.details);
+  ASSERT_TRUE(response.failure_status.has_value());
+  EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
+  EXPECT_EQ(1, counterValue("host_allowlist.rq_lb_attempt_exhausted"));
+}
+
+TEST_F(HostAllowlistLoadBalancerTest, RecreatesLegacyFallbackOnHostUpdate) {
   setHosts(0, {});
   auto state = std::make_shared<InspectingFallbackState>();
   createLoadBalancerWithFallback(makeConfig(), std::make_unique<InspectingFallbackLb>(state, true));
@@ -606,7 +628,7 @@ TEST_F(QuotaAwareLoadBalancerTest, RecreatesLegacyFallbackOnHostUpdate) {
   EXPECT_EQ(2, state->worker_lb_create_count);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, RedistributesRoundingRemainderToFirstHealthyPriority) {
+TEST_F(HostAllowlistLoadBalancerTest, RedistributesRoundingRemainderToFirstHealthyPriority) {
   auto state = std::make_shared<InspectingFallbackState>();
   for (uint32_t priority = 0; priority < 3; ++priority) {
     auto host = makeHost(absl::StrCat("tcp://127.0.0.1:", 80 + priority),
@@ -626,7 +648,7 @@ TEST_F(QuotaAwareLoadBalancerTest, RedistributesRoundingRemainderToFirstHealthyP
   EXPECT_EQ((std::vector<uint32_t>{34, 33, 33}), state->healthy_load);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, RedistributesZeroLoadToLiveDegradedPriority) {
+TEST_F(HostAllowlistLoadBalancerTest, RedistributesZeroLoadToLiveDegradedPriority) {
   auto exhausted = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/member/0");
   auto degraded = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/member/0");
   setHosts(0, {exhausted});
@@ -644,7 +666,7 @@ TEST_F(QuotaAwareLoadBalancerTest, RedistributesZeroLoadToLiveDegradedPriority) 
   EXPECT_EQ((std::vector<uint32_t>{0, 100}), state->degraded_load);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, RedistributesRoundingRemainderToFirstDegradedPriority) {
+TEST_F(HostAllowlistLoadBalancerTest, RedistributesRoundingRemainderToFirstDegradedPriority) {
   auto state = std::make_shared<InspectingFallbackState>();
   for (uint32_t priority = 0; priority < 3; ++priority) {
     auto host = makeHost(absl::StrCat("tcp://127.0.0.1:", 80 + priority),
@@ -664,7 +686,7 @@ TEST_F(QuotaAwareLoadBalancerTest, RedistributesRoundingRemainderToFirstDegraded
   EXPECT_EQ((std::vector<uint32_t>{34, 33, 33}), state->degraded_load);
 }
 
-TEST_F(QuotaAwareLoadBalancerTest, PeekWithNoQuotaAvailableHostLeavesLoadAtZero) {
+TEST_F(HostAllowlistLoadBalancerTest, PeekWithNoQuotaAvailableHostLeavesLoadAtZero) {
   auto host = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/member/0");
   setHosts(0, {host});
   setCandidates({});
@@ -681,7 +703,7 @@ TEST_F(QuotaAwareLoadBalancerTest, PeekWithNoQuotaAvailableHostLeavesLoadAtZero)
 }
 
 } // namespace
-} // namespace QuotaAware
+} // namespace HostAllowlist
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

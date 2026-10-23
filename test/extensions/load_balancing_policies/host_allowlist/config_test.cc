@@ -1,11 +1,11 @@
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/extensions/load_balancing_policies/quota_aware/v3/quota_aware.pb.h"
+#include "envoy/extensions/load_balancing_policies/host_allowlist/v3/host_allowlist.pb.h"
 #include "envoy/extensions/load_balancing_policies/round_robin/v3/round_robin.pb.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/config/utility.h"
-#include "source/extensions/load_balancing_policies/quota_aware/config.h"
-#include "source/extensions/load_balancing_policies/quota_aware/load_balancer.h"
+#include "source/extensions/load_balancing_policies/host_allowlist/config.h"
+#include "source/extensions/load_balancing_policies/host_allowlist/load_balancer.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -20,61 +20,72 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
-namespace QuotaAware {
+namespace HostAllowlist {
 namespace {
 
-using ::envoy::extensions::load_balancing_policies::quota_aware::v3::QuotaAware;
+using ::envoy::extensions::load_balancing_policies::host_allowlist::v3::HostAllowlist;
 using ::envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
+using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 
-void addRoundRobinFallback(QuotaAware& config) {
+void fillRequiredFields(HostAllowlist& config) {
+  config.set_metadata_namespace("envoy.filters.http.ratelimit");
+  config.set_metadata_key("candidates");
+  if (config.host_metadata_keys().empty()) {
+    config.add_host_metadata_keys("id");
+  }
+}
+
+void addRoundRobinChild(HostAllowlist& config) {
+  fillRequiredFields(config);
   auto* typed_extension_config =
-      config.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+      config.mutable_child_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->set_name("envoy.load_balancing_policies.round_robin");
   RoundRobin rr;
   std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(rr);
 }
 
-TEST(QuotaAwareLbConfigTest, NoFallbackLb) {
+TEST(HostAllowlistLbConfigTest, NoFallbackLb) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancing_policies.quota_aware");
-  QuotaAware config_msg;
+  config.set_name("envoy.load_balancing_policies.host_allowlist");
+  HostAllowlist config_msg;
   std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
-  EXPECT_EQ("envoy.load_balancing_policies.quota_aware", factory.name());
+  EXPECT_EQ("envoy.load_balancing_policies.host_allowlist", factory.name());
   EXPECT_THROW_WITH_REGEX(factory.loadConfig(context, config_msg).value(), EnvoyException,
-                          "value is required");
+                          "value length must be at least 1 characters");
 }
 
-TEST(QuotaAwareLbConfigTest, NoFallbackPolicies) {
+TEST(HostAllowlistLbConfigTest, NoFallbackPolicies) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancing_policies.quota_aware");
-  QuotaAware config_msg;
-  config_msg.mutable_fallback_policy();
+  config.set_name("envoy.load_balancing_policies.host_allowlist");
+  HostAllowlist config_msg;
+  fillRequiredFields(config_msg);
+  config_msg.mutable_child_policy();
   std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
 
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
   auto result = factory.loadConfig(context, config_msg);
   EXPECT_THAT(result, StatusHelpers::HasStatus(
                           absl::StatusCode::kInvalidArgument,
-                          HasSubstr("didn't find a registered fallback load balancer factory")));
+                          HasSubstr("didn't find a registered child load balancer factory")));
 }
 
-TEST(QuotaAwareLbConfigTest, FirstValidFallbackPolicyIsUsed) {
+TEST(HostAllowlistLbConfigTest, FirstValidFallbackPolicyIsUsed) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   ::envoy::config::core::v3::TypedExtensionConfig config;
-  config.set_name("envoy.load_balancing_policies.quota_aware");
-  QuotaAware config_msg;
+  config.set_name("envoy.load_balancing_policies.host_allowlist");
+  HostAllowlist config_msg;
 
   auto* unknown =
-      config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
+      config_msg.mutable_child_policy()->add_policies()->mutable_typed_extension_config();
   unknown->set_name("not.a.real.policy");
   Protobuf::Struct empty;
   std::ignore = unknown->mutable_typed_config()->PackFrom(empty);
-  addRoundRobinFallback(config_msg);
+  addRoundRobinChild(config_msg);
 
   std::ignore = config.mutable_typed_config()->PackFrom(config_msg);
   auto& factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(config);
@@ -91,33 +102,30 @@ TEST(QuotaAwareLbConfigTest, FirstValidFallbackPolicyIsUsed) {
   EXPECT_NE(nullptr, thread_aware_lb->factory());
 }
 
-TEST(QuotaAwareLbConfigTest, EmptyConfigProto) {
-  QuotaAwareLoadBalancerFactory factory;
+TEST(HostAllowlistLbConfigTest, EmptyConfigProto) {
+  HostAllowlistLoadBalancerFactory factory;
   EXPECT_NE(nullptr, factory.createEmptyConfigProto());
-  EXPECT_EQ("envoy.load_balancing_policies.quota_aware", factory.name());
+  EXPECT_EQ("envoy.load_balancing_policies.host_allowlist", factory.name());
 }
 
-TEST(QuotaAwareLbConfigTest, DefaultsAreGeneric) {
+TEST(HostAllowlistLbConfigTest, DefaultsAreGeneric) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  QuotaAware config_msg;
-  addRoundRobinFallback(config_msg);
+  HostAllowlist config_msg;
+  addRoundRobinChild(config_msg);
 
-  auto result = QuotaAwareLoadBalancerFactory().loadConfig(context, config_msg);
+  auto result = HostAllowlistLoadBalancerFactory().loadConfig(context, config_msg);
   EXPECT_OK(result);
-  const auto* cfg = dynamic_cast<const QuotaAwareLbConfig*>(result.value().get());
+  const auto* cfg = dynamic_cast<const HostAllowlistLbConfig*>(result.value().get());
   ASSERT_NE(nullptr, cfg);
-  EXPECT_EQ(kDefaultMetadataNamespace, cfg->metadataNamespace());
-  EXPECT_EQ(kDefaultCandidatesKey, cfg->candidatesKey());
+  EXPECT_EQ("envoy.filters.http.ratelimit", cfg->metadataNamespace());
+  EXPECT_EQ("candidates", cfg->metadataKey());
   EXPECT_EQ(kDefaultHostMetadataNamespace, cfg->hostMetadataNamespace());
-  EXPECT_EQ(kDefaultHostIdKey, cfg->hostIdKey());
-  EXPECT_EQ(kDefaultHostSecondaryIdKey, cfg->hostSecondaryIdKey());
-  EXPECT_EQ(kDefaultCandidateIdField, cfg->candidateIdField());
-  EXPECT_EQ(kDefaultCandidateSecondaryIdField, cfg->candidateSecondaryIdField());
+  EXPECT_THAT(cfg->hostMetadataKeys(), testing::ElementsAre("id"));
   EXPECT_FALSE(cfg->failClosedOnMissingMetadata());
 }
 
 } // namespace
-} // namespace QuotaAware
+} // namespace HostAllowlist
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

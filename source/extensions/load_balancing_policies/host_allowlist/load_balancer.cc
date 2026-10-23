@@ -1,4 +1,4 @@
-#include "source/extensions/load_balancing_policies/quota_aware/load_balancer.h"
+#include "source/extensions/load_balancing_policies/host_allowlist/load_balancer.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -31,7 +31,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
-namespace QuotaAware {
+namespace HostAllowlist {
 namespace {
 
 using ::Envoy::Upstream::HealthyAndDegradedLoad;
@@ -43,8 +43,6 @@ using ::Envoy::Upstream::LoadBalancerContext;
 using ::Envoy::Upstream::TypedLoadBalancerFactory;
 
 // Equal, or host_id is a '/' -delimited child of candidate_id.
-// Joins RLS short "ns/backend" to AR host "ns/backend/route/.../ref/N".
-// "svc-a" matches "svc-a/shard/0"; "svc-a" does not match "svc-a-west/..." .
 bool hierarchicalIdMatches(absl::string_view host_id, absl::string_view candidate_id) {
   if (candidate_id.empty() || host_id.size() < candidate_id.size()) {
     return false;
@@ -55,28 +53,30 @@ bool hierarchicalIdMatches(absl::string_view host_id, absl::string_view candidat
   return host_id.size() == candidate_id.size() || host_id[candidate_id.size()] == '/';
 }
 
-struct CandidatePair {
-  std::string id;
-  std::string secondary;
-};
-
-// Host with a secondary id matches the exact pair. Host without a secondary
-// id matches any live pair whose primary id hierarchically matches.
 class PassedCandidates {
 public:
-  void add(absl::string_view id, absl::string_view secondary) {
-    if (id.empty()) {
+  void add(std::vector<std::string> values) {
+    if (values.empty() || values[0].empty()) {
       return;
     }
-    pairs_.push_back({std::string(id), std::string(secondary)});
+    entries_.push_back(std::move(values));
   }
 
-  bool matches(absl::string_view host_id, absl::string_view host_secondary) const {
-    for (const auto& pair : pairs_) {
-      if (!hierarchicalIdMatches(host_id, pair.id)) {
+  bool matches(const std::vector<absl::string_view>& host_values) const {
+    for (const auto& candidate : entries_) {
+      if (!hierarchicalIdMatches(host_values[0], candidate[0])) {
         continue;
       }
-      if (host_secondary.empty() || pair.secondary == host_secondary) {
+      bool ok = true;
+      const size_t n = std::min(candidate.size(), host_values.size());
+      for (size_t i = 1; i < n; ++i) {
+        // Host missing a later key matches any candidate value for it.
+        if (!host_values[i].empty() && host_values[i] != candidate[i]) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) {
         return true;
       }
     }
@@ -84,36 +84,38 @@ public:
   }
 
 private:
-  // Candidate lists are small (one entry per live quota group). Linear scan,
-  // upgrade to a trie if this is ever large.
-  std::vector<CandidatePair> pairs_;
+  // Candidate lists are small (one entry per live group). Linear scan.
+  std::vector<std::vector<std::string>> entries_;
 };
 
-absl::string_view hostSecondaryId(const Host& host, const QuotaAwareLbConfig& config) {
+std::vector<absl::string_view> hostMetadataValues(const Host& host,
+                                                  const HostAllowlistLbConfig& config) {
+  std::vector<absl::string_view> values;
+  values.reserve(config.hostMetadataKeys().size());
   const auto metadata = host.metadata();
-  if (metadata == nullptr) {
-    return {};
+  for (const auto& key : config.hostMetadataKeys()) {
+    if (metadata == nullptr) {
+      values.push_back({});
+      continue;
+    }
+    const Protobuf::Value& value =
+        Config::Metadata::metadataValue(metadata.get(), config.hostMetadataNamespace(), key);
+    if (value.has_string_value()) {
+      values.push_back(value.string_value());
+    } else {
+      values.push_back({});
+    }
   }
-  const Protobuf::Value& value = Config::Metadata::metadataValue(
-      metadata.get(), config.hostMetadataNamespace(), config.hostSecondaryIdKey());
-  if (!value.has_string_value()) {
-    return {};
-  }
-  return value.string_value();
+  return values;
 }
 
-bool hostHasQuota(const Host& host, const QuotaAwareLbConfig& config,
-                  const PassedCandidates& passed) {
-  const auto metadata = host.metadata();
-  if (metadata == nullptr) {
+bool hostOnAllowlist(const Host& host, const HostAllowlistLbConfig& config,
+                     const PassedCandidates& passed) {
+  const auto values = hostMetadataValues(host, config);
+  if (values.empty() || values[0].empty()) {
     return true;
   }
-  const Protobuf::Value& value = Config::Metadata::metadataValue(
-      metadata.get(), config.hostMetadataNamespace(), config.hostIdKey());
-  if (!value.has_string_value() || value.string_value().empty()) {
-    return true;
-  }
-  return passed.matches(value.string_value(), hostSecondaryId(host, config));
+  return passed.matches(values);
 }
 
 std::string structFieldString(const Protobuf::Struct& fields, const std::string& key) {
@@ -126,31 +128,28 @@ std::string structFieldString(const Protobuf::Struct& fields, const std::string&
 
 // nullopt: key missing or not a list. value: parsed set, possibly empty.
 std::optional<PassedCandidates> parseCandidates(const envoy::config::core::v3::Metadata& metadata,
-                                                const QuotaAwareLbConfig& config) {
-  const Protobuf::Value& value = Config::Metadata::metadataValue(
-      &metadata, config.metadataNamespace(), config.candidatesKey());
+                                                const HostAllowlistLbConfig& config) {
+  const Protobuf::Value& value =
+      Config::Metadata::metadataValue(&metadata, config.metadataNamespace(), config.metadataKey());
   if (!value.has_list_value()) {
     return std::nullopt;
   }
   PassedCandidates passed;
   for (const auto& item : value.list_value().values()) {
-    if (item.has_string_value() && !item.string_value().empty()) {
-      passed.add(item.string_value(), "");
-      continue;
-    }
     if (!item.has_struct_value()) {
       continue;
     }
-    passed.add(structFieldString(item.struct_value(), config.candidateIdField()),
-               structFieldString(item.struct_value(), config.candidateSecondaryIdField()));
+    std::vector<std::string> values;
+    values.reserve(config.hostMetadataKeys().size());
+    for (const auto& key : config.hostMetadataKeys()) {
+      values.push_back(structFieldString(item.struct_value(), key));
+    }
+    passed.add(std::move(values));
   }
   return passed;
 }
 
-// Zero load on priorities with no quota-available host, then renormalize to 100.
-// Not LoadBalancerBase::recalculatePerPriorityState: that function reads HostSet
-// health/overprovisioning. Quota exclusion is per-request and must not mutate
-// HostSet or pretend excluded hosts are unhealthy.
+// Zero load on priorities with no allowlisted host, then renormalize to 100.
 void redistributeLoad(HealthyAndDegradedLoad& load,
                       const absl::InlinedVector<uint8_t, 8>& healthy_ok,
                       const absl::InlinedVector<uint8_t, 8>& degraded_ok) {
@@ -220,10 +219,10 @@ void redistributeLoad(HealthyAndDegradedLoad& load,
   }
 }
 
-class QuotaHostExclusionContext : public LoadBalancerContext {
+class HostAllowlistExclusionContext : public LoadBalancerContext {
 public:
-  QuotaHostExclusionContext(LoadBalancerContext& inner, const QuotaAwareLbConfig& config,
-                            const PassedCandidates& passed, const PrioritySet& priority_set)
+  HostAllowlistExclusionContext(LoadBalancerContext& inner, const HostAllowlistLbConfig& config,
+                                const PassedCandidates& passed, const PrioritySet& priority_set)
       : inner_(inner), config_(config), passed_(passed), priority_set_(priority_set) {
     uint32_t host_count = 0;
     for (const auto& host_set : priority_set_.hostSetsPerPriority()) {
@@ -244,32 +243,26 @@ public:
     return inner_.downstreamHeaders();
   }
 
-  // LoadBalancerBase::chooseHostSet calls this on the context before picking a
-  // priority. Without zeroing exhausted P0 load, inner priority keeps 100% on
-  // healthy-but-excluded P0 and skip-only returns that host.
   const HealthyAndDegradedLoad&
   determinePriorityLoad(const PrioritySet& priority_set,
                         const HealthyAndDegradedLoad& original_priority_load,
                         const Upstream::RetryPriority::PriorityMappingFunc& mapping) override {
     const HealthyAndDegradedLoad& inner_load =
         inner_.determinePriorityLoad(priority_set, original_priority_load, mapping);
-    // Returned by const-ref; must outlive the inner chooseHostSet call.
     filtered_load_ = inner_load;
 
     const auto& host_sets = priority_set.hostSetsPerPriority();
-    // Typical clusters have 2-3 priorities. Capacity 8 stays on the stack;
-    // InlinedVector allocates if a cluster has more.
     absl::InlinedVector<uint8_t, 8> healthy_ok(host_sets.size(), 0);
     absl::InlinedVector<uint8_t, 8> degraded_ok(host_sets.size(), 0);
     for (size_t i = 0; i < host_sets.size(); ++i) {
       for (const auto& host : host_sets[i]->healthyHosts()) {
-        if (hostHasQuota(*host, config_, passed_)) {
+        if (hostOnAllowlist(*host, config_, passed_)) {
           healthy_ok[i] = 1;
           break;
         }
       }
       for (const auto& host : host_sets[i]->degradedHosts()) {
-        if (hostHasQuota(*host, config_, passed_)) {
+        if (hostOnAllowlist(*host, config_, passed_)) {
           degraded_ok[i] = 1;
           break;
         }
@@ -280,7 +273,7 @@ public:
   }
 
   bool shouldSelectAnotherHost(const Host& host) override {
-    if (!hostHasQuota(host, config_, passed_)) {
+    if (!hostOnAllowlist(host, config_, passed_)) {
       return true;
     }
     return inner_.shouldSelectAnotherHost(host);
@@ -305,21 +298,21 @@ public:
 
 private:
   LoadBalancerContext& inner_;
-  const QuotaAwareLbConfig& config_;
+  const HostAllowlistLbConfig& config_;
   const PassedCandidates& passed_;
   const PrioritySet& priority_set_;
   uint32_t retry_count_;
   HealthyAndDegradedLoad filtered_load_;
 };
 
-HostSelectionResponse quotaExhausted() {
-  HostSelectionResponse response(nullptr, "quota_exhausted");
+HostSelectionResponse lbAttemptExhausted() {
+  HostSelectionResponse response(nullptr, "lb_attempt_exhausted");
   response.failure_status = Http::Code::TooManyRequests;
   return response;
 }
 
-HostSelectionResponse quotaMetadataMissing() {
-  HostSelectionResponse response(nullptr, "quota_metadata_missing");
+HostSelectionResponse lbMetadataMissing() {
+  HostSelectionResponse response(nullptr, "lb_metadata_missing");
   response.failure_status = Http::Code::TooManyRequests;
   return response;
 }
@@ -333,16 +326,16 @@ bool anyHealthyHosts(const PrioritySet& priority_set) {
   return false;
 }
 
-bool anyQuotaAvailableHost(const PrioritySet& priority_set, const QuotaAwareLbConfig& config,
-                           const PassedCandidates& passed) {
+bool anyAllowlistedHost(const PrioritySet& priority_set, const HostAllowlistLbConfig& config,
+                        const PassedCandidates& passed) {
   for (const auto& host_set : priority_set.hostSetsPerPriority()) {
     for (const auto& host : host_set->healthyHosts()) {
-      if (hostHasQuota(*host, config, passed)) {
+      if (hostOnAllowlist(*host, config, passed)) {
         return true;
       }
     }
     for (const auto& host : host_set->degradedHosts()) {
-      if (hostHasQuota(*host, config, passed)) {
+      if (hostOnAllowlist(*host, config, passed)) {
         return true;
       }
     }
@@ -352,37 +345,32 @@ bool anyQuotaAvailableHost(const PrioritySet& priority_set, const QuotaAwareLbCo
 
 } // namespace
 
-QuotaAwareLoadBalancer::QuotaAwareLoadBalancer(const QuotaAwareLbConfig& config,
-                                               ThreadAwareLoadBalancerPtr fallback_picker_lb,
-                                               Stats::Scope& scope)
-    : config_(config), stats_(std::make_shared<QuotaAwareStats>(QuotaAwareStats{
-                           ALL_QUOTA_AWARE_STATS(POOL_COUNTER_PREFIX(scope, "quota_aware"))})),
-      fallback_picker_lb_(std::move(fallback_picker_lb)) {}
+HostAllowlistLoadBalancer::HostAllowlistLoadBalancer(const HostAllowlistLbConfig& config,
+                                                     ThreadAwareLoadBalancerPtr child_picker_lb,
+                                                     Stats::Scope& scope)
+    : config_(config),
+      stats_(std::make_shared<HostAllowlistStats>(HostAllowlistStats{
+          ALL_HOST_ALLOWLIST_STATS(POOL_COUNTER_PREFIX(scope, "host_allowlist"))})),
+      child_picker_lb_(std::move(child_picker_lb)) {}
 
-QuotaAwareLbConfig::QuotaAwareLbConfig(std::string metadata_namespace, std::string candidates_key,
-                                       std::string host_metadata_namespace, std::string host_id_key,
-                                       std::string host_secondary_id_key,
-                                       std::string candidate_id_field,
-                                       std::string candidate_secondary_id_field,
-                                       bool fail_closed_on_missing_metadata,
-                                       TypedLoadBalancerFactory* fallback_load_balancer_factory,
-                                       LoadBalancerConfigPtr&& fallback_load_balancer_config)
-    : fallback_picker_lb_config_{fallback_load_balancer_factory,
-                                 std::move(fallback_load_balancer_config)},
-      metadata_namespace_(std::move(metadata_namespace)),
-      candidates_key_(std::move(candidates_key)),
+HostAllowlistLbConfig::HostAllowlistLbConfig(std::string metadata_namespace,
+                                             std::string metadata_key,
+                                             std::string host_metadata_namespace,
+                                             std::vector<std::string> host_metadata_keys,
+                                             bool fail_closed_on_missing_metadata,
+                                             TypedLoadBalancerFactory* child_load_balancer_factory,
+                                             LoadBalancerConfigPtr&& child_load_balancer_config)
+    : child_picker_lb_config_{child_load_balancer_factory, std::move(child_load_balancer_config)},
+      metadata_namespace_(std::move(metadata_namespace)), metadata_key_(std::move(metadata_key)),
       host_metadata_namespace_(std::move(host_metadata_namespace)),
-      host_id_key_(std::move(host_id_key)),
-      host_secondary_id_key_(std::move(host_secondary_id_key)),
-      candidate_id_field_(std::move(candidate_id_field)),
-      candidate_secondary_id_field_(std::move(candidate_secondary_id_field)),
+      host_metadata_keys_(std::move(host_metadata_keys)),
       fail_closed_on_missing_metadata_(fail_closed_on_missing_metadata) {}
 
-absl::StatusOr<std::unique_ptr<QuotaAwareLbConfig>>
-QuotaAwareLbConfig::make(const QuotaAwareProto& config, ServerFactoryContext& context) {
-  ASSERT(config.has_fallback_policy());
+absl::StatusOr<std::unique_ptr<HostAllowlistLbConfig>>
+HostAllowlistLbConfig::make(const HostAllowlistProto& config, ServerFactoryContext& context) {
+  ASSERT(config.has_child_policy());
   absl::InlinedVector<absl::string_view, 4> missing_policies;
-  for (const auto& policy : config.fallback_policy().policies()) {
+  for (const auto& policy : config.child_policy().policies()) {
     TypedLoadBalancerFactory* factory =
         Envoy::Config::Utility::getAndCheckFactory<TypedLoadBalancerFactory>(
             policy.typed_extension_config(), /*is_optional=*/true);
@@ -391,129 +379,130 @@ QuotaAwareLbConfig::make(const QuotaAwareProto& config, ServerFactoryContext& co
       RETURN_IF_NOT_OK(Envoy::Config::Utility::translateOpaqueConfig(
           policy.typed_extension_config().typed_config(), context.messageValidationVisitor(),
           *proto_message));
-      auto fallback_load_balancer_config = factory->loadConfig(context, *proto_message);
-      RETURN_IF_NOT_OK_REF(fallback_load_balancer_config.status());
+      auto child_load_balancer_config = factory->loadConfig(context, *proto_message);
+      RETURN_IF_NOT_OK_REF(child_load_balancer_config.status());
 
       auto orDefault = [](const std::string& value, absl::string_view def) {
         return value.empty() ? std::string(def) : value;
       };
-      return std::unique_ptr<QuotaAwareLbConfig>(new QuotaAwareLbConfig(
-          orDefault(config.metadata_namespace(), kDefaultMetadataNamespace),
-          orDefault(config.candidates_key(), kDefaultCandidatesKey),
+      std::vector<std::string> host_metadata_keys(config.host_metadata_keys().begin(),
+                                                  config.host_metadata_keys().end());
+      return std::unique_ptr<HostAllowlistLbConfig>(new HostAllowlistLbConfig(
+          config.metadata_namespace(), config.metadata_key(),
           orDefault(config.host_metadata_namespace(), kDefaultHostMetadataNamespace),
-          orDefault(config.host_id_key(), kDefaultHostIdKey),
-          orDefault(config.host_secondary_id_key(), kDefaultHostSecondaryIdKey),
-          orDefault(config.candidate_id_field(), kDefaultCandidateIdField),
-          orDefault(config.candidate_secondary_id_field(), kDefaultCandidateSecondaryIdField),
-          config.fail_closed_on_missing_metadata(), factory,
-          std::move(fallback_load_balancer_config.value())));
+          std::move(host_metadata_keys), config.fail_closed_on_missing_metadata(), factory,
+          std::move(child_load_balancer_config.value())));
     }
     missing_policies.push_back(policy.typed_extension_config().name());
   }
   return absl::InvalidArgumentError(absl::StrCat(
-      "quota aware LB: didn't find a registered fallback load balancer factory with names from ",
+      "host allowlist LB: didn't find a registered child load balancer factory with names from ",
       absl::StrJoin(missing_policies, ", ")));
 }
 
-Upstream::ThreadAwareLoadBalancerPtr QuotaAwareLbConfig::create(const ClusterInfo& cluster_info,
-                                                                const PrioritySet& priority_set,
-                                                                Loader& runtime,
-                                                                RandomGenerator& random,
-                                                                TimeSource& time_source) const {
-  return fallback_picker_lb_config_.load_balancer_factory->create(
+Upstream::ThreadAwareLoadBalancerPtr HostAllowlistLbConfig::create(const ClusterInfo& cluster_info,
+                                                                   const PrioritySet& priority_set,
+                                                                   Loader& runtime,
+                                                                   RandomGenerator& random,
+                                                                   TimeSource& time_source) const {
+  return child_picker_lb_config_.load_balancer_factory->create(
       makeOptRefFromPtr<const Upstream::LoadBalancerConfig>(
-          fallback_picker_lb_config_.load_balancer_config.get()),
+          child_picker_lb_config_.load_balancer_config.get()),
       cluster_info, priority_set, runtime, random, time_source);
 }
 
-absl::Status QuotaAwareLoadBalancer::initialize() {
-  ASSERT(fallback_picker_lb_ != nullptr);
-  return fallback_picker_lb_->initialize();
+absl::Status HostAllowlistLoadBalancer::initialize() {
+  ASSERT(child_picker_lb_ != nullptr);
+  return child_picker_lb_->initialize();
 }
 
-LoadBalancerFactorySharedPtr QuotaAwareLoadBalancer::factory() {
+LoadBalancerFactorySharedPtr HostAllowlistLoadBalancer::factory() {
   if (!factory_) {
     factory_ =
-        std::make_shared<LoadBalancerFactoryImpl>(config_, fallback_picker_lb_->factory(), stats_);
+        std::make_shared<LoadBalancerFactoryImpl>(config_, child_picker_lb_->factory(), stats_);
   }
   return factory_;
 }
 
-LoadBalancerPtr QuotaAwareLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
-  return std::make_unique<LoadBalancerImpl>(config_, fallback_picker_lb_factory_, stats_, params);
+LoadBalancerPtr
+HostAllowlistLoadBalancer::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+  return std::make_unique<LoadBalancerImpl>(config_, child_picker_lb_factory_, stats_, params);
 }
 
-QuotaAwareLoadBalancer::LoadBalancerImpl::LoadBalancerImpl(
-    const QuotaAwareLbConfig& config, LoadBalancerFactorySharedPtr fallback_picker_lb_factory,
-    QuotaAwareStatsSharedPtr stats, LoadBalancerParams params)
-    : config_(config), fallback_picker_lb_factory_(std::move(fallback_picker_lb_factory)),
-      stats_(std::move(stats)), fallback_picker_lb_(fallback_picker_lb_factory_->create(params)),
+HostAllowlistLoadBalancer::LoadBalancerImpl::LoadBalancerImpl(
+    const HostAllowlistLbConfig& config, LoadBalancerFactorySharedPtr child_picker_lb_factory,
+    HostAllowlistStatsSharedPtr stats, LoadBalancerParams params)
+    : config_(config), child_picker_lb_factory_(std::move(child_picker_lb_factory)),
+      stats_(std::move(stats)), child_picker_lb_(child_picker_lb_factory_->create(params)),
       priority_set_(params.priority_set), local_priority_set_(params.local_priority_set) {
-  ASSERT(fallback_picker_lb_ != nullptr);
-  if (fallback_picker_lb_factory_->recreateOnHostChangeDeprecated()) {
+  ASSERT(child_picker_lb_ != nullptr);
+  if (child_picker_lb_factory_->recreateOnHostChangeDeprecated()) {
     member_update_cb_ = priority_set_.addMemberUpdateCb(
         [this](const Upstream::HostVector&, const Upstream::HostVector&) {
-          fallback_picker_lb_ =
-              fallback_picker_lb_factory_->create({priority_set_, local_priority_set_});
-          ASSERT(fallback_picker_lb_ != nullptr);
+          child_picker_lb_ = child_picker_lb_factory_->create({priority_set_, local_priority_set_});
+          ASSERT(child_picker_lb_ != nullptr);
         });
   }
 }
 
 HostConstSharedPtr
-QuotaAwareLoadBalancer::LoadBalancerImpl::peekAnotherHost(LoadBalancerContext* context) {
+HostAllowlistLoadBalancer::LoadBalancerImpl::peekAnotherHost(LoadBalancerContext* context) {
   if (context == nullptr || context->requestStreamInfo() == nullptr) {
     if (config_.failClosedOnMissingMetadata()) {
       return nullptr;
     }
-    return fallback_picker_lb_->peekAnotherHost(context);
+    return child_picker_lb_->peekAnotherHost(context);
   }
   const auto passed = parseCandidates(context->requestStreamInfo()->dynamicMetadata(), config_);
   if (!passed.has_value()) {
     if (config_.failClosedOnMissingMetadata()) {
       return nullptr;
     }
-    return fallback_picker_lb_->peekAnotherHost(context);
+    return child_picker_lb_->peekAnotherHost(context);
   }
-  QuotaHostExclusionContext wrapped(*context, config_, *passed, priority_set_);
-  return fallback_picker_lb_->peekAnotherHost(&wrapped);
+  HostAllowlistExclusionContext wrapped(*context, config_, *passed, priority_set_);
+  return child_picker_lb_->peekAnotherHost(&wrapped);
 }
 
 HostSelectionResponse
-QuotaAwareLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
+HostAllowlistLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* context) {
   if (context == nullptr || context->requestStreamInfo() == nullptr) {
     if (config_.failClosedOnMissingMetadata()) {
       stats_->rq_metadata_missing_.inc();
-      return quotaMetadataMissing();
+      return lbMetadataMissing();
     }
-    return fallback_picker_lb_->chooseHost(context);
+    return child_picker_lb_->chooseHost(context);
   }
 
   const auto passed = parseCandidates(context->requestStreamInfo()->dynamicMetadata(), config_);
   if (!passed.has_value()) {
     if (config_.failClosedOnMissingMetadata()) {
       stats_->rq_metadata_missing_.inc();
-      return quotaMetadataMissing();
+      return lbMetadataMissing();
     }
-    return fallback_picker_lb_->chooseHost(context);
+    return child_picker_lb_->chooseHost(context);
   }
 
-  if (anyHealthyHosts(priority_set_) && !anyQuotaAvailableHost(priority_set_, config_, *passed)) {
-    stats_->rq_exhausted_.inc();
-    return quotaExhausted();
+  if (anyHealthyHosts(priority_set_) && !anyAllowlistedHost(priority_set_, config_, *passed)) {
+    stats_->rq_lb_attempt_exhausted_.inc();
+    return lbAttemptExhausted();
   }
 
-  QuotaHostExclusionContext wrapped(*context, config_, *passed, priority_set_);
-  HostSelectionResponse response = fallback_picker_lb_->chooseHost(&wrapped);
+  HostAllowlistExclusionContext wrapped(*context, config_, *passed, priority_set_);
+  HostSelectionResponse response = child_picker_lb_->chooseHost(&wrapped);
+  if (response.host != nullptr && !hostOnAllowlist(*response.host, config_, *passed)) {
+    stats_->rq_lb_attempt_exhausted_.inc();
+    return lbAttemptExhausted();
+  }
   if (response.host == nullptr && anyHealthyHosts(priority_set_) &&
-      !anyQuotaAvailableHost(priority_set_, config_, *passed)) {
-    stats_->rq_exhausted_.inc();
-    return quotaExhausted();
+      !anyAllowlistedHost(priority_set_, config_, *passed)) {
+    stats_->rq_lb_attempt_exhausted_.inc();
+    return lbAttemptExhausted();
   }
   return response;
 }
 
-} // namespace QuotaAware
+} // namespace HostAllowlist
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

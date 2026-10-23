@@ -3,7 +3,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/extensions/load_balancing_policies/quota_aware/v3/quota_aware.pb.h"
+#include "envoy/extensions/load_balancing_policies/host_allowlist/v3/host_allowlist.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
@@ -16,19 +16,20 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
-namespace QuotaAware {
+namespace HostAllowlist {
 
-using QuotaAwareProto = envoy::extensions::load_balancing_policies::quota_aware::v3::QuotaAware;
+using HostAllowlistProto =
+    envoy::extensions::load_balancing_policies::host_allowlist::v3::HostAllowlist;
 using ::Envoy::Random::RandomGenerator;
 using ::Envoy::Runtime::Loader;
 using ::Envoy::Upstream::ClusterInfo;
 using ::Envoy::Upstream::PrioritySet;
 
-class QuotaAwareLoadBalancerFactory
-    : public Upstream::TypedLoadBalancerFactoryBase<QuotaAwareProto> {
+class HostAllowlistLoadBalancerFactory
+    : public Upstream::TypedLoadBalancerFactoryBase<HostAllowlistProto> {
 public:
-  QuotaAwareLoadBalancerFactory()
-      : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.quota_aware") {}
+  HostAllowlistLoadBalancerFactory()
+      : TypedLoadBalancerFactoryBase("envoy.load_balancing_policies.host_allowlist") {}
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadConfig(Server::Configuration::ServerFactoryContext& context,
@@ -40,7 +41,7 @@ public:
          RandomGenerator& random, TimeSource& time_source) override;
 };
 
-} // namespace QuotaAware
+} // namespace HostAllowlist
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy

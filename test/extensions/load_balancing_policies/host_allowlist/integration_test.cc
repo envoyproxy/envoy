@@ -14,16 +14,21 @@
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {
-namespace QuotaAware {
+namespace HostAllowlist {
 namespace {
 
-constexpr absl::string_view kQuotaAwarePolicy = R"EOF(
+constexpr absl::string_view kHostAllowlistPolicy = R"EOF(
 policies:
 - typed_extension_config:
-    name: envoy.load_balancing_policies.quota_aware
+    name: envoy.load_balancing_policies.host_allowlist
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.quota_aware.v3.QuotaAware
-      fallback_policy:
+      "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.host_allowlist.v3.HostAllowlist
+      metadata_namespace: envoy.filters.http.ratelimit
+      metadata_key: candidates
+      host_metadata_keys:
+      - id
+      - secondary_id
+      child_policy:
         policies:
         - typed_extension_config:
             name: envoy.load_balancing_policies.round_robin
@@ -39,10 +44,10 @@ policies:
       "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
 )EOF";
 
-class QuotaAwareIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                  public HttpIntegrationTest {
+class HostAllowlistIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                     public HttpIntegrationTest {
 public:
-  QuotaAwareIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+  HostAllowlistIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
     setUpstreamCount(2);
   }
 
@@ -130,12 +135,12 @@ endpoints:
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "example.com"}};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, QuotaAwareIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, HostAllowlistIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(QuotaAwareIntegrationTest, MissingMetadataFailOpenUsesP0) {
-  initializeCluster(kQuotaAwarePolicy);
+TEST_P(HostAllowlistIntegrationTest, MissingMetadataFailOpenUsesP0) {
+  initializeCluster(kHostAllowlistPolicy);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(request_headers_, 0);
   waitForNextUpstreamRequest(0);
@@ -145,7 +150,7 @@ TEST_P(QuotaAwareIntegrationTest, MissingMetadataFailOpenUsesP0) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(QuotaAwareIntegrationTest, P0ExhaustedPicksP1) {
+TEST_P(HostAllowlistIntegrationTest, P0ExhaustedPicksP1) {
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.set_metadata
 typed_config:
@@ -157,7 +162,7 @@ typed_config:
       - id: dc1/svc-b
         secondary_id: ""
 )EOF");
-  initializeCluster(kQuotaAwarePolicy);
+  initializeCluster(kHostAllowlistPolicy);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(request_headers_, 0);
   waitForNextUpstreamRequest(1);
@@ -167,7 +172,7 @@ typed_config:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(QuotaAwareIntegrationTest, SamePrimaryDifferentSecondaryPicksLiveMember) {
+TEST_P(HostAllowlistIntegrationTest, SamePrimaryDifferentSecondaryPicksLiveMember) {
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.set_metadata
 typed_config:
@@ -214,7 +219,7 @@ endpoints:
 )EOF",
                                               local_address, local_address),
                                   *assignment);
-        TestUtility::loadFromYaml(std::string(kQuotaAwarePolicy),
+        TestUtility::loadFromYaml(std::string(kHostAllowlistPolicy),
                                   *cluster_0->mutable_load_balancing_policy());
       });
   HttpIntegrationTest::initialize();
@@ -227,7 +232,7 @@ endpoints:
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(QuotaAwareIntegrationTest, EmptyCandidatesReturns429) {
+TEST_P(HostAllowlistIntegrationTest, EmptyCandidatesReturns429) {
   config_helper_.prependFilter(R"EOF(
 name: envoy.filters.http.set_metadata
 typed_config:
@@ -237,7 +242,7 @@ typed_config:
     value:
       candidates: []
 )EOF");
-  initializeCluster(kQuotaAwarePolicy);
+  initializeCluster(kHostAllowlistPolicy);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(request_headers_, 0);
   ASSERT_TRUE(response->waitForEndStream());
@@ -245,7 +250,7 @@ typed_config:
   EXPECT_EQ("429", response->headers().getStatusValue());
 }
 
-TEST_P(QuotaAwareIntegrationTest, ClusterWithoutPolicyStillRoundRobin) {
+TEST_P(HostAllowlistIntegrationTest, ClusterWithoutPolicyStillRoundRobin) {
   initializeCluster(kRoundRobinPolicy, false);
   std::set<uint64_t> seen;
   for (int i = 0; i < 4; ++i) {
@@ -263,7 +268,7 @@ TEST_P(QuotaAwareIntegrationTest, ClusterWithoutPolicyStillRoundRobin) {
 }
 
 } // namespace
-} // namespace QuotaAware
+} // namespace HostAllowlist
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy
