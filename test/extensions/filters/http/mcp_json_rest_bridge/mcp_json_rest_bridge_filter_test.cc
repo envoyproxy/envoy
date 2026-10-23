@@ -4795,6 +4795,16 @@ TEST_P(McpHttpMethodFilterTest, NonPostMethodsReturnMethodNotAllowed) {
   EXPECT_THAT(
       additional_response_headers.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
       StrEq("POST"));
+
+  // Simulate how the filter manager passes the local response through the encoder filter chain.
+  EXPECT_EQ(filter_->encodeHeaders(additional_response_headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl response_body("HTTP Method Not Allowed");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(additional_response_headers.getStatusValue(), StrEq("405"));
+  EXPECT_THAT(additional_response_headers.getContentLengthValue(), StrEq("23"));
+  EXPECT_THAT(response_body.toString(), StrEq("HTTP Method Not Allowed"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
