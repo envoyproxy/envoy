@@ -142,13 +142,14 @@ typed_config:
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
           ping_interval:
-            seconds: 300
+            {}
           auto_close_connections: {}
           request_path: "{}"
           request_method: {}{}{}
 )EOF",
-        auto_close_connections ? "true" : "false", request_path, request_method,
-        connection_limit_config, validation_config.empty() ? "" : "\n" + validation_config);
+        ping_interval_yaml_, auto_close_connections ? "true" : "false", request_path,
+        request_method, connection_limit_config,
+        validation_config.empty() ? "" : "\n" + validation_config);
 
     config_helper_.addConfigModifier(
         [filter_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -233,6 +234,10 @@ typed_config:
   std::string upstream_request_path_ =
       std::string(Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
                       DEFAULT_REVERSE_TUNNEL_REQUEST_PATH);
+
+  // The ping interval rendered into the filter config. Defaults to a long interval so keepalives do
+  // not interfere with handshake-focused tests.
+  std::string ping_interval_yaml_ = "seconds: 300";
 
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::trace);
@@ -661,6 +666,29 @@ TEST_P(ReverseTunnelFilterIntegrationTest, BasicReverseTunnelHandshake) {
 
   tcp_client->close();
   tcp_client2->close();
+}
+
+// A sub-second ping interval is honored end to end. The old code truncated 500ms to zero seconds;
+// the keepalive now fires on the configured millisecond interval.
+TEST_P(ReverseTunnelFilterIntegrationTest, SubSecondPingIntervalSendsKeepalive) {
+  ping_interval_yaml_ = "nanos: 500000000";
+  addReverseTunnelFilter();
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "test-node", "test-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1));
+
+  // Advance past the interval plus its maximum jitter, but short of the reply deadline, so exactly
+  // one keepalive is written to the accepted tunnel.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(700));
+  tcp_client->waitForData("RPING");
+
+  tcp_client->close();
 }
 
 // End-to-end reverse connection handshake test where the downstream reverse connection listener

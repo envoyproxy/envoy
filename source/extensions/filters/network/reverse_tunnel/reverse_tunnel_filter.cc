@@ -777,10 +777,6 @@ void ReverseTunnelFilter::completeAcceptedConnection() {
 
   Bootstrap::ReverseConnection::ReverseConnectionUtility::applySslQuietClose(connection);
 
-  // Convert ping interval to seconds as required by the manager API.
-  const std::chrono::seconds ping_seconds =
-      std::chrono::duration_cast<std::chrono::seconds>(config_->pingInterval());
-
   // The socket manager derives any tenant-scoped internal keys itself, so lifecycle logging keeps
   // the original node, cluster, and tenant fields.
   const bool tenant_isolation_enabled = socket_manager->tenantIsolationEnabled();
@@ -797,7 +793,7 @@ void ReverseTunnelFilter::completeAcceptedConnection() {
 
   const int socket_fd = pending_socket_->ioHandle().fdDoNotUse();
   socket_manager->addConnectionSocket(
-      pending_node_id_, pending_cluster_id_, std::move(pending_socket_), ping_seconds,
+      pending_node_id_, pending_cluster_id_, std::move(pending_socket_), config_->pingInterval(),
       /* rebalanced= */ config_->skipRebalancing(), pending_tenant_id_,
       pending_initiator_worker_id_, pending_initiator_connection_id_);
   stats_.accepted_.inc();
