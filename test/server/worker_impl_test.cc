@@ -202,12 +202,31 @@ TEST_F(WorkerImplTest, ListenerAddressesPostToWorkerThread) {
 
   const Network::Address::InstanceConstSharedPtr address =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80);
+  bool stopped = false;
   EXPECT_CALL(*handler_, stopListenerAddresses(Ref(listener), ElementsAre(address)))
-      .WillOnce(InvokeWithoutArgs([current_thread_id, &ci]() {
+      .WillOnce(InvokeWithoutArgs([current_thread_id, &stopped]() {
         EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        stopped = true;
+      }));
+  // The completion is called on the worker thread after the handler has stopped the addresses.
+  worker_.stopListenerAddresses(listener, {address}, [current_thread_id, &stopped, &ci]() {
+    EXPECT_NE(current_thread_id, std::this_thread::get_id());
+    EXPECT_TRUE(stopped);
+    ci.setReady();
+  });
+  ci.waitReady();
+
+  const Network::ConnectionDrainEvent drain_event{MonotonicTime(std::chrono::seconds(1)),
+                                                  Server::DrainStrategy::Immediate};
+  EXPECT_CALL(*handler_, onListenerAddressesDrain(Ref(listener), _))
+      .WillOnce(Invoke([current_thread_id, &ci, &drain_event](const Network::ListenerConfig&,
+                                                              Network::ConnectionDrainEvent event) {
+        EXPECT_NE(current_thread_id, std::this_thread::get_id());
+        EXPECT_EQ(drain_event.start_time, event.start_time);
+        EXPECT_EQ(drain_event.strategy, event.strategy);
         ci.setReady();
       }));
-  worker_.stopListenerAddresses(listener, {address});
+  worker_.onListenerAddressesDrain(listener, drain_event);
   ci.waitReady();
 
   EXPECT_CALL(*handler_, removeListenerAddresses(Ref(listener)))

@@ -60,6 +60,8 @@ public:
   void stopListenerAddresses(
       const Network::ListenerConfig& listener,
       const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) override;
+  void onListenerAddressesDrain(const Network::ListenerConfig& listener,
+                                Network::ConnectionDrainEvent drain_event) override;
   void removeListenerAddresses(const Network::ListenerConfig& listener) override;
   void disableListeners() override;
   void enableListeners() override;

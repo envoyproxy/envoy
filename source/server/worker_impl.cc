@@ -170,9 +170,18 @@ void WorkerImpl::onListenerDrain(uint64_t listener_tag, Network::ConnectionDrain
 
 void WorkerImpl::stopListenerAddresses(
     const Network::ListenerConfig& listener,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) {
-  dispatcher_->post([this, &listener, addresses]() -> void {
+    const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
+    std::function<void()> completion) {
+  dispatcher_->post([this, &listener, addresses, completion = std::move(completion)]() -> void {
     handler_->stopListenerAddresses(listener, addresses);
+    completion();
+  });
+}
+
+void WorkerImpl::onListenerAddressesDrain(const Network::ListenerConfig& listener,
+                                          Network::ConnectionDrainEvent drain_event) {
+  dispatcher_->post([this, &listener, drain_event]() -> void {
+    handler_->onListenerAddressesDrain(listener, drain_event);
   });
 }
 

@@ -73,9 +73,11 @@ public:
                           const std::list<const Network::FilterChain*>& filter_chains,
                           Network::ConnectionDrainEvent drain_event) override;
   void onListenerDrain(uint64_t listener_tag, Network::ConnectionDrainEvent drain_event) override;
-  void stopListenerAddresses(
-      const Network::ListenerConfig& listener,
-      const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) override;
+  void stopListenerAddresses(const Network::ListenerConfig& listener,
+                             const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
+                             std::function<void()> completion) override;
+  void onListenerAddressesDrain(const Network::ListenerConfig& listener,
+                                Network::ConnectionDrainEvent drain_event) override;
   void removeListenerAddresses(const Network::ListenerConfig& listener) override;
 
 private:

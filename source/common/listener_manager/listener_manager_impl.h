@@ -358,15 +358,13 @@ private:
 
   /**
    * Stop the workers from accepting connections on the addresses of the given socket factories,
-   * which an in place update removed from the listener.
+   * which an in place update removed from the listener, and close the sockets once all workers have
+   * stopped accepting connections on them.
    * @param listener supplies the listener that the in place update replaced.
    * @param socket_factories supplies the socket factories of the removed addresses.
-   * @return the completion to pass to addListenerToWorker() for each worker, which runs on the main
-   * thread and closes the sockets once all workers have stopped accepting connections on them.
    */
-  ListenerCompletionCallback
-  stopListenerAddresses(ListenerImpl& listener,
-                        absl::Span<Network::ListenSocketFactory* const> socket_factories);
+  void stopListenerAddresses(ListenerImpl& listener,
+                             absl::Span<Network::ListenSocketFactory* const> socket_factories);
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
   static ListenerManagerStats generateStats(Stats::Scope& scope);

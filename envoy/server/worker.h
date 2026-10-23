@@ -113,8 +113,7 @@ public:
    * Notify all connections in the given filter chains of the listener that they are being
    * drained. This is intended to be invoked at the start of a drain sequence (before the
    * drain timer expires). Connections are not closed. This is a fire-and-forget operation
-   * that is posted to the worker's dispatcher. It also notifies the connections of the addresses
-   * that stopListenerAddresses() stopped, unless their listeners are draining already.
+   * that is posted to the worker's dispatcher.
    * @param listener_tag supplies the tag passed to addListener().
    * @param filter_chains supplies the filter chains whose connections should be notified.
    * @param drain_event describes the drain sequence (start time and strategy), captured
@@ -139,17 +138,29 @@ public:
   /**
    * Stop accepting new connections on the addresses that an in place update removed from a
    * listener. The listeners of the addresses keep using the replaced listener, which must outlive
-   * them, until removeListenerAddresses() or removeListener() removes them. The next
-   * onFilterChainDrain() notifies their connections that they are being drained. This is a
-   * fire-and-forget operation that is posted to the worker's dispatcher, so the completion of a
-   * later addListener() is called after the worker has stopped accepting connections on the
-   * addresses.
+   * them, until removeListenerAddresses() or removeListener() removes them.
+   * onListenerAddressesDrain() notifies their connections that they are being drained.
    * @param listener supplies the listener that the in place update replaced.
    * @param addresses supplies the removed addresses.
+   * @param completion supplies the completion to be called when the worker has stopped accepting
+   * new connections on the addresses. This completion is called on the worker thread. No locking
+   * is performed by the worker.
    */
-  virtual void stopListenerAddresses(
-      const Network::ListenerConfig& listener,
-      const std::vector<Network::Address::InstanceConstSharedPtr>& addresses) PURE;
+  virtual void
+  stopListenerAddresses(const Network::ListenerConfig& listener,
+                        const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
+                        std::function<void()> completion) PURE;
+
+  /**
+   * Notify the connections of the addresses that stopListenerAddresses() stopped for the listener
+   * that they are being drained. Connections are not closed. This is a fire-and-forget operation
+   * that is posted to the worker's dispatcher, so the listener must outlive it.
+   * @param listener supplies the listener passed to stopListenerAddresses().
+   * @param drain_event describes the drain sequence (start time and strategy), captured
+   *        once on the main thread so all connections share a consistent drain timeline.
+   */
+  virtual void onListenerAddressesDrain(const Network::ListenerConfig& listener,
+                                        Network::ConnectionDrainEvent drain_event) PURE;
 
   /**
    * Remove the listeners of the addresses that stopListenerAddresses() stopped for the listener and

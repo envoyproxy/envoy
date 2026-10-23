@@ -9191,21 +9191,14 @@ filter_chains:
     return listener_handle;
   }
 
-  // Applies the update in place and returns the drain timer of the replaced listener. If
-  // add_completion is given, the add completion of the worker is saved to it instead of being
-  // called.
-  Event::MockTimer* updateInPlace(const envoy::config::listener::v3::Listener& listener_proto,
-                                  Worker::AddListenerCompletion* add_completion = nullptr) {
+  // Applies the update in place and returns the drain timer of the replaced listener.
+  Event::MockTimer* updateInPlace(const envoy::config::listener::v3::Listener& listener_proto) {
     EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
     EXPECT_CALL(*worker_, addListener(Optional(_), _, _, _, _));
     auto* drain_timer = new Event::MockTimer(&server_.dispatcher_);
     EXPECT_CALL(*drain_timer, enableTimer(_, _));
     EXPECT_TRUE(addOrUpdateListener(listener_proto));
-    if (add_completion != nullptr) {
-      *add_completion = std::exchange(worker_->add_listener_completion_, nullptr);
-    } else {
-      worker_->callAddCompletion();
-    }
+    worker_->callAddCompletion();
     return drain_timer;
   }
 
@@ -9328,19 +9321,31 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, RemoveAddress) {
   const Network::ListenerConfig& replaced_listener = manager_->listeners().front().get();
 
   // The workers stop accepting connections on the removed address before the update is applied, and
-  // its connections drain with the filter chain drain of the update, which has no filter chains.
+  // its connections start draining with the same drain event as the filter chains.
   Sequence sequence;
+  std::function<void()> stop_completion;
+  Network::ConnectionDrainEvent filter_chain_drain_event;
+  Network::ConnectionDrainEvent addresses_drain_event;
   EXPECT_CALL(*worker_,
               stopListenerAddresses(Ref(replaced_listener),
                                     ElementsAre(Pointee(Property(
-                                        &Network::Address::Instance::asString, "127.0.0.2:1234")))))
-      .InSequence(sequence);
+                                        &Network::Address::Instance::asString, "127.0.0.2:1234"))),
+                                    _))
+      .InSequence(sequence)
+      .WillOnce(SaveArg<2>(&stop_completion));
   EXPECT_CALL(*worker_, addListener(Optional(_), _, _, _, _)).InSequence(sequence);
-  EXPECT_CALL(*worker_, onFilterChainDrain(_, IsEmpty(), _)).InSequence(sequence);
+  EXPECT_CALL(*worker_, onFilterChainDrain(_, IsEmpty(), _))
+      .InSequence(sequence)
+      .WillOnce(SaveArg<2>(&filter_chain_drain_event));
+  EXPECT_CALL(*worker_, onListenerAddressesDrain(Ref(replaced_listener), _))
+      .InSequence(sequence)
+      .WillOnce(SaveArg<1>(&addresses_drain_event));
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
   auto* drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
   EXPECT_TRUE(addOrUpdateListener(listenerProto({"127.0.0.1"}), "version2"));
+  EXPECT_EQ(filter_chain_drain_event.start_time, addresses_drain_event.start_time);
+  EXPECT_EQ(filter_chain_drain_event.strategy, addresses_drain_event.strategy);
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_in_place_updated").value());
   EXPECT_EQ("version2",
             dynamic_cast<ListenerImpl&>(manager_->listeners().front().get()).versionInfo());
@@ -9351,8 +9356,9 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, RemoveAddress) {
 
   // The socket of the removed address closes once all workers have stopped accepting connections on
   // it.
-  EXPECT_TRUE(socket2->isOpen());
   worker_->callAddCompletion();
+  EXPECT_TRUE(socket2->isOpen());
+  stop_completion();
   EXPECT_FALSE(socket2->isOpen());
   EXPECT_TRUE(socket1->isOpen());
 
@@ -9377,7 +9383,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddBackRemovedAddress) {
   const Network::Address::Instance& address1 = *listener.listenSocketFactories()[0]->localAddress();
   const Network::Address::Instance& address2 = *listener.listenSocketFactories()[1]->localAddress();
 
-  EXPECT_CALL(*worker_, stopListenerAddresses(_, _));
+  EXPECT_CALL(*worker_, stopListenerAddresses(_, _, _));
   updateInPlace(listenerProto({"127.0.0.1"}));
   auto new_socket2 = expectListenSocket("127.0.0.2:1234");
   updateInPlace(listenerProto({"127.0.0.1", "127.0.0.2"}));
@@ -9396,9 +9402,9 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddBackAddressBeforeItsSocke
   auto socket1 = expectListenSocket("127.0.0.1:1234");
   auto socket2 = expectListenSocket("127.0.0.2:1234");
   ListenerHandle* listener_foo = addActiveListener(listenerProto({"127.0.0.1", "127.0.0.2"}));
-  EXPECT_CALL(*worker_, stopListenerAddresses(_, _));
-  Worker::AddListenerCompletion add_completion;
-  updateInPlace(listenerProto({"127.0.0.1"}), &add_completion);
+  std::function<void()> stop_completion;
+  EXPECT_CALL(*worker_, stopListenerAddresses(_, _, _)).WillOnce(SaveArg<2>(&stop_completion));
+  updateInPlace(listenerProto({"127.0.0.1"}));
 
   EXPECT_CALL(*socket2, duplicate());
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, _)).Times(0);
@@ -9406,7 +9412,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddBackAddressBeforeItsSocke
   const Network::SocketSharedPtr cloned_socket2 = socketFactory(1).getListenSocket(0);
   EXPECT_NE(socket2, cloned_socket2);
 
-  add_completion();
+  stop_completion();
   EXPECT_FALSE(socket2->isOpen());
   EXPECT_TRUE(cloned_socket2->isOpen());
 
@@ -9420,9 +9426,9 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddBackChangedAddressBeforeI
   auto socket1 = expectListenSocket("127.0.0.1:1234");
   auto socket2 = expectListenSocket("127.0.0.2:1234");
   ListenerHandle* listener_foo = addActiveListener(listenerProto({"127.0.0.1", "127.0.0.2"}));
-  EXPECT_CALL(*worker_, stopListenerAddresses(_, _));
-  Worker::AddListenerCompletion add_completion;
-  updateInPlace(listenerProto({"127.0.0.1"}), &add_completion);
+  std::function<void()> stop_completion;
+  EXPECT_CALL(*worker_, stopListenerAddresses(_, _, _)).WillOnce(SaveArg<2>(&stop_completion));
+  updateInPlace(listenerProto({"127.0.0.1"}));
 
   auto new_listener_proto = listenerProto({"127.0.0.1", "127.0.0.2"});
   new_listener_proto.mutable_additional_addresses(0)
@@ -9508,10 +9514,10 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressRemovedByOtherList
   auto socket2 = expectListenSocket("127.0.0.2:1234");
   auto socket3 = expectListenSocket("127.0.0.3:1234");
   ListenerHandle* listener_bar = addActiveListener(bar_listener_proto);
-  EXPECT_CALL(*worker_, stopListenerAddresses(_, _));
-  Worker::AddListenerCompletion bar_add_completion;
+  std::function<void()> bar_stop_completion;
+  EXPECT_CALL(*worker_, stopListenerAddresses(_, _, _)).WillOnce(SaveArg<2>(&bar_stop_completion));
   bar_listener_proto.mutable_additional_addresses()->Clear();
-  updateInPlace(bar_listener_proto, &bar_add_completion);
+  updateInPlace(bar_listener_proto);
 
   EXPECT_CALL(*socket3, duplicate()).Times(0);
   auto new_socket3 = expectListenSocket("127.0.0.3:1234");
@@ -9519,10 +9525,8 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, AddAddressRemovedByOtherList
   EXPECT_EQ(new_socket3, socketFactory(1).getListenSocket(0));
   EXPECT_TRUE(socket3->isOpen());
 
-  EXPECT_CALL(*worker_, stopListenerAddresses(_, _));
-  Worker::AddListenerCompletion add_completion;
-  updateInPlace(listenerProto({"127.0.0.1"}), &add_completion);
-  add_completion();
+  EXPECT_CALL(*worker_, stopListenerAddresses(_, _, _));
+  updateInPlace(listenerProto({"127.0.0.1"}));
   EXPECT_FALSE(new_socket3->isOpen());
   EXPECT_TRUE(socket3->isOpen());
 
@@ -9557,9 +9561,11 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, RemoveAddressAfterFilterChai
   EXPECT_EQ("", dynamic_cast<ListenerImpl&>(manager_->listeners().front().get()).versionInfo());
 
   listener_proto.mutable_additional_addresses()->Clear();
-  EXPECT_CALL(*worker_, stopListenerAddresses(
-                            _, ElementsAre(Pointee(Property(&Network::Address::Instance::asString,
-                                                            "127.0.0.2:1234")))));
+  EXPECT_CALL(*worker_,
+              stopListenerAddresses(_,
+                                    ElementsAre(Pointee(Property(
+                                        &Network::Address::Instance::asString, "127.0.0.2:1234"))),
+                                    _));
   updateInPlace(listener_proto);
   EXPECT_FALSE(duplicated_socket2->isOpen());
   EXPECT_FALSE(socket2->isOpen());
@@ -9582,7 +9588,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest,
   manager_->drainFilterChains(dynamic_cast<ListenerImpl&>(manager_->listeners().front().get()),
                               {std::make_shared<NiceMock<Network::MockFilterChain>>()});
 
-  EXPECT_CALL(*worker_, stopListenerAddresses(_, _));
+  EXPECT_CALL(*worker_, stopListenerAddresses(_, _, _));
   updateInPlace(listenerProto({"127.0.0.1"}));
   EXPECT_FALSE(socket2->isOpen());
   EXPECT_TRUE(socket1->isOpen());
@@ -9608,9 +9614,11 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, ReplaceListenerAddress) {
   new_listener_proto.set_stat_prefix("foo");
   auto socket3 = expectListenSocket("127.0.0.3:1234");
   EXPECT_CALL(*socket3->io_handle_, listen(_));
-  EXPECT_CALL(*worker_, stopListenerAddresses(
-                            _, ElementsAre(Pointee(Property(&Network::Address::Instance::asString,
-                                                            "127.0.0.1:1234")))));
+  EXPECT_CALL(*worker_,
+              stopListenerAddresses(_,
+                                    ElementsAre(Pointee(Property(
+                                        &Network::Address::Instance::asString, "127.0.0.1:1234"))),
+                                    _));
   Event::MockTimer* drain_timer = updateInPlace(new_listener_proto);
   EXPECT_EQ(socket2, socketFactory(0).getListenSocket(0));
   EXPECT_EQ(socket3, socketFactory(1).getListenSocket(0));
@@ -9957,7 +9965,7 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, RemoveListenerDuringAddressD
   auto socket2 = expectListenSocket("127.0.0.2:1234");
   ListenerHandle* listener_foo = addActiveListener(listenerProto({"127.0.0.1", "127.0.0.2"}));
   const Network::ListenerConfig& replaced_listener = manager_->listeners().front().get();
-  EXPECT_CALL(*worker_, stopListenerAddresses(Ref(replaced_listener), _));
+  EXPECT_CALL(*worker_, stopListenerAddresses(Ref(replaced_listener), _, _));
   Event::MockTimer* drain_timer = updateInPlace(listenerProto({"127.0.0.1"}));
   EXPECT_FALSE(socket2->isOpen());
 
@@ -9991,9 +9999,11 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateTest, FullUpdateSkipsClosedSockets
   // The listener that the first update replaces shares the socket that the second update closes.
   auto socket3 = expectListenSocket("127.0.0.3:1234");
   updateInPlace(listenerProto({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
-  EXPECT_CALL(*worker_, stopListenerAddresses(
-                            _, ElementsAre(Pointee(Property(&Network::Address::Instance::asString,
-                                                            "127.0.0.2:1234")))));
+  EXPECT_CALL(*worker_,
+              stopListenerAddresses(_,
+                                    ElementsAre(Pointee(Property(
+                                        &Network::Address::Instance::asString, "127.0.0.2:1234"))),
+                                    _));
   updateInPlace(listenerProto({"127.0.0.1", "127.0.0.3"}));
   EXPECT_FALSE(socket2->isOpen());
 
@@ -10576,6 +10586,7 @@ public:
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(second_worker_));
     ListenerManagerImplInPlaceAddressUpdateTest::SetUp();
     EXPECT_CALL(*second_worker_, onFilterChainDrain(_, _, _)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*second_worker_, onListenerAddressesDrain(_, _)).Times(::testing::AnyNumber());
   }
 
   MockWorker* second_worker_ = new MockWorker();
@@ -10603,19 +10614,24 @@ TEST_P(ListenerManagerImplInPlaceAddressUpdateWithTwoWorkersTest, RemoveAddress)
   worker_->callAddCompletion();
   second_worker_->callAddCompletion();
 
-  EXPECT_CALL(*worker_, stopListenerAddresses(_, _));
-  EXPECT_CALL(*second_worker_, stopListenerAddresses(_, _));
+  std::function<void()> stop_completion;
+  std::function<void()> second_stop_completion;
+  EXPECT_CALL(*worker_, stopListenerAddresses(_, _, _)).WillOnce(SaveArg<2>(&stop_completion));
+  EXPECT_CALL(*second_worker_, stopListenerAddresses(_, _, _))
+      .WillOnce(SaveArg<2>(&second_stop_completion));
   EXPECT_CALL(*worker_, addListener(Optional(_), _, _, _, _));
   EXPECT_CALL(*second_worker_, addListener(Optional(_), _, _, _, _));
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
   auto* drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
   EXPECT_TRUE(addOrUpdateListener(listenerProto({"127.0.0.1"})));
-
   worker_->callAddCompletion();
+  second_worker_->callAddCompletion();
+
+  stop_completion();
   EXPECT_TRUE(sockets[2]->isOpen());
   EXPECT_TRUE(sockets[3]->isOpen());
-  second_worker_->callAddCompletion();
+  second_stop_completion();
   EXPECT_FALSE(sockets[2]->isOpen());
   EXPECT_FALSE(sockets[3]->isOpen());
   EXPECT_TRUE(sockets[0]->isOpen());

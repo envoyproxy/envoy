@@ -1038,7 +1038,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker,
       server_.runtime(), server_.api().randomGenerator());
 }
 
-ListenerManagerImpl::ListenerCompletionCallback ListenerManagerImpl::stopListenerAddresses(
+void ListenerManagerImpl::stopListenerAddresses(
     ListenerImpl& listener, absl::Span<Network::ListenSocketFactory* const> socket_factories) {
   std::vector<Network::Address::InstanceConstSharedPtr> addresses;
   auto sockets = std::make_shared<std::vector<Network::SocketSharedPtr>>();
@@ -1066,19 +1066,20 @@ ListenerManagerImpl::ListenerCompletionCallback ListenerManagerImpl::stopListene
   }
   listener.debugLog(absl::StrCat("stopping removed addresses ",
                                  absl::StrJoin(addresses, ",", Network::AddressStrFormatter())));
+  const auto workers_pending_stop = std::make_shared<std::atomic<uint64_t>>(workers_.size());
   for (const auto& worker : workers_) {
-    worker->stopListenerAddresses(listener, addresses);
-  }
-  return [sockets, workers_pending_stop = std::make_shared<uint64_t>(workers_.size())]() {
-    ASSERT_IS_MAIN_OR_TEST_THREAD();
-    // Close the sockets once all workers have stopped accepting connections on them, so that the
-    // connections waiting in their accept queues fail fast.
-    if (--*workers_pending_stop == 0) {
-      for (const auto& socket : *sockets) {
-        socket->close();
+    worker->stopListenerAddresses(listener, addresses, [this, sockets, workers_pending_stop]() {
+      // Close the sockets once all workers have stopped accepting connections on them, so that the
+      // connections waiting in their accept queues fail fast.
+      if (--(*workers_pending_stop) == 0) {
+        server_.dispatcher().post([sockets]() {
+          for (const auto& socket : *sockets) {
+            socket->close();
+          }
+        });
       }
-    }
-  };
+    });
+  }
 }
 
 void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
@@ -1129,7 +1130,6 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
   ASSERT(*existing_active_listener != nullptr);
 
   std::vector<Network::ListenSocketFactory*> removed_socket_factories;
-  ListenerCompletionCallback completion_callback;
   if (listener.inPlaceAddressUpdate()) {
     // The workers keep their listeners of the kept addresses, so only the added addresses start
     // listening.
@@ -1153,14 +1153,13 @@ void ListenerManagerImpl::inPlaceFilterChainUpdate(ListenerImpl& listener) {
     }
     removed_socket_factories = exclusiveSocketFactories(**existing_active_listener, listener);
     if (!removed_socket_factories.empty()) {
-      completion_callback =
-          stopListenerAddresses(**existing_active_listener, removed_socket_factories);
+      stopListenerAddresses(**existing_active_listener, removed_socket_factories);
     }
   }
 
   for (const auto& worker : workers_) {
     // Explicitly override the existing listener with a new listener config.
-    addListenerToWorker(*worker, listener.listenerTag(), listener, completion_callback);
+    addListenerToWorker(*worker, listener.listenerTag(), listener, nullptr);
   }
 
   auto previous_listener = std::move(*existing_active_listener);
@@ -1244,11 +1243,17 @@ void ListenerManagerImpl::drainGroup(
           : Server::DrainStrategy::Immediate;
   const Network::ConnectionDrainEvent filter_chain_drain_event{
       server_.api().timeSource().monotonicTime(), drain_strategy};
-  // The workers also start draining the connections of the addresses that the in place update
-  // stopped, so this is posted even when no filter chains drain.
   for (const auto& worker : workers_) {
     worker->onFilterChainDrain(draining_group->getDrainingListenerTag(),
                                draining_group->getDrainingFilterChains(), filter_chain_drain_event);
+  }
+  // The connections of the addresses that the in place update stopped drain like those of the
+  // removed filter chains.
+  if (draining_group->numDrainingAddresses() != 0) {
+    for (const auto& worker : workers_) {
+      worker->onListenerAddressesDrain(*draining_group->getDrainingListener(),
+                                       filter_chain_drain_event);
+    }
   }
 
   // Start the drain sequence which completes when the listener's drain manager has completed

@@ -2429,7 +2429,7 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateKeepsListenerOfReboundAddr
 }
 
 // The listener of a stopped address no longer accepts connections, and its connections are drained
-// with the next filter chain drain and kept until the address is removed.
+// with the drain of the stopped addresses and kept until the address is removed.
 TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddresses) {
   auto listener1 = new NiceMock<Network::MockListener>();
   auto listener2 = new NiceMock<Network::MockListener>();
@@ -2469,20 +2469,22 @@ TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddresses) {
   EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*address1).has_value());
   EXPECT_EQ(1UL, handler_->numConnections());
 
-  // The next drain of the filter chains notifies the connection, and a later one does not notify it
-  // again.
+  // Only the drain of the addresses stopped for the given listener notifies the connection, and a
+  // later one does not notify it again.
+  NiceMock<Network::MockListenerConfig> other_listener;
+  ON_CALL(other_listener, listenerTag()).WillByDefault(Return(1));
   const Network::ConnectionDrainEvent drain_event{MonotonicTime(std::chrono::seconds(1)),
                                                   Server::DrainStrategy::Immediate};
   Network::ConnectionDrainEvent notified_drain_event;
   EXPECT_CALL(*server_connection, onDrain(_)).WillOnce(SaveArg<0>(&notified_drain_event));
-  handler_->onFilterChainDrain(1, {}, drain_event);
   handler_->onFilterChainDrain(1, {}, Network::ConnectionDrainEvent{});
+  handler_->onListenerAddressesDrain(other_listener, Network::ConnectionDrainEvent{});
+  handler_->onListenerAddressesDrain(*test_listener, drain_event);
+  handler_->onListenerAddressesDrain(*test_listener, Network::ConnectionDrainEvent{});
   EXPECT_EQ(drain_event.start_time, notified_drain_event.start_time);
   EXPECT_EQ(Server::DrainStrategy::Immediate, notified_drain_event.strategy);
 
   // Only the addresses stopped for the given listener are removed.
-  NiceMock<Network::MockListenerConfig> other_listener;
-  ON_CALL(other_listener, listenerTag()).WillByDefault(Return(1));
   handler_->removeListenerAddresses(other_listener);
   EXPECT_EQ(1UL, handler_->numConnections());
 

@@ -354,11 +354,6 @@ void ConnectionHandlerImpl::onFilterChainDrain(
         [&filter_chains, drain_event](Network::ConnectionHandler::ActiveListener& listener) {
           listener.onFilterChainDrainStart(filter_chains, drain_event);
         });
-    // A listener keeps its first drain event, so only the listeners of the addresses stopped after
-    // the previous drain begin draining.
-    for (auto& stopped : listener_it->second->stopped_per_address_details_list_) {
-      stopped.details_->listener_->onListenerDrainStart(drain_event);
-    }
   }
 }
 
@@ -415,6 +410,18 @@ void ConnectionHandlerImpl::stopListenerAddresses(
     auto entry = tcp_listener_map_by_address_.find(per_address->address_->asStringView());
     if (entry == tcp_listener_map_by_address_.end() || entry->second == per_address) {
       addToTcpListenerMap(per_address, /*keep_existing_entries=*/true);
+    }
+  }
+}
+
+void ConnectionHandlerImpl::onListenerAddressesDrain(const Network::ListenerConfig& listener,
+                                                     Network::ConnectionDrainEvent drain_event) {
+  if (ActiveListenerDetailsOptRef details = findActiveListenerByTag(listener.listenerTag());
+      details.has_value()) {
+    for (StoppedAddressDetails& stopped : details->stopped_per_address_details_list_) {
+      if (stopped.replaced_listener_ == &listener) {
+        stopped.details_->listener_->onListenerDrainStart(drain_event);
+      }
     }
   }
 }
