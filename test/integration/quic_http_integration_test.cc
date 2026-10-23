@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "envoy/common/platform.h"
+#include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 
 #include "source/common/quic/envoy_quic_client_connection.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
@@ -30,6 +31,22 @@ using testing::Ge;
 namespace Quic {
 
 namespace {
+
+bool dualStackUdpIsBindable() {
+  const auto address = Network::Test::getAnyAddress(Network::Address::IpVersion::v6, true);
+  auto& syscalls = Api::OsSysCallsSingleton::get();
+  const auto fd = syscalls.socket(AF_INET6, SOCK_DGRAM, 0).return_value_;
+  if (!SOCKET_VALID(fd)) {
+    return false;
+  }
+  const int v6only = 0;
+  const bool supported =
+      syscalls.setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)).return_value_ ==
+          0 &&
+      syscalls.bind(fd, address->sockAddr(), address->sockAddrLen()).return_value_ == 0;
+  syscalls.close(fd);
+  return supported;
+}
 
 // Returns true if a socket can bind() to `address`.
 [[maybe_unused]] bool addressIsBindable(const std::string& address) {
@@ -96,15 +113,49 @@ TEST_P(QuicHttpIntegrationTest, GetRequestAndEmptyResponse) {
   EXPECT_THAT(log, testing::MatchesRegex("TLSv1.3 TLS_(AES_128_GCM|CHACHA20_POLY1305)_SHA256 -"));
 }
 
+TEST_P(QuicHttpIntegrationTest, DualStackListenerServesIpv4ClientUsingDefaultWriter) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "This regression requires an IPv4 client.";
+  }
+  if (!dualStackUdpIsBindable()) {
+    GTEST_SKIP() << "An IPv6 UDP socket with IPV6_V6ONLY=0 cannot bind [::]:0.";
+  }
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    listener->mutable_address()->mutable_socket_address()->set_address("::");
+    listener->mutable_address()->mutable_socket_address()->set_ipv4_compat(true);
+    // Force the sendmsg path on Linux too, where automatic writer selection may use GSO.
+    auto* writer =
+        listener->mutable_udp_listener_config()->mutable_udp_packet_packet_writer_config();
+    writer->set_name("envoy.udp_packet_writer.default");
+    std::ignore = writer->mutable_typed_config()->PackFrom(
+        envoy::extensions::udp_packet_writer::v3::UdpDefaultWriterFactory());
+  });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  ASSERT_TRUE(quic_connection_->waitForHandshakeDone());
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(5, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("aaaaa", response->body());
+  EXPECT_EQ("127.0.0.1", quic_connection_->peer_address().host().ToString());
+  codec_client_->close();
+}
+
 TEST_P(QuicHttpIntegrationTest, GetPeerAndLocalCertsInfo) {
   // These are not implemented yet, but configuring them shouldn't cause crash.
-  useAccessLog("%DOWNSTREAM_PEER_CERT% %DOWNSTREAM_PEER_ISSUER% %DOWNSTREAM_PEER_SERIAL% "
+  useAccessLog("%DOWNSTREAM_PEER_CERT% %DOWNSTREAM_PEER_CERT_CHAIN% %DOWNSTREAM_PEER_ISSUER% "
+               "%DOWNSTREAM_PEER_SERIAL% "
                "%DOWNSTREAM_PEER_FINGERPRINT_1% %DOWNSTREAM_PEER_FINGERPRINT_256% "
                "%DOWNSTREAM_LOCAL_SUBJECT% %DOWNSTREAM_PEER_SUBJECT% %DOWNSTREAM_LOCAL_URI_SAN% "
                "%DOWNSTREAM_PEER_URI_SAN%");
   testRouterHeaderOnlyRequestAndResponse();
   std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_EQ("- - - - - - - - -", log);
+  EXPECT_EQ("- - - - - - - - - -", log);
 }
 
 TEST_P(QuicHttpIntegrationTest, Draft29NotSupportedByDefault) {
@@ -852,33 +903,27 @@ typed_config:
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
 
-  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
-  auto* cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setExpectedPeerAddress(fmt::format(
-          "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
-  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  // Defer cert validation with a generous timeout so it remains pending until after disconnect.
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
+  cert_validator.setExpectedPeerAddress(fmt::format(
+      "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
+  // Once cert validation starts, shorten the handshake timeout so the handshake fails while cert
   // validation is pending.
-  quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
-  auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
-  persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
-  persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
+  cert_validator.setOnValidationStartedCallback([this]() {
+    quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(1);
+    quic_connection_->SetNetworkTimeouts(connect_timeout, connect_timeout);
+  });
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -894,31 +939,26 @@ typed_config:
   )EOF"),
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
-  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
-  auto cert_validator_factory =
-      Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
-          getFactory("envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->resetForTest();
-  static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
-  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
+  auto& cert_validator = static_cast<Extensions::TransportSockets::Tls::TimedCertValidator&>(
+      ContextImplPeer::getMutableCertValidator(
+          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  // Defer cert validation with a generous timeout so it remains pending until after teardown.
+  cert_validator.updateValidationTimeOutMs(TestUtility::DefaultTimeout);
+  // Once cert validation starts, shorten the handshake timeout so the handshake fails while cert
   // validation is pending.
-  quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
-  auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
-  persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
-  persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
+  cert_validator.setOnValidationStartedCallback([this]() {
+    quic::QuicTime::Delta connect_timeout = quic::QuicTime::Delta::FromMilliseconds(1);
+    quic_connection_->SetNetworkTimeouts(connect_timeout, connect_timeout);
+  });
   codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), std::nullopt);
   EXPECT_TRUE(codec_client_->disconnected());
 
-  Envoy::Ssl::ClientContextSharedPtr client_ssl_ctx = transport_socket_factory_->sslCtx();
-  auto& cert_validator = static_cast<const Extensions::TransportSockets::Tls::TimedCertValidator&>(
-      ContextImplPeer::getCertValidator(
-          static_cast<Extensions::TransportSockets::Tls::ClientContextImpl&>(*client_ssl_ctx)));
+  ASSERT_TRUE(cert_validator.validationStarted());
   EXPECT_TRUE(cert_validator.validationPending());
   codec_client_.reset();
+  cert_validator.updateValidationTimeOutMs(std::chrono::milliseconds(0));
   while (cert_validator.validationPending()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
@@ -2458,6 +2498,92 @@ TEST_P(QuicHttpIntegrationTest, FirstRequestSucceedsWithoutEnvoyBugOnNewConnecti
   test_server_->waitForCounter("server.envoy_bug_failures", testing::Eq(0));
 
   codec_client_->close();
+}
+
+class QuicUpstreamAutoHostSniIntegrationTest : public QuicHttpIntegrationTest {
+public:
+  void initialize() override {
+    setUpstreamProtocol(Http::CodecType::HTTP3);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_load_assignment()
+          ->mutable_endpoints(0)
+          ->mutable_lb_endpoints(0)
+          ->mutable_endpoint()
+          ->set_hostname(upstream_hostname_);
+      // Turn off `auto_sni` so that the request host does not override the SNI.
+      auto& protocol_options = (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"];
+      auto http_protocol_options =
+          MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(protocol_options);
+      http_protocol_options.mutable_upstream_http_protocol_options()->set_auto_sni(false);
+      std::ignore = protocol_options.PackFrom(http_protocol_options);
+      auto* transport_socket = cluster->mutable_transport_socket();
+      auto quic_transport = MessageUtil::anyConvert<
+          envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport>(
+          transport_socket->typed_config());
+      quic_transport.mutable_upstream_tls_context()->set_auto_host_sni(true);
+      std::ignore = transport_socket->mutable_typed_config()->PackFrom(quic_transport);
+    });
+    QuicHttpIntegrationTest::initialize();
+  }
+
+  // Sends a request through the HTTP/3 cluster and checks the SNI that the upstream received.
+  void expectUpstreamSni(absl::string_view expected_sni) {
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    std::string sni;
+    ASSERT_TRUE(fake_upstream_connection_->sharedConnection().executeOnDispatcher(
+        [&sni](Network::Connection& connection) { sni = connection.ssl()->sni(); }));
+    EXPECT_EQ(expected_sni, sni);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client_->close();
+  }
+
+  std::string upstream_hostname_{"upstream.lyft.com"};
+};
+
+INSTANTIATE_TEST_SUITE_P(QuicHttpIntegrationTests, QuicUpstreamAutoHostSniIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// The upstream host's hostname takes precedence over the configured SNI.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesHostname) {
+  initialize();
+  expectUpstreamSni("upstream.lyft.com");
+}
+
+// The server certificate is validated against the upstream host's hostname.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, FailsWhenCertificateDoesNotMatchHostname) {
+  upstream_hostname_ = "upstream.example.com";
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  test_server_->waitForCounter(
+      "http3.upstream.tx.quic_connection_close_error_code_QUIC_TLS_CERTIFICATE_UNKNOWN", Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_connect_fail", Eq(1));
+  codec_client_->close();
+}
+
+// Hostnames that are not valid SNI fall back to the configured SNI.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesConfiguredSniWithIpHostname) {
+  upstream_hostname_ = Network::Test::getLoopbackAddressString(version_);
+  initialize();
+  expectUpstreamSni("foo.lyft.com");
+}
+
+// Disabling the runtime guard restores the previous behavior.
+TEST_P(QuicUpstreamAutoHostSniIntegrationTest, UsesConfiguredSniWithRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_upstream_auto_host_sni",
+                                    "false");
+  upstream_hostname_ = "upstream.example.com";
+  initialize();
+  expectUpstreamSni("foo.lyft.com");
 }
 
 } // namespace Quic

@@ -1,7 +1,5 @@
 #include "source/extensions/compression/zstd/decompressor/zstd_decompressor_impl.h"
 
-#include "source/common/runtime/runtime_features.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
@@ -67,9 +65,7 @@ bool ZstdDecompressorImpl::process(Buffer::Instance& output_buffer, uint64_t lim
 
     // Check bomb protection after every decompression step, not after the
     // entire slice is drained. This matches gzip and brotli behavior.
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.enable_compression_bomb_protection") &&
-        (output_buffer.length() > limit)) {
+    if (output_buffer.length() > limit) {
       stats_.zstd_generic_error_.inc();
       ENVOY_LOG(trace,
                 "excessive decompression ratio detected: output "

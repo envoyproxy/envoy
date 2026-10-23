@@ -451,6 +451,17 @@ TEST_P(TsiSocketTest, HandshakeSuccessAndTransferData) {
   expectTransferDataFromClientToServer(ApplicationData);
 }
 
+// The handshakers (and their streams to the handshaker service) are released as
+// soon as the handshake completes, not when the connection is closed.
+TEST_P(TsiSocketTest, HandshakeSuccessReleasesHandshakers) {
+  startFakeHandshakerService();
+  initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);
+  EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(2);
+  doHandshakeAndExpectSuccess();
+  EXPECT_EQ(dispatcher_.to_delete_.size(), 2);
+  expectTransferDataFromClientToServer(ApplicationData);
+}
+
 TEST_P(TsiSocketTest, HandshakeSuccessAndTransferLargeData) {
   startFakeHandshakerService();
   initializeSockets(/*server_validator=*/nullptr, /*client_validator=*/nullptr);

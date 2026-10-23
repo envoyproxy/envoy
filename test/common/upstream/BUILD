@@ -188,14 +188,17 @@ envoy_cc_test(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:xds_resource_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:od_cds_api_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
 envoy_cc_test(
     name = "cluster_manager_lifecycle_test",
     srcs = ["cluster_manager_lifecycle_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_manager_impl_test_common",
         "//source/extensions/clusters/dns:dns_cluster_lib",

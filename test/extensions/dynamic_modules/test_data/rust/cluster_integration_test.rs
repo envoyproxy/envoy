@@ -280,6 +280,7 @@ impl Cluster for AsyncHostSelectionCluster {
     Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
       select_by_header: !self.logical_hostnames.is_empty(),
+      completion_threads: Vec::new(),
     }))
   }
 }
@@ -302,6 +303,17 @@ impl AsyncCompletionTask {
 struct AsyncHostSelectionLb {
   hosts: SharedHostList,
   select_by_header: bool,
+  completion_threads: Vec<std::thread::JoinHandle<()>>,
+}
+
+// A completion thread runs module code until it has exited, so it must not outlive the module.
+// Envoy destroys every load balancer before it can unload the module, so join the threads here.
+impl Drop for AsyncHostSelectionLb {
+  fn drop(&mut self) {
+    for thread in self.completion_threads.drain(..) {
+      let _ = thread.join();
+    }
+  }
 }
 
 impl ClusterLb for AsyncHostSelectionLb {
@@ -338,7 +350,9 @@ impl ClusterLb for AsyncHostSelectionLb {
     };
     // Spawn a background thread to complete the host selection asynchronously.
     // The ABI implementation posts the completion to the correct worker thread.
-    std::thread::spawn(move || task.run());
+    self
+      .completion_threads
+      .push(std::thread::spawn(move || task.run()));
     HostSelectionResult::AsyncPending(Box::new(AsyncHandle {
       cancelled: Arc::new(AtomicBool::new(false)),
     }))
@@ -704,14 +718,14 @@ impl ClusterLb for WorkerLocalRebuildLb {
     num_hosts_removed: usize,
   ) {
     // Drop removed hosts resolved directly from the member update.
-    for i in 0..num_hosts_removed {
+    for i in 0 .. num_hosts_removed {
       if let Some(host) = envoy_lb.get_member_update_host(i, false) {
         let addr = host as usize;
         self.hosts.retain(|&existing| existing != addr);
       }
     }
     // Learn added hosts directly from the member update so routing uses the pointer it returns.
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       if let Some(host) = envoy_lb.get_member_update_host(i, true) {
         self.hosts.push(host as usize);
       }
@@ -926,7 +940,7 @@ impl ClusterLb for MemberUpdatePackedAddressLb {
     num_hosts_added: usize,
     _num_hosts_removed: usize,
   ) {
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       // The packed bytes must agree with the formatted address for the same host.
       let verified = match (
         envoy_lb.get_member_update_host_packed_address(i, true),

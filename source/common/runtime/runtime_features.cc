@@ -39,12 +39,17 @@ RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
-RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_composite_cluster_skip_clusters_without_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_fix_reentrancy);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown);
 RUNTIME_GUARD(envoy_reloadable_features_connectivity_grid_prevent_double_h2_scheduled);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
+// When enabled, which is the default, the dynamic forward proxy cluster replaces a host with a
+// new host instance when DNS resolution changes its address, publishing the change as a regular
+// priority set update (old host removed, new host added) so that connection pools to the stale
+// address are drained. Disable to restore the previous behavior of mutating the existing host's
+// address in place, which keeps already-established connections to the old address alive.
+RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_replace_host_on_address_change);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
@@ -66,7 +71,6 @@ RUNTIME_GUARD(envoy_reloadable_features_ecds_filter_use_parent_stats_prefix);
 // factory after a transient health-check flap.
 RUNTIME_GUARD(envoy_reloadable_features_enable_batch_aware_update);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
-RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // TODO(adisuissa): enable once the LRS server-self-ads support is fully
 // implemented, and tested.
@@ -90,14 +94,13 @@ RUNTIME_GUARD(envoy_reloadable_features_filter_chain_drain_uses_configured_strat
 // lost. See https://github.com/envoyproxy/envoy/issues/46841
 RUNTIME_GUARD(envoy_reloadable_features_filter_manager_forward_added_data_on_continue);
 RUNTIME_GUARD(envoy_reloadable_features_fix_http3_early_data_timing);
+RUNTIME_GUARD(envoy_reloadable_features_geoip_sanitize_geo_headers);
 RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_happy_eyeballs_sort_non_ip_addresses);
 RUNTIME_GUARD(envoy_reloadable_features_header_mutation_url_encode_query_params);
-RUNTIME_GUARD(envoy_reloadable_features_health_check_after_cluster_warming);
 RUNTIME_GUARD(envoy_reloadable_features_hide_transport_failure_reason_in_response_body);
 RUNTIME_GUARD(envoy_reloadable_features_hot_restart_propagate_stat_tags);
 RUNTIME_GUARD(envoy_reloadable_features_http1_allow_query_method);
-RUNTIME_GUARD(envoy_reloadable_features_http1_close_connection_on_zombie_stream_complete);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_fix_goaway_loadshed_point);
 RUNTIME_GUARD(envoy_reloadable_features_http2_flood_protection_active_streams);
@@ -113,6 +116,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_ja4_alpn_hex_conversion_fix);
+RUNTIME_GUARD(envoy_reloadable_features_ja4_filter_grease_signature_algorithms);
 RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_sanitize_payload_headers_filter_wide);
@@ -121,7 +125,6 @@ RUNTIME_GUARD(envoy_reloadable_features_listener_filter_reentrant_continue_guard
 RUNTIME_GUARD(envoy_reloadable_features_local_ratelimit_shadow_mode_no_short_circuit);
 RUNTIME_GUARD(envoy_reloadable_features_map_http_stream_reset_to_tcp_rst);
 RUNTIME_GUARD(envoy_reloadable_features_match_headers_individually);
-RUNTIME_GUARD(envoy_reloadable_features_mcp_filter_use_new_metadata_namespace);
 RUNTIME_GUARD(envoy_reloadable_features_metadata_formatter_only_truncate_string);
 RUNTIME_GUARD(envoy_reloadable_features_mobile_use_network_observer_registry);
 // When enabled, a non-graceful admin drain (/drain_listeners without `graceful`) also starts a
@@ -148,16 +151,17 @@ RUNTIME_GUARD(envoy_reloadable_features_preserve_downstream_keepalive);
 RUNTIME_GUARD(envoy_reloadable_features_propagate_downstream_rst_to_upstream);
 RUNTIME_GUARD(envoy_reloadable_features_propagate_upstream_rst_through_tunneled_tcp_proxy);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_added_tlvs_format_string);
-RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_allow_duplicate_tlvs);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_protocol_remove_too_long_tlvs);
 // TODO(panting): Default to true after ssl fix.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_enable_reset_ssl_after_handshake);
+RUNTIME_GUARD(envoy_reloadable_features_quic_hot_restart_time_wait_before_forward);
 RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_resumption_disabled_by_default);
 RUNTIME_GUARD(envoy_reloadable_features_quic_mtls_server_enabled);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
 RUNTIME_GUARD(envoy_reloadable_features_quic_support_additional_ecdsa_curves);
+RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_auto_host_sni);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_client_certificates);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_validate_headers_only_content_length);
@@ -170,7 +174,6 @@ RUNTIME_GUARD(envoy_reloadable_features_sanitize_html_stats_names);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_upstream_stream_duration_header);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);
 RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_dynamic_metadata);
-RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
 RUNTIME_GUARD(envoy_reloadable_features_spiffe_validator_use_upstream_subject_alt_names);
@@ -206,13 +209,14 @@ RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 // route configuration instead of sending another VHDS request and waiting for the response.
 RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
-RUNTIME_GUARD(envoy_reloadable_features_xds_legacy_delta_skip_subsequent_node);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
+RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
 // When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
 // scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
 // TODO: flip to true after sufficient testing.
@@ -348,6 +352,13 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli
 // DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
 // Do not turn this on if DnsFilter is used or until the race is fixed
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
+
+// When an on-demand cluster discovery asks for a cluster its config source has already answered
+// as missing, answer the request immediately from that remembered answer instead of starting
+// another discovery and waiting for the response or the discovery timeout.
+// TODO(wbpcode): flip to true after deployments have had a few releases to adopt the behavior
+// change.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_odcds_missing_cluster_cache);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

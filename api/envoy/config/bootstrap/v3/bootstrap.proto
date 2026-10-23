@@ -42,7 +42,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 44]
+// [#next-free-field: 45]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -239,6 +239,14 @@ message Bootstrap {
     // are marked as unused. Must be a multiple of the ``stats_flush_interval``.
     google.protobuf.Duration stats_eviction_interval = 42
         [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // Optional runtime derived duration, in milliseconds, to perform metric eviction. The runtime
+    // key is read on every stats flush, so the interval can be changed without restarting Envoy.
+    // ``default_value`` is used if the runtime key is not set, or if its value is not a multiple of
+    // the ``stats_flush_interval``. A value of 0 disables eviction. ``default_value`` must also be a
+    // multiple of the ``stats_flush_interval``. See ``stats_eviction_interval`` for how eviction
+    // works.
+    core.v3.RuntimeUInt64 runtime_stats_eviction_interval = 44;
   }
 
   // Optional watchdog configuration.

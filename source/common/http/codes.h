@@ -281,6 +281,10 @@ private:
   void recordHistogram(Stats::Scope& scope, Stats::StatName base_name, Stats::StatNameTagSpan tags,
                        absl::Span<const Stats::StatName> names, Stats::Histogram::Unit unit,
                        uint64_t count) const;
+  // As above, for a base name that still needs its tokens joined.
+  void recordHistogram(Stats::Scope& scope, absl::Span<const Stats::StatName> base_names,
+                       Stats::StatNameTagSpan tags, absl::Span<const Stats::StatName> names,
+                       Stats::Histogram::Unit unit, uint64_t count) const;
 
   mutable Stats::StatNamePool stat_name_pool_;
   Stats::SymbolTable& symbol_table_;
@@ -291,6 +295,8 @@ private:
   const Stats::StatName virtual_host_tag_;
   const Stats::StatName virtual_cluster_tag_;
   const Stats::StatName route_tag_;
+  const Stats::StatName from_zone_tag_;
+  const Stats::StatName to_zone_tag_;
 
   // The 'upstream_rq*' names, and the same names under each of the categories they are also
   // charged under.

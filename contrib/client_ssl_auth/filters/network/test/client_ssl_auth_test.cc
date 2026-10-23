@@ -278,6 +278,21 @@ TEST_F(ClientSslAuthFilterTest, Ssl) {
   EXPECT_EQ(4U, stats_store_.counter("auth.clientssl.vpn.update_failure").value());
 }
 
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(ClientSslAuthFilterTest, StatsAreTagged) {
+  setup();
+
+  const Stats::CounterSharedPtr auth_no_ssl =
+      TestUtility::findCounter(stats_store_, "auth.clientssl.vpn.auth_no_ssl");
+  ASSERT_NE(auth_no_ssl, nullptr);
+  EXPECT_EQ("auth.clientssl.auth_no_ssl", auth_no_ssl->tagExtractedName());
+  ASSERT_EQ(1U, auth_no_ssl->tags().size());
+  EXPECT_EQ("envoy.clientssl_prefix", auth_no_ssl->tags()[0].name_);
+  EXPECT_EQ("vpn", auth_no_ssl->tags()[0].value_);
+
+  EXPECT_CALL(request_, cancel());
+}
+
 } // namespace ClientSslAuth
 } // namespace NetworkFilters
 } // namespace Extensions

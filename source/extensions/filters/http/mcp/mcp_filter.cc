@@ -183,7 +183,7 @@ McpFilterConfig::McpFilterConfig(const envoy::extensions::filters::http::mcp::v3
           proto_config.has_max_supported_protocol_version()
               ? std::optional<std::string>(proto_config.max_supported_protocol_version().value())
               : std::nullopt),
-      metadata_namespace_(Filters::Common::Mcp::metadataNamespace()),
+      metadata_namespace_(Filters::Common::Mcp::McpConstants::McpfilterNamespace),
       parser_config_(proto_config.has_parser_config()
                          ? McpParserConfig::fromProto(proto_config.parser_config())
                          : McpParserConfig::createDefault()),

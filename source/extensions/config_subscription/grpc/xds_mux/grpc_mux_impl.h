@@ -87,10 +87,11 @@ public:
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
-  // Additionally adds resources to the given watch's interest, updating both the watch-map routing
-  // and the subscription (see GrpcMuxWatch::append).
-  void appendWatch(const std::string& type_url, Watch* watch,
-                   const absl::flat_hash_set<std::string>& resources,
+  // Additionally adds and/or removes resources in the given watch's interest, updating both the
+  // watch-map routing and the subscription (see GrpcMuxWatch::update).
+  void updateWatch(const std::string& type_url, Watch* watch,
+                   const absl::flat_hash_set<std::string>& resources_to_add,
+                   const absl::flat_hash_set<std::string>& resources_to_remove,
                    const SubscriptionOptions& options);
   // Registers glob interest for the given watch; routing only, never affects the subscription
   // (see GrpcMuxWatch::accept).
@@ -160,8 +161,9 @@ protected:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
-    void append(const absl::flat_hash_set<std::string>& resources) override {
-      parent_.appendWatch(type_url_, watch_, resources, options_);
+    void update(const absl::flat_hash_set<std::string>& resources_to_add,
+                const absl::flat_hash_set<std::string>& resources_to_remove) override {
+      parent_.updateWatch(type_url_, watch_, resources_to_add, resources_to_remove, options_);
     }
 
     void accept(const absl::flat_hash_set<std::string>& patterns) override {

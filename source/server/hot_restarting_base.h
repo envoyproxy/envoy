@@ -64,6 +64,7 @@ private:
   void getPassedFdIfPresent(envoy::HotRestartMessage* out, msghdr* message);
   std::unique_ptr<envoy::HotRestartMessage> parseProtoAndResetState();
   void initRecvBufIfNewMessage();
+  void resetReceiveState();
   // An int in [0, MaxConcurrentProcesses). As hot restarts happen, each next process gets the
   // next of 0,1,2,0,1,...
   // A HotRestartingBase's domain socket's name contains its base_id_ value, and so we can use

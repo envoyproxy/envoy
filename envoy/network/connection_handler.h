@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
@@ -14,6 +15,8 @@
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/common/interval_value.h"
+
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Network {
@@ -154,6 +157,12 @@ public:
    * @return the stat prefix used for per-handler stats.
    */
   virtual const std::string& statPrefix() const PURE;
+
+  /**
+   * @return the id of the worker this handler runs on, or std::nullopt when the handler is not
+   *         owned by a worker thread.
+   */
+  virtual std::optional<uint32_t> workerId() const PURE;
 
   /**
    * Close idle HTTP connections.
@@ -342,6 +351,17 @@ public:
    * @return socket options specific to this factory that should be applied to all sockets.
    */
   virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
+   * Initializes routing of UDP packets to the correct worker. Called once when a listener is added
+   * or updated, after the listen sockets are created. Implementations may register init targets
+   * with the listener's init manager.
+   * Only called if envoy.restart_features.defer_worker_routing_init is enabled.
+   * @param listen_socket_factories the listener's socket factories, one per address.
+   * @return a status indicating if an error occurred.
+   */
+  virtual absl::Status initializeWorkerRouting(
+      absl::Span<const Network::ListenSocketFactoryPtr> listen_socket_factories) PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;
