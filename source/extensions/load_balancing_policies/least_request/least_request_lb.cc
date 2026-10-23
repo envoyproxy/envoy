@@ -13,7 +13,7 @@ uint64_t LeastRequestLoadBalancer::effectiveActiveRequests(const Host& host) con
 
 double LeastRequestLoadBalancer::hostWeight(const Host& host) const {
   // This method is called to calculate the dynamic weight as following when all load balancing
-  // weights are not equal:
+  // weights are not equal, or when `active_request_bias` is explicitly configured:
   //
   // `weight = load_balancing_weight / (active_requests + 1)^active_request_bias`
   //

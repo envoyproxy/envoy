@@ -345,6 +345,66 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_2.chooseHost(nullptr).host);
 }
 
+// Validate that an explicitly configured active request bias is honored even when all host weights
+// are equal.
+TEST_P(LeastRequestLoadBalancerTest, EqualWeightsWithActiveRequestBias) {
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
+  lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  // Effective weights: host[0] = 1 / (1+1) = 0.5, host[1] = 1 / (0+1) = 1.0.
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(0);
+
+  // With P2C and random() always returning 0, host[0] would be sampled twice and always picked.
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+
+  // We should see a 2:1 ratio for hosts[1] to hosts[0].
+  size_t host_1_counts = 0;
+  for (size_t i = 0; i < 300; ++i) {
+    if (lb_2.chooseHost(nullptr).host == hostSet().healthy_hosts_[1]) {
+      ++host_1_counts;
+    }
+  }
+  EXPECT_NEAR(200, host_1_counts, 2);
+}
+
+// Validate that disabling the runtime guard restores P2C selection when all host weights are equal,
+// even if an active request bias is configured.
+TEST_P(LeastRequestLoadBalancerTest, EqualWeightsWithActiveRequestBiasRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.least_request_lb_active_request_bias_forces_weighted",
+        "false"}});
+
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
+  lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
+
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
+  hostSet().hosts_ = hostSet().healthy_hosts_;
+  hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
+
+  hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
+  hostSet().healthy_hosts_[1]->stats().rq_active_.set(0);
+
+  // P2C samples host[0] twice, so it is picked despite having more active requests.
+  EXPECT_CALL(random_, random()).WillRepeatedly(Return(0));
+  for (size_t i = 0; i < 10; ++i) {
+    EXPECT_EQ(hostSet().healthy_hosts_[0], lb_2.chooseHost(nullptr).host);
+  }
+}
+
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
   hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
                               makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
