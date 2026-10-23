@@ -1185,7 +1185,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "65pxi65+rPu5SFiqNVWym53DS8mqazdU9cbxgUpwSZc=",
+        "bzlTransitiveDigest": "1Ucc8RDPg5Vjib7vuIK2jQvz02cy9NJAEseIuBzc4Fg=",
         "usagesDigest": "1vlTA8e/0hphk7YLFyHJk3uuUdQmT1ESwnAq2kCFek4=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1205,7 +1205,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_llvm_extension": {
       "general": {
-        "bzlTransitiveDigest": "65pxi65+rPu5SFiqNVWym53DS8mqazdU9cbxgUpwSZc=",
+        "bzlTransitiveDigest": "1Ucc8RDPg5Vjib7vuIK2jQvz02cy9NJAEseIuBzc4Fg=",
         "usagesDigest": "1W2LoLtXCPxn5c1oS0NuFLnrHy08+nckHe1taSJN/B8=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1232,7 +1232,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "65pxi65+rPu5SFiqNVWym53DS8mqazdU9cbxgUpwSZc=",
+        "bzlTransitiveDigest": "1Ucc8RDPg5Vjib7vuIK2jQvz02cy9NJAEseIuBzc4Fg=",
         "usagesDigest": "D0OekSd4FDQit+nDVWiJsu0YoStYcWnAjWnctPriQQg=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1254,7 +1254,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "65pxi65+rPu5SFiqNVWym53DS8mqazdU9cbxgUpwSZc=",
+        "bzlTransitiveDigest": "1Ucc8RDPg5Vjib7vuIK2jQvz02cy9NJAEseIuBzc4Fg=",
         "usagesDigest": "GClG4k7fosfl8mL37eMTinR0qEZS5pDUIpP2jOfyTxM=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1274,7 +1274,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "65pxi65+rPu5SFiqNVWym53DS8mqazdU9cbxgUpwSZc=",
+        "bzlTransitiveDigest": "1Ucc8RDPg5Vjib7vuIK2jQvz02cy9NJAEseIuBzc4Fg=",
         "usagesDigest": "Hd4QSmesQd7+Ko+6J9BlM7wze1gVYTNgYlXwEI6wXGo=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",

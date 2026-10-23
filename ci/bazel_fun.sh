@@ -34,6 +34,7 @@ run_in_mods() {
     }
     for module_dir in "${_mod_dirs[@]}"; do
         status=0
+        echo "Updating .. $module_dir" >&2
         pushd "$module_dir" > /dev/null || return 1
         "$fn" "$module_dir" "$@" || status=$?
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
