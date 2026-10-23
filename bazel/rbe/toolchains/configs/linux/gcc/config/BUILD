@@ -30,5 +30,5 @@ platform(
         "container-image": "docker://%s" % image_gcc(),
         "OSFamily": "Linux",
     },
-    parents = ["@local_config_platform//:host"],
+    parents = ["@platforms//host"],
 )

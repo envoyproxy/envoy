@@ -32,7 +32,7 @@ LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats
                                  prefix};
   Stats::LiteScopeHelper helper(
       scope, kPrefix, prefix.empty() ? Stats::TagStringViewSpan() : Stats::TagStringViewSpan{tag},
-      absl::StrCat(kPrefix, ".", prefix));
+      absl::StrCat(kPrefix, ".", prefix), /*sanitize=*/false);
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER(helper))};
 }
 

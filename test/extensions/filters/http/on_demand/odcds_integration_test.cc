@@ -605,7 +605,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
 //  - a request to unknown cluster "new_cluster" triggers on-demand discovery (the initial
 //    subscription, via start()), which is resolved and the request succeeds;
 //  - a request to a different unknown cluster "new_cluster_2" triggers a SECOND on-demand
-//    discovery, which goes through requestOnDemandUpdate()/append() on the already-started
+//    discovery, which goes through requestOnDemandUpdate()/update() on the already-started
 //    subscription.
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoverySecondClusterRoutesResponse) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
@@ -654,7 +654,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoverySecondClusterRoutesResponse
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Second request -> a DIFFERENT on-demand cluster ("new_cluster_2"). This is the second on-demand
-  // request on the same subscription, so it flows through requestOnDemandUpdate()/append(). The
+  // request on the same subscription, so it flows through requestOnDemandUpdate()/update(). The
   // response must be routed to the ODCDS callbacks so the cluster is added and the request succeeds
   // (before the fix this timed out with a 503).
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));

@@ -1360,6 +1360,31 @@ absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
   return absl::OkStatus();
 }
 
+bool McpJsonRestBridgeFilter::validateClientCapabilitiesMeta(const nlohmann::json& json_rpc,
+                                                             absl::string_view method) {
+  const nlohmann::json& params = json_rpc[McpConstants::PARAMS_FIELD];
+  const nlohmann::json& meta = params[McpConstants::META_FIELD];
+  const auto client_capabilities = meta.find(McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD);
+  if (client_capabilities != meta.end() && client_capabilities->is_object()) {
+    return true;
+  }
+
+  const std::string error_message =
+      client_capabilities == meta.end()
+          ? absl::StrCat("Missing required params._meta field: ",
+                         McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD)
+          : absl::StrCat("Invalid params._meta field: ",
+                         McpConstants::MCP_META_CLIENT_CAPABILITIES_FIELD, " must be an object");
+  ENVOY_STREAM_LOG(debug, "Rejecting stateless MCP request: {}", *decoder_callbacks_,
+                   error_message);
+  sendErrorResponse(
+      Http::Code::BadRequest, BridgeStatus::RequestMcpClientCapabilitiesInvalid,
+      generateErrorJsonResponse(McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE, error_message)
+          .dump(),
+      nullptr, method, params);
+  return false;
+}
+
 bool McpJsonRestBridgeFilter::validateMcpMethodHeader(
     const nlohmann::json& json_rpc, absl::string_view method,
     Http::RequestHeaderMapOptRef request_headers) {
@@ -1458,6 +1483,10 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
 
   if (is_stateless_request_ && method == McpConstants::Methods::TOOLS_CALL &&
       !validateMcpNameHeader(json_rpc, method, request_headers)) {
+    return;
+  }
+
+  if (is_stateless_request_ && !validateClientCapabilitiesMeta(json_rpc, method)) {
     return;
   }
 

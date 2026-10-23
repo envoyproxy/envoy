@@ -269,6 +269,13 @@ protected:
                                                     const std::string& overwrite_authority = "");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
+  // Whether the stats store derives tags with the explicit-tags logic (the tag-friendly scope API)
+  // rather than with the legacy tag-extraction rules. Both modes must produce identical stat
+  // names, tag-extracted names and tags for the stats asserted with expectStatTags().
+  bool useExplicitStatsTags() const { return version_ == Network::Address::IpVersion::v6; }
+  // Checks a counter's flat name, the name it is tag-extracted to, and the tags attached to it.
+  void expectStatTags(const std::string& name, const std::string& tag_extracted_name,
+                      const std::vector<std::pair<std::string, std::string>>& tags);
   void testRouterVirtualClusters();
   void testRouteStats();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);

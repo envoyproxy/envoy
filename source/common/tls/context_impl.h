@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "envoy/network/transport_socket.h"
-#include "envoy/singleton/instance.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/private_key/private_key.h"
@@ -88,30 +87,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-// The TLS stat name builtins (BoringSSL cipher/curve/signature algorithm/version names, plus the
-// fixed prefixes and "unknown" fallbacks) are identical for every TLS context. Interning
-// them into a per-context StatNameSet duplicated ~150 locked symbol-table encodes and a
-// builtin map per context, and repeated it on every SDS certificate rotation. Instead we
-// build the set once per server and share it via the singleton manager. The set is fully
-// populated at construction and immutable thereafter, so the lock-free getBuiltin() reads
-// performed on worker threads remain safe.
-class TlsBuiltinStatNames : public Singleton::Instance {
-public:
-  explicit TlsBuiltinStatNames(Stats::SymbolTable& symbol_table);
-
-  Stats::StatNameSet& statNameSet() const { return *stat_name_set_; }
-
-  const Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName unknown_ssl_cipher_;
-  const Stats::StatName unknown_ssl_curve_;
-  const Stats::StatName unknown_ssl_algorithm_;
-  const Stats::StatName unknown_ssl_version_;
-  const Stats::StatName ssl_ciphers_;
-  const Stats::StatName ssl_versions_;
-  const Stats::StatName ssl_curves_;
-  const Stats::StatName ssl_sigalgs_;
-};
-
 class ContextImpl : public virtual Envoy::Ssl::Context,
                     protected Logger::Loggable<Logger::Id::config> {
 public:
@@ -180,8 +155,9 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols,
                                           absl::Status& parse_status);
 
-  void incCounter(const Stats::StatName name, absl::string_view value,
-                  const Stats::StatName fallback) const;
+  // Increments the "<name>.<value>" counter of the scope, with the value as its tag_name tag.
+  void incCounter(const Stats::StatName name, const Stats::StatName tag_name,
+                  absl::string_view value, const Stats::StatName fallback) const;
 
   // Helper function to validate cert for TCP connections asynchronously.
   ValidationResults customVerifyCertChain(

@@ -284,14 +284,8 @@ generateListenerStatsScope(const envoy::config::listener::v3::Listener& config,
       scope_matcher = std::make_shared<Stats::StatsMatcherImpl>(
           stats_matcher_proto, stats.symbolTable(), server.serverFactoryContext());
     } else {
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::config), warn,
-                          "Failed to unpack stats matcher for listener {}: {}", config.name(),
-                          status.message());
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.strict_stats_matcher_unpacked")) {
-        return absl::InvalidArgumentError(fmt::format(
-            "Failed to unpack stats matcher for listener {}: {}", config.name(), status.message()));
-      }
+      return absl::InvalidArgumentError(fmt::format(
+          "Failed to unpack stats matcher for listener {}: {}", config.name(), status.message()));
     }
   }
 
@@ -508,12 +502,11 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildProxyProtocolListenerFilter(config);
     SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
   }
-  if (!workers_started_) {
-    // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
-    // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
-    // listener constructor so that this listener's children entities could register their targets
-    // with their parent's initManager.
-    parent_.server_.initManager().add(listener_init_target_);
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.defer_worker_routing_init")) {
+    // QUIC listeners register targets in initializeWorkerRouting(), which runs after the
+    // constructor, so with the runtime flag enabled registration is deferred to
+    // ListenerManagerImpl::addOrUpdateListenerInternal instead.
+    registerInitTargetIfWorkersNotStarted();
   }
 }
 
@@ -761,9 +754,11 @@ ListenerImpl::buildUdpListenerFactory(const envoy::config::listener::v3::Listene
           "connection_balance_config is configured for QUIC listener which "
           "doesn't work with connection balancer.");
     }
+    absl::Status creation_status = absl::OkStatus();
     udp_listener_config_->listener_factory_ = std::make_unique<Quic::ActiveQuicListenerFactory>(
         config.udp_listener_config().quic_options(), concurrency, quic_stat_names_,
-        validation_visitor_, *listener_factory_context_);
+        validation_visitor_, *listener_factory_context_, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
 
     if (config.udp_listener_config().has_udp_packet_packet_writer_config()) {
       auto* quic_packet_writer_factory_factory =
@@ -1362,6 +1357,12 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
     }
   }
   return false;
+}
+
+void ListenerImpl::registerInitTargetIfWorkersNotStarted() {
+  if (!workers_started_) {
+    parent_.server_.initManager().add(listener_init_target_);
+  }
 }
 
 absl::Status ListenerImpl::cloneSocketFactoryFrom(const ListenerImpl& other) {

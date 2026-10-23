@@ -39,7 +39,7 @@ fn new_tls_certificate_selector_config(
 /// every test certificate is.
 fn is_der_certificate(certificate: &[u8]) -> bool {
   certificate.len() > 4
-    && certificate[..2] == [0x30, 0x82]
+    && certificate[.. 2] == [0x30, 0x82]
     && usize::from(u16::from_be_bytes([certificate[2], certificate[3]])) + 4 == certificate.len()
 }
 

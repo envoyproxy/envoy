@@ -5,12 +5,11 @@
 //! arm of [`crate::declare_all_init_functions!`], which registers a factory through
 //! [`crate::NEW_FORMATTER_CONFIG_FUNCTION`] and lets a single module dispatch by `formatter_name`.
 
+pub use crate::access_log::AccessLogType;
 use crate::{abi, bytes_to_module_buffer, ffi_export, EnvoyBuffer};
 use std::cell::RefCell;
 use std::ffi::c_void;
 use std::ptr;
-
-pub use crate::access_log::AccessLogType;
 
 /// Trait that the dynamic module implements to provide a command parser configuration.
 ///

@@ -160,6 +160,29 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
+TEST_F(RateLimitFilterTest, ShadowModeDescriptor) {
+  InSequence s;
+  setUpTest(filter_config_);
+
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  (*descriptor_statuses)[1].set_shadow_over_limit(true);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
+                               std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);
+
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.shadow_over_limit").value());
+}
+
 TEST_F(RateLimitFilterTest, SubstitutionFormatterTest1) {
   InSequence s;
   setUpTest(formatter_test_1);

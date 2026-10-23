@@ -39,7 +39,6 @@ RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
-RUNTIME_GUARD(envoy_reloadable_features_codec_client_enable_idle_timer_only_when_connected);
 RUNTIME_GUARD(envoy_reloadable_features_composite_cluster_skip_clusters_without_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_fix_reentrancy);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown);
@@ -72,7 +71,6 @@ RUNTIME_GUARD(envoy_reloadable_features_ecds_filter_use_parent_stats_prefix);
 // factory after a transient health-check flap.
 RUNTIME_GUARD(envoy_reloadable_features_enable_batch_aware_update);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_response_path_matching);
-RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // TODO(adisuissa): enable once the LRS server-self-ads support is fully
 // implemented, and tested.
@@ -119,6 +117,7 @@ RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_ja4_alpn_hex_conversion_fix);
+RUNTIME_GUARD(envoy_reloadable_features_ja4_filter_grease_signature_algorithms);
 RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_add_verification_status_header);
 RUNTIME_GUARD(envoy_reloadable_features_jwt_authn_sanitize_payload_headers_filter_wide);
@@ -176,12 +175,10 @@ RUNTIME_GUARD(envoy_reloadable_features_sanitize_html_stats_names);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_upstream_stream_duration_header);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);
 RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_dynamic_metadata);
-RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
 RUNTIME_GUARD(envoy_reloadable_features_spiffe_validator_use_upstream_subject_alt_names);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_socket_report_connection_reset);
-RUNTIME_GUARD(envoy_reloadable_features_strict_stats_matcher_unpacked);
 RUNTIME_GUARD(envoy_reloadable_features_strip_dotdot_segments_with_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_strip_path_parameters_per_segment);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_strip_upgrade_header_on_failed_websocket_upgrades);
@@ -213,11 +210,13 @@ RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
+RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
 // When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
 // scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
 // TODO: flip to true after sufficient testing.
