@@ -133,8 +133,12 @@ override_repo(
     envoy_build_config = "envoy_build_config",
 )
 
-mobile_platforms_ext = use_extension("//bazel:extensions.bzl", "envoy_mobile_platforms_extension")
-use_repo(mobile_platforms_ext, "mobile_clang_platform")
+arch_alias_ext = use_extension("@envoy_toolshed//repository:extensions.bzl", "arch_alias_extension")
+arch_alias_ext.alias(
+    name = "mobile_clang_platform",
+    amd64 = "//bazel/platforms/rbe:linux_x64",
+)
+use_repo(arch_alias_ext, "mobile_clang_platform")
 
 llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
 use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
