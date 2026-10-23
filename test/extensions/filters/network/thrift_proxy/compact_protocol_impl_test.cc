@@ -212,6 +212,23 @@ TEST_F(CompactProtocolTest, ReadMessageBegin) {
     expectMetadata("the_name", MessageType::Call, 0x102);
     EXPECT_EQ(buffer.length(), 0);
   }
+
+  // Near-INT32_MAX name length: buffer-length comparison must not use signed arithmetic.
+  // With the old code, (id_size + name_len_size + name_len + 2) overflows in the signed
+  // domain (UB); the fix casts each operand to uint64_t individually before adding.
+  {
+    Buffer::OwnedImpl buffer;
+    resetMetadata();
+
+    buffer.writeBEInt<int16_t>(0x8221);
+    buffer.writeByte(32);
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x07}); // name_len = INT32_MAX, name_len_size = 5
+    // Buffer is 8 bytes total; nowhere near INT32_MAX bytes of name data.
+
+    EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+    expectDefaultMetadata();
+    EXPECT_EQ(buffer.length(), 8);
+  }
 }
 
 TEST_F(CompactProtocolTest, ReadMessageEnd) {
@@ -980,6 +997,21 @@ TEST_F(CompactProtocolTest, ReadString) {
     EXPECT_TRUE(proto.readString(buffer, value));
     EXPECT_EQ(value, "string");
     EXPECT_EQ(buffer.length(), 0);
+  }
+
+  // Near-INT32_MAX string length: buffer-length comparison must not use signed arithmetic.
+  // With the old code, (str_len + len_size) overflows in the signed domain (UB);
+  // the fix casts each operand to uint64_t individually before adding.
+  {
+    Buffer::OwnedImpl buffer;
+    std::string value = "-";
+
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x07}); // str_len = INT32_MAX, len_size = 5
+    // Buffer is 5 bytes total; nowhere near INT32_MAX bytes of string data.
+
+    EXPECT_FALSE(proto.readString(buffer, value));
+    EXPECT_EQ(value, "-");
+    EXPECT_EQ(buffer.length(), 5);
   }
 }
 
