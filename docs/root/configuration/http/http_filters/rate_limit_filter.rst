@@ -9,9 +9,36 @@ Rate limit
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
 has one or more :ref:`rate limit configurations<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`
-that match the filter stage setting. The :ref:`route<envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>`
-can optionally include the virtual host rate limit configurations. More than one configuration can
+that match the filter stage setting. More than one configuration can
 apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
+
+Whether the virtual host rate limit configurations apply to a route is set by
+:ref:`vh_rate_limits <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.vh_rate_limits>`
+in the route's ``typed_per_filter_config``. This replaces the deprecated
+:ref:`include_vh_rate_limits <envoy_v3_api_field_config.route.v3.RouteAction.include_vh_rate_limits>`.
+
+* :ref:`OVERRIDE <envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions.OVERRIDE>`
+  (the default): the virtual host configurations apply only if the route has no
+  :ref:`rate limit configurations <envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>`.
+* :ref:`INCLUDE <envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions.INCLUDE>`:
+  both the route and the virtual host configurations apply.
+* :ref:`IGNORE <envoy_v3_api_enum_value_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.VhRateLimitsOptions.IGNORE>`:
+  the virtual host configurations never apply to the route.
+
+An empty ``rate_limits`` list on a route is the same as not setting the field, so it does not stop
+the virtual host rate limits. To exempt a route from them, set ``vh_rate_limits`` to ``IGNORE``:
+
+.. code-block:: yaml
+
+  routes:
+  - match:
+      prefix: "/healthz"
+    route:
+      cluster: backend
+    typed_per_filter_config:
+      envoy.filters.http.ratelimit:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+        vh_rate_limits: IGNORE
 
 If the rate limit service is called, and the response for any of the descriptors is over limit, a
 429 response is returned (the response is configurable via :ref:`rate_limited_status <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limited_status>`). The rate limit filter also sets the :ref:`x-envoy-ratelimited<config_http_filters_router_x-envoy-ratelimited>` header,

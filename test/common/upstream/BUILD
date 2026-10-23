@@ -198,6 +198,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_manager_lifecycle_test",
     srcs = ["cluster_manager_lifecycle_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_manager_impl_test_common",
         "//source/extensions/clusters/dns:dns_cluster_lib",

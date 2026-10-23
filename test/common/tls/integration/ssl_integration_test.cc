@@ -10,7 +10,9 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/ssl/ssl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -85,8 +87,17 @@ BORINGSSL_TEST_P(SslIntegrationTest, UnknownSslAlert) {
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
-// Test that stats produced by the tls transport socket have correct tag extraction.
+// Test that stats produced by the tls transport socket have the same flat names, tag-extracted
+// names and tags whether the tags are derived by the legacy tag-extraction rules (IPv4) or
+// supplied explicitly (IPv6).
 TEST_P(SslIntegrationTest, StatsTagExtraction) {
+  // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+  // server in different modes. The mode is read during server initialization, before the runtime
+  // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+  const bool explicit_tags = version_ == Network::Address::IpVersion::v6;
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                explicit_tags);
+
   // Configure TLS to use specific parameters so the exact metrics the test expects are created.
   // TLSv1.3 doesn't allow specifying the cipher suites, so use TLSv1.2 to force a specific cipher
   // suite to simplify the test.
@@ -121,6 +132,12 @@ TEST_P(SslIntegrationTest, StatsTagExtraction) {
 
   testRouterRequestAndResponseWithBody(1024, 1024, false, false, &creator);
   checkStats();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+  // would silently be exercising the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicit_tags);
 
   using ExpectedResultsMap =
       absl::node_hash_map<std::string, std::pair<std::string, Stats::TagVector>>;

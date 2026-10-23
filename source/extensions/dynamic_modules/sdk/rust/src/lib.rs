@@ -5,6 +5,10 @@
 #![allow(dead_code)]
 #![allow(clippy::unnecessary_cast)]
 
+include!(concat!(env!("OUT_DIR"), "/export_name.rs"));
+#[doc(hidden)]
+pub use __export_name_impl as __export_name;
+
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
@@ -576,7 +580,8 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
 ///
 /// The result is a `SmallVec` inlined for the common case of one to four strings, avoiding a heap
 /// allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
-/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that
+/// pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],
 ) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
@@ -695,7 +700,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -709,7 +714,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -722,7 +727,7 @@ macro_rules! ffi_export {
     fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -734,7 +739,7 @@ macro_rules! ffi_export {
     unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -811,8 +816,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
-/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
-///   mutations
+/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header mutations
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
@@ -1356,8 +1360,8 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 /// # Example
 ///
 /// ```
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true
@@ -1764,7 +1768,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+///   fn new_load_balancer(
+///     &self,
+///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+///   ) -> Option<Box<dyn ClusterLb>> {
 ///     Some(Box::new(MyClusterLb {}))
 ///   }
 /// }
@@ -2070,7 +2077,7 @@ pub static NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewConfigValidatorConf
 #[macro_export]
 macro_rules! declare_config_validator_init_functions {
   ($f:ident, $new_config_validator_config_fn:expr) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(

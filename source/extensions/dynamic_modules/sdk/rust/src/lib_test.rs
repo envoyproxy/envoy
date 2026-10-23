@@ -239,6 +239,41 @@ fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
 }
 
 #[test]
+fn test_envoy_dynamic_module_on_http_filter_config_scheduled() {
+  // The hook receives the config object the event was scheduled on, so it can emit the metrics
+  // defined on it.
+  static SCHEDULED: std::sync::Mutex<Vec<(usize, u64)>> = std::sync::Mutex::new(Vec::new());
+  struct TestHttpFilterConfig;
+  impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
+    fn on_scheduled(&self, envoy_config: &mut EnvoyHttpFilterConfigImpl, event_id: u64) {
+      SCHEDULED
+        .lock()
+        .unwrap()
+        .push((envoy_config.raw_ptr as usize, event_id));
+    }
+  }
+
+  let new_fn: NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl> =
+    |_, _, _| Some(Box::new(TestHttpFilterConfig));
+  let config_ptr = envoy_dynamic_module_on_http_filter_config_new_impl(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: std::ptr::null_mut(),
+    },
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  // Only handed on, never dereferenced.
+  let envoy_config_ptr = 0x1234 as abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr;
+
+  unsafe {
+    envoy_dynamic_module_on_http_filter_config_scheduled(envoy_config_ptr, config_ptr, 7);
+    envoy_dynamic_module_on_http_filter_config_destroy(config_ptr);
+  }
+  assert_eq!(*SCHEDULED.lock().unwrap(), vec![(0x1234, 7)]);
+}
+
+#[test]
 // This tests the round-trip of the envoy_dynamic_module_on_http_filter_new_impl and
 // envoy_dynamic_module_on_http_filter_destroy.
 fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
@@ -5147,7 +5182,8 @@ fn test_tls_certificate_selector_certificate_requested_panic_declines_the_certif
 #[test]
 fn test_tls_certificate_selector_envoy_config_calls_envoy() {
   use tls_certificate_selector::{
-    EnvoyTlsCertificateSelectorConfig, EnvoyTlsCertificateSelectorConfigScheduler,
+    EnvoyTlsCertificateSelectorConfig,
+    EnvoyTlsCertificateSelectorConfigScheduler,
   };
   let envoy_config = tls_certificate_selector::EnvoyTlsCertificateSelectorConfigImpl {
     raw: tls_certificate_selector_envoy_config(),
@@ -6304,7 +6340,7 @@ fn write_mock_cluster_host_ptrs(
   result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
   count: usize,
 ) {
-  for index in 0..count {
+  for index in 0 .. count {
     unsafe {
       result_host_ptrs
         .add(index)
@@ -6560,7 +6596,7 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_m
 ) -> bool {
   let mut recorded = MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH.lock().unwrap();
   recorded.clear();
-  for i in 0..entries_size {
+  for i in 0 .. entries_size {
     let entry = unsafe { &*entries.add(i) };
     let key = unsafe { std::slice::from_raw_parts(entry.key_ptr as *const u8, entry.key_length) };
     let value =
@@ -10139,7 +10175,7 @@ fn test_envoy_dynamic_module_on_stat_sink_flush_reads_snapshot() {
     fn on_flush(&self, snapshot: &stats_sink::MetricSnapshot<'_>) {
       let mut seen = SEEN_COUNTERS.lock().unwrap();
       let mut name = Vec::new();
-      for index in 0..snapshot.counter_count() {
+      for index in 0 .. snapshot.counter_count() {
         if let Some(counter) = snapshot.counter(index, &mut name) {
           seen.push((
             String::from_utf8_lossy(&name).into_owned(),
@@ -10781,7 +10817,7 @@ fn test_mock_envoy_transport_socket_do_read() {
       let mut buffer = [0u8; 8];
       let (status, n) = envoy.io_read(&mut buffer);
       assert_eq!(status, IoStatus::Success);
-      envoy.read_buffer_add(&buffer[..n]);
+      envoy.read_buffer_add(&buffer[.. n]);
       IoResult::keep_open(n, false)
     }
     fn on_do_write(
@@ -10820,7 +10856,7 @@ fn test_mock_envoy_transport_socket_do_read() {
 
   let mut mock = transport_socket::MockEnvoyTransportSocket::new();
   mock.expect_io_read().times(1).returning(|buffer| {
-    buffer[..5].copy_from_slice(b"hello");
+    buffer[.. 5].copy_from_slice(b"hello");
     (IoStatus::Success, 5)
   });
   mock
@@ -11698,7 +11734,7 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_cluster_no
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
   status_code: u32,
 ) -> bool {
-  if !(200..600).contains(&status_code) {
+  if !(200 .. 600).contains(&status_code) {
     return false;
   }
   STUB_SPECIFIER_SELECTION
@@ -13119,7 +13155,7 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_cluster_not_
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
   status_code: u32,
 ) -> bool {
-  if !(200..600).contains(&status_code) {
+  if !(200 .. 600).contains(&status_code) {
     return false;
   }
   STUB_ROUTE_DECISION
