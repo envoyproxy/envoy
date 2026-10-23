@@ -243,7 +243,10 @@ pub trait CertValidatorConfig: Send + Sync {
 // =============================================================================
 
 use crate::{
-  drop_wrapped_c_void_ptr, ffi_export, wrap_into_c_void_ptr, NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  wrap_into_c_void_ptr,
+  NEW_CERT_VALIDATOR_CONFIG_FUNCTION,
 };
 
 ffi_export! {

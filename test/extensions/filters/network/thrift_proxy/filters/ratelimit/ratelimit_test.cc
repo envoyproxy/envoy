@@ -232,6 +232,36 @@ TEST_F(ThriftRateLimitFilterTest, OkResponse) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
 }
 
+TEST_F(ThriftRateLimitFilterTest, ShadowModeDescriptor) {
+  setupTest(filter_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(ThriftProxy::FilterStatus::StopIteration, filter_->messageBegin(request_metadata_));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited))
+      .Times(0);
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  (*descriptor_statuses)[1].set_shadow_over_limit(true);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
+                               std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ratelimit.shadow_over_limit")
+                    .value());
+}
+
 TEST_F(ThriftRateLimitFilterTest, ImmediateOkResponse) {
   setupTest(filter_config_);
   InSequence s;
