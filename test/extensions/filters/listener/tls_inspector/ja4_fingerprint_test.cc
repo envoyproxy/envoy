@@ -1,5 +1,4 @@
 #include "source/common/common/hex.h"
-#include "source/common/ssl/ssl.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
@@ -58,12 +57,15 @@ std::vector<uint8_t> buildExtensionsWithSigAlgs(const std::vector<uint8_t>& sig_
   return exts;
 }
 
+// ``SSL_parse_client_hello`` is BoringSSL-only. OpenSSL builds still cover the GREASE
+// sig-alg filtering via the ``GreaseValueFilteredFromSignatureAlgorithms`` test below
+// and the end-to-end handshake test in ``tls_inspector_ja4_test.cc``.
+#ifndef ENVOY_SSL_OPENSSL
 // End-to-end wire-format regression test for the GREASE-in-signature_algorithms
 // bug. Parses a captured TLS record + handshake header + ClientHello body from
-// hex using BoringSSL's SSL_parse_client_hello (the same code path Envoy hits
-// when it feeds ClientHello bytes into ``JA4Fingerprinter::create`` through the
-// listener filter), then asserts the resulting ``JA4`` fingerprint matches the
-// expected spec-compliant value.
+// hex using BoringSSL's SSL_parse_client_hello, feeds it into
+// ``JA4Fingerprinter::create``, then asserts the resulting ``JA4`` fingerprint
+// matches the expected spec-compliant value.
 //
 // The vector is Browser-1's captured ClientHello from tls_inspector_ja4_test.cc
 // with a single GREASE codepoint (0x0a0a) injected into the signature_algorithms
@@ -106,9 +108,9 @@ TEST(JA4Fingerprinter, EndToEndGreaseSigAlgProducesExpectedFingerprint) {
 
   // Same expected fingerprint as Browser-1 in ``tls_inspector_ja4_test.cc``: the
   // injected GREASE codepoint must not affect ``JA4_c``.
-  EXPECT_EQ(fingerprint, SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1",
-                                    "t13d1515h2_8daaf6152771_de4a06bb82e3"));
+  EXPECT_EQ(fingerprint, "t13d1516h2_8daaf6152771_e5627efa2ab1");
 }
+#endif
 
 // Regression test for the ``JA4`` spec's requirement that GREASE values be excluded
 // from the signature_algorithms input to the ``JA4_c`` hash. A ClientHello with a
