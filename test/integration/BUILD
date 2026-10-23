@@ -1302,8 +1302,11 @@ envoy_cc_test_library(
         ":test_host_predicate_lib",
         "//envoy/event:timer_interface",
         "//source/common/common:thread_annotations",
+        "//source/common/config:well_known_names",
         "//source/common/http:header_utility_lib",
         "//source/common/network:socket_option_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/tls:context_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
@@ -3029,6 +3032,7 @@ envoy_cc_test(
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
         "//test/test_common:logging_lib",
+        "@envoy_api//envoy/extensions/udp_packet_writer/v3:pkg_cc_proto",
     ]),
 )
 

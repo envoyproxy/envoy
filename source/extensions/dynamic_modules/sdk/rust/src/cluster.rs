@@ -1,8 +1,19 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
-  strs_to_module_buffers, wrap_into_c_void_ptr, CompletionCallback, EnvoyCounterId,
-  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  CompletionCallback,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
   NEW_CLUSTER_CONFIG_FUNCTION,
 };
 #[cfg(any(test, feature = "mock"))]
@@ -72,8 +83,7 @@ pub trait Cluster: Send + Sync {
   /// default implementation is a no-op.
   ///
   /// * `envoy_cluster` provides access to the underlying Envoy cluster object.
-  /// * `event_id` is the module-defined identifier supplied at the main-thread fan-out call
-  ///   site.
+  /// * `event_id` is the module-defined identifier supplied at the main-thread fan-out call site.
   fn on_worker_event(&self, _envoy_cluster: &dyn EnvoyCluster, _event_id: u64) {}
 
   /// Called when the server initialization is complete (PostInit lifecycle stage).
@@ -1167,8 +1177,8 @@ impl EnvoyClusterImpl {
     metadata: &[Vec<(String, String, String)>],
   ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
     let count = addresses.len();
-    // The host reads weights and localities up to count and expects a rectangular metadata block, so
-    // reject any inconsistent length before crossing the ABI to avoid an out of bounds read.
+    // The host reads weights and localities up to count and expects a rectangular metadata block,
+    // so reject any inconsistent length before crossing the ABI to avoid an out of bounds read.
     if hostnames.is_some_and(|hostnames| hostnames.len() != count) {
       return None;
     }
@@ -1970,7 +1980,7 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     match result.family {
       4 => {
         let mut v4 = [0u8; 4];
-        v4.copy_from_slice(&result.address_bytes[..4]);
+        v4.copy_from_slice(&result.address_bytes[.. 4]);
         Some(PackedAddress::V4(v4, result.port))
       },
       6 => Some(PackedAddress::V6(result.address_bytes, result.port)),
@@ -3291,7 +3301,7 @@ mod tests {
     let weights = vec![1, 2];
 
     assert!(cluster
-      .add_hosts_with_hostnames(&addresses, &hostnames[..1], &weights)
+      .add_hosts_with_hostnames(&addresses, &hostnames[.. 1], &weights)
       .is_none());
     assert!(crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
       .lock()
@@ -3359,9 +3369,9 @@ mod tests {
         "sub-zone".to_owned(),
       ),
     ];
-    assert!(cluster.add_hosts(&addresses, &weights[..1]).is_none());
+    assert!(cluster.add_hosts(&addresses, &weights[.. 1]).is_none());
     assert!(cluster
-      .add_hosts_with_locality(&addresses, &weights, &localities[..1], &[])
+      .add_hosts_with_locality(&addresses, &weights, &localities[.. 1], &[])
       .is_none());
     let metadata_short = vec![vec![("f".to_owned(), "k".to_owned(), "v".to_owned())]];
     assert!(cluster

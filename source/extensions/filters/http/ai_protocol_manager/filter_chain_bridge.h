@@ -77,13 +77,33 @@ public:
   void onUnrecoverableError() override;
 
   // Http::DownstreamWatermarkCallbacks (replay side: downstream back-pressure).
-  void onAboveWriteBufferHighWatermark() override { onAboveReplayWatermark(); }
-  void onBelowWriteBufferLowWatermark() override { onBelowReplayWatermark(); }
+  // pauseSource()/resumeSource() echo back here synchronously; pausing replay
+  // on them deadlocks ingest, since replay is what drains it.
+  void onAboveWriteBufferHighWatermark() override {
+    if (own_highs_ > 0) {
+      --own_highs_;
+      return;
+    }
+    onAboveReplayWatermark();
+  }
+  void onBelowWriteBufferLowWatermark() override {
+    if (own_lows_ > 0) {
+      --own_lows_;
+      return;
+    }
+    onBelowReplayWatermark();
+  }
 
 private:
   // FilterChainBridge
-  void pauseSource() override { encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark(); }
-  void resumeSource() override { encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark(); }
+  void pauseSource() override {
+    ++own_highs_;
+    encoder_callbacks_.onEncoderFilterAboveWriteBufferHighWatermark();
+  }
+  void resumeSource() override {
+    ++own_lows_;
+    encoder_callbacks_.onEncoderFilterBelowWriteBufferLowWatermark();
+  }
   void unsubscribeReplayWatermarks() override {
     decoder_callbacks_.removeDownstreamWatermarkCallbacks(*this);
   }
@@ -91,6 +111,9 @@ private:
   Http::StreamEncoderFilterCallbacks& encoder_callbacks_;
   Http::StreamDecoderFilterCallbacks& decoder_callbacks_;
   AiProtocolManagerStats& stats_;
+  // Echoes owed for our own pauseSource()/resumeSource() calls.
+  uint32_t own_highs_{0};
+  uint32_t own_lows_{0};
 };
 
 } // namespace AiProtocolManager

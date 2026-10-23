@@ -1,9 +1,19 @@
 use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer, strs_to_module_buffers,
-  wrap_into_c_void_ptr, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId,
-  EnvoyHistogramId, EnvoyHistogramVecId, NewBootstrapExtensionConfigFunction,
+  abi,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
+  NewBootstrapExtensionConfigFunction,
   NEW_BOOTSTRAP_EXTENSION_CONFIG_FUNCTION,
 };
 #[cfg(any(test, feature = "mock"))]

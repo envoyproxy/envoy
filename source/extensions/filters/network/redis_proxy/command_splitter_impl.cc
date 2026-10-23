@@ -1118,8 +1118,8 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 InstanceStats InstanceImpl::generateStats(Stats::Scope& scope, absl::string_view stat_prefix) {
   // The stat prefix is the flat prefix, "redis.(<stat_prefix>.)*": the stat prefix is the tag of
   // every stat.
-  const Stats::TaggedStatName tagged_prefix =
-      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, "splitter");
+  const Stats::TaggedStatName tagged_prefix = Stats::mergeStatPrefix(
+      scope.symbolTable(), stat_prefix, "splitter", {}, {}, /*sanitize=*/false);
   Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
                                 tagged_prefix.name());
   return {ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER(helper))};
@@ -1130,7 +1130,8 @@ CommandStats InstanceImpl::makeCommandStats(Stats::Scope& scope, absl::string_vi
   // The stat prefix is the flat prefix, "redis.(<stat_prefix>.)*": the stat prefix is the tag of
   // every stat; the command stays part of the tag-extracted name.
   const Stats::TaggedStatName tagged_prefix =
-      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, absl::StrCat("command.", command));
+      Stats::mergeStatPrefix(scope.symbolTable(), stat_prefix, absl::StrCat("command.", command),
+                             {}, {}, /*sanitize=*/false);
   Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
                                 tagged_prefix.name());
   Stats::StatNameManagedStorage storage{"latency", scope.symbolTable()};

@@ -117,7 +117,7 @@ private:
     Stats::LiteScopeHelper helper(scope, "dns_filter",
                                   stat_prefix.empty() ? Stats::TagStringViewSpan{}
                                                       : Stats::TagStringViewSpan{tag},
-                                  absl::StrCat("dns_filter.", stat_prefix));
+                                  absl::StrCat("dns_filter.", stat_prefix), /*sanitize=*/false);
     return {ALL_DNS_FILTER_STATS(POOL_COUNTER(helper), POOL_HISTOGRAM(helper))};
   }
 
