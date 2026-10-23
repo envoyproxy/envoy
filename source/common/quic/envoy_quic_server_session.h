@@ -92,6 +92,15 @@ public:
     should_send_go_away_on_dispatch_ = should_send_go_away_on_dispatch;
   }
 
+  void
+  setH3ResetStreamLoadShedPoint(Server::LoadShedPoint* should_reset_stream_on_creating_stream) {
+    ENVOY_LOG_ONCE_IF(
+        trace, should_reset_stream_on_creating_stream == nullptr,
+        "LoadShedPoint envoy.load_shed_points.http3_server_reset_stream_on_creating_stream "
+        "is not found. Is it configured?");
+    should_reset_stream_on_creating_stream_ = should_reset_stream_on_creating_stream;
+  }
+
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
@@ -192,6 +201,7 @@ private:
   // Load shed points for H3 GoAway
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_ = nullptr;
   Server::LoadShedPoint* should_send_go_away_on_dispatch_ = nullptr;
+  Server::LoadShedPoint* should_reset_stream_on_creating_stream_ = nullptr;
   Http::SessionIdleListInterface* session_idle_list_;
   bool h3_go_away_sent_ = false;
   bool on_connection_closed_called_ = false;

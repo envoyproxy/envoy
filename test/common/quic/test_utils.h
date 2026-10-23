@@ -56,7 +56,13 @@ public:
                                   createServerConnectionSocket(listen_socket.ioHandle(),
                                                                self_address, peer_address,
                                                                "example.com", "h3-29"),
-                                  generator, nullptr) {}
+                                  generator, nullptr) {
+    ON_CALL(*this, OnStreamReset(testing::_, testing::_))
+        .WillByDefault(
+            testing::Invoke([this](quic::QuicStreamId id, quic::QuicRstStreamErrorCode error) {
+              EnvoyQuicServerConnection::OnStreamReset(id, error);
+            }));
+  }
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -68,6 +74,7 @@ public:
   MOCK_METHOD(quic::DatagramStatus, SendDatagram,
               (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
+  MOCK_METHOD(void, OnStreamReset, (quic::QuicStreamId, quic::QuicRstStreamErrorCode), (override));
 };
 
 class MockEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
