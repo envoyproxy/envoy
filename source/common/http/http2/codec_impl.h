@@ -787,9 +787,9 @@ protected:
   // Called when a stream encodes to the http2 connection which enables us to
   // keep the active_streams list in LRU if deferred processing.
   void updateActiveStreamsOnEncode(StreamImpl& stream) {
-    // Splice rather than remove and re-insert, so the list node is not freed and reallocated on
-    // every encode.
-    active_streams_.splice(active_streams_.begin(), active_streams_, stream.entry());
+    // moveBetweenLists() splices rather than removing and re-inserting, so the list node is not
+    // freed and reallocated on every encode.
+    stream.moveBetweenLists(active_streams_, active_streams_);
   }
 
   // dumpState helper method.
