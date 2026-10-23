@@ -19,9 +19,26 @@ _symbol_prefix_transition = transition(
 def _rust_static_module_impl(ctx):
     module = ctx.attr.module[0]
     cc_info = cc_common.merge_cc_infos(
-        cc_infos = [module[CcInfo], ctx.attr._rust_runtime[CcInfo]],
+        cc_infos = [
+            module[CcInfo],
+            ctx.attr._rust_runtime[CcInfo],
+            ctx.attr._rust_runtime_system_libs[CcInfo],
+        ],
     )
-    return [cc_info, DefaultInfo(files = module[DefaultInfo].files)]
+
+    # Expose the module's static libraries, including its prefixed SDK, so that the Windows export
+    # directives can be generated from the hooks they define.
+    static_libraries = []
+    for linker_input in module[CcInfo].linking_context.linker_inputs.to_list():
+        for library in linker_input.libraries:
+            static_library = library.static_library or library.pic_static_library
+            if static_library:
+                static_libraries.append(static_library)
+    return [
+        cc_info,
+        DefaultInfo(files = module[DefaultInfo].files),
+        OutputGroupInfo(static_libraries = depset(static_libraries)),
+    ]
 
 _rust_static_module = rule(
     implementation = _rust_static_module_impl,
@@ -35,6 +52,10 @@ _rust_static_module = rule(
             default = Label("//source/extensions/dynamic_modules/sdk/rust:rust_runtime"),
             providers = [CcInfo],
         ),
+        "_rust_runtime_system_libs": attr.label(
+            default = Label("//source/extensions/dynamic_modules/sdk/rust:rust_runtime_system_libs"),
+            providers = [CcInfo],
+        ),
     },
 )
 
@@ -46,7 +67,8 @@ def envoy_rust_static_module(name, module_name, deps = [], tags = [], visibility
     private copy of std/compiler_builtins, and retain rules_rust's transitive CcInfo.
     The SDK's rust_runtime staticlib supplies the allocator shim and std once.
     It is shared without the prefix transition; all other in-binary Rust code must be rlibs.
-    Rust's export_name handles platform-specific C symbol decoration.
+    Rust's export_name handles platform-specific C symbol decoration. On Windows, the
+    prefixed hooks are exported via `/EXPORT` linker directives for GetProcAddress lookup.
 
     Args:
         name: C++-compatible target name. The Rust target is <name>_lib.
@@ -56,6 +78,7 @@ def envoy_rust_static_module(name, module_name, deps = [], tags = [], visibility
         visibility: Visibility of the C++-compatible target.
         **kwargs: Arguments forwarded to rust_library.
     """
+    testonly = kwargs.get("testonly", False)
     rust_library(
         name = name + "_lib",
         alwayslink = True,
@@ -63,13 +86,82 @@ def envoy_rust_static_module(name, module_name, deps = [], tags = [], visibility
         tags = tags,
         **kwargs
     )
+    rust_name = "_" + name + "_rust"
     _rust_static_module(
-        name = name,
+        name = rust_name,
         module = ":" + name + "_lib",
         module_name = module_name,
         tags = tags,
-        testonly = kwargs.get("testonly", False),
+        testonly = testonly,
+    )
+
+    static_libraries_name = "_" + name + "_static_libraries"
+    native.filegroup(
+        name = static_libraries_name,
+        srcs = [":" + rust_name],
+        output_group = "static_libraries",
+        tags = tags,
+        testonly = testonly,
+    )
+
+    _envoy_dynamic_module_windows_exports(
+        name = name,
+        module_name = module_name,
+        archives = ":" + static_libraries_name,
+        deps = [":" + rust_name],
+        tags = tags,
+        testonly = testonly,
         visibility = visibility,
+    )
+
+def _envoy_dynamic_module_windows_exports(name, module_name, archives, deps, tags, **kwargs):
+    """Wraps a statically linked module so its prefixed hooks are exported on Windows.
+
+    On Windows, an executable only exports the symbols named on the linker command line, and a
+    module definition file cannot express the `*_envoy_dynamic_module_on_*` pattern. Instead,
+    generate a source file with an `/EXPORT` linker directive for every prefixed hook the archives
+    define, so that any binary linking this module exports its hooks for lookup with
+    GetProcAddress. Only defined symbols are listed since exporting an undefined one fails the
+    link.
+
+    Args:
+        name: Name of the resulting cc_library.
+        module_name: The module name the hooks are prefixed with.
+        archives: Label of the static archives that define the prefixed hooks.
+        deps: The module's cc deps.
+        tags: Bazel tags forwarded to the underlying targets.
+        **kwargs: Extra arguments forwarded to cc_library (e.g. visibility).
+    """
+    windows_exports_name = "_" + name + "_windows_exports"
+    native.genrule(
+        name = windows_exports_name,
+        srcs = [archives],
+        outs = [name + "_windows_exports.c"],
+        cmd = (
+            "($(location @llvm_toolchain_llvm//:nm) --defined-only --format=just-symbols " +
+            "$(SRCS) 2>/dev/null | " +
+            "grep -E '^" + module_name + "_envoy_dynamic_module_on_[a-z_]+$$' || true) | " +
+            "sort -u | " +
+            "sed 's|.*|#pragma comment(linker, \"/EXPORT:&\")|' > $@; " +
+            "echo 'typedef int " + module_name + "_windows_exports_unused;' >> $@"
+        ),
+        tools = ["@llvm_toolchain_llvm//:nm"],
+        target_compatible_with = ["@platforms//os:windows"],
+        tags = tags,
+        testonly = kwargs.get("testonly", False),
+    )
+
+    cc_library(
+        name = name,
+        srcs = select({
+            "@platforms//os:windows": [":" + windows_exports_name],
+            "//conditions:default": [],
+        }),
+        deps = deps,
+        # The generated source only carries linker directives, so it must always be linked.
+        alwayslink = True,
+        tags = tags,
+        **kwargs
     )
 
 def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], **kwargs):
@@ -160,39 +252,11 @@ def envoy_dynamic_module_prefix_symbols(name, module_name, archive, tags = [], *
         tags = tags,
     )
 
-    # On Windows, an executable only exports the symbols named on the linker command line, and a
-    # module definition file cannot express the `*_envoy_dynamic_module_on_*` pattern. Instead,
-    # generate a source file with an `/EXPORT` linker directive for every renamed hook the
-    # archive defines, so that any binary linking this module exports its hooks for lookup with
-    # GetProcAddress. Only defined symbols are listed since exporting an undefined one fails the
-    # link.
-    windows_exports_name = "_" + name + "_windows_exports"
-    native.genrule(
-        name = windows_exports_name,
-        srcs = [":" + renamed_name],
-        outs = [name + "_windows_exports.c"],
-        cmd = (
-            "($(location @llvm_toolchain_llvm//:nm) --defined-only --format=just-symbols " +
-            "$(location :" + renamed_name + ") | " +
-            "grep -E '^" + module_name + "_envoy_dynamic_module_on_[a-z_]+$$' || true) | " +
-            "sort -u | " +
-            "sed 's|.*|#pragma comment(linker, \"/EXPORT:&\")|' > $@; " +
-            "echo 'typedef int " + module_name + "_windows_exports_unused;' >> $@"
-        ),
-        tools = ["@llvm_toolchain_llvm//:nm"],
-        target_compatible_with = ["@platforms//os:windows"],
-        tags = tags,
-    )
-
-    cc_library(
+    _envoy_dynamic_module_windows_exports(
         name = name,
-        srcs = select({
-            "@platforms//os:windows": [":" + windows_exports_name],
-            "//conditions:default": [],
-        }),
+        module_name = module_name,
+        archives = ":" + renamed_name,
         deps = [":" + import_name],
-        # The generated source only carries linker directives, so it must always be linked.
-        alwayslink = True,
         tags = tags,
         **kwargs
     )
