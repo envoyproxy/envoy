@@ -42,5 +42,6 @@ use_repo(llvm, "llvm_toolchain")
 
 register_toolchains("@llvm_toolchain//:all")
 
-envoy_llvm = use_extension("@envoy//bazel:extensions.bzl", "envoy_llvm_extension")
-envoy_llvm.host(path = LLVM_PREFIX)
+llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
+llvm_toolchain_alias_ext.host(path = LLVM_PREFIX)
+use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")

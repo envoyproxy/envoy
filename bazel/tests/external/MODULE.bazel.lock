@@ -1241,7 +1241,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "ng0RitMy+CwXXGCeeIcATfoFsCjPAT6gxUlEDRrR1fE=",
+        "bzlTransitiveDigest": "DNRO9Sq+YII2ZPpP6GAo6HZ2zpwDoToGTf6wq/IwtYE=",
         "usagesDigest": "iA1seCCxL1JoTeQEGHUPSEc93vO3JA4pM8sK4sMMan4=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1259,36 +1259,9 @@
         }
       }
     },
-    "@@envoy+//bazel:extensions.bzl%envoy_llvm_extension": {
-      "general": {
-        "bzlTransitiveDigest": "ng0RitMy+CwXXGCeeIcATfoFsCjPAT6gxUlEDRrR1fE=",
-        "usagesDigest": "XeNLepMZy0qIbebHUGFpwvUh3VqZ4dAGUOYkUJaGQ+g=",
-        "recordedInputs": [
-          "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
-          "REPO_MAPPING:envoy+,cu envoy++wasm_cargo+cu",
-          "REPO_MAPPING:envoy+,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:envoy+,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
-          "REPO_MAPPING:envoy+,llvm_minimal_linux_x64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64",
-          "REPO_MAPPING:envoy+,llvm_minimal_linux_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64",
-          "REPO_MAPPING:envoy+,llvm_minimal_macos_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64"
-        ],
-        "generatedRepoSpecs": {
-          "llvm_toolchain_llvm": {
-            "repoRuleId": "@@envoy+//bazel:extensions.bzl%_llvm_alias_repo",
-            "attributes": {
-              "minimal_linux_x64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64//:BUILD.bazel",
-              "minimal_linux_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
-              "minimal_macos_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
-            }
-          }
-        }
-      }
-    },
     "@@envoy+//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "ng0RitMy+CwXXGCeeIcATfoFsCjPAT6gxUlEDRrR1fE=",
+        "bzlTransitiveDigest": "DNRO9Sq+YII2ZPpP6GAo6HZ2zpwDoToGTf6wq/IwtYE=",
         "usagesDigest": "ymD/bnZhvue8QBxkA+Ac/m/a7viCmw83gRqefjG+JBc=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1310,7 +1283,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "ng0RitMy+CwXXGCeeIcATfoFsCjPAT6gxUlEDRrR1fE=",
+        "bzlTransitiveDigest": "DNRO9Sq+YII2ZPpP6GAo6HZ2zpwDoToGTf6wq/IwtYE=",
         "usagesDigest": "FAw8Y3mQshR9sd1RHlAiDwpIEJGM2+PMZQFujBl5IUQ=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1330,8 +1303,8 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "ng0RitMy+CwXXGCeeIcATfoFsCjPAT6gxUlEDRrR1fE=",
-        "usagesDigest": "G+KlVtFoUK0FqdErw4GMGqSBeWq8a8aScpL8BedlAmQ=",
+        "bzlTransitiveDigest": "DNRO9Sq+YII2ZPpP6GAo6HZ2zpwDoToGTf6wq/IwtYE=",
+        "usagesDigest": "PAKPVvO8cX+q6rOc94CBj2PuUR0CHcNuCfqfSSrj7Vs=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
           "REPO_MAPPING:envoy+,bazel_tools bazel_tools",
@@ -1439,10 +1412,10 @@
         }
       }
     },
-    "@@envoy_toolshed+//compile:extensions.bzl%llvm_minimal_extension": {
+    "@@envoy_toolshed+//compile:extensions.bzl%llvm_toolchain_alias_extension": {
       "general": {
         "bzlTransitiveDigest": "nY5OGKfG6E1DqU8Yqz965AaNlZA0sP2dmgLqztX9H+o=",
-        "usagesDigest": "rY+5W+kFcyElXy7lMAiZ+GXDgSRFXvoI4iVTHf1lK1Y=",
+        "usagesDigest": "8GMveoLITSKMEsobVIas96l+IBSnHQRFl6nG3WMwdNM=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_minimal_linux_x64": {
@@ -1467,6 +1440,14 @@
               "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.29/llvm-minimal-22.1.8-macOS-ARM64.tar.zst",
               "sha256": "ca6c644a6d285d52d62bf7cb206d839623668eaf86cdc25bc0a709cd137a2017",
               "strip_prefix": "llvm-minimal-22.1.8-macOS-ARM64"
+            }
+          },
+          "llvm_toolchain_llvm": {
+            "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_toolchain_alias",
+            "attributes": {
+              "minimal_linux_x64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_linux_x64//:BUILD.bazel",
+              "minimal_linux_arm64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
+              "minimal_macos_arm64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
             }
           }
         }
@@ -1596,6 +1577,27 @@
               "linux_aarch64": "@@envoy_toolshed++sq_prebuilt_extension+sq_prebuilt_linux_aarch64//:BUILD.bazel",
               "linux_x86_64": "@@envoy_toolshed++sq_prebuilt_extension+sq_prebuilt_linux_x86_64//:BUILD.bazel",
               "toolchain_type_label": "'@@envoy_toolshed+//pgp:toolchain_type'"
+            }
+          }
+        }
+      }
+    },
+    "@@envoy_toolshed+//repository:extensions.bzl%arch_alias_extension": {
+      "general": {
+        "bzlTransitiveDigest": "oZ1GQvsh/sFXd5CnpYRnLm8vjQfhyjI/+hujmuRzNkY=",
+        "usagesDigest": "OjmR4CrAbd0r3Q9QvvdGenYi80L+i+Haic1DdeaUStE=",
+        "recordedInputs": [
+          "REPO_MAPPING:,envoy envoy+",
+          "REPO_MAPPING:envoy-docs+,envoy envoy+"
+        ],
+        "generatedRepoSpecs": {
+          "clang_platform": {
+            "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
+            "attributes": {
+              "aliases": {
+                "amd64": "'@@envoy+//bazel/platforms/rbe:linux_x64'",
+                "aarch64": "'@@envoy+//bazel/platforms/rbe:linux_arm64'"
+              }
             }
           }
         }
