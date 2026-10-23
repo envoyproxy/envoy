@@ -96,8 +96,7 @@ absl::Status ModelRouterFilter::decodeSync(HttpFilters::AiProtocolManager::AiReq
 
   filter_state->setData(FilterStateKeys::ResolvedRoutes,
                         std::make_shared<LlmRoutesFilterStateObject>(it->second),
-                        StreamInfo::FilterState::LifeSpan::Request,
-                        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
+                        StreamInfo::FilterState::LifeSpan::Request);
 
   config_->stats().success_.inc();
 
