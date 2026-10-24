@@ -69,7 +69,7 @@ envoy_extension_cc_test(
     ]),
     extension_names = ["envoy.filters.http.wasm"],
     rbe_pool = "linux_x64_large",
-    shard_count = 16,
+    shard_count = 8,
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
@@ -79,6 +79,7 @@ envoy_extension_cc_test(
         "//source/extensions/common/wasm:wasm_lib",
         "//source/extensions/filters/http/wasm:config",
         "//test/extensions/common/wasm:wasm_runtime",
+        "//test/extensions/filters/http/wasm/test_data:test_cpp_plugin",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",

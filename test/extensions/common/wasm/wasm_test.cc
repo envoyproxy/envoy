@@ -45,6 +45,64 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
+template <class Base> class WasmCacheSetUpTest : public testing::Test {
+public:
+  class Fixture : public Base {
+  public:
+    void TestBody() override {}
+  };
+
+  class ClearingFixture : public Fixture {
+  public:
+    bool clearCodeCacheOnSetUp() override { return true; }
+  };
+};
+
+using WasmCacheTestBases = testing::Types<WasmTestBase<>, WasmPluginConfigTestBase<>>;
+TYPED_TEST_SUITE(WasmCacheSetUpTest, WasmCacheTestBases);
+
+TYPED_TEST(WasmCacheSetUpTest, ClearingIsOptIn) {
+  clearCodeCacheForTesting();
+  Stats::IsolatedStoreImpl store;
+  auto scope = store.createScope("");
+  getCreateStatsHandler().lockAndCreateStats(scope);
+
+  typename TestFixture::Fixture fixture;
+  EXPECT_FALSE(fixture.clearCodeCacheOnSetUp());
+  fixture.SetUp();
+  getCreateStatsHandler().onEvent(WasmEvent::RemoteLoadCacheHit);
+  EXPECT_EQ(store.counter("wasm.remote_load_cache_hits").value(), 1);
+
+  typename TestFixture::ClearingFixture clearing_fixture;
+  clearing_fixture.SetUp();
+  // A reset must bind subsequent events to the new scope, even while the old scope is alive.
+  Stats::IsolatedStoreImpl new_store;
+  auto new_scope = new_store.createScope("");
+  getCreateStatsHandler().lockAndCreateStats(new_scope);
+  getCreateStatsHandler().onEvent(WasmEvent::RemoteLoadCacheHit);
+  EXPECT_EQ(new_store.counter("wasm.remote_load_cache_hits").value(), 1);
+  EXPECT_EQ(store.counter("wasm.remote_load_cache_hits").value(), 1);
+  clearCodeCacheForTesting();
+}
+
+TEST(WasmRuntimeTest, SingleRuntimeDualFilterMatrix) {
+  const auto full_matrix = wasmTestMatrix(true, true);
+  const auto matrix = wasmDualFilterTestMatrix(true, true, true);
+  std::vector<std::tuple<std::string, std::string, bool>> expected;
+  for (const auto& [runtime, language] : full_matrix) {
+    if (runtime == std::get<0>(full_matrix.front()) || runtime == "null") {
+      expected.emplace_back(runtime, language, true);
+      expected.emplace_back(runtime, language, false);
+    }
+  }
+  EXPECT_EQ(matrix, expected);
+  EXPECT_LE(matrix.size(), 4);
+  ASSERT_GE(matrix.size(), 2);
+  EXPECT_EQ(matrix[matrix.size() - 2],
+            std::make_tuple(std::string("null"), std::string("cpp"), true));
+  EXPECT_EQ(matrix.back(), std::make_tuple(std::string("null"), std::string("cpp"), false));
+}
+
 std::string sha256(absl::string_view data) {
   std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
   EVP_MD_CTX* ctx(EVP_MD_CTX_new());
@@ -76,7 +134,6 @@ class WasmCommonTest : public testing::TestWithParam<std::tuple<std::string, std
 public:
   void SetUp() override { // NOLINT(readability-identifier-naming)
     Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::debug);
-    clearCodeCacheForTesting();
 
     api_ = Api::createApiForTest(stats_store_);
     dispatcher_ = api_->allocateDispatcher("wasm_test");
@@ -420,6 +477,7 @@ TEST_P(WasmCommonTest, Utilities) {
 }
 
 TEST_P(WasmCommonTest, Stats) {
+  clearCodeCacheForTesting();
   // We set logger level to critical here to gain more coverage.
   Logger::Registry::getLog(Logger::Id::wasm).set_level(spdlog::level::critical);
 
@@ -465,6 +523,7 @@ TEST_P(WasmCommonTest, Stats) {
 // The wasm_vm_count gauge is process-wide, updated once per Wasm VM instance regardless of the
 // runtime or the scope/prefix the plugin config uses.
 TEST_P(WasmCommonTest, WasmVmCountGauge) {
+  clearCodeCacheForTesting();
   auto vm_configuration = "vm_count_gauge";
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
@@ -500,6 +559,7 @@ TEST_P(WasmCommonTest, WasmVmCountGauge) {
 // The memory_size gauge adds up the linear memory of every VM instance of a runtime and drops the
 // VM's share when the VM is destroyed.
 TEST_P(WasmCommonTest, MemorySizeGauge) {
+  clearCodeCacheForTesting();
   auto vm_configuration = "memory_size_gauge";
   const std::string runtime = absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
 
@@ -563,6 +623,7 @@ TEST_P(WasmCommonTest, MemorySizeGauge) {
 // The memory_size gauge is updated when a base VM is created and when a thread-local plugin is
 // created on a cloned VM.
 TEST_P(WasmCommonTest, MemorySizeGaugeThreadLocalPlugin) {
+  clearCodeCacheForTesting();
   NiceMock<Init::MockManager> init_manager;
   auto vm_configuration = "memory_size_gauge";
   const std::string runtime = absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam()));
@@ -940,6 +1001,7 @@ TEST_P(WasmCommonTest, DEPRECATED_FEATURE_TEST(VmCacheDeprecatedCapabilityRestri
 }
 
 TEST_P(WasmCommonTest, RemoteCode) {
+  clearCodeCacheForTesting();
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
@@ -1045,6 +1107,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 }
 
 TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
+  clearCodeCacheForTesting();
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
@@ -1096,7 +1159,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
       .WillRepeatedly(Invoke([&, retry = num_retries](
                                  Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                                  const Http::AsyncClient::RequestOptions&) mutable
-                                 -> Http::AsyncClient::Request* {
+                             -> Http::AsyncClient::Request* {
         if (retry-- == 0) {
           Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
               Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
@@ -1161,6 +1224,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 // config: it fetches the code itself, and a failure of that fetch must not overwrite code that a
 // concurrent fetch has already cached.
 TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
+  clearCodeCacheForTesting();
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
@@ -1270,6 +1334,7 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
 
 // With nack_on_code_cache_miss, a createWasm while a fetch is in progress fails immediately.
 TEST_P(WasmCommonTest, RemoteCodeInProgressNackOnCacheMiss) {
+  clearCodeCacheForTesting();
   if (std::get<0>(GetParam()) == "null") {
     return;
   }
@@ -1915,9 +1980,6 @@ class PluginConfigTest : public testing::TestWithParam<std::tuple<std::string, s
 public:
   PluginConfigTest() = default;
 
-  // NOLINTNEXTLINE(readability-identifier-naming)
-  void SetUp() override { clearCodeCacheForTesting(); }
-
   void setUp(const std::string& plugin_config_yaml, bool singleton) {
     envoy::extensions::wasm::v3::PluginConfig plugin_config;
     TestUtility::loadFromYaml(plugin_config_yaml, plugin_config);
@@ -1948,6 +2010,7 @@ INSTANTIATE_TEST_SUITE_P(PluginConfigRuntimes, PluginConfigTest,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(PluginConfigTest, FailReloadPolicy) {
+  clearCodeCacheForTesting();
   auto [runtime, language] = GetParam();
   if (runtime == "null") {
     return;
@@ -2295,6 +2358,7 @@ vm_config:
 // The vm_memory_size gauge of a plugin reports the memory of the VMs serving it once the plugin is
 // used, so plugins sharing a VM each report its full size.
 TEST_P(PluginConfigTest, VmMemorySizeGauge) {
+  clearCodeCacheForTesting();
   auto [runtime, language] = GetParam();
   if (runtime == "null") {
     return;

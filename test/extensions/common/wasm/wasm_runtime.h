@@ -9,12 +9,12 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
-// Testable runtime and language combinations.
-std::vector<std::tuple<std::string, std::string>> wasmTestMatrix(bool include_nullvm,
-                                                                 bool cpp_only);
+// Testable runtime and language combinations. single_runtime selects the first enabled sandbox.
+std::vector<std::tuple<std::string, std::string>> wasmTestMatrix(bool include_nullvm, bool cpp_only,
+                                                                 bool single_runtime = false);
 
 std::vector<std::tuple<std::string, std::string, bool>>
-wasmDualFilterTestMatrix(bool include_nullvm, bool cpp_only);
+wasmDualFilterTestMatrix(bool include_nullvm, bool cpp_only, bool single_runtime = false);
 
 std::vector<std::tuple<std::string, std::string, bool, Http::CodecType>>
 wasmDualFilterWithCodecsTestMatrix(bool include_nullvm, bool cpp_only,

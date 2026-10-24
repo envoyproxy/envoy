@@ -38,8 +38,6 @@ protected:
         .WillByDefault(ReturnRef(dispatcher_));
   }
 
-  void SetUp() override { Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting(); }
-
   void initializeForRemote() {
     retry_timer_ = new Event::MockTimer();
 
@@ -442,6 +440,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
 }
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
+  Envoy::Extensions::Common::Wasm::clearCodeCacheForTesting();
   if (std::get<0>(GetParam()) == "null") {
     return;
   }

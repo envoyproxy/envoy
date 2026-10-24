@@ -55,7 +55,14 @@ private:
 template <typename Base = testing::Test> class WasmTestBase : public Base {
 public:
   // NOLINTNEXTLINE(readability-identifier-naming)
-  void SetUp() override { clearCodeCacheForTesting(); }
+  void SetUp() override {
+    if (clearCodeCacheOnSetUp()) {
+      clearCodeCacheForTesting();
+    }
+  }
+
+  // Opt in when a test needs a cold remote-code cache or reset creation stats.
+  virtual bool clearCodeCacheOnSetUp() { return false; }
 
   void setupBase(const std::string& runtime, const std::string& code, CreateContextFn create_root) {
     Api::ApiPtr api = Api::createApiForTest(stats_store_);
@@ -210,7 +217,14 @@ public:
   WasmPluginConfigTestBase() = default;
 
   // NOLINTNEXTLINE(readability-identifier-naming)
-  void SetUp() override { clearCodeCacheForTesting(); }
+  void SetUp() override {
+    if (clearCodeCacheOnSetUp()) {
+      clearCodeCacheForTesting();
+    }
+  }
+
+  // Opt in when a test needs a cold remote-code cache or reset creation stats.
+  virtual bool clearCodeCacheOnSetUp() { return false; }
 
   void setUp(const envoy::extensions::wasm::v3::PluginConfig plugin_config,
              bool singleton = false) {
