@@ -20,13 +20,16 @@ request and recording latency samples to use in the calculation of the concurren
 
 Gradient Controller
 ~~~~~~~~~~~~~~~~~~~
-The gradient controller makes forwarding decisions based on a periodically measured ideal round-trip
-time (minRTT) for an upstream.
+The gradient controller makes forwarding decisions based on a latency baseline for an upstream.
+By default, it periodically measures an ideal round-trip time (minRTT). An optional EWMA mode learns
+the baseline continuously without reducing concurrency specifically to measure minRTT.
 
 :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig>`
 
 Calculating the minRTT
 ^^^^^^^^^^^^^^^^^^^^^^
+
+This section describes the default ``LEGACY`` baseline mode.
 
 The minRTT is periodically measured by pinning the concurrency limit to the configured
 ``min_concurrency`` and measuring the latency under these ideal conditions. The calculation is also
@@ -69,6 +72,53 @@ concurrency limit during normal operation. If the current concurrency limit is a
 the minRTT calculation concurrency when a minRTT measurement starts, the controller will keep the
 lower current limit rather than raising it for the measurement window.
 
+EWMA Baseline
+^^^^^^^^^^^^^
+Setting :ref:`baseline_mode
+<envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.baseline_mode>`
+to ``EWMA`` explicitly selects a continuously learned baseline. There are no startup, periodic, or
+minimum-limit-triggered minRTT measurement windows in this mode. The controller still limits
+concurrency in response to latency increases; it does not deliberately lower the limit just to
+measure a baseline.
+
+This mode adapts the short-term versus long-term latency comparison from
+`Netflix Gradient2Limit
+<https://github.com/Netflix/concurrency-limits/blob/main/concurrency-limits-core/src/main/java/com/netflix/concurrency/limits/limit/Gradient2Limit.java>`_.
+It retains Envoy's gradient bounds and square-root headroom rather than implementing the complete
+Gradient2 algorithm.
+
+Each nonempty concurrency-update window contributes its arithmetic mean of completed request
+latencies. During warmup, the baseline is the arithmetic mean of the first ``warmup_windows`` window
+means (10 by default), giving each window equal weight regardless of request volume. Limit updates
+continue during warmup. Afterwards, each window updates the baseline using:
+
+.. math::
+
+    \alpha = 1 - 2^{-\Delta t / half\_life}
+
+    baseline_{new} = baseline_{old} + \alpha (sampleRTT - baseline_{old})
+
+Here, ``sampleRTT`` is that window's arithmetic mean and ``delta t`` is its elapsed duration.
+``half_life`` defaults to 300s. Empty windows neither advance warmup nor age the baseline, and
+cancelled requests do not contribute latency samples. The first nonempty window initializes the
+baseline. The initial concurrency limit defaults to the minimum calculated limit; an optional
+``initial_concurrency`` can select a higher starting limit up to ``max_concurrency_limit``. The
+existing ``min_concurrency_limit`` continues to bound calculated limits without triggering probes.
+Runtime minimum and maximum limits also bound the initial concurrency.
+
+Gradual learning avoids an abrupt replacement of the baseline by a probe that happens to overlap a
+latency spike. It does not make the baseline immune to overload: sustained higher latency will
+eventually be learned. Half-life, warmup, and initial concurrency should therefore be chosen for the
+service's expected latency changes and startup behavior.
+
+All :ref:`ewma_baseline
+<envoy_v3_api_field_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.ewma_baseline>`
+fields are optional. Supplying these parameters without explicitly selecting ``EWMA`` is rejected,
+not treated as an implicit opt-in. In EWMA mode, ``interval``, ``fixed_value``, ``request_count``,
+``jitter``, and ``sample_aggregate_percentile`` must be unset. Probe-related runtime overrides and
+the percentile runtime override do not apply. The default ``LEGACY`` mode preserves the existing
+periodic or fixed baseline and percentile aggregation behavior.
+
 The Gradient
 ^^^^^^^^^^^^
 The gradient is calculated using summarized sampled request latencies (sampleRTT):
@@ -82,11 +132,20 @@ Notice that *B*, the buffer value added to the minRTT, allows for normal varianc
 latencies by requiring the sampled latencies the exceed the minRTT by some configurable threshold
 before decreasing the gradient value.
 
-The buffer will be a percentage of the measured minRTT value whose value is modified via the buffer field in the :ref:`minRTT calculation parameters <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`. The buffer is calculated as follows:
+The buffer is the larger of a percentage of the baseline and the optional absolute
+``min_latency_delta`` in the :ref:`minRTT calculation parameters
+<envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.GradientControllerConfig.MinimumRTTCalculationParams>`:
 
 .. math::
 
-    B = minRTT * buffer_{pct}
+    B = \max(minRTT * buffer_{pct}, min\_latency\_delta)
+
+The buffers are not added together. For example, a 4ms baseline with a 100% relative buffer and a
+20ms absolute buffer allows a 24ms buffered baseline, not 28ms. This can tolerate ordinary
+network or scheduling noise on low-latency services without requiring an extremely large relative
+buffer. ``min_latency_delta`` is optional, defaults to zero, and works independently of EWMA mode.
+Unset or zero preserves the existing percentage-only buffer. In EWMA mode, ``minRTT`` in the formula
+denotes the learned baseline, not a low-concurrency measurement.
 
 The gradient value is then used to update the concurrency limit via:
 
@@ -155,6 +214,31 @@ The above configuration can be understood as follows:
 * Pin concurrency to 50 while calculating minRTT, collect 50 request samples, and use the p90 to
   summarize them.
 * The filter is enabled by default.
+
+An opt-in EWMA example with a 20ms absolute buffer is:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.adaptive_concurrency
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency
+    gradient_controller_config:
+      baseline_mode: EWMA
+      ewma_baseline:
+        half_life: 300s
+        warmup_windows: 10
+        initial_concurrency: 200
+      concurrency_limit_params:
+        concurrency_update_interval: 3s
+        min_concurrency_limit: 4
+        max_concurrency_limit: 200
+      min_rtt_calc_params:
+        buffer:
+          value: 50
+        min_latency_delta: 0.020s
+
+Only ``baseline_mode: EWMA`` enables the new baseline algorithm. The tuning values shown above are
+optional, and the absolute buffer remains disabled unless configured with a positive duration.
 
 .. note::
 
@@ -230,3 +314,7 @@ The gradient controller uses the namespace
   burst_queue_size, Gauge, The current headroom value in the concurrency limit calculation.
   min_rtt_msecs, Gauge, The current measured minRTT value.
   sample_rtt_msecs, Gauge, The current measured sampleRTT aggregate.
+
+In EWMA mode, ``min_rtt_msecs`` reports the learned baseline and ``sample_rtt_msecs`` reports the
+latest nonempty window's arithmetic mean, both in milliseconds. They are not latency percentiles.
+``min_rtt_calculation_active`` remains zero because no minRTT measurement windows are entered.
