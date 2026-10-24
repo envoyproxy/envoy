@@ -852,7 +852,7 @@ config_setting(
 config_setting(
     name = "ios_x86_64",
     constraint_values = [
-        "@build_bazel_apple_support//constraints:simulator",
+        "@apple_support//constraints:simulator",
         "@platforms//cpu:x86_64",
         "@platforms//os:ios",
     ],
@@ -861,7 +861,7 @@ config_setting(
 config_setting(
     name = "ios_armv7",
     constraint_values = [
-        "@build_bazel_apple_support//constraints:device",
+        "@apple_support//constraints:device",
         "@platforms//cpu:armv7",
         "@platforms//os:ios",
     ],
@@ -871,7 +871,7 @@ config_setting(
 config_setting(
     name = "ios_armv7s",
     constraint_values = [
-        "@build_bazel_apple_support//constraints:device",
+        "@apple_support//constraints:device",
         "@platforms//cpu:armv7",
         "@platforms//os:ios",
     ],
@@ -880,7 +880,7 @@ config_setting(
 config_setting(
     name = "ios_arm64",
     constraint_values = [
-        "@build_bazel_apple_support//constraints:device",
+        "@apple_support//constraints:device",
         "@platforms//cpu:arm64",
         "@platforms//os:ios",
     ],
@@ -889,7 +889,7 @@ config_setting(
 config_setting(
     name = "ios_sim_arm64",
     constraint_values = [
-        "@build_bazel_apple_support//constraints:simulator",
+        "@apple_support//constraints:simulator",
         "@platforms//cpu:arm64",
         "@platforms//os:ios",
     ],
@@ -898,7 +898,7 @@ config_setting(
 config_setting(
     name = "ios_arm64e",
     constraint_values = [
-        "@build_bazel_apple_support//constraints:device",
+        "@apple_support//constraints:device",
         "@platforms//cpu:arm64e",
         "@platforms//os:ios",
     ],
