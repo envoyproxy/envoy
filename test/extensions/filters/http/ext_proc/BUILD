@@ -635,6 +635,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = [
+        "envoy.filters.http.ext_authz",
         "envoy.filters.http.ext_proc",
     ],
     rbe_pool = "linux_x64_large",
@@ -643,10 +644,13 @@ envoy_extension_cc_test(
         "skip_on_windows",
     ],
     deps = [
+        "//source/extensions/filters/http/ext_authz:config",
         "//source/extensions/filters/http/ext_proc:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
