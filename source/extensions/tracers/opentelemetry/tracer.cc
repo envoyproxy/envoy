@@ -13,6 +13,7 @@
 #include "source/common/tracing/trace_context_impl.h"
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "absl/strings/numbers.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
@@ -84,6 +85,30 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
                            std::string(tracestate()), /*is_remote=*/false);
   return parent_tracer_.startSpan(name, stream_info_, start_time, span_context, {},
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
+}
+
+void Span::updateParent(const Tracing::TraceContext& trace_context) {
+  SpanContextExtractor extractor(trace_context);
+  absl::StatusOr<SpanContext> context = extractor.extractSpanContext();
+  if (!context.ok()) {
+    return;
+  }
+  setParentContextIsRemote(context->isRemote());
+  setTraceId(context->traceId());
+  setParentId(context->spanId());
+
+  // Merge tracestates, with new components added on the left.
+  // https://www.w3.org/TR/trace-context/#mutating-the-tracestate-field
+  absl::InlinedVector<absl::string_view, 2> tracestate_pieces;
+  if (!context->tracestate().empty()) {
+    tracestate_pieces.push_back(context->tracestate());
+  }
+  const std::string tracestate = getTracestate();
+  if (!tracestate.empty() &&
+      absl::c_find(tracestate_pieces, tracestate) == tracestate_pieces.end()) {
+    tracestate_pieces.push_back(tracestate);
+  }
+  setTracestate(absl::StrJoin(tracestate_pieces, ","));
 }
 
 void Span::finishSpan() {
