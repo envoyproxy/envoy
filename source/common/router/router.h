@@ -308,8 +308,6 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats),
-        allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
         reject_early_connect_data_enabled_(config->reject_connect_request_early_data_) {}
 
   ~Filter() override;
@@ -580,6 +578,7 @@ private:
 
   GenericConnPoolPtr createConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
                                     const Upstream::HostConstSharedPtr& host);
+  void maybeEnableUpstreamHalfClose(const GenericConnPool& conn_pool);
   UpstreamRequestPtr createUpstreamRequest();
   std::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                     const Http::HeaderMap& headers) const;
@@ -702,7 +701,7 @@ private:
   bool include_attempt_count_in_request_ : 1 = false;
   bool include_timeout_retry_header_in_request_ : 1 = false;
   bool request_buffer_overflowed_ : 1 = false;
-  const bool allow_multiplexed_upstream_half_close_ : 1 = false;
+  bool upstream_half_close_enabled_ : 1 = false;
   bool upstream_request_started_ : 1 = false;
   // True if cross-cluster retry is enabled: refreshClusterOnRetry is set in the effective retry
   // policy and there is no hedge policy (hedging is incompatible with cross-cluster retry).
