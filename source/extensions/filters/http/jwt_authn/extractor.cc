@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/jwt_authn/extractor.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
@@ -12,6 +13,7 @@
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/container/btree_map.h"
+#include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
@@ -172,18 +174,24 @@ private:
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
   struct HeaderLocationSpec {
-    HeaderLocationSpec(const Http::LowerCaseString& header, const std::string& value_prefix)
-        : header_(header), value_prefix_(value_prefix) {}
+    HeaderLocationSpec(const Http::LowerCaseString& header, const std::string& value_prefix,
+                       bool case_insensitive)
+        : header_(header), value_prefix_(value_prefix), case_insensitive_(case_insensitive) {}
     // The header name.
     Http::LowerCaseString header_;
     // The value prefix. e.g. for "Bearer <token>", the value_prefix is "Bearer ".
     std::string value_prefix_;
+    // The Bearer authentication scheme is case-insensitive in Authorization headers.
+    const bool case_insensitive_;
     // Issuers that specified this header.
     JwtIssuerChecker issuer_checker_;
   };
   using HeaderLocationSpecPtr = std::unique_ptr<HeaderLocationSpec>;
+  using HeaderLocationMap = std::map<std::string, HeaderLocationSpecPtr>;
   // The map of (header + value_prefix) to HeaderLocationSpecPtr
-  std::map<std::string, HeaderLocationSpecPtr> header_locations_;
+  HeaderLocationMap header_locations_;
+  // Keep both configurations so runtime changes also restore the original issuer grouping.
+  HeaderLocationMap case_insensitive_header_locations_;
 
   // ParamMap value type to store issuers that specified this header.
   struct ParamLocationSpec {
@@ -242,12 +250,22 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
 void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
                                     const std::string& value_prefix) {
   ENVOY_LOG(debug, "addHeaderConfig for issuer {} at {}", issuer, header_name.get());
-  const std::string map_key = header_name.get() + value_prefix;
-  auto& header_location_spec = header_locations_[map_key];
-  if (!header_location_spec) {
-    header_location_spec = std::make_unique<HeaderLocationSpec>(header_name, value_prefix);
-  }
-  header_location_spec->issuer_checker_.add(issuer);
+  const bool case_insensitive =
+      header_name == Http::CustomHeaders::get().Authorization &&
+      absl::EqualsIgnoreCase(value_prefix, JwtConstValues::get().BearerPrefix);
+  const auto add_location = [&](HeaderLocationMap& locations, const std::string& prefix,
+                                bool ignore_case) {
+    const std::string map_key = header_name.get() + prefix;
+    auto& header_location_spec = locations[map_key];
+    if (!header_location_spec) {
+      header_location_spec = std::make_unique<HeaderLocationSpec>(header_name, prefix, ignore_case);
+    }
+    header_location_spec->issuer_checker_.add(issuer);
+  };
+  add_location(header_locations_, value_prefix, false);
+  add_location(case_insensitive_header_locations_,
+               case_insensitive ? JwtConstValues::get().BearerPrefix : value_prefix,
+               case_insensitive);
 }
 
 void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::string& param) {
@@ -265,7 +283,11 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   std::vector<JwtLocationConstPtr> tokens;
 
   // Check header locations first
-  for (const auto& location_it : header_locations_) {
+  const auto& header_locations =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.jwt_authn_case_insensitive_bearer")
+          ? case_insensitive_header_locations_
+          : header_locations_;
+  for (const auto& location_it : header_locations) {
     const auto& location_spec = location_it.second;
     ENVOY_LOG(debug, "extract {}", location_it.first);
     auto header_value = headers.get(location_spec->header_);
@@ -273,7 +295,20 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
       for (size_t i = 0; i < header_value.size(); i++) {
         auto value_str = header_value[i]->value().getStringView();
         if (!location_spec->value_prefix_.empty()) {
-          const auto pos = value_str.find(location_spec->value_prefix_);
+          const auto& prefix = location_spec->value_prefix_;
+          auto pos = absl::string_view::npos;
+          if (location_spec->case_insensitive_) {
+            const auto prefix_it =
+                std::search(value_str.begin(), value_str.end(), prefix.begin(), prefix.end(),
+                            [](char lhs, char rhs) {
+                              return absl::ascii_tolower(lhs) == absl::ascii_tolower(rhs);
+                            });
+            if (prefix_it != value_str.end()) {
+              pos = prefix_it - value_str.begin();
+            }
+          } else {
+            pos = value_str.find(prefix);
+          }
           if (pos == absl::string_view::npos) {
             // value_prefix not found anywhere in value_str, so skip
             continue;
