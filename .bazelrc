@@ -170,6 +170,16 @@ common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
 
+build:gcc --per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --host_per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --per_file_copt=external/cel-cpp.*@-Wno-sign-compare
+build:gcc --per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --host_per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --per_file_copt=external/grpc-httpjson-transcoding.*@-Wno-range-loop-construct
+build:gcc --per_file_copt=external/protobuf.*/upb/.*@-Wno-maybe-
+build:gcc --per_file_copt=external/v8.*@-Wno-dangling-else
+build:gcc --per_file_copt=external/grpc\+.*@-Wno-attributes
+
 
 #############################################################################
 # tests
