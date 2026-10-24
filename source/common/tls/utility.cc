@@ -16,7 +16,11 @@
 #include "source/common/ssl/ssl.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "openssl/err.h"
+#include "openssl/evp.h"
+#include "openssl/pem.h"
 #include "openssl/tls1.h"
 #include "openssl/x509v3.h"
 
@@ -24,6 +28,11 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
+
+SINGLETON_MANAGER_REGISTRATION(crl_cache);
+SINGLETON_MANAGER_REGISTRATION(ca_cert_cache);
+SINGLETON_MANAGER_REGISTRATION(cert_chain_cache);
+SINGLETON_MANAGER_REGISTRATION(private_key_cache);
 
 static constexpr int MAX_OID_LENGTH = 256;
 
@@ -765,6 +774,155 @@ Utility::EffectiveTlsParams Utility::effectiveTlsParams(const Ssl::TlsParams& pa
       .ecdh_curves = provides_ciphers_and_curves ? EMPTY_STRING : params.ecdh_curves,
       .signature_algorithms = provides_sigalgs ? EMPTY_STRING : params.signature_algorithms,
   };
+}
+
+absl::StatusOr<std::unique_ptr<CrlList>> parseCrlList(absl::string_view crl_pem,
+                                                      absl::string_view crl_path) {
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // Based on BoringSSL's X509_load_cert_crl_file().
+  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+  if (list == nullptr) {
+    return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
+  }
+
+  auto crl_list = std::make_unique<CrlList>();
+  for (const X509_INFO* item : list.get()) {
+    if (item->crl) {
+      crl_list->push_back(bssl::UpRef(item->crl));
+    }
+  }
+  return crl_list;
+}
+
+std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<CrlCache>(SINGLETON_MANAGER_REGISTERED_NAME(crl_cache),
+                                              [] { return std::make_shared<CrlCache>(); });
+}
+
+absl::StatusOr<std::unique_ptr<CaCertList>> parseCaCertList(absl::string_view ca_pem,
+                                                            absl::string_view ca_path) {
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(ca_pem.data()), ca_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  // Based on BoringSSL's X509_load_cert_crl_file().
+  bssl::UniquePtr<STACK_OF(X509_INFO)> list(
+      PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
+  if (list == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
+  }
+
+  auto ca_cert_list = std::make_unique<CaCertList>();
+  for (const X509_INFO* item : list.get()) {
+    if (item->x509) {
+      ca_cert_list->certs.push_back(bssl::UpRef(item->x509));
+    }
+    if (item->crl) {
+      ca_cert_list->crls.push_back(bssl::UpRef(item->crl));
+    }
+  }
+  // A blob that parses but carries no certificate is not a usable trust bundle.
+  if (ca_cert_list->certs.empty()) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
+  }
+  return ca_cert_list;
+}
+
+std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<CaCertCache>(SINGLETON_MANAGER_REGISTERED_NAME(ca_cert_cache),
+                                                 [] { return std::make_shared<CaCertCache>(); });
+}
+
+absl::StatusOr<std::unique_ptr<CertChain>> parseCertChain(absl::string_view cert_pem,
+                                                          absl::string_view cert_path) {
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert_pem.data()), cert_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  auto cert_chain = std::make_unique<CertChain>();
+  cert_chain->leaf.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
+  if (cert_chain->leaf == nullptr) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load certificate chain from ", cert_path));
+  }
+  // Read rest of the certificate chain.
+  while (true) {
+    bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
+    if (cert == nullptr) {
+      break;
+    }
+    cert_chain->intermediates.push_back(std::move(cert));
+  }
+  // Check for EOF.
+  const uint32_t err = ERR_peek_last_error();
+  if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+    ERR_clear_error();
+  } else {
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to load certificate chain from ", cert_path));
+  }
+  return cert_chain;
+}
+
+std::shared_ptr<CertChainCache> getCertChainCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<CertChainCache>(
+      SINGLETON_MANAGER_REGISTERED_NAME(cert_chain_cache),
+      [] { return std::make_shared<CertChainCache>(); });
+}
+
+absl::StatusOr<bssl::UniquePtr<EVP_PKEY>> parsePrivateKey(absl::string_view key_pem,
+                                                          absl::string_view key_path,
+                                                          const std::string& password,
+                                                          bool fips_mode) {
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(key_pem.data()), key_pem.size()));
+  RELEASE_ASSERT(bio != nullptr, "");
+  bssl::UniquePtr<EVP_PKEY> pkey(
+      PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr,
+                              !password.empty() ? const_cast<char*>(password.c_str()) : nullptr));
+  if (pkey == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("Failed to load private key from {}, Cause: {}", key_path,
+                    Utility::getLastCryptoError().value_or("unknown")));
+  }
+  absl::Status status = checkPrivateKey(pkey, key_path, fips_mode);
+  if (!status.ok()) {
+    return status;
+  }
+  return pkey;
+}
+
+absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, absl::string_view key_path,
+                             bool fips_mode) {
+  if (fips_mode) {
+    // Verify that private keys are passing FIPS pairwise consistency tests.
+    switch (EVP_PKEY_id(pkey.get())) {
+    case EVP_PKEY_EC: {
+      const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
+      if (!EC_KEY_check_fips(ecdsa_private_key)) {
+        return absl::InvalidArgumentError(
+            fmt::format("Failed to load private key from {}, ECDSA key failed "
+                        "pairwise consistency test required in FIPS mode",
+                        key_path));
+      }
+    } break;
+    case EVP_PKEY_RSA: {
+      RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
+      if (!RSA_check_fips(rsa_private_key)) {
+        return absl::InvalidArgumentError(
+            fmt::format("Failed to load private key from {}, RSA key failed "
+                        "pairwise consistency test required in FIPS mode",
+                        key_path));
+      }
+    } break;
+    }
+  }
+  return absl::OkStatus();
+}
+
+std::shared_ptr<PrivateKeyCache> getPrivateKeyCache(Singleton::Manager& singleton_manager) {
+  return singleton_manager.getTyped<PrivateKeyCache>(
+      SINGLETON_MANAGER_REGISTERED_NAME(private_key_cache),
+      [] { return std::make_shared<PrivateKeyCache>(); });
 }
 
 } // namespace Tls

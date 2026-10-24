@@ -9,9 +9,9 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/utility.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -27,11 +27,11 @@ namespace Envoy {
 namespace {
 
 // Two downstream mTLS listeners that reference the same CRL content exercise the process-wide
-// CrlCache (source/common/tls/cert_validator/default_validator.h), which parses the CRL once and
-// shares the parsed representation across TLS contexts. This test validates that removing (or
-// re-pointing) the config for one of the sharing listeners keeps the CRL valid and enforced for the
-// surviving listener, and that tearing down both listeners is safe. It is primarily intended to run
-// under ASAN/TSAN to catch lifetime regressions in the shared-CRL handling.
+// CrlCache (source/common/tls/utility.h), which parses the CRL once and shares the parsed
+// representation across TLS contexts. This test validates that removing (or re-pointing) the config
+// for one of the sharing listeners keeps the CRL valid and enforced for the surviving listener, and
+// that tearing down both listeners is safe. It is primarily intended to run under ASAN/TSAN to
+// catch lifetime regressions in the shared-CRL handling.
 class ListenerCrlShareIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                         public HttpIntegrationTest {
 public:

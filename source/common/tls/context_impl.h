@@ -22,9 +22,9 @@
 #include "source/common/common/matchers.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/cert_validator/cert_validator.h"
-#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/stats.h"
+#include "source/common/tls/utility.h"
 
 #include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
@@ -64,12 +64,10 @@ struct TlsContext {
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_;
-  // When the parsed-certificate caches are enabled, these retain the shared
-  // parsed material for this context's lifetime so the process-wide caches keep
-  // the entries alive (and thus reusable by sibling contexts and the next xDS
-  // generation) rather than releasing them the moment this loader returns.
+  // The parsed certificate chain and private key, held for this context's lifetime so that cached
+  // entries stay reusable by sibling contexts and the next xDS generation.
   Extensions::TransportSockets::Tls::CertChainSharedPtr shared_cert_chain_;
-  Extensions::TransportSockets::Tls::ParsedPrivateKeySharedPtr shared_private_key_;
+  Extensions::TransportSockets::Tls::PrivateKeySharedPtr shared_private_key_;
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;
@@ -90,8 +88,6 @@ struct TlsContext {
                               Extensions::TransportSockets::Tls::PrivateKeyCache* cache);
   absl::Status loadPkcs12(const std::string& data, const std::string& data_path,
                           const std::string& password, bool fips_mode);
-  absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
-                               bool fips_mode);
 };
 } // namespace Ssl
 

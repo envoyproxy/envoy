@@ -20,10 +20,10 @@
 #endif
 
 #include "source/common/ssl/ssl.h"
-#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/context_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
+#include "source/common/tls/utility.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/tls/test_private_key_method_provider.h"

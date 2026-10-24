@@ -39,8 +39,6 @@
 #include "source/common/tls/utility.h"
 
 #include "absl/synchronization/mutex.h"
-#include "openssl/err.h"
-#include "openssl/pem.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -48,137 +46,6 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-SINGLETON_MANAGER_REGISTRATION(crl_cache);
-SINGLETON_MANAGER_REGISTRATION(ca_cert_cache);
-SINGLETON_MANAGER_REGISTRATION(cert_chain_cache);
-SINGLETON_MANAGER_REGISTRATION(private_key_cache);
-
-absl::StatusOr<CrlListSharedPtr> CrlCache::getOrCreate(const std::string& crl_pem,
-                                                       const std::string& crl_path) {
-  return getOrParse(crl_pem, [&]() -> absl::StatusOr<std::unique_ptr<CrlList>> {
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(crl_pem.data()), crl_pem.size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-    // Based on BoringSSL's X509_load_cert_crl_file().
-    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-    if (list == nullptr) {
-      return absl::InvalidArgumentError(absl::StrCat("Failed to load CRL from ", crl_path));
-    }
-
-    auto crl_list = std::make_unique<CrlList>();
-    for (const X509_INFO* item : list.get()) {
-      if (item->crl) {
-        crl_list->crls.push_back(bssl::UpRef(item->crl));
-      }
-    }
-    return crl_list;
-  });
-}
-
-std::shared_ptr<CrlCache> getCrlCache(Singleton::Manager& singleton_manager) {
-  return singleton_manager.getTyped<CrlCache>(SINGLETON_MANAGER_REGISTERED_NAME(crl_cache),
-                                              [] { return std::make_shared<CrlCache>(); });
-}
-
-absl::StatusOr<CaCertListSharedPtr> CaCertCache::getOrCreate(const std::string& ca_pem,
-                                                             const std::string& ca_path) {
-  return getOrParse(ca_pem, [&]() -> absl::StatusOr<std::unique_ptr<CaCertList>> {
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(ca_pem.data()), ca_pem.size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-    // Based on BoringSSL's X509_load_cert_crl_file().
-    bssl::UniquePtr<STACK_OF(X509_INFO)> list(
-        PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
-    if (list == nullptr) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
-    }
-
-    auto ca_cert_list = std::make_unique<CaCertList>();
-    for (const X509_INFO* item : list.get()) {
-      if (item->x509) {
-        ca_cert_list->certs.push_back(bssl::UpRef(item->x509));
-      }
-      if (item->crl) {
-        ca_cert_list->crls.push_back(bssl::UpRef(item->crl));
-      }
-    }
-    // A blob that parses but carries no certificate is not a usable trust bundle.
-    if (ca_cert_list->certs.empty()) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load trusted CA certificates from ", ca_path));
-    }
-    return ca_cert_list;
-  });
-}
-
-std::shared_ptr<CaCertCache> getCaCertCache(Singleton::Manager& singleton_manager) {
-  return singleton_manager.getTyped<CaCertCache>(SINGLETON_MANAGER_REGISTERED_NAME(ca_cert_cache),
-                                                 [] { return std::make_shared<CaCertCache>(); });
-}
-
-absl::StatusOr<CertChainSharedPtr> CertChainCache::getOrCreate(const std::string& cert_pem,
-                                                               const std::string& cert_path) {
-  return getOrParse(cert_pem, [&]() -> absl::StatusOr<std::unique_ptr<CertChain>> {
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert_pem.data()), cert_pem.size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-    // The leaf carries trust settings, so read it with the AUX variant; any
-    // remaining certificates are the intermediate chain.
-    auto cert_chain = std::make_unique<CertChain>();
-    cert_chain->leaf.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
-    if (cert_chain->leaf == nullptr) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load certificate chain from ", cert_path));
-    }
-    while (true) {
-      bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
-      if (cert == nullptr) {
-        break;
-      }
-      cert_chain->intermediates.push_back(std::move(cert));
-    }
-    // A trailing "no start line" error just marks EOF after the last certificate;
-    // any other error is a real parse failure.
-    const uint32_t err = ERR_peek_last_error();
-    if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
-      ERR_clear_error();
-    } else {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load certificate chain from ", cert_path));
-    }
-    return cert_chain;
-  });
-}
-
-std::shared_ptr<CertChainCache> getCertChainCache(Singleton::Manager& singleton_manager) {
-  return singleton_manager.getTyped<CertChainCache>(
-      SINGLETON_MANAGER_REGISTERED_NAME(cert_chain_cache),
-      [] { return std::make_shared<CertChainCache>(); });
-}
-
-absl::StatusOr<ParsedPrivateKeySharedPtr>
-PrivateKeyCache::getOrCreate(const std::string& key_pem, const std::string& key_path) {
-  // The FIPS pairwise check is deferred to the first caller (see loadPrivateKey), so it runs once
-  // per distinct key rather than once per context.
-  return getOrParse(key_pem, [&]() -> absl::StatusOr<std::unique_ptr<ParsedPrivateKey>> {
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(key_pem.data()), key_pem.size()));
-    RELEASE_ASSERT(bio != nullptr, "");
-    auto parsed_key = std::make_unique<ParsedPrivateKey>();
-    parsed_key->pkey.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
-    if (parsed_key->pkey == nullptr) {
-      return absl::InvalidArgumentError(
-          absl::StrCat("Failed to load private key from ", key_path,
-                       ", Cause: ", Utility::getLastCryptoError().value_or("unknown")));
-    }
-    return parsed_key;
-  });
-}
-
-std::shared_ptr<PrivateKeyCache> getPrivateKeyCache(Singleton::Manager& singleton_manager) {
-  return singleton_manager.getTyped<PrivateKeyCache>(
-      SINGLETON_MANAGER_REGISTERED_NAME(private_key_cache),
-      [] { return std::make_shared<PrivateKeyCache>(); });
-}
 
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
@@ -218,7 +85,9 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
     // reference is needed.
     std::shared_ptr<CaCertCache> ca_cert_cache = getCaCertCache(context_.singletonManager());
     absl::StatusOr<CaCertListSharedPtr> ca_certs_or_error =
-        ca_cert_cache->getOrCreate(config_->caCert(), config_->caCertPath());
+        ca_cert_cache->getOrCreate(config_->caCert(), [this] {
+          return parseCaCertList(config_->caCert(), config_->caCertPath());
+        });
     RETURN_IF_NOT_OK_REF(ca_certs_or_error.status());
     shared_ca_certs_ = std::move(*ca_certs_or_error);
 
@@ -259,15 +128,18 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
     // referenced from many TLS contexts is materialized in memory only once. The
     // returned CrlList keeps the cache alive, so no separate reference is needed.
     std::shared_ptr<CrlCache> crl_cache = getCrlCache(context_.singletonManager());
-    absl::StatusOr<CrlListSharedPtr> crl_list_or_error = crl_cache->getOrCreate(
-        config_->certificateRevocationList(), config_->certificateRevocationListPath());
+    absl::StatusOr<CrlListSharedPtr> crl_list_or_error =
+        crl_cache->getOrCreate(config_->certificateRevocationList(), [this] {
+          return parseCrlList(config_->certificateRevocationList(),
+                              config_->certificateRevocationListPath());
+        });
     RETURN_IF_NOT_OK_REF(crl_list_or_error.status());
     shared_crl_ = std::move(*crl_list_or_error);
 
     for (auto& ctx : contexts) {
       X509_STORE* store = SSL_CTX_get_cert_store(ctx);
       X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
-      for (const auto& crl : shared_crl_->crls) {
+      for (const auto& crl : *shared_crl_) {
         // X509_STORE_add_crl takes its own reference, so the shared CRL stays
         // valid for the store's lifetime even after this cache entry is released.
         X509_STORE_add_crl(store, crl.get());
