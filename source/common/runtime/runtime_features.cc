@@ -34,6 +34,11 @@
 // If issues are found that require a runtime feature to be disabled, it should be reported
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
+
+// When enabled, which is the default, the ALTS transport socket's server-side handshakes talk to
+// the ALTS handshaker service through Envoy's async gRPC client, so a worker thread never waits for
+// the handshaker service. Disable to restore the previous blocking gRPC calls.
+RUNTIME_GUARD(envoy_reloadable_features_alts_async_handshaker);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
