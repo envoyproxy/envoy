@@ -5201,6 +5201,16 @@ TEST_F(DynamicModuleHttpFilterTest, ClearRouteClusterCacheNoCallbacks) {
   envoy_dynamic_module_callback_http_clear_route_cluster_cache(filter_no_callbacks.get());
 }
 
+TEST_F(DynamicModuleHttpFilterTest, DrainConnectionUponCompletion) {
+  EXPECT_CALL(decoder_callbacks_.stream_info_, setShouldDrainConnectionUponCompletion(true));
+  envoy_dynamic_module_callback_http_drain_connection_upon_completion(filter_.get());
+}
+
+TEST_F(DynamicModuleHttpFilterTest, DrainConnectionUponCompletionNoCallbacks) {
+  auto filter_no_callbacks = std::make_unique<DynamicModuleHttpFilter>(nullptr, symbol_table_, 3);
+  envoy_dynamic_module_callback_http_drain_connection_upon_completion(filter_no_callbacks.get());
+}
+
 // ----------------------------- Config-Level HTTP Callout ABI Tests -----------------------------
 
 TEST_F(DynamicModuleHttpFilterWithConfigTest, HttpFilterConfigHttpCallout_MissingRequiredHeaders) {

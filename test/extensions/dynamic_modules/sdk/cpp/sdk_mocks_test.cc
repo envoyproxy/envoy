@@ -35,6 +35,12 @@ TEST(SdkMocksTest, RefreshRouteClusterIsMockable) {
   handle.refreshRouteCluster();
 }
 
+TEST(SdkMocksTest, DrainConnectionUponCompletionIsMockable) {
+  MockHttpFilterHandle handle;
+  EXPECT_CALL(handle, drainConnectionUponCompletion()).Times(1);
+  handle.drainConnectionUponCompletion();
+}
+
 TEST(SdkMocksTest, HasFilterStateIsMockable) {
   MockHttpFilterHandle handle;
   EXPECT_CALL(handle, hasFilterState("existing_key")).WillOnce(testing::Return(true));

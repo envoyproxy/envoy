@@ -2233,6 +2233,8 @@ WEAK_STUB(HttpFilterRecreateStream,
           envoy_dynamic_module_callback_http_filter_recreate_stream(nullptr, nullptr, 0))
 WEAK_STUB(HttpClearRouteClusterCache,
           envoy_dynamic_module_callback_http_clear_route_cluster_cache(nullptr))
+WEAK_STUB(HttpDrainConnectionUponCompletion,
+          envoy_dynamic_module_callback_http_drain_connection_upon_completion(nullptr))
 WEAK_STUB(ListenerFilterSetDetectedTransportProtocol,
           envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(nullptr,
                                                                                         {nullptr,
