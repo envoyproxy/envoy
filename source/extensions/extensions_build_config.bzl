@@ -671,6 +671,7 @@ EXTENSIONS = {
     # Cluster specifier plugin
     #
     "envoy.router.cluster_specifier_plugin.dynamic_modules": "//source/extensions/router/cluster_specifiers/dynamic_modules:config",
+    "envoy.router.cluster_specifier_plugin.header_weighted": "//source/extensions/router/cluster_specifiers/header_weighted:config",
     "envoy.router.cluster_specifier_plugin.lua":             "//source/extensions/router/cluster_specifiers/lua:config",
     "envoy.router.cluster_specifier_plugin.matcher":         "//source/extensions/router/cluster_specifiers/matcher:config",
     "envoy.router.cluster_specifier_plugin.priority_group":  "//source/extensions/router/cluster_specifiers/priority_group:config",
