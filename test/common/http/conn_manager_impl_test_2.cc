@@ -18,9 +18,6 @@ namespace Envoy {
 namespace Http {
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
   setup();
   setupFilterChain(1, 0);
 
@@ -44,15 +41,13 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestCompleteWithUpstreamHalfCloseEnabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
   setup();
   setupFilterChain(1, 0);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   startRequest();
+  decoder_filters_[0]->callbacks_->downstreamCallbacks()->enableHalfClose();
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -83,9 +78,6 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestCompleteWithUpstreamH
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
   EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
   setup();
   setupFilterChain(1, 0);
@@ -110,9 +102,6 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10NoOptimize) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
   EXPECT_CALL(runtime_.snapshot_, getBoolean(_, _)).WillRepeatedly(Return(false));
   EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http10));
   setup();
@@ -140,9 +129,6 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete10NoOptimize)
 }
 
 TEST_F(HttpConnectionManagerImplTest, DisconnectOnProxyConnectionDisconnect) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
   setup();
 
   setupFilterChain(1, 0);
@@ -734,9 +720,6 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDurationSafeHttp1) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, IntermediateBufferingEarlyResponse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
   setup();
 
   setupFilterChain(2, 0);

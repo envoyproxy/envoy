@@ -231,9 +231,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
       direction_(direction), server_context_(server_context),
       use_connection_event_drain_(
-          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")),
-      allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")) {
   ENVOY_LOG_ONCE_IF(
       trace, accept_new_http_stream_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http_connection_manager_decode_headers is not "

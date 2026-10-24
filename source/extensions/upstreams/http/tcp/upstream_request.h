@@ -39,6 +39,7 @@ public:
     return conn_pool_data_.value().host();
   }
   bool valid() const override { return conn_pool_data_.has_value(); }
+  bool supportsIndependentHalfClose() const override { return true; }
 
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
@@ -93,8 +94,6 @@ private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
-  bool downstream_complete_ = false;
-  const bool force_reset_on_upstream_half_close_{};
 };
 
 } // namespace Tcp
