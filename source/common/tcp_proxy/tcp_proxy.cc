@@ -951,6 +951,7 @@ void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
         upstream_timing.upstream_connect_complete_;
   }
   upstream_ = std::move(upstream);
+  upstream_accounts_for_bytes_ = upstream_->accountsForUpstreamBytes();
   generic_conn_pool_.reset();
   read_callbacks_->upstreamHost(host);
   // No need to set information using address_provider in case routing via Router::UpstreamRequest
@@ -1128,7 +1129,9 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   }
 
   if (upstream_) {
-    getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
+    if (!upstream_accounts_for_bytes_) {
+      getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
+    }
     upstream_->encodeData(data, end_stream);
     resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   } else if (receive_before_connect_) {
@@ -1325,7 +1328,9 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "upstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
-  getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
+  if (!upstream_accounts_for_bytes_) {
+    getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
+  }
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesSent(data.length());
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
@@ -1445,7 +1450,7 @@ void Filter::onUpstreamConnection() {
     // Early data should only happen when receive_before_connect is enabled.
     ASSERT(receive_before_connect_);
 
-    if (early_data_buffer_.length() > 0) {
+    if (early_data_buffer_.length() > 0 && !upstream_accounts_for_bytes_) {
       getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(early_data_buffer_.length());
     }
     upstream_->encodeData(early_data_buffer_, early_data_end_stream_);
