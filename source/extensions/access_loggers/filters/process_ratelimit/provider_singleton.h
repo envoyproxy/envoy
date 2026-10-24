@@ -3,7 +3,6 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/type/v3/token_bucket.pb.h"
 #include "envoy/type/v3/token_bucket.pb.validate.h"
@@ -126,7 +125,7 @@ public:
         scope_(factory_context.scope().createScope("local_ratelimit_discovery")),
         fallback_always_deny_limiter_(std::make_shared<AlwaysDenyLocalRateLimiter>()) {}
 
-  class TokenBucketSubscription : public Config::SubscriptionCallbacks {
+  class TokenBucketSubscription : public Config::SingletonSubscriptionCallbacks {
   public:
     explicit TokenBucketSubscription(RateLimiterProviderSingleton& parent,
                                      absl::string_view resource_name);
@@ -139,23 +138,18 @@ public:
 
     std::shared_ptr<LocalRateLimiterImpl> getLimiter();
 
-    // Config::SubscriptionCallbacks
-    absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                const std::string&) override;
+    // Config::SingletonSubscriptionCallbacks
+    absl::Status onResourceUpdate(const Config::DecodedResource& resource,
+                                  const std::string& version_info) override;
 
-    absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                const std::string&) override;
+    void onResourceRemoved() override;
 
-    void onConfigUpdateFailed(Config::ConfigUpdateFailureReason, const EnvoyException*) override {}
+    void onFailure(Config::ConfigUpdateFailureReason, const EnvoyException*) override {}
 
   private:
-    void handleAddedResource(const Config::DecodedResourceRef& resource);
-    void handleRemovedResource(absl::string_view resource_name);
-
     RateLimiterProviderSingleton& parent_;
     std::string resource_name_;
-    Config::SubscriptionPtr subscription_;
+    std::unique_ptr<Config::SingletonSubscription> subscription_;
     absl::flat_hash_map<intptr_t, SetRateLimiterCb> setters_;
     std::optional<envoy::type::v3::TokenBucket> config_;
     std::weak_ptr<LocalRateLimiterImpl> limiter_;
