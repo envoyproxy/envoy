@@ -26,7 +26,7 @@ common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/4547ef0485c2d8d256bfd564597571fb37065daf
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/9e987830a91b7611f2e6091697126c4a72c89cb8
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
