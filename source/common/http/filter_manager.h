@@ -137,7 +137,13 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   virtual bool canContinue() PURE;
   virtual Buffer::InstancePtr createBuffer() PURE;
   virtual Buffer::InstancePtr& bufferedData() PURE;
-  virtual bool observedEndStream() PURE;
+  // Whether the end of the stream has been observed, used for the end_stream flag when resuming
+  // iteration. With per-filter observed end stream enabled, this is whether the end-of-stream
+  // marker has reached this filter's position: an end-stream-carrying frame was either delivered
+  // to this filter or parked at this position while iteration is stopped. Otherwise it is the
+  // stream-level observed_[de|en]code_end_stream_ flag.
+  bool observedEndStream() const;
+  virtual bool streamObservedEndStream() const PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
   virtual void doHeaders(bool end_stream) PURE;
@@ -240,6 +246,12 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   bool end_stream_{};
   // If true, the filter has processed headers.
   bool processed_headers_{};
+  // True once the end-of-stream marker has reached this filter's position. Unlike end_stream_,
+  // which is set only when the terminal frame is actually delivered to the filter's callback,
+  // this is also set when that frame parks at this position without the filter being invoked.
+  // Frame deliveries latch this flag (|=) and never clear it; only the data injection APIs,
+  // which author the marker rather than record its arrival, may retract it.
+  bool observed_end_stream_{};
 };
 
 /**
@@ -257,7 +269,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override { return false; }
   void do1xxHeaders() override { IS_ENVOY_BUG("unexpected 1xx headers"); }
   void doHeaders(bool end_stream) override;
@@ -351,7 +363,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   bool canContinue() override;
   Buffer::InstancePtr createBuffer() override;
   Buffer::InstancePtr& bufferedData() override;
-  bool observedEndStream() override;
+  bool streamObservedEndStream() const override;
   bool has1xxHeaders() override;
   void do1xxHeaders() override;
   void doHeaders(bool end_stream) override;
@@ -710,7 +722,12 @@ public:
                 uint64_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
-        proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
+        proxy_100_continue_(proxy_100_continue),
+        per_filter_observed_end_stream_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.filter_manager_per_filter_observed_end_stream")),
+        inject_data_with_state_update_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
+        buffer_limit_(buffer_limit) {}
 
   ~FilterManager() override {
     ASSERT(state_.destroyed_);
@@ -1138,7 +1155,7 @@ private:
   // filter_streaming is the variable to indicate if stream is streaming, and its value may be
   // changed by the function.
   bool handleDataIfStopAll(ActiveStreamFilterBase& filter, Buffer::Instance& data,
-                           bool& filter_streaming);
+                           bool& filter_streaming, bool end_stream);
 
   MetadataMapVector* getRequestMetadataMapVector() {
     if (request_metadata_map_vector_ == nullptr) {
@@ -1166,6 +1183,10 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  // Runtime flags latched when the filter manager is created, so the end_stream handling stays
+  // consistent for the lifetime of the stream.
+  const bool per_filter_observed_end_stream_;
+  const bool inject_data_with_state_update_;
 
   StreamDecoderFilters decoder_filters_;
   StreamEncoderFilters encoder_filters_;
