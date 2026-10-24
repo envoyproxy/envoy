@@ -177,7 +177,8 @@ build:mobile-cc-xds-enabled --define=envoy_mobile_xds=enabled
 
 # Coverage
 build:mobile-coverage --build_tests_only
-build:mobile-coverage --@envoy//tools/coverage:config=@envoy_mobile//test:coverage_config
+build:mobile-coverage --coverage_report_generator=@envoy_mobile//test:coverage_report
+build:mobile-coverage --@envoy_mobile//test:config=@envoy_mobile//test:coverage_config
 build:mobile-coverage --config=mobile-clang
 build:mobile-coverage --legacy_important_outputs=false
 build:mobile-coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only

@@ -36,6 +36,20 @@ bazel_dep(name = "xds", version = "0.0.0-20251210-ee656c7")
 bazel_dep(name = "yq.bzl", version = "0.4.0")
 bazel_dep(name = "zipkin-api", version = "1.0.0.bcr.1")
 
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
+)
+
 ####################################################################################
 # deps: Dev
 ####################################################################################
