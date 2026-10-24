@@ -39,6 +39,8 @@ constexpr absl::string_view ModelRequest = "envoy.ai.model.request";
 // The model to send upstream, when it differs from the one the request names. It replaces the model
 // in the request body and in the rewritten path.
 constexpr absl::string_view ModelResolved = "envoy.ai.model.resolved";
+// The list of LLM providers and models to try for this request.
+constexpr absl::string_view ResolvedRoutes = "envoy.ai.routes";
 } // namespace FilterStateKeys
 
 // A wire API held in filter state. It is created from and serializes as an LLMProtocol value name,

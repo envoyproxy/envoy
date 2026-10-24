@@ -2424,6 +2424,13 @@ envoy.http.ext_proc.response_processors.save_processing_response:
   - envoy.http.ext_proc.response_processors
   security_posture: unknown
   status: wip
+envoy.http.ai_filters.model_router:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.ai_filters.model_router.v3.ModelRouter
 envoy.http.ai_filters.request_info:
   categories:
   - envoy.http.ai_filters
@@ -2431,6 +2438,13 @@ envoy.http.ai_filters.request_info:
   status: alpha
   type_urls:
   - envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+envoy.http.ai_filters.route_selector:
+  categories:
+  - envoy.http.ai_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.ai_filters.route_selector.v3.RouteSelector
 envoy.http.ai_filters.schema_validation:
   categories:
   - envoy.http.ai_filters

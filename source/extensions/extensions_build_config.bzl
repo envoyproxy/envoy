@@ -505,7 +505,9 @@ EXTENSIONS = {
     #
     # AI filters
     #
+    "envoy.http.ai_filters.model_router":               "//source/extensions/http/ai_filters/model_router:config",
     "envoy.http.ai_filters.request_info":               "//source/extensions/http/ai_filters/request_info:config",
+    "envoy.http.ai_filters.route_selector":             "//source/extensions/http/ai_filters/route_selector:config",
     "envoy.http.ai_filters.schema_validation":          "//source/extensions/http/ai_filters/schema_validation:config",
     "envoy.http.ai_filters.transcoder":                 "//source/extensions/http/ai_filters/transcoder:config",
 
