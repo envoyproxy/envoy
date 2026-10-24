@@ -576,6 +576,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
+    cds_pauses_.erase(cluster.info()->name());
     updateClusterCounts();
   }
   cluster_data = active_clusters_.find(cluster.info()->name());
@@ -875,8 +876,12 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   // Otherwise, applyUpdates() will fire with a dangling cluster reference.
   updates_map_.erase(cluster_name);
 
-  active_clusters_[cluster_name] = std::move(warming_it->second);
+  // Move the new ClusterData into active and erase from warming before destroying the old
+  // active ClusterData.
+  ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
+  ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
+  // old_active is destroyed here, after both maps are consistent.
 }
 
 bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const bool remove_ignored) {
@@ -918,6 +923,7 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
     removed = true;
     init_helper_.removeCluster(*existing_warming_cluster->second);
     warming_clusters_.erase(existing_warming_cluster);
+    cds_pauses_.erase(cluster_name);
     ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
   }
 
@@ -1020,32 +1026,38 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
+  updateCdsPause(*cluster_entry_it->second);
   updateClusterCounts();
   return result;
 }
 
-void ClusterManagerImpl::updateClusterCounts() {
-  // This if/else block implements a control flow mechanism that can be used by an ADS
-  // implementation to properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can
-  // use it to detect when a previously sent cluster becomes warm before sending routes that depend
-  // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
-  // it's supporting cluster is ready.
-  //
-  // We achieve that by leaving CDS in the paused state as long as there is at least
-  // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
-  // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
-  // signal to ADS to proceed with RDS updates.
-  // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
-  const bool all_clusters_initialized =
-      init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  if (all_clusters_initialized && xds_manager_.adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-    if (resume_cds_ == nullptr && !warming_clusters_.empty()) {
-      resume_cds_ = xds_manager_.pause(type_url);
-    } else if (warming_clusters_.empty()) {
-      resume_cds_.reset();
-    }
+void ClusterManagerImpl::updateCdsPause(const ClusterData& cluster_data) {
+  if (init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized ||
+      shutdown_ || !xds_manager_.adsMux()) {
+    return;
   }
+  const auto& name = cluster_data.cluster_->info()->name();
+  if (!cluster_data.cluster_->info()->waitForWarmOnInit()) {
+    cds_pauses_.erase(name);
+  } else if (!cds_pauses_.contains(name)) {
+    cds_pauses_.emplace(
+        name, xds_manager_.pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()));
+  }
+}
+
+void ClusterManagerImpl::updateClusterCounts() {
+  // This implements a control flow mechanism that can be used by an ADS implementation to
+  // properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can use it to
+  // detect when a previously sent cluster becomes warm before sending routes that depend on it.
+  // This can improve incidence of HTTP 503 responses from Envoy when a route is used before
+  // its supporting cluster is ready.
+  //
+  // We achieve that by leaving CDS in the paused state as long as there is at least one
+  // warming cluster that has not opted out of CDS gating (wait_for_warm_on_init: true).
+  // CDS pause handles are acquired per-cluster via updateCdsPause(), called from loadCluster().
+  // Once all blocking clusters are warmed up, CDS is resumed and ACK is sent to ADS, providing
+  // a signal to ADS to proceed with RDS updates.
+  //
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }
