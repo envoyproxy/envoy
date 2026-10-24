@@ -221,15 +221,19 @@ message McpOverride {
   // It defaults to 8KB (8192 bytes).
   google.protobuf.UInt32Value max_request_body_size = 2;
 
-  // Overrides the global clear_route_cache setting for this route.
-  bool clear_route_cache = 3;
+  // Overrides the global clear_route_cache setting for this route. If not set, the global
+  // setting is used.
+  google.protobuf.BoolValue clear_route_cache = 3;
 
-  // Overrides the global parser config for this route.
+  // Overrides the global parser config for this route. If not set, the global parser config is
+  // used.
   ParserConfig parser_config = 4;
 
-  // Overrides the global request storage mode for this route.
+  // Overrides the global request storage mode for this route. If ``MODE_UNSPECIFIED``, the global
+  // request storage mode is used.
   Mcp.RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
-  // Overrides the global reject_duplicate_keys setting for this route.
-  bool reject_duplicate_keys = 6;
+  // Overrides the global reject_duplicate_keys setting for this route. If not set, the global
+  // setting is used.
+  google.protobuf.BoolValue reject_duplicate_keys = 6;
 }

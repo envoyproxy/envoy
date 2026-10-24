@@ -12,6 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/common/mcp/filter_state.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -124,11 +125,13 @@ public:
             proto_config.has_max_request_body_size()
                 ? std::optional<uint32_t>(proto_config.max_request_body_size().value())
                 : std::nullopt),
-        clear_route_cache_(proto_config.clear_route_cache()),
-        parser_config_(McpParserConfig::fromProto(proto_config.parser_config())),
+        clear_route_cache_(PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config, clear_route_cache)),
+        parser_config_(
+            proto_config.has_parser_config()
+                ? std::make_optional(McpParserConfig::fromProto(proto_config.parser_config()))
+                : std::nullopt),
         request_storage_mode_(proto_config.request_storage_mode()),
-        reject_duplicate_keys_(proto_config.reject_duplicate_keys()) {
-    parser_config_.setRejectDuplicateKeys(reject_duplicate_keys_);
+        reject_duplicate_keys_(PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config, reject_duplicate_keys)) {
   }
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
@@ -136,20 +139,20 @@ public:
   }
 
   std::optional<uint32_t> maxRequestBodySize() const { return max_request_body_size_; }
-  bool clearRouteCache() const { return clear_route_cache_; }
-  const ParserConfig& parserConfig() const { return parser_config_; }
+  std::optional<bool> clearRouteCache() const { return clear_route_cache_; }
+  const std::optional<ParserConfig>& parserConfig() const { return parser_config_; }
   envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode requestStorageMode() const {
     return request_storage_mode_;
   }
-  bool rejectDuplicateKeys() const { return reject_duplicate_keys_; }
+  std::optional<bool> rejectDuplicateKeys() const { return reject_duplicate_keys_; }
 
 private:
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const std::optional<uint32_t> max_request_body_size_;
-  const bool clear_route_cache_;
-  ParserConfig parser_config_;
+  const std::optional<bool> clear_route_cache_;
+  const std::optional<ParserConfig> parser_config_;
   const envoy::extensions::filters::http::mcp::v3::Mcp::RequestStorageMode request_storage_mode_;
-  const bool reject_duplicate_keys_;
+  const std::optional<bool> reject_duplicate_keys_;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
