@@ -480,6 +480,7 @@ envoy_cc_test(
     deps = [
         "//source/common/api:api_lib",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:address_lib",
         "//source/server:worker_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",

@@ -46,6 +46,7 @@ using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::ReturnRefOfCopy;
 using testing::SaveArg;
+using testing::Sequence;
 
 namespace Envoy {
 namespace Server {
@@ -400,6 +401,8 @@ public:
     listeners_.emplace_back(std::move(test_listener));
 
     EXPECT_CALL(listeners_.back()->socketFactory(0), socketType()).WillOnce(Return(socket_type));
+    // The listener of each address is the mock listener at the same index.
+    Sequence create_listener_sequence;
     for (std::vector<Network::Listener*>::size_type i = 0; i < mock_listeners.size(); i++) {
       EXPECT_CALL(listeners_.back()->socketFactory(i), localAddress())
           .WillRepeatedly(ReturnRef(addresses[i]));
@@ -409,6 +412,7 @@ public:
 
       if (socket_type == Network::Socket::Type::Stream) {
         EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+            .InSequence(create_listener_sequence)
             .WillOnce(Invoke([i, &mock_listeners, &listener_callbacks_map](
                                  Network::SocketSharedPtr&& socket,
                                  Network::TcpListenerCallbacks& cb, Runtime::Loader&,
@@ -2351,6 +2355,496 @@ TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdate) {
   old_listener_callbacks->onAccept(Network::ConnectionSocketPtr{connection});
   EXPECT_EQ(0UL, handler_->numConnections());
   EXPECT_CALL(*old_listener, onDestroy());
+}
+
+// An in place update adds listeners for the addresses that the existing listener does not listen
+// on, and keeps the listeners of the other addresses.
+TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateAddsNewAddresses) {
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  auto listener1 = new NiceMock<Network::MockListener>();
+  Network::Address::InstanceConstSharedPtr address1(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  TestListener* old_test_listener =
+      addListener(1, true, false, "test_listener", listener1, &listener_callbacks1, address1);
+  handler_->addListener(std::nullopt, *old_test_listener, runtime_, random_);
+
+  Network::Address::InstanceConstSharedPtr address2(
+      new Network::Address::Ipv4Instance("127.0.0.2", 10001));
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers{
+      {address2->asString(), std::make_shared<Network::NopConnectionBalancerImpl>()}};
+  auto new_filter_chain_manager = std::make_shared<NiceMock<Network::MockFilterChainManager>>();
+  auto* new_test_listener = new TestMultiAddressesListener(
+      *this, 1, true, false, "test_listener", Network::Socket::Type::Stream,
+      std::chrono::milliseconds(15000), false, access_log_, connection_balancers,
+      new_filter_chain_manager, ENVOY_TCP_BACKLOG_SIZE, false, 2);
+  listeners_.emplace_back(new_test_listener);
+  EXPECT_CALL(new_test_listener->socketFactory(0), localAddress())
+      .WillRepeatedly(ReturnRef(address1));
+  EXPECT_CALL(new_test_listener->socketFactory(1), localAddress())
+      .WillRepeatedly(ReturnRef(address2));
+  EXPECT_CALL(new_test_listener->socketFactory(1), getListenSocket(_))
+      .WillOnce(Return(new_test_listener->sockets_[1]));
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  auto listener2 = new NiceMock<Network::MockListener>();
+  EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+      .WillOnce(Invoke([&listener_callbacks2,
+                        listener2](Network::SocketSharedPtr&&, Network::TcpListenerCallbacks& cb,
+                                   Runtime::Loader&, Random::RandomGenerator&,
+                                   const Network::ListenerConfig&,
+                                   Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+        listener_callbacks2 = &cb;
+        return std::unique_ptr<Network::Listener>(listener2);
+      }));
+  handler_->addListener(1, *new_test_listener, runtime_, random_);
+  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*address2).has_value());
+
+  // Both the kept and the added address use the new config.
+  EXPECT_CALL(manager_, findFilterChain(_, _)).Times(0);
+  EXPECT_CALL(*new_filter_chain_manager, findFilterChain(_, _)).Times(2);
+  EXPECT_CALL(*access_log_, log(_, _)).Times(2);
+  listener_callbacks1->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  listener_callbacks2->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
+}
+
+// An in place update keeps the listener of an address when the new config binds its socket factory
+// to another port, like a filter chain only update of a port 0 address that gets new sockets.
+TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateKeepsListenerOfReboundAddress) {
+  auto listener = new NiceMock<Network::MockListener>();
+  TestListener* old_test_listener = addListener(1, true, false, "test_listener", listener);
+  handler_->addListener(std::nullopt, *old_test_listener, runtime_, random_);
+
+  TestListener* new_test_listener = addListener(1, true, false, "test_listener", nullptr);
+  EXPECT_CALL(new_test_listener->socketFactory(), localAddress())
+      .WillRepeatedly(ReturnRefOfCopy(Network::Address::InstanceConstSharedPtr(
+          new Network::Address::Ipv4Instance("127.0.0.1", 10002))));
+  handler_->addListener(1, *new_test_listener, runtime_, random_);
+  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*local_address_).has_value());
+
+  EXPECT_CALL(*listener, onDestroy());
+}
+
+// The listener of a stopped address no longer accepts connections, and its connections are drained
+// with the drain of the stopped addresses and kept until the address is removed.
+TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddresses) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr address1(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  Network::Address::InstanceConstSharedPtr address2(
+      new Network::Address::Ipv4Instance("127.0.0.2", 10001));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{address1, address2};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {address1->asString(), &listener_callbacks1}, {address2->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  auto* server_connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(server_connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks2->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  MockFunction<void()> stopped;
+  {
+    InSequence s;
+    EXPECT_CALL(*listener2, onDestroy());
+    EXPECT_CALL(stopped, Call());
+  }
+  handler_->stopListenerAddresses(*test_listener, {address2});
+  stopped.Call();
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address2).has_value());
+  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*address1).has_value());
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  // Only the drain of the addresses stopped for the given listener notifies the connection, and a
+  // later one does not notify it again.
+  NiceMock<Network::MockListenerConfig> other_listener;
+  ON_CALL(other_listener, listenerTag()).WillByDefault(Return(1));
+  const Network::ConnectionDrainEvent drain_event{MonotonicTime(std::chrono::seconds(1)),
+                                                  Server::DrainStrategy::Immediate};
+  Network::ConnectionDrainEvent notified_drain_event;
+  EXPECT_CALL(*server_connection, onDrain(_)).WillOnce(SaveArg<0>(&notified_drain_event));
+  handler_->onFilterChainDrain(1, {}, Network::ConnectionDrainEvent{});
+  handler_->onListenerAddressesDrain(other_listener, Network::ConnectionDrainEvent{});
+  handler_->onListenerAddressesDrain(*test_listener, drain_event);
+  handler_->onListenerAddressesDrain(*test_listener, Network::ConnectionDrainEvent{});
+  EXPECT_EQ(drain_event.start_time, notified_drain_event.start_time);
+  EXPECT_EQ(Server::DrainStrategy::Immediate, notified_drain_event.strategy);
+
+  // Only the addresses stopped for the given listener are removed.
+  handler_->removeListenerAddresses(other_listener);
+  EXPECT_EQ(1UL, handler_->numConnections());
+
+  EXPECT_CALL(*access_log_, log(_, _));
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  handler_->removeListenerAddresses(*test_listener);
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  EXPECT_CALL(*listener1, onDestroy());
+  handler_.reset();
+}
+
+// The listener of a stopped address keeps the config of the replaced listener when the listener is
+// updated in place again.
+TEST_F(ConnectionHandlerTest, TcpListenerStoppedAddressKeepsConfig) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr address1(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  Network::Address::InstanceConstSharedPtr address2(
+      new Network::Address::Ipv4Instance("127.0.0.2", 10001));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{address1, address2};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {address1->asString(), &listener_callbacks1}, {address2->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  auto* server_connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(server_connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks2->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+  EXPECT_EQ(1UL, test_listener->open_connections_.count());
+
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, {address2});
+  TestListener* new_test_listener = addListener(1, true, false, "test_listener", nullptr);
+  handler_->addListener(1, *new_test_listener, runtime_, random_);
+
+  EXPECT_CALL(*access_log_, log(_, _));
+  server_connection->close(Network::ConnectionCloseType::NoFlush);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(0UL, handler_->numConnections());
+  EXPECT_EQ(0UL, test_listener->open_connections_.count());
+
+  EXPECT_CALL(*listener1, onDestroy());
+}
+
+// An address that is stopped and added back by an in place update gets a new listener.
+TEST_F(ConnectionHandlerTest, TcpListenerInplaceUpdateAddsBackStoppedAddress) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr address1(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  Network::Address::InstanceConstSharedPtr address2(
+      new Network::Address::Ipv4Instance("127.0.0.2", 10001));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{address1, address2};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {address1->asString(), &listener_callbacks1}, {address2->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, {address2});
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*address2).has_value());
+
+  auto* new_test_listener = new TestMultiAddressesListener(
+      *this, 1, true, false, "test_listener", Network::Socket::Type::Stream,
+      std::chrono::milliseconds(15000), false, access_log_, connection_balancers, nullptr,
+      ENVOY_TCP_BACKLOG_SIZE, false, 2);
+  listeners_.emplace_back(new_test_listener);
+  EXPECT_CALL(new_test_listener->socketFactory(0), localAddress())
+      .WillRepeatedly(ReturnRef(address1));
+  EXPECT_CALL(new_test_listener->socketFactory(1), localAddress())
+      .WillRepeatedly(ReturnRef(address2));
+  EXPECT_CALL(new_test_listener->socketFactory(1), getListenSocket(_))
+      .WillOnce(Return(new_test_listener->sockets_[1]));
+  auto listener3 = new NiceMock<Network::MockListener>();
+  EXPECT_CALL(*handler_, createListener(_, _, _, _, _, _))
+      .WillOnce(Invoke([listener3](Network::SocketSharedPtr&&, Network::TcpListenerCallbacks&,
+                                   Runtime::Loader&, Random::RandomGenerator&,
+                                   const Network::ListenerConfig&,
+                                   Server::ThreadLocalOverloadStateOptRef) -> Network::ListenerPtr {
+        return std::unique_ptr<Network::Listener>(listener3);
+      }));
+  handler_->addListener(1, *new_test_listener, runtime_, random_);
+  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*address2).has_value());
+
+  // Removing the stopped address does not affect the new listener of the address.
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  handler_->removeListenerAddresses(*test_listener);
+  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*address2).has_value());
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList()).Times(2);
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*listener3, onDestroy());
+  handler_.reset();
+}
+
+// Removing filter chains also closes the connections of the stopped addresses that use them.
+TEST_F(ConnectionHandlerTest, TcpListenerRemoveFilterChainsOfStoppedAddresses) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr address1(
+      new Network::Address::Ipv4Instance("127.0.0.1", 10001));
+  Network::Address::InstanceConstSharedPtr address2(
+      new Network::Address::Ipv4Instance("127.0.0.2", 10001));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{address1, address2};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {address1->asString(), &listener_callbacks1}, {address2->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+  auto* server_connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(server_connection));
+  EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
+  listener_callbacks2->onAccept(
+      Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, {address2});
+
+  EXPECT_CALL(*access_log_, log(_, _));
+  const std::list<const Network::FilterChain*> filter_chains{filter_chain_.get()};
+  handler_->removeFilterChains(1, filter_chains, []() {});
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(0UL, handler_->numConnections());
+
+  // Removing a listener also removes the listeners of its stopped addresses.
+  EXPECT_CALL(*listener1, onDestroy());
+  handler_->stopListeners(1, {});
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList()).Times(2);
+  handler_->removeListeners(1);
+
+  // Stopping or removing the addresses of a removed listener does nothing.
+  handler_->stopListenerAddresses(*test_listener, {address1});
+  handler_->removeListenerAddresses(*test_listener);
+}
+
+// Stopping an address removes the entries of the address and of its IPv4 aliases, unless they
+// belong to another listener.
+TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddressesWithIpv4Aliases) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr any_address(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
+  Network::Address::InstanceConstSharedPtr mapped_address(
+      new Network::Address::Ipv6Instance("::FFFF:192.168.0.1", 80, nullptr, false));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{any_address, mapped_address};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {any_address->asString(), &listener_callbacks1},
+      {mapped_address->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  // A later listener takes over the entry of the IPv4 address of the mapped address.
+  Network::Address::InstanceConstSharedPtr ipv4_address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80));
+  auto listener3 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener2 =
+      addListener(2, true, false, "test_listener2", listener3, nullptr, ipv4_address);
+  handler_->addListener(std::nullopt, *test_listener2, runtime_, random_);
+
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, addresses);
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*any_address).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(*mapped_address).has_value());
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(Network::Address::Ipv4Instance("10.0.0.1", 80))
+                   .has_value());
+  EXPECT_TRUE(handler_->getBalancedHandlerByAddress(*ipv4_address).has_value());
+
+  // No entry keeps the listeners of the stopped addresses alive once they are removed.
+  MockFunction<void()> removed;
+  {
+    InSequence s;
+    EXPECT_CALL(dispatcher_, clearDeferredDeleteList()).Times(2);
+    EXPECT_CALL(removed, Call());
+  }
+  handler_->removeListenerAddresses(*test_listener);
+  removed.Call();
+
+  EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
+  EXPECT_CALL(*listener3, onDestroy());
+  handler_.reset();
+}
+
+// Stopping an address gives its IPv4 entry back to a remaining dual stack address.
+TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddressesRestoresIpv4Alias) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr any_address(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
+  Network::Address::InstanceConstSharedPtr ipv4_any_address(new Network::Address::Ipv4Instance(80));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{any_address, ipv4_any_address};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {any_address->asString(), &listener_callbacks1},
+      {ipv4_any_address->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, {ipv4_any_address});
+  auto balanced_handler =
+      handler_->getBalancedHandlerByAddress(Network::Address::Ipv4Instance("10.0.0.1", 80));
+  ASSERT_TRUE(balanced_handler.has_value());
+  EXPECT_EQ(dynamic_cast<Network::BalancedConnectionHandler*>(listener_callbacks1),
+            &balanced_handler.ref());
+
+  EXPECT_CALL(*listener1, onDestroy());
+}
+
+// Stopping an IPv4-mapped address gives its entry back to the remaining IPv4 address.
+TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddressesRestoresOwnEntry) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr ipv4_address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80));
+  Network::Address::InstanceConstSharedPtr mapped_address(
+      new Network::Address::Ipv6Instance("::FFFF:192.168.0.1", 80, nullptr, false));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{ipv4_address, mapped_address};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {ipv4_address->asString(), &listener_callbacks1},
+      {mapped_address->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, {mapped_address});
+  auto balanced_handler = handler_->getBalancedHandlerByAddress(*ipv4_address);
+  ASSERT_TRUE(balanced_handler.has_value());
+  EXPECT_EQ(dynamic_cast<Network::BalancedConnectionHandler*>(listener_callbacks1),
+            &balanced_handler.ref());
+
+  EXPECT_CALL(*listener1, onDestroy());
+}
+
+// A remaining address whose own entry another listener took over does not get an IPv4 entry back,
+// so that its listener does not outlive the listener config.
+TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddressesSkipsIpv4AliasOfTakenOverAddress) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr any_address(
+      new Network::Address::Ipv6Instance("::", 80, nullptr, false));
+  Network::Address::InstanceConstSharedPtr ipv4_any_address(new Network::Address::Ipv4Instance(80));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{any_address, ipv4_any_address};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {any_address->asString(), &listener_callbacks1},
+      {ipv4_any_address->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  // A later listener takes over the entry of the dual stack address, like one in another network
+  // namespace.
+  auto listener3 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener2 =
+      addListener(2, true, false, "test_listener2", listener3, nullptr, any_address);
+  handler_->addListener(std::nullopt, *test_listener2, runtime_, random_);
+
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, {ipv4_any_address});
+  EXPECT_FALSE(handler_->getBalancedHandlerByAddress(Network::Address::Ipv4Instance("10.0.0.1", 80))
+                   .has_value());
+
+  MockFunction<void()> listener_removed;
+  {
+    InSequence s;
+    EXPECT_CALL(*listener1, onDestroy());
+    EXPECT_CALL(listener_removed, Call());
+  }
+  handler_->removeListeners(1);
+  listener_removed.Call();
+
+  EXPECT_CALL(*listener3, onDestroy());
+}
+
+// Stopping an address does not give the IPv4 entry of another listener to a remaining address.
+TEST_F(ConnectionHandlerTest, TcpListenerStopListenerAddressesKeepsIpv4EntryOfOtherListener) {
+  auto listener1 = new NiceMock<Network::MockListener>();
+  auto listener2 = new NiceMock<Network::MockListener>();
+  std::vector<Network::Listener*> mock_listeners{listener1, listener2};
+  Network::Address::InstanceConstSharedPtr mapped_address(
+      new Network::Address::Ipv6Instance("::FFFF:192.168.0.1", 80, nullptr, false));
+  Network::Address::InstanceConstSharedPtr other_address(
+      new Network::Address::Ipv4Instance("127.0.0.2", 80));
+  std::vector<Network::Address::InstanceConstSharedPtr> addresses{mapped_address, other_address};
+  Network::TcpListenerCallbacks* listener_callbacks1;
+  Network::TcpListenerCallbacks* listener_callbacks2;
+  absl::flat_hash_map<std::string, Network::TcpListenerCallbacks**> listener_callbacks_map{
+      {mapped_address->asString(), &listener_callbacks1},
+      {other_address->asString(), &listener_callbacks2}};
+  absl::flat_hash_map<std::string, Network::ConnectionBalancerSharedPtr> connection_balancers;
+  TestMultiAddressesListener* test_listener =
+      addMultiAddrsListener(1, true, false, "test_listener", mock_listeners, addresses,
+                            connection_balancers, listener_callbacks_map);
+  handler_->addListener(std::nullopt, *test_listener, runtime_, random_);
+
+  // A later listener takes over the entry of the IPv4 address of the mapped address.
+  Network::Address::InstanceConstSharedPtr ipv4_address(
+      new Network::Address::Ipv4Instance("192.168.0.1", 80));
+  Network::TcpListenerCallbacks* listener_callbacks3;
+  auto listener3 = new NiceMock<Network::MockListener>();
+  TestListener* test_listener2 =
+      addListener(2, true, false, "test_listener2", listener3, &listener_callbacks3, ipv4_address);
+  handler_->addListener(std::nullopt, *test_listener2, runtime_, random_);
+
+  EXPECT_CALL(*listener2, onDestroy());
+  handler_->stopListenerAddresses(*test_listener, {other_address});
+  auto balanced_handler = handler_->getBalancedHandlerByAddress(*ipv4_address);
+  ASSERT_TRUE(balanced_handler.has_value());
+  EXPECT_EQ(dynamic_cast<Network::BalancedConnectionHandler*>(listener_callbacks3),
+            &balanced_handler.ref());
+
+  EXPECT_CALL(*listener1, onDestroy());
+  EXPECT_CALL(*listener3, onDestroy());
 }
 
 TEST_F(ConnectionHandlerTest, TcpListenerDrainFilterChainsNotifiesConnections) {
