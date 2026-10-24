@@ -88,6 +88,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
       actually_erased = (requested_resource_state_.erase(r) > 0);
     }
     ASSERT(!requested_resource_state_.contains(r));
+    unbindAlias(r);
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -160,6 +161,9 @@ bool DeltaSubscriptionState::isHeartbeatResponse(
     return false;
   }
   if (resource.has_resource()) {
+    return false;
+  }
+  if (resource.aliases_size() > 0) {
     return false;
   }
 
@@ -237,17 +241,38 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
-    if (requested_resource_state_.contains(Wildcard)) {
-      for (const auto& resource : message.resources()) {
-        addResourceStateFromServer(resource);
-      }
-    } else {
-      // We are not subscribed to wildcard, so we only take resources that we explicitly requested
-      // and ignore the others.
-      for (const auto& resource : message.resources()) {
-        if (requested_resource_state_.contains(resource.name())) {
-          addResourceStateFromServer(resource);
+    for (const auto& resource : message.resources()) {
+      if (!resource.has_resource() && resource.aliases_size() > 0) {
+        unbindAlias(resource.name());
+        if (auto maybe_resource = getRequestedResourceState(resource.name());
+            maybe_resource.has_value()) {
+          maybe_resource->setAsWaitingForServer();
         }
+        for (const auto& alias : resource.aliases()) {
+          unbindAlias(alias);
+          if (auto maybe_alias = getRequestedResourceState(alias); maybe_alias.has_value()) {
+            maybe_alias->setAsWaitingForServer();
+          }
+        }
+        continue;
+      }
+      if (!isHeartbeatResponse(resource)) {
+        unbindAlias(resource.name());
+        for (const auto& alias : resource.aliases()) {
+          if (alias != resource.name() && requested_resource_state_.contains(alias)) {
+            bindAlias(alias, resource.name());
+          }
+        }
+      }
+      if (auto it = canonical_name_to_aliases_.find(resource.name());
+          it != canonical_name_to_aliases_.end()) {
+        for (const auto& bound_alias : it->second) {
+          requested_resource_state_.at(bound_alias).setVersion(resource.version());
+        }
+      }
+      if (requested_resource_state_.contains(Wildcard) ||
+          requested_resource_state_.contains(resource.name())) {
+        addResourceStateFromServer(resource);
       }
     }
   }
@@ -263,6 +288,14 @@ void DeltaSubscriptionState::handleGoodResponse(
   // received as a part of the wildcard subscription or resources we already lost interest in, we
   // just drop them.
   for (const auto& resource_name : message.removed_resources()) {
+    if (auto it = canonical_name_to_aliases_.find(resource_name);
+        it != canonical_name_to_aliases_.end()) {
+      for (const auto& bound_alias : it->second) {
+        requested_resource_state_.at(bound_alias).setAsWaitingForServer();
+      }
+      unbindCanonicalName(resource_name);
+    }
+    unbindAlias(resource_name);
     if (auto maybe_resource = getRequestedResourceState(resource_name);
         maybe_resource.has_value()) {
       maybe_resource->setAsWaitingForServer();
@@ -424,6 +457,37 @@ DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_nam
     return {};
   }
   return {itr->second};
+}
+
+void DeltaSubscriptionState::bindAlias(absl::string_view alias, absl::string_view canonical_name) {
+  unbindAlias(alias);
+  alias_to_canonical_name_.emplace(alias, canonical_name);
+  canonical_name_to_aliases_[canonical_name].emplace(alias);
+}
+
+void DeltaSubscriptionState::unbindAlias(absl::string_view alias) {
+  auto it = alias_to_canonical_name_.find(alias);
+  if (it == alias_to_canonical_name_.end()) {
+    return;
+  }
+  auto canonical_it = canonical_name_to_aliases_.find(it->second);
+  ASSERT(canonical_it != canonical_name_to_aliases_.end());
+  canonical_it->second.erase(alias);
+  if (canonical_it->second.empty()) {
+    canonical_name_to_aliases_.erase(canonical_it);
+  }
+  alias_to_canonical_name_.erase(it);
+}
+
+void DeltaSubscriptionState::unbindCanonicalName(absl::string_view canonical_name) {
+  auto it = canonical_name_to_aliases_.find(canonical_name);
+  if (it == canonical_name_to_aliases_.end()) {
+    return;
+  }
+  for (const auto& alias : it->second) {
+    alias_to_canonical_name_.erase(alias);
+  }
+  canonical_name_to_aliases_.erase(it);
 }
 
 } // namespace Config

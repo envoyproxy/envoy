@@ -1476,6 +1476,110 @@ TEST_P(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
   deliverDiscoveryResponse(create_resource_with_ttl(false), {}, "debug1", "nonce1", true, 1);
 }
 
+TEST_P(DeltaSubscriptionStateTestBlank, AliasResolutionAndReconnect) {
+  updateSubscriptionInterest({"alias_1", "alias_2"}, {WildcardStr});
+  auto cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->resource_names_subscribe(), UnorderedElementsAre("alias_1", "alias_2"));
+
+  // 1. Server responds with canonical_1 and aliases={"alias_1", "alias_2", "unrequested_alias"}.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added;
+    auto* r = added.Add();
+    r->set_name("canonical_1");
+    r->set_version("version1");
+    r->add_aliases("alias_1");
+    r->add_aliases("alias_2");
+    r->add_aliases("unrequested_alias");
+    r->mutable_resource();
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    deliverDiscoveryResponse(added, {}, "debug1", "nonce1");
+  }
+
+  // Reconnect: initial_resource_versions should track version1 under the requested aliases.
+  markStreamFresh(true);
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->initial_resource_versions(),
+              UnorderedElementsAre(Pair("alias_1", "version1"), Pair("alias_2", "version1")));
+
+  // 2. Subsequent update to canonical_1 without aliases updates the bound aliases' versions.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added;
+    auto* r = added.Add();
+    r->set_name("canonical_1");
+    r->set_version("version2");
+    r->mutable_resource();
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    deliverDiscoveryResponse(added, {}, "debug2", "nonce2");
+  }
+  markStreamFresh(true);
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->initial_resource_versions(),
+              UnorderedElementsAre(Pair("alias_1", "version2"), Pair("alias_2", "version2")));
+
+  // 3. Rebinding alias_1 to canonical_2 updates alias_1 while keeping alias_2 on canonical_1.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added;
+    auto* r = added.Add();
+    r->set_name("canonical_2");
+    r->set_version("version3");
+    r->add_aliases("alias_1");
+    r->mutable_resource();
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    deliverDiscoveryResponse(added, {}, "debug3", "nonce3");
+  }
+  markStreamFresh(true);
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->initial_resource_versions(),
+              UnorderedElementsAre(Pair("alias_1", "version3"), Pair("alias_2", "version2")));
+
+  // 4. Unresolved alias response (!has_resource() with aliases) resets alias_1 to waitingForServer.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added;
+    auto* r = added.Add();
+    r->set_name("alias_1");
+    r->set_version("version4");
+    r->add_aliases("alias_1");
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    deliverDiscoveryResponse(added, {}, "debug4", "nonce4");
+  }
+  markStreamFresh(true);
+  cur_request = getNextRequestAckless();
+  EXPECT_THAT(cur_request->initial_resource_versions(),
+              UnorderedElementsAre(Pair("alias_2", "version2")));
+
+  // 5. Removing canonical_1 resets its bound alias_2 to waitingForServer.
+  {
+    auto removed = populateRepeatedString({"canonical_1"});
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    deliverDiscoveryResponse({}, removed, "debug5", "nonce5");
+  }
+  markStreamFresh(true);
+  cur_request = getNextRequestAckless();
+  EXPECT_TRUE(cur_request->initial_resource_versions().empty());
+
+  // 6. Rebind both aliases, then unsubscribe alias_1 and remove alias_2 directly.
+  {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added;
+    auto* r = added.Add();
+    r->set_name("canonical_1");
+    r->set_version("version5");
+    r->add_aliases("alias_1");
+    r->add_aliases("alias_2");
+    r->mutable_resource();
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    deliverDiscoveryResponse(added, {}, "debug6", "nonce6");
+  }
+  updateSubscriptionInterest({}, {"alias_1"});
+  {
+    auto removed = populateRepeatedString({"alias_2"});
+    EXPECT_CALL(*ttl_timer_, disableTimer());
+    deliverDiscoveryResponse({}, removed, "debug7", "nonce7");
+  }
+  markStreamFresh(true);
+  cur_request = getNextRequestAckless();
+  EXPECT_TRUE(cur_request->initial_resource_versions().empty());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

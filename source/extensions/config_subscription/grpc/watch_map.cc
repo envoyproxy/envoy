@@ -357,7 +357,29 @@ void WatchMap::onConfigUpdate(
   // space for the vector for the good case.
   decoded_resources.reserve(added_resources.size());
   for (const auto* r : added_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r->name());
+    absl::flat_hash_set<Watch*> interested_in_r = watchesInterestedIn(r->name());
+    if (auto it = canonical_name_to_aliases_.find(r->name());
+        it != canonical_name_to_aliases_.end()) {
+      for (const auto& bound_alias : it->second) {
+        const absl::flat_hash_set<Watch*> alias_watches = watchesInterestedIn(bound_alias);
+        interested_in_r.insert(alias_watches.begin(), alias_watches.end());
+      }
+    }
+    unbindAlias(r->name());
+    if (!r->has_resource()) {
+      unbindCanonicalName(r->name());
+    }
+    for (const auto& alias : r->aliases()) {
+      const absl::flat_hash_set<Watch*> alias_watches = watchesInterestedIn(alias);
+      interested_in_r.insert(alias_watches.begin(), alias_watches.end());
+      if (r->has_resource()) {
+        if (alias != r->name() && watch_interest_.contains(alias)) {
+          bindAlias(alias, r->name());
+        }
+      } else {
+        unbindAlias(alias);
+      }
+    }
     // If there are no watches, then we don't need to decode. If there are watches, they should all
     // be for the same resource type, so we can just use the callbacks of the first watch to decode.
     if (interested_in_r.empty()) {
@@ -371,7 +393,15 @@ void WatchMap::onConfigUpdate(
   }
   absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<std::string>> per_watch_removed;
   for (const auto& r : removed_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r);
+    absl::flat_hash_set<Watch*> interested_in_r = watchesInterestedIn(r);
+    if (auto it = canonical_name_to_aliases_.find(r); it != canonical_name_to_aliases_.end()) {
+      for (const auto& bound_alias : it->second) {
+        const absl::flat_hash_set<Watch*> alias_watches = watchesInterestedIn(bound_alias);
+        interested_in_r.insert(alias_watches.begin(), alias_watches.end());
+      }
+      unbindCanonicalName(r);
+    }
+    unbindAlias(r);
     for (const auto& interested_watch : interested_in_r) {
       *per_watch_removed[interested_watch].Add() = r;
     }
@@ -463,10 +493,42 @@ WatchMap::findRemovals(const absl::flat_hash_set<std::string>& newly_removed_fro
     entry->second.erase(watch);
     if (entry->second.empty()) {
       watch_interest_.erase(entry);
+      unbindAlias(name);
       newly_removed_from_subscription.insert(name);
     }
   }
   return newly_removed_from_subscription;
+}
+
+void WatchMap::bindAlias(absl::string_view alias, absl::string_view canonical_name) {
+  unbindAlias(alias);
+  alias_to_canonical_name_.emplace(alias, canonical_name);
+  canonical_name_to_aliases_[canonical_name].emplace(alias);
+}
+
+void WatchMap::unbindAlias(absl::string_view alias) {
+  auto it = alias_to_canonical_name_.find(alias);
+  if (it == alias_to_canonical_name_.end()) {
+    return;
+  }
+  auto canonical_it = canonical_name_to_aliases_.find(it->second);
+  ASSERT(canonical_it != canonical_name_to_aliases_.end());
+  canonical_it->second.erase(alias);
+  if (canonical_it->second.empty()) {
+    canonical_name_to_aliases_.erase(canonical_it);
+  }
+  alias_to_canonical_name_.erase(it);
+}
+
+void WatchMap::unbindCanonicalName(absl::string_view canonical_name) {
+  auto it = canonical_name_to_aliases_.find(canonical_name);
+  if (it == canonical_name_to_aliases_.end()) {
+    return;
+  }
+  for (const auto& alias : it->second) {
+    alias_to_canonical_name_.erase(alias);
+  }
+  canonical_name_to_aliases_.erase(it);
 }
 
 } // namespace Config

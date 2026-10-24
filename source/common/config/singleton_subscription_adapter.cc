@@ -22,6 +22,10 @@ absl::Status SingletonSubscriptionCallbacksAdapter::onConfigUpdate(
     return absl::InvalidArgumentError(fmt::format(
         "Unexpected multiple resources ({} resources) in singleton SotW update", resources.size()));
   }
+  if (!resources[0].get().hasResource()) {
+    callbacks_.onResourceRemoved();
+    return absl::OkStatus();
+  }
   return callbacks_.onResourceUpdate(resources[0].get(), version_info);
 }
 
@@ -34,6 +38,10 @@ absl::Status SingletonSubscriptionCallbacksAdapter::onConfigUpdate(
       return absl::InvalidArgumentError(fmt::format(
           "Unexpected multiple added resources ({} resources) in singleton Delta update",
           added_resources.size()));
+    }
+    if (!added_resources[0].get().hasResource()) {
+      callbacks_.onResourceRemoved();
+      return absl::OkStatus();
     }
     return callbacks_.onResourceUpdate(added_resources[0].get(), system_version_info);
   }

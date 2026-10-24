@@ -38,6 +38,28 @@ TEST(SingletonSubscriptionAdapterTest, SotWWithResource) {
   EXPECT_TRUE(adapter.onConfigUpdate(resources, "v1").ok());
 }
 
+TEST(SingletonSubscriptionAdapterTest, SotWUnresolvedResource) {
+  MockSingletonSubscriptionCallbacks callbacks;
+  SingletonSubscriptionCallbacksAdapter adapter(callbacks);
+
+  NiceMock<MockOpaqueResourceDecoder> resource_decoder;
+  Protobuf::Arena arena;
+  EXPECT_CALL(resource_decoder, decodeResource(_, _))
+      .WillOnce([](const Protobuf::Any&,
+                   Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
+      });
+  envoy::service::discovery::v3::Resource empty_resource;
+  empty_resource.set_name("my_alias");
+  empty_resource.add_aliases("my_alias");
+  empty_resource.set_version("v1");
+  DecodedResourceImpl decoded_resource(resource_decoder, empty_resource, arena);
+  std::vector<DecodedResourceRef> resources{decoded_resource};
+
+  EXPECT_CALL(callbacks, onResourceRemoved());
+  EXPECT_TRUE(adapter.onConfigUpdate(resources, "v1").ok());
+}
+
 TEST(SingletonSubscriptionAdapterTest, DeltaRemovedResources) {
   MockSingletonSubscriptionCallbacks callbacks;
   SingletonSubscriptionCallbacksAdapter adapter(callbacks);
@@ -61,6 +83,29 @@ TEST(SingletonSubscriptionAdapterTest, DeltaAddedResources) {
 
   EXPECT_CALL(callbacks, onResourceUpdate(Ref(decoded_resource), "v1"))
       .WillOnce(Return(absl::OkStatus()));
+  EXPECT_TRUE(adapter.onConfigUpdate(added_resources, removed_resources, "v1").ok());
+}
+
+TEST(SingletonSubscriptionAdapterTest, DeltaUnresolvedResource) {
+  MockSingletonSubscriptionCallbacks callbacks;
+  SingletonSubscriptionCallbacksAdapter adapter(callbacks);
+
+  NiceMock<MockOpaqueResourceDecoder> resource_decoder;
+  Protobuf::Arena arena;
+  EXPECT_CALL(resource_decoder, decodeResource(_, _))
+      .WillOnce([](const Protobuf::Any&,
+                   Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
+      });
+  envoy::service::discovery::v3::Resource empty_resource;
+  empty_resource.set_name("my_alias");
+  empty_resource.add_aliases("my_alias");
+  empty_resource.set_version("v1");
+  DecodedResourceImpl decoded_resource(resource_decoder, empty_resource, arena);
+  std::vector<DecodedResourceRef> added_resources{decoded_resource};
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+
+  EXPECT_CALL(callbacks, onResourceRemoved());
   EXPECT_TRUE(adapter.onConfigUpdate(added_resources, removed_resources, "v1").ok());
 }
 
