@@ -47,6 +47,7 @@ private:
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) const;
   void handleGoodResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
+  bool removeResourceStateFromServer(absl::string_view resource_name);
 
   class ResourceState {
   public:
