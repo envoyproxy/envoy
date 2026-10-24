@@ -1594,7 +1594,7 @@
     "@@envoy_toolshed+//coverage/grcov:extensions.bzl%grcov_extension": {
       "general": {
         "bzlTransitiveDigest": "QUP/WzigwonW/hjUKRYfJjp0K1WE0xufDbWc7EHFTVc=",
-        "usagesDigest": "L7zPjzZXGqMbUAJrusw80VE/y7LvLr8LmuEbUTpEIxg=",
+        "usagesDigest": "ja9AYZNzLaOUxQrgnJlcMUaBCOpeCA+BNhX6pFJSoHo=",
         "recordedInputs": [
           "REPO_MAPPING:envoy_toolshed+,bazel_tools bazel_tools"
         ],
