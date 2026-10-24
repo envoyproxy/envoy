@@ -505,8 +505,8 @@ ProtobufTypes::MessagePtr TunnelResponseHeadersOrTrailersImpl::serializeAsProto(
   auto proto_out = std::make_unique<envoy::config::core::v3::HeaderMap>();
   value().iterate([&proto_out](const HeaderEntry& e) -> HeaderMap::Iterate {
     auto* new_header = proto_out->add_headers();
-    new_header->set_key(std::string(e.key().getStringView()));
-    new_header->set_value(std::string(e.value().getStringView()));
+    new_header->set_key(e.key().getStringView());
+    new_header->set_value(e.value().getStringView());
     return HeaderMap::Iterate::Continue;
   });
   return proto_out;

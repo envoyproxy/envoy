@@ -1750,7 +1750,7 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   ImmediateResponse invalid_mutation_response;
   invalid_mutation_response.mutable_status()->set_code(
       static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
-  invalid_mutation_response.set_details(std::string(processing_status.message()));
+  invalid_mutation_response.set_details(processing_status.message());
   sendImmediateResponse(invalid_mutation_response);
 }
 

@@ -50,6 +50,7 @@ envoy_cc_library(
         ":filter_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

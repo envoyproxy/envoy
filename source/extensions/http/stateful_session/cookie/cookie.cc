@@ -16,7 +16,7 @@ bool CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
   if (host_changed) {
     // Build proto message
     envoy::Cookie cookie;
-    cookie.set_address(std::string(host_address));
+    cookie.set_address(host_address);
     if (factory_.ttl_ != std::chrono::seconds::zero()) {
       const auto expiry_time = std::chrono::duration_cast<std::chrono::seconds>(
           (time_source_.systemTime() + std::chrono::seconds(factory_.ttl_)).time_since_epoch());

@@ -7,6 +7,8 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/health_checkers/dynamic_modules/health_checker.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
@@ -27,8 +29,8 @@ Upstream::HealthCheckerSharedPtr DynamicModuleHealthCheckerFactory::createCustom
       module_config.name(), module_config.do_not_close(), module_config.load_globally(),
       context.serverFactoryContext(), proto_config.health_checker_name());
   if (!dynamic_module_or_error.ok()) {
-    throw EnvoyException("Failed to load dynamic module: " +
-                         std::string(dynamic_module_or_error.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to load dynamic module: ",
+                                      dynamic_module_or_error.status().message()));
   }
 
   // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
@@ -36,8 +38,8 @@ Upstream::HealthCheckerSharedPtr DynamicModuleHealthCheckerFactory::createCustom
   if (proto_config.has_health_checker_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.health_checker_config());
     if (!config_or_error.ok()) {
-      throw EnvoyException("Failed to parse health checker config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(absl::StrCat("Failed to parse health checker config: ",
+                                        config_or_error.status().message()));
     }
     health_checker_config_str = std::move(config_or_error.value());
   }
@@ -46,8 +48,8 @@ Upstream::HealthCheckerSharedPtr DynamicModuleHealthCheckerFactory::createCustom
       proto_config.health_checker_name(), health_checker_config_str,
       std::move(dynamic_module_or_error.value()));
   if (!module_health_checker_config.ok()) {
-    throw EnvoyException("Failed to create dynamic module health checker config: " +
-                         std::string(module_health_checker_config.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to create dynamic module health checker config: ",
+                                      module_health_checker_config.status().message()));
   }
 
   return std::make_shared<DynamicModuleHealthChecker>(

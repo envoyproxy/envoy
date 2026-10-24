@@ -7,6 +7,8 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -48,8 +50,8 @@ buildFilterFactoryCallback(Extensions::DynamicModules::DynamicModulePtr dynamic_
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, proto_config.filter_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-    return absl::InvalidArgumentError("Failed to create filter config: " +
-                                      std::string(filter_config.status().message()));
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to create filter config: ", filter_config.status().message()));
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
@@ -201,8 +203,8 @@ DynamicModuleConfigFactory::createHttpFilterRouteConfigTyped(
   if (!filter_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, filter_name, Extensions::DynamicModules::PerRouteConfigErrorStat);
-    return absl::InvalidArgumentError("Failed to create pre-route filter config: " +
-                                      std::string(filter_config.status().message()));
+    return absl::InvalidArgumentError(absl::StrCat("Failed to create pre-route filter config: ",
+                                                   filter_config.status().message()));
   }
   return filter_config.value();
 }

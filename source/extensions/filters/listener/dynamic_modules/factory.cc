@@ -8,6 +8,8 @@
 #include "source/extensions/filters/listener/dynamic_modules/filter.h"
 #include "source/extensions/filters/listener/dynamic_modules/filter_config.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -39,8 +41,8 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
       Extensions::DynamicModules::incrementLoadFailure(
           server_context, proto_config.filter_name(),
           Extensions::DynamicModules::ConfigInitErrorStat);
-      throw EnvoyException("Failed to parse filter config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(
+          absl::StrCat("Failed to parse filter config: ", config_or_error.status().message()));
     }
     filter_config_str = std::move(config_or_error.value());
   }
@@ -61,8 +63,8 @@ DynamicModuleListenerFilterConfigFactory::createListenerFilterFactoryFromProto(
     Extensions::DynamicModules::incrementLoadFailure(
         server_context, proto_config.filter_name(),
         Extensions::DynamicModules::ConfigInitErrorStat);
-    throw EnvoyException("Failed to create filter config: " +
-                         std::string(filter_config.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to create filter config: ", filter_config.status().message()));
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.

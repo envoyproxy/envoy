@@ -941,7 +941,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
           factory_.clusterFromProto(cluster, outlier_event_logger_, added_via_api);
 
   if (!new_cluster_pair_or_error.ok()) {
-    return absl::InvalidArgumentError(std::string(new_cluster_pair_or_error.status().message()));
+    return absl::InvalidArgumentError(new_cluster_pair_or_error.status().message());
   }
   auto& new_cluster = new_cluster_pair_or_error->first;
   auto& lb = new_cluster_pair_or_error->second;

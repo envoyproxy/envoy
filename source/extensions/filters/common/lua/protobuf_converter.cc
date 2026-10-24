@@ -150,10 +150,8 @@ void ProtobufConverterUtils::pushLuaTableFromMapField(lua_State* state,
     const auto* entry_reflection = entry->GetReflection();
 
     // Get key and value field descriptors using the standard protobuf map field names
-    const auto* key_field =
-        entry_descriptor->FindFieldByName(std::string(ProtobufMap::KEY_FIELD_NAME));
-    const auto* value_field =
-        entry_descriptor->FindFieldByName(std::string(ProtobufMap::VALUE_FIELD_NAME));
+    const auto* key_field = entry_descriptor->FindFieldByName(ProtobufMap::KEY_FIELD_NAME);
+    const auto* value_field = entry_descriptor->FindFieldByName(ProtobufMap::VALUE_FIELD_NAME);
 
     if (key_field == nullptr || value_field == nullptr) {
       continue; // Skip if this isn't a proper map entry
@@ -251,7 +249,7 @@ int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
   const absl::string_view filter_name = getStringViewFromLuaString(state, 2);
 
   // Look up the typed metadata by filter name
-  const auto it = typed_metadata_map.find(std::string(filter_name));
+  const auto it = typed_metadata_map.find(filter_name);
   if (it == typed_metadata_map.end()) {
     // Return nil if the filter name is not found
     lua_pushnil(state);
@@ -272,7 +270,7 @@ int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
 
   // Get the descriptor pool to find the message type
   const auto* descriptor =
-      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string(type_name));
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type_name);
 
   if (descriptor == nullptr) {
     lua_pushnil(state);

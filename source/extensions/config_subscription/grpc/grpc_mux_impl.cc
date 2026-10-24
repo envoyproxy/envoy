@@ -613,7 +613,7 @@ void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
     api_state.pending_ = true;
     return; // Drop this request; the unpause will enqueue a new one.
   }
-  request_queue_->emplace(std::string(queue_item));
+  request_queue_->emplace(queue_item);
   drainRequests();
 }
 
