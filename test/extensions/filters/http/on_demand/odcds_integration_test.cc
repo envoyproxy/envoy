@@ -342,6 +342,75 @@ public:
     registerTestServerPorts({"http"});
   }
 
+  // Discovers "new_cluster" through ODCDS while the CDS configuration is a SotW file, then
+  // delivers a second SotW CDS update that does not contain "new_cluster".
+  void discoverClusterThenUpdateSotwCds(bool track_sotw_resources) {
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.cds_sotw_track_resources",
+                                      track_sotw_resources ? "true" : "false");
+    addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
+                          OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
+                      "integration", {});
+    // CDS is served from a file, and does not use xDS-TP.
+    CdsHelper cds_helper;
+    auto sotw_cluster = ConfigHelper::buildStaticCluster(
+        "sotw_cluster", 1, Network::Test::getLoopbackAddressString(ipVersion()));
+    cds_helper.setCds({sotw_cluster});
+    config_helper_.addConfigModifier(
+        [&cds_helper](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* cds_config = bootstrap.mutable_dynamic_resources()->mutable_cds_config();
+          cds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+          cds_config->mutable_path_config_source()->set_path(cds_helper.cdsPath());
+        });
+    initialize();
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"Pick-This-Cluster", "new_cluster"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    createXdsConnection();
+    auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    odcds_stream_->startGrpcStream();
+
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"},
+                                             {}, odcds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+        Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
+                                             odcds_stream_.get()));
+
+    waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    verifyResponse(std::move(response), "200", {}, {});
+    EXPECT_EQ(0, test_server_->counter("cluster_manager.cluster_removed")->value());
+
+    // The next SotW CDS update changes "sotw_cluster", and does not mention "new_cluster".
+    sotw_cluster.mutable_connect_timeout()->set_seconds(10);
+    cds_helper.setCds({sotw_cluster});
+    test_server_->waitForCounter("cluster_manager.cds.update_success", testing::Ge(2));
+
+    if (track_sotw_resources) {
+      // The ODCDS cluster is not owned by the SotW CDS subscription, so it is still there and
+      // the next request is handled without another on-demand discovery.
+      EXPECT_EQ(0, test_server_->counter("cluster_manager.cluster_removed")->value());
+      response = codec_client_->makeHeaderOnlyRequest(request_headers);
+      waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+      upstream_request_->encodeHeaders(default_response_headers_, true);
+      ASSERT_TRUE(response->waitForEndStream());
+      verifyResponse(std::move(response), "200", {}, {});
+    } else {
+      // Without tracking, every dynamic cluster missing from the SotW update is removed.
+      test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
+    }
+
+    cleanUpXdsConnection();
+    cleanupUpstreamAndDownstream();
+  }
+
   FakeStreamPtr odcds_stream_;
   std::size_t odcds_upstream_idx_;
   std::size_t new_cluster_upstream_idx_;
@@ -599,6 +668,18 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
 
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
+}
+
+// Tests that a SotW CDS update (here from a file, without xDS-TP) does not remove a cluster that
+// was discovered through ODCDS.
+TEST_P(OdCdsIntegrationTest, SotwCdsUpdateKeepsOnDemandCluster) {
+  discoverClusterThenUpdateSotwCds(true);
+}
+
+// Tests that the previous behavior, removing every dynamic cluster that is missing from a SotW
+// CDS update, is restored by disabling the runtime guard.
+TEST_P(OdCdsIntegrationTest, SotwCdsUpdateRemovesOnDemandClusterWithTrackingDisabled) {
+  discoverClusterThenUpdateSotwCds(false);
 }
 
 // Regression test for on-demand CDS with two DIFFERENT clusters on the same subscription:

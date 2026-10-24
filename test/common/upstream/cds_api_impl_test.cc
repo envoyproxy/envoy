@@ -19,6 +19,7 @@
 #include "test/mocks/upstream/cluster_priority_set.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -40,6 +41,31 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
 protected:
+  // The tests that do not set `support_multi_ads_sources` exercise the legacy removal path, in
+  // which every dynamic cluster missing from a SotW update is removed.
+  CdsApiImplTest() { setSotwTracking(false); }
+
+  void setSotwTracking(bool enabled) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.cds_sotw_track_resources", enabled ? "true" : "false"}});
+  }
+
+  std::vector<Config::DecodedResourceRef>
+  sotwUpdate(const std::string& version, const std::vector<std::string>& cluster_names) {
+    envoy::service::discovery::v3::DiscoveryResponse response;
+    response.set_version_info(version);
+    for (const auto& name : cluster_names) {
+      envoy::config::cluster::v3::Cluster cluster;
+      cluster.set_name(name);
+      std::ignore = response.add_resources()->PackFrom(cluster);
+    }
+    responses_.push_back(
+        std::make_unique<envoy::service::discovery::v3::DiscoveryResponse>(response));
+    decoded_.push_back(std::make_unique<Config::DecodedResourcesWrapper>(
+        TestUtility::decodeResources<envoy::config::cluster::v3::Cluster>(*responses_.back())));
+    return decoded_.back()->refvec_;
+  }
+
   void setup(bool support_multi_ads_sources = false) {
     envoy::config::core::v3::ConfigSource cds_config;
     cds_ = *CdsApiImpl::create(cds_config, nullptr, cm_, *scope_.rootScope(), validation_visitor_,
@@ -82,6 +108,9 @@ protected:
   Config::SubscriptionCallbacks* cds_callbacks_{};
   ReadyWatcher initialized_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  TestScopedRuntime scoped_runtime_;
+  std::vector<std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>> responses_;
+  std::vector<std::unique_ptr<Config::DecodedResourcesWrapper>> decoded_;
 };
 
 // Regression test against only updating versionInfo() if at least one cluster
@@ -470,6 +499,63 @@ resources:
 
   EXPECT_OK(cds_callbacks_->onConfigUpdate(decoded_resources2.refvec_, response2.version_info()));
   EXPECT_EQ("1", cds_->versionInfo());
+}
+
+// Tests that the runtime guard alone enables SotW tracking, without the xDS-TP based config
+// sources, so a cluster added by OD-CDS is not removed by a SotW update.
+TEST_F(CdsApiImplTest, SotwTrackingRuntimeGuardKeepsOnDemandClusters) {
+  InSequence s;
+  setSotwTracking(true);
+  setup(false);
+
+  expectAdd("sotw_cluster_1", "0");
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("0", {"sotw_cluster_1"}), "0"));
+
+  // "od_cluster_1" may exist in the cluster manager, but it is never reported by clusters().
+  expectAdd("sotw_cluster_2", "1");
+  EXPECT_CALL(cm_, clusters()).Times(0);
+  EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
+  EXPECT_CALL(cm_, removeCluster("od_cluster_1", false)).Times(0);
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("1", {"sotw_cluster_2"}), "1"));
+  EXPECT_EQ("1", cds_->versionInfo());
+}
+
+// Tests that with the runtime guard disabled a SotW update still removes every dynamic cluster
+// that is missing from it, including the clusters that were not received through CDS.
+TEST_F(CdsApiImplTest, SotwTrackingRuntimeGuardDisabledRemovesAllMissingClusters) {
+  InSequence s;
+  setup(false);
+
+  expectAdd("sotw_cluster_1", "0");
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("0", {"sotw_cluster_1"}), "0"));
+
+  expectAdd("sotw_cluster_2", "1");
+  EXPECT_CALL(cm_, clusters())
+      .WillOnce(Return(makeClusterInfoMaps({"sotw_cluster_1", "od_cluster_1"})));
+  EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
+  EXPECT_CALL(cm_, removeCluster("od_cluster_1", false));
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("1", {"sotw_cluster_2"}), "1"));
+}
+
+// Tests that the clusters received while the runtime guard was disabled are tracked, so enabling
+// the guard does not leave them behind when a later SotW update no longer contains them.
+TEST_F(CdsApiImplTest, SotwTrackingEnabledAtRuntimeRemovesPreviouslyReceivedClusters) {
+  InSequence s;
+  setup(false);
+
+  expectAdd("sotw_cluster_1", "0");
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("0", {"sotw_cluster_1"}), "0"));
+
+  setSotwTracking(true);
+  expectAdd("sotw_cluster_2", "1");
+  EXPECT_CALL(cm_, clusters()).Times(0);
+  EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
+  EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("1", {"sotw_cluster_2"}), "1"));
 }
 
 } // namespace
