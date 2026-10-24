@@ -108,9 +108,11 @@ public:
   const PendingStream& peek() const override { return *items_.back(); }
   PendingStream& peek() override { return *items_.back(); }
 
-  void pop() override {
+  PendingStream& pop() override {
     ASSERT(!items_.empty());
+    PendingStream& item = *items_.back();
     items_.pop_back();
+    return item;
   }
 
   bool isOverloaded() const override { return items_.size() > 1; }
