@@ -447,9 +447,9 @@ public:
         shadow_writer_(new NiceMock<Router::MockShadowWriter>()) {
     ON_CALL(factory_context_, localInfo()).WillByDefault(ReturnRef(local_info_));
     filter_config_ = std::make_shared<Router::FilterConfig>(
-        factory_context_, pool_.add("fuzz_filter"), *fake_stats_.rootScope(), cm_, runtime_,
-        random_, Router::ShadowWriterPtr{shadow_writer_}, true /*emit_dynamic_stats*/,
-        false /*start_child_span*/, true /*suppress_envoy_headers*/,
+        factory_context_, *fake_stats_.rootScope(), pool_.add("fuzz_filter"),
+        *fake_stats_.rootScope(), cm_, runtime_, random_, Router::ShadowWriterPtr{shadow_writer_},
+        true /*emit_dynamic_stats*/, false /*start_child_span*/, true /*suppress_envoy_headers*/,
         false /*respect_expected_rq_timeout*/, true /*suppress_grpc_request_failure_code_stats*/,
         false /*flush_upstream_log_on_upstream_stream*/,
         false /*reject_connect_request_early_data*/, std::move(strict_headers_to_check),
