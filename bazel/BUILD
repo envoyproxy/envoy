@@ -155,10 +155,28 @@ genrule(
     tools = ["//tools/windows:gen_dynamic_modules_exports"],
 )
 
+# Shared LLVM unwinder for sanitizer builds (see .bazelrc asan notes). cc_import sets
+# the solib rpath and adds the .so to runfiles so it works under RBE.
+cc_import(
+    name = "libunwind_shared",
+    shared_library = select({
+        "@platforms//cpu:x86_64": "@llvm_toolchain_llvm//:lib/x86_64-unknown-linux-gnu/libunwind.so.1",
+        "@platforms//cpu:aarch64": "@llvm_toolchain_llvm//:lib/aarch64-unknown-linux-gnu/libunwind.so.1",
+    }),
+    target_compatible_with = ["@platforms//os:linux"],
+)
+
 cc_library(
     name = "static_stdlib",
     linkopts = select({
+        # Normal clang builds: static LLVM libunwind via -unwindlib=libunwind. Under ASAN the
+        # unwinder must be shared (see .bazelrc); -unwindlib=none keeps the driver from adding one.
+        "//bazel:asan_build": ["-unwindlib=none"],
         "//bazel:linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "//bazel:asan_build": [":libunwind_shared"],
         "//conditions:default": [],
     }),
 )
