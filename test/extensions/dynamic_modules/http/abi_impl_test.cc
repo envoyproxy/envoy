@@ -565,6 +565,15 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithCustomResponseCodeDetails) {
                                                    {test_details.data(), test_details.size()});
 }
 
+// A non-200 reply leaves the gRPC status unset, so a gRPC client gets the mapped status
+// (403 -> PERMISSION_DENIED) rather than OK.
+TEST_F(DynamicModuleHttpFilterTest, SendResponseNon200LeavesGrpcStatusUnset) {
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::Forbidden, Eq(""), _,
+                                                 Eq(std::nullopt), Eq("dynamic_module")));
+  envoy_dynamic_module_callback_http_send_response(filter_.get(), 403, nullptr, 0, {nullptr, 0},
+                                                   {nullptr, 0});
+}
+
 // The streaming-response ABI forwards to the encoder and sets sent_local_reply_. Each test pins the
 // forwarded encoder call, then drives the matching encode hook and asserts it returns Continue
 // without touching the null fixture config, which both proves the suppression and would crash
