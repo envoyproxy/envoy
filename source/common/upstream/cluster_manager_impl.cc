@@ -336,10 +336,10 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
   // single instance here and share it with the async client of every cluster on every worker
   // thread. This must happen on the main thread, before any worker can call httpAsyncClient().
   async_client_router_config_ = std::make_shared<Router::FilterConfig>(
-      context_, http_context_.asyncClientStatPrefix(), *stats_.rootScope(), *this, runtime_,
-      random_, std::make_unique<Router::ShadowWriterImpl>(*this), true, false, false, false, false,
-      false, false, Protobuf::RepeatedPtrField<std::string>{}, time_source_, http_context_,
-      router_context_);
+      context_, *stats_.rootScope(), http_context_.asyncClientStatPrefix(), *stats_.rootScope(),
+      *this, runtime_, random_, std::make_unique<Router::ShadowWriterImpl>(*this), true, false,
+      false, false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}, time_source_,
+      http_context_, router_context_);
 
   if (auto admin = context.admin(); admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(

@@ -44,8 +44,8 @@ enum class LogResult { Yes, No, Undecided };
 
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
-  void setupPolicy(envoy::config::rbac::v3::RBAC::Action action,
-                   std::string rules_stat_prefix = "") {
+  void setupPolicy(envoy::config::rbac::v3::RBAC::Action action, std::string rules_stat_prefix = "",
+                   std::string stats_prefix = "test") {
     envoy::extensions::filters::http::rbac::v3::RBAC config;
 
     envoy::config::rbac::v3::Policy policy;
@@ -69,7 +69,7 @@ public:
     config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
 
     setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
-        config, "test", *stats_store_.rootScope(), context_,
+        config, stats_prefix, *stats_store_.rootScope(), context_,
         ProtobufMessage::getStrictValidationVisitor()));
   }
 
@@ -1651,6 +1651,57 @@ TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataT
                         IsStructString("rules_stat_prefix_enforced_engine_result", "allowed"),
                         IsStructString("rules_stat_prefix_enforced_effective_policy_id",
                                        "enforced_only_policy"))))));
+}
+
+// The rules prefix and the policy name are tags of the stats. The filter's own prefix is empty:
+// the parent's prefix lives in the prefixed scope.
+TEST_F(RoleBasedAccessControlFilterTest, StatsAreTagged) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "rules_prefix_", /*stats_prefix=*/"");
+
+  const Stats::Counter& allowed = config_->stats().allowed_;
+  EXPECT_EQ("rbac.rules_prefix_.allowed", allowed.name());
+  EXPECT_EQ("rbac.allowed", allowed.tagExtractedName());
+  ASSERT_EQ(1U, allowed.tags().size());
+  EXPECT_EQ("envoy.rbac_http_prefix", allowed.tags()[0].name_);
+  EXPECT_EQ("rules_prefix_", allowed.tags()[0].value_);
+
+  const Stats::Counter& shadow_allowed = config_->stats().shadow_allowed_;
+  EXPECT_EQ("rbac.shadow_rules_prefix_.shadow_allowed", shadow_allowed.name());
+  EXPECT_EQ("rbac.shadow_allowed", shadow_allowed.tagExtractedName());
+  ASSERT_EQ(1U, shadow_allowed.tags().size());
+  EXPECT_EQ("envoy.rbac_http_prefix", shadow_allowed.tags()[0].name_);
+  EXPECT_EQ("shadow_rules_prefix_", shadow_allowed.tags()[0].value_);
+
+  config_->stats().incPolicyDenied("foobar");
+  const Stats::CounterSharedPtr policy_denied =
+      TestUtility::findCounter(stats_store_, "rbac.rules_prefix_.policy.foobar.denied");
+  ASSERT_NE(policy_denied, nullptr);
+  EXPECT_EQ("rbac.policy.denied", policy_denied->tagExtractedName());
+  ASSERT_EQ(2U, policy_denied->tags().size());
+  EXPECT_EQ("envoy.rbac_http_prefix", policy_denied->tags()[0].name_);
+  EXPECT_EQ("rules_prefix_", policy_denied->tags()[0].value_);
+  EXPECT_EQ("envoy.rbac_policy_name", policy_denied->tags()[1].name_);
+  EXPECT_EQ("foobar", policy_denied->tags()[1].value_);
+}
+
+// Without a rules prefix the group stats are untagged, and the per-policy stats carry only the
+// policy name tag.
+TEST_F(RoleBasedAccessControlFilterTest, StatsAreTaggedWithoutRulesPrefix) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW, "", /*stats_prefix=*/"");
+
+  const Stats::Counter& allowed = config_->stats().allowed_;
+  EXPECT_EQ("rbac.allowed", allowed.name());
+  EXPECT_EQ("rbac.allowed", allowed.tagExtractedName());
+  EXPECT_TRUE(allowed.tags().empty());
+
+  config_->stats().incPolicyDenied("foobar");
+  const Stats::CounterSharedPtr policy_denied =
+      TestUtility::findCounter(stats_store_, "rbac.policy.foobar.denied");
+  ASSERT_NE(policy_denied, nullptr);
+  EXPECT_EQ("rbac.policy.denied", policy_denied->tagExtractedName());
+  ASSERT_EQ(1U, policy_denied->tags().size());
+  EXPECT_EQ("envoy.rbac_policy_name", policy_denied->tags()[0].name_);
+  EXPECT_EQ("foobar", policy_denied->tags()[0].value_);
 }
 
 } // namespace
