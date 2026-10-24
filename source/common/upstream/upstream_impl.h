@@ -707,6 +707,11 @@ public:
   static PrioritySet::UpdateHostsParams
   partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
 
+  // Moves one host between the healthy, degraded and excluded views after a health change. Falls
+  // back to partitionHosts when the host is not in the set.
+  static PrioritySet::UpdateHostsParams applyHealthTransition(const HostSet& host_set,
+                                                              const HostSharedPtr& host);
+
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                    const HostVector& hosts_removed,
