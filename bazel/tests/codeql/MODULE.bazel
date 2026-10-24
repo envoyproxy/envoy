@@ -15,6 +15,20 @@ bazel_dep(name = "tclap", version = "1.2.5.bcr.1", dev_dependency = True)
 
 bazel_dep(name = "toolchains_llvm", version = "1.9.1.envoy")
 
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
+)
+
 local_path_override(
     module_name = "envoy",
     path = "../../../",

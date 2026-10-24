@@ -1,3 +1,17 @@
 module(
     name = "envoy_build_config",
 )
+
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
+)
