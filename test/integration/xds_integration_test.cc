@@ -499,7 +499,10 @@ public:
     EXPECT_EQ("200", response->headers().getStatusValue());
     if (expect_close) {
       EXPECT_EQ("close", response->headers().getConnectionValue());
-
+      // Honor Connection: close locally so a later remote close cannot interrupt another client's
+      // handshake on the shared dispatcher. Waiting for the server would also let the drain
+      // deadline close other deleted filter chains before their requests are sent.
+      codec_client.close();
     } else {
       EXPECT_EQ(nullptr, response->headers().Connection());
     }
