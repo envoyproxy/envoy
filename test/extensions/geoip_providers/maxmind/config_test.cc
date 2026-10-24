@@ -658,18 +658,17 @@ TEST_F(MaxmindProviderConfigTest, DoesNotShareMissingDbWithStrictConfig) {
   )EOF";
   const std::string missing_db_path = TestEnvironment::temporaryPath("missing-city.mmdb");
   MaxmindProviderConfig permissive_config;
-  TestUtility::loadFromYaml(
-      absl::StrFormat(provider_config_yaml, missing_db_path, "true"), permissive_config);
+  TestUtility::loadFromYaml(absl::StrFormat(provider_config_yaml, missing_db_path, "true"),
+                            permissive_config);
   MaxmindProviderConfig strict_config;
   TestUtility::loadFromYaml(absl::StrFormat(provider_config_yaml, missing_db_path, "false"),
                             strict_config);
 
   MaxmindProviderFactory factory;
-  EXPECT_LOG_CONTAINS(
-      "warning", "Starting without Maxmind database city_db",
-      EXPECT_NE(factory.createGeoipProviderDriver(permissive_config, "maxmind",
-                                                  server_factory_context_),
-                nullptr));
+  EXPECT_LOG_CONTAINS("warning", "Starting without Maxmind database city_db",
+                      EXPECT_NE(factory.createGeoipProviderDriver(permissive_config, "maxmind",
+                                                                  server_factory_context_),
+                                nullptr));
   EXPECT_THROW_WITH_REGEX(
       factory.createGeoipProviderDriver(strict_config, "maxmind", server_factory_context_),
       EnvoyException, "Unable to open Maxmind database file");

@@ -1037,7 +1037,8 @@ TEST_F(GeoipProviderTest, AllowsMissingDatabaseAndLoadsItWhenItAppears) {
 
   TestEnvironment::writeStringToFileForTest(
       missing_db_path,
-      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(default_city_db_path)));
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(default_city_db_path)),
+      true);
   {
     absl::ReaderMutexLock guard(mutex_);
     ASSERT_EQ(1, on_changed_cbs_.size());
