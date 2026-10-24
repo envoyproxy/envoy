@@ -19,6 +19,8 @@ envoy_cc_library(
         "//envoy/event:dispatcher_interface",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:enum_to_int",
