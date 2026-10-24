@@ -50,10 +50,14 @@ jobs:
     name: Running mobile coverage
     uses: ./.github/workflows/_mobile_container_ci.yml
     with:
-      command: >-
-        bazel run --config=ci --config=mobile-rbe --config=mobile-coverage
-        @envoy_toolshed//coverage:run --
+      command: bazel
       args: >-
+        run
+        --config=ci
+        --config=mobile-rbe
+        --config=mobile-coverage
+        @envoy_toolshed//coverage:run
+        --
         --summary-only
         --config=test-coverage
         --validate-target=@envoy_mobile//test:coverage_report.validate
