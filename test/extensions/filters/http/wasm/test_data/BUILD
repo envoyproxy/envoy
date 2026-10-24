@@ -150,19 +150,15 @@ envoy_cc_test_library(
 )
 
 envoy_wasm_cc_binary(
-    name = "test_cpp.wasm",
-    srcs = [
-        "test_async_call_cpp.cc",
-        "test_body_cpp.cc",
-        "test_close_stream_cpp.cc",
-        "test_cpp.cc",
-        "test_grpc_call_cpp.cc",
-        "test_grpc_stream_cpp.cc",
-        "test_panic_cpp.cc",
-        "test_resume_call_cpp.cc",
-        "test_shared_data_cpp.cc",
-        "test_shared_queue_cpp.cc",
-    ],
+    name = "headers_cpp.wasm",
+    srcs = ["test_cpp.cc"],
+    copts = ["-DWASM_TEST_CPP_HEADERS_ONLY=1"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "advanced_cpp.wasm",
+    srcs = ["test_cpp.cc"],
     protobuf = "lite",
     deps = [
         ":test_cc_proto",
@@ -172,6 +168,68 @@ envoy_wasm_cc_binary(
         "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
     ],
+)
+
+envoy_wasm_cc_binary(
+    name = "body_cpp.wasm",
+    srcs = ["test_body_cpp.cc"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "async_call_cpp.wasm",
+    srcs = ["test_async_call_cpp.cc"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "resume_call_cpp.wasm",
+    srcs = ["test_resume_call_cpp.cc"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "close_stream_cpp.wasm",
+    srcs = ["test_close_stream_cpp.cc"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "grpc_call_cpp.wasm",
+    srcs = ["test_grpc_call_cpp.cc"],
+    protobuf = "lite",
+    deps = [
+        ":test_cc_proto",
+        "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
+    ],
+)
+
+envoy_wasm_cc_binary(
+    name = "grpc_stream_cpp.wasm",
+    srcs = ["test_grpc_stream_cpp.cc"],
+    protobuf = "lite",
+    deps = [
+        ":test_cc_proto",
+        "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
+    ],
+)
+
+envoy_wasm_cc_binary(
+    name = "shared_data_cpp.wasm",
+    srcs = ["test_shared_data_cpp.cc"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "shared_queue_cpp.wasm",
+    srcs = ["test_shared_queue_cpp.cc"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "panic_cpp.wasm",
+    srcs = ["test_panic_cpp.cc"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
 )
 
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.

@@ -123,6 +123,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "wasm_runtime_test",
+    srcs = ["wasm_runtime_test.cc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":wasm_runtime",
+    ],
+)
+
+envoy_cc_test(
     name = "context_test",
     srcs = ["context_test.cc"],
     rbe_pool = "linux_x64_small",
