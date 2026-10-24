@@ -148,17 +148,19 @@ logs read it with
           text_format_source:
             inline_string: "%REQ(x-llm-api)%"
 
-The example reads a request header, which is only safe for a header the edge
-strips from client requests: a caller that can set it picks the API its own
-payload is read and validated as.
+Only read headers stripped at the edge, or clients can pick their own validation
+schema.
 
-The filter-level configuration decides what happens on every other route. By
-default those requests are passed through untouched -- not parsed, and not
-offloaded; setting
-:ref:`parse_unconfigured_routes
+Setting this filter state marks a request as an AI endpoint without per-route
+config (for a static default, use :ref:`RouteConfiguration.typed_per_filter_config
+<envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config>`).
+Unlike per-route config, it only buffers non-streaming JSON requests so streams
+and upgrades never stall. Conversely, route-declared endpoints populate this
+object when unset so upstream filter chains can read the client's API.
+
+Other routes pass through untouched unless :ref:`parse_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
-offloads and parses them too, but never fails a request over it -- a payload that
-does not parse is forwarded unchanged.
+is set, which parses them best-effort and forwards unparseable payloads unchanged.
 
 .. code-block:: yaml
 
@@ -537,8 +539,9 @@ When :ref:`response_handling.token_usage
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.token_usage>`
 is configured, 2xx responses with a ``text/event-stream`` or
 ``application/json`` content type are observed as they stream through the
-filter. Inspection is scoped to routes carrying a per-route configuration;
-setting :ref:`include_unconfigured_routes
+filter. Inspection is scoped to routes carrying a per-route configuration and
+to requests whose ``envoy.ai.llm_protocol.request`` filter state object names
+an API; setting :ref:`include_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.include_unconfigured_routes>`
 widens it to every route, for response-only installations whose routes cannot
 be declared (for example a dynamic-forward-proxy cluster). The filter **never stops iteration or modifies the original
