@@ -63,7 +63,8 @@ public:
 
     // Set the mirror policy with cluster header or cluster name.
     config_helper_.addConfigModifier(
-        [=](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        [=, this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
           auto* mirror_policy = hcm.mutable_route_config()
                                     ->mutable_virtual_hosts(0)
@@ -74,6 +75,9 @@ public:
             mirror_policy->set_cluster_header(cluster_header);
           } else {
             mirror_policy->set_cluster(cluster_name);
+          }
+          if (mirror_policy_modifier_ != nullptr) {
+            mirror_policy_modifier_(*mirror_policy);
           }
         });
   }
@@ -193,6 +197,8 @@ typed_config:
   }
 
   const bool streaming_shadow_ = std::get<1>(GetParam());
+  std::function<void(envoy::config::route::v3::RouteAction::RequestMirrorPolicy&)>
+      mirror_policy_modifier_;
   std::optional<int> cluster_with_custom_filter_;
   std::string filter_name_ = "on-local-reply-filter";
   std::unique_ptr<Http::TestRequestHeaderMapImpl> upstream_headers_;
@@ -221,6 +227,60 @@ TEST_P(ShadowPolicyIntegrationTest, Basic) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_cx_total")->value());
 }
 
+TEST_P(ShadowPolicyIntegrationTest, MirrorPolicyStats) {
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("test_mirror");
+  };
+  initialConfigSetup("cluster_1", "");
+  initialize();
+
+  sendRequestAndValidateResponse(1);
+  sendRequestAndValidateResponse(2);
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_success", Eq(2));
+  EXPECT_EQ(2, test_server_->counter("mirror.test_mirror.rq_sampled")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_no_cluster")->value());
+  EXPECT_EQ(2, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_failure")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_cancelled")->value());
+}
+
+TEST_P(ShadowPolicyIntegrationTest, MirrorPolicyStatsNon2xxIsFailure) {
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("test_mirror");
+  };
+  initialConfigSetup("cluster_1", "");
+  initialize();
+  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_[1].get())
+      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+          Http::TestResponseHeaderMapImpl({{":status", "503"}})));
+
+  sendRequestAndValidateResponse(1);
+
+  test_server_->waitForCounter("mirror.test_mirror.rq_failure", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_success")->value());
+}
+
+TEST_P(ShadowPolicyIntegrationTest, MirrorPolicyStatsNoCluster) {
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("test_mirror");
+  };
+  initialConfigSetup("", "mirror_cluster");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  cleanupUpstreamAndDownstream();
+
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_sampled")->value());
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_no_cluster")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_started")->value());
+}
+
 TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
   initialConfigSetup("cluster_1", "");
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -247,6 +307,9 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = false;
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("test_mirror");
+  };
   initialConfigSetup("cluster_1", "");
   initialize();
 
@@ -295,6 +358,10 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithDownstreamReset) {
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_tx_reset")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_tx_reset")->value(), 1);
+  // The mirror body was still streaming when the downstream reset, so the mirror is cancelled.
+  test_server_->waitForCounter("mirror.test_mirror.rq_cancelled", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_failure")->value());
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_rq_completed")->value(), 0);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_rq_completed")->value(), 0);
 }

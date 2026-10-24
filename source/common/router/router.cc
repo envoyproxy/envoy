@@ -883,6 +883,9 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       const auto& policy_ref = *shadow_policy;
       if (FilterUtility::shouldShadow(policy_ref, config_->runtime_, callbacks_->streamId())) {
         active_shadow_policies.push_back(std::cref(policy_ref));
+        if (policy_ref.stats() != nullptr) {
+          policy_ref.stats()->rq_sampled_.inc();
+        }
       }
     }
   }
@@ -937,6 +940,9 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
     const std::optional<absl::string_view> shadow_cluster_name =
         getShadowCluster(shadow_policy, *downstream_headers_);
     if (!shadow_cluster_name.has_value()) {
+      if (shadow_policy.stats() != nullptr) {
+        shadow_policy.stats()->rq_no_cluster_.inc();
+      }
       continue;
     }
     const bool last_policy = (i == num_shadow_policies - 1);
@@ -985,10 +991,11 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
       // without waiting.
       Http::RequestMessagePtr request(new Http::RequestMessageImpl(std::move(shadow_headers)));
       config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
-                                     options);
+                                     options, shadow_policy.stats());
     } else {
       Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
-          std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
+          std::string(shadow_cluster_name.value()), std::move(shadow_headers), options,
+          shadow_policy.stats());
       if (shadow_stream != nullptr) {
         ASSERT(std::find(shadow_streams_.begin(), shadow_streams_.end(), shadow_stream) ==
                shadow_streams_.end());

@@ -92,6 +92,7 @@ envoy_cc_library(
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//envoy/rds:rds_config_interface",
+        "//envoy/stats:stats_macros",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tracing:tracer_interface",
@@ -146,6 +147,7 @@ envoy_cc_library(
     name = "shadow_writer_interface",
     hdrs = ["shadow_writer.h"],
     deps = [
+        ":router_interface",
         "//envoy/http:async_client_interface",
         "//envoy/http:message_interface",
     ],
