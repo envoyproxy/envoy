@@ -1,5 +1,9 @@
+#include <array>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <string>
+#include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/http/filter.h"
@@ -1197,6 +1201,795 @@ TEST_F(FilterManagerTest, DecodeDataFrameLostAfterContinueWithoutGuard) {
 
 TEST_F(FilterManagerTest, DecodeDataFrameNotLostAfterContinueWithAddDecodedData) {
   runAddDecodedDataOnContinueTest(/*forward_data=*/true);
+}
+
+class FilterManagerPerFilterBufferTest : public FilterManagerTest {
+public:
+  using Chunks = std::vector<std::pair<std::string, bool>>;
+
+  struct FilterRecord {
+    std::function<FilterHeadersStatus(bool)> decode_headers = [](bool) {
+      return FilterHeadersStatus::Continue;
+    };
+    std::function<FilterDataStatus(Buffer::Instance&, bool)> decode_data =
+        [](Buffer::Instance&, bool) { return FilterDataStatus::Continue; };
+    std::function<FilterTrailersStatus()> decode_trailers = [] {
+      return FilterTrailersStatus::Continue;
+    };
+    std::function<FilterHeadersStatus(bool)> encode_headers = [](bool) {
+      return FilterHeadersStatus::Continue;
+    };
+    std::function<FilterDataStatus(Buffer::Instance&, bool)> encode_data =
+        [](Buffer::Instance&, bool) { return FilterDataStatus::Continue; };
+    std::function<FilterTrailersStatus()> encode_trailers = [] {
+      return FilterTrailersStatus::Continue;
+    };
+    std::vector<bool> decoded_headers;
+    Chunks decoded_data;
+    int decoded_trailers{};
+    std::vector<bool> encoded_headers;
+    Chunks encoded_data;
+    int encoded_trailers{};
+  };
+
+  void initializeChain(bool per_filter_buffer, bool per_filter_observed_end_stream = true) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.filter_manager_per_filter_buffer",
+          per_filter_buffer ? "true" : "false"},
+         {"envoy.reloadable_features.filter_manager_per_filter_observed_end_stream",
+          per_filter_observed_end_stream ? "true" : "false"}});
+    initialize();
+
+    // The last filter consumes the request body, as the router does.
+    records_[2].decode_data = [](Buffer::Instance& data, bool) {
+      data.drain(data.length());
+      return FilterDataStatus::Continue;
+    };
+    for (size_t i = 0; i < filters_.size(); i++) {
+      filters_[i] = std::make_shared<NiceMock<MockStreamFilter>>();
+      FilterRecord& record = records_[i];
+      ON_CALL(*filters_[i], decodeHeaders(_, _))
+          .WillByDefault(Invoke([&record](RequestHeaderMap&, bool end_stream) {
+            record.decoded_headers.push_back(end_stream);
+            return record.decode_headers(end_stream);
+          }));
+      ON_CALL(*filters_[i], decodeData(_, _))
+          .WillByDefault(Invoke([&record](Buffer::Instance& data, bool end_stream) {
+            record.decoded_data.emplace_back(data.toString(), end_stream);
+            return record.decode_data(data, end_stream);
+          }));
+      ON_CALL(*filters_[i], decodeTrailers(_)).WillByDefault(Invoke([&record](RequestTrailerMap&) {
+        record.decoded_trailers++;
+        return record.decode_trailers();
+      }));
+      ON_CALL(*filters_[i], encodeHeaders(_, _))
+          .WillByDefault(Invoke([&record](ResponseHeaderMap&, bool end_stream) {
+            record.encoded_headers.push_back(end_stream);
+            return record.encode_headers(end_stream);
+          }));
+      ON_CALL(*filters_[i], encodeData(_, _))
+          .WillByDefault(Invoke([&record](Buffer::Instance& data, bool end_stream) {
+            record.encoded_data.emplace_back(data.toString(), end_stream);
+            return record.encode_data(data, end_stream);
+          }));
+      ON_CALL(*filters_[i], encodeTrailers(_)).WillByDefault(Invoke([&record](ResponseTrailerMap&) {
+        record.encoded_trailers++;
+        return record.encode_trailers();
+      }));
+    }
+
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillRepeatedly(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+          // The filter manager keeps a view of the name, so it must outlive the stream.
+          constexpr std::array<absl::string_view, 3> names{"filter0", "filter1", "filter2"};
+          for (size_t i = 0; i < filters_.size(); i++) {
+            callbacks.setFilterConfigName(names[i]);
+            createStreamFilterFactoryCb(filters_[i])(callbacks);
+          }
+          return true;
+        }));
+
+    ON_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef(*request_headers_)));
+    ON_CALL(filter_manager_callbacks_, requestTrailers())
+        .WillByDefault(Invoke([this]() -> RequestTrailerMapOptRef {
+          return makeOptRefFromPtr(request_trailers_.get());
+        }));
+    ON_CALL(filter_manager_callbacks_, setRequestTrailers(_))
+        .WillByDefault(Invoke(
+            [this](RequestTrailerMapPtr&& trailers) { request_trailers_ = std::move(trailers); }));
+    ON_CALL(filter_manager_callbacks_, encodeHeaders(_, _))
+        .WillByDefault(Invoke(
+            [this](ResponseHeaderMap&, bool end_stream) { sent_headers_.push_back(end_stream); }));
+    ON_CALL(filter_manager_callbacks_, encodeData(_, _))
+        .WillByDefault(Invoke([this](Buffer::Instance& data, bool end_stream) {
+          sent_data_.emplace_back(data.toString(), end_stream);
+          data.drain(data.length());
+        }));
+    ON_CALL(filter_manager_callbacks_, encodeTrailers(_))
+        .WillByDefault(Invoke([this](ResponseTrailerMap&) { sent_trailers_++; }));
+
+    filter_manager_->createDownstreamFilterChain();
+    filter_manager_->requestHeadersInitialized();
+  }
+
+  void decodeData(absl::string_view body, bool end_stream) {
+    Buffer::OwnedImpl data(body);
+    filter_manager_->decodeData(data, end_stream);
+  }
+
+  void decodeTrailers() {
+    request_trailers_ = std::make_unique<TestRequestTrailerMapImpl>(
+        TestRequestTrailerMapImpl{{"trailer", "value"}});
+    filter_manager_->decodeTrailers(*request_trailers_);
+  }
+
+  // The response is originated by the last decoder filter, i.e. the first encoder filter.
+  void encodeHeaders(bool end_stream) {
+    filters_[2]->decoder_callbacks_->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        end_stream, "details");
+  }
+
+  void encodeData(absl::string_view body, bool end_stream) {
+    Buffer::OwnedImpl data(body);
+    filters_[2]->decoder_callbacks_->encodeData(data, end_stream);
+  }
+
+  void encodeTrailers() {
+    filters_[2]->decoder_callbacks_->encodeTrailers(std::make_unique<TestResponseTrailerMapImpl>(
+        TestResponseTrailerMapImpl{{"trailer", "value"}}));
+  }
+
+  static std::string concat(const Chunks& chunks) {
+    std::string result;
+    for (const auto& chunk : chunks) {
+      result += chunk.first;
+    }
+    return result;
+  }
+
+  // Request body "aaa" is buffered at filter 1 and the final "bbb" at filter 0.
+  void bufferRequestBodyAtTwoFilters(FilterDataStatus buffer_status) {
+    records_[0].decode_data = [buffer_status](Buffer::Instance&, bool end_stream) {
+      return end_stream ? buffer_status : FilterDataStatus::Continue;
+    };
+    records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+    records_[1].decode_data = [buffer_status](Buffer::Instance&, bool end_stream) {
+      return end_stream ? FilterDataStatus::Continue : buffer_status;
+    };
+
+    filter_manager_->decodeHeaders(*request_headers_, false);
+    decodeData("aaa", false);
+    decodeData("bbb", true);
+  }
+
+  // Response body "aaa" is buffered at filter 1 and the final "bbb" at filter 2, which is the
+  // first encoder filter.
+  void bufferResponseBodyAtTwoFilters() {
+    filter_manager_->decodeHeaders(*request_headers_, true);
+    records_[2].encode_data = [](Buffer::Instance&, bool end_stream) {
+      return end_stream ? FilterDataStatus::StopIterationAndBuffer : FilterDataStatus::Continue;
+    };
+    records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+    records_[1].encode_data = [](Buffer::Instance&, bool end_stream) {
+      return end_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndBuffer;
+    };
+
+    encodeHeaders(false);
+    encodeData("aaa", false);
+    encodeData("bbb", true);
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  std::array<std::shared_ptr<MockStreamFilter>, 3> filters_;
+  std::array<FilterRecord, 3> records_;
+  RequestHeaderMapPtr request_headers_{
+      new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+  RequestTrailerMapPtr request_trailers_;
+  std::vector<bool> sent_headers_;
+  Chunks sent_data_;
+  int sent_trailers_{};
+};
+
+TEST_F(FilterManagerPerFilterBufferTest,
+       RequestBodyBufferedAtDifferentFiltersKeepsOrderAndFilters) {
+  initializeChain(true);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  // Each filter holds only the bytes stopped at its own position.
+  EXPECT_EQ("bbb", filters_[0]->decoder_callbacks_->decodingBuffer()->toString());
+  EXPECT_EQ("aaa", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+
+  // Filter 1 resumes first: the end of stream is still held by filter 0.
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ(std::vector<bool>{false}, records_[2].decoded_headers);
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+
+  // Filter 0 resumes: "bbb" still goes through filter 1 before reaching filter 2.
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}, {"bbb", true}}), records_[1].decoded_data);
+  EXPECT_EQ((Chunks{{"aaa", false}, {"bbb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestBodyBufferedAtDifferentFiltersResumedInOrder) {
+  initializeChain(true);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  // Filter 0 resumes first: "bbb" joins the data buffered at filter 1.
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_TRUE(records_[2].decoded_headers.empty());
+  EXPECT_EQ("aaabbb", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ(std::vector<bool>{false}, records_[2].decoded_headers);
+  EXPECT_EQ((Chunks{{"aaabbb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestBodySharesStreamBufferWhenPerFilterBufferDisabled) {
+  initializeChain(false);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  // Both filters see the single stream-level buffer.
+  EXPECT_EQ("aaabbb", filters_[0]->decoder_callbacks_->decodingBuffer()->toString());
+  EXPECT_EQ("aaabbb", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  // "bbb" bypasses filter 1.
+  EXPECT_EQ("aaa", concat(records_[1].decoded_data));
+  EXPECT_EQ("aaabbb", concat(records_[2].decoded_data));
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, PerFilterBufferRequiresPerFilterObservedEndStream) {
+  initializeChain(true, false);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  EXPECT_EQ("aaabbb", filters_[0]->decoder_callbacks_->decodingBuffer()->toString());
+  EXPECT_EQ("aaabbb", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest,
+       ResponseBodyBufferedAtDifferentFiltersKeepsOrderAndFilters) {
+  initializeChain(true);
+  bufferResponseBodyAtTwoFilters();
+
+  EXPECT_EQ("bbb", filters_[2]->encoder_callbacks_->encodingBuffer()->toString());
+  EXPECT_EQ("aaa", filters_[1]->encoder_callbacks_->encodingBuffer()->toString());
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ(std::vector<bool>{false}, sent_headers_);
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}, {"bbb", true}}), records_[1].encoded_data);
+  EXPECT_EQ((Chunks{{"aaa", false}, {"bbb", true}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest,
+       ResponseBodySharesStreamBufferWhenPerFilterBufferDisabled) {
+  initializeChain(false);
+  bufferResponseBodyAtTwoFilters();
+
+  EXPECT_EQ("aaabbb", filters_[2]->encoder_callbacks_->encodingBuffer()->toString());
+  EXPECT_EQ("aaabbb", filters_[1]->encoder_callbacks_->encodingBuffer()->toString());
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  // "bbb" bypasses filter 1.
+  EXPECT_EQ("aaa", concat(records_[1].encoded_data));
+  EXPECT_EQ("aaabbb", concat(sent_data_));
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersHeldByEarlierFilterAreNotForwardedEarly) {
+  initializeChain(true);
+  records_[0].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+  decodeTrailers();
+
+  // Trailers are held by filter 0, so filter 1 forwards only its data.
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(0, records_[1].decoded_trailers);
+  EXPECT_EQ(0, records_[2].decoded_trailers);
+
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersReachingStoppedFilterAreForwardedOnResume) {
+  initializeChain(true);
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  records_[1].decode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+  decodeTrailers();
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersHeldByEarlierFilterAreNotForwardedEarly) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_trailers = [] { return FilterTrailersStatus::StopIteration; };
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  encodeHeaders(false);
+  encodeData("aaa", false);
+  encodeTrailers();
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+  EXPECT_EQ(0, sent_trailers_);
+
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, BodyAddedByTwoFiltersToHeaderOnlyRequestIsCoalesced) {
+  initializeChain(true);
+  records_[0].decode_headers = [this](bool) {
+    Buffer::OwnedImpl data("aa");
+    filters_[0]->decoder_callbacks_->addDecodedData(data, false);
+    return FilterHeadersStatus::Continue;
+  };
+  records_[1].decode_headers = [this](bool) {
+    Buffer::OwnedImpl data("bb");
+    filters_[1]->decoder_callbacks_->addDecodedData(data, false);
+    return FilterHeadersStatus::Continue;
+  };
+
+  filter_manager_->decodeHeaders(*request_headers_, true);
+
+  EXPECT_EQ((std::vector<bool>{true}), records_[0].decoded_headers);
+  EXPECT_EQ((std::vector<bool>{false}), records_[1].decoded_headers);
+  EXPECT_EQ((std::vector<bool>{false}), records_[2].decoded_headers);
+  EXPECT_TRUE(records_[0].decoded_data.empty());
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[1].decoded_data);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, BodyAddedByTwoFiltersToHeaderOnlyResponseIsCoalesced) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_headers = [this](bool) {
+    Buffer::OwnedImpl data("aa");
+    filters_[2]->encoder_callbacks_->addEncodedData(data, false);
+    return FilterHeadersStatus::Continue;
+  };
+  records_[1].encode_headers = [this](bool) {
+    Buffer::OwnedImpl data("bb");
+    filters_[1]->encoder_callbacks_->addEncodedData(data, false);
+    return FilterHeadersStatus::Continue;
+  };
+
+  encodeHeaders(true);
+
+  EXPECT_EQ((std::vector<bool>{false}), records_[0].encoded_headers);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[1].encoded_data);
+  EXPECT_EQ((Chunks{{"aabb", true}}), records_[0].encoded_data);
+  EXPECT_EQ((std::vector<bool>{false}), sent_headers_);
+  EXPECT_EQ((Chunks{{"aabb", true}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, TakeBufferedRequestDataRestoresStreamOrder) {
+  initializeChain(true);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  Buffer::InstancePtr data = filter_manager_->takeBufferedRequestData();
+  ASSERT_NE(nullptr, data);
+  EXPECT_EQ("aaabbb", data->toString());
+  EXPECT_EQ(0, filters_[0]->decoder_callbacks_->decodingBuffer()->length());
+  EXPECT_EQ(0, filters_[1]->decoder_callbacks_->decodingBuffer()->length());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, TakeBufferedRequestDataFromStreamBuffer) {
+  initializeChain(false);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  Buffer::InstancePtr data = filter_manager_->takeBufferedRequestData();
+  ASSERT_NE(nullptr, data);
+  EXPECT_EQ("aaabbb", data->toString());
+  EXPECT_EQ(0, filters_[1]->decoder_callbacks_->decodingBuffer()->length());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, TakeBufferedRequestDataWithoutBody) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+
+  EXPECT_EQ(nullptr, filter_manager_->takeBufferedRequestData());
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, SetBufferLimitAppliesToTotalOfFilterBuffers) {
+  initializeChain(true);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndWatermark);
+
+  // The two 3-byte buffers cross the new limit together, so the stream is paused once.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, SetBufferLimitAppliesToStreamBuffer) {
+  initializeChain(false);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndWatermark);
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, NewFilterBufferUsesCurrentBufferLimit) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+
+  // Filter 1's buffer is created after the limit change.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndWatermark;
+  };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ModifyDecodingBufferModifiesOnlyOwnBuffer) {
+  initializeChain(true);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  filters_[1]->decoder_callbacks_->modifyDecodingBuffer(
+      [](Buffer::Instance& buffer) { buffer.add("!"); });
+  EXPECT_EQ("aaa!", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+  EXPECT_EQ("bbb", filters_[0]->decoder_callbacks_->decodingBuffer()->toString());
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa!", false}, {"bbb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ModifyEncodingBufferModifiesOnlyOwnBuffer) {
+  initializeChain(true);
+  bufferResponseBodyAtTwoFilters();
+
+  filters_[1]->encoder_callbacks_->modifyEncodingBuffer(
+      [](Buffer::Instance& buffer) { buffer.add("!"); });
+  EXPECT_EQ("aaa!", filters_[1]->encoder_callbacks_->encodingBuffer()->toString());
+  EXPECT_EQ("bbb", filters_[2]->encoder_callbacks_->encodingBuffer()->toString());
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa!", false}, {"bbb", true}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, StopAllBuffersRequestAtStoppedFilter) {
+  initializeChain(true);
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+  decodeData("bbb", true);
+  EXPECT_TRUE(records_[1].decoded_data.empty());
+  EXPECT_EQ(nullptr, filters_[0]->decoder_callbacks_->decodingBuffer());
+  EXPECT_EQ("aaabbb", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaabbb", true}}), records_[1].decoded_data);
+  EXPECT_EQ((Chunks{{"aaabbb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTrailersAddedBeforeStopAllFilterAreForwarded) {
+  initializeChain(true);
+  records_[0].decode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[0]->decoder_callbacks_->addDecodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+  EXPECT_EQ(0, records_[1].decoded_trailers);
+
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), records_[2].decoded_data);
+  EXPECT_EQ(1, records_[1].decoded_trailers);
+  EXPECT_EQ(1, records_[2].decoded_trailers);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersAddedBeforeStoppedFilterAreForwarded) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  EXPECT_EQ(0, sent_trailers_);
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, records_[0].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTrailersAddedBeforeStopAllFilterAreForwarded) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[2].encode_data = [this](Buffer::Instance&, bool end_stream) {
+    if (end_stream) {
+      filters_[2]->encoder_callbacks_->addEncodedTrailers().addCopy(LowerCaseString("added"), "1");
+    }
+    return FilterDataStatus::Continue;
+  };
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopAllIterationAndBuffer; };
+
+  encodeHeaders(false);
+  encodeData("aaa", true);
+  EXPECT_EQ(0, records_[1].encoded_trailers);
+
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}}), sent_data_);
+  EXPECT_EQ(1, records_[1].encoded_trailers);
+  EXPECT_EQ(1, sent_trailers_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTotalAboveLimitRaisesWatermarkWhenStreaming) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+
+  // Neither 3-byte buffer is above the limit, but their total is.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  EXPECT_CALL(filter_manager_callbacks_, onRequestDataTooLarge()).Times(0);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndWatermark);
+
+  // 3 bytes are still above half the limit.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(0);
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa", false}, {"bbb", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTotalAboveLimitSendsPayloadTooLargeWhenBuffering) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+
+  EXPECT_CALL(filter_manager_callbacks_, onRequestDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, MovingBytesBetweenFilterBuffersKeepsWatermarkState) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(4);
+  records_[0].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[0].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndWatermark;
+  };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndWatermark;
+  };
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaaaa", false);
+
+  // The bytes move from filter 0's buffer into filter 1's without toggling the watermark.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark()).Times(0);
+  filters_[0]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ(0, filters_[0]->decoder_callbacks_->decodingBuffer()->length());
+  EXPECT_EQ("aaaaa", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+  testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
+
+  // The last filter drains the bytes.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaaaa", false}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RaisingLimitAboveRequestTotalReleasesWatermark) {
+  initializeChain(true);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndWatermark);
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  filters_[0]->decoder_callbacks_->setBufferLimit(100);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTotalAboveLimitCallsDownstreamWatermarkCallbacks) {
+  initializeChain(true);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  MockDownstreamWatermarkCallbacks watermark_callbacks;
+  filters_[2]->decoder_callbacks_->addDownstreamWatermarkCallbacks(watermark_callbacks);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+  records_[2].encode_data = [](Buffer::Instance&, bool end_stream) {
+    return end_stream ? FilterDataStatus::StopIterationAndWatermark : FilterDataStatus::Continue;
+  };
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].encode_data = [](Buffer::Instance&, bool end_stream) {
+    return end_stream ? FilterDataStatus::Continue : FilterDataStatus::StopIterationAndWatermark;
+  };
+
+  // Neither 3-byte buffer is above the limit, but their total is.
+  EXPECT_CALL(watermark_callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge()).Times(0);
+  encodeHeaders(false);
+  encodeData("aaa", false);
+  encodeData("bbb", true);
+
+  // 3 bytes are still above half the limit.
+  EXPECT_CALL(watermark_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  testing::Mock::VerifyAndClearExpectations(&watermark_callbacks);
+
+  EXPECT_CALL(watermark_callbacks, onBelowWriteBufferLowWatermark());
+  filters_[2]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa", false}, {"bbb", true}}), sent_data_);
+
+  filters_[2]->decoder_callbacks_->removeDownstreamWatermarkCallbacks(watermark_callbacks);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTotalAboveLimitReportsTooLargeWhenBuffering) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
+  bufferResponseBodyAtTwoFilters();
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTooLargeOwnedByFilterThatExceededLimit) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+
+  // Filter 1 buffers first; filter 0 then takes the total over the limit.
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+  validateFilterStateData("filter0");
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTooLargeOwnedByBufferCreatorWithSharedBuffer) {
+  initializeChain(false);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+  validateFilterStateData("filter1");
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTooLargeFromAddedDataOwnedByAddingFilter) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+
+  // Data added outside of any filter callback, e.g. from an async completion.
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  Buffer::OwnedImpl data("aaa");
+  filters_[1]->decoder_callbacks_->addDecodedData(data, false);
+  validateFilterStateData("filter1");
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RequestTooLargeFromLoweredLimitHasNoOwner) {
+  initializeChain(true);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndBuffer);
+
+  EXPECT_CALL(filter_manager_callbacks_, onRequestDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "413"), _));
+  filter_manager_->setBufferLimit(2);
+  EXPECT_FALSE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTooLargeOwnedByFilterThatExceededLimit) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+
+  // Filter 1 buffers first; filter 2 then takes the total over the limit.
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
+  bufferResponseBodyAtTwoFilters();
+  validateFilterStateData("filter2");
+
+  filter_manager_->destroyFilters();
 }
 
 } // namespace

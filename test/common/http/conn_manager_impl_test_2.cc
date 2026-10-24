@@ -1307,7 +1307,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddBodyInline) {
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         Buffer::OwnedImpl data("hello");
         encoder_filters_[1]->callbacks_->addEncodedData(data, true);
-        EXPECT_EQ(5UL, encoder_filters_[0]->callbacks_->encodingBuffer()->length());
+        EXPECT_EQ(5UL, encoder_filters_[1]->callbacks_->encodingBuffer()->length());
         return FilterHeadersStatus::Continue;
       }));
   EXPECT_CALL(*encoder_filters_[1], encodeComplete());
