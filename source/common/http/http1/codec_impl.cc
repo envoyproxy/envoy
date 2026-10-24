@@ -25,6 +25,7 @@
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/websocket/handshake.h"
 
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
@@ -51,6 +52,7 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view ChunkedContentLength = "http1.content_length_and_chunked_not_allowed";
   const absl::string_view HttpsInPlaintext = "http1.https_url_on_plaintext_connection";
   const absl::string_view InvalidScheme = "http1.invalid_scheme";
+  const absl::string_view InvalidWebsocketHandshake = "http1.invalid_websocket_handshake";
 };
 
 struct Http1HeaderTypesValues {
@@ -89,6 +91,12 @@ StatefulHeaderKeyFormatterPtr statefulFormatterFromSettings(const Http::Http1Set
     return settings.stateful_header_key_formatter_->create();
   }
   return nullptr;
+}
+
+bool hasValidWebsocketHandshake(const ResponseHeaderMap& headers, absl::string_view websocket_key) {
+  const auto accept_headers = headers.get(Http::Headers::get().SecWebSocketAccept);
+  return Utility::isWebSocketUpgradeRequest(headers) && accept_headers.size() == 1 &&
+         accept_headers[0]->value().getStringView() == WebSocket::computeAccept(websocket_key);
 }
 
 constexpr size_t CRLF_SIZE = 2;
@@ -142,7 +150,8 @@ void ResponseEncoderImpl::encode1xxHeaders(const ResponseHeaderMap& headers) {
 
 void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& headers,
                                           std::optional<uint64_t> status, bool end_stream,
-                                          bool bodiless_request) {
+                                          bool bodiless_request,
+                                          absl::string_view generated_websocket_key) {
   HeaderKeyFormatterOptConstRef formatter(headers.formatter());
   if (!formatter.has_value()) {
     formatter = connection_.formatter();
@@ -169,6 +178,10 @@ void StreamEncoderImpl::encodeHeadersBase(const RequestOrResponseHeaderMap& head
 
         return HeaderMap::Iterate::Continue;
       });
+
+  if (!generated_websocket_key.empty()) {
+    encodeFormattedHeader(header_values.SecWebSocketKey.get(), generated_websocket_key, formatter);
+  }
 
   if (headers.ContentLength()) {
     saw_content_length = true;
@@ -437,7 +450,7 @@ void ResponseEncoderImpl::encodeHeaders(const ResponseHeaderMap& headers, bool e
     is_response_to_connect_request_ = false;
   }
 
-  encodeHeadersBase(headers, std::make_optional<uint64_t>(numeric_status), end_stream, false);
+  encodeHeadersBase(headers, std::make_optional<uint64_t>(numeric_status), end_stream, false, {});
 }
 
 static constexpr absl::string_view REQUEST_POSTFIX = " HTTP/1.1\r\n";
@@ -474,6 +487,15 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
     // protocol stream. This will likely cause the server to disconnect, since it will be unable to
     // parse the protocol.
     disableChunkEncoding();
+
+    // RFC 6455 requires a Sec-WebSocket-Key on HTTP/1.1 upgrades, but requests may arrive without
+    // one, e.g. when converted from an RFC 8441 extended CONNECT (which has no key).
+    if (Utility::isWebSocketUpgradeRequest(headers) &&
+        headers.get(header_values.SecWebSocketKey).empty() &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http1_synthesize_websocket_key")) {
+      generated_websocket_key_ = WebSocket::generateKey();
+    }
   }
 
   if (connection_.sendFullyQualifiedUrl() && !is_connect) {
@@ -496,7 +518,7 @@ Status RequestEncoderImpl::encodeHeaders(const RequestHeaderMap& headers, bool e
   }
 
   encodeHeadersBase(headers, std::nullopt, end_stream,
-                    HeaderUtility::requestShouldHaveNoBody(headers));
+                    HeaderUtility::requestShouldHaveNoBody(headers), generated_websocket_key_);
   return okStatus();
 }
 
@@ -1520,6 +1542,19 @@ Envoy::StatusOr<CallbackResult> ClientConnectionImpl::onHeadersCompleteBase() {
     auto& headers = absl::get<ResponseHeaderMapPtr>(headers_or_trailers_);
     ENVOY_CONN_LOG(trace, "Client: onHeadersComplete size={}", connection_, headers->size());
     headers->setStatus(enumToInt(parser_->statusCode()));
+
+    const absl::string_view generated_websocket_key =
+        pending_response_.value().encoder_.generatedWebsocketKey();
+    if (!generated_websocket_key.empty() &&
+        parser_->statusCode() == Http::Code::SwitchingProtocols) {
+      if (!hasValidWebsocketHandshake(*headers, generated_websocket_key)) {
+        RETURN_IF_ERROR(
+            sendProtocolError(Http1ResponseCodeDetails::get().InvalidWebsocketHandshake));
+        return codecProtocolError("http/1.1 protocol error: invalid websocket handshake");
+      }
+      // The accept is derived from a key the downstream never sent, so it must not be forwarded.
+      headers->remove(Http::Headers::get().SecWebSocketAccept);
+    }
 
     if (parser_->statusCode() >= Http::Code::OK &&
         parser_->statusCode() < Http::Code::MultipleChoices &&

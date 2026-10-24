@@ -77,6 +77,16 @@ WebSocket Upgrade.
 This same upgrade-``CONNECT``-upgrade transformation will be performed on any
 HTTP/2+ hop, with the documented flaw that the HTTP/1.1 method is always assumed to be ``GET``.
 
+`RFC 8441 <https://www.rfc-editor.org/rfc/rfc8441>`_ replaces the
+`RFC 6455 <https://www.rfc-editor.org/rfc/rfc6455>`_ ``Sec-WebSocket-Key``/``Sec-WebSocket-Accept``
+exchange with the ``:protocol`` pseudo-header. When the HTTP/1.1 codec sends a WebSocket upgrade
+without a ``sec-websocket-key``, as happens when converting an extended ``CONNECT``, it generates one
+and validates the upstream's ``upgrade``, ``connection``, and ``sec-websocket-accept`` response
+headers. Invalid handshakes are treated as upstream protocol errors (a ``502`` for retry and outlier
+detection purposes). The generated key and accept are never visible to filters or the downstream.
+A retry generates a new key. An existing key is preserved without additional validation so that
+upgrade-``CONNECT``-upgrade chains continue to use the original HTTP/1.1 client's key.
+
 Non-WebSocket upgrades are allowed to use any valid HTTP method (i.e. ``POST``) and the current
 upgrade/downgrade mechanism will drop the original method and transform the upgrade request to
 a ``GET`` method on the final Envoy-Upstream hop.

@@ -84,6 +84,7 @@ All http1 details are rooted at *http1.*
    http1.invalid_characters, The headers contained illegal characters.
    http1.invalid_transfer_encoding, The Transfer-Encoding header was not valid.
    http1.invalid_url, The request URL was not valid.
+   http1.invalid_websocket_handshake, A ``101`` response to a WebSocket upgrade for which the codec generated the ``Sec-WebSocket-Key`` did not carry the matching ``Upgrade``, ``Connection`` and ``Sec-WebSocket-Accept`` headers.
    http1.too_many_headers, Too many headers were sent with this request.
    http1.transfer_encoding_not_allowed, A transfer encoding was sent on a response it was disallowed on.
    http1.unexpected_underscore, An underscore was sent in a header key when disallowed by configuration.
