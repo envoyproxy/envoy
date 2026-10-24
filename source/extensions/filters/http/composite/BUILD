@@ -50,6 +50,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        "//envoy/event:dispatcher_interface",
         "//envoy/registry",
         "//envoy/server:filter_config_interface",
         "//source/extensions/filters/http/common:factory_base_lib",
