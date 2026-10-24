@@ -148,6 +148,10 @@ def _windows_llvm_repo(repository_ctx):
     if not objcopy.exists:
         fail("Could not find %s. Set BAZEL_LLVM to the host LLVM installation." % objcopy)
     repository_ctx.symlink(objcopy, "bin/llvm-objcopy.exe")
+    nm = llvm_root.get_child("bin/llvm-nm.exe")
+    if not nm.exists:
+        fail("Could not find %s. Set BAZEL_LLVM to the host LLVM installation." % nm)
+    repository_ctx.symlink(nm, "bin/llvm-nm.exe")
     repository_ctx.file(
         "BUILD.bazel",
         """
@@ -158,6 +162,11 @@ exports_files(["llvm.bzl"])
 alias(
     name = "objcopy",
     actual = "bin/llvm-objcopy.exe",
+)
+
+alias(
+    name = "nm",
+    actual = "bin/llvm-nm.exe",
 )
 """,
     )

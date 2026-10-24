@@ -144,8 +144,15 @@ macro_rules! __export_name_impl {{
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
     .parse_callbacks(Box::new(TrimEnumNameFromVariantName));
 
+  // A dynamic module DLL imports the Envoy callbacks from the Envoy executable. A static module
+  // (non-empty prefix) is linked into the Envoy binary itself, where the callbacks are defined
+  // directly, so the import stubs would collide with those definitions.
   #[cfg(target_os = "windows")]
-  let bindings = bindings.extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]");
+  let bindings = if prefix.is_empty() {
+    bindings.extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]")
+  } else {
+    bindings
+  };
 
   let bindings = bindings.generate().expect("Unable to generate bindings");
 

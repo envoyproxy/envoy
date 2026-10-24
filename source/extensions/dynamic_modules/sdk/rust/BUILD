@@ -1,5 +1,6 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps", "crate_deps")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_library", "rust_static_library", "rust_test")
 load(
@@ -22,6 +23,17 @@ rust_static_library(
     name = "rust_runtime",
     srcs = ["runtime.rs"],
     edition = "2021",
+    visibility = ["//visibility:public"],
+)
+
+# System libraries that the Rust std library needs in the final C++ link, in addition to the ones
+# rules_rust already adds. rules_rust's default MSVC list lacks ntdll, which std uses for file I/O.
+cc_library(
+    name = "rust_runtime_system_libs",
+    linkopts = select({
+        "@platforms//os:windows": ["ntdll.lib"],
+        "//conditions:default": [],
+    }),
     visibility = ["//visibility:public"],
 )
 
