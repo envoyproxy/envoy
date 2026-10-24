@@ -914,7 +914,7 @@ bool McpJsonRestBridgePerRouteConfig::hasEndpoint(absl::string_view host,
 }
 
 Http::FilterHeadersStatus
-McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool) {
+McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, bool end_stream) {
   absl::string_view path = request_headers.getPathValue();
   auto query_idx = path.find('?');
   if (query_idx != absl::string_view::npos) {
@@ -959,6 +959,12 @@ McpJsonRestBridgeFilter::decodeHeaders(Http::RequestHeaderMap& request_headers, 
                                    Http::Headers::get().MethodValues.Post);
         },
         "", json::object(), Grpc::Status::WellKnownGrpcStatus::InvalidArgument);
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  if (end_stream) {
+    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestFailedToParseJsonRpc,
+                      generateErrorJsonResponse(-32700, "JSON parse error").dump());
     return Http::FilterHeadersStatus::StopIteration;
   }
 
