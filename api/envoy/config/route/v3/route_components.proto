@@ -2805,7 +2805,11 @@ message RateLimit {
   // requests based on the action with this field set to true. Users should ensure that the rate limit is enforced by the actions
   // applied on the request path, i.e. the ones with this field set to false.
   //
-  // Currently, this is only supported by the HTTP global rate filter.
+  // Supported by HTTP global and local rate limiting. Local completion updates matching descriptor
+  // buckets, draining over-budget buckets to zero; the default bucket is consumed only on requests.
+  // Local route and virtual-host policy support requires the disabled-by-default runtime guard
+  // ``envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done``.
+  // Embedded ``rate_limits`` do not require a runtime override.
   bool apply_on_stream_done = 6;
 
   // Descriptor level X-RateLimit headers options which may override the filter level setting.

@@ -5,6 +5,8 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 
@@ -95,7 +97,7 @@ response_headers_to_add:
 enable_retry_after_header: true
 )";
 
-class FilterTest : public testing::Test {
+class FilterTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   FilterTest() = default;
 
@@ -139,6 +141,19 @@ public:
   }
   void setup(const std::string& yaml, const bool enabled = true, const bool enforced = true) {
     setupPerRoute(yaml, enabled, enforced);
+  }
+
+  void expectRemaining(uint64_t remaining) {
+    ASSERT_NE(nullptr, filter_->token_bucket_context_);
+    EXPECT_EQ(remaining, filter_->token_bucket_context_->remainingTokens());
+  }
+
+  void expectRemainingAfterRequest(absl::Span<const RateLimit::Descriptor> descriptors,
+                                   uint64_t remaining) {
+    const auto result = filter_->requestAllowed(descriptors);
+    EXPECT_TRUE(result.allowed);
+    ASSERT_NE(nullptr, result.token_bucket_context);
+    EXPECT_EQ(remaining, result.token_bucket_context->remainingTokens());
   }
 
   uint64_t findCounter(const std::string& name) {
@@ -1089,6 +1104,29 @@ TEST_F(DescriptorFilterTest, UseInlinedRateLimitConfig) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
 
+TEST_F(DescriptorFilterTest, InlinedRequestOnlyActionsSkipCompletionWork) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done", "true"}});
+  setUpTest(fmt::format(inlined_descriptor_config_yaml, 2, 1, "60s"));
+  EXPECT_TRUE(config_->hasRateLimitConfigs());
+  EXPECT_FALSE(config_->hasStreamDoneActions());
+  Http::TestRequestHeaderMapImpl headers{{"x-header-name", "test_value"}};
+  EXPECT_CALL(decoder_callbacks_, routeSharedPtr()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  expectRemaining(1);
+
+  // Completion skips stream info lookup and route-policy traversal.
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(_))
+      .Times(0);
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(_))
+      .Times(0);
+  filter_->onDestroy();
+  expectRemaining(1);
+}
+
 TEST_F(DescriptorFilterTest, UseInlinedRateLimitConfigWithCustomHitsAddend) {
   setUpTest(
       fmt::format(inlined_descriptor_config_yaml_with_custom_hits_addend, 119, 119, "60s", false));
@@ -1247,6 +1285,355 @@ TEST_F(FilterTest, RequestRateLimitedWithoutRetryAfterHeaderForNon429Status) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_2_->decodeHeaders(request_headers, false));
+}
+
+TEST_F(FilterTest, StreamDoneWithoutDescriptorsDoesNotConsumeDefaultBucket) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done", "true"}});
+  setup(fmt::format(config_yaml, "false", "2", "false", "\"OFF\"", "false", "429"));
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  filter_->onDestroy();
+  expectRemaining(1);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->decodeHeaders(headers, true));
+  filter_2_->onDestroy();
+  expectRemaining(0);
+}
+
+class StreamDoneFilterTest : public FilterTest, public testing::WithParamInterface<bool> {
+public:
+  void setupStreamDone(const std::string& format = "%RESP(x-cost)%", bool enabled = true,
+                       bool refund = false) {
+    envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
+    TestUtility::loadFromYaml(fmt::format(inlined_descriptor_config_yaml, 6, 1, "1000s"), config);
+    config.mutable_token_bucket()->set_max_tokens(2);
+    config.set_local_rate_limit_per_downstream_connection(GetParam());
+    config.mutable_rate_limits()->Clear();
+    auto* request_limit = config.add_rate_limits();
+    auto* action = request_limit->add_actions()->mutable_generic_key();
+    action->set_descriptor_key("foo2");
+    action->set_descriptor_value("bar2");
+    auto* completion_limit = config.add_rate_limits();
+    *completion_limit = *request_limit;
+    completion_limit->set_apply_on_stream_done(true);
+    completion_limit->mutable_hits_addend()->set_format(format);
+    completion_limit->mutable_hits_addend()->set_is_negative_hits(refund);
+    setup(MessageUtil::getJsonStringFromMessageOrError(config), enabled);
+  }
+
+  void checkRuntimeChange(bool initially_enabled) {
+    runtime_.mergeValues(
+        {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done",
+          initially_enabled ? "true" : "false"}});
+    setupStreamDone("%BYTES_SENT%");
+    Http::TestRequestHeaderMapImpl headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    decoder_callbacks_.stream_info_.bytes_sent_ = 2;
+    runtime_.mergeValues(
+        {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done",
+          initially_enabled ? "false" : "true"}});
+    filter_->onDestroy();
+    expectRemaining(3);
+
+    // Embedded completion accounting is independent of the route-policy guard on every stream.
+    Filter next_filter(config_);
+    next_filter.setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, next_filter.decodeHeaders(headers, true));
+    next_filter.onDestroy();
+    expectRemaining(0);
+  }
+
+  TestScopedRuntime runtime_;
+};
+
+INSTANTIATE_TEST_SUITE_P(PerConnection, StreamDoneFilterTest, testing::Bool());
+
+TEST_P(StreamDoneFilterTest, DisablingRouteRuntimeDoesNotAffectEmbeddedAccounting) {
+  checkRuntimeChange(true);
+}
+
+TEST_P(StreamDoneFilterTest, EnablingRouteRuntimeDoesNotAffectEmbeddedAccounting) {
+  checkRuntimeChange(false);
+}
+
+TEST_P(StreamDoneFilterTest, ChargesResponseUsageAtCompletion) {
+  setupStreamDone();
+  EXPECT_TRUE(config_->hasStreamDoneActions());
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"x-cost", "5"}};
+  EXPECT_CALL(decoder_callbacks_, routeSharedPtr());
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  // Encoding the response has not charged completion usage.
+  expectRemaining(5);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  filter_->onDestroy();
+  expectRemaining(0);
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enforced"));
+
+  // The next stream enforces the updated process or connection budget.
+  auto next_filter = std::make_shared<Filter>(config_);
+  next_filter->setDecoderFilterCallbacks(decoder_callbacks_);
+  testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            next_filter->decodeHeaders(request_headers, true));
+}
+
+TEST_P(StreamDoneFilterTest, CompletionUsesPerRouteConfig) {
+  setupStreamDone();
+  auto per_route_config = config_;
+  setup(fmt::format(config_yaml, "false", "100", "false", "\"OFF\"", "false", "429"));
+  EXPECT_CALL(decoder_callbacks_, mostSpecificPerFilterConfig())
+      .WillOnce(Return(per_route_config.get()));
+  EXPECT_CALL(decoder_callbacks_, routeSharedPtr());
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "5"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  filter_->onDestroy();
+  expectRemaining(0);
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
+}
+
+TEST_P(StreamDoneFilterTest, CompletionCanRefundUsage) {
+  setupStreamDone("%RESP(x-cost)%", true, true);
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "2"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  expectRemaining(5);
+  filter_->onDestroy();
+  expectRemaining(6);
+}
+
+TEST_P(StreamDoneFilterTest, UsesFinalStreamInfoWithoutResponseHeaders) {
+  setupStreamDone("%BYTES_SENT%");
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  decoder_callbacks_.stream_info_.bytes_sent_ = 4;
+  filter_->onDestroy();
+  expectRemaining(1);
+}
+
+TEST_P(StreamDoneFilterTest, ChargesStreamInfoUsageForLocallyRateLimitedRequest) {
+  setupStreamDone("%BYTES_SENT%");
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  filter_->onDestroy();
+
+  Filter second_filter(config_);
+  second_filter.setDecoderFilterCallbacks(decoder_callbacks_);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            second_filter.decodeHeaders(request_headers, true));
+  second_filter.onDestroy();
+
+  // The default bucket is empty; descriptor tokens remain. Reuse callbacks so all three streams
+  // share the connection bucket too.
+  filter_2_->setDecoderFilterCallbacks(decoder_callbacks_);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_2_->decodeHeaders(request_headers, true));
+  expectRemaining(3);
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "429"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_2_->encodeHeaders(response_headers, true));
+  decoder_callbacks_.stream_info_.bytes_sent_ = 2;
+  filter_2_->onDestroy();
+  // Like global rate limiting, completion charges local-response usage.
+  expectRemaining(1);
+  EXPECT_EQ(2U, findCounter("test.http_local_rate_limit.ok"));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.enforced"));
+}
+
+TEST_P(StreamDoneFilterTest, InvalidResponseCostDoesNotChargeAgain) {
+  setupStreamDone();
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "invalid"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  filter_->onDestroy();
+  expectRemaining(5);
+  if (!GetParam()) {
+    EXPECT_TRUE(config_->requestAllowed({}).allowed);
+    EXPECT_FALSE(config_->requestAllowed({}).allowed);
+  }
+}
+
+TEST_P(StreamDoneFilterTest, MissingResponseCostDoesNotChargeAgain) {
+  setupStreamDone();
+  Http::TestRequestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_LOG_NOT_CONTAINS("warning", "Invalid hits_addend", filter_->onDestroy());
+  expectRemaining(5);
+}
+
+TEST_P(StreamDoneFilterTest, EmptyCompletionUsageDoesNotSkipLaterPolicy) {
+  envoy::extensions::filters::http::local_ratelimit::v3::LocalRateLimit config;
+  TestUtility::loadFromYaml(fmt::format(inlined_descriptor_config_yaml, 6, 1, "1000s"), config);
+  config.set_local_rate_limit_per_downstream_connection(GetParam());
+  config.clear_rate_limits();
+  for (const auto* format : {"%RESP(x-empty-cost)%", "%RESP(x-cost)%"}) {
+    auto* policy = config.add_rate_limits();
+    auto* action = policy->add_actions()->mutable_generic_key();
+    action->set_descriptor_key("foo2");
+    action->set_descriptor_value("bar2");
+    policy->set_apply_on_stream_done(true);
+    policy->mutable_hits_addend()->set_format(format);
+  }
+  setup(MessageUtil::getJsonStringFromMessageOrError(config));
+
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers{{"x-empty-cost", ""}, {"x-cost", "3"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  EXPECT_LOG_NOT_CONTAINS("warning", "Invalid hits_addend", filter_->onDestroy());
+
+  // The valid policy charges three tokens; a one-token request leaves two.
+  RateLimit::Descriptor descriptor;
+  descriptor.entries_ = {{"foo2", "bar2"}};
+  expectRemainingAfterRequest({&descriptor, 1}, 2);
+}
+
+TEST_P(StreamDoneFilterTest, DisabledOrNotDecodedDoesNotAccount) {
+  setupStreamDone();
+  filter_->onDestroy();
+  setupStreamDone("%RESP(x-cost)%", false);
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, routeSharedPtr()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  filter_->onDestroy();
+  EXPECT_EQ(0U, findCounter("test.http_local_rate_limit.enabled"));
+}
+
+class StreamDoneRouteRuntimeTest : public DescriptorFilterTest,
+                                   public testing::WithParamInterface<bool> {
+public:
+  void checkRouteBehavior(bool completion_enabled) {
+    TestScopedRuntime runtime;
+    if (completion_enabled) {
+      runtime.mergeValues(
+          {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done",
+            "true"}});
+    }
+    // With no override, existing routes retain request-path enforcement.
+    setUpTest(fmt::format(descriptor_vh_config_yaml, "5", "DRAFT_VERSION_03", "1", "0", "INCLUDE"));
+    auto& policy = GetParam() ? vh_rate_limit_ : route_rate_limit_;
+    auto& other_policy = GetParam() ? route_rate_limit_ : vh_rate_limit_;
+    other_policy.disable_key_ = "disabled";
+    ON_CALL(policy, applyOnStreamDone()).WillByDefault(Return(true));
+    EXPECT_CALL(policy, populateDescriptors(_, _, _, _))
+        .Times(completion_enabled ? 0 : 1)
+        .WillRepeatedly(testing::SetArgReferee<0>(descriptor_));
+    EXPECT_CALL(decoder_callbacks_, routeSharedPtr());
+    Http::TestRequestHeaderMapImpl headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+    testing::Mock::VerifyAndClearExpectations(&policy);
+
+    // A runtime change must neither move the charge nor apply it twice.
+    runtime.mergeValues(
+        {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done",
+          completion_enabled ? "false" : "true"}});
+    EXPECT_CALL(policy, populateDescriptors(_, _, _, _))
+        .Times(completion_enabled ? 1 : 0)
+        .WillRepeatedly(testing::SetArgReferee<0>(descriptor_));
+    filter_->onDestroy();
+    testing::Mock::VerifyAndClearExpectations(&policy);
+
+    // This filter was constructed before the update but reads the guard when decoding headers.
+    filter_2_->setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_CALL(policy, populateDescriptors(_, _, _, _))
+        .Times(completion_enabled ? 1 : 0)
+        .WillRepeatedly(testing::SetArgReferee<0>(descriptor_));
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
+        .Times(completion_enabled ? 1 : 0);
+    EXPECT_EQ(completion_enabled ? Http::FilterHeadersStatus::StopIteration
+                                 : Http::FilterHeadersStatus::Continue,
+              filter_2_->decodeHeaders(headers, true));
+    testing::Mock::VerifyAndClearExpectations(&policy);
+    EXPECT_CALL(policy, populateDescriptors(_, _, _, _))
+        .Times(completion_enabled ? 0 : 1)
+        .WillRepeatedly(testing::SetArgReferee<0>(descriptor_));
+    filter_2_->onDestroy();
+    testing::Mock::VerifyAndClearExpectations(&policy);
+    testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+    // Completion exhausted the descriptor; a request-path action must now reject.
+    ON_CALL(policy, applyOnStreamDone()).WillByDefault(Return(false));
+    EXPECT_CALL(policy, populateDescriptors(_, _, _, _))
+        .WillOnce(testing::SetArgReferee<0>(descriptor_));
+    Filter probe(config_);
+    probe.setDecoderFilterCallbacks(decoder_callbacks_);
+    EXPECT_CALL(decoder_callbacks_, routeSharedPtr()).Times(0);
+    EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, probe.decodeHeaders(headers, true));
+    Http::TestResponseHeaderMapImpl response_headers;
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, probe.encodeHeaders(response_headers, true));
+    EXPECT_EQ("1", response_headers.get_("x-ratelimit-limit"));
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(VirtualHost, StreamDoneRouteRuntimeTest, testing::Bool());
+
+TEST_P(StreamDoneRouteRuntimeTest, DefaultRuntimePreservesRequestEnforcement) {
+  checkRouteBehavior(false);
+}
+
+TEST_P(StreamDoneRouteRuntimeTest, EnabledRuntimeAccountsAtCompletion) { checkRouteBehavior(true); }
+
+TEST_P(StreamDoneRouteRuntimeTest, RequestOnlyPoliciesSkipCompletionWork) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done", "true"}});
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "5", "DRAFT_VERSION_03", "5", "0", "INCLUDE"));
+  auto& policy = GetParam() ? vh_rate_limit_ : route_rate_limit_;
+  auto& disabled_policy = GetParam() ? route_rate_limit_ : vh_rate_limit_;
+  disabled_policy.disable_key_ = "disabled";
+  ON_CALL(disabled_policy, applyOnStreamDone()).WillByDefault(Return(true));
+  ON_CALL(policy, applyOnStreamDone()).WillByDefault(Return(false));
+  EXPECT_CALL(policy, populateDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(decoder_callbacks_, routeSharedPtr()).Times(0);
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  expectRemaining(4);
+
+  // Disabled completion entries must not trigger a second policy traversal.
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(_))
+      .Times(0);
+  EXPECT_CALL(decoder_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(_))
+      .Times(0);
+  EXPECT_CALL(decoder_callbacks_.route_->route_entry_, includeVirtualHostRateLimits()).Times(0);
+  filter_->onDestroy();
+  expectRemaining(4);
+}
+
+TEST_F(DescriptorFilterTest, RouteAndVirtualHostStreamDoneActions) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues(
+      {{"envoy.reloadable_features.local_rate_limit_route_policy_apply_on_stream_done", "true"}});
+  setUpTest(fmt::format(descriptor_vh_config_yaml, "5", "\"OFF\"", "5", "0", "INCLUDE"));
+  EXPECT_CALL(route_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
+  EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  testing::Mock::VerifyAndClearExpectations(&route_rate_limit_);
+  testing::Mock::VerifyAndClearExpectations(&vh_rate_limit_);
+  EXPECT_CALL(route_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
+  EXPECT_CALL(vh_rate_limit_, applyOnStreamDone()).WillRepeatedly(Return(true));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(testing::SetArgReferee<0>(descriptor_));
+  // Completion retains the request's route across cache changes.
+  decoder_callbacks_.route_.reset();
+  filter_->onDestroy();
 }
 
 } // namespace LocalRateLimitFilter

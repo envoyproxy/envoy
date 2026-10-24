@@ -32,6 +32,7 @@ envoy_cc_test(
         "//test/mocks/ratelimit:ratelimit_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
