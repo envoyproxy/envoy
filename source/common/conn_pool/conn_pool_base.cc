@@ -99,6 +99,9 @@ PendingStreamPtr ConnPoolImplBase::popPendingStream() {
   pending_stream_queue_->pop();
   PendingStreamPtr pending_stream = stream.removeFromList(pending_streams_);
   ASSERT(pending_streams_.size() == pending_stream_queue_->size());
+  if (!hasPendingStreams()) {
+    connection_capacity_cb_.reset();
+  }
   return pending_stream;
 }
 
@@ -106,6 +109,9 @@ PendingStreamPtr ConnPoolImplBase::removePendingStream(PendingStream& stream) {
   pending_stream_queue_->remove(stream);
   PendingStreamPtr pending_stream = stream.removeFromList(pending_streams_);
   ASSERT(pending_streams_.size() == pending_stream_queue_->size());
+  if (!hasPendingStreams()) {
+    connection_capacity_cb_.reset();
+  }
   return pending_stream;
 }
 
@@ -140,6 +146,7 @@ void ConnPoolImplBase::deleteIsPendingImpl() {
 }
 
 void ConnPoolImplBase::destructAllConnections() {
+  connection_capacity_cb_.reset();
   for (auto* list : {&ready_clients_, &busy_clients_, &connecting_clients_, &early_data_clients_}) {
     while (!list->empty()) {
       list->front()->close();
@@ -246,6 +253,25 @@ ConnPoolImplBase::ConnectionResult ConnPoolImplBase::tryCreateNewConnections() {
   }
   ASSERT(!is_draining_for_deletion_ || result != ConnectionResult::CreatedNewConnection,
          dumpState());
+  if (result == ConnectionResult::NoConnectionRateLimited &&
+      pendingStreamCount() > connecting_stream_capacity_ && !is_draining_for_deletion_ &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.conn_pool_wakeup_on_connection_release")) {
+    if (!connection_capacity_cb_) {
+      connection_capacity_cb_ =
+          host_->cluster().resourceManager(priority_).addConnectionCapacityCallback(
+              dispatcher_, [this]() {
+                if (Runtime::runtimeFeatureEnabled(
+                        "envoy.reloadable_features.conn_pool_wakeup_on_connection_release")) {
+                  onUpstreamReady();
+                } else {
+                  connection_capacity_cb_.reset();
+                }
+              });
+    }
+  } else {
+    connection_capacity_cb_.reset();
+  }
   return result;
 }
 
@@ -573,6 +599,7 @@ void ConnPoolImplBase::drainClients(std::list<ActiveClientPtr>& clients) {
 void ConnPoolImplBase::drainConnectionsImpl(DrainBehavior drain_behavior) {
   if (drain_behavior == Envoy::ConnectionPool::DrainBehavior::DrainAndDelete) {
     is_draining_for_deletion_ = true;
+    connection_capacity_cb_.reset();
     checkForIdleAndCloseIdleConnsIfDraining();
     return;
   }

@@ -83,6 +83,7 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
   ON_CALL(cb_dispatcher, post(_)).WillByDefault(Invoke([](Event::PostCb cb) { cb(); }));
 
   auto manager = ThreadSafeCallbackManager::create();
+  EXPECT_EQ(0, manager->size());
 
   auto handle1 = manager->add(cb_dispatcher, [this]() {
     called(5);
@@ -92,12 +93,14 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
     called(10);
     return absl::OkStatus();
   });
+  EXPECT_EQ(2, manager->size());
 
   EXPECT_CALL(*this, called(5));
   EXPECT_CALL(*this, called(10));
   manager->runCallbacks();
 
   handle1.reset();
+  EXPECT_EQ(1, manager->size());
   EXPECT_CALL(*this, called(10));
   manager->runCallbacks();
 
@@ -109,9 +112,12 @@ TEST_F(ThreadSafeCallbackManagerTest, All) {
   });
   manager->runCallbacks();
   handle3.reset();
+  EXPECT_EQ(1, manager->size());
 
   EXPECT_CALL(*this, called(10));
   manager->runCallbacks();
+  handle2.reset();
+  EXPECT_EQ(0, manager->size());
 }
 
 // Validate that the handles returned from callback-registration can outlive the manager
@@ -166,6 +172,78 @@ TEST_F(ThreadSafeCallbackManagerTest, RegisterAndRemoveOnExpiredThread) {
   t.join();
   EXPECT_CALL(*this, called(10));
   manager->runCallbacks();
+}
+
+TEST_F(ThreadSafeCallbackManagerTest, CoalescesPendingCallbacks) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  std::vector<Event::PostCb> posted;
+  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  }));
+  auto manager = ThreadSafeCallbackManager::create();
+  unsigned calls = 0;
+  auto handle = manager->add(dispatcher, [&]() { ++calls; });
+
+  std::thread notifier([&]() {
+    for (unsigned i = 0; i < 100; ++i) {
+      manager->runCallbacks(/*coalesce=*/true);
+    }
+  });
+  notifier.join();
+  EXPECT_EQ(0, calls);
+  ASSERT_EQ(1, posted.size());
+  posted.front()();
+  posted.clear();
+  EXPECT_EQ(1, calls);
+
+  manager->runCallbacks(/*coalesce=*/true);
+  ASSERT_EQ(1, posted.size());
+  handle.reset();
+  posted.front()();
+  EXPECT_EQ(1, calls);
+}
+
+TEST_F(ThreadSafeCallbackManagerTest, NotificationDuringCoalescedCallbackIsNotLost) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  std::vector<Event::PostCb> posted;
+  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  }));
+  auto manager = ThreadSafeCallbackManager::create();
+  unsigned calls = 0;
+  auto handle = manager->add(dispatcher, [&]() {
+    if (++calls == 1) {
+      manager->runCallbacks(/*coalesce=*/true);
+    }
+  });
+
+  manager->runCallbacks(/*coalesce=*/true);
+  ASSERT_EQ(1, posted.size());
+  auto first = std::move(posted.front());
+  posted.clear();
+  first();
+  ASSERT_EQ(1, posted.size());
+  posted.front()();
+  EXPECT_EQ(2, calls);
+}
+
+TEST_F(ThreadSafeCallbackManagerTest, DoesNotCoalesceByDefault) {
+  testing::NiceMock<Event::MockDispatcher> dispatcher;
+  std::vector<Event::PostCb> posted;
+  ON_CALL(dispatcher, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) {
+    posted.push_back(std::move(cb));
+  }));
+  auto manager = ThreadSafeCallbackManager::create();
+  unsigned calls = 0;
+  auto handle = manager->add(dispatcher, [&]() { ++calls; });
+
+  manager->runCallbacks();
+  manager->runCallbacks();
+  ASSERT_EQ(2, posted.size());
+  for (auto& cb : posted) {
+    cb();
+  }
+  EXPECT_EQ(2, calls);
 }
 
 } // namespace Common

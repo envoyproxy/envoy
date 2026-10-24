@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/callback.h"
 #include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
@@ -421,6 +422,7 @@ private:
   bool deferred_deleting_{false};
 
   Event::SchedulableCallbackPtr upstream_ready_cb_;
+  Common::CallbackHandlePtr connection_capacity_cb_;
   Common::DebugRecursionChecker recursion_checker_;
   Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
 

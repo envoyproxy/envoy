@@ -238,11 +238,20 @@ class TcpConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing
 public:
   TcpConnPoolImplTest()
       : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")) {}
+        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")) {
+    // Capacity notifications must not run inline while a connection is being closed.
+    ON_CALL(dispatcher_, post(_)).WillByDefault([this](Event::PostCb cb) {
+      posted_callbacks_.push_back(std::move(cb));
+    });
+  }
 
   ~TcpConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()))
         << TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges());
+    conn_pool_.reset();
+    for (auto& cb : posted_callbacks_) {
+      cb();
+    }
   }
 
   void initialize() {
@@ -261,6 +270,7 @@ public:
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::unique_ptr<ConnPoolBase> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
+  std::vector<Event::PostCb> posted_callbacks_;
 };
 
 /**

@@ -141,7 +141,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resource_manager_interface",
     hdrs = ["resource_manager.h"],
-    deps = ["//envoy/common:resource_interface"],
+    deps = [
+        "//envoy/common:callback",
+        "//envoy/common:resource_interface",
+    ],
 )
 
 envoy_cc_library(
