@@ -44,6 +44,7 @@ RUNTIME_GUARD(envoy_reloadable_features_conn_pool_fix_reentrancy);
 RUNTIME_GUARD(envoy_reloadable_features_conn_pool_grid_early_return_on_teardown);
 RUNTIME_GUARD(envoy_reloadable_features_connectivity_grid_prevent_double_h2_scheduled);
 RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
+RUNTIME_GUARD(envoy_reloadable_features_default_client_tls_max_version_is_1_3);
 // When enabled, which is the default, the dynamic forward proxy cluster replaces a host with a
 // new host instance when DNS resolution changes its address, publishing the change as a regular
 // priority set update (old host removed, new host added) so that connection pools to the stale

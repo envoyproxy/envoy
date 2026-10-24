@@ -17,6 +17,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -341,10 +342,17 @@ protected:
     auto connect_second_time = [&]() {
       ENVOY_LOG_MISC(debug, "connect count: {}", connect_count);
       if (++connect_count == 2) {
-        // By default, the session is not created with session resumption. The
-        // client should see a session ID but the server should not.
-        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
-        EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+        // By default, the session is not created with session resumption. With TLS 1.2, the client
+        // sees a session ID but the server doesn't. TLS 1.3 has no session ID on the client. A TLS
+        // 1.3 server has no session ID with BoringSSL, but OpenSSL creates one when it sends a
+        // ticket.
+        if (client_connection->ssl()->tlsVersion() == "TLSv1.3") {
+          EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->sessionId());
+          EXPECT_EQ(SSL_SELECT(true, false), server_connection->ssl()->sessionId().empty());
+        } else {
+          EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+          EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+        }
 
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
