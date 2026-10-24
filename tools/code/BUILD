@@ -88,7 +88,13 @@ genrule(
         PATH,
         " ".join(CODE_CHECKS),
     ),
-    tags = ["no-remote-exec"],
+    # The check reads the source tree outside of its declared inputs and
+    # `|| :` turns any failure into a successful action, so a broken run must
+    # not be shared through the remote cache.
+    tags = [
+        "no-remote-cache",
+        "no-remote-exec",
+    ],
     tools = [
         ":check",
         ":extensions_build_config",
