@@ -395,6 +395,14 @@ TEST_F(RedisConnPoolImplTest, Basic) {
 TEST_F(RedisConnPoolImplTest, ShardSize) {
   InSequence s;
 
+  // The Redis cluster load balancer interprets the shard index and returns nullptr past the last
+  // shard, so shardSize() walks the slot space until that happens.
+  envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .WillOnce(Return(
+          makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
+
   setup();
 
   Common::Redis::RespValueSharedPtr value = std::make_shared<Common::Redis::RespValue>();
@@ -407,7 +415,6 @@ TEST_F(RedisConnPoolImplTest, ShardSize) {
           Invoke([&](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
             EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
             EXPECT_EQ(context->downstreamConnection(), nullptr);
-            std::cout << (context->computeHashKey().value()) << std::endl;
             if (context->computeHashKey() < shard_size) {
               return cm_.thread_local_cluster_.lb_.host_;
             }
@@ -424,6 +431,43 @@ TEST_F(RedisConnPoolImplTest, ShardSize) {
   }
 
   delete client;
+  tls_.shutdownThread();
+};
+
+// A generic (non-Redis-cluster) load balancer ignores the shard index, so shardSize() must report
+// the number of healthy hosts without probing the load balancer once per slot.
+TEST_F(RedisConnPoolImplTest, ShardSizeGenericLoadBalancer) {
+  InSequence s;
+
+  setup();
+
+  auto& host_set = *cm_.thread_local_cluster_.cluster_.prioritySet().getMockHostSet(0);
+  std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> mock_hosts;
+  for (uint16_t i = 0; i < 3; i++) {
+    mock_hosts.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
+    host_set.hosts_.push_back(mock_hosts.back());
+    host_set.healthy_hosts_.push_back(mock_hosts.back());
+  }
+
+  // The load balancer must not be consulted at all on this path.
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).Times(0);
+
+  EXPECT_EQ(conn_pool_->shardSize(), 3);
+
+  tls_.shutdownThread();
+};
+
+// With no healthy hosts, shardSize() returns 0, which callers translate into a "no upstream host"
+// error response.
+TEST_F(RedisConnPoolImplTest, ShardSizeGenericLoadBalancerNoHealthyHosts) {
+  InSequence s;
+
+  setup();
+
+  EXPECT_CALL(cm_.thread_local_cluster_.lb_, chooseHost(_)).Times(0);
+
+  EXPECT_EQ(conn_pool_->shardSize(), 0);
+
   tls_.shutdownThread();
 };
 
@@ -482,8 +526,16 @@ TEST_F(RedisConnPoolImplTest, ShardNoHost) {
   tls_.shutdownThread();
 };
 
+// A Redis cluster load balancer that never returns nullptr is still bounded by MaxSlot, and
+// duplicate hosts are counted once.
 TEST_F(RedisConnPoolImplTest, ShardSizeDuplicateHosts) {
   InSequence s;
+
+  envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
+  cluster_type.set_name("envoy.clusters.redis");
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
+      .WillOnce(Return(
+          makeOptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType>(cluster_type)));
 
   setup();
 
