@@ -215,7 +215,7 @@ protected:
   // Wire up TLS so extension_->getLocalRegistry() returns a real registry,
   // then swap in mock histograms for recording verification.
   void setupTLSWithMockHistograms() {
-    tls_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    tls_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *extension_);
     auto tls_slot = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
     thread_local_.setDispatcher(&dispatcher_);
     tls_slot->set([registry = tls_registry_](Event::Dispatcher&) { return registry; });

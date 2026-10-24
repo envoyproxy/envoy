@@ -64,8 +64,7 @@ protected:
     ASSERT_NE(registered_acceptor, nullptr);
     registered_acceptor->extension_ = extension_.get();
 
-    thread_local_registry_ =
-        std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *extension_);
     socket_manager_ = thread_local_registry_->socketManager();
     ASSERT_NE(socket_manager_, nullptr);
 
