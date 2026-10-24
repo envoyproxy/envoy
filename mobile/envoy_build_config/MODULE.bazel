@@ -7,6 +7,20 @@ bazel_dep(name = "envoy", version = "1.41.0-dev")
 bazel_dep(name = "envoy_mobile", version = "1.41.0-dev")
 bazel_dep(name = "platforms", version = "1.1.0")
 
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "94e3d6c7f85227d8473398ee12e25a2ecb1e3d7a",
+    remote = "https://github.com/envoyproxy/toolshed",
+    strip_prefix = "jq",
+)
+
 local_path_override(
     module_name = "envoy",
     path = "../..",

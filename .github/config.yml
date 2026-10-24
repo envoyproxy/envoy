@@ -289,8 +289,8 @@ run:
     - .github/config.yml
     - bazel/external/quiche.BUILD
     - mobile/.bazelrc
-    - mobile/**/*
     - test/run_envoy_bazel_coverage.sh
+    - mobile/**/*
     - tools/code_format/check_format.py
     - tools/coverage/**/*
   mobile-format:
