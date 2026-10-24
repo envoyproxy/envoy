@@ -378,6 +378,72 @@ TEST_F(TranscoderFilterTest, TwoInstanceDecodeChainTranscodesToIrAppliesAiFilter
   EXPECT_EQ(counterValue("transcoded"), 2);
 }
 
+// A request bound for Anthropic leaves with the API's own path and version header, from its
+// binding, with no route config saying so.
+TEST_F(TranscoderFilterTest, FromIrToAnthropicSetsThePathAndTheVersionHeader) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, R"({
+    "model": "claude-sonnet-4-5", "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hello!"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/messages");
+  EXPECT_EQ(request_headers_.get_("anthropic-version"), "2023-06-01");
+  EXPECT_EQ(forwarded()["model"], "claude-sonnet-4-5");
+  EXPECT_EQ(counterValue("transcoded"), 1);
+}
+
+// A version the request already carries is kept: the client may ask for a newer API.
+TEST_F(TranscoderFilterTest, FromIrToAnthropicKeepsAVersionHeaderTheRequestHas) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
+  request_headers_ = Http::TestRequestHeaderMapImpl{
+      {":method", "POST"}, {":path", "/v1/chat/completions"}, {"anthropic-version", "2025-01-01"}};
+  std::vector<AiFilterSharedPtr> filters;
+  filters.push_back(std::make_shared<TranscoderFilter>(
+      makeConfig(TranscoderProto::FROM_IR), makeContext(LLMProtocol::OpenAiChatCompletions)));
+  runDecodeChain(std::move(filters), R"({
+    "model": "claude-sonnet-4-5", "max_completion_tokens": 16,
+    "messages": [{"role": "user", "content": "Hello!"}]
+  })");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.get_("anthropic-version"), "2025-01-01");
+}
+
+// The header an Anthropic client sends is the provider's: it goes back out to Anthropic as the
+// client sent it, and not at all to a backend of another API. Two tests, as each needs a fresh
+// stream: the transcoder records what it read once per stream.
+class ClientBindingHeaderTest : public TranscoderFilterTest {
+public:
+  void runBothLegs(LLMProtocol target) {
+    target_protocol_ = target;
+    request_headers_ = Http::TestRequestHeaderMapImpl{
+        {":method", "POST"}, {":path", "/v1/messages"}, {"anthropic-version", "2024-01-01"}};
+    const AiFilterContext context = makeContext(LLMProtocol::AnthropicMessages);
+    runDecodeChain(
+        {std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::TO_IR), context),
+         std::make_shared<TranscoderFilter>(makeConfig(TranscoderProto::FROM_IR), context)},
+        R"({"model": "claude-sonnet-4-5", "max_tokens": 16,)"
+        R"( "messages": [{"role": "user", "content": "Hi"}]})");
+    ASSERT_TRUE(status_.ok()) << status_;
+  }
+};
+
+TEST_F(ClientBindingHeaderTest, GoesBackOutToTheSameApiAsSent) {
+  runBothLegs(LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/messages");
+  EXPECT_EQ(request_headers_.get_("anthropic-version"), "2024-01-01");
+  EXPECT_EQ(forwarded()["model"], "claude-sonnet-4-5");
+}
+
+TEST_F(ClientBindingHeaderTest, DoesNotReachAnotherApi) {
+  runBothLegs(LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1beta/models/claude-sonnet-4-5:generateContent");
+  EXPECT_TRUE(request_headers_.get_("anthropic-version").empty());
+}
+
 // Bidirectional unary response transcoding. The response chain runs in reverse, so a Gemini
 // backend's response is converted to the IR by `backend_boundary_filter` (`response_handling:
 // TO_IR`), passes `mid_filter`, and is converted to Anthropic Messages for the client by

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 
+#include <iterator>
 #include <utility>
 
 #include "source/common/protobuf/protobuf.h"
@@ -19,6 +20,38 @@ namespace {
 
 constexpr absl::string_view ModelField = "model";
 constexpr absl::string_view StreamField = "stream";
+
+// Checks whether an HTTP header name is a protected protocol/framing header that binding mutations
+// are not allowed to modify or remove.
+bool isReservedHeader(absl::string_view name) {
+  return absl::StartsWith(name, ":") || name == "host" || name == "content-length" ||
+         name == "transfer-encoding";
+}
+
+// Validates that a header mutation is well-formed by checking three rules:
+// - Not a reserved header: Rejects pseudo-headers (`:*`), `host`, `content-length`, and
+//   `transfer-encoding` via `isReservedHeader`.
+// - Lowercase without whitespace: Rejects header names containing uppercase letters or spaces.
+// - String value (if set): If `value` is provided (rather than unset/null to remove the header),
+//   verifies that the value is a string.
+absl::Status validateHeaderMutation(const LlmBinding::Mutation& mutation) {
+  if (isReservedHeader(mutation.header)) {
+    return absl::InvalidArgumentError(
+        absl::StrCat("a binding mutation cannot write the `", mutation.header, "` header"));
+  }
+  for (const char c : mutation.header) {
+    if (absl::ascii_isupper(c) || absl::ascii_isspace(c)) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "a binding mutation names the header `", mutation.header, "`, which must be lower-case"));
+    }
+  }
+  if (mutation.value.has_value() && !mutation.value->is_string()) {
+    return absl::InvalidArgumentError(absl::StrCat("a binding mutation writes the `",
+                                                   mutation.header,
+                                                   "` header with a value that is not a string"));
+  }
+  return absl::OkStatus();
+}
 
 // `value` as JSON; nullopt for a null, which removes the field as an unset value does.
 absl::StatusOr<std::optional<nlohmann::json>> toJson(const Protobuf::Value& value) {
@@ -72,7 +105,7 @@ const LlmBinding& editsOf(const LlmBinding& binding, const LlmBinding* api_bindi
 
 std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& binding,
                                           const LlmBinding* api_binding, absl::string_view path,
-                                          nlohmann::json& body) {
+                                          nlohmann::json& body, const HeaderLookup& header) {
   LlmBindingRead read{binding};
   const LlmBinding& edits = editsOf(*binding, api_binding);
   if (const UriPattern* pattern = patternOf(*binding, api_binding); pattern != nullptr) {
@@ -97,18 +130,27 @@ std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& bindin
     read.model = std::move(match->model);
     read.path_variables = std::move(match->variables);
   }
-  if (body.is_object()) {
-    for (const LlmBinding::Mutation& mutation : edits.mutations()) {
-      if (!mutation.value.has_value()) {
-        continue;
-      }
-      const auto field = body.find(mutation.body_field);
-      if (field == body.end()) {
-        continue;
-      }
-      read.written_fields.emplace(mutation.body_field, std::move(*field));
-      body.erase(field);
+  // Strip provider-specific body fields and record provider-specific headers for removal by the
+  // caller so they do not leak when routing to a different provider.
+  for (const LlmBinding::Mutation& mutation : edits.mutations()) {
+    if (!mutation.value.has_value()) {
+      continue;
     }
+    if (mutation.isHeader()) {
+      if (std::optional<std::string> sent = header(mutation.header); sent.has_value()) {
+        read.written_headers.emplace(mutation.header, *std::move(sent));
+      }
+      continue;
+    }
+    if (!body.is_object()) {
+      continue;
+    }
+    const auto field = body.find(mutation.body_field);
+    if (field == body.end()) {
+      continue;
+    }
+    read.written_fields.emplace(mutation.body_field, std::move(*field));
+    body.erase(field);
   }
   return read;
 }
@@ -118,7 +160,7 @@ std::optional<LlmBindingRead> readRequest(const LlmBindingConstSharedPtr& bindin
 LlmBinding::LlmBinding(std::optional<UriPattern>&& pattern, std::vector<Mutation>&& mutations)
     : pattern_(std::move(pattern)), mutations_(std::move(mutations)) {
   for (const Mutation& mutation : mutations_) {
-    if (!mutation.value.has_value()) {
+    if (!mutation.value.has_value() && !mutation.isHeader()) {
       removes_model_ |= mutation.body_field == ModelField;
       removes_stream_ |= mutation.body_field == StreamField;
     }
@@ -138,10 +180,20 @@ LlmBinding::create(const envoy::type::ai::v3::LLMBinding& proto) {
   std::vector<Mutation> mutations;
   mutations.reserve(proto.mutations_size());
   for (const envoy::type::ai::v3::LLMBinding::Mutation& mutation : proto.mutations()) {
-    if (mutation.body_field().empty()) {
-      return absl::InvalidArgumentError("a binding mutation names no body field");
+    Mutation converted;
+    switch (mutation.target_case()) {
+    case envoy::type::ai::v3::LLMBinding::Mutation::kBodyField:
+      converted.body_field = mutation.body_field();
+      break;
+    case envoy::type::ai::v3::LLMBinding::Mutation::kHeader:
+      converted.header = mutation.header();
+      break;
+    case envoy::type::ai::v3::LLMBinding::Mutation::TARGET_NOT_SET:
+      break;
     }
-    Mutation converted{mutation.body_field()};
+    if (converted.body_field.empty() && converted.header.empty()) {
+      return absl::InvalidArgumentError("a binding mutation names no body field or header");
+    }
     if (mutation.has_value()) {
       absl::StatusOr<std::optional<nlohmann::json>> value = toJson(mutation.value());
       if (!value.ok()) {
@@ -150,6 +202,11 @@ LlmBinding::create(const envoy::type::ai::v3::LLMBinding& proto) {
       converted.value = *std::move(value);
     }
     converted.keep_existing = mutation.keep_existing();
+    if (converted.isHeader()) {
+      if (const absl::Status status = validateHeaderMutation(converted); !status.ok()) {
+        return status;
+      }
+    }
     mutations.push_back(std::move(converted));
   }
   return std::make_shared<const LlmBinding>(std::move(pattern), std::move(mutations));
@@ -177,18 +234,19 @@ absl::StatusOr<LlmBindingConstSharedPtr> LlmBinding::parse(absl::string_view tex
 std::optional<LlmBindingRead>
 readClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSharedPtr& api_binding,
                absl::Span<const LlmBindingConstSharedPtr> client_bindings, absl::string_view path,
-               nlohmann::json& body) {
+               nlohmann::json& body, const HeaderLookup& header) {
   if (binding != nullptr) {
-    return readRequest(binding, api_binding.get(), path, body);
+    return readRequest(binding, api_binding.get(), path, body, header);
   }
   if (api_binding != nullptr) {
-    if (std::optional<LlmBindingRead> read = readRequest(api_binding, nullptr, path, body);
+    if (std::optional<LlmBindingRead> read = readRequest(api_binding, nullptr, path, body, header);
         read.has_value()) {
       return read;
     }
   }
   for (const LlmBindingConstSharedPtr& client_binding : client_bindings) {
-    if (std::optional<LlmBindingRead> read = readRequest(client_binding, nullptr, path, body);
+    if (std::optional<LlmBindingRead> read =
+            readRequest(client_binding, nullptr, path, body, header);
         read.has_value()) {
       return read;
     }
@@ -196,10 +254,10 @@ readClientPath(const LlmBindingConstSharedPtr& binding, const LlmBindingConstSha
   return std::nullopt;
 }
 
-absl::StatusOr<std::optional<std::string>> writeRequest(const LlmBinding& binding,
-                                                        const LlmBinding* api_binding,
-                                                        const LlmBindingRead* arrived,
-                                                        nlohmann::json& body, bool& unresolved) {
+absl::StatusOr<std::optional<std::string>>
+writeRequest(const LlmBinding& binding, const LlmBinding* api_binding,
+             const LlmBindingRead* arrived, nlohmann::json& body, const HeaderLookup& header,
+             std::vector<HeaderMutation>& headers, bool& unresolved) {
   unresolved = false;
   // `{model}` reads the body as rendered, before any mutation removes it.
   std::optional<std::string> model;
@@ -239,15 +297,38 @@ absl::StatusOr<std::optional<std::string>> writeRequest(const LlmBinding& bindin
     }
     path = *std::move(rendered);
   }
-  if (!body.is_object()) {
-    return path;
-  }
 
   // The filter hands back the arrived binding itself when the request leaves in it.
   const bool same_binding = arrived != nullptr && arrived->binding.get() == &binding;
-  // Each mutation is decided before its placeholders are filled: one that keeps an existing field
-  // or restores the client's value needs none.
+  // Stage header edits locally so `headers` remains untouched if a mutation fails mid-loop.
+  std::vector<HeaderMutation> header_edits;
   for (const LlmBinding::Mutation& mutation : editsOf(binding, api_binding).mutations()) {
+    if (mutation.isHeader()) {
+      if (!mutation.value.has_value()) {
+        header_edits.push_back({mutation.header, std::nullopt});
+        continue;
+      }
+      if (mutation.keep_existing && header(mutation.header).has_value()) {
+        continue;
+      }
+      if (same_binding) {
+        if (const auto written = arrived->written_headers.find(mutation.header);
+            written != arrived->written_headers.end()) {
+          header_edits.push_back({mutation.header, written->second});
+          continue;
+        }
+      }
+      absl::StatusOr<std::string> filled =
+          fillPlaceholders(mutation.value->get_ref<const std::string&>(), value);
+      if (!filled.ok()) {
+        return filled.status();
+      }
+      header_edits.push_back({mutation.header, *std::move(filled)});
+      continue;
+    }
+    if (!body.is_object()) {
+      continue;
+    }
     if (!mutation.value.has_value()) {
       body.erase(mutation.body_field);
       continue;
@@ -273,6 +354,8 @@ absl::StatusOr<std::optional<std::string>> writeRequest(const LlmBinding& bindin
     }
     body[mutation.body_field] = *std::move(filled);
   }
+  headers.insert(headers.end(), std::make_move_iterator(header_edits.begin()),
+                 std::make_move_iterator(header_edits.end()));
   return path;
 }
 

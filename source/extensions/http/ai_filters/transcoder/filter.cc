@@ -28,6 +28,7 @@ using HttpFilters::AiProtocolManager::AiResponseStreamReceiver;
 using HttpFilters::AiProtocolManager::BindingUse;
 using HttpFilters::AiProtocolManager::FieldPathSegment;
 using HttpFilters::AiProtocolManager::FlattenJsonField;
+using HttpFilters::AiProtocolManager::HeaderMutation;
 using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
 using HttpFilters::AiProtocolManager::LlmBindingObject;
 using HttpFilters::AiProtocolManager::LlmBindingRead;
@@ -328,6 +329,14 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
   // upstream would reject fails here rather than over the network.
   TranscodeContext ctx;
   ctx.request_path = request_headers_.getPathValue();
+  // The engine reads no headers itself; the first value of a header is the one a binding sees.
+  ctx.request_header = [this](absl::string_view name) -> std::optional<std::string> {
+    const Http::HeaderMap::GetResult values = request_headers_.get(Http::LowerCaseString(name));
+    if (values.empty()) {
+      return std::nullopt;
+    }
+    return std::string(values[0]->value().getStringView());
+  };
   ctx.request_binding = instructions.request_binding;
   ctx.arrived = LlmBindingReadObject::fromFilterState(*filter_state_);
   if (instructions.response_binding != nullptr) {
@@ -360,6 +369,16 @@ absl::Status TranscoderFilter::transcodeRequest(nlohmann::json& json,
       !ctx.ir_model.empty() ? std::move(ctx.ir_model) : modelFromPath(instructions.request_binding);
   if (ctx.rewritten_path.has_value()) {
     request_headers_.setPath(*ctx.rewritten_path);
+  }
+  // The binding's header edits, applied here because the engine owns no headers: the headers
+  // themselves are held back until the AI filters finish, so these reach the upstream.
+  for (const HeaderMutation& mutation : ctx.header_mutations) {
+    const Http::LowerCaseString name(mutation.name);
+    if (mutation.value.has_value()) {
+      request_headers_.setCopy(name, *mutation.value);
+    } else {
+      request_headers_.remove(name);
+    }
   }
   return absl::OkStatus();
 }
