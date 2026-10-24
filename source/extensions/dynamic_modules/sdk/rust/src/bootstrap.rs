@@ -280,8 +280,8 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// [`BootstrapExtensionConfig::on_secret_add_or_update`] and
   /// [`BootstrapExtensionConfig::on_secret_removal`] callbacks when dynamic TLS certificate secrets
   /// become active, are rotated, or are removed. SDS secrets are independent xDS resources, so
-  /// these fire even when no cluster or listener is re-pushed. Secrets already active at enable time
-  /// are replayed immediately.
+  /// these fire even when no cluster or listener is re-pushed. Secrets already active at enable
+  /// time are replayed immediately.
   ///
   /// This must be called on the main thread, typically during or after `on_server_initialized`,
   /// since the SecretManager is not available until that point.
