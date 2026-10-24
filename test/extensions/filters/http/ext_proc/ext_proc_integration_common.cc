@@ -1143,6 +1143,42 @@ void ExtProcIntegrationTest::initializeLogConfig(std::string& access_log_path) {
   });
 }
 
+void ExtProcIntegrationTest::initializeDownstreamPushbackConfig(
+    envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode,
+    bool send_headers, bool send_trailers) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+
+  config_helper_.setBufferLimits(1024, 1024);
+  auto* processing_mode = proto_config_.mutable_processing_mode();
+  processing_mode->set_request_header_mode(ProcessingMode::SKIP);
+  processing_mode->set_response_header_mode(send_headers ? ProcessingMode::SEND
+                                                         : ProcessingMode::SKIP);
+  processing_mode->set_response_body_mode(body_mode);
+  processing_mode->set_response_trailer_mode(send_trailers ? ProcessingMode::SEND
+                                                           : ProcessingMode::SKIP);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+}
+
+void ExtProcIntegrationTest::verifyUpstreamAndSidestreamFlowControlPaused(
+    bool expect_sidestream_paused) {
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               testing::Ge(1));
+
+  if (expect_sidestream_paused) {
+    test_server_->waitForCounter(
+        "cluster.ext_proc_server_0.upstream_flow_control_paused_reading_total", testing::Ge(1));
+  } else {
+    EXPECT_EQ(test_server_
+                  ->counter("cluster.ext_proc_server_0.upstream_flow_control_"
+                            "paused_reading_total")
+                  ->value(),
+              0);
+  }
+}
+
 void ExtProcIntegrationTest::performStandAloneModeOverrideNormal(
     envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode initial_body_mode,
     bool delay_header_response) {

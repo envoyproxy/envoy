@@ -279,6 +279,8 @@ public:
   MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
   MOCK_METHOD(void, addUpstreamWatermarkCallbacks, (UpstreamWatermarkCallbacks&));
   MOCK_METHOD(void, removeUpstreamWatermarkCallbacks, (UpstreamWatermarkCallbacks&));
+  MOCK_METHOD(void, addEncoderFilterWatermarkCallbacks, (EncoderFilterWatermarkCallbacks&));
+  MOCK_METHOD(void, removeEncoderFilterWatermarkCallbacks, (EncoderFilterWatermarkCallbacks&));
   MOCK_METHOD(void, setBufferLimit, (uint64_t));
   MOCK_METHOD(uint64_t, bufferLimit, ());
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
@@ -347,6 +349,7 @@ public:
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_;
+  std::list<EncoderFilterWatermarkCallbacks*> encoder_filter_callbacks_;
   testing::NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
@@ -617,6 +620,12 @@ public:
 };
 
 class MockUpstreamWatermarkCallbacks : public UpstreamWatermarkCallbacks {
+public:
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockEncoderFilterWatermarkCallbacks : public EncoderFilterWatermarkCallbacks {
 public:
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());

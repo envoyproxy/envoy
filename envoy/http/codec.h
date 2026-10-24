@@ -745,6 +745,25 @@ public:
 };
 
 /**
+ * Callbacks for encoder filter watermark limits, originating from encoder filters
+ * buffering response data from upstream.
+ */
+class EncoderFilterWatermarkCallbacks {
+public:
+  virtual ~EncoderFilterWatermarkCallbacks() = default;
+
+  /**
+   * Called when an encoder filter goes over its high watermark buffering upstream response data.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when an encoder filter goes from over its high watermark to under its low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
+};
+
+/**
  * Callbacks for server connections.
  */
 class ServerConnectionCallbacks : public virtual ConnectionCallbacks {

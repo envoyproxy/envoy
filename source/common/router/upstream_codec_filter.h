@@ -29,11 +29,12 @@ namespace Router {
 class UpstreamCodecFilter : public Http::StreamDecoderFilter,
                             public Logger::Loggable<Logger::Id::router>,
                             public Http::DownstreamWatermarkCallbacks,
+                            public Http::EncoderFilterWatermarkCallbacks,
                             public Http::UpstreamCallbacks {
 public:
   UpstreamCodecFilter() : bridge_(*this), deferred_reset_status_(absl::OkStatus()) {}
 
-  // Http::DownstreamWatermarkCallbacks
+  // Http::DownstreamWatermarkCallbacks and Http::EncoderFilterWatermarkCallbacks
   void onBelowWriteBufferLowWatermark() override;
   void onAboveWriteBufferHighWatermark() override;
 
@@ -42,7 +43,10 @@ public:
   void onUpstreamConnectionEstablished() override;
 
   // Http::StreamFilterBase
-  void onDestroy() override { callbacks_->removeDownstreamWatermarkCallbacks(*this); }
+  void onDestroy() override {
+    callbacks_->removeDownstreamWatermarkCallbacks(*this);
+    callbacks_->removeEncoderFilterWatermarkCallbacks(*this);
+  }
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
