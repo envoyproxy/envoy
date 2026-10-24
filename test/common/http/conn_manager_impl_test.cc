@@ -4894,8 +4894,6 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainCloseViaConnectionDrain) {
   setup(SetupOpts().setTracing(false));
 
   EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
-  filter_callbacks_.connection_.raiseConnectionDrain(
-      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
 
   // Store the basic request encoder during filter chain setup.
   auto* filter = new MockStreamFilter();
@@ -4928,6 +4926,8 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainCloseViaConnectionDrain) {
   EXPECT_CALL(*codec_, dispatch(_))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
         decoder_ = &conn_manager_->newStream(response_encoder_);
+        filter_callbacks_.connection_.raiseConnectionDrain(
+            Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
 
         RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":authority", "host"},
                                                                  {":method", "GET"},
@@ -5055,16 +5055,14 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
 // not be consulted).
 TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithCloseViaConnectionDrain) {
   setup();
-  // Notify of drain before the request/response so the drain-close decision uses the connection
-  // event. Declared outside the sequence below since the notification is not an ordered mock call.
   EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
-  filter_callbacks_.connection_.raiseConnectionDrain(
-      Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
 
   InSequence s;
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
+    filter_callbacks_.connection_.raiseConnectionDrain(
+        Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
     RequestHeaderMapPtr headers{
         new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
     decoder_->decodeHeaders(std::move(headers), true);
