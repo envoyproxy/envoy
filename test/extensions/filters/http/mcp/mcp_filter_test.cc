@@ -25,6 +25,7 @@ using testing::_;
 using testing::AllOf;
 using testing::Contains;
 using testing::Key;
+using testing::Ne;
 using testing::NiceMock;
 using testing::Not;
 using testing::Pair;
@@ -3509,6 +3510,156 @@ TEST_F(McpFilterTest, RejectModeRejectsDeleteWithoutSessionId) {
               sendLocalReply(Http::Code::BadRequest, "Only MCP traffic is allowed", _, _, _));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+}
+
+// Tests that McpFilter rewrites the body's traceparent and tracestate based on
+// the active span.
+TEST_F(McpFilterTest, TraceContextReparentActiveSpan) {
+  // SPELLCHECKER(off)
+  static constexpr absl::string_view kBody = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "rojo=00f067aa0ba902b7"
+      }
+    }
+  })";
+  static constexpr absl::string_view kBodyWithoutTracestate = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+      }
+    }
+  })";
+  // SPELLCHECKER(on)
+  static constexpr absl::string_view kBodyTraceparent =
+      "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+  static constexpr absl::string_view kOtherTraceparent =
+      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01";
+  static constexpr absl::string_view kBodyTracestate = "rojo=00f067aa0ba902b7";
+
+  struct TestCase {
+    absl::string_view label;
+    std::optional<absl::string_view> traceparent_header, tracestate_header;
+    absl::string_view body;
+    absl::string_view want_traceparent_header, want_tracestate_header;
+  };
+  static const TestCase kTestCases[] = {
+      {
+          .label = "trace context headers match body",
+          .traceparent_header = kBodyTraceparent,
+          .tracestate_header = kBodyTracestate,
+          .body = kBody,
+          .want_traceparent_header = kBodyTraceparent,
+          .want_tracestate_header = kBodyTracestate,
+      },
+      {
+          .label = "trace context headers absent",
+          .traceparent_header = std::nullopt,
+          .tracestate_header = std::nullopt,
+          .body = kBody,
+          .want_traceparent_header = kBodyTraceparent,
+          .want_tracestate_header = kBodyTracestate,
+      },
+      {
+          .label = "traceparent header differs from body",
+          .traceparent_header = kOtherTraceparent,
+          .tracestate_header = kBodyTracestate,
+          .body = kBody,
+          // The body's traceparent and tracestate should be copied to the
+          // headers.
+          .want_traceparent_header = kBodyTraceparent,
+          .want_tracestate_header = kBodyTracestate,
+      },
+      {
+          .label = "traceparent headers present, but tracestate missing from body",
+          .traceparent_header = kBodyTraceparent,
+          .tracestate_header = kBodyTracestate,
+          .body = kBodyWithoutTracestate,
+          .want_traceparent_header = kBodyTraceparent,
+          // The incoming tracestate header will be replaced with the empty
+          // string because the body's tracestate is empty.
+          .want_tracestate_header = "",
+      },
+  };
+
+  for (const TestCase& test_case : kTestCases) {
+    SCOPED_TRACE(testing::Message() << "test case: " << test_case.label);
+
+    envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+    proto_config.mutable_propagate_trace_context()->set_reparent_active_span(true);
+    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+    filter_ = std::make_unique<McpFilter>(config_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+
+    Http::TestRequestHeaderMapImpl headers{
+        {":method", "POST"},
+        {"content-type", "application/json"},
+        {"accept", "application/json, text/event-stream"},
+    };
+    if (test_case.traceparent_header.has_value()) {
+      headers.setCopy(Http::LowerCaseString("traceparent"), *test_case.traceparent_header);
+    }
+    if (test_case.tracestate_header.has_value()) {
+      headers.setCopy(Http::LowerCaseString("tracestate"), *test_case.tracestate_header);
+    }
+    ON_CALL(decoder_callbacks_, requestHeaders())
+        .WillByDefault(Return(Http::RequestHeaderMapOptRef(headers)));
+    filter_->decodeHeaders(headers, false);
+
+    Buffer::OwnedImpl buffer(test_case.body);
+
+    EXPECT_CALL(decoder_callbacks_.active_span_, getSpanId())
+        .WillOnce(Return(std::string("21b6bcb2a5588606")));
+    EXPECT_CALL(decoder_callbacks_.active_span_, getTracestate())
+        .WillOnce(Return(std::string("foobar=123")));
+    // The active span should be updated with a `TraceContext` derived from the
+    // body's traceparent, not the incoming traceparent header.
+    EXPECT_CALL(decoder_callbacks_.active_span_, updateParent(_))
+        .WillOnce([](const Tracing::TraceContext& trace_context) {
+          EXPECT_EQ(trace_context.get("traceparent"), kBodyTraceparent);
+        });
+    EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+        .WillOnce([&buffer](std::function<void(Buffer::Instance&)> cb) { cb(buffer); });
+
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+    // McpFilter copies the body's traceparent and tracestate to the outgoing
+    // header. It's up to the implementation of `Span::updateParent()` to again
+    // rewrite the headers based on the given trace context, if it so desires.
+    EXPECT_EQ(headers.get_("traceparent"), test_case.want_traceparent_header);
+    EXPECT_EQ(headers.get_("tracestate"), test_case.want_tracestate_header);
+
+    // The body's traceparent should have been rewritten with a new parent ID
+    // equal to the active span's ID. Likewise, the body's tracestate should
+    // now be equal to the active span's tracestate.
+    Protobuf::Struct rewritten_body;
+    TestUtility::loadFromJson(buffer.toString(), rewritten_body);
+
+    Protobuf::Struct want_body;
+    TestUtility::loadFromJson(R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "test",
+      "_meta": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-21b6bcb2a5588606-01",
+        "tracestate": "foobar=123"
+      }
+    }
+  })",
+                              want_body);
+    EXPECT_THAT(rewritten_body, ProtoEq(want_body));
+  }
 }
 
 TEST_F(McpFilterTest, TraceContextEnabledValidParentAndState) {
