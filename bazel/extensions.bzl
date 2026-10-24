@@ -16,44 +16,8 @@ _MODULES_SEGMENT = "/modules/"
 _SOURCE_JSON_SUFFIX = "/source.json"
 _LLVM_VERSION = "22.1.8"
 
-_LLVM_REPO_LOADS = """load("@rules_cc//cc:cc_library.bzl", "cc_library")
-
-"""
-
-_LLVM_LIBRARY_TARGETS = """
-
-filegroup(
-    name = "libclang_cpp",
-    srcs = glob(["lib/**/libclang-cpp.so*", "lib64/**/libclang-cpp.so*"], allow_empty = True),
-)
-
-filegroup(
-    name = "libllvm",
-    srcs = glob(["lib/**/libLLVM.so*", "lib64/**/libLLVM.so*"], allow_empty = True),
-)
-
-cc_library(
-    name = "clang_tooling_headers",
-    hdrs = glob(["include/clang/**", "include/clang-c/**", "include/llvm/**", "include/llvm-c/**"], allow_empty = True),
-    includes = ["include"],
-)
-"""
-
 def _llvm_repo_build(llvm_version):
-    build = render_llvm_repo_build(llvm_version.split(".")[0])
-    libclang_glob = 'glob(["lib/libclang.so*", "lib/libclang*.dylib"], allow_empty = True)'
-    if libclang_glob not in build:
-        fail("The envoy_toolshed LLVM repository BUILD template changed")
-    build = build.replace(
-        libclang_glob,
-        'glob(["lib/**/libclang.so*", "lib/**/libclang*.dylib", "lib64/**/libclang.so*", "lib64/**/libclang*.dylib"], allow_empty = True)',
-    )
-    return "".join([
-        _LLVM_REPO_LOADS,
-        build,
-        _LLVM_LIBRARY_TARGETS,
-        '\nexports_files(["llvm.bzl"])\n',
-    ])
+    return render_llvm_repo_build(llvm_version.split(".")[0])
 
 def _write_llvm_bzl(repository_ctx, llvm_version, llvm_lib_dir, is_host):
     major = llvm_version.split(".")[0]
