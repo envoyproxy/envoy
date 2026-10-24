@@ -13,6 +13,60 @@ public:
     TestUtility::loadFromYaml(yaml, local_reply_config);
     config_helper_.setLocalReply(local_reply_config);
   }
+
+  // Sends a request with the given method and a gRPC content type, makes the upstream fail so that
+  // Envoy sends a local reply, and checks whether that reply is gRPC-style or plain HTTP.
+  void runNonPostWithGrpcContentTypeLocalReplyTest(const std::string& method,
+                                                   bool expect_grpc_reply) {
+    const bool header_only_request = method == "HEAD";
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    auto encoder_decoder = codec_client_->startRequest(
+        Http::TestRequestHeaderMapImpl{{":method", method},
+                                       {":path", "/package.service/method"},
+                                       {":scheme", "http"},
+                                       {":authority", "sni.lyft.com"},
+                                       {"content-type", "application/grpc"}},
+        header_only_request);
+    auto response = std::move(encoder_decoder.second);
+
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(response->waitForEndStream());
+
+    if (downstream_protocol_ == Http::CodecType::HTTP1 && !header_only_request) {
+      // The request body was never completed, so Envoy closes the HTTP/1 connection.
+      ASSERT_TRUE(codec_client_->waitForDisconnect());
+    } else {
+      codec_client_->close();
+    }
+
+    EXPECT_TRUE(response->complete());
+    if (expect_grpc_reply) {
+      EXPECT_EQ("200", response->headers().getStatusValue());
+      EXPECT_EQ("application/grpc", response->headers().getContentTypeValue());
+      EXPECT_EQ("14", response->headers().getGrpcStatusValue());
+      EXPECT_EQ(response->body(), "");
+    } else {
+      EXPECT_EQ("503", response->headers().getStatusValue());
+      EXPECT_EQ("text/plain", response->headers().getContentTypeValue());
+      EXPECT_EQ(nullptr, response->headers().GrpcStatus());
+      EXPECT_EQ(nullptr, response->headers().GrpcMessage());
+      if (response->trailers() != nullptr) {
+        EXPECT_EQ(nullptr, response->trailers()->GrpcStatus());
+      }
+      if (header_only_request) {
+        // A HEAD reply carries the headers of the 503 but no body.
+        EXPECT_EQ(response->body(), "");
+      } else {
+        EXPECT_EQ(response->body(), "upstream connect error or disconnect/reset before headers. "
+                                    "reset reason: connection termination");
+      }
+    }
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(Protocols, LocalReplyIntegrationTest,
@@ -644,6 +698,36 @@ body_format:
   EXPECT_EQ("513", response->headers().Status()->value().getStringView());
 
   EXPECT_EQ(response->body(), "");
+}
+
+// A request with a gRPC content type but a method other than POST is not a gRPC request
+// (https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md), so it gets an ordinary HTTP
+// local reply instead of a trailers-only 200 that an HTTP cache could store. See
+// https://github.com/envoyproxy/envoy/issues/48070.
+TEST_P(LocalReplyIntegrationTest, GetWithGrpcContentTypeGetsHttpLocalReply) {
+  initialize();
+  runNonPostWithGrpcContentTypeLocalReplyTest("GET", /*expect_grpc_reply=*/false);
+}
+
+TEST_P(LocalReplyIntegrationTest, HeadWithGrpcContentTypeGetsHttpLocalReply) {
+  initialize();
+  runNonPostWithGrpcContentTypeLocalReplyTest("HEAD", /*expect_grpc_reply=*/false);
+}
+
+TEST_P(LocalReplyIntegrationTest,
+       GetWithGrpcContentTypeGetsGrpcLocalReplyWhenRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.grpc_local_reply_requires_post",
+                                    "false");
+  initialize();
+  runNonPostWithGrpcContentTypeLocalReplyTest("GET", /*expect_grpc_reply=*/true);
+}
+
+TEST_P(LocalReplyIntegrationTest,
+       HeadWithGrpcContentTypeGetsGrpcLocalReplyWhenRuntimeGuardDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.grpc_local_reply_requires_post",
+                                    "false");
+  initialize();
+  runNonPostWithGrpcContentTypeLocalReplyTest("HEAD", /*expect_grpc_reply=*/true);
 }
 
 } // namespace Envoy

@@ -35,10 +35,11 @@ using Protobuf::util::MessageDifferencer;
 
 class FilterManagerTest : public testing::Test {
 public:
-  void initialize() {
+  void initialize(bool grpc_local_reply_requires_post = true) {
     filter_manager_ = std::make_unique<DownstreamFilterManager>(
         filter_manager_callbacks_, dispatcher_, connection_, 0, nullptr, true, 10000,
-        filter_factory_, local_reply_, protocol_, time_source_, filter_state_, overload_manager_);
+        filter_factory_, local_reply_, protocol_, time_source_, filter_state_, overload_manager_,
+        grpc_local_reply_requires_post);
   }
 
   // Simple helper to wrapper filter to the factory function.
@@ -72,6 +73,63 @@ public:
     auto expected = std::make_unique<Protobuf::StringValue>();
     expected->set_value(expected_name);
     EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
+  }
+
+  // Sends a local reply to a request that carries a gRPC content type but uses the given method,
+  // and checks whether the reply is gRPC-style (trailers-only 200 with grpc-status) or plain HTTP.
+  void runGrpcContentTypeLocalReplyTest(const std::string& method,
+                                        bool grpc_local_reply_requires_post,
+                                        bool expect_grpc_reply) {
+    initialize(grpc_local_reply_requires_post);
+
+    std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+    EXPECT_CALL(*filter, decodeHeaders(_, true))
+        .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+          filter->callbacks_->sendLocalReply(Code::ServiceUnavailable, "no healthy upstream",
+                                             nullptr, std::nullopt, "details");
+          return FilterHeadersStatus::StopIteration;
+        }));
+
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+          auto factory = createDecoderFilterFactoryCb(filter);
+          callbacks.setFilterConfigName("configName1");
+          factory(callbacks);
+          return true;
+        }));
+
+    RequestHeaderMapPtr request_headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"},
+                                     {":path", "/"},
+                                     {":method", method},
+                                     {"content-type", "application/grpc"}}};
+    ON_CALL(filter_manager_callbacks_, requestHeaders())
+        .WillByDefault(Return(makeOptRef(*request_headers)));
+
+    filter_manager_->createDownstreamFilterChain();
+    filter_manager_->requestHeadersInitialized();
+
+    EXPECT_CALL(local_reply_, rewrite(_, _, _, _, _, _));
+    EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_))
+        .WillOnce(Invoke([expect_grpc_reply](auto& response_headers) {
+          if (expect_grpc_reply) {
+            EXPECT_EQ("200", response_headers.getStatusValue());
+            EXPECT_THAT(response_headers,
+                        ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
+            EXPECT_THAT(response_headers, ContainsHeader(Http::Headers::get().GrpcStatus, "14"));
+          } else {
+            EXPECT_EQ("503", response_headers.getStatusValue());
+            EXPECT_THAT(response_headers,
+                        ContainsHeader(Http::Headers::get().ContentType, "text/plain"));
+            EXPECT_EQ(nullptr, response_headers.GrpcStatus());
+          }
+        }));
+    EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
+    EXPECT_CALL(filter_manager_callbacks_, endStream());
+
+    filter_manager_->decodeHeaders(*request_headers, true);
+
+    filter_manager_->destroyFilters();
   }
 
   void runSendDirectLocalReplySavedResponseMetadataTest(bool flush_saved_response_metadata) {
@@ -237,6 +295,32 @@ TEST_F(FilterManagerTest, RequestHeadersOrResponseHeadersAccess) {
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerTest, SendLocalReplyToPostWithGrpcContentTypeIsGrpc) {
+  runGrpcContentTypeLocalReplyTest("POST", /*grpc_local_reply_requires_post=*/true,
+                                   /*expect_grpc_reply=*/true);
+}
+
+// A request with a gRPC content type but a method other than POST is not a gRPC request
+// (https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md), so it gets an ordinary HTTP
+// local reply rather than a trailers-only 200 that an HTTP cache could store. See
+// https://github.com/envoyproxy/envoy/issues/48070.
+TEST_F(FilterManagerTest, SendLocalReplyToGetWithGrpcContentTypeIsNotGrpc) {
+  runGrpcContentTypeLocalReplyTest("GET", /*grpc_local_reply_requires_post=*/true,
+                                   /*expect_grpc_reply=*/false);
+}
+
+TEST_F(FilterManagerTest, SendLocalReplyToHeadWithGrpcContentTypeIsNotGrpc) {
+  runGrpcContentTypeLocalReplyTest("HEAD", /*grpc_local_reply_requires_post=*/true,
+                                   /*expect_grpc_reply=*/false);
+}
+
+// The connection manager latches the runtime guard and passes it to the filter manager; with the
+// guard disabled the legacy gRPC-style reply is produced for any method.
+TEST_F(FilterManagerTest, SendLocalReplyToGetWithGrpcContentTypeIsGrpcWhenPostNotRequired) {
+  runGrpcContentTypeLocalReplyTest("GET", /*grpc_local_reply_requires_post=*/false,
+                                   /*expect_grpc_reply=*/true);
+}
+
 // Verifies that the local reply persists the gRPC classification even if the request headers are
 // modified.
 TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
@@ -257,7 +341,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   RequestHeaderMapPtr grpc_headers{
       new TestRequestHeaderMapImpl{{":authority", "host"},
                                    {":path", "/"},
-                                   {":method", "GET"},
+                                   {":method", "POST"},
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
@@ -333,7 +417,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
   RequestHeaderMapPtr grpc_headers{
       new TestRequestHeaderMapImpl{{":authority", "host"},
                                    {":path", "/"},
-                                   {":method", "GET"},
+                                   {":method", "POST"},
                                    {"content-type", "application/grpc"}}};
 
   ON_CALL(filter_manager_callbacks_, requestHeaders())
