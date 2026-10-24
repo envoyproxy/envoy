@@ -324,5 +324,66 @@ TEST(UnionStringTest, All) {
   }
 }
 
+TEST(UnionStringStorageTest, MoveAssignment) {
+  const std::string large(4096, 'a');
+  const std::string other_large(8192, 'b');
+
+  auto make_heap = [&](const std::string& value) {
+    UnionStringStorage storage;
+    storage.assign(value.data(), value.size());
+    EXPECT_EQ(UnionStringStorage::StorageLocation::Heap, storage.storageLocation());
+    return storage;
+  };
+  auto view = [](const UnionStringStorage& storage) {
+    return absl::string_view(storage.data(), storage.size());
+  };
+
+  // Reference source into heap destination.
+  {
+    const std::string ref("reference");
+    UnionStringStorage dest = make_heap(large);
+    UnionStringStorage src{absl::string_view(ref)};
+    dest = std::move(src);
+    EXPECT_EQ(UnionStringStorage::StorageLocation::Reference, dest.storageLocation());
+    EXPECT_EQ(ref, view(dest));
+  }
+
+  // Inline source into heap destination.
+  {
+    UnionStringStorage dest = make_heap(large);
+    UnionStringStorage src;
+    src.assign("inline", 6);
+    ASSERT_EQ(UnionStringStorage::StorageLocation::Inline, src.storageLocation());
+    dest = std::move(src);
+    EXPECT_EQ(UnionStringStorage::StorageLocation::Inline, dest.storageLocation());
+    EXPECT_EQ("inline", view(dest));
+    dest.assign(other_large.data(), other_large.size());
+    EXPECT_EQ(other_large, view(dest));
+  }
+
+  // Heap source into heap destination.
+  {
+    UnionStringStorage dest = make_heap(large);
+    UnionStringStorage src = make_heap(other_large);
+    dest = std::move(src);
+    EXPECT_EQ(UnionStringStorage::StorageLocation::Heap, dest.storageLocation());
+    EXPECT_EQ(other_large, view(dest));
+    // Reusing a moved-from value is bug-prone, but even so
+    // the moved-from object must be safe to reuse and destroy.
+    // NOLINTNEXTLINE(bugprone-use-after-move)
+    src.assign("reuse", 5);
+    EXPECT_EQ("reuse", view(src));
+  }
+
+  // Self move assignment preserves the value.
+  {
+    UnionStringStorage storage = make_heap(large);
+    UnionStringStorage& alias = storage;
+    storage = std::move(alias);
+    EXPECT_EQ(UnionStringStorage::StorageLocation::Heap, storage.storageLocation());
+    EXPECT_EQ(large, view(storage));
+  }
+}
+
 } // namespace
 } // namespace Envoy
