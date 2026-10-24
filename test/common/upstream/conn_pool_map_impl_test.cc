@@ -457,6 +457,95 @@ TEST_F(ConnPoolMapImplDeathTest, ReentryAddDrainedCallbackTripsAssert) {
 }
 #endif // !defined(NDEBUG)
 
+namespace {
+// A mock pool that reports when it is actually destroyed, so tests can assert
+// destruction timing relative to map operations.
+class DestructionTrackingPool : public NiceMock<Http::ConnectionPool::MockInstance> {
+public:
+  explicit DestructionTrackingPool(bool& destroyed) : destroyed_(destroyed) {}
+  ~DestructionTrackingPool() override { destroyed_ = true; }
+
+private:
+  bool& destroyed_;
+};
+} // namespace
+
+// Eviction through freeOnePool() must defer pool destruction instead of
+// destroying the pool inside active_pools_.erase(): the inline destructor runs
+// ActiveClient teardown, which re-enters ConnPoolImplBase::checkForIdleAndNotify
+// and its still-registered idle callback (httpConnPoolIsIdle -> erasePool)
+// while the outer erase is mid-flight, double-destroying the same map slot.
+TEST_F(ConnPoolMapImplTest, FreeOnePoolDefersDeletionOfEvictedPool) {
+  TestMapPtr test_map = makeTestMapWithLimit(1);
+
+  bool pool_destroyed = false;
+  Http::ConnectionPool::Instance* first_raw = nullptr;
+  TestMap::PoolOptRef first = test_map->getPool(1, [&]() {
+    auto pool = std::make_unique<DestructionTrackingPool>(pool_destroyed);
+    ON_CALL(*pool, hasActiveConnections).WillByDefault(Return(false));
+    ON_CALL(*pool, isIdle).WillByDefault(Return(false)); // still owns a connecting client
+    first_raw = pool.get();
+    return pool;
+  });
+  ASSERT_TRUE(first.has_value());
+  EXPECT_EQ(1, test_map->size());
+
+  TestMap::PoolOptRef second = test_map->getPool(2, getBasicFactory());
+  ASSERT_TRUE(second.has_value());
+  EXPECT_EQ(1, test_map->size());
+
+  // The evicted pool is queued for deferred deletion and still alive.
+  ASSERT_EQ(1, dispatcher_.to_delete_.size());
+  EXPECT_EQ(first_raw, dispatcher_.to_delete_.front().get());
+  EXPECT_FALSE(pool_destroyed);
+
+  // The circuit breaker account is released synchronously with the map slot.
+  EXPECT_EQ(1, host_->cluster_.resourceManager(ResourcePriority::Default).connectionPools().count());
+
+  dispatcher_.to_delete_.clear();
+  EXPECT_TRUE(pool_destroyed);
+}
+
+// freeOnePool() should prefer victims that are fully idle (no clients at all):
+// their teardown is quiet, unlike pools that still own connecting or ready
+// keepalive clients.
+TEST_F(ConnPoolMapImplTest, FreeOnePoolPrefersFullyIdlePool) {
+  TestMapPtr test_map = makeTestMapWithLimit(2);
+
+  bool busy_destroyed = false;
+  bool idle_destroyed = false;
+  Http::ConnectionPool::Instance* busy_raw = nullptr;
+  Http::ConnectionPool::Instance* idle_raw = nullptr;
+
+  TestMap::PoolOptRef busy = test_map->getPool(1, [&]() {
+    auto pool = std::make_unique<DestructionTrackingPool>(busy_destroyed);
+    ON_CALL(*pool, hasActiveConnections).WillByDefault(Return(false));
+    ON_CALL(*pool, isIdle).WillByDefault(Return(false)); // owns a connecting client
+    busy_raw = pool.get();
+    return pool;
+  });
+  TestMap::PoolOptRef idle = test_map->getPool(2, [&]() {
+    auto pool = std::make_unique<DestructionTrackingPool>(idle_destroyed);
+    ON_CALL(*pool, hasActiveConnections).WillByDefault(Return(false));
+    ON_CALL(*pool, isIdle).WillByDefault(Return(true));
+    idle_raw = pool.get();
+    return pool;
+  });
+  ASSERT_TRUE(busy.has_value() && idle.has_value());
+
+  TestMap::PoolOptRef third = test_map->getPool(3, getBasicFactory());
+  ASSERT_TRUE(third.has_value());
+
+  // The fully idle pool is evicted even though the other victim candidate
+  // comes first in iteration order.
+  ASSERT_EQ(1, dispatcher_.to_delete_.size());
+  EXPECT_EQ(idle_raw, dispatcher_.to_delete_.front().get());
+  EXPECT_FALSE(idle_destroyed);
+  EXPECT_FALSE(busy_destroyed);
+  EXPECT_EQ(2, test_map->size());
+  EXPECT_EQ(busy_raw, &(test_map->getPool(1, getNeverCalledFactory()).value().get()));
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
