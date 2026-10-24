@@ -4,10 +4,13 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
+#include "source/common/common/macros.h"
 #include "source/common/http/headers.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/utility.h"
+
+#include "openssl/err.h"
 
 using Envoy::Network::PostIoAction;
 
@@ -17,6 +20,45 @@ namespace TransportSockets {
 namespace Tls {
 
 namespace {
+
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+using VerifiedCertChain = std::vector<bssl::UniquePtr<X509>>;
+
+int verifiedChainSessionIndex() {
+  CONSTRUCT_ON_FIRST_USE(int, []() {
+    const int index = SSL_SESSION_get_ex_new_index(
+        0, nullptr, nullptr, nullptr, [](void*, void* data, CRYPTO_EX_DATA*, int, long, void*) {
+          delete static_cast<VerifiedCertChain*>(data);
+        });
+    RELEASE_ASSERT(index >= 0, "Failed to allocate verified-chain session metadata index");
+    return index;
+  }());
+}
+
+absl::StatusOr<VerifiedCertChain> copyVerifiedChain(absl::Span<const bssl::UniquePtr<X509>> chain) {
+  constexpr size_t MaxCertificates = 64;
+  constexpr size_t MaxBytes = 48 * 1024;
+  if (chain.size() > MaxCertificates) {
+    return absl::ResourceExhaustedError("Verified session chain has too many certificates");
+  }
+  VerifiedCertChain copy;
+  size_t bytes = 0;
+  for (const auto& cert : chain) {
+    const int length = i2d_X509(cert.get(), nullptr);
+    if (length <= 0 || static_cast<size_t>(length) + 3 > MaxBytes - bytes) {
+      return absl::ResourceExhaustedError("Verified session chain exceeds its size limit");
+    }
+    bytes += length + 3;
+    bssl::UniquePtr<X509> cloned(X509_dup(cert.get()));
+    if (!cloned) {
+      return absl::InternalError("Failed to copy verified session certificate");
+    }
+    copy.push_back(std::move(cloned));
+  }
+  return copy;
+}
+
+#endif
 
 // Applies certificate-level tls_params to ssl after SSL_set_SSL_CTX (which only transfers cert
 // material).
@@ -106,6 +148,16 @@ void SslExtendedSocketInfoImpl::setCertificateValidationStatus(
 
 void SslExtendedSocketInfoImpl::setValidatedCertChain(std::vector<bssl::UniquePtr<X509>> chain) {
   ssl_handshaker_.setValidatedCertChain(std::move(chain));
+}
+
+absl::Span<const bssl::UniquePtr<X509>>
+SslExtendedSocketInfoImpl::validatedCertChainForSessionTicket() const {
+  return ssl_handshaker_.validatedCertChainForSessionTicket();
+}
+
+void SslExtendedSocketInfoImpl::setResumedValidatedCertChain(
+    std::vector<bssl::UniquePtr<X509>> chain) {
+  ssl_handshaker_.setResumedValidatedCertChain(std::move(chain));
 }
 
 Envoy::Ssl::ClientValidationStatus SslExtendedSocketInfoImpl::certificateValidationStatus() const {
@@ -198,6 +250,44 @@ bool SslHandshakerImpl::peerCertificateValidated() const {
          Envoy::Ssl::ClientValidationStatus::Validated;
 }
 
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+bool SslHandshakerImpl::saveValidatedCertChainToSession(SSL* ssl, SSL_SESSION* session) {
+  if (SSL_SESSION_get_ex_data(session, verifiedChainSessionIndex()) != nullptr) {
+    return true; // Published session metadata is immutable.
+  }
+  auto* info = dynamic_cast<SslExtendedSocketInfoImpl*>(static_cast<Ssl::SslExtendedSocketInfo*>(
+      SSL_get_ex_data(ssl, ContextImpl::sslExtendedSocketInfoIndex())));
+  if (info == nullptr) {
+    return false;
+  }
+  auto chain = copyVerifiedChain(info->validatedCertChainForSessionTicket());
+  if (!chain.ok()) {
+    ERR_clear_error();
+    return false; // Skip caching rather than storing a truncated or invalid chain.
+  }
+  auto metadata = std::make_unique<VerifiedCertChain>(std::move(chain).value());
+  if (!SSL_SESSION_set_ex_data(session, verifiedChainSessionIndex(), metadata.get())) {
+    return false;
+  }
+  metadata.release(); // The SSL_SESSION ex-data destructor owns the immutable chain.
+  return true;
+}
+
+#else
+bool SslHandshakerImpl::saveValidatedCertChainToSession(SSL*, SSL_SESSION*) { return false; }
+#endif
+
+absl::Span<const bssl::UniquePtr<X509>>
+SslHandshakerImpl::validatedCertChainForSessionTicket() const {
+  if (SSL_session_reused(ssl())) {
+    // TLS 1.2 can renew a ticket before doHandshake() returns and commits the restored chain.
+    return validated_chain_.empty() ? absl::MakeConstSpan(resumed_validated_chain_)
+                                    : absl::MakeConstSpan(validated_chain_);
+  }
+  return peerCertificateValidated() ? absl::MakeConstSpan(validated_chain_)
+                                    : absl::Span<const bssl::UniquePtr<X509>>{};
+}
+
 namespace {
 bool sawBytesFromDownstream(SSL* ssl) {
   if (ssl == nullptr) {
@@ -227,6 +317,32 @@ Network::PostIoAction SslHandshakerImpl::doHandshake() {
   }
 
   if (rc == 1) {
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+    if (SSL_is_server(ssl()) && SSL_session_reused(ssl()) && resumed_validated_chain_.empty()) {
+      SSL_SESSION* session = SSL_get_session(ssl());
+      auto* stored = session == nullptr
+                         ? nullptr
+                         : static_cast<const VerifiedCertChain*>(
+                               SSL_SESSION_get_ex_data(session, verifiedChainSessionIndex()));
+      if (stored != nullptr) {
+        auto restored = copyVerifiedChain(*stored);
+        if (!restored.ok()) {
+          handshake_callbacks_->onFailure();
+          return PostIoAction::Close;
+        }
+        resumed_validated_chain_ = std::move(restored).value();
+      }
+    }
+#endif
+    if (SSL_is_server(ssl()) && SSL_session_reused(ssl()) && !resumed_validated_chain_.empty()) {
+      bssl::UniquePtr<X509> peer(SSL_get_peer_certificate(ssl()));
+      if (!peer || X509_cmp(peer.get(), resumed_validated_chain_.front().get()) != 0) {
+        handshake_callbacks_->onFailure();
+        return PostIoAction::Close;
+      }
+      validated_chain_ = std::move(resumed_validated_chain_);
+    }
+    resumed_validated_chain_.clear();
     state_ = Ssl::SocketState::HandshakeComplete;
     handshake_callbacks_->onSuccess(ssl());
 

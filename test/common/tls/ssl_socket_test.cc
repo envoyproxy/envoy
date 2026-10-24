@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -27,6 +28,7 @@
 #include "source/common/tls/private_key/private_key_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
+#include "source/common/tls/session_ticket_codec.h"
 
 #include "test/common/tls/cert_validator/timed_cert_validator.h"
 #include "test/common/tls/ssl_certs_test.h"
@@ -1403,9 +1405,11 @@ protected:
         stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection),
         version_(GetParam()) {}
 
-  void testClientSessionResumption(const std::string& server_ctx_yaml,
-                                   const std::string& client_ctx_yaml, bool expect_reuse,
-                                   const Network::Address::IpVersion version);
+  void testClientSessionResumption(
+      const std::string& server_ctx_yaml, const std::string& client_ctx_yaml, bool expect_reuse,
+      const Network::Address::IpVersion version,
+      const std::function<void(const Ssl::ConnectionInfo&, bool)>& check_peer_certificate = {},
+      const std::function<void(SSL*)>& before_reconnect = {});
   void testClientSessionResumptionSniSequence(const std::string& server_ctx_yaml,
                                               const std::string& client_ctx_yaml,
                                               const std::vector<uint64_t>& expected_reuse_counts,
@@ -5243,14 +5247,13 @@ TEST_P(SslSocketTest, SuppressClientCaListOnTheWireDisabled) {
 namespace {
 
 // Test connecting with a client to server1, then trying to reuse the session on server2
-void testTicketSessionResumption(const std::string& server_ctx_yaml1,
-                                 const std::vector<std::string>& server_names1,
-                                 const std::string& server_ctx_yaml2,
-                                 const std::vector<std::string>& server_names2,
-                                 const std::string& client_ctx_yaml, bool expect_reuse,
-                                 const Network::Address::IpVersion ip_version,
-                                 const uint32_t expected_lifetime_hint = 0,
-                                 const std::string& expected_sni = "") {
+void testTicketSessionResumption(
+    const std::string& server_ctx_yaml1, const std::vector<std::string>& server_names1,
+    const std::string& server_ctx_yaml2, const std::vector<std::string>& server_names2,
+    const std::string& client_ctx_yaml, bool expect_reuse,
+    const Network::Address::IpVersion ip_version, const uint32_t expected_lifetime_hint = 0,
+    const std::string& expected_sni = "",
+    const std::function<void(const Ssl::ConnectionInfo&, bool)>& check_peer_certificate = {}) {
   Event::SimulatedTimeSystem time_system;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
       transport_socket_factory_context;
@@ -5338,6 +5341,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
           auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
           EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
         }
+        if (check_peer_certificate) {
+          check_peer_certificate(*server_connection->ssl(), false);
+        }
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher->exit();
@@ -5380,7 +5386,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   // first, so always wait until both have happened.
   size_t connect_count = 0;
   auto connect_second_time = [&connect_count, &dispatcher, &server_connection, &client_connection,
-                              expect_reuse, &expected_sni]() {
+                              &check_peer_certificate, expect_reuse, &expected_sni]() {
     connect_count++;
     if (connect_count == 2) {
       if (expect_reuse) {
@@ -5394,6 +5400,9 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
         }
       } else {
         EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+      }
+      if (check_peer_certificate) {
+        check_peer_certificate(*server_connection->ssl(), expect_reuse);
       }
       client_connection->close(Network::ConnectionCloseType::NoFlush);
       server_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -5610,6 +5619,153 @@ TEST_P(SslSocketTest, TicketSessionResumptionWithClientCA) {
   testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               version_);
 }
+
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+TEST_P(SslSocketTest, TicketSessionResumptionPreservesVerifiedIssuer) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.preserve_verified_peer_chain_in_session_ticket", "true"}});
+  // Certificate expiry is unrelated to whether the verified issuer survives resumption.
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      allow_expired_certificate: true
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF";
+
+  const auto check_peer_certificate = [](const Ssl::ConnectionInfo& info, bool resumed) {
+    SCOPED_TRACE(resumed ? "resumed mTLS connection" : "initial mTLS connection");
+    EXPECT_THAT(info.uriSanPeerCertificate(), testing::ElementsAre("spiffe://lyft.com/test-team"));
+    EXPECT_EQ(TEST_SAN_URI_CERT_SERIAL, info.serialNumberPeerCertificate());
+    EXPECT_FALSE(info.issuerPeerCertificate().empty());
+    EXPECT_EQ(TEST_CA_CERT_SERIAL, info.serialNumberPeerCertificateIssuer());
+    EXPECT_EQ(TEST_CA_CERT_256_HASH, info.sha256PeerCertificateIssuerDigest());
+    EXPECT_EQ(!resumed, info.peerCertificateValidated());
+    const auto& handshaker = dynamic_cast<const SslHandshakerImpl&>(info);
+    const auto chain = handshaker.validatedCertChain();
+    ASSERT_EQ(2, chain.size());
+    EXPECT_EQ(TEST_SAN_URI_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*chain[0]));
+    EXPECT_EQ(TEST_CA_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*chain[1]));
+  };
+
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
+                              version_, 0, {}, check_peer_certificate);
+}
+
+TEST_P(SslSocketTest, VerifiedChainTicketFallbackRotationAndUntrusted) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.preserve_verified_peer_chain_in_session_ticket", "true"}});
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      allow_expired_certificate: true
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+)EOF";
+
+  for (const std::string scenario : {"rotation", "rejected session", "untrusted"}) {
+    SCOPED_TRACE(scenario);
+    std::string first = server_ctx_yaml;
+    std::string second = server_ctx_yaml;
+    std::vector<std::string> first_names;
+    const bool untrusted = scenario == "untrusted";
+    if (scenario == "rotation") {
+      second = absl::StrReplaceAll(
+          second, {{"ticket_key_a\"", "ticket_key_b\"\n      filename: \"{{ test_rundir "
+                                      "}}/test/common/tls/test_data/ticket_key_a\""}});
+    } else if (scenario == "rejected session") {
+      first_names = {"different.example.com"};
+    } else {
+      first = absl::StrReplaceAll(
+          first,
+          {{"ca_cert.pem", "fake_ca_cert.pem"},
+           {"allow_expired_certificate: true",
+            "allow_expired_certificate: true\n      trust_chain_verification: ACCEPT_UNTRUSTED"}});
+      second = first;
+    }
+    std::vector<std::string> initial_der;
+    const auto check = [&](const Ssl::ConnectionInfo& info, bool resumed) {
+      const auto chain = dynamic_cast<const SslHandshakerImpl&>(info).validatedCertChain();
+      EXPECT_EQ(!resumed && !untrusted, info.peerCertificateValidated());
+      if (untrusted) {
+        EXPECT_TRUE(chain.empty());
+        EXPECT_TRUE(info.serialNumberPeerCertificateIssuer().empty());
+        EXPECT_TRUE(info.sha256PeerCertificateIssuerDigest().empty());
+        return;
+      }
+      ASSERT_EQ(2, chain.size());
+      EXPECT_EQ(TEST_CA_CERT_SERIAL, info.serialNumberPeerCertificateIssuer());
+      std::vector<std::string> der;
+      for (const auto& cert : chain) {
+        const int length = i2d_X509(cert.get(), nullptr);
+        ASSERT_GT(length, 0);
+        std::string encoded(length, '\0');
+        auto* cursor = reinterpret_cast<uint8_t*>(encoded.data());
+        ASSERT_EQ(length, i2d_X509(cert.get(), &cursor));
+        der.push_back(std::move(encoded));
+      }
+      if (initial_der.empty()) {
+        initial_der = der;
+      } else {
+        EXPECT_EQ(initial_der, der);
+      }
+    };
+    testTicketSessionResumption(first, first_names, second, {}, client_ctx_yaml,
+                                scenario != "rejected session", version_, 0, {}, check);
+  }
+}
+
+#endif
 
 TEST_P(SslSocketTest, TicketSessionResumptionRotateKey) {
   const std::string server_ctx_yaml1 = R"EOF(
@@ -6219,10 +6375,11 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_EQ(0UL, client_stats_store.counter("ssl.session_reused").value());
 }
 
-void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_yaml,
-                                                const std::string& client_ctx_yaml,
-                                                bool expect_reuse,
-                                                const Network::Address::IpVersion version) {
+void SslSocketTest::testClientSessionResumption(
+    const std::string& server_ctx_yaml, const std::string& client_ctx_yaml, bool expect_reuse,
+    const Network::Address::IpVersion version,
+    const std::function<void(const Ssl::ConnectionInfo&, bool)>& check_peer_certificate,
+    const std::function<void(SSL*)>& before_reconnect) {
   InSequence s;
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
@@ -6276,8 +6433,13 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   client_connection->connect();
 
   size_t connect_count = 0;
-  auto connect_second_time = [&connect_count, &server_connection]() {
+  bool second_connection = false;
+  auto connect_second_time = [&connect_count, &server_connection, &check_peer_certificate,
+                              &second_connection, expect_reuse]() {
     if (++connect_count == 2) {
+      if (check_peer_certificate) {
+        check_peer_certificate(*server_connection->ssl(), second_connection && expect_reuse);
+      }
       server_connection->close(Network::ConnectionCloseType::NoFlush);
     }
   };
@@ -6329,6 +6491,10 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   connect_count = 0;
   close_count = 0;
+  second_connection = true;
+  if (before_reconnect) {
+    before_reconnect(dynamic_cast<const SslHandshakerImpl&>(*server_connection->ssl()).ssl());
+  }
 
   client_connection = dispatcher->createClientConnection(
       socket->connectionInfoProvider().localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -6827,6 +6993,248 @@ TEST_P(SslSocketTest, ClientSessionResumptionEnabledTls13) {
 
   testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_);
 }
+
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+TEST_P(SslSocketTest, VerifiedChainStatefulSessionResumption) {
+  TestScopedRuntime scoped_runtime;
+  const std::string server_yaml = R"EOF(
+  disable_stateless_session_resumption: true
+  require_client_certificate: true
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF";
+  const std::string client_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_2
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+  for (const std::string scenario : {"preserved", "default", "untrusted", "disabled", "expired",
+                                     "evicted", "selected certificate"}) {
+    SCOPED_TRACE(scenario);
+    const bool enabled = scenario != "default";
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.preserve_verified_peer_chain_in_session_cache",
+          enabled ? "true" : "false"},
+         {"envoy.reloadable_features.preserve_verified_peer_chain_in_session_ticket", "true"}});
+    std::string server = server_yaml;
+    std::string client = client_yaml;
+    const bool selected_certificate = scenario == "selected certificate";
+    const bool untrusted = scenario == "untrusted";
+    const bool expect_reuse =
+        scenario != "disabled" && scenario != "expired" && scenario != "evicted";
+    if (untrusted) {
+      server = absl::StrReplaceAll(
+          server,
+          {{"ca_cert.pem", "fake_ca_cert.pem"},
+           {"trusted_ca:", "trust_chain_verification: ACCEPT_UNTRUSTED\n      trusted_ca:"}});
+    } else if (scenario == "disabled") {
+      server += "  disable_stateful_session_resumption: true\n";
+    } else if (selected_certificate) {
+      server = absl::StrReplaceAll(
+          server,
+          {{"    tls_certificates:\n      certificate_chain:",
+            "    tls_certificates:\n    - certificate_chain:"},
+           {"    validation_context:",
+            "    - certificate_chain:\n"
+            "        filename: \"{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem\"\n"
+            "      private_key:\n"
+            "        filename: \"{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem\"\n"
+            "    validation_context:"}});
+      client += "  sni: server1.example.com\n";
+    }
+    std::vector<std::string> initial_fingerprints;
+    const auto check = [&](const Ssl::ConnectionInfo& info, bool resumed) {
+      const auto& handshaker = dynamic_cast<const SslHandshakerImpl&>(info);
+      EXPECT_NE(0, SSL_CTX_get_options(SSL_get_SSL_CTX(handshaker.ssl())) & SSL_OP_NO_TICKET);
+      if (selected_certificate) {
+        EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL,
+                  Utility::getSerialNumberFromCertificate(*SSL_get_certificate(handshaker.ssl())));
+        // The selected certificate context has no cached sessions. Resumption must look up
+        // the original context's cache while retaining the chain attached to that session.
+        EXPECT_EQ(0, SSL_CTX_sess_number(SSL_get_SSL_CTX(handshaker.ssl())));
+      }
+      EXPECT_EQ(!resumed && !untrusted, info.peerCertificateValidated());
+      const auto chain = handshaker.validatedCertChain();
+      if (untrusted || (resumed && !enabled)) {
+        EXPECT_TRUE(chain.empty());
+        EXPECT_TRUE(info.serialNumberPeerCertificateIssuer().empty());
+        EXPECT_TRUE(info.sha256PeerCertificateIssuerDigest().empty());
+        return;
+      }
+      ASSERT_EQ(3, chain.size());
+      EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_SERIAL, info.serialNumberPeerCertificateIssuer());
+      EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_256_HASH, info.sha256PeerCertificateIssuerDigest());
+      std::vector<std::string> fingerprints;
+      for (const auto& cert : chain) {
+        fingerprints.push_back(Utility::getSha256DigestFromCertificate(*cert));
+      }
+      if (initial_fingerprints.empty()) {
+        initial_fingerprints = fingerprints;
+      } else {
+        EXPECT_EQ(initial_fingerprints, fingerprints);
+      }
+    };
+    const auto before_reconnect = [&](SSL* ssl) {
+      if (scenario == "expired") {
+        SSL_SESSION* session = SSL_get_session(ssl);
+        ASSERT_NE(nullptr, session);
+        SSL_SESSION_set_time(session, 0);
+        SSL_SESSION_set_timeout(session, 1);
+      } else if (scenario == "evicted") {
+        EXPECT_EQ(1, SSL_CTX_remove_session(SSL_get_SSL_CTX(ssl), SSL_get_session(ssl)));
+      }
+    };
+    testClientSessionResumption(server, client, expect_reuse, version_, check, before_reconnect);
+  }
+}
+
+TEST_P(SslSocketTest, VerifiedChainTicketSessionResumptionTls13) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.preserve_verified_peer_chain_in_session_ticket", "true"}});
+  const std::string server_ctx_yaml = R"EOF(
+  require_client_certificate: true
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      allow_expired_certificate: true
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF";
+  const std::string client_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_chain.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns3_key.pem"
+)EOF";
+  std::vector<std::string> initial_fingerprints;
+  const auto check = [&](const Ssl::ConnectionInfo& info, bool resumed) {
+    SCOPED_TRACE(resumed ? "resumed TLS 1.3" : "initial TLS 1.3");
+    EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_SERIAL, info.serialNumberPeerCertificateIssuer());
+    EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_256_HASH, info.sha256PeerCertificateIssuerDigest());
+    EXPECT_EQ(!resumed, info.peerCertificateValidated());
+    const auto chain = dynamic_cast<const SslHandshakerImpl&>(info).validatedCertChain();
+    ASSERT_EQ(3, chain.size());
+    EXPECT_EQ(TEST_SAN_DNS3_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*chain[0]));
+    EXPECT_EQ(TEST_INTERMEDIATE_CA_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*chain[1]));
+    EXPECT_EQ(TEST_CA_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*chain[2]));
+    std::vector<std::string> fingerprints;
+    for (const auto& cert : chain) {
+      fingerprints.push_back(Utility::getSha256DigestFromCertificate(*cert));
+    }
+    if (resumed) {
+      EXPECT_EQ(initial_fingerprints, fingerprints);
+    } else {
+      initial_fingerprints = std::move(fingerprints);
+    }
+  };
+  testClientSessionResumption(server_ctx_yaml, client_ctx_yaml, true, version_, check);
+  // Without configured keys, the same server context keeps its generated ticket key.
+  const auto generated_key_server =
+      absl::StrReplaceAll(server_ctx_yaml, {{R"EOF(  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a"
+)EOF",
+                                             ""}});
+  initial_fingerprints.clear();
+  testClientSessionResumption(generated_key_server, client_ctx_yaml, true, version_, check);
+}
+
+TEST(SessionTicketCodecTest, AuthenticatedRoundTripAndTampering) {
+  auto codec = SessionTicketCodec::create({});
+  ASSERT_TRUE(codec.ok());
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  const std::string session = "opaque BoringSSL session";
+  std::vector<uint8_t> ticket(session.size() + (*codec)->maxOverhead());
+  size_t ticket_len;
+  ASSERT_EQ(1, (*codec)->seal(ssl.get(), ticket.data(), &ticket_len, ticket.size(),
+                              reinterpret_cast<const uint8_t*>(session.data()), session.size()));
+  ticket.resize(ticket_len);
+  std::vector<uint8_t> plaintext(ticket.size());
+  size_t plaintext_len;
+  ASSERT_EQ(ssl_ticket_aead_success,
+            (*codec)->open(ssl.get(), plaintext.data(), &plaintext_len, plaintext.size(),
+                           ticket.data(), ticket.size()));
+  EXPECT_EQ(session, std::string(reinterpret_cast<char*>(plaintext.data()), plaintext_len));
+  for (size_t i = 0; i < ticket.size(); ++i) {
+    ticket[i] ^= 1;
+    EXPECT_EQ(ssl_ticket_aead_ignore_ticket,
+              (*codec)->open(ssl.get(), plaintext.data(), &plaintext_len, plaintext.size(),
+                             ticket.data(), ticket.size()));
+    EXPECT_EQ(0, plaintext_len);
+    ticket[i] ^= 1;
+  }
+  for (size_t length = 0; length < ticket.size(); ++length) {
+    EXPECT_EQ(ssl_ticket_aead_ignore_ticket,
+              (*codec)->open(ssl.get(), plaintext.data(), &plaintext_len, plaintext.size(),
+                             ticket.data(), length));
+  }
+}
+
+TEST(SessionTicketCodecTest, KeyRotationAndOutputBounds) {
+  Ssl::ServerContextConfig::SessionTicketKey old_key{};
+  Ssl::ServerContextConfig::SessionTicketKey new_key{};
+  old_key.name_[0] = 1;
+  new_key.name_[0] = 2;
+  new_key.aes_key_[0] = 3;
+  auto original = SessionTicketCodec::create({old_key});
+  auto rotated = SessionTicketCodec::create({new_key, old_key});
+  auto retired = SessionTicketCodec::create({new_key});
+  ASSERT_TRUE(original.ok() && rotated.ok() && retired.ok());
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  bssl::UniquePtr<SSL> ssl(SSL_new(ctx.get()));
+  const std::array<uint8_t, 4> session{{1, 2, 3, 4}};
+  std::vector<uint8_t> ticket(session.size() + (*original)->maxOverhead());
+  size_t ticket_len, plaintext_len;
+  ASSERT_EQ(1, (*original)->seal(ssl.get(), ticket.data(), &ticket_len, ticket.size(),
+                                 session.data(), session.size()));
+  std::array<uint8_t, 4> plaintext;
+  EXPECT_EQ(ssl_ticket_aead_success, (*rotated)->open(ssl.get(), plaintext.data(), &plaintext_len,
+                                                      plaintext.size(), ticket.data(), ticket_len));
+  EXPECT_EQ(session, plaintext);
+  EXPECT_EQ(ssl_ticket_aead_ignore_ticket,
+            (*retired)->open(ssl.get(), plaintext.data(), &plaintext_len, plaintext.size(),
+                             ticket.data(), ticket_len));
+  EXPECT_EQ(
+      ssl_ticket_aead_ignore_ticket,
+      (*rotated)->open(ssl.get(), plaintext.data(), &plaintext_len, 0, ticket.data(), ticket_len));
+  EXPECT_EQ(0, (*rotated)->seal(ssl.get(), ticket.data(), &ticket_len, 0, session.data(),
+                                session.size()));
+}
+
+#endif
 
 TEST_P(SslSocketTest, SslError) {
   const std::string server_ctx_yaml = R"EOF(
