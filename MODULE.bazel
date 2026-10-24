@@ -137,21 +137,6 @@ local_path_override(
     path = "api",
 )
 
-single_version_override(
-    module_name = "proxy-wasm-cpp-sdk",
-    version = "0.0.0-250925-e5256b0.envoy.1",
-)
-
-single_version_override(
-    module_name = "boringssl",
-    version = "0.20260929.0",
-)
-
-single_version_override(
-    module_name = "openssl",
-    version = "3.5.9.envoy",
-)
-
 # testing/debugging
 # local_path_override(
 #     module_name = "envoy_toolshed",
@@ -171,6 +156,21 @@ single_version_override(
 #     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "jq",
 # )
+
+single_version_override(
+    module_name = "proxy-wasm-cpp-sdk",
+    version = "0.0.0-250925-e5256b0.envoy.1",
+)
+
+single_version_override(
+    module_name = "boringssl",
+    version = "0.20260929.0",
+)
+
+single_version_override(
+    module_name = "openssl",
+    version = "3.5.9.envoy",
+)
 
 ####################################################################################
 # setup: Compilers
