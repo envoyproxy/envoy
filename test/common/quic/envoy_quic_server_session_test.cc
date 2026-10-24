@@ -1039,6 +1039,51 @@ TEST_F(EnvoyQuicServerSessionTest, CreateIncomingStreamGoAwayAndCloseOnDispatch)
   EXPECT_FALSE(quic_connection_->connected());
 }
 
+TEST_F(EnvoyQuicServerSessionTest, CreateIncomingStreamResetStreamOnCreatingStream) {
+  Server::MockLoadShedPoint reset_stream_lsp;
+  ON_CALL(overload_manager_,
+          getLoadShedPoint(Server::LoadShedPointName::get().H3ServerResetStreamOnCreatingStream))
+      .WillByDefault(Return(&reset_stream_lsp));
+  installReadFilter();
+
+  EXPECT_CALL(reset_stream_lsp, shouldShedLoad()).WillOnce(Return(true));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+      .Times(2)
+      .WillRepeatedly(Invoke([](const quic::QuicFrame& frame) {
+        quic::DeleteFrame(&const_cast<quic::QuicFrame&>(frame));
+        return true;
+      }));
+  EXPECT_CALL(*quic_connection_, OnStreamReset(4u, quic::QUIC_STREAM_REQUEST_REJECTED));
+
+  EXPECT_EQ(nullptr, envoy_quic_session_.GetOrCreateStream(4u));
+  EXPECT_EQ(1U, stats_.tx_reset_.value());
+  EXPECT_EQ(1U, TestUtility::findCounter(
+                    listener_config_.listenerScope().store(),
+                    "http3.downstream.tx.quic_reset_stream_error_code_QUIC_STREAM_REQUEST_REJECTED")
+                    ->value());
+  EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
+  EXPECT_TRUE(testing::Mock::VerifyAndClearExpectations(quic_connection_));
+
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+      .WillRepeatedly(Invoke([](const quic::QuicFrame& frame) {
+        quic::DeleteFrame(&const_cast<quic::QuicFrame&>(frame));
+        return true;
+      }));
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  setupRequestDecoderMock(request_decoder);
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+
+  EXPECT_CALL(reset_stream_lsp, shouldShedLoad()).WillOnce(Return(false));
+  auto* stream = dynamic_cast<EnvoyQuicServerStream*>(
+      createNewStreamWithId(8u, request_decoder, stream_callbacks));
+  ASSERT_NE(nullptr, stream);
+
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
+}
+
 TEST_F(EnvoyQuicServerSessionTest, ConnectedAfterHandshake) {
   installReadFilter();
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::Connected));
