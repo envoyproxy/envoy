@@ -461,6 +461,40 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   filter->onDestroy();
 }
 
+// Exercise the Rust SDK wrappers against real Envoy ABI callbacks.
+class DynamicModuleHttpNestedMetadataTest : public Event::TestUsingSimulatedTime,
+                                            public testing::Test {};
+
+TEST_F(DynamicModuleHttpNestedMetadataTest, Rust) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  ASSERT_OK(dynamic_module);
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  auto config = newDynamicModuleHttpFilterConfig(
+      "nested_metadata_callbacks", "", DefaultMetricsNamespace, false,
+      std::move(dynamic_module.value()), *stats_scope, context);
+  ASSERT_OK(config);
+  auto filter =
+      std::make_shared<DynamicModuleHttpFilter>(config.value(), stats_scope->symbolTable(), 0);
+  filter->initializeInModuleFilter();
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  TestUtility::loadFromJson(R"EOF({
+    "claims": {
+      "sub": "user-123", "exp": 123, "active": false,
+      "a": {"b": {"c": {"role.name": "admin"}}},
+      "values": ["admin", 42, false]
+    }
+  })EOF",
+                            (*callbacks.stream_info_.metadata_
+                                  .mutable_filter_metadata())["envoy.filters.http.jwt_authn"]);
+  filter->setDecoderFilterCallbacks(callbacks);
+  Http::TestRequestHeaderMapImpl headers{};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, true));
+  filter->onDestroy();
+}
+
 TEST_P(DynamicModuleHttpLanguageTests, DynamicMetadataCallbacks) {
   const std::string filter_name = "dynamic_metadata_callbacks";
   const std::string filter_config = "";
