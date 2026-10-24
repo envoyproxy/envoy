@@ -166,8 +166,17 @@ private:
   void addProvider(const JwtProvider& provider);
 
   // @return what should be the 3-part base64url-encoded substring; see RFC-7519
-  absl::string_view extractJWT(absl::string_view value_str,
-                               absl::string_view::size_type after) const;
+  static absl::string_view extractJWT(absl::string_view value_str,
+                                      absl::string_view::size_type after);
+
+  // The first token found in a header value, and the unconsumed remainder of that value.
+  struct HeaderToken {
+    absl::string_view token;
+    absl::string_view rest;
+  };
+  // @return the first token in value_str, or nullopt if the required_prefix was not found in it.
+  static std::optional<HeaderToken> extractHeaderToken(absl::string_view required_prefix,
+                                                        absl::string_view value_str);
 
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
@@ -260,6 +269,46 @@ void ExtractorImpl::addCookieConfig(const std::string& issuer, const std::string
   cookie_location_spec.issuer_checker_.add(issuer);
 }
 
+// RFC 9110 5.3 mandates that header values concatenated by commas be treated
+// identically to the values appearing in repeated headers. Scans value_str for
+// the required_prefix, if any, and extracts the first found token and the
+// suffix to search next, if any, in accordance with the RFC.
+//
+// @return the first token in value_str and the remainder after it, or nullopt if the value_prefix
+// was not found in value_str.
+std::optional<ExtractorImpl::HeaderToken>
+ExtractorImpl::extractHeaderToken(const absl::string_view required_prefix,
+                                  const absl::string_view value_str) {
+  if (required_prefix.empty()) {
+    // Split on commas so that headers collapsed as allowed by RFC 9110 Section
+    // 5.3 are honored.
+    if (const auto comma = value_str.find(','); comma != absl::string_view::npos) {
+      const auto rest = absl::StripLeadingAsciiWhitespace(value_str.substr(comma + 1));
+      return HeaderToken{.token = value_str.substr(0, comma), .rest = rest};
+    }
+    return HeaderToken{.token = value_str, .rest = {}};
+  }
+
+  const auto pos = value_str.find(required_prefix);
+  if (pos == absl::string_view::npos) {
+    return std::nullopt;
+  }
+
+  const absl::string_view::size_type after = pos + required_prefix.length();
+  // Split on commas so that headers collapsed as allowed by RFC 9110 Section
+  // 5.3 are honored. For backwards compatibility, skip commas that aren't
+  // followed by the required prefix.
+  if (const auto next_prefix = value_str.find(required_prefix, after);
+      next_prefix != absl::string_view::npos) {
+    const auto before_next = absl::StripTrailingAsciiWhitespace(value_str.substr(0, next_prefix));
+    if (before_next.size() > after && before_next.back() == ',') {
+      return HeaderToken{.token = extractJWT(before_next.substr(0, before_next.size() - 1), after),
+                         .rest = value_str.substr(next_prefix)};
+    }
+  }
+  return HeaderToken{.token = extractJWT(value_str, after), .rest = {}};
+}
+
 std::vector<JwtLocationConstPtr>
 ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
   std::vector<JwtLocationConstPtr> tokens;
@@ -272,16 +321,18 @@ ExtractorImpl::extract(const Http::RequestHeaderMap& headers) const {
     if (!header_value.empty()) {
       for (size_t i = 0; i < header_value.size(); i++) {
         auto value_str = header_value[i]->value().getStringView();
-        if (!location_spec->value_prefix_.empty()) {
-          const auto pos = value_str.find(location_spec->value_prefix_);
-          if (pos == absl::string_view::npos) {
-            // value_prefix not found anywhere in value_str, so skip
-            continue;
+        // Loop to handle multiple concatenated header values.
+        do {
+          const auto extracted = extractHeaderToken(location_spec->value_prefix_, value_str);
+          if (!extracted.has_value()) {
+            // value_prefix_ not found anywhere in value_str, so skip
+            break;
           }
-          value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
-        }
-        tokens.push_back(std::make_unique<const JwtHeaderLocation>(
-            std::string(value_str), location_spec->issuer_checker_, location_spec->header_));
+          tokens.push_back(std::make_unique<const JwtHeaderLocation>(std::string(extracted->token),
+                                                                     location_spec->issuer_checker_,
+                                                                     location_spec->header_));
+          value_str = extracted->rest;
+        } while (!value_str.empty());
       }
     }
   }
@@ -338,7 +389,7 @@ constexpr absl::string_view ConstantBase64UrlEncodingCharsPlusDot =
 //
 // See RFC-7519 § 2, RFC-7515 § 2, and RFC-4648 "Base-N Encodings" § 5.
 absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
-                                            absl::string_view::size_type after) const {
+                                            absl::string_view::size_type after) {
   const auto starting = value_str.find_first_of(ConstantBase64UrlEncodingCharsPlusDot, after);
   if (starting == value_str.npos) {
     return value_str;
