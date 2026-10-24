@@ -42,6 +42,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/numbers.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Router {
@@ -1417,6 +1418,23 @@ void Filter::onDestroy() {
 void Filter::onResponseTimeout() {
   ENVOY_STREAM_LOG(debug, "upstream timeout", *callbacks_);
 
+  // Work out where the newest in-flight upstream request was when the timeout fired, so the
+  // response code details can tell a stalled connection or request send apart from a slow
+  // upstream. This has to happen before the list is drained below.
+  std::string details = StreamInfo::ResponseCodeDetails::get().ResponseTimeout;
+  if (!upstream_requests_.empty() &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.response_timeout_phase_details")) {
+    UpstreamRequest& newest = *upstream_requests_.front();
+    if (!newest.hadUpstream()) {
+      // The pool never handed over a connection: the request was still queued, the TCP connect
+      // had not finished, or the TLS handshake was still in progress. These cannot be told apart
+      // here because connection timing is only copied onto the request once the pool is ready.
+      absl::StrAppend(&details, "{connecting}");
+    } else if (!newest.streamInfo().upstreamInfo()->upstreamTiming().last_upstream_tx_byte_sent_) {
+      absl::StrAppend(&details, "{sending_request}");
+    }
+  }
+
   // Reset any upstream requests that are still in flight.
   while (!upstream_requests_.empty()) {
     UpstreamRequestPtr upstream_request =
@@ -1456,8 +1474,7 @@ void Filter::onResponseTimeout() {
     upstream_request->resetStream();
   }
 
-  onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout,
-                         StreamInfo::ResponseCodeDetails::get().ResponseTimeout);
+  onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout, details);
 }
 
 // Called when the per try timeout is hit but we didn't reset the request
