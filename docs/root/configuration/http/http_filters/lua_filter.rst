@@ -214,6 +214,20 @@ drained the VM is torn down, and the next configuration asking for that id and s
 fresh one. Leaving the field unset, which is the default, keeps every configuration's scripts in
 VMs of their own.
 
+.. _config_http_filters_lua_failure_policy:
+
+Script errors
+-------------
+
+An error a script raises and does not catch is logged and counted in the ``errors``
+:ref:`statistic <config_http_filters_lua_stats>`, and the script stops running. By default the
+filter chain then continues as though the script had returned, so a request a script meant to
+reject reaches the upstream anyway. A script that makes an admission decision, such as an
+authorization check, should set :ref:`failure_policy
+<envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.failure_policy>` to ``FAIL_CLOSED``, which
+fails the stream with a ``503`` local reply instead, or resets it if the response has already
+started downstream.
+
 Upstream Filter
 ---------------
 

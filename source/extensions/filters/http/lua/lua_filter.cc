@@ -82,6 +82,7 @@ constexpr int HttpCallOptionsIndex = 5;
 
 struct HttpResponseCodeDetailValues {
   const absl::string_view LuaResponse = "lua_response";
+  const absl::string_view LuaScriptError = "lua_script_error";
 };
 using HttpResponseCodeDetails = ConstSingleton<HttpResponseCodeDetailValues>;
 
@@ -625,8 +626,8 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
     const absl::Status status = resumeCoroutine(2, yield_callback_);
     if (status.ok()) {
       markDead();
-    } else {
-      filter_.scriptError(status);
+    } else if (filter_.scriptError(callbacks_, status)) {
+      return;
     }
 
     if (state_ == State::Running) {
@@ -688,9 +689,9 @@ int StreamHandleWrapper::luaRequestHeaders(lua_State* state) {
   if (!request_headers.has_value()) {
     // Push nil rather than returning no values. A lua_CFunction that returns 0 yields *nothing*,
     // which is not the same as nil: `tostring(handle:requestHeaders())` then raises "value
-    // expected" instead of evaluating, and because scriptError() continues the filter chain the
-    // script silently stops running. Returning a real nil keeps the documented contract usable in
-    // an argument position, and matches luaBase64Decode above.
+    // expected" instead of evaluating, and because scriptError() continues the filter chain by
+    // default the script silently stops running. Returning a real nil keeps the documented
+    // contract usable in an argument position, and matches luaBase64Decode above.
     lua_pushnil(state);
     return 1;
   }
@@ -1027,6 +1028,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
     : cluster_manager_(cluster_manager),
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
+      fail_closed_(proto_config.failure_policy() ==
+                   envoy::extensions::filters::http::lua::v3::Lua::FAIL_CLOSED),
       filter_context_(proto_config.filter_context()),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
       lua_stats_scope_(
@@ -1130,15 +1133,15 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
   const absl::Status coroutine_status = handle.get()->coroutineStatus();
   if (coroutine_status.ok()) {
     handle.markDead();
-  } else {
-    scriptError(coroutine_status);
+  } else if (scriptError(callbacks, coroutine_status)) {
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   return status;
 }
 
-Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance& data,
-                                      bool end_stream) {
+Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, FilterCallbacks& callbacks,
+                                      Buffer::Instance& data, bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
     handle.markLive();
@@ -1147,15 +1150,16 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
     const absl::Status coroutine_status = handle.get()->coroutineStatus();
     if (coroutine_status.ok()) {
       handle.markDead();
-    } else {
-      scriptError(coroutine_status);
+    } else if (scriptError(callbacks, coroutine_status)) {
+      return Http::FilterDataStatus::StopIterationNoBuffer;
     }
   }
 
   return status;
 }
 
-Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
+Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, FilterCallbacks& callbacks,
+                                              Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
     handle.markLive();
@@ -1164,19 +1168,26 @@ Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::Hea
     const absl::Status coroutine_status = handle.get()->coroutineStatus();
     if (coroutine_status.ok()) {
       handle.markDead();
-    } else {
-      scriptError(coroutine_status);
+    } else if (scriptError(callbacks, coroutine_status)) {
+      return Http::FilterTrailersStatus::StopIteration;
     }
   }
 
   return status;
 }
 
-void Filter::scriptError(const absl::Status& status) {
+bool Filter::scriptError(FilterCallbacks& callbacks, const absl::Status& status) {
   stats_.errors_.inc();
   scriptLog(spdlog::level::err, status.message());
   request_stream_wrapper_.reset();
   response_stream_wrapper_.reset();
+  if (!config_->failClosed() || stream_failed_) {
+    return false;
+  }
+  stream_failed_ = true;
+  callbacks.sendLocalReply(Http::Code::ServiceUnavailable,
+                           HttpResponseCodeDetails::get().LuaScriptError);
+  return true;
 }
 
 int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {

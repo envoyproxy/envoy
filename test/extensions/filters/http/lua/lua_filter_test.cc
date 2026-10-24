@@ -116,6 +116,14 @@ public:
     THROW_IF_NOT_OK_REF(creation_status);
   }
 
+  void setupFailClosed(const std::string& lua_code) {
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.mutable_default_source_code()->set_inline_string(lua_code);
+    proto_config.set_failure_policy(envoy::extensions::filters::http::lua::v3::Lua::FAIL_CLOSED);
+    setupConfig(proto_config, {});
+    setupFilter();
+  }
+
   void setupFilter() {
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
@@ -855,6 +863,185 @@ TEST_F(LuaHttpFilterTest, ErrorDuringCallback) {
   });
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// The default policy continues the stream without a local reply.
+TEST_F(LuaHttpFilterTest, FailOpenByDefault) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      error("boom")
+    end
+  )EOF"};
+
+  setup(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("error", "boom", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, FailClosedOnRequestHeadersError) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      error("boom")
+    end
+  )EOF"};
+
+  setupFailClosed(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "", _,
+                                                 Eq(std::nullopt), "lua_script_error"));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("error", "boom", {
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, true));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, FailClosedOnRequestBodyError) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      for chunk in request_handle:bodyChunks() do
+        error("boom")
+      end
+    end
+  )EOF"};
+
+  setupFailClosed(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "", _,
+                                                 Eq(std::nullopt), "lua_script_error"));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_LOG_CONTAINS("error", "boom", {
+    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, false));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, FailClosedOnRequestTrailersError) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:trailers()
+      error("boom")
+    end
+  )EOF"};
+
+  setupFailClosed(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "", _,
+                                                 Eq(std::nullopt), "lua_script_error"));
+  Http::TestRequestTrailerMapImpl request_trailers{{"foo", "bar"}};
+  EXPECT_LOG_CONTAINS("error", "boom", {
+    EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+TEST_F(LuaHttpFilterTest, FailClosedOnResponseHeadersError) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      error("boom")
+    end
+  )EOF"};
+
+  setupFailClosed(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "", _,
+                                                 Eq(std::nullopt), "lua_script_error"));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("error", "boom", {
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// An error after an httpCall() resumes the script fails the stream instead of continuing it.
+TEST_F(LuaHttpFilterTest, FailClosedOnErrorAfterHttpCall) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "POST",
+          [":path"] = "/",
+          [":authority"] = "foo",
+        },
+        "hello world",
+        5000)
+      error("boom")
+    end
+  )EOF"};
+
+  setupFailClosed(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks = &cb;
+            return &request;
+          }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, "", _,
+                                                 Eq(std::nullopt), "lua_script_error"));
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  EXPECT_LOG_CONTAINS("error", "boom",
+                      { callbacks->onSuccess(request, std::move(response_message)); });
+  EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// Once a stream has failed, a second error, such as one raised while the local reply passes
+// through envoy_on_response, is counted but does not replace the reply.
+TEST_F(LuaHttpFilterTest, FailClosedFailsAStreamOnce) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      error("request boom")
+    end
+
+    function envoy_on_response(response_handle)
+      error("response boom")
+    end
+  )EOF"};
+
+  setupFailClosed(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("error", "request boom", {
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, true));
+  });
+
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "503"}};
+  EXPECT_LOG_CONTAINS("error", "response boom", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(2, stats_store_.counter("test.lua.errors").value());
 }
 
 // Use of header iterator across yield.

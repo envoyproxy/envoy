@@ -22,10 +22,24 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Lua {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.lua.v2.Lua";
+
+  // What the filter does with a stream whose script raises an error it does not catch. In every
+  // case the error is logged and counted in the ``errors`` statistic.
+  enum FailurePolicy {
+    // The filter chain continues as though the script had returned at the point it raised.
+    FAIL_OPEN = 0;
+
+    // The stream is failed with a locally generated ``503 Service Unavailable``, whose
+    // response code details are ``lua_script_error``. If the response has already started
+    // downstream, the stream is reset instead. Only the first error fails a stream: an error
+    // raised by ``envoy_on_response`` while it handles that ``503`` is logged and counted, and
+    // the ``503`` is sent regardless.
+    FAIL_CLOSED = 1;
+  }
 
   // The Lua code that Envoy will execute. This can be a very small script that
   // further loads code from disk if desired. Note that if JSON configuration is used, the code must
@@ -157,6 +171,14 @@ message Lua {
   // one is drained the VM is torn down, and the next configuration asking for that id and script
   // builds a fresh one.
   string shared_vm_id = 9;
+
+  // What to do with a stream when a script raises an error it does not catch, whether in
+  // ``envoy_on_request`` or ``envoy_on_response``. Defaults to
+  // :ref:`FAIL_OPEN <envoy_v3_api_enum_value_extensions.filters.http.lua.v3.Lua.FailurePolicy.FAIL_OPEN>`.
+  // A script making an admission decision, such as an authorization check, should set
+  // :ref:`FAIL_CLOSED <envoy_v3_api_enum_value_extensions.filters.http.lua.v3.Lua.FailurePolicy.FAIL_CLOSED>`
+  // so that a bug in the script denies the request rather than letting it through.
+  FailurePolicy failure_policy = 10 [(validate.rules).enum = {defined_only: true}];
 }
 
 // [#next-free-field: 8]
