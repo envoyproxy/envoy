@@ -2133,8 +2133,26 @@ void ClusterImplBase::reloadHealthyHosts(const HostSharedPtr& host) {
   reloadHealthyHostsHelper(host);
 }
 
-void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr&) {
+void ClusterImplBase::reloadHealthyHostsHelper(const HostSharedPtr& host) {
   const auto& host_sets = prioritySet().hostSetsPerPriority();
+
+  // A health change re-partitions only the host's priority. A null host comes from
+  // finishInitialization() and re-partitions every priority.
+  if (host != nullptr &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.incremental_health_transition")) {
+    const uint32_t priority = host->priority();
+    if (priority < host_sets.size()) {
+      const auto& host_set = host_sets[priority];
+      prioritySet().updateHosts(
+          priority,
+          HostSetImpl::partitionHosts(host_set->hostsPtr(), host_set->hostsPerLocalityPtr()),
+          host_set->localityWeights(), {}, {}, std::nullopt, std::nullopt);
+      return;
+    }
+    IS_ENVOY_BUG(fmt::format("health change for host at priority {} beyond {} host sets", priority,
+                             host_sets.size()));
+  }
+
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& host_set = host_sets[priority];
     // TODO(htuch): Can we skip these copies by exporting out const shared_ptr from HostSet?
