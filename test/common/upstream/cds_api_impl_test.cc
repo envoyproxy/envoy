@@ -531,9 +531,16 @@ TEST_F(CdsApiImplTest, SotwTrackingRuntimeGuardDisabledRemovesAllMissingClusters
   EXPECT_CALL(cm_, clusters())
       .WillOnce(Return(makeClusterInfoMaps({"sotw_cluster_1", "od_cluster_1"})));
   expectAdd("sotw_cluster_2", "1");
-  EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
-  EXPECT_CALL(cm_, removeCluster("od_cluster_1", false));
+  // The removal order depends on the hash map iteration order.
+  std::vector<std::string> removed;
+  EXPECT_CALL(cm_, removeCluster(_, false))
+      .Times(2)
+      .WillRepeatedly([&removed](absl::string_view name, bool) {
+        removed.emplace_back(name);
+        return true;
+      });
   EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("1", {"sotw_cluster_2"}), "1"));
+  EXPECT_THAT(removed, testing::UnorderedElementsAre("sotw_cluster_1", "od_cluster_1"));
 }
 
 // Clusters received while the guard was disabled are still tracked.
