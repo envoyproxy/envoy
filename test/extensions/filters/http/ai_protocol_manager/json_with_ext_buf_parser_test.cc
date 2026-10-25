@@ -249,6 +249,37 @@ TEST_F(JsonWithExtBufParserTest, FeedAfterCompletionIsRejected) {
               HasStatusCode(absl::StatusCode::kFailedPrecondition));
 }
 
+// The filter forwards the raw body, so a second document in a non-final chunk
+// must fail the parse, not be skipped. Rejected on the feed() that carries it.
+TEST_F(JsonWithExtBufParserTest, TrailingDocumentInNonFinalChunkIsRejected) {
+  {
+    JsonWithExtBufParser parser(config_);
+    EXPECT_THAT(parser.feed(R"({"valid":1} {"smuggled":"data"})", /*end_stream=*/false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_THAT(parser.feed("", /*end_stream=*/true),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_TRUE(parser.takeDocument().json().is_null());
+  }
+  {
+    JsonWithExtBufParser parser(config_);
+    ASSERT_OK(parser.feed(R"({"valid":1})", /*end_stream=*/false));
+    EXPECT_THAT(parser.feed(R"({"smuggled":"data"})", /*end_stream=*/false),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_THAT(parser.feed("", /*end_stream=*/true),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_TRUE(parser.takeDocument().json().is_null());
+  }
+}
+
+// Trailing whitespace over several non-final chunks is fine.
+TEST_F(JsonWithExtBufParserTest, TrailingWhitespaceAcrossChunksIsAccepted) {
+  JsonWithExtBufParser parser(config_);
+  ASSERT_OK(parser.feed(R"({"valid":1})", /*end_stream=*/false));
+  ASSERT_OK(parser.feed(" \n", /*end_stream=*/false));
+  ASSERT_OK(parser.feed("\t", /*end_stream=*/true));
+  EXPECT_EQ(parser.takeDocument().json(), nlohmann::json::parse(R"({"valid":1})"));
+}
+
 // Errors are sticky: the same failure comes back rather than half a document.
 TEST_F(JsonWithExtBufParserTest, ErrorsAreTerminal) {
   JsonWithExtBufParser parser(config_);
@@ -306,6 +337,28 @@ TEST_F(JsonWithExtBufParserTest, CallbacksNoOpOnceAnErrorIsRecorded) {
   parser.onContainerClose(/*depth=*/1, /*token_end=*/1);
 
   EXPECT_THAT(parser.feed("{}", /*end_stream=*/true), HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_TRUE(parser.takeDocument().json().is_null());
+}
+
+// onKey/onNumber/onBoolean must also stop once an error is recorded: the stack
+// may be out of step, and returning OK would let the cursor carry on.
+TEST_F(JsonWithExtBufParserTest, ValueCallbacksDoNotAttachOnceAnErrorIsRecorded) {
+  JsonWithExtBufParser parser(config_);
+  // Open a real root so stack_.back() is a live container.
+  ASSERT_OK(parser.feed(R"({"keep":1,)", /*end_stream=*/false));
+  // Record an error via a void callback: closing past the root is internal.
+  parser.onContainerClose(/*depth=*/1, /*token_end=*/0);
+  parser.onContainerClose(/*depth=*/1, /*token_end=*/0);
+
+  // Each returns the recorded error and attaches nothing.
+  EXPECT_THAT(parser.onKey("k", /*depth=*/1, /*token_start=*/0),
+              HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_THAT(parser.onNumber("k", "7", /*depth=*/1, /*token_start=*/0, /*token_end=*/1),
+              HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_THAT(parser.onBoolean("k", true, /*depth=*/1, /*token_start=*/0, /*token_end=*/4),
+              HasStatusCode(absl::StatusCode::kInternal));
+
+  EXPECT_THAT(parser.feed("}", /*end_stream=*/true), HasStatusCode(absl::StatusCode::kInternal));
   EXPECT_TRUE(parser.takeDocument().json().is_null());
 }
 

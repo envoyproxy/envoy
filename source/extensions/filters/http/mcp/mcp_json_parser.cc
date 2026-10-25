@@ -357,13 +357,15 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
   }
 
   depth_++;
+  // Push for every object, empty key included, so EndObject always pops the
+  // matching frame. Otherwise `{"":{}}` would pop its parent's path segment.
+  path_stack_.push_back({current_path_cache_.size()});
 
   bool is_duplicate = false;
   if (!name.empty()) {
     // Check for duplicate key in the parent scope before entering this object
     is_duplicate = checkDuplicateKey(name);
 
-    path_stack_.push_back(std::string(name));
     // Update cached path
     if (!current_path_cache_.empty()) {
       current_path_cache_ += ".";
@@ -445,9 +447,8 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
 
     if (!path_stack_.empty()) {
-      const size_t trim_size = path_stack_.back().size() + (path_stack_.size() > 1 ? 1 : 0);
-      ASSERT(current_path_cache_.size() >= trim_size);
-      current_path_cache_.resize(current_path_cache_.size() - trim_size);
+      // Restore the path to what it was before this object's StartObject.
+      current_path_cache_.resize(path_stack_.back().cache_size_before);
       path_stack_.pop_back();
     }
     if (context_stack_.size() > 1) {

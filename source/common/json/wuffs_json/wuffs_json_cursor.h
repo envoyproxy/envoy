@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
@@ -177,6 +179,11 @@ public:
 
   // Feed one body chunk. Set closed=true on the final chunk (signals EOF to Wuffs).
   // Returns non-OK on malformed JSON or internal allocation failure.
+  //
+  // Exactly one root value is accepted; anything but whitespace after it is an
+  // error, in any chunk. Errors are sticky: after the first non-OK result, every
+  // later call returns the same status. Feeding after the root value has
+  // completed is also an error.
   absl::Status feed(absl::string_view chunk, bool closed);
 
   // One level of a structural pattern-path match: a dict key or an array wildcard.
@@ -232,7 +239,34 @@ public:
   // budget before doing so.
   static constexpr int kMaxTrackedDepth = 17;
 
+  // Duplicate-key detection for one object. Public only so tests can reach
+  // kLinearScanLimit.
+  //
+  // Most objects are small, and a hash set costs tens of bytes per key. So keys
+  // are packed into one buffer and scanned linearly until the object grows past
+  // kLinearScanLimit, then moved to a hash set. Results are the same either way.
+  class SeenKeys {
+  public:
+    // Scan linearly up to this many keys. Keys are capped at kMaxKeyBytes, so
+    // the buffer stays small.
+    static constexpr size_t kLinearScanLimit = 32;
+
+    // Returns true if `key` was not already present.
+    bool insert(absl::string_view key);
+    void clear();
+
+  private:
+    // Small mode: all key bytes back to back, plus where each key ends.
+    std::string bytes_;
+    std::vector<uint32_t> ends_;
+    // Large mode, once non-null.
+    std::unique_ptr<absl::flat_hash_set<std::string>> large_;
+  };
+
 private:
+  // feed() without the sticky-error check.
+  absl::Status feedChunk(absl::string_view chunk, bool closed);
+
   Handler& handler_;
 
   wuffs_json__decoder::unique_ptr decoder_;
@@ -242,6 +276,8 @@ private:
 
   size_t body_src_pos_{0};
   bool wuffs_done_{false};
+  // First error returned by feed(); every later call returns it again.
+  absl::Status status_;
   // Cap key length at 256 bytes: well above any legitimate schema field name
   // (longest observed ~25B, e.g. "input_audio_transcription") while bounding
   // per-key allocation and guarding against DoS via unbounded key lengths.
@@ -264,8 +300,9 @@ private:
   // key_stack_[d] — key of the item at depth d; forwarded as the `key` argument
   // to callbacks, and the sole label source for matchesPatternPath.
   std::string key_stack_[kMaxTrackedDepth]{};
-  // duplicate-key detection.
-  absl::flat_hash_set<std::string> seen_keys_[kMaxTrackedDepth]{};
+
+  // Duplicate-key detection, one per depth.
+  SeenKeys seen_keys_[kMaxTrackedDepth]{};
 
   bool in_string_chain_{false};
   // bytes rewound by Wuffs on short_read; prepended to next chunk.
