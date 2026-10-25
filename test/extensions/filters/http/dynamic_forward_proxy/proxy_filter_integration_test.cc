@@ -688,6 +688,7 @@ TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
 #endif
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
+  useAccessLog("%RESPONSE_CODE_DETAILS% %RESPONSE_FLAGS% %UPSTREAM_HOST%");
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
@@ -708,7 +709,7 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   ASSERT_TRUE(response1->waitForEndStream());
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("200", response1->headers().getStatusValue());
-  EXPECT_EQ("200", response2->headers().getStatusValue());
+  EXPECT_EQ("200", response2->headers().getStatusValue()) << waitForAccessLog(access_log_name_, 1);
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
