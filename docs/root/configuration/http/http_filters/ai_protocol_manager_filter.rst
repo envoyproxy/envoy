@@ -332,8 +332,10 @@ receives it through typed namespace forwarding:
       typed:
       - envoy.ai.request_info
 
-Only typed metadata is published. If the namespace already holds a record for
-the stream, the new one is skipped and counted by ``request_info.duplicate``.
+Only typed metadata is published unless :ref:`extraction
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.extraction>` is
+configured. If the namespace already holds a record for the stream, the new one
+is skipped and counted by ``request_info.duplicate``.
 
 The model is also stored as the ``envoy.ai.model.request`` :ref:`filter state
 object <well_known_filter_state>`, a string, so filters, the router and access
@@ -341,6 +343,91 @@ logs can read it without unpacking the record, e.g. with
 ``%FILTER_STATE(envoy.ai.model.request:PLAIN)%``. Nothing is stored when the
 request names no usable model, and an object a filter ahead already set is
 kept.
+
+.. _config_http_filters_ai_protocol_manager_request_info_extraction:
+
+Policy extraction
+^^^^^^^^^^^^^^^^^
+
+A client may send a routing or policy block alongside the prompt that the typed
+record has no field for, and that a consumer which never sees the body — an
+external processor running on request headers, a CEL matcher, a route's
+``metadata_match`` — still needs. :ref:`extraction
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.extraction>`
+copies such values, arrays and objects included, out of the parsed body into
+**untyped** dynamic metadata. The filter copies; it does not interpret.
+
+.. code-block:: yaml
+
+  - name: envoy.http.ai_filters.request_info
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.request_info.v3.RequestInfo
+      extraction:
+        rules:
+        - path: [settings]
+        - path: [model_list]
+        - path: [generationConfig, thinkingConfig, thinkingBudget]
+          key: thinking_budget
+        - path: [generation_config, thinking_config, thinking_budget]
+          key: thinking_budget
+
+For a body of ``{"model": "auto", "contents": [...], "settings": [{"cost": "low",
+"quality": "high"}], "model_list": ["model_a", "model_b"]}`` this writes
+
+.. code-block:: json
+
+  {"settings": [{"cost": "low", "quality": "high"}], "model_list": ["model_a", "model_b"]}
+
+to the untyped ``envoy.ai.request_info`` namespace, next to the typed record
+under the same name, where the :ref:`untyped forwarding namespaces
+<envoy_v3_api_field_extensions.filters.http.ext_proc.v3.MetadataOptions.MetadataNamespaces.untyped>`
+of an ext_proc filter, ``metadata.filter_metadata["envoy.ai.request_info"]``
+in CEL, or ``%DYNAMIC_METADATA(envoy.ai.request_info:model_list)%`` in an
+access log read it. :ref:`metadata_namespace
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.Extraction.metadata_namespace>`
+moves it elsewhere.
+
+A rule's :ref:`path
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.ExtractionRule.path>`
+is a list of object keys from the payload root; arrays are not indexed. The
+value found there is written whole under the rule's :ref:`key
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.ExtractionRule.key>`,
+which defaults to the path joined with ``.``. Several rules may name one key:
+the first to find a value wins, so a camelCase rule falls back to a snake_case
+one as above. An absent or ``null`` path writes the rule's :ref:`on_missing
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.ExtractionRule.on_missing>`,
+if set, and only when no rule found a value for the key. A key a filter ahead
+already wrote to the namespace is left alone. Rules are literal paths, so they
+work on any wire API, declared or not.
+
+The body is client controlled, and a copied value is held for the stream,
+forwarded to every external processor that receives the namespace, and written
+to access logs, so what one request may copy is bounded by :ref:`limits
+<envoy_v3_api_field_extensions.http.ai_filters.request_info.v3.RequestInfo.Extraction.limits>`:
+
+.. csv-table::
+  :header: Limit, Default, Bounds
+  :widths: 2, 1, 1
+
+  ``max_value_bytes`` per rule, 4KiB, 64B to 1MiB
+  ``max_total_bytes`` per request, 16KiB, 64B to 4MiB
+  ``max_depth`` below the path, 8, 1 to 32
+  ``max_string_bytes`` per string or key, 256, 1 to 64KiB
+
+Bytes are charged as the value is walked — string and key bytes plus a small
+per-node overhead — so an oversized value costs no more than the limit before
+it is abandoned. A value over any limit is dropped whole rather than truncated,
+so a consumer never acts on half a policy; it is counted by
+``request_info.extraction_dropped``. A value Envoy cannot represent as
+metadata — a string the manager offloaded past :ref:`inline_string_threshold_bytes
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`,
+a non-finite number, or an integer past 2\ :sup:`53` that would not survive the
+``protobuf.Value`` double — is dropped likewise and counted by
+``request_info.extraction_unusable``. Either also counts the record as
+``request_info.partial``. Raise the limits only as far as the largest value a
+deployment legitimately sends; the counters show when a default is too low.
+Extraction runs only when the typed record is published, so a duplicate
+installation of the filter extracts nothing.
 
 Transcoder
 ~~~~~~~~~~
@@ -829,6 +916,8 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_info.published, Counter, The request info AI filter published an ``envoy.data.ai.v3.RequestInfo`` record.
   request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.
+  request_info.extraction_dropped, Counter, A configured extraction value exceeded a :ref:`limit <config_http_filters_ai_protocol_manager_request_info_extraction>` and was dropped whole.
+  request_info.extraction_unusable, Counter, A configured extraction value could not be represented as metadata (an offloaded string or an unrepresentable number) and was dropped whole.
   transcoder.transcoded, Counter, "The transcoder AI filter converted a payload (a request, a unary response or an SSE event) into or out of the canonical IR."
   transcoder.unresolved, Counter, "A payload could not be transcoded because the route declared no wire API for its leg. A request is rejected; a response is forwarded untranslated and counted once, however many SSE events it has."
   transcoder.failed, Counter, "A payload could not be converted: its rules failed, or a converted request failed the target schema. A request is rejected; a response or SSE event is forwarded untranslated."

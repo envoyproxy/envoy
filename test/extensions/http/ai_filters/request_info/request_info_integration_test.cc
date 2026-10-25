@@ -1,9 +1,13 @@
+#include <optional>
 #include <string>
 
 #include "envoy/data/ai/v3/request_info.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
+
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/integration/http_integration.h"
@@ -45,6 +49,11 @@ public:
             if (record_present_) {
               ASSERT_TRUE(entry->second.UnpackTo(&captured_));
             }
+            const auto& untyped_metadata = request.metadata_context().filter_metadata();
+            const auto untyped = untyped_metadata.find("envoy.ai.request_info");
+            if (untyped != untyped_metadata.end()) {
+              captured_untyped_ = untyped->second;
+            }
             headers_seen_.Notify();
           }
         });
@@ -84,6 +93,8 @@ public:
         envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SKIP);
     ext_proc.mutable_metadata_options()->mutable_forwarding_namespaces()->add_typed(
         "envoy.ai.request_info");
+    ext_proc.mutable_metadata_options()->mutable_forwarding_namespaces()->add_untyped(
+        "envoy.ai.request_info");
     envoy::config::listener::v3::Filter ext_proc_filter;
     ext_proc_filter.set_name("envoy.filters.http.ext_proc");
     std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(ext_proc);
@@ -117,6 +128,7 @@ typed_config:
   absl::Notification headers_seen_;
   bool record_present_{false};
   envoy::data::ai::v3::RequestInfo captured_;
+  std::optional<Protobuf::Struct> captured_untyped_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RequestInfoIntegrationTest,
@@ -211,6 +223,65 @@ TEST_P(RequestInfoIntegrationTest, RouterReadsModelFromFilterState) {
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
+}
+
+// The extracted policy reaches an ext_proc that only sees request headers, via untyped namespace
+// forwarding, and is readable through %DYNAMIC_METADATA%.
+TEST_P(RequestInfoIntegrationTest, ForwardsExtractedPolicyToExtProcBeforeReleasingHeaders) {
+  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+    auto* header = hcm.mutable_route_config()
+                       ->mutable_virtual_hosts(0)
+                       ->mutable_routes(0)
+                       ->add_request_headers_to_add()
+                       ->mutable_header();
+    header->set_key("x-ai-model-list");
+    header->set_value("%DYNAMIC_METADATA(envoy.ai.request_info:model_list)%");
+  });
+  initializeWithExtProc(R"EOF(      extraction:
+        rules:
+        - path: [settings]
+        - path: [model_list]
+        - path: [missing]
+          key: tier
+          on_missing: default
+        limits:
+          max_value_bytes: 1024
+)EOF");
+
+  const std::string payload =
+      R"({"model":"auto","messages":[{"role":"user","content":"hi"}],)"
+      R"("settings":[{"cost":"low","quality":"high"}],"model_list":["model_a","model_b"]})";
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/v1/chat/completions"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"content-type", "application/json"}},
+      payload);
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
+            nlohmann::json::parse(payload));
+  const auto model_list =
+      upstream_request_->headers().get(Http::LowerCaseString("x-ai-model-list"));
+  ASSERT_EQ(model_list.size(), 1);
+  EXPECT_EQ(nlohmann::json::parse(model_list[0]->value().getStringView()),
+            nlohmann::json::parse(R"(["model_a","model_b"])"));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+
+  ASSERT_TRUE(headers_seen_.WaitForNotificationWithTimeout(absl::Seconds(5)));
+  ASSERT_TRUE(record_present_);
+  EXPECT_EQ(captured_.model(), "auto");
+  ASSERT_TRUE(captured_untyped_.has_value());
+  EXPECT_EQ(nlohmann::json::parse(MessageUtil::getJsonStringFromMessageOrError(*captured_untyped_)),
+            nlohmann::json::parse(R"({"settings":[{"cost":"low","quality":"high"}],)"
+                                  R"("model_list":["model_a","model_b"],"tier":"default"})"));
+  EXPECT_EQ(counterValue("ai_protocol_manager.request_info.published"), 1);
+  EXPECT_EQ(counterValue("ai_protocol_manager.request_info.partial"), 0);
+  EXPECT_EQ(counterValue("ai_protocol_manager.request_info.extraction_dropped"), 0);
 }
 
 } // namespace
