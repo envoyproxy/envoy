@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.fault.v3;
 
+import "envoy/config/core/v3/base.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/extensions/filters/common/fault/v3/fault.proto";
 import "envoy/type/v3/percent.proto";
@@ -23,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
 // [#extension: envoy.filters.http.fault]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message FaultAbort {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.FaultAbort";
@@ -58,6 +59,12 @@ message FaultAbort {
   // The response body to be returned when aborting the request.
   // If not specified, defaults to "fault filter abort".
   string response_body = 6;
+
+  // Specifies a list of HTTP headers that should be added to the response when the request is
+  // aborted. For gRPC requests, the ``Content-Type`` header is always set to ``application/grpc``
+  // after these headers are evaluated.
+  repeated config.core.v3.HeaderValueOption response_headers_to_add = 7
+      [(validate.rules).repeated = {max_items: 10}];
 }
 
 // [#next-free-field: 17]

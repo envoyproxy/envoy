@@ -93,6 +93,26 @@ public:
     response_body: "custom response body"
   )EOF";
 
+  const std::string abort_with_response_headers_yaml = R"EOF(
+  abort:
+    percentage:
+      numerator: 100
+      denominator: HUNDRED
+    http_status: 429
+    response_body: '{"error":"fault filter abort"}'
+    response_headers_to_add:
+    - header:
+        key: content-type
+        value: application/json
+      append_action: OVERWRITE_IF_EXISTS_OR_ADD
+    - header:
+        key: x-fault-abort
+        value: injected
+    - header:
+        key: x-response-status
+        value: '%RESP(:status)%'
+  )EOF";
+
   const std::string fixed_delay_and_abort_yaml = R"EOF(
   delay:
     percentage:
@@ -342,6 +362,40 @@ TEST_F(FaultFilterTest, AbortWithHttpStatusAndResponseBody) {
   EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
 }
 
+TEST_F(FaultFilterTest, AbortWithHttpStatusAndResponseHeaders) {
+  setUpTest(abort_with_response_headers_yaml);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("fault.http.abort.abort_percent",
+                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
+      .WillOnce(Return(429));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "429"},
+                                                   {"content-length", "30"},
+                                                   {"content-type", "application/json"},
+                                                   {"x-fault-abort", "injected"},
+                                                   {"x-response-status", "429"}};
+  EXPECT_CALL(decoder_filter_callbacks_,
+              encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1UL, config_->stats().aborts_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().active_faults_.value());
+  EXPECT_EQ("fault_filter_abort", decoder_filter_callbacks_.details());
+}
+
 TEST_F(FaultFilterTest, HeaderAbortWithHttpStatus) {
   setUpTest(header_abort_only_yaml);
 
@@ -407,6 +461,14 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   fault.mutable_abort()->mutable_percentage()->set_denominator(
       envoy::type::v3::FractionalPercent::HUNDRED);
   fault.mutable_abort()->set_grpc_status(5);
+  auto* content_type = fault.mutable_abort()->add_response_headers_to_add();
+  content_type->mutable_header()->set_key("content-type");
+  content_type->mutable_header()->set_value("application/json");
+  content_type->set_append_action(
+      envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
+  auto* custom_header = fault.mutable_abort()->add_response_headers_to_add();
+  custom_header->mutable_header()->set_key("x-fault-abort");
+  custom_header->mutable_header()->set_value("injected");
   setUpTest(fault);
 
   EXPECT_CALL(runtime_.snapshot_,
@@ -431,7 +493,8 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"content-type", "application/grpc"},
                                                    {"grpc-status", "5"},
-                                                   {"grpc-message", "fault filter abort"}};
+                                                   {"grpc-message", "fault filter abort"},
+                                                   {"x-fault-abort", "injected"}};
   EXPECT_CALL(decoder_filter_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
