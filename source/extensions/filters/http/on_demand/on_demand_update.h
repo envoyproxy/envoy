@@ -1,12 +1,14 @@
 #pragma once
 
 #include <optional>
+#include <string>
 
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/strings/str_cat.h"
@@ -44,19 +46,102 @@ struct OnDemandFilterStats {
 };
 
 /**
- * Keys of the monotonic timestamps the filter latches into StreamInfo::downstreamTiming(), for use
- * with %COMMON_DURATION(start:end:precision)%. A key is only set if the corresponding discovery
- * was actually requested.
+ * What the on-demand filter did for one request, stored in the request's filter state under
+ * DiscoveryState::key() with LifeSpan::Request, which is carried over to a recreated stream. The
+ * object only exists if a discovery was started. Other filters and access logs can read it through
+ * the generic Object interface, for example
+ * %FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:cluster)%. Fields that are not
+ * known (yet) read as unset, which access logs print as "-":
+ *
+ *   host                          :authority of the request that waited for route discovery.
+ *   vhost                         Virtual host that was discovered; set once a route resolved.
+ *   route_config                  Name of the route configuration that holds that virtual host.
+ *   cluster                       Cluster that on-demand CDS was asked for.
+ *   route_status                  pending | found | not_found | cancelled
+ *   cluster_status                pending | available | missing | timeout | cancelled
+ *   route_discovery_duration_us   Set once the route discovery finished, whatever the outcome.
+ *   cluster_discovery_duration_us Set once the cluster discovery finished, whatever the outcome.
  */
-namespace Timing {
-constexpr absl::string_view RouteDiscoveryStart =
-    "envoy.filters.http.on_demand.route_discovery_start";
-constexpr absl::string_view RouteDiscoveryEnd = "envoy.filters.http.on_demand.route_discovery_end";
-constexpr absl::string_view ClusterDiscoveryStart =
-    "envoy.filters.http.on_demand.cluster_discovery_start";
-constexpr absl::string_view ClusterDiscoveryEnd =
-    "envoy.filters.http.on_demand.cluster_discovery_end";
-} // namespace Timing
+class DiscoveryState : public StreamInfo::FilterState::Object {
+public:
+  static constexpr absl::string_view key() { return "envoy.filters.http.on_demand.discovery"; }
+
+  // The string views returned by getField() point at these literals.
+  static constexpr absl::string_view Pending = "pending";
+  static constexpr absl::string_view Cancelled = "cancelled";
+  static constexpr absl::string_view Found = "found";
+  static constexpr absl::string_view NotFound = "not_found";
+  static constexpr absl::string_view Available = "available";
+  static constexpr absl::string_view Missing = "missing";
+  static constexpr absl::string_view Timeout = "timeout";
+
+  // The status is one of the constants above. A finished discovery carries a duration.
+  void setRoute(absl::string_view status, std::optional<int64_t> duration_us = std::nullopt) {
+    route_status_ = status;
+    route_duration_us_ = duration_us;
+  }
+  void setCluster(absl::string_view status, std::optional<int64_t> duration_us = std::nullopt) {
+    cluster_status_ = status;
+    cluster_duration_us_ = duration_us;
+  }
+  void setHost(absl::string_view host) { host_ = std::string(host); }
+  void setVirtualHost(absl::string_view vhost, absl::string_view route_config) {
+    vhost_ = std::string(vhost);
+    route_config_ = std::string(route_config);
+  }
+  void setClusterName(absl::string_view cluster) { cluster_ = std::string(cluster); }
+
+  // StreamInfo::FilterState::Object
+  std::optional<std::string> serializeAsString() const override {
+    return absl::StrCat("route=", route_status_.empty() ? "-" : route_status_,
+                        ",cluster=", cluster_status_.empty() ? "-" : cluster_status_);
+  }
+  bool hasFieldSupport() const override { return true; }
+  FieldType getField(absl::string_view field_name) const override {
+    if (field_name == "host") {
+      return stringField(host_);
+    }
+    if (field_name == "vhost") {
+      return stringField(vhost_);
+    }
+    if (field_name == "route_config") {
+      return stringField(route_config_);
+    }
+    if (field_name == "cluster") {
+      return stringField(cluster_);
+    }
+    if (field_name == "route_status") {
+      return stringField(route_status_);
+    }
+    if (field_name == "cluster_status") {
+      return stringField(cluster_status_);
+    }
+    if (field_name == "route_discovery_duration_us") {
+      return durationField(route_duration_us_);
+    }
+    if (field_name == "cluster_discovery_duration_us") {
+      return durationField(cluster_duration_us_);
+    }
+    return absl::monostate{};
+  }
+
+private:
+  static FieldType stringField(absl::string_view value) {
+    return value.empty() ? FieldType{absl::monostate{}} : FieldType{value};
+  }
+  static FieldType durationField(std::optional<int64_t> duration_us) {
+    return duration_us.has_value() ? FieldType{*duration_us} : FieldType{absl::monostate{}};
+  }
+
+  std::string host_;
+  std::string vhost_;
+  std::string route_config_;
+  std::string cluster_;
+  absl::string_view route_status_;
+  absl::string_view cluster_status_;
+  std::optional<int64_t> route_duration_us_;
+  std::optional<int64_t> cluster_duration_us_;
+};
 
 class OnDemandRouteUpdate;
 class DecodeHeadersBehavior;
@@ -158,9 +243,13 @@ public:
 
 private:
   MonotonicTime now() const;
+  // The request's DiscoveryState, created on first use.
+  DiscoveryState& discoveryState();
   void startRouteDiscovery(MonotonicTime start);
   void finishRouteDiscovery(bool route_exists);
-  void startClusterDiscovery(MonotonicTime start);
+  // Records which virtual host and route config the route discovery resolved to, if any.
+  void recordVirtualHost();
+  void startClusterDiscovery(MonotonicTime start, absl::string_view cluster_name);
   void finishClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status);
 
   OnDemandFilterConfigSharedPtr config_;
@@ -170,6 +259,8 @@ private:
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
   bool downstream_end_stream_{false};
+  // Only valid during decodeHeaders(), which is where a route discovery is started.
+  Http::RequestHeaderMap* request_headers_{};
   // Set when the route config update callback ran inside decodeHeaders(), i.e. no asynchronous
   // discovery was started.
   bool route_update_completed_sync_{false};

@@ -195,12 +195,14 @@ OptRef<const Router::Route> OnDemandRouteUpdate::handleMissingRoute() {
   return callbacks_->route();
 }
 
-Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap&,
+Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::RequestHeaderMap& headers,
                                                              bool end_stream) {
   downstream_end_stream_ = end_stream;
+  request_headers_ = &headers;
   auto config = getConfig();
 
   config->decodeHeadersBehavior().decodeHeaders(*this);
+  request_headers_ = nullptr;
   return filter_iteration_state_;
 }
 
@@ -227,7 +229,7 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
     return;
   }
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
-  startClusterDiscovery(now());
+  startClusterDiscovery(now(), cluster_name);
   auto callback = std::make_unique<Upstream::ClusterDiscoveryCallback>(
       [this](Upstream::ClusterDiscoveryStatus cluster_status) {
         onClusterDiscoveryCompletion(cluster_status);
@@ -268,6 +270,12 @@ void OnDemandRouteUpdate::onDestroy() {
   route_config_updated_callback_.reset();
   cluster_discovery_handle_.reset();
   // A discovery still in flight here was abandoned, e.g. the client went away while waiting.
+  if (route_discovery_in_flight_) {
+    discoveryState().setRoute(DiscoveryState::Cancelled);
+  }
+  if (cluster_discovery_in_flight_) {
+    discoveryState().setCluster(DiscoveryState::Cancelled);
+  }
   if (auto stats = config_->stats(); stats.has_value()) {
     if (route_discovery_in_flight_) {
       stats->route_discovery_cancelled_.inc();
@@ -310,6 +318,7 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     if (route_exists) {
       callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
       callbacks_->downstreamCallbacks()->clearRouteCache();
+      recordVirtualHost();
       if (!require_route_match || callbacks_->route().has_value()) {
         getConfig()->decodeHeadersBehavior().decodeHeaders(*this);
         if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
@@ -325,6 +334,7 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
     callbacks_->downstreamCallbacks()->clearRouteCache();
     route_exists = callbacks_->route().has_value();
+    recordVirtualHost();
   }
 
   // Legacy behavior (guard disabled): recreate the stream so processing restarts from the
@@ -384,10 +394,49 @@ MonotonicTime OnDemandRouteUpdate::now() const {
   return callbacks_->dispatcher().timeSource().monotonicTime();
 }
 
+DiscoveryState& OnDemandRouteUpdate::discoveryState() {
+  auto& filter_state = callbacks_->streamInfo().filterState();
+  if (auto* state = filter_state->getDataMutable<DiscoveryState>(DiscoveryState::key());
+      state != nullptr) {
+    return *state;
+  }
+  auto state = std::make_shared<DiscoveryState>();
+  auto& ref = *state;
+  filter_state->setData(DiscoveryState::key(), std::move(state),
+                        StreamInfo::FilterState::LifeSpan::Request);
+  return ref;
+}
+
+namespace {
+absl::string_view clusterStatusName(Upstream::ClusterDiscoveryStatus status) {
+  switch (status) {
+  case Upstream::ClusterDiscoveryStatus::Available:
+    return DiscoveryState::Available;
+  case Upstream::ClusterDiscoveryStatus::Missing:
+    return DiscoveryState::Missing;
+  case Upstream::ClusterDiscoveryStatus::Timeout:
+    return DiscoveryState::Timeout;
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+int64_t microseconds(MonotonicTime::duration duration) {
+  return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+}
+
+int64_t milliseconds(MonotonicTime::duration duration) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+}
+} // namespace
+
 void OnDemandRouteUpdate::startRouteDiscovery(MonotonicTime start) {
   route_discovery_in_flight_ = true;
   route_discovery_start_ = start;
-  callbacks_->streamInfo().downstreamTiming().setValue(Timing::RouteDiscoveryStart, start);
+  auto& state = discoveryState();
+  state.setRoute(DiscoveryState::Pending);
+  if (request_headers_ != nullptr) {
+    state.setHost(request_headers_->getHostValue());
+  }
   if (auto stats = config_->stats(); stats.has_value()) {
     stats->route_discovery_requested_.inc();
     stats->route_discovery_pending_.inc();
@@ -399,25 +448,36 @@ void OnDemandRouteUpdate::finishRouteDiscovery(bool route_exists) {
     return;
   }
   route_discovery_in_flight_ = false;
-  const MonotonicTime end = now();
-  callbacks_->streamInfo().downstreamTiming().setValue(Timing::RouteDiscoveryEnd, end);
+  const auto elapsed = now() - route_discovery_start_;
+  discoveryState().setRoute(route_exists ? DiscoveryState::Found : DiscoveryState::NotFound,
+                            microseconds(elapsed));
   if (auto stats = config_->stats(); stats.has_value()) {
     (route_exists ? stats->route_discovery_found_ : stats->route_discovery_not_found_).inc();
     stats->route_discovery_pending_.dec();
     // Only successful discoveries are timed, so that the histogram is the latency of a usable
     // answer rather than a mix with negative answers.
     if (route_exists) {
-      stats->route_discovery_duration_.recordValue(
-          std::chrono::duration_cast<std::chrono::milliseconds>(end - route_discovery_start_)
-              .count());
+      stats->route_discovery_duration_.recordValue(milliseconds(elapsed));
     }
   }
 }
 
-void OnDemandRouteUpdate::startClusterDiscovery(MonotonicTime start) {
+void OnDemandRouteUpdate::recordVirtualHost() {
+  // Only called after a route discovery completed, so the state exists. A route can only resolve
+  // against the refreshed route config.
+  if (auto route = callbacks_->route(); route.has_value()) {
+    const Router::VirtualHost& vhost = route->virtualHost();
+    discoveryState().setVirtualHost(vhost.name(), vhost.routeConfig().name());
+  }
+}
+
+void OnDemandRouteUpdate::startClusterDiscovery(MonotonicTime start,
+                                                absl::string_view cluster_name) {
   cluster_discovery_in_flight_ = true;
   cluster_discovery_start_ = start;
-  callbacks_->streamInfo().downstreamTiming().setValue(Timing::ClusterDiscoveryStart, start);
+  auto& state = discoveryState();
+  state.setCluster(DiscoveryState::Pending);
+  state.setClusterName(cluster_name);
   if (auto stats = config_->stats(); stats.has_value()) {
     stats->cluster_discovery_requested_.inc();
     stats->cluster_discovery_pending_.inc();
@@ -429,8 +489,8 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
     return;
   }
   cluster_discovery_in_flight_ = false;
-  const MonotonicTime end = now();
-  callbacks_->streamInfo().downstreamTiming().setValue(Timing::ClusterDiscoveryEnd, end);
+  const auto elapsed = now() - cluster_discovery_start_;
+  discoveryState().setCluster(clusterStatusName(cluster_status), microseconds(elapsed));
   if (auto stats = config_->stats(); stats.has_value()) {
     switch (cluster_status) {
     case Upstream::ClusterDiscoveryStatus::Available:
@@ -438,9 +498,7 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
       // Only successful discoveries are timed: a timeout always lasts about the configured
       // timeout, and a missing cluster is a quick negative answer, so neither says anything about
       // how long it takes to get a usable cluster.
-      stats->cluster_discovery_duration_.recordValue(
-          std::chrono::duration_cast<std::chrono::milliseconds>(end - cluster_discovery_start_)
-              .count());
+      stats->cluster_discovery_duration_.recordValue(milliseconds(elapsed));
       break;
     case Upstream::ClusterDiscoveryStatus::Missing:
       stats->cluster_discovery_missing_.inc();

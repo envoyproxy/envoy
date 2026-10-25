@@ -71,23 +71,39 @@ about the configured timeout, so including it would make the high percentiles me
 plane is not answering, requests keep waiting and are not recorded in the histogram until the route is
 found; ``route_discovery_pending`` and ``route_discovery_cancelled`` are the signals to watch then.
 
-Access log timing
------------------
+.. _config_http_filters_on_demand_filter_state:
 
-For every discovery that was actually started, the filter latches monotonic timestamps into the
-stream's downstream timing, which can be used with the
-:ref:`COMMON_DURATION <config_access_log_format_common_duration>` access log command:
+Filter state
+------------
 
-* ``envoy.filters.http.on_demand.route_discovery_start`` and ``envoy.filters.http.on_demand.route_discovery_end``
-* ``envoy.filters.http.on_demand.cluster_discovery_start`` and ``envoy.filters.http.on_demand.cluster_discovery_end``
+When a request has to wait for a discovery, the filter stores what happened in the request's filter state
+under ``envoy.filters.http.on_demand.discovery``, so that an access log can show which host, virtual host,
+route configuration and cluster were involved and how long each discovery took. The object has
+``Request`` life span, so it is carried over to a stream that is recreated after the discovery. It does not
+exist for requests that did not wait, and the access log prints ``-`` for them.
 
-A key is not set if the corresponding discovery did not happen, so the command renders ``-`` for
-requests that did not wait. The end key is set for every outcome, including a failed or timed out discovery. For example,
-to log the time spent in route discovery in microseconds:
+.. csv-table::
+  :header: Field, Description
+  :widths: 1, 3
+
+  host, "The ``:authority`` of the request that waited for route discovery."
+  vhost, "The virtual host that was discovered. Only set once a route of the request resolved."
+  route_config, "The name of the route configuration that holds that virtual host."
+  cluster, "The cluster that on-demand CDS was asked for."
+  route_status, "``pending``, ``found``, ``not_found`` or ``cancelled``."
+  cluster_status, "``pending``, ``available``, ``missing``, ``timeout`` or ``cancelled``."
+  route_discovery_duration_us, "Microseconds the route discovery took. Set once it finished, whatever the outcome."
+  cluster_discovery_duration_us, "Microseconds the cluster discovery took. Set once it finished, whatever the outcome."
+
+Unlike the duration histograms, the durations are set for every outcome, so a timed out discovery shows how
+long the request waited. For example, to log which cluster the request waited for and for how long:
 
 .. code-block:: none
 
-  %COMMON_DURATION(envoy.filters.http.on_demand.route_discovery_start:envoy.filters.http.on_demand.route_discovery_end:us)%
+  %FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:cluster)% %FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:cluster_discovery_duration_us)%
+
+The cluster name and the host are only available in the filter state and in access logs, not in stat names,
+which keeps the number of stats independent of the number of clusters and hosts.
 
 Configuration
 -------------

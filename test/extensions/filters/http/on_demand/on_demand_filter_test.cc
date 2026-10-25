@@ -551,22 +551,35 @@ public:
     }
     return store_.histogramValues(full_name, true);
   }
-  std::optional<MonotonicTime> timing(absl::string_view key) {
-    return decoder_callbacks_.streamInfo().downstreamTiming().getValue(key);
+
+  // Fields of the request's DiscoveryState, read through the generic filter state interface like
+  // any other filter would. monostate if the state or the field does not exist.
+  StreamInfo::FilterState::Object::FieldType field(absl::string_view name) {
+    const auto* state = decoder_callbacks_.streamInfo().filterState()->getDataReadOnlyGeneric(
+        DiscoveryState::key());
+    return state == nullptr ? StreamInfo::FilterState::Object::FieldType{absl::monostate{}}
+                            : state->getField(name);
+  }
+  void expectField(absl::string_view name, absl::string_view value) {
+    EXPECT_EQ(StreamInfo::FilterState::Object::FieldType{value}, field(name));
+  }
+  bool hasField(absl::string_view name) {
+    return !absl::holds_alternative<absl::monostate>(field(name));
   }
 
   // Starts an asynchronous route discovery and returns the callback the filter registered.
   Http::RouteConfigUpdatedCallbackSharedPtr startRouteDiscovery() {
     Http::RouteConfigUpdatedCallbackSharedPtr callback;
-    Http::TestRequestHeaderMapImpl headers;
+    Http::TestRequestHeaderMapImpl headers{{":authority", "foo.example.com"}};
     EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
     EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
         .WillOnce(SaveArg<0>(&callback));
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
     EXPECT_EQ(1UL, counter("route_discovery_requested"));
     EXPECT_EQ(1UL, pending("route_discovery_pending"));
-    EXPECT_TRUE(timing(Timing::RouteDiscoveryStart).has_value());
-    EXPECT_FALSE(timing(Timing::RouteDiscoveryEnd).has_value());
+    expectField("route_status", "pending");
+    expectField("host", "foo.example.com");
+    EXPECT_FALSE(hasField("route_discovery_duration_us"));
     return callback;
   }
 
@@ -578,16 +591,18 @@ public:
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
     EXPECT_EQ(1UL, counter("cluster_discovery_requested"));
     EXPECT_EQ(1UL, pending("cluster_discovery_pending"));
-    EXPECT_TRUE(timing(Timing::ClusterDiscoveryStart).has_value());
-    EXPECT_FALSE(timing(Timing::ClusterDiscoveryEnd).has_value());
+    expectField("cluster_status", "pending");
+    expectField("cluster", decoder_callbacks_.route_->route_entry_.cluster_name_);
+    EXPECT_FALSE(hasField("cluster_discovery_duration_us"));
   }
 
-  void expectClusterDiscoveryFinished(bool expect_duration) {
+  void expectClusterDiscoveryFinished(absl::string_view status, bool expect_duration) {
     EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
     EXPECT_EQ(0UL, counter("cluster_discovery_cancelled"));
     EXPECT_EQ(expect_duration ? 1UL : 0UL, durations("cluster_discovery_duration").size());
-    // The access log timing is set for every outcome.
-    EXPECT_TRUE(timing(Timing::ClusterDiscoveryEnd).has_value());
+    // The filter state records every outcome and its duration, unlike the histogram.
+    expectField("cluster_status", status);
+    EXPECT_TRUE(hasField("cluster_discovery_duration_us"));
   }
 
   Stats::TestUtil::TestStore store_;
@@ -603,7 +618,9 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryFound) {
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
   EXPECT_EQ(1UL, durations("route_discovery_duration").size());
-  EXPECT_TRUE(timing(Timing::RouteDiscoveryEnd).has_value());
+  expectField("route_status", "found");
+  EXPECT_TRUE(hasField("route_discovery_duration_us"));
+  EXPECT_FALSE(hasField("cluster_status"));
   // Cluster discovery was never involved.
   EXPECT_EQ(0UL, counter("cluster_discovery_requested"));
 }
@@ -618,7 +635,9 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotFound) {
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
   // Only found discoveries are timed.
   EXPECT_TRUE(durations("route_discovery_duration").empty());
-  EXPECT_TRUE(timing(Timing::RouteDiscoveryEnd).has_value());
+  // The filter state still records the outcome and how long the request waited.
+  expectField("route_status", "not_found");
+  EXPECT_TRUE(hasField("route_discovery_duration_us"));
 }
 
 // The callback running inside decodeHeaders() means there was nothing to discover (neither VHDS nor
@@ -636,8 +655,8 @@ TEST_F(OnDemandFilterStatsTest, SynchronousRouteUpdateCompletionIsNotADiscovery)
   EXPECT_EQ(0UL, counter("route_discovery_not_found"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
   EXPECT_TRUE(durations("route_discovery_duration").empty());
-  EXPECT_FALSE(timing(Timing::RouteDiscoveryStart).has_value());
-  EXPECT_FALSE(timing(Timing::RouteDiscoveryEnd).has_value());
+  EXPECT_FALSE(hasField("route_status"));
+  EXPECT_FALSE(hasField("host"));
   // Destroying the stream afterwards must not report a cancellation either.
   filter_->onDestroy();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
@@ -652,6 +671,8 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryCancelledWhenStreamIsDestroyed) {
   EXPECT_EQ(0UL, counter("route_discovery_not_found"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
   EXPECT_TRUE(durations("route_discovery_duration").empty());
+  expectField("route_status", "cancelled");
+  EXPECT_FALSE(hasField("route_discovery_duration_us"));
 }
 
 // Once the discovery completed, destroying the (recreated) stream is not a cancellation.
@@ -663,6 +684,32 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotCancelledAfterCompletion) {
   filter_->onDestroy();
   EXPECT_EQ(0UL, counter("route_discovery_cancelled"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
+  expectField("route_status", "found");
+}
+
+// The virtual host and route config that handled the request are recorded once a route resolves.
+TEST_F(OnDemandFilterStatsTest, RouteDiscoveryRecordsVirtualHostAndRouteConfig) {
+  setupWithStats(false);
+  auto callback = startRouteDiscovery();
+  EXPECT_FALSE(hasField("vhost"));
+  EXPECT_FALSE(hasField("route_config"));
+
+  NiceMock<Router::MockVirtualHost> vhost;
+  NiceMock<Router::MockConfig> route_config;
+  const std::string vhost_name = "foo_vhost";
+  const std::string route_config_name = "foo_routes";
+  ON_CALL(vhost, name()).WillByDefault(ReturnRef(vhost_name));
+  ON_CALL(vhost, routeConfig()).WillByDefault(ReturnRef(route_config));
+  ON_CALL(route_config, name()).WillByDefault(ReturnRef(route_config_name));
+  EXPECT_CALL(*decoder_callbacks_.route_, virtualHost()).WillRepeatedly(ReturnRef(vhost));
+  const Router::Route& route = *decoder_callbacks_.route_;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(makeOptRef(route)));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  (*callback)(true);
+  expectField("vhost", "foo_vhost");
+  expectField("route_config", "foo_routes");
+  expectField("host", "foo.example.com");
 }
 
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryAvailable) {
@@ -672,7 +719,7 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryAvailable) {
   EXPECT_EQ(1UL, counter("cluster_discovery_available"));
   EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
   EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
-  expectClusterDiscoveryFinished(true);
+  expectClusterDiscoveryFinished("available", true);
 }
 
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryMissing) {
@@ -682,7 +729,7 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryMissing) {
   EXPECT_EQ(0UL, counter("cluster_discovery_available"));
   EXPECT_EQ(1UL, counter("cluster_discovery_missing"));
   EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
-  expectClusterDiscoveryFinished(false);
+  expectClusterDiscoveryFinished("missing", false);
 }
 
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
@@ -692,7 +739,7 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
   EXPECT_EQ(0UL, counter("cluster_discovery_available"));
   EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
   EXPECT_EQ(1UL, counter("cluster_discovery_timeout"));
-  expectClusterDiscoveryFinished(false);
+  expectClusterDiscoveryFinished("timeout", false);
 }
 
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) {
@@ -705,6 +752,8 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) 
   EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
   EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
   EXPECT_TRUE(durations("cluster_discovery_duration").empty());
+  expectField("cluster_status", "cancelled");
+  EXPECT_FALSE(hasField("cluster_discovery_duration_us"));
 }
 
 // A route that is already known and a cluster that already exists trigger no discovery at all.
@@ -714,8 +763,9 @@ TEST_F(OnDemandFilterStatsTest, NoDiscoveryNoStats) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
   EXPECT_EQ(0UL, counter("route_discovery_requested"));
   EXPECT_EQ(0UL, counter("cluster_discovery_requested"));
-  EXPECT_FALSE(timing(Timing::RouteDiscoveryStart).has_value());
-  EXPECT_FALSE(timing(Timing::ClusterDiscoveryStart).has_value());
+  // No discovery, no filter state.
+  EXPECT_EQ(nullptr, decoder_callbacks_.streamInfo().filterState()->getDataReadOnlyGeneric(
+                         DiscoveryState::key()));
 }
 
 TEST(OnDemandConfigTest, Basic) {
