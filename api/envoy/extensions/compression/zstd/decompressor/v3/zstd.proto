@@ -28,6 +28,7 @@ message Zstd {
   // to train specific dictionaries for decompression.
   repeated config.core.v3.DataSource dictionaries = 1;
 
-  // Value for decompressor's next output buffer. If not set, defaults to 4096.
+  // Value for decompressor's next output buffer. If not set, defaults to the zstd recommended
+  // output buffer size, ``ZSTD_DStreamOutSize()`` (128 KiB).
   google.protobuf.UInt32Value chunk_size = 2 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
 }
