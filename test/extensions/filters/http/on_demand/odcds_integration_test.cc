@@ -342,15 +342,14 @@ public:
     registerTestServerPorts({"http"});
   }
 
-  // Discovers "new_cluster" through ODCDS while the CDS configuration is a SotW file, then
-  // delivers a second SotW CDS update that does not contain "new_cluster".
+  // Discovers "new_cluster" via ODCDS, then sends a file-based SotW CDS update without it.
   void discoverClusterThenUpdateSotwCds(bool track_sotw_resources) {
     config_helper_.addRuntimeOverride("envoy.reloadable_features.cds_sotw_track_resources",
                                       track_sotw_resources ? "true" : "false");
     addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
                           OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
                       "integration", {});
-    // CDS is served from a file, and does not use xDS-TP.
+    // File-based SotW CDS, no xDS-TP.
     CdsHelper cds_helper;
     auto sotw_cluster = ConfigHelper::buildStaticCluster(
         "sotw_cluster", 1, Network::Test::getLoopbackAddressString(ipVersion()));
@@ -388,14 +387,12 @@ public:
     verifyResponse(std::move(response), "200", {}, {});
     EXPECT_EQ(0, test_server_->counter("cluster_manager.cluster_removed")->value());
 
-    // The next SotW CDS update changes "sotw_cluster", and does not mention "new_cluster".
     sotw_cluster.mutable_connect_timeout()->set_seconds(10);
     cds_helper.setCds({sotw_cluster});
     test_server_->waitForCounter("cluster_manager.cds.update_success", testing::Ge(2));
 
     if (track_sotw_resources) {
-      // The ODCDS cluster is not owned by the SotW CDS subscription, so it is still there and
-      // the next request is handled without another on-demand discovery.
+      // The cluster survives, so no new on-demand discovery is needed.
       EXPECT_EQ(0, test_server_->counter("cluster_manager.cluster_removed")->value());
       response = codec_client_->makeHeaderOnlyRequest(request_headers);
       waitForNextUpstreamRequest(new_cluster_upstream_idx_);
@@ -403,7 +400,7 @@ public:
       ASSERT_TRUE(response->waitForEndStream());
       verifyResponse(std::move(response), "200", {}, {});
     } else {
-      // Without tracking, every dynamic cluster missing from the SotW update is removed.
+      // Without tracking, the ODCDS cluster is removed.
       test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Eq(1));
     }
 
@@ -670,14 +667,12 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
   cleanupUpstreamAndDownstream();
 }
 
-// Tests that a SotW CDS update (here from a file, without xDS-TP) does not remove a cluster that
-// was discovered through ODCDS.
+// A SotW CDS update does not remove a cluster discovered through ODCDS.
 TEST_P(OdCdsIntegrationTest, SotwCdsUpdateKeepsOnDemandCluster) {
   discoverClusterThenUpdateSotwCds(true);
 }
 
-// Tests that the previous behavior, removing every dynamic cluster that is missing from a SotW
-// CDS update, is restored by disabling the runtime guard.
+// Disabling the runtime guard restores the removal.
 TEST_P(OdCdsIntegrationTest, SotwCdsUpdateRemovesOnDemandClusterWithTrackingDisabled) {
   discoverClusterThenUpdateSotwCds(false);
 }

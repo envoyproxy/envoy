@@ -71,8 +71,8 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   CdsStats stats_;
   // This enables tracking the resources via SotW for wildcard-CDS, so concurrent OD-CDS
-  // resources won't get overridden when a CDS-wildcard update arrives. Tracking is also enabled
-  // by the envoy.reloadable_features.cds_sotw_track_resources runtime guard.
+  // resources won't get overridden when a CDS-wildcard update arrives. Also enabled by the
+  // envoy.reloadable_features.cds_sotw_track_resources runtime guard.
   // TODO(adisuissa): once proper support for an xDS-Caching layer is added,
   // this will not be relevant, as the callbacks will be similar to delta-xDS
   // from each collection source.

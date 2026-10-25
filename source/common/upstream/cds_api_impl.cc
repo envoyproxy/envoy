@@ -50,16 +50,13 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
 
 absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                         const std::string& version_info) {
-  // The input resources will be the next sotw_resource_names_.
   absl::flat_hash_set<std::string> next_sotw_resource_names;
   next_sotw_resource_names.reserve(resources.size());
   std::transform(resources.cbegin(), resources.cend(),
                  std::inserter(next_sotw_resource_names, next_sotw_resource_names.begin()),
                  [](const Config::DecodedResourceRef resource) { return resource.get().name(); });
 
-  // If another source (for example OD-CDS) may be adding clusters to the cluster-manager, Envoy
-  // needs to track which clusters are received via the SotW CDS configuration, so only clusters
-  // that were added through SotW CDS and are not updated will be removed.
+  // Other sources (e.g. OD-CDS) may add clusters, so only remove the clusters received via SotW.
   if (support_multi_ads_sources_ ||
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.cds_sotw_track_resources")) {
     // Find all the clusters that are currently used, but no longer appear in
@@ -80,8 +77,7 @@ absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourc
     return status;
   }
 
-  // The names are tracked even when they are not used for removal, so that enabling the runtime
-  // guard above does not leave clusters that were added earlier unknown to the next SotW update.
+  // Track the names even if unused, so enabling the guard at runtime doesn't leak clusters.
   sotw_resource_names_ = std::move(next_sotw_resource_names);
 
   auto all_existing_clusters = cm_.clusters();

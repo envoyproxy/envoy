@@ -41,8 +41,7 @@ MATCHER_P(WithName, expectedName, "") { return arg.name() == expectedName; }
 
 class CdsApiImplTest : public testing::Test {
 protected:
-  // The tests that do not set `support_multi_ads_sources` exercise the legacy removal path, in
-  // which every dynamic cluster missing from a SotW update is removed.
+  // Tests default to the legacy removal path.
   CdsApiImplTest() { setSotwTracking(false); }
 
   void setSotwTracking(bool enabled) {
@@ -501,8 +500,7 @@ resources:
   EXPECT_EQ("1", cds_->versionInfo());
 }
 
-// Tests that the runtime guard alone enables SotW tracking, without the xDS-TP based config
-// sources, so a cluster added by OD-CDS is not removed by a SotW update.
+// The runtime guard alone keeps OD-CDS clusters on a SotW update.
 TEST_F(CdsApiImplTest, SotwTrackingRuntimeGuardKeepsOnDemandClusters) {
   InSequence s;
   setSotwTracking(true);
@@ -512,7 +510,6 @@ TEST_F(CdsApiImplTest, SotwTrackingRuntimeGuardKeepsOnDemandClusters) {
   EXPECT_CALL(initialized_, ready());
   EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("0", {"sotw_cluster_1"}), "0"));
 
-  // "od_cluster_1" may exist in the cluster manager, but it is never reported by clusters().
   expectAdd("sotw_cluster_2", "1");
   EXPECT_CALL(cm_, clusters()).Times(0);
   EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
@@ -521,33 +518,31 @@ TEST_F(CdsApiImplTest, SotwTrackingRuntimeGuardKeepsOnDemandClusters) {
   EXPECT_EQ("1", cds_->versionInfo());
 }
 
-// Tests that with the runtime guard disabled a SotW update still removes every dynamic cluster
-// that is missing from it, including the clusters that were not received through CDS.
+// With the guard disabled, a SotW update removes every dynamic cluster not in it.
 TEST_F(CdsApiImplTest, SotwTrackingRuntimeGuardDisabledRemovesAllMissingClusters) {
   InSequence s;
   setup(false);
 
-  expectAdd("sotw_cluster_1", "0");
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
+  expectAdd("sotw_cluster_1", "0");
   EXPECT_CALL(initialized_, ready());
   EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("0", {"sotw_cluster_1"}), "0"));
 
-  expectAdd("sotw_cluster_2", "1");
   EXPECT_CALL(cm_, clusters())
       .WillOnce(Return(makeClusterInfoMaps({"sotw_cluster_1", "od_cluster_1"})));
+  expectAdd("sotw_cluster_2", "1");
   EXPECT_CALL(cm_, removeCluster("sotw_cluster_1", false));
   EXPECT_CALL(cm_, removeCluster("od_cluster_1", false));
   EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("1", {"sotw_cluster_2"}), "1"));
 }
 
-// Tests that the clusters received while the runtime guard was disabled are tracked, so enabling
-// the guard does not leave them behind when a later SotW update no longer contains them.
+// Clusters received while the guard was disabled are still tracked.
 TEST_F(CdsApiImplTest, SotwTrackingEnabledAtRuntimeRemovesPreviouslyReceivedClusters) {
   InSequence s;
   setup(false);
 
-  expectAdd("sotw_cluster_1", "0");
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(makeClusterInfoMaps({})));
+  expectAdd("sotw_cluster_1", "0");
   EXPECT_CALL(initialized_, ready());
   EXPECT_OK(cds_callbacks_->onConfigUpdate(sotwUpdate("0", {"sotw_cluster_1"}), "0"));
 
