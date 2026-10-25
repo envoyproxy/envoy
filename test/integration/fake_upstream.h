@@ -671,6 +671,7 @@ private:
   testing::NiceMock<Random::MockRandomGenerator> random_;
   testing::NiceMock<Http::MockHeaderValidatorStats> header_validator_stats_;
   Http::HeaderValidatorFactoryPtr header_validator_factory_;
+  std::shared_ptr<Network::ReadFilter> read_filter_;
 };
 
 using FakeHttpConnectionPtr = std::unique_ptr<FakeHttpConnection>;
