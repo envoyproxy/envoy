@@ -1184,7 +1184,7 @@ shellcheck:
   project_desc: "Now you do not need to depend on the system shellcheck version in your bazel-managed (mono)repos."
   project_url: "https://github.com/aignas/rules_shellcheck"
   apparent_name: rules_shellcheck
-  release_date: "2025-08-13"
+  release_date: "2026-10-15"
   use_category:
   - build
   license: "MIT"
