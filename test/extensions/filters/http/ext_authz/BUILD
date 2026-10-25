@@ -146,6 +146,7 @@ envoy_extension_cc_test(
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",
+        "//source/common/config:well_known_names",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/ext_authz:config",
         "//source/extensions/filters/http/lua:config",
@@ -156,6 +157,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//source/server/config_validation:server_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration:utility_lib",
         "//test/mocks/server:options_mocks",
         "//test/test_common:file_system_for_test_lib",
         "//test/test_common:status_utility_lib",
