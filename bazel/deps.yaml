@@ -1038,7 +1038,7 @@ rules_foreign_cc:
   project_name: "Rules for using foreign build systems in Bazel"
   project_desc: "Rules for using foreign build systems in Bazel"
   project_url: "https://github.com/bazelbuild/rules_foreign_cc"
-  release_date: "2025-06-24"
+  release_date: "2026-10-25"
   use_category:
   - build
   - dataplane_core
