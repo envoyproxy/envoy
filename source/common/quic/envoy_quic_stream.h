@@ -231,6 +231,11 @@ protected:
 
   void encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers);
 
+  // Aborts both stream sides. When reliable stream reset is negotiated, preserves
+  // bytes already written via RESET_STREAM_AT and stops the read side to
+  // match QuicStream::Reset() semantics. Otherwise sends a full Reset().
+  void maybeReliableReset(quic::QuicRstStreamErrorCode rst);
+
   // Converts `header_list` into a new `Http::MetadataMap`.
   std::unique_ptr<Http::MetadataMap>
   metadataMapFromHeaderList(const quic::QuicHeaderList& header_list);

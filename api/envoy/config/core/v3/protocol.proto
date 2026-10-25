@@ -57,7 +57,7 @@ message QuicKeepAliveSettings {
 }
 
 // QUIC protocol options which apply to both downstream and upstream connections.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message QuicProtocolOptions {
   // Config for QUIC connection migration across network interfaces, i.e. cellular to WIFI, upon
   // network change events from the platform, i.e. the current network gets
@@ -184,6 +184,12 @@ message QuicProtocolOptions {
   // Communication with Network Elements) and process SCONE packets.
   // If not present, the QUICHE default behavior will be used.
   google.protobuf.BoolValue enable_scone = 13;
+
+  // If true, the QUIC connection will signal support for `reliable stream reset
+  // <https://datatracker.ietf.org/doc/draft-ietf-quic-reliable-stream-reset/>`_ and use
+  // ``RESET_STREAM_AT`` when aborting streams so that stream data already written is still
+  // delivered up to a reliable size. If not present, the QUICHE default behavior will be used.
+  google.protobuf.BoolValue enable_reliable_stream_reset = 14;
 }
 
 message UpstreamHttpProtocolOptions {
