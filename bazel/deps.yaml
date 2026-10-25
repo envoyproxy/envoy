@@ -1016,7 +1016,7 @@ rules_apple:
   project_name: "Apple Rules for Bazel"
   project_desc: "Bazel rules for Apple platforms"
   project_url: "https://github.com/bazelbuild/rules_apple"
-  release_date: "2025-03-14"
+  release_date: "2026-10-17"
   use_category:
   - build
   license: "Apache-2.0"
