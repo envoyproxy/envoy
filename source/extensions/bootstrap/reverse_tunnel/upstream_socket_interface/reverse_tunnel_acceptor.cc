@@ -51,13 +51,14 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
     std::string node_id = addr->logicalName();
     ENVOY_LOG(debug, "reverse_tunnel: using node_id: {}", node_id);
 
-    // Try to get a cached socket for the node.
-    auto socket = socket_manager->getConnectionSocket(node_id);
+    // Try to get a cached socket for the node, carrying any partial ping echo retained while idle.
+    std::string retained_ping_prefix;
+    auto socket = socket_manager->getConnectionSocket(node_id, &retained_ping_prefix);
     if (socket) {
       ENVOY_LOG(debug, "reverse_tunnel: reusing cached socket for node: {}", node_id);
       // Create IOHandle that owns the socket using RAII.
-      auto io_handle = std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket),
-                                                                           node_id, *tls_registry);
+      auto io_handle = std::make_unique<UpstreamReverseConnectionIOHandle>(
+          std::move(socket), node_id, *tls_registry, retained_ping_prefix);
       return io_handle;
     }
   }
