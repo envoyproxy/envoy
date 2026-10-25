@@ -9,8 +9,7 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_test_library(
-    name = "main",
-    srcs = ["main.cc"],
+    name = "main_lib",
     hdrs = ["main.h"],
     deps = [
         "//envoy/common:logger",
@@ -19,6 +18,16 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:test_runtime_lib",
+    ],
+)
+
+exports_files(["main.cc"])
+
+envoy_cc_test_library(
+    name = "main",
+    srcs = ["main.cc"],
+    deps = [
+        ":main_lib",
         "@benchmark",
         "@tclap",
     ],

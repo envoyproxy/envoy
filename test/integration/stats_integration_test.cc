@@ -297,9 +297,12 @@ std::vector<std::pair<std::string, std::string>> tagsOf(const Stats::Metric& met
 void checkExpectation(IntegrationTestServer& server, const StatExpectation& expectation) {
   Stats::CounterSharedPtr counter = server.counter(expectation.name_);
   Stats::GaugeSharedPtr gauge = server.gauge(expectation.name_);
+  Stats::ParentHistogramSharedPtr histogram = server.histogram(expectation.name_);
   const Stats::Metric* metric = counter != nullptr ? static_cast<Stats::Metric*>(counter.get())
-                                                   : static_cast<Stats::Metric*>(gauge.get());
-  ASSERT_NE(metric, nullptr) << "no counter or gauge named '" << expectation.name_ << "'";
+                                : gauge != nullptr ? static_cast<Stats::Metric*>(gauge.get())
+                                                   : static_cast<Stats::Metric*>(histogram.get());
+  ASSERT_NE(metric, nullptr) << "no counter, gauge or histogram named '" << expectation.name_
+                             << "'";
 
   EXPECT_EQ(metric->tagExtractedName(), expectation.tag_extracted_name_)
       << " for stat '" << expectation.name_ << "'";
@@ -340,6 +343,7 @@ public:
     const std::string& listener_address = Config::TagNames::get().LISTENER_ADDRESS;
     const std::string& response_code_class = Config::TagNames::get().RESPONSE_CODE_CLASS;
     const std::string& tcp_prefix = Config::TagNames::get().TCP_PREFIX;
+    const std::string& worker_id = Config::TagNames::get().WORKER_ID;
     const std::string& xds_resource_name = Config::TagNames::get().XDS_RESOURCE_NAME;
 
     return {
@@ -358,9 +362,11 @@ public:
         {"listener.tcp_listener.downstream_cx_total",
          "listener.downstream_cx_total",
          {{listener_address, "tcp_listener"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         // The admin listener is deliberately excluded from listener address tagging, in both the
         // legacy extraction rules and the explicit-tags scope.
         {"listener.admin.downstream_cx_total", "listener.admin.downstream_cx_total", {}},
+#endif
         // TCP proxy scope, `source/common/tcp_proxy/tcp_proxy.cc`.
         {"tcp.tcp_stats.downstream_cx_total",
          "tcp.downstream_cx_total",
@@ -396,15 +402,53 @@ public:
          {{listener_address, mainListenerScope()},
           {hcm_prefix, "config_test"},
           {response_code_class, "2"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         {"listener.admin.http.admin.downstream_rq_2xx",
          "listener.admin.http.downstream_rq_xx",
          {{hcm_prefix, "admin"}, {response_code_class, "2"}}},
+#endif
+        // The router filter, `source/extensions/filters/http/router/config.cc`. It creates its
+        // stats in the server's scope with the connection manager's prefix in the name, rather
+        // than in the connection manager's scope, because its virtual host and route level stats
+        // are documented to live at the root. So the prefix tag comes from name extraction here.
+        {"http.config_test.no_route", "http.no_route", {{hcm_prefix, "config_test"}}},
+        {"http.config_test.rq_total", "http.rq_total", {{hcm_prefix, "config_test"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
         // The admin listener runs a connection manager too, with 'admin' as its stat prefix. As
         // with the listener address, the admin listener scope itself is not tagged.
         {"http.admin.downstream_rq_total", "http.downstream_rq_total", {{hcm_prefix, "admin"}}},
         {"listener.admin.http.admin.downstream_rq_completed",
          "listener.admin.http.downstream_rq_completed",
          {{hcm_prefix, "admin"}}},
+#endif
+        // Per-thread scopes of the worker id migration: a worker thread's 'worker_<id>' segment
+        // carries the envoy.worker_id tag and tag-extracts to a literal 'worker', while the main
+        // thread's name stays a plain, untagged segment.
+        // Dispatcher histograms, `source/common/event/dispatcher_impl.cc`.
+        {"server.dispatcher.loop_duration_us", "server.dispatcher.loop_duration_us", {}},
+        {"listener_manager.worker_0.dispatcher.loop_duration_us",
+         "listener_manager.worker.dispatcher.loop_duration_us",
+         {{worker_id, "0"}}},
+        // Thread local cluster manager gauges, `source/common/upstream/cluster_manager_impl.cc`.
+        {"thread_local_cluster_manager.main_thread.clusters_inflated",
+         "thread_local_cluster_manager.main_thread.clusters_inflated",
+         {}},
+        {"thread_local_cluster_manager.worker_0.clusters_inflated",
+         "thread_local_cluster_manager.worker.clusters_inflated",
+         {{worker_id, "0"}}},
+        // Per-handler listener stats, `source/server/active_listener_base.h`. The admin listener
+        // is served from the main thread, so its handler contributes no worker tag.
+        {absl::StrCat("listener.", mainListenerScope(), ".worker_0.downstream_cx_total"),
+         "listener.worker.downstream_cx_total",
+         {{listener_address, mainListenerScope()}, {worker_id, "0"}}},
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+        {"listener.admin.main_thread.downstream_cx_total",
+         "listener.admin.main_thread.downstream_cx_total",
+         {}},
+#endif
+        // Per-thread watchdog counters, `source/server/guarddog_impl.cc`.
+        {"server.main_thread.watchdog_miss", "server.main_thread.watchdog_miss", {}},
+        {"server.worker_0.watchdog_miss", "server.worker.watchdog_miss", {{worker_id, "0"}}},
         // SDS scope, `source/common/secret/sds_api.cc`.
         {"sds.server_cert.key_rotation_failed",
          "sds.key_rotation_failed",
@@ -450,6 +494,10 @@ resources:
 
   config_helper_.addConfigModifier([this, secret_path](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Dispatcher stats are off by default; enable them so the per-thread dispatcher histograms
+    // exist.
+    bootstrap.set_enable_dispatcher_stats(true);
+
     // Serve the default listener over TLS with a dynamic secret, which creates the SDS scope.
     envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
     auto* sds_secret_config =
@@ -502,6 +550,15 @@ resources:
   auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
   ASSERT_NE(store, nullptr);
   EXPECT_EQ(store->useExplicitTags(), explicitTags());
+
+  // The watchdog counters and the dispatcher histograms are created on their own threads, so wait
+  // for them before checking the expectations. Waiting for a histogram's samples also proves it
+  // exists.
+  test_server_->waitForCounterExists("server.main_thread.watchdog_miss");
+  test_server_->waitForCounterExists("server.worker_0.watchdog_miss");
+  test_server_->waitUntilHistogramHasSamples("server.dispatcher.loop_duration_us");
+  test_server_->waitUntilHistogramHasSamples(
+      "listener_manager.worker_0.dispatcher.loop_duration_us");
 
   for (const StatExpectation& expectation : expectations()) {
     checkExpectation(*test_server_, expectation);

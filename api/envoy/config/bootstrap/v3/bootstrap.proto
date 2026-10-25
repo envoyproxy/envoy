@@ -42,7 +42,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 44]
+// [#next-free-field: 45]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -239,6 +239,14 @@ message Bootstrap {
     // are marked as unused. Must be a multiple of the ``stats_flush_interval``.
     google.protobuf.Duration stats_eviction_interval = 42
         [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // Optional runtime derived duration, in milliseconds, to perform metric eviction. The runtime
+    // key is read on every stats flush, so the interval can be changed without restarting Envoy.
+    // ``default_value`` is used if the runtime key is not set, or if its value is not a multiple of
+    // the ``stats_flush_interval``. A value of 0 disables eviction. ``default_value`` must also be a
+    // multiple of the ``stats_flush_interval``. See ``stats_eviction_interval`` for how eviction
+    // works.
+    core.v3.RuntimeUInt64 runtime_stats_eviction_interval = 44;
   }
 
   // Optional watchdog configuration.
@@ -431,7 +439,8 @@ message Bootstrap {
   GrpcAsyncClientManagerConfig grpc_async_client_manager_config = 40;
 
   // Optional configuration for memory allocation manager.
-  // Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
+  // Memory releasing is supported with `tcmalloc <https://github.com/google/tcmalloc>`_ and
+  // `gperftools <https://github.com/gperftools/gperftools>`_.
   MemoryAllocatorManager memory_allocator_manager = 41;
 
   // When enabled, Envoy pins each worker thread to a distinct CPU from the process affinity mask,
@@ -790,13 +799,14 @@ message CustomInlineHeader {
 
 // [#next-free-field: 6]
 message MemoryAllocatorManager {
-  // Configures tcmalloc to perform background release of free memory in amount of bytes per ``memory_release_interval`` interval.
-  // If equals to ``0``, no memory release will occur. Defaults to ``0``.
+  // Configures tcmalloc to perform background release of free memory in amount of bytes per
+  // ``memory_release_interval`` interval. If equals to ``0``, no memory release will occur.
+  // Defaults to ``0``.
   uint64 bytes_to_release = 1;
 
-  // Interval in milliseconds for memory releasing. If specified, during every
-  // interval Envoy will try to release ``bytes_to_release`` of free memory back to operating system for reuse.
-  // Defaults to ``1000`` milliseconds.
+  // Interval in milliseconds for memory releasing. If specified, during every interval Envoy will
+  // try to release ``bytes_to_release`` of free memory back to operating system for reuse. If set
+  // to ``0``, no memory release will occur. Defaults to ``1000`` milliseconds.
   google.protobuf.Duration memory_release_interval = 2;
 
   // Sets the soft memory limit for tcmalloc. When the total memory used by tcmalloc exceeds this

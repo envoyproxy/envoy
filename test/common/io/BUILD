@@ -73,9 +73,11 @@ envoy_cc_test(
     }),
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/protobuf:utility_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
     ] + select({
         "//bazel:linux": [
             "//source/common/io:io_uring_impl_lib",

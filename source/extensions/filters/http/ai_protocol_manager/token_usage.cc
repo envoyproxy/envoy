@@ -1,31 +1,31 @@
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 #include "source/common/common/assert.h"
-#include "source/extensions/filters/http/ai_protocol_manager/api_protocol_adapter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_readers.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 
-// One of the three per-value ApiProtocol maps; the proto <-> internal pair
-// lives in api_protocol_conversion.h. Kept as separate exhaustive switches so
+// One of the three per-value LLMProtocol maps; the proto <-> internal pair
+// lives in llm_protocol_conversion.h. Kept as separate exhaustive switches so
 // a new enum value fails the build at each.
-absl::string_view apiProtocolName(ApiProtocol protocol) {
+absl::string_view llmProtocolName(LLMProtocol protocol) {
   switch (protocol) {
-  case ApiProtocol::OpenAiChatCompletions:
+  case LLMProtocol::OpenAiChatCompletions:
     return "OPENAI_CHAT_COMPLETIONS";
-  case ApiProtocol::OpenAiResponses:
+  case LLMProtocol::OpenAiResponses:
     return "OPENAI_RESPONSES";
-  case ApiProtocol::AnthropicMessages:
+  case LLMProtocol::AnthropicMessages:
     return "ANTHROPIC_MESSAGES";
-  case ApiProtocol::GeminiGenerateContent:
+  case LLMProtocol::GeminiGenerateContent:
     return "GEMINI_GENERATE_CONTENT";
-  case ApiProtocol::Unspecified:
+  case LLMProtocol::Unspecified:
     break;
   }
-  return "API_PROTOCOL_UNSPECIFIED";
+  return "LLM_PROTOCOL_UNSPECIFIED";
 }
 
 void TokenUsage::merge(const TokenUsage& update) {
@@ -46,15 +46,15 @@ void TokenUsage::merge(const TokenUsage& update) {
   if (!update.model.empty()) {
     model = update.model;
   }
-  if (update.api_protocol != ApiProtocol::Unspecified) {
-    api_protocol = update.api_protocol;
+  if (update.llm_protocol != LLMProtocol::Unspecified) {
+    llm_protocol = update.llm_protocol;
   }
 }
 
-void TokenUsage::finalize(const ApiProtocolAdapter& adapter) {
+void TokenUsage::finalize(const LLMProtocolAdapter& adapter) {
   // Canonicalization rules are per dialect: the adapter must be the
-  // accumulator's own (finalizeUsage() in api_protocol_adapter.h wires this).
-  ASSERT(adapter.protocol() == api_protocol);
+  // accumulator's own (finalizeUsage() in llm_protocol_adapter.h wires this).
+  ASSERT(adapter.protocol() == llm_protocol);
   // The summations below must not run twice.
   ASSERT(!finalized_);
   if (finalized_) {

@@ -28,6 +28,7 @@ envoy_cc_library(
         ":fatal_error_handler_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
+        "//source/common/coroutine:backtrace_lib",
         "//source/common/singleton:threadsafe_singleton",
         "//source/server:backtrace_lib",
     ],

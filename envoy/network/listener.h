@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/resource.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -68,8 +69,13 @@ public:
 
   /**
    * Clone this socket factory so it can be used by a new listener (e.g., if the address is shared).
+   * @param tcp_backlog_size supplies the tcp_backlog_size of the new listener. This is passed
+   *        explicitly (rather than read off the existing factory) because it is the one listener
+   *        option that can be re-applied to an already-listening socket via a second listen()
+   *        call, so a change to it does not by itself force full socket recreation; the cloned
+   *        factory must carry the new listener's value rather than the one it is cloned from.
    */
-  virtual ListenSocketFactoryPtr clone() const PURE;
+  virtual ListenSocketFactoryPtr clone(uint32_t tcp_backlog_size) const PURE;
 
   /**
    * Close all sockets. This is used during draining scenarios.
@@ -489,7 +495,7 @@ public:
   virtual const IoHandle::UdpSaveCmsgConfig& udpSaveCmsgConfig() const PURE;
 };
 
-using UdpListenerCallbacksOptRef = std::optional<std::reference_wrapper<UdpListenerCallbacks>>;
+using UdpListenerCallbacksOptRef = OptRef<UdpListenerCallbacks>;
 
 /**
  * An abstract socket listener. Free the listener to stop listening on the socket.

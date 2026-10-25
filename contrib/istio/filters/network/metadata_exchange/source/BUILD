@@ -19,7 +19,6 @@ envoy_cc_library(
         "metadata_exchange.h",
         "metadata_exchange_initial_header.h",
     ],
-    repository = "@envoy",
     deps = [
         "//contrib/istio/filters/common/source:metadata_object_lib",
         "//contrib/istio/filters/common/source:workload_discovery_lib",
@@ -46,7 +45,6 @@ envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":metadata_exchange",
         "@envoy_api//contrib/envoy/extensions/filters/network/metadata_exchange/v3:pkg_cc_proto",

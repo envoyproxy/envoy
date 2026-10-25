@@ -1,7 +1,6 @@
 #include "source/extensions/filters/udp/dynamic_modules/factory.h"
 
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/dynamic_modules/worker_index.h"
 #include "source/extensions/filters/udp/dynamic_modules/filter.h"
 
 namespace Envoy {
@@ -45,8 +44,7 @@ DynamicModuleUdpListenerFilterConfigFactory::createFilterFactoryFromProto(
 
   return [filter_config](Network::UdpListenerFilterManager& filter_manager,
                          Network::UdpReadFilterCallbacks& callbacks) -> void {
-    const uint32_t worker_index = Extensions::DynamicModules::parseWorkerIndexFromDispatcherName(
-        callbacks.udpListener().dispatcher().name());
+    const uint32_t worker_index = callbacks.udpListener().dispatcher().workerId().value_or(0);
     filter_manager.addReadFilter(
         std::make_unique<DynamicModuleUdpListenerFilter>(callbacks, filter_config, worker_index));
   };

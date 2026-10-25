@@ -386,8 +386,7 @@ TEST_P(ShadowPolicyIntegrationTest, RequestMirrorPolicyWithShadowUpstreamReset) 
 
   // Send upstream reset on shadow request.
   upstream_request_shadow->encodeResetStream();
-  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_rx_reset", Eq(1),
-                               std::chrono::milliseconds(1000));
+  test_server_->waitForCounter("cluster.cluster_1.upstream_rq_rx_reset", Eq(1));
 
   codec_client_->sendData(encoder, 20, true);
   ASSERT_TRUE(upstream_request_main->waitForData(*dispatcher_, 20));
@@ -779,7 +778,7 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
 
   // Connecting to the shadow stream should cause backpressure due to connection backup.
   test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
-                               Eq(1), std::chrono::milliseconds(500));
+                               Eq(1));
 
   codec_client_->sendData(encoder, 1023, false);
 

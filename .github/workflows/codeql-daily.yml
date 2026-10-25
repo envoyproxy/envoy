@@ -12,90 +12,13 @@ concurrency:
   group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
   cancel-in-progress: true
 
-
 jobs:
   CodeQL-Build:
-
     permissions:
-      security-events: write  # for github/codeql-action/analyze to upload SARIF results
+      actions: read
+      contents: read
+      security-events: write
       pull-requests: read
-    strategy:
-      fail-fast: false
-
-    # CodeQL runs on ubuntu-24.04
-    runs-on: ubuntu-22.04
-    if: github.repository == 'envoyproxy/envoy'
-
-    steps:
-
-    - uses: envoyproxy/toolshed/actions/bind-mounts@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
-      if: |
-        ! github.event.repository.private
-      with:
-        mounts: |
-          - src: /mnt/workspace
-            target: GITHUB_WORKSPACE
-            chown: "runner:runner"
-          - src: /mnt/runner-home
-            target: /home/runner/.cache
-            chown: "runner:runner"
-    - name: Free disk space
-      if: |
-        env.BUILD_TARGETS != ''
-        && github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
-      with:
-        to_remove: |
-          /usr/local/.ghcup
-          /usr/local/lib/android
-
-    - name: Checkout repository
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
-      with:
-        languages: cpp
-        trap-caching: false
-
-    - name: Install deps
-      shell: bash
-      run: |
-       sudo apt-get update --error-on=any
-       sudo apt-get install --yes \
-           libtool libtinfo5 automake autoconf curl unzip
-       # Note: the llvm/clang version should match the version specified in:
-       #  - bazel/toolchains.bzl
-       #  - .github/workflows/codeql-push.yml
-       #
-       # IMPORTANT: the clang bundle MUST be unpacked outside $GITHUB_WORKSPACE (we use $RUNNER_TEMP).
-       # The CodeQL C++ extractor treats anything under the source root as project code, so headers
-       # under a checkout subdirectory would be analysed as Envoy source and produce false positives
-       # (e.g. cpp/new-free-mismatch in <vector>, alert #1881). Keeping it under $RUNNER_TEMP makes
-       # CodeQL classify those headers as system headers — same as /usr/include/c++/** on a normal
-       # build. Do NOT move this back into the checkout tree.
-       mkdir -p "${RUNNER_TEMP}/clang22.1.8"
-       cd "${RUNNER_TEMP}/clang22.1.8"
-       wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
-       tar -xf LLVM-22.1.8-Linux-X64.tar.xz --strip-components 1
-
-    - name: Build
-      run: |
-       bazelisk shutdown
-       bazel build \
-           -c fastbuild \
-           --repo_env=BAZEL_LLVM_PATH="${RUNNER_TEMP}/clang22.1.8" \
-           --spawn_strategy=local \
-           --discard_analysis_cache \
-           --nouse_action_cache \
-           --features="-layering_check" \
-           --config=clang-local \
-           --config=ci \
-           //source/common/http/...
-
-    - name: Clean Artifacts
-      run: |
-        git clean -xdf
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
+    uses: ./.github/workflows/_codeql.yml
+    with:
+      targets: '@envoy//source/common/http/...'

@@ -33,7 +33,8 @@ struct CreateWasmStats {
 
 #define LIFECYCLE_STATS(COUNTER, GAUGE)                                                            \
   COUNTER(created)                                                                                 \
-  GAUGE(active, NeverImport)
+  GAUGE(active, NeverImport)                                                                       \
+  GAUGE(memory_size, NeverImport)
 
 struct LifecycleStats {
   LIFECYCLE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
@@ -106,6 +107,7 @@ public:
   ~LifecycleStatsHandler() = default;
 
   void onEvent(WasmEvent event);
+  void onMemorySizeChanged(uint64_t previous_size, uint64_t new_size);
   static int64_t getActiveVmCount();
 
 protected:
@@ -114,20 +116,22 @@ protected:
 };
 
 // TODO(wbpcode): refactor all these stats handlers into a single one.
-#define WASM_STATS(COUNTER)                                                                        \
+#define WASM_STATS(COUNTER, GAUGE)                                                                 \
   COUNTER(vm_reload)                                                                               \
   COUNTER(vm_reload_backoff)                                                                       \
   COUNTER(vm_reload_success)                                                                       \
-  COUNTER(vm_reload_failure)
+  COUNTER(vm_reload_failure)                                                                       \
+  GAUGE(vm_memory_size, NeverImport)
 
 struct WasmStats {
-  WASM_STATS(GENERATE_COUNTER_STRUCT)
+  WASM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
 class StatsHandler {
 public:
   StatsHandler(Stats::Scope& parent_scope, const std::string& prefix);
   void onEvent(WasmEvent event) const;
+  void onMemorySizeChanged(uint64_t previous_size, uint64_t new_size) const;
   WasmStats& wasmStats() const { return wasm_stats_; }
 
 private:

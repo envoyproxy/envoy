@@ -4,6 +4,7 @@
 #include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gmock/gmock.h"
@@ -50,6 +51,7 @@ public:
   std::shared_ptr<MockFilterConfig> filter_config_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
+  NiceMock<Event::MockDispatcher> main_dispatcher_;
 };
 
 // Verify filter functionality when signing works for header only request.
@@ -217,7 +219,8 @@ TEST_F(AwsRequestSigningFilterTest, FilterConfigImplGetters) {
   Stats::IsolatedStoreImpl stats;
   auto signer = std::make_unique<Common::Aws::MockSigner>();
   const auto* signer_ptr = signer.get();
-  FilterConfigImpl config(std::move(signer), "prefix", *stats.rootScope(), "foo", true);
+  FilterConfigImpl config(std::move(signer), "prefix", *stats.rootScope(), "foo", true,
+                          main_dispatcher_);
 
   EXPECT_EQ(signer_ptr, &config.signer());
   EXPECT_EQ(0UL, config.stats().signing_added_.value());
@@ -236,13 +239,48 @@ TEST_F(AwsRequestSigningFilterTest, PerRouteConfigSignWithHostRewrite) {
   EXPECT_CALL(*(signer), addCallbackIfCredentialsPending(_)).WillRepeatedly(Return(false));
 
   FilterConfigImpl per_route_config(std::move(signer), "prefix", *stats.rootScope(),
-                                    "overridden-host", false);
+                                    "overridden-host", false, main_dispatcher_);
   ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillByDefault(Return(&per_route_config));
 
   Http::TestRequestHeaderMapImpl headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
   EXPECT_EQ("overridden-host", headers.getHostValue());
+}
+
+// A configuration released off the main thread hands its signer, and therefore its credentials
+// provider chain, to the main dispatcher rather than destroying it in place.
+TEST_F(AwsRequestSigningFilterTest, ConfigReleasedOffMainThreadIsPostedToMainDispatcher) {
+  Stats::IsolatedStoreImpl stats;
+  ON_CALL(main_dispatcher_, isThreadSafe()).WillByDefault(Return(false));
+
+  auto config =
+      std::make_unique<FilterConfigImpl>(std::make_unique<NiceMock<MockSigner>>(), "prefix",
+                                         *stats.rootScope(), "foo", true, main_dispatcher_);
+
+  Event::PostCb posted;
+  EXPECT_CALL(main_dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  // Running the posted callback releases the signer on the main thread.
+  posted();
+}
+
+// A configuration released on the main thread is destroyed in place, with nothing posted to the
+// dispatcher.
+TEST_F(AwsRequestSigningFilterTest, ConfigReleasedOnMainThreadIsDestroyedInPlace) {
+  Stats::IsolatedStoreImpl stats;
+  ON_CALL(main_dispatcher_, isThreadSafe()).WillByDefault(Return(true));
+
+  auto config =
+      std::make_unique<FilterConfigImpl>(std::make_unique<NiceMock<MockSigner>>(), "prefix",
+                                         *stats.rootScope(), "foo", true, main_dispatcher_);
+
+  EXPECT_CALL(main_dispatcher_, post(_)).Times(0);
+  config.reset();
 }
 
 // Verify filter decodeData functionality when credentials are pending.
@@ -290,6 +328,63 @@ TEST_F(AwsRequestSigningFilterTest, DecodeDataCredentialsPending) {
   // We should see continueDecoding called when the captured callback is triggered
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   capture();
+}
+
+// A signer that records its own destruction, so that tests can observe exactly when the
+// credentials provider chain owned by a route level configuration is released.
+class DestructionTrackingSigner : public MockSigner {
+public:
+  explicit DestructionTrackingSigner(bool& destroyed) : destroyed_(destroyed) {}
+  ~DestructionTrackingSigner() override { destroyed_ = true; }
+
+private:
+  bool& destroyed_;
+};
+
+// The signer handed to the main dispatcher outlives the configuration that owned it, and is
+// released only once the main thread runs the posted callback.
+TEST_F(AwsRequestSigningFilterTest, SignerOutlivesConfigUntilPostedCallbackRuns) {
+  Stats::IsolatedStoreImpl stats;
+  ON_CALL(main_dispatcher_, isThreadSafe()).WillByDefault(Return(false));
+
+  bool signer_destroyed = false;
+  auto config = std::make_unique<FilterConfigImpl>(
+      std::make_unique<DestructionTrackingSigner>(signer_destroyed), "prefix", *stats.rootScope(),
+      "foo", true, main_dispatcher_);
+
+  Event::PostCb posted;
+  EXPECT_CALL(main_dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  EXPECT_FALSE(signer_destroyed);
+  posted();
+  EXPECT_TRUE(signer_destroyed);
+}
+
+// A signer handed to a main dispatcher that never runs the posted callback, because the main
+// dispatcher has already exited, is released when the callback itself is destroyed.
+TEST_F(AwsRequestSigningFilterTest, SignerIsReleasedWhenPostedCallbackIsDiscarded) {
+  Stats::IsolatedStoreImpl stats;
+  ON_CALL(main_dispatcher_, isThreadSafe()).WillByDefault(Return(false));
+
+  bool signer_destroyed = false;
+  auto config = std::make_unique<FilterConfigImpl>(
+      std::make_unique<DestructionTrackingSigner>(signer_destroyed), "prefix", *stats.rootScope(),
+      "foo", true, main_dispatcher_);
+
+  Event::PostCb posted;
+  EXPECT_CALL(main_dispatcher_, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  config.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  EXPECT_FALSE(signer_destroyed);
+  posted = nullptr;
+  EXPECT_TRUE(signer_destroyed);
 }
 
 } // namespace

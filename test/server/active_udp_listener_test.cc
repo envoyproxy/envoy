@@ -225,7 +225,7 @@ TEST_P(ActiveUdpListenerTest, HotRestartShutdownForwardsUnknownSessions) {
 
   // An unregistered session is forwarded to the child instance without creating local state,
   // so a repeated datagram is forwarded again.
-  EXPECT_CALL(packet_handler, handle(0, _)).Times(3);
+  EXPECT_CALL(packet_handler, handle(0, _, _)).Times(3);
   active_listener_->onData(makeRecvData(2000));
   active_listener_->onData(makeRecvData(2000));
 
@@ -246,7 +246,7 @@ TEST_P(ActiveUdpListenerTest, HotRestartShutdownGuardDisabledServesLocally) {
   active_listener_->addReadFilter(std::move(test_filter));
 
   Network::MockNonDispatchedUdpPacketHandler packet_handler;
-  EXPECT_CALL(packet_handler, handle(_, _)).Times(0);
+  EXPECT_CALL(packet_handler, handle(_, _, _)).Times(0);
   Network::ExtraShutdownListenerOptions options;
   options.non_dispatched_udp_packet_handler_ = packet_handler;
   active_listener_->shutdownListener(options);

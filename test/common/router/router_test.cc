@@ -8214,6 +8214,22 @@ TEST_F(RouterTest, SetDynamicMaxStreamDuration) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
+TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfHeaderOverflows) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder_, Http::Protocol::Http10);
+
+  // The timer will not be created.
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_).Times(0);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-upstream-stream-duration-ms", "18446744073709551615"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  router_->onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 TEST_F(RouterTest, NotSetDynamicMaxStreamDurationIfZero) {
   NiceMock<Http::MockRequestEncoder> encoder1;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder_, Http::Protocol::Http10);
@@ -8906,6 +8922,51 @@ TEST_F(RouterTest, RemoteResetNoErrorBeforeResponseStarted) {
                    "response was received already.");
 
   router_->onDestroy();
+}
+
+class CustomRetryStateTestPolicy : public TestRetryPolicy {
+public:
+  RetryStatePtr createRetryState(Http::RequestHeaderMap&, const Upstream::ClusterInfo&,
+                                 Server::Configuration::CommonFactoryContext&, Event::Dispatcher&,
+                                 Upstream::ResourcePriority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override {
+    create_called_ = true;
+    received_stream_info_ = stream_info.ptr();
+    auto state = std::make_unique<NiceMock<MockRetryState>>();
+    ON_CALL(*state, enabled()).WillByDefault(Return(true));
+    EXPECT_CALL(*state, isAutomaticallyConfiguredForHttp3()).WillOnce(Return(true));
+    return state;
+  }
+
+  mutable bool create_called_{false};
+  mutable StreamInfo::StreamInfo* received_stream_info_{nullptr};
+};
+
+TEST_F(RouterTest, ProdFilterDelegatesToRetryPolicyCreateRetryState) {
+  auto custom_policy = std::make_shared<CustomRetryStateTestPolicy>();
+  RetryPolicyConstSharedPtr policy_ptr = custom_policy;
+  ON_CALL(callbacks_.route_->route_entry_, retryPolicy()).WillByDefault(ReturnRef(policy_ptr));
+
+  ProdFilter prod_filter(config_, config_->default_stats_);
+  prod_filter.setDecoderFilterCallbacks(callbacks_);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  EXPECT_CALL(callbacks_, removeDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(callbacks_, addDownstreamWatermarkCallbacks(_));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess,
+                        std::optional<uint64_t>(std::nullopt)));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  prod_filter.decodeHeaders(headers, true);
+
+  EXPECT_TRUE(custom_policy->create_called_);
+  EXPECT_EQ(&callbacks_.stream_info_, custom_policy->received_stream_info_);
+
+  prod_filter.onDestroy();
 }
 
 } // namespace Router

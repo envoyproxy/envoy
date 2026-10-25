@@ -49,6 +49,22 @@ You can use [`tools/config_validation/BUILD`](../tools/config_validation/BUILD) 
 for this flow. See also the [`rules_python`](https://github.com/bazelbuild/rules_python)
 documentation for further references.
 
+# Adding external dependencies to Envoy (Rust)
+
+Rust crates come from the Cargo workspace in [`Cargo.toml`](../Cargo.toml) and
+[`Cargo.lock`](../Cargo.lock). The `crate_universe` extension of
+[`rules_rust`](https://github.com/bazelbuild/rules_rust) pins them for Bazel in
+[`Cargo.Bazel.envoy.lock`](../Cargo.Bazel.envoy.lock). Bazel never checks that file against the
+Cargo files, so it has to be repinned after every crate change. The process is:
+
+1. Add or update the crate in the relevant `Cargo.toml` and update `Cargo.lock`, for example with
+   `cargo update -p <crate> --precise <version>`.
+2. Repin `Cargo.Bazel.envoy.lock` with `ci/do_ci.sh lockfiles` (see
+   [`ci/README.md`](../ci/README.md)). The `deps` CI check fails while the lockfiles are out of sync.
+3. Reference the crate from Bazel with `crate_deps()` or `all_crate_deps()` from
+   `@envoy_rust_crate_index//:defs.bzl`.
+4. `bazel test //test/...`
+
 # Updating an external dependency version
 
 1. Update the corresponding `bazel_dep` in [`MODULE.bazel`](../MODULE.bazel) and

@@ -122,7 +122,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
   }
 #else
   spdy_headers = envoyHeadersToHttp2HeaderBlock(headers);
-  if (headers.Method()->value() == "HEAD") {
+  if (headers.getMethodValue() == "HEAD") {
     sent_head_request_ = true;
   }
 #endif

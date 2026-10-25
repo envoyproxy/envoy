@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
@@ -9,6 +10,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/coroutine/status_macros.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/serializer.h"
@@ -31,6 +33,43 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
+
+// Wraps the in-memory store and records each write's size and end_stream flag.
+class RecordingExternalBufferFactory : public ExternalBufferFactory {
+public:
+  struct Write {
+    uint64_t size;
+    bool end_stream;
+  };
+
+  using ExternalBufferFactory::createBuffer;
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
+    return std::make_unique<RecordingBuffer>(inner_.createBuffer(dispatcher), writes_);
+  }
+
+  std::vector<Write> writes_;
+
+private:
+  class RecordingBuffer : public ExternalBuffer {
+  public:
+    RecordingBuffer(ExternalBufferPtr inner, std::vector<Write>& writes)
+        : inner_(std::move(inner)), writes_(writes) {}
+    void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) override {
+      writes_.push_back({data->length(), end_stream});
+      inner_->write(std::move(data), end_stream, std::move(cb));
+    }
+    void read(uint64_t offset, uint64_t length, ReadCallback cb) override {
+      inner_->read(offset, length, std::move(cb));
+    }
+    uint64_t length() const override { return inner_->length(); }
+
+  private:
+    ExternalBufferPtr inner_;
+    std::vector<Write>& writes_;
+  };
+
+  InMemoryExternalBufferFactory inner_;
+};
 
 class AiProtocolManagerFilterTest : public testing::Test {
 public:
@@ -80,6 +119,50 @@ public:
           replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_, cb);
           return replay_cb_;
         }));
+    ON_CALL(encoder_callbacks_.dispatcher_, post(testing::_))
+        .WillByDefault(Invoke([this](Event::PostCb cb) { posted_.push_back(std::move(cb)); }));
+    ON_CALL(encoder_callbacks_.dispatcher_, createSchedulableCallback_(testing::_))
+        .WillByDefault(Invoke([this](std::function<void()> cb) -> Event::SchedulableCallback* {
+          auto* scb =
+              new NiceMock<Event::MockSchedulableCallback>(&encoder_callbacks_.dispatcher_, cb);
+          ON_CALL(*scb, scheduleCallbackCurrentIteration()).WillByDefault(Invoke([this, scb, cb]() {
+            scb->enabled_ = true;
+            posted_.push_back([scb, cb]() {
+              if (scb->enabled_) {
+                scb->enabled_ = false;
+                cb();
+              }
+            });
+          }));
+          ON_CALL(*scb, scheduleCallbackNextIteration()).WillByDefault(Invoke([this, scb, cb]() {
+            scb->enabled_ = true;
+            posted_.push_back([scb, cb]() {
+              if (scb->enabled_) {
+                scb->enabled_ = false;
+                cb();
+              }
+            });
+          }));
+          return scb;
+        }));
+    ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(testing::_, testing::_))
+        .WillByDefault(Invoke([this](Buffer::Instance& data, bool end_stream) {
+          encoded_injected_.add(data);
+          encoded_injected_end_stream_ = end_stream;
+          ++encoded_inject_calls_;
+        }));
+    ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault(Invoke([this]() {
+      ++encode_continue_calls_;
+    }));
+    ON_CALL(encoder_callbacks_,
+            sendLocalReply(testing::_, testing::_, testing::_, testing::_, testing::_))
+        .WillByDefault(
+            Invoke([this](Http::Code code, absl::string_view,
+                          std::function<void(Http::ResponseHeaderMap&)>,
+                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+              encode_local_reply_code_ = code;
+              ++encode_local_reply_calls_;
+            }));
   }
 
   // Run at trace so debug/trace-log argument expressions execute too.
@@ -100,23 +183,28 @@ public:
           ->mutable_inline_string_threshold_bytes()
           ->set_value(inline_string_threshold_bytes);
     }
-    filter_ = std::make_unique<AiProtocolManagerFilter>(
-        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
-                                                       AiFilterFactories{}));
+    filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
+        proto, *stats_store_.rootScope(), AiFilterFactories{}, factory_));
     filter_->setDecoderFilterCallbacks(callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   // Parses unconfigured routes too, so a test can show the chain is not run there.
-  void createFilterWithAiFilters(AiFilterFactories ai_filter_factories) {
+  void createFilterWithAiFilters(
+      AiFilterFactories ai_filter_factories,
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::
+          BodyReserialization reserialize_body =
+              envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::ALWAYS) {
     if (filter_ != nullptr) {
       filter_->onDestroy();
     }
     envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
     proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
-    filter_ = std::make_unique<AiProtocolManagerFilter>(
-        factory_, std::make_shared<const FilterConfig>(proto, *stats_store_.rootScope(),
-                                                       std::move(ai_filter_factories)));
+    proto.mutable_request_handling()->set_reserialize_body(reserialize_body);
+    filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
+        proto, *stats_store_.rootScope(), std::move(ai_filter_factories), factory_));
     filter_->setDecoderFilterCallbacks(callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
   // decodeHeaders() for a stream the filter is expected to engage on.
@@ -138,13 +226,21 @@ public:
     return filter_->decodeHeaders(headers, /*end_stream=*/false);
   }
 
+  // A route declaring a Chat Completions endpoint.
+  static PerRouteProto chatRoute() {
+    PerRouteProto proto;
+    proto.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+    return proto;
+  }
+
   // Attaches a per-route config declaring the route an AI endpoint with a
   // request payload for the filter to hold.
-  void setRouteConfig() {
-    PerRouteProto proto;
-    proto.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-    route_config_ = std::make_unique<RouteConfig>(proto);
+  void setRouteConfig() { setRouteConfig(chatRoute()); }
+  void setRouteConfig(const PerRouteProto& proto) {
+    route_config_ = RouteConfig::create(proto).value();
     ON_CALL(callbacks_, mostSpecificPerFilterConfig())
+        .WillByDefault(testing::Return(route_config_.get()));
+    ON_CALL(encoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
   }
 
@@ -184,9 +280,10 @@ public:
 
   std::deque<Event::PostCb> posted_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  InMemoryExternalBufferFactory factory_;
+  ExternalBufferFactorySharedPtr factory_{std::make_shared<InMemoryExternalBufferFactory>()};
   FilterConfigSharedPtr config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Http::UpstreamWatermarkCallbacks* watermark_cb_{};
   // Owned by the manager the filter builds; present so createSchedulableCallback()
   // returns a usable callback during construction.
@@ -203,6 +300,13 @@ public:
   int local_reply_calls_{0};
   std::optional<Http::Code> local_reply_code_;
   std::string local_reply_details_;
+
+  Buffer::OwnedImpl encoded_injected_;
+  bool encoded_injected_end_stream_{false};
+  int encoded_inject_calls_{0};
+  int encode_continue_calls_{0};
+  int encode_local_reply_calls_{0};
+  std::optional<Http::Code> encode_local_reply_code_;
 };
 
 // With a payload to inspect, iteration pauses so the rest of the chain does not
@@ -293,6 +397,24 @@ TEST_F(AiProtocolManagerFilterTest, LargePayloadReplayedInChunks) {
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), big.size());
   EXPECT_EQ(injected_.toString(), big);
+}
+
+// A last frame with end_stream reaches the store as one write carrying end_stream.
+TEST_F(AiProtocolManagerFilterTest, FinalFrameEndStreamReachesStoreInOneWrite) {
+  auto recording = std::make_shared<RecordingExternalBufferFactory>();
+  factory_ = recording;
+  engageIgnoringPayload();
+
+  const std::string chunk(64 * 1024, 'x'); // At the write flush threshold.
+  Buffer::OwnedImpl body(chunk);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  ASSERT_EQ(recording->writes_.size(), 1);
+  EXPECT_EQ(recording->writes_[0].size, chunk.size());
+  EXPECT_TRUE(recording->writes_[0].end_stream);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(injected_.toString(), chunk);
 }
 
 // Destroying the filter mid-flight cancels pending callbacks; no replay occurs.
@@ -459,7 +581,7 @@ public:
 
   // Attaches a per-route config on the encode path.
   void setEncodeRouteConfig(const PerRouteProto& proto) {
-    route_config_ = std::make_unique<RouteConfig>(proto);
+    route_config_ = RouteConfig::create(proto).value();
     ON_CALL(encoder_callbacks_, mostSpecificPerFilterConfig())
         .WillByDefault(testing::Return(route_config_.get()));
   }
@@ -470,8 +592,8 @@ public:
     metadata_writes_.clear();
     typed_metadata_writes_.clear();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                             AiFilterFactories{});
-    filter_ = std::make_unique<AiProtocolManagerFilter>(factory_, config_);
+                                             AiFilterFactories{}, factory_);
+    filter_ = std::make_unique<AiProtocolManagerFilter>(config_);
     // A stream filter receives both callback sets in production; encode-path
     // code may rely on the decoder callbacks (e.g. the buffer memory account).
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
@@ -539,7 +661,7 @@ public:
   LogLevelSetter log_level_setter_{spdlog::level::trace};
 
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
-  InMemoryExternalBufferFactory factory_;
+  ExternalBufferFactorySharedPtr factory_{std::make_shared<InMemoryExternalBufferFactory>()};
   FilterConfigSharedPtr config_;
   std::unique_ptr<RouteConfig> route_config_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -569,7 +691,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseUsagePublishedAtEndOfStream) {
 
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   // The provider total is always preserved, agreeing or not.
   EXPECT_EQ(typed->model(), "gpt-4o");
   EXPECT_EQ(typed->input_tokens().value(), 19);
@@ -618,7 +740,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction)
   envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
   auto* token_usage = proto_config.mutable_response_handling()->mutable_token_usage();
   token_usage->set_include_unconfigured_routes(true);
-  token_usage->set_default_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  token_usage->set_default_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   token_usage->mutable_limits()->mutable_max_json_body_size()->set_value(64);
   setupWithProto(proto_config);
   Http::TestResponseHeaderMapImpl headers{
@@ -628,7 +750,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ContentLengthOverCapFailsExtraction)
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
   EXPECT_EQ(counterValue("response_parse_error"), 0); // Never buffered or parsed.
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
@@ -696,7 +818,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, ExtractionFailurePublishesStatusOnly
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
   EXPECT_EQ(typed->model(), "gpt-4o");
   EXPECT_FALSE(typed->has_total_tokens()); // No counts recovered.
   EXPECT_FALSE(typed->has_input_tokens());
@@ -806,7 +928,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, SseAnthropicComputedTotal) {
   EXPECT_EQ(typed->input_tokens().value(), 2679);
   EXPECT_EQ(typed->output_tokens().value(), 15);
   EXPECT_EQ(typed->total_tokens().value(), 2694);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
 // A JSON body (Gemini generateContent) is parsed at end of stream.
@@ -827,7 +949,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, JsonBodyGemini) {
   EXPECT_EQ(typed->output_tokens().value(), 161);
   EXPECT_EQ(typed->total_tokens().value(), 167);
   EXPECT_EQ(typed->output_token_details().reasoning_tokens().value(), 12);
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
   EXPECT_EQ(typed->model(), "gemini-2.5-flash");
 }
 
@@ -980,13 +1102,13 @@ TEST_F(AiProtocolManagerFilterResponseTest, UsageAbsentCountsMissing) {
 
 // A configured fallback wire API pins extraction for shapes auto-detection
 // cannot place.
-TEST_F(AiProtocolManagerFilterResponseTest, DefaultApiProtocolConfig) {
-  setup("{default_api_protocol: ANTHROPIC_MESSAGES}");
+TEST_F(AiProtocolManagerFilterResponseTest, DefaultLLMProtocolConfig) {
+  setup("{default_llm_protocol: ANTHROPIC_MESSAGES}");
   sendHeaders("application/json");
   sendData("{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}", true);
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
 }
 
 // Token usage is scoped to declared routes by default: with
@@ -1018,38 +1140,58 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
-// The per-route response API outranks the per-route request API, which
-// outranks the configured fallback.
+// The backend API left in filter state outranks the per-route response API,
+// which outranks the per-route request API, which outranks the configured
+// fallback.
 TEST_F(AiProtocolManagerFilterResponseTest, PerRouteProtocolPrecedence) {
   // The ambiguous body below carries Anthropic-style usage keys with no
   // detectable shape marker, so whichever protocol seeds extraction wins.
   const std::string ambiguous = "{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}";
 
+  // filter state (ANTHROPIC_MESSAGES) > route response (GEMINI_GENERATE_CONTENT): a model
+  // router that sent the request elsewhere also decides what the response is read as.
+  setup("{default_llm_protocol: OPENAI_CHAT_COMPLETIONS}");
+  PerRouteProto rerouted;
+  rerouted.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  rerouted.mutable_response()->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  setEncodeRouteConfig(rerouted);
+  encoder_callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::LlmProtocolResponse,
+      std::make_shared<ResponseLlmProtocol>(LLMProtocol::AnthropicMessages),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  sendHeaders("application/json");
+  sendData(ambiguous, true);
+  {
+    const auto typed = singleTypedWrite("envoy.ai.token_usage");
+    ASSERT_TRUE(typed.has_value());
+    EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  }
+
   // route response (ANTHROPIC_MESSAGES) > route request (OPENAI_CHAT_COMPLETIONS).
-  setup("{default_api_protocol: GEMINI_GENERATE_CONTENT}");
+  setup("{default_llm_protocol: GEMINI_GENERATE_CONTENT}");
   PerRouteProto per_route;
-  per_route.mutable_request()->set_api_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-  per_route.mutable_response()->set_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  per_route.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  per_route.mutable_response()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   setEncodeRouteConfig(per_route);
   sendHeaders("application/json");
   sendData(ambiguous, true);
   {
     const auto typed = singleTypedWrite("envoy.ai.token_usage");
     ASSERT_TRUE(typed.has_value());
-    EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+    EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   }
 
-  // route request > default_api_protocol.
-  setup("{default_api_protocol: GEMINI_GENERATE_CONTENT}");
+  // route request > default_llm_protocol.
+  setup("{default_llm_protocol: GEMINI_GENERATE_CONTENT}");
   PerRouteProto request_only;
-  request_only.mutable_request()->set_api_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  request_only.mutable_request()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   setEncodeRouteConfig(request_only);
   sendHeaders("application/json");
   sendData(ambiguous, true);
   {
     const auto typed = singleTypedWrite("envoy.ai.token_usage");
     ASSERT_TRUE(typed.has_value());
-    EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+    EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
   }
 }
 
@@ -1211,7 +1353,7 @@ TEST_F(AiProtocolManagerFilterResponseTest, OversizedBodyWithoutContentLengthFai
 
   const auto typed = singleTypedWrite("envoy.ai.token_usage");
   ASSERT_TRUE(typed.has_value());
-  EXPECT_EQ(typed->api_protocol(), envoy::type::ai::v3::API_PROTOCOL_UNSPECIFIED);
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED);
   EXPECT_EQ(typed->extraction_status(), envoy::data::ai::v3::TokenUsage::FAILED);
   EXPECT_EQ(counterValue("response_body_too_large"), 1);
   EXPECT_EQ(counterValue("token_usage_failed"), 1);
@@ -1258,27 +1400,35 @@ TEST_F(AiProtocolManagerFilterTest, ParsesDeclaredEndpointPayloadAndReplaysItVer
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(counterValue("request_parsed"), 1);
   EXPECT_EQ(counterValue("request_parse_error"), 0);
-  EXPECT_EQ(counterValue("request_schema_invalid"), 0);
 }
 
 // Rewrites `model` so a test can tell the chain ran ahead of replay.
 class ContextRecordingAiFilter : public AiFilter {
 public:
   struct Seen {
-    ApiProtocol protocol;
+    LLMProtocol protocol;
+    LLMProtocol request_protocol;
     std::string path;
     const StreamInfo::StreamInfo* stream_info;
+    uint64_t payload_bytes;
+    LlmBindingConstSharedPtr request_binding;
+    LlmBindingConstSharedPtr response_binding;
   };
 
-  ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen)
-      : context_(context), seen_(seen) {}
+  ContextRecordingAiFilter(const AiFilterContext& context, std::vector<Seen>& seen,
+                           BindingUse binding_use = {})
+      : context_(context), seen_(seen), binding_use_(binding_use) {}
+
+  BindingUse bindingUse() const override { return binding_use_; }
 
   Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                        AiRequestPropagator propagate_request,
                                        LocalReplier) override {
     ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
-    seen_.push_back({context_.request_protocol,
-                     std::string(context_.request_headers.getPathValue()), &context_.stream_info});
+    seen_.push_back({context_.request_protocol, request->protocol(),
+                     std::string(context_.request_headers.getPathValue()), &context_.stream_info,
+                     context_.request_payload_bytes, context_.request_binding,
+                     context_.response_binding});
     request->json()["model"] = "rewritten";
     co_return co_await std::move(propagate_request)(std::move(request));
   }
@@ -1286,7 +1436,39 @@ public:
 private:
   const AiFilterContext context_;
   std::vector<Seen>& seen_;
+  const BindingUse binding_use_;
 };
+
+// Receives the request and passes it on without editing it.
+class PassThroughAiFilter : public AiFilter {
+public:
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+};
+
+TEST_F(AiProtocolManagerFilterTest, ForwardsTheReceivedBodyWhenReserializationIsDisabled) {
+  createFilterWithAiFilters(
+      {[](const AiFilterContext&) -> AiFilterSharedPtr {
+        return std::make_unique<PassThroughAiFilter>();
+      }},
+      envoy::extensions::filters::http::ai_protocol_manager::v3::RequestHandling::DISABLE);
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string payload =
+      "{ \"model\": \"gpt-4\",  \"messages\": [ {\"role\": \"user\", \"content\": \"hi\"} ] }";
+  Buffer::OwnedImpl body(payload);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(injected_.toString(), payload);
+  EXPECT_TRUE(injected_end_stream_);
+}
 
 TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) {
   std::vector<ContextRecordingAiFilter::Seen> seen;
@@ -1305,11 +1487,110 @@ TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverDeclaredPayload) 
   EXPECT_EQ(local_reply_calls_, 0);
   EXPECT_EQ(built, 1);
   ASSERT_EQ(seen.size(), 1);
-  EXPECT_EQ(seen[0].protocol, ApiProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(seen[0].path, "/chat/completions");
   EXPECT_EQ(seen[0].stream_info, &callbacks_.stream_info_);
   EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
   EXPECT_TRUE(injected_end_stream_);
+}
+
+// The payload byte count a filter sees spans the whole body, not the frame that closed it.
+TEST_F(AiProtocolManagerFilterTest, AiFilterContextCarriesTotalPayloadBytes) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  const std::string first = R"({"model":"gpt-4","messages":)";
+  const std::string second = R"([{"role":"user","content":"hi"}]})";
+  Buffer::OwnedImpl head(first);
+  EXPECT_EQ(filter_->decodeData(head, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Buffer::OwnedImpl tail(second);
+  EXPECT_EQ(filter_->decodeData(tail, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].payload_bytes, first.size() + second.size());
+}
+
+class AiProtocolManagerFilterStateTest : public AiProtocolManagerFilterTest {
+public:
+  // What the AI filters see on `route`, a Chat Completions route, when filter state names `named`.
+  std::vector<ContextRecordingAiFilter::Seen>
+  runWithFilterState(LLMProtocol named, const PerRouteProto& route = chatRoute(),
+                     BindingUse binding_use = {}) {
+    std::vector<ContextRecordingAiFilter::Seen> seen;
+    createFilterWithAiFilters(
+        {[&seen, binding_use](const AiFilterContext& context) -> AiFilterSharedPtr {
+          return std::make_unique<ContextRecordingAiFilter>(context, seen, binding_use);
+        }});
+    setRouteConfig(route);
+    callbacks_.stream_info_.filterState()->setData(FilterStateKeys::LlmProtocolRequest,
+                                                   std::make_shared<RequestLlmProtocol>(named),
+                                                   StreamInfo::FilterState::LifeSpan::FilterChain);
+    EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+    Buffer::OwnedImpl body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+    EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+    drain();
+    return seen;
+  }
+};
+
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateOutranksTheRoute) {
+  const auto seen = runWithFilterState(LLMProtocol::AnthropicMessages);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::AnthropicMessages);
+}
+
+// A Chat Completions route whose clients and backend carry their APIs on bindings of its own.
+PerRouteProto routeWithBindings() {
+  PerRouteProto proto = AiProtocolManagerFilterTest::chatRoute();
+  proto.mutable_request()->mutable_binding()->set_uri_pattern("/gateway/{model}/chat");
+  proto.mutable_response()->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  proto.mutable_response()->mutable_binding()->set_uri_pattern("/v1/messages");
+  return proto;
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, RouteBindingsReachTheAiFilters) {
+  const auto seen = runWithFilterState(LLMProtocol::Unspecified, routeWithBindings());
+  ASSERT_EQ(seen.size(), 1);
+  ASSERT_NE(seen[0].request_binding, nullptr);
+  EXPECT_EQ(seen[0].request_binding->pattern()->source(), "/gateway/{model}/chat");
+  ASSERT_NE(seen[0].response_binding, nullptr);
+  EXPECT_EQ(seen[0].response_binding->pattern()->source(), "/v1/messages");
+}
+
+// The route's request binding is how its clients carry the route's API, so it lapses for a
+// request that filter state names another API for.
+TEST_F(AiProtocolManagerFilterStateTest, RouteRequestBindingLapsesForAnotherApi) {
+  const auto seen = runWithFilterState(LLMProtocol::AnthropicMessages, routeWithBindings());
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].request_binding, nullptr);
+  EXPECT_NE(seen[0].response_binding, nullptr);
+}
+
+// Route and chain are configured apart, so a binding the route declares that no AI filter applies
+// is counted where a request shows it.
+TEST_F(AiProtocolManagerFilterStateTest, CountsARouteBindingNoAiFilterApplies) {
+  runWithFilterState(LLMProtocol::Unspecified, routeWithBindings(), {.request = true});
+  EXPECT_EQ(counterValue("route_binding_unused"), 1);
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, RouteBindingsTheChainAppliesAreNotCounted) {
+  runWithFilterState(LLMProtocol::Unspecified, routeWithBindings(),
+                     {.request = true, .response = true});
+  EXPECT_EQ(counterValue("route_binding_unused"), 0);
+}
+
+TEST_F(AiProtocolManagerFilterStateTest, UnspecifiedFilterStateLeavesTheRoute) {
+  const auto seen = runWithFilterState(LLMProtocol::Unspecified);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::OpenAiChatCompletions);
 }
 
 TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
@@ -1387,10 +1668,9 @@ TEST_F(AiProtocolManagerFilterTest, DoesNotSetContentLengthOnReplayWhenAbsent) {
   EXPECT_EQ(request_headers_.ContentLength(), nullptr);
 }
 
-// A payload whose `model` is larger than the inline-string threshold: the
-// parser offloads the value, and the schema declares `model` non-offloadable,
-// so the default 1KiB threshold rejects it.
-TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
+// A payload whose `model` is larger than the default 1KiB inline-string
+// threshold: the parser leaves the value in the external buffer.
+TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsOffloaded) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
@@ -1398,10 +1678,12 @@ TEST_F(AiProtocolManagerFilterTest, ModelOverInlineStringThresholdIsRejected) {
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
-  EXPECT_EQ(local_reply_calls_, 1);
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
-  EXPECT_EQ(inject_calls_, 0);
+  EXPECT_EQ(local_reply_calls_, 0);
+  const auto* index =
+      callbacks_.stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+          APMRequestPayloadIndex::kFilterStateKey);
+  ASSERT_NE(index, nullptr);
+  EXPECT_TRUE(JsonWithExtBuf::isExternalRef(index->index().json().at("model")));
 }
 
 // The same payload is accepted once the configured threshold is raised above
@@ -1421,6 +1703,11 @@ TEST_F(AiProtocolManagerFilterTest, RaisedInlineStringThresholdKeepsLargeValuesI
   // preserve key order; compare the parsed JSON rather than the raw bytes.
   EXPECT_EQ(nlohmann::json::parse(injected_.toString()), nlohmann::json::parse(payload));
   EXPECT_TRUE(injected_end_stream_);
+  const auto* index =
+      callbacks_.stream_info_.filterState()->getDataReadOnly<APMRequestPayloadIndex>(
+          APMRequestPayloadIndex::kFilterStateKey);
+  ASSERT_NE(index, nullptr);
+  EXPECT_TRUE(index->index().json().at("model").is_string());
 }
 
 // Malformed JSON is answered with a 400 and never reaches the upstream.
@@ -1436,10 +1723,7 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJson) {
   EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
   EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
   EXPECT_EQ(inject_calls_, 0);
-  // A body that is not JSON at all is a parse error, not a schema failure: the
-  // two 400s are counted apart because they mean different things to operate on.
   EXPECT_EQ(counterValue("request_parse_error"), 1);
-  EXPECT_EQ(counterValue("request_schema_invalid"), 0);
   EXPECT_EQ(counterValue("request_parsed"), 0);
 }
 
@@ -1530,9 +1814,9 @@ TEST_F(AiProtocolManagerFilterTest, RejectsMalformedJsonMidUpload) {
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A payload that is valid JSON syntax but fails schema validation is answered
-// with a 400 and never reaches the upstream.
-TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
+// Schema validation is an AI filter's job: without one, a well-formed payload
+// the declared API would reject is forwarded.
+TEST_F(AiProtocolManagerFilterTest, ForwardsSchemaInvalidPayloadWithoutValidationFilter) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
 
@@ -1541,14 +1825,10 @@ TEST_F(AiProtocolManagerFilterTest, RejectsPayloadFailingSchemaValidation) {
   EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
   drain();
 
-  EXPECT_EQ(local_reply_calls_, 1);
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_EQ(local_reply_details_, "ai_protocol_manager_invalid_json");
-  EXPECT_EQ(inject_calls_, 0);
-  // Well-formed JSON that the declared API rejects: schema drift, not garbage.
-  EXPECT_EQ(counterValue("request_schema_invalid"), 1);
-  EXPECT_EQ(counterValue("request_parse_error"), 0);
-  EXPECT_EQ(counterValue("request_parsed"), 0);
+  EXPECT_EQ(local_reply_calls_, 0);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString()),
+            nlohmann::json::parse(R"({"model":"gpt-4"})"));
+  EXPECT_EQ(counterValue("request_parsed"), 1);
 }
 
 // Unknown fields are permitted and pass through untouched.
@@ -1852,8 +2132,7 @@ TEST_F(AiProtocolManagerFilterTest, RouteConfigIsStrictEvenWithBestEffortConfigu
   EXPECT_EQ(inject_calls_, 0);
 }
 
-// A declared endpoint's valid payload is parsed, validated against the
-// declared API's schema, and forwarded unchanged.
+// A declared endpoint's valid payload is parsed and forwarded unchanged.
 TEST_F(AiProtocolManagerFilterTest, PassThroughEndpointIsParsedAndForwarded) {
   setRouteConfig();
   EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
@@ -1883,21 +2162,6 @@ TEST_F(AiProtocolManagerFilterTest, SetsFilterStateObjectOnParsedPayload) {
   EXPECT_EQ(fs->index().json()["model"], "gpt-4");
 }
 
-// A payload with valid JSON syntax but violating the route's schema is rejected with 400.
-TEST_F(AiProtocolManagerFilterTest, SchemaValidationRejectsInvalidPayload) {
-  setRouteConfig();
-  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
-
-  // Missing required "messages" array.
-  Buffer::OwnedImpl body(R"({"model":"gpt-4"})");
-  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
-  drain();
-
-  EXPECT_EQ(local_reply_calls_, 1);
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_EQ(inject_calls_, 0);
-}
-
 // Trailers arriving after a stream was rejected are dropped with StopIteration.
 TEST_F(AiProtocolManagerFilterTest, TrailersDroppedAfterPayloadRejection) {
   setRouteConfig();
@@ -1910,6 +2174,336 @@ TEST_F(AiProtocolManagerFilterTest, TrailersDroppedAfterPayloadRejection) {
   // Send trailers on the dying stream.
   Http::TestRequestTrailerMapImpl trailers;
   EXPECT_EQ(filter_->decodeTrailers(trailers), Http::FilterTrailersStatus::StopIteration);
+}
+
+class SseTaggingAiFilter : public AiFilter {
+public:
+  explicit SseTaggingAiFilter(std::string tag, bool fail = false)
+      : tag_(std::move(tag)), fail_(fail) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+
+  Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver receive_event,
+                                          SseStreamPropagator propagate_event) override {
+    while (true) {
+      ASSIGN_OR_CO_RETURN(auto event, co_await receive_event());
+      if (!event.has_value()) {
+        co_return absl::OkStatus();
+      }
+      if (fail_) {
+        co_return absl::InternalError("sse filter error");
+      }
+      if ((*event)->is_json()) {
+        (*event)->json().json()[tag_] = true;
+      }
+      CO_RETURN_IF_ERROR(co_await propagate_event(std::move(*event)));
+    }
+  }
+
+private:
+  std::string tag_;
+  bool fail_;
+};
+
+TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverSseResponse) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<SseTaggingAiFilter>("first");
+                             },
+                             [](const AiFilterContext&) -> AiFilterSharedPtr {
+                               return std::make_shared<SseTaggingAiFilter>("second");
+                             }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "text/event-stream"}, {"content-length", "100"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(resp_headers.getContentLengthValue().empty());
+
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\ndata: [DONE]\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_TRUE(encoded_injected_end_stream_);
+  EXPECT_EQ(encoded_injected_.toString(),
+            "data: {\"a\":1,\"first\":true,\"second\":true}\n\ndata: [DONE]\n\n");
+}
+
+TEST_F(AiProtocolManagerFilterTest, SseResponseEndedByTrailersContinuesEncoding) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<SseTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestResponseTrailerMapImpl resp_trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->encodeTrailers(resp_trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_EQ(encode_continue_calls_, 1);
+  EXPECT_EQ(encoded_injected_.toString(), "data: {\"a\":1,\"tagged\":true}\n\n");
+}
+
+TEST_F(AiProtocolManagerFilterTest, SseResponseFilterErrorSendsBadGatewayLocalReply) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<SseTaggingAiFilter>("tagged", /*fail=*/true);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "text/event-stream"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl sse_chunk("data: {\"a\":1}\n\n");
+  EXPECT_EQ(filter_->encodeData(sse_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 1);
+  EXPECT_EQ(encode_local_reply_code_, Http::Code::BadGateway);
+}
+
+class UnaryTaggingAiFilter : public AiFilter {
+public:
+  explicit UnaryTaggingAiFilter(std::string tag, std::vector<std::string>* order = nullptr,
+                                bool fail = false)
+      : tag_(std::move(tag)), order_(order), fail_(fail) {}
+
+  Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
+                                       AiRequestPropagator propagate_request,
+                                       LocalReplier) override {
+    ASSIGN_OR_CO_RETURN(AiRequestPtr request, co_await std::move(receive_request)());
+    co_return co_await std::move(propagate_request)(std::move(request));
+  }
+
+  Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver receive,
+                                            AiResponseStreamPropagator propagate) override {
+    if (order_ != nullptr) {
+      order_->push_back(tag_);
+    }
+    while (true) {
+      ASSIGN_OR_CO_RETURN(std::vector<FlattenJsonField> fields, co_await receive());
+      if (fields.empty()) {
+        break;
+      }
+      if (fail_) {
+        co_return absl::InternalError("unary filter error");
+      }
+      CO_RETURN_IF_ERROR(co_await propagate(std::move(fields)));
+    }
+    std::vector<FlattenJsonField> tag_batch;
+    tag_batch.emplace_back(std::vector<FieldPathSegment>{tag_}, nlohmann::json(true));
+    CO_RETURN_IF_ERROR(co_await propagate(std::move(tag_batch)));
+    co_return absl::OkStatus();
+  }
+
+private:
+  std::string tag_;
+  std::vector<std::string>* order_;
+  bool fail_;
+};
+
+TEST_F(AiProtocolManagerFilterTest, RunsConfiguredAiFiltersOverUnaryJsonResponse) {
+  std::vector<std::string> encode_order;
+  createFilterWithAiFilters(
+      {[&](const AiFilterContext&) -> AiFilterSharedPtr {
+         return std::make_shared<UnaryTaggingAiFilter>("first", &encode_order);
+       },
+       [&](const AiFilterContext&) -> AiFilterSharedPtr {
+         return std::make_shared<UnaryTaggingAiFilter>("second", &encode_order);
+       }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "100"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(resp_headers.getContentLengthValue().empty());
+
+  Buffer::OwnedImpl json_chunk(R"({"id":"chatcmpl-1","a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_TRUE(encoded_injected_end_stream_);
+  // Filters run in reverse order on the response path: "second" (N-1) before "first" (0).
+  EXPECT_EQ(encode_order, (std::vector<std::string>{"second", "first"}));
+  EXPECT_EQ(encoded_injected_.toString(),
+            R"({"id":"chatcmpl-1","a":1,"second":true,"first":true})");
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseEndedByTrailersContinuesEncoding) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnaryTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl json_chunk(R"({"a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, false), Http::FilterDataStatus::StopIterationNoBuffer);
+  Http::TestResponseTrailerMapImpl resp_trailers{{"x-trailer", "1"}};
+  EXPECT_EQ(filter_->encodeTrailers(resp_trailers), Http::FilterTrailersStatus::StopIteration);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 0);
+  EXPECT_EQ(encode_continue_calls_, 1);
+  EXPECT_EQ(encoded_injected_.toString(), R"({"a":1,"tagged":true})");
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseFilterErrorSendsBadGatewayLocalReply) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnaryTaggingAiFilter>("tagged", /*order=*/nullptr, /*fail=*/true);
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  Http::TestResponseHeaderMapImpl resp_headers{{":status", "200"},
+                                               {"content-type", "application/json"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+
+  Buffer::OwnedImpl json_chunk(R"({"a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encode_local_reply_calls_, 1);
+  EXPECT_EQ(encode_local_reply_code_, Http::Code::BadGateway);
+}
+
+TEST_F(AiProtocolManagerFilterTest, UnaryJsonResponseEngagesOnStructuredSuffixAndSkipsFramedRpc) {
+  createFilterWithAiFilters({[](const AiFilterContext&) -> AiFilterSharedPtr {
+    return std::make_shared<UnaryTaggingAiFilter>("tagged");
+  }});
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  // Framed RPC responses (`application/grpc+json`, `application/connect+json`) carry a 5-byte
+  // binary envelope and must pass through without starting the unary JSON pipeline.
+  Http::TestResponseHeaderMapImpl grpc_json_headers{
+      {":status", "200"}, {"content-type", "application/grpc+json"}, {"content-length", "50"}};
+  EXPECT_EQ(filter_->encodeHeaders(grpc_json_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(grpc_json_headers.getContentLengthValue(), "50");
+
+  Http::TestResponseHeaderMapImpl connect_json_headers{
+      {":status", "200"}, {"content-type", "application/connect+json"}, {"content-length", "50"}};
+  EXPECT_EQ(filter_->encodeHeaders(connect_json_headers, false),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(connect_json_headers.getContentLengthValue(), "50");
+
+  // A structured `+json` response suffix engages unary JSON filtering.
+  Http::TestResponseHeaderMapImpl vendor_json_headers{
+      {":status", "200"},
+      {"content-type", "application/vnd.openai+json"},
+      {"content-length", "50"}};
+  EXPECT_EQ(filter_->encodeHeaders(vendor_json_headers, false),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(vendor_json_headers.getContentLengthValue().empty());
+
+  Buffer::OwnedImpl json_chunk(R"({"a":1})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(encoded_injected_.toString(), R"({"a":1,"tagged":true})");
+}
+
+TEST_F(AiProtocolManagerFilterTest,
+       UnaryJsonResponseAnchorsContentLengthBeforeRemovalForTokenUsageLimit) {
+  if (filter_ != nullptr) {
+    filter_->onDestroy();
+  }
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto;
+  proto.mutable_request_handling()->set_parse_unconfigured_routes(true);
+  proto.mutable_response_handling()
+      ->mutable_token_usage()
+      ->mutable_limits()
+      ->mutable_max_json_body_size()
+      ->set_value(128);
+  filter_ = std::make_unique<AiProtocolManagerFilter>(std::make_shared<const FilterConfig>(
+      proto, *stats_store_.rootScope(),
+      AiFilterFactories{[](const AiFilterContext&) -> AiFilterSharedPtr {
+        return std::make_shared<UnaryTaggingAiFilter>("tagged");
+      }},
+      factory_));
+  filter_->setDecoderFilterCallbacks(callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl req_body(R"({"model":"gpt-4","messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(req_body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+  ASSERT_TRUE(injected_end_stream_);
+
+  // Advertise content-length > max_json_body_size (128), while sending a body smaller than 128
+  // bytes so only the header check in encodeHeaders() can trigger response_body_too_large.
+  Http::TestResponseHeaderMapImpl resp_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"content-length", "1000"}};
+  EXPECT_EQ(filter_->encodeHeaders(resp_headers, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_TRUE(resp_headers.getContentLengthValue().empty());
+  EXPECT_EQ(counterValue("response_body_too_large"), 1);
+
+  Buffer::OwnedImpl json_chunk(
+      R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12}})");
+  EXPECT_EQ(filter_->encodeData(json_chunk, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(counterValue("token_usage_failed"), 1);
+  EXPECT_EQ(counterValue("token_usage_found"), 0);
+  EXPECT_EQ(
+      encoded_injected_.toString(),
+      R"({"model":"gpt-4","usage":{"prompt_tokens":5,"completion_tokens":7,"total_tokens":12},"tagged":true})");
 }
 
 } // namespace

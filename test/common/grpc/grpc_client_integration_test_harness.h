@@ -423,6 +423,13 @@ public:
     }
 
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
+    if (retry_policy_.has_value()) {
+      *config.mutable_retry_policy() = *retry_policy_;
+    }
+    if (per_stream_buffer_limit_bytes_ != 0) {
+      config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(
+          per_stream_buffer_limit_bytes_);
+    }
 
     fillServiceWideInitialMetadata(config);
     return *AsyncClientImpl::create(config, server_factory_context_);
@@ -557,6 +564,7 @@ public:
     options.setMetadata(m);
     options.setSendInternal(send_internal_header_stream_option_);
     options.setSendXff(send_xff_header_stream_option_);
+    options.setBufferBodyForRetry(buffer_body_for_retry_stream_option_);
     if (watermark_callbacks_ != nullptr) {
       options.setSidestreamWatermarkCallbacks(watermark_callbacks_);
     }
@@ -643,8 +651,12 @@ public:
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
   bool skip_envoy_headers_{false};
+  std::optional<envoy::config::core::v3::RetryPolicy> retry_policy_;
+  // Envoy gRPC per-stream buffer limit, 0 means the field is not set.
+  uint32_t per_stream_buffer_limit_bytes_{0};
   bool send_internal_header_stream_option_{true};
   bool send_xff_header_stream_option_{true};
+  bool buffer_body_for_retry_stream_option_{false};
   // Connection buffer limits, 0 means default limit from config is used.
   uint32_t connection_buffer_limits_{0};
   testing::NiceMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};

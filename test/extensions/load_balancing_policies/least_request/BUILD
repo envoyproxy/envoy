@@ -1,13 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -54,10 +54,11 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "least_request_load_balancer_fuzz_test",
     srcs = ["least_request_load_balancer_fuzz_test.cc"],
     corpus = "least_request_load_balancer_corpus",
+    extension_names = ["envoy.load_balancing_policies.least_request"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":least_request_load_balancer_fuzz_proto_cc_proto",
@@ -67,20 +68,23 @@ envoy_cc_fuzz_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "least_request_lb_benchmark",
     srcs = ["least_request_lb_benchmark.cc"],
+    extension_names = ["envoy.load_balancing_policies.least_request"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/least_request:least_request_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
+        "@benchmark",
     ],
 )
 
-envoy_benchmark_test(
+envoy_extension_benchmark_test(
     name = "least_request_lb_benchmark_test",
     timeout = "long",
     benchmark_binary = "least_request_lb_benchmark",
+    extension_names = ["envoy.load_balancing_policies.least_request"],
 )
 
 envoy_extension_cc_test(

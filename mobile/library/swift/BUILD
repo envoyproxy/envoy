@@ -77,7 +77,7 @@ swift_library(
     ] + [
         "@envoy_mobile_extra_swift_sources//:extra_swift_srcs",
     ],
-    defines = envoy_mobile_defines("@envoy"),
+    defines = envoy_mobile_defines(),
     features = [
         "swift.emit_symbol_graph",
         "swift.enable_library_evolution",

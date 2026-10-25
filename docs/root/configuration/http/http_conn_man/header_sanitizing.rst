@@ -35,6 +35,8 @@ Envoy will potentially sanitize the following headers:
 * :ref:`x-envoy-upstream-rq-timeout-alt-response
   <config_http_filters_router_x-envoy-upstream-rq-timeout-alt-response>`
 * :ref:`x-envoy-upstream-rq-timeout-ms <config_http_filters_router_x-envoy-upstream-rq-timeout-ms>`
+* :ref:`x-envoy-upstream-stream-duration-ms
+  <config_http_filters_router_x-envoy-upstream-stream-duration-ms>`
 * :ref:`x-forwarded-client-cert <config_http_conn_man_headers_x-forwarded-client-cert>`
 * :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>`
 * :ref:`x-forwarded-proto <config_http_conn_man_headers_x-forwarded-proto>`

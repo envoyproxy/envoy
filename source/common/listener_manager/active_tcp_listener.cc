@@ -7,6 +7,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/utility.h"
 
 namespace Envoy {
@@ -24,7 +25,7 @@ ActiveTcpListener::ActiveTcpListener(Network::TcpConnectionHandler& parent,
           parent.createListener(std::move(socket), *this, runtime, random, config, overload_state),
           config),
       tcp_conn_handler_(parent), connection_balancer_(connection_balancer),
-      listen_address_(listen_address) {
+      listen_address_(listen_address), overload_state_(overload_state) {
   connection_balancer_.registerHandler(*this);
 }
 
@@ -125,6 +126,12 @@ void ActiveTcpListener::onAcceptWorker(Network::ConnectionSocketPtr&& socket,
     }
   }
 
+  // Rebind to this worker's own overload state handle now that the socket has settled here,
+  // in case it was handed off from a different worker via exact_balance. No-op otherwise.
+  if (auto* accepted_socket = dynamic_cast<Network::AcceptedSocketImpl*>(socket.get())) {
+    accepted_socket->setOverloadState(overload_state_);
+  }
+
   auto active_socket = std::make_unique<ActiveTcpSocket>(
       *this, std::move(socket), hand_off_restored_destination_connections, network_namespace);
 
@@ -178,8 +185,8 @@ void ActiveTcpListener::post(Network::ConnectionSocketPtr&& socket) {
                      handoff = config_->handOffRestoredDestinationConnections()]() {
     auto balanced_handler = tcp_conn_handler.getBalancedHandlerByTag(tag, *address);
     if (balanced_handler.has_value()) {
-      balanced_handler->get().onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true,
-                                             address->networkNamespace());
+      balanced_handler->onAcceptWorker(std::move(socket_to_rebalance->socket), handoff, true,
+                                       address->networkNamespace());
       return;
     }
   });

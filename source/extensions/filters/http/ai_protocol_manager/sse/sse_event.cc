@@ -23,6 +23,7 @@ void SseEvent::set_raw_data(Buffer::InstancePtr raw_data) {
   is_json_ = false;
   has_data_ = true;
   json_ = JsonWithExtBuf{};
+  json_payload_bytes_ = 0;
   raw_data_ext_refs_.clear();
 }
 

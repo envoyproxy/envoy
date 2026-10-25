@@ -84,6 +84,13 @@ public:
    */
   ReverseTunnelInitiatorExtension* getExtension() const { return extension_; }
 
+  /**
+   * @return true once the bootstrap extension has been instantiated. Socket creation dereferences
+   *         the server context, so an ``rc://`` listener resolved before the extension exists would
+   *         crash at listener creation.
+   */
+  bool isInitialized() const { return context_ != nullptr; }
+
   // BootstrapExtensionFactory implementation
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,

@@ -2,10 +2,13 @@
 
 #include "source/extensions/network/dns_resolver/hickory/hickory_dns_impl.h"
 
+#include "source/common/common/macros.h"
 #include "source/common/network/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Network {
@@ -27,7 +30,91 @@ absl::StatusOr<std::string> serializeConfigToJson(
   return json;
 }
 
+// Decouples a DNS completion from the resolver lifetime. The module receives a never-reused token
+// instead of the resolver pointer and the completion resolves it here, so a completion arriving
+// after the resolver is destroyed is dropped without touching freed memory.
+struct ResolverCompletionTarget {
+  ResolverCompletionTarget(Event::Dispatcher& dispatcher,
+                           std::weak_ptr<HickoryDnsResolver> resolver)
+      : dispatcher(dispatcher), resolver(std::move(resolver)) {}
+  Event::Dispatcher& dispatcher;
+  std::weak_ptr<HickoryDnsResolver> resolver;
+};
+
+struct DnsResolverRegistry {
+  absl::Mutex mutex;
+  uint64_t next_token ABSL_GUARDED_BY(mutex) = 1;
+  absl::flat_hash_map<uint64_t, std::shared_ptr<ResolverCompletionTarget>>
+      targets ABSL_GUARDED_BY(mutex);
+};
+
+DnsResolverRegistry& dnsResolverRegistry() { MUTABLE_CONSTRUCT_ON_FIRST_USE(DnsResolverRegistry); }
+
 } // namespace
+
+uint64_t allocateDnsResolverToken() {
+  auto& registry = dnsResolverRegistry();
+  absl::MutexLock lock(&registry.mutex);
+  return registry.next_token++;
+}
+
+void registerDnsResolver(uint64_t token, Event::Dispatcher& dispatcher,
+                         std::weak_ptr<HickoryDnsResolver> resolver) {
+  auto target = std::make_shared<ResolverCompletionTarget>(dispatcher, std::move(resolver));
+  auto& registry = dnsResolverRegistry();
+  absl::MutexLock lock(&registry.mutex);
+  registry.targets[token] = std::move(target);
+}
+
+void unregisterDnsResolver(uint64_t token) {
+  auto& registry = dnsResolverRegistry();
+  absl::MutexLock lock(&registry.mutex);
+  registry.targets.erase(token);
+}
+
+// Resolves a completion token to its target and posts the result to the resolver dispatcher. The
+// resolver is never dereferenced here, so a completion arriving after destruction is dropped.
+void completeDnsResolution(uint64_t token, uint64_t query_id,
+                           envoy_dynamic_module_type_dns_resolution_status status,
+                           envoy_dynamic_module_type_module_buffer details,
+                           const envoy_dynamic_module_type_dns_address* addresses,
+                           size_t num_addresses) {
+  std::shared_ptr<ResolverCompletionTarget> target;
+  {
+    auto& registry = dnsResolverRegistry();
+    absl::MutexLock lock(&registry.mutex);
+    auto it = registry.targets.find(token);
+    if (it == registry.targets.end()) {
+      return;
+    }
+    target = it->second;
+  }
+
+  const std::string details_str = (details.ptr != nullptr && details.length > 0)
+                                      ? std::string(details.ptr, details.length)
+                                      : std::string();
+  std::list<DnsResponse> response;
+  for (size_t i = 0; i < num_addresses; i++) {
+    const auto& addr = addresses[i];
+    if (addr.address_ptr == nullptr || addr.address_length == 0) {
+      continue;
+    }
+    std::string addr_str(addr.address_ptr, addr.address_length);
+    auto address = Utility::parseInternetAddressAndPortNoThrow(addr_str);
+    if (address != nullptr) {
+      response.emplace_back(DnsResponse(address, std::chrono::seconds(addr.ttl_seconds)));
+    }
+  }
+
+  target->dispatcher.post([weak_resolver = target->resolver, query_id, status,
+                           details = std::move(details_str),
+                           response = std::move(response)]() mutable {
+    // The resolver may have been destroyed between post and now, so re-check the weak reference.
+    if (auto resolver = weak_resolver.lock()) {
+      resolver->onResolveComplete(query_id, status, details, std::move(response));
+    }
+  });
+}
 
 // -- HickoryDnsResolverConfig -------------------------------------------------
 
@@ -148,8 +235,9 @@ HickoryDnsResolver::HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config,
     : config_(std::move(config)), dispatcher_(dispatcher),
       scope_(root_scope.createScope("dns.hickory.")),
       stats_(generateHickoryDnsResolverStats(*scope_)) {
-  resolver_module_ptr_ =
-      config_->on_dns_resolver_new_(config_->in_module_config_, static_cast<const void*>(this));
+  token_ = allocateDnsResolverToken();
+  resolver_module_ptr_ = config_->on_dns_resolver_new_(
+      config_->in_module_config_, reinterpret_cast<const void*>(static_cast<uintptr_t>(token_)));
   // A null result means the module could not create the resolver, for example under resource
   // exhaustion. Reject the configuration instead of aborting the process.
   if (resolver_module_ptr_ == nullptr) {
@@ -158,11 +246,15 @@ HickoryDnsResolver::HickoryDnsResolver(HickoryDnsResolverConfigSharedPtr config,
   }
 }
 
+void HickoryDnsResolver::registerForCompletions() {
+  registerDnsResolver(token_, dispatcher_, weak_from_this());
+}
+
 HickoryDnsResolver::~HickoryDnsResolver() {
-  // Step 1: Set the C++ shutdown flag so the ABI callback called from Tokio threads
-  // skips posting to the dispatcher. The posted lambda also locks a `weak_ptr` to this
-  // resolver as the final use-after-free guard.
-  shutting_down_.store(true, std::memory_order_release);
+  // Step 1: Unregister the completion target so a completion arriving during teardown resolves to
+  // nothing instead of touching this resolver. The posted lambda also locks a weak_ptr as a final
+  // guard.
+  unregisterDnsResolver(token_);
 
   // If construction could not create the module resolver, there is nothing to destroy or drain.
   if (resolver_module_ptr_ == nullptr) {
@@ -308,6 +400,8 @@ absl::StatusOr<DnsResolverSharedPtr> HickoryDnsResolverFactory::createDnsResolve
   auto resolver = std::make_shared<HickoryDnsResolver>(std::move(*config_or), dispatcher,
                                                        api.rootScope(), creation_status);
   RETURN_IF_NOT_OK(creation_status);
+  // Register after construction so weak_from_this is valid for the completion callback.
+  resolver->registerForCompletions();
   return resolver;
 }
 
@@ -317,59 +411,14 @@ REGISTER_FACTORY(HickoryDnsResolverFactory, DnsResolverFactory);
 } // namespace Envoy
 
 // -- ABI Callback Implementation ----------------------------------------------
-// This callback may be called from any thread by the Rust module. It copies all
-// buffer data synchronously and posts the results to the Envoy dispatcher thread.
+// This callback may be called from any thread by the Rust module. resolver_envoy_ptr is the
+// never-reused token handed to the module at creation, resolved back to the resolver here so a
+// completion arriving after the resolver is destroyed is dropped safely.
 void envoy_dynamic_module_callback_dns_resolve_complete(
     envoy_dynamic_module_type_dns_resolver_envoy_ptr resolver_envoy_ptr, uint64_t query_id,
     envoy_dynamic_module_type_dns_resolution_status status,
     envoy_dynamic_module_type_module_buffer details,
     const envoy_dynamic_module_type_dns_address* addresses, size_t num_addresses) {
-
-  // const_cast is safe here: the resolver passed itself as const void* during creation,
-  // and we need the mutable reference to post to its dispatcher.
-  auto* resolver = const_cast<Envoy::Network::HickoryDnsResolver*>(
-      static_cast<const Envoy::Network::HickoryDnsResolver*>(resolver_envoy_ptr));
-
-  // Fast path: if the resolver is already shutting down, skip the response copy entirely.
-  // The Rust task is expected to observe the Rust-side shutdown flag and bail out before
-  // reaching this callback, but this guard also covers the narrow window where the C++
-  // destructor has set the flag while the callback is in flight on a Tokio thread.
-  if (resolver->shutting_down_.load(std::memory_order_acquire)) {
-    return;
-  }
-
-  // The resolver storage is kept alive across this FFI call because
-  // `on_dns_resolver_destroy_` (invoked from the C++ destructor) blocks on
-  // `runtime.shutdown_timeout(5s)` until in-flight FFI calls return. Capture a
-  // `weak_ptr` so the posted lambda does not extend the resolver's lifetime; if the
-  // dispatcher fails to drain the lambda before the resolver is destroyed, the
-  // lambda's `lock()` returns `nullptr` and the callback is safely skipped.
-  std::weak_ptr<Envoy::Network::HickoryDnsResolver> weak_resolver = resolver->weak_from_this();
-
-  const std::string details_str = (details.ptr != nullptr && details.length > 0)
-                                      ? std::string(details.ptr, details.length)
-                                      : std::string();
-  std::list<Envoy::Network::DnsResponse> response;
-  for (size_t i = 0; i < num_addresses; i++) {
-    const auto& addr = addresses[i];
-    if (addr.address_ptr == nullptr || addr.address_length == 0) {
-      continue;
-    }
-    std::string addr_str(addr.address_ptr, addr.address_length);
-    auto address = Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(addr_str);
-    if (address != nullptr) {
-      response.emplace_back(
-          Envoy::Network::DnsResponse(address, std::chrono::seconds(addr.ttl_seconds)));
-    }
-  }
-
-  resolver->dispatcher_.post([weak_resolver = std::move(weak_resolver), query_id, status,
-                              details = std::move(details_str),
-                              response = std::move(response)]() mutable {
-    // If the resolver was destroyed between `post()` and now, `lock()` returns `nullptr`
-    // and the lambda exits safely without touching freed memory.
-    if (auto resolver_shared = weak_resolver.lock()) {
-      resolver_shared->onResolveComplete(query_id, status, details, std::move(response));
-    }
-  });
+  const uint64_t token = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(resolver_envoy_ptr));
+  Envoy::Network::completeDnsResolution(token, query_id, status, details, addresses, num_addresses);
 }

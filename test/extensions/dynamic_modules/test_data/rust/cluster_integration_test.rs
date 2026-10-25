@@ -83,6 +83,16 @@ fn new_cluster_config(
         metrics: envoy_cluster_metrics,
       }))
     },
+    "persistent_host_map" => {
+      let counter_id = envoy_cluster_metrics
+        .define_counter("persistent_host_map_hits_total")
+        .ok();
+      Some(Box::new(PersistentHostMapClusterConfig {
+        upstream_address: config_str.to_string(),
+        counter_id,
+        metrics: envoy_cluster_metrics,
+      }))
+    },
     "member_update_packed_address" => {
       let counter_id = envoy_cluster_metrics
         .define_counter("packed_address_verified_total")
@@ -270,6 +280,7 @@ impl Cluster for AsyncHostSelectionCluster {
     Some(Box::new(AsyncHostSelectionLb {
       hosts: self.hosts.clone(),
       select_by_header: !self.logical_hostnames.is_empty(),
+      completion_threads: Vec::new(),
     }))
   }
 }
@@ -292,6 +303,17 @@ impl AsyncCompletionTask {
 struct AsyncHostSelectionLb {
   hosts: SharedHostList,
   select_by_header: bool,
+  completion_threads: Vec<std::thread::JoinHandle<()>>,
+}
+
+// A completion thread runs module code until it has exited, so it must not outlive the module.
+// Envoy destroys every load balancer before it can unload the module, so join the threads here.
+impl Drop for AsyncHostSelectionLb {
+  fn drop(&mut self) {
+    for thread in self.completion_threads.drain(..) {
+      let _ = thread.join();
+    }
+  }
 }
 
 impl ClusterLb for AsyncHostSelectionLb {
@@ -328,7 +350,9 @@ impl ClusterLb for AsyncHostSelectionLb {
     };
     // Spawn a background thread to complete the host selection asynchronously.
     // The ABI implementation posts the completion to the correct worker thread.
-    std::thread::spawn(move || task.run());
+    self
+      .completion_threads
+      .push(std::thread::spawn(move || task.run()));
     HostSelectionResult::AsyncPending(Box::new(AsyncHandle {
       cancelled: Arc::new(AtomicBool::new(false)),
     }))
@@ -659,7 +683,7 @@ impl Cluster for WorkerLocalRebuildCluster {
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
     if event_id == WORKER_LOCAL_REBUILD_ADD_EVENT_ID {
-      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
     }
   }
 }
@@ -694,14 +718,14 @@ impl ClusterLb for WorkerLocalRebuildLb {
     num_hosts_removed: usize,
   ) {
     // Drop removed hosts resolved directly from the member update.
-    for i in 0..num_hosts_removed {
+    for i in 0 .. num_hosts_removed {
       if let Some(host) = envoy_lb.get_member_update_host(i, false) {
         let addr = host as usize;
         self.hosts.retain(|&existing| existing != addr);
       }
     }
     // Learn added hosts directly from the member update so routing uses the pointer it returns.
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       if let Some(host) = envoy_lb.get_member_update_host(i, true) {
         self.hosts.push(host as usize);
       }
@@ -714,6 +738,93 @@ impl ClusterLb for WorkerLocalRebuildLb {
       && !self.hosts.is_empty()
       && envoy_lb.get_hosts_count(0) == self.hosts.len();
     if converged {
+      if let Some(counter_id) = self.counter_id {
+        let _ = self.metrics.increment_counter(counter_id, 1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// Persistent cross-priority host map.
+// =============================================================================
+//
+// Selects the persistent host map during init and resolves the routed host on each worker through
+// find_host_by_address, which reads the cross-priority host map published to that worker.
+
+struct PersistentHostMapClusterConfig {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterConfig for PersistentHostMapClusterConfig {
+  fn new_cluster(&self, _envoy_cluster: &dyn EnvoyCluster) -> Box<dyn Cluster> {
+    Box::new(PersistentHostMapCluster {
+      upstream_address: self.upstream_address.clone(),
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    })
+  }
+}
+
+struct PersistentHostMapCluster {
+  upstream_address: String,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl Cluster for PersistentHostMapCluster {
+  fn on_init(&mut self, envoy_cluster: &dyn EnvoyCluster) {
+    envoy_cluster.use_persistent_host_map();
+    envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
+    envoy_cluster.pre_init_complete();
+  }
+
+  fn new_load_balancer(
+    &self,
+    _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+  ) -> Option<Box<dyn ClusterLb>> {
+    Some(Box::new(PersistentHostMapLb {
+      upstream_address: self.upstream_address.clone(),
+      host: None,
+      counter_id: self.counter_id,
+      metrics: self.metrics.clone(),
+    }))
+  }
+}
+
+struct PersistentHostMapLb {
+  upstream_address: String,
+  host: Option<usize>,
+  counter_id: Option<EnvoyCounterId>,
+  metrics: Arc<dyn EnvoyClusterMetrics>,
+}
+
+impl ClusterLb for PersistentHostMapLb {
+  fn choose_host(
+    &mut self,
+    _context: Option<&dyn ClusterLbContext>,
+    _async_completion: Box<dyn EnvoyAsyncHostSelectionComplete>,
+  ) -> HostSelectionResult {
+    match self.host {
+      Some(host) => {
+        HostSelectionResult::Selected(host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr)
+      },
+      None => HostSelectionResult::NoHost,
+    }
+  }
+
+  fn on_host_membership_update(
+    &mut self,
+    envoy_lb: &dyn EnvoyClusterLoadBalancer,
+    _num_hosts_added: usize,
+    _num_hosts_removed: usize,
+  ) {
+    self.host = envoy_lb
+      .find_host_by_address(&self.upstream_address)
+      .map(|host| host as usize);
+    if self.host.is_some() {
       if let Some(counter_id) = self.counter_id {
         let _ = self.metrics.increment_counter(counter_id, 1);
       }
@@ -776,7 +887,7 @@ impl Cluster for MemberUpdatePackedAddressCluster {
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
     if event_id == PACKED_ADDRESS_ADD_EVENT_ID {
-      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
     }
   }
 }
@@ -829,7 +940,7 @@ impl ClusterLb for MemberUpdatePackedAddressLb {
     num_hosts_added: usize,
     _num_hosts_removed: usize,
   ) {
-    for i in 0..num_hosts_added {
+    for i in 0 .. num_hosts_added {
       // The packed bytes must agree with the formatted address for the same host.
       let verified = match (
         envoy_lb.get_member_update_host_packed_address(i, true),
@@ -1109,7 +1220,7 @@ impl Cluster for HealthyHostsRebuildCluster {
 
   fn on_scheduled(&self, envoy_cluster: &dyn EnvoyCluster, event_id: u64) {
     if event_id == HEALTHY_HOSTS_REBUILD_ADD_EVENT_ID {
-      envoy_cluster.add_hosts(&[self.upstream_address.clone()], &[1u32]);
+      envoy_cluster.add_hosts(std::slice::from_ref(&self.upstream_address), &[1u32]);
     }
   }
 }

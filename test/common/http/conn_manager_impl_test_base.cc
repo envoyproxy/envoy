@@ -137,6 +137,7 @@ public:
     return parent_.earlyHeaderMutationExtensions();
   }
   bool shouldStripTrailingHostDot() const override { return parent_.shouldStripTrailingHostDot(); }
+  bool recordRouteResolutionStats() const override { return parent_.recordRouteResolutionStats(); }
   uint32_t maxRequestsPerConnection() const override { return parent_.maxRequestsPerConnection(); }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return parent_.proxyStatusConfig();

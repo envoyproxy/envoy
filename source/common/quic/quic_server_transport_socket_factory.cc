@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/runtime/runtime_features.h"
@@ -25,18 +26,20 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
           quic_transport.downstream_tls_context(), context, server_names, true);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
-  // QUIC client certificate authentication is gated by a runtime guard so it can be disabled to
-  // restore the prior "not supported" startup error. A client certificate requirement also needs a
-  // trust anchor to validate the presented certificate against.
+  // Requiring a client certificate is gated by a runtime guard, and needs a validation context to
+  // validate the presented chain against.
   if (server_config->requireClientCertificate()) {
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
       return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
     }
-    const auto* validation_ctx = server_config->certificateValidationContext();
-    if (validation_ctx == nullptr || validation_ctx->caCert().empty()) {
+
+    // Only the presence of a validation context can be checked here, because its contents may come
+    // from SDS and are not resolved yet. createSslServerContext() checks the trusted_ca once they
+    // are.
+    if (!server_config->validationContextConfigured()) {
       return absl::InvalidArgumentError(
-          "QUIC downstream TLS context requires a client certificate but no "
-          "validation_context.trusted_ca is configured");
+          "QUIC downstream TLS context sets require_client_certificate but configures no "
+          "validation context.");
     }
   }
 
@@ -67,6 +70,25 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
 }
 
 namespace {
+
+bool canValidateClientCertificate(const Envoy::Ssl::ServerContextConfig& config) {
+  if (!config.validationContextConfigured()) {
+    return false;
+  }
+
+  const auto* validation_ctx = config.certificateValidationContext();
+  if (validation_ctx == nullptr) {
+    // The validation context is configured but not yet ready (pending SDS). Ignore this special
+    // case and assume that it will eventually be ready.
+    return true;
+  }
+
+  return !validation_ctx->caCert().empty() || validation_ctx->customValidatorConfig().has_value() ||
+         validation_ctx->trustChainVerification() ==
+             envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                 ACCEPT_UNTRUSTED;
+}
+
 absl::Status initializeQuicCertAndKey(Ssl::TlsContext& context,
                                       const Ssl::TlsCertificateConfig& /*cert_config*/) {
   // Convert the certificate chain loaded into the context into PEM, as that is what the QUICHE
@@ -155,6 +177,15 @@ QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
 
 absl::StatusOr<Envoy::Ssl::ServerContextSharedPtr>
 QuicServerTransportSocketFactory::createSslServerContext() const {
+  if (config_->requireClientCertificate()) {
+    if (!canValidateClientCertificate(*config_)) {
+      return absl::InvalidArgumentError(
+          "QUIC downstream TLS context sets require_client_certificate but its validation context "
+          "has no trusted_ca and no custom_validator_config, so no client certificate could be "
+          "validated.");
+    }
+  }
+
   auto context_or_error =
       manager_.createSslServerContext(stats_scope_, *config_, initializeQuicCertAndKey);
   RETURN_IF_NOT_OK(context_or_error.status());

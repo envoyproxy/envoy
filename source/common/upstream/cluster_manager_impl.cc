@@ -25,6 +25,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
@@ -38,6 +39,8 @@
 #include "source/common/router/router.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
+#include "source/common/stats/utility.h"
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
@@ -226,14 +229,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
-      // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
-      // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
-      // avoid double pause ClusterLoadAssignment.
-      const std::vector<std::string> paused_xds_types{
-          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-          Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-      Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
+      // Secondary cluster initialization may create EDS, LEDS, and SDS subscriptions.
+      const auto cluster_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+      Config::ScopedResume resume = xds_manager_.pause(Config::dependentTypeUrls(cluster_type_url));
       initializeSecondaryClusters();
     }
     return;
@@ -316,6 +314,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
                        ? std::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : std::nullopt),
       local_info_(context.localInfo()), cm_stats_(generateStats(*stats_.rootScope())),
+      odcds_discovery_stats_(generateOdCdsDiscoveryStats(*stats_.rootScope())),
       init_helper_(xds_manager_,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
       time_source_(context.timeSource()), dispatcher_(context.mainThreadDispatcher()),
@@ -550,11 +549,19 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
+OdCdsDiscoveryStats ClusterManagerImpl::generateOdCdsDiscoveryStats(Stats::Scope& scope) {
+  return {ALL_ODCDS_DISCOVERY_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.odcds."))};
+}
+
 ThreadLocalClusterManagerStats
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::generateStats(Stats::Scope& scope,
                                                                  const std::string& thread_name) {
-  const std::string final_prefix = absl::StrCat("thread_local_cluster_manager.", thread_name);
-  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE_PREFIX(scope, final_prefix))};
+  // thread_local_cluster_manager.(worker_<id>.)*: a worker thread contributes the
+  // envoy.worker_id tag; any other thread name (the main thread) stays a plain segment.
+  const auto prefix =
+      Stats::workerStatPrefix(scope.symbolTable(), "thread_local_cluster_manager.", thread_name);
+  Stats::LiteScopeHelper helper(scope, prefix.baseName(), prefix.tags(), prefix.name());
+  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE(helper))};
 }
 
 absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
@@ -1257,7 +1264,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
-  HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
+  HostLookupMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
 
   // When enabled, a multi-priority update is applied to each worker thread's priority set as a
   // single batch (see ClusterEntry::updateHosts()) so the worker-local load balancer rebuilds
@@ -1266,7 +1273,9 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   const bool enable_batch_aware_update =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
 
-  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
+  if (pending_cluster_creations_.erase(cm_cluster.cluster().info()->name()) != 0) {
+    odcds_discovery_stats_.discovery_success_.inc();
+  }
 
   const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
   const std::string drop_category = cm_cluster.cluster().dropCategory();
@@ -1388,7 +1397,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 ClusterManagerImpl::ClusterInitializationObjectConstSharedPtr
 ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category) {
   if (!deferralIsSupportedForCluster(cluster_info)) {
     return nullptr;
@@ -1481,7 +1490,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
 
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category)
     : cluster_info_(std::move(cluster_info)), load_balancer_factory_(load_balancer_factory),
       cross_priority_host_map_(map), drop_overload_(drop_overload), drop_category_(drop_category) {
@@ -1494,7 +1503,7 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>& per_priority_state,
     const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category)
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map),
@@ -1603,7 +1612,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
     std::optional<uint32_t> overprovisioning_factor,
-    HostMapConstSharedPtr cross_priority_host_map) {
+    HostLookupMapConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
@@ -1626,7 +1635,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
     const std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>&
         updates,
-    HostMapConstSharedPtr cross_priority_host_map) {
+    HostLookupMapConstSharedPtr cross_priority_host_map) {
   // Nothing to apply. Return early so we match the per-priority path, which simply iterates an
   // empty update list and does nothing: no batch host update (and so no end-of-batch member update
   // callback fired with an empty diff) and no load balancer recreation.
@@ -1767,8 +1776,28 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
       // it means that it was other worker thread that requested the discovery.
       return;
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_missing_cluster_cache") &&
+        !warming_clusters_.contains(name) && odcds->isKnownMissing(name)) {
+      ENVOY_LOG(debug,
+                "cm odcds: the requested cluster {} is already known to be missing, posting the "
+                "answer back to {}",
+                name, worker_dispatcher.name());
+      // The config source behind this handle has already answered that the cluster doesn't
+      // exist. A cluster that is warming (delivered by another config source meanwhile) is
+      // deliberately not answered from the remembered answer: the cluster lifecycle callbacks
+      // resolve the request with Available once the warm-up completes.
+      //
+      // Nothing is left pending on the main thread, so only the requesting worker is answered;
+      // any other worker that asks posts here and gets its own answer.
+      odcds->recordKnownMissingAnswer();
+      worker_dispatcher.post([invoker = std::move(invoker)] {
+        invoker.invokeAllCallbacks(ClusterDiscoveryStatus::Missing);
+      });
+      return;
+    }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
     // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
+    odcds_discovery_stats_.discovery_attempt_.inc();
     odcds->updateOnDemand(name);
     // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
     auto timer = dispatcher_.createTimer([this, name] { notifyExpiredDiscovery(name); });
@@ -1804,7 +1833,17 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
-  // Let all the worker threads know that the discovery timed out.
+  switch (status) {
+  case ClusterDiscoveryStatus::Available:
+    break;
+  case ClusterDiscoveryStatus::Missing:
+    odcds_discovery_stats_.discovery_missing_.inc();
+    break;
+  case ClusterDiscoveryStatus::Timeout:
+    odcds_discovery_stats_.discovery_timeout_.inc();
+    break;
+  }
+  // Let all worker threads know how the discovery completed.
   tls_.runOnAllThreads(
       [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         ENVOY_LOG(
@@ -1961,7 +2000,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, bool weighted_priority_health,
-    uint64_t overprovisioning_factor, HostMapConstSharedPtr cross_priority_host_map) {
+    uint64_t overprovisioning_factor, HostLookupMapConstSharedPtr cross_priority_host_map) {
   ASSERT(thread_local_clusters_.contains(name));
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
@@ -2428,7 +2467,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
-        quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry,
+        quic_stat_names_, *stats_.rootScope(), quic_info, network_observer_registry,
         context_.overloadManager());
 #else
     (void)quic_info;
@@ -2466,7 +2505,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     }
     return Http::Http3::allocateConnPool(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info,
+        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, quic_info,
         network_observer_registry, context_.overloadManager(), false);
 #else
     UNREFERENCED_PARAMETER(source);

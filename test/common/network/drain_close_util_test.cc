@@ -147,6 +147,131 @@ TEST_F(DrainCloseUtilTest, ListenerDrainTypeWithoutListenerInfo) {
   EXPECT_EQ(Default, listenerDrainType(connection));
 }
 
+// A ramp factor compresses the gradual ramp into the first part of the drain window:
+// drain iff elapsed > random % (ramp_factor * drain_time).
+TEST_F(DrainCloseUtilTest, GradualStrategyRampFactor) {
+  const ConnectionDrainEvent event = gradualEventStartingNow();
+  time_system_.advanceTimeWait(std::chrono::seconds(30));
+
+  // random % 50 == 29 < 30 elapsed -> drain.
+  setRandom(29);
+  EXPECT_TRUE(shouldDrainClose(context_, Default, event, 0.5));
+  // random % 50 == 30, not strictly less than 30 elapsed -> no drain.
+  setRandom(30);
+  EXPECT_FALSE(shouldDrainClose(context_, Default, event, 0.5));
+  // random % 50 == 20 < 30 elapsed -> drain, where the full window (70 > 30) would not.
+  setRandom(70);
+  EXPECT_TRUE(shouldDrainClose(context_, Default, event, 0.5));
+  EXPECT_FALSE(shouldDrainClose(context_, Default, event));
+
+  // Past the compressed ramp every decision drains, well before the drain deadline.
+  time_system_.advanceTimeWait(std::chrono::seconds(20));
+  setRandom(99);
+  EXPECT_TRUE(shouldDrainClose(context_, Default, event, 0.5));
+  EXPECT_FALSE(shouldDrainClose(context_, Default, event));
+}
+
+// The proactive drain delay is spread over [window_start_factor * drain_time,
+// drain_time - grace_period].
+TEST_F(DrainCloseUtilTest, ProactiveDrainDelaySpreadsOverWindow) {
+  const ConnectionDrainEvent event = gradualEventStartingNow();
+  const std::chrono::milliseconds grace_period{10000};
+
+  // The window is [50s, 90s]: the jitter is random % 40000ms on top of its start.
+  setRandom(0);
+  EXPECT_EQ(std::chrono::milliseconds(50000),
+            proactiveDrainDelay(context_, event, grace_period, 0.5));
+  setRandom(39999);
+  EXPECT_EQ(std::chrono::milliseconds(89999),
+            proactiveDrainDelay(context_, event, grace_period, 0.5));
+  setRandom(40000);
+  EXPECT_EQ(std::chrono::milliseconds(50000),
+            proactiveDrainDelay(context_, event, grace_period, 0.5));
+
+  // The delay is relative to now, not to the start of the drain sequence.
+  time_system_.advanceTimeWait(std::chrono::seconds(20));
+  setRandom(1000);
+  EXPECT_EQ(std::chrono::milliseconds(31000),
+            proactiveDrainDelay(context_, event, grace_period, 0.5));
+}
+
+// A connection notified before the window opens (e.g. accepted while the listener is draining)
+// still gets a delay into the window, measured from now.
+TEST_F(DrainCloseUtilTest, ProactiveDrainDelayWhenNotifiedBeforeWindow) {
+  const ConnectionDrainEvent event = gradualEventStartingNow();
+  const std::chrono::milliseconds grace_period{10000};
+
+  // 49s in, the window [50s, 90s] is 1s away: the jitter is random % 40000ms on top of that.
+  time_system_.advanceTimeWait(std::chrono::seconds(49));
+  setRandom(0);
+  EXPECT_EQ(std::chrono::milliseconds(1000),
+            proactiveDrainDelay(context_, event, grace_period, 0.5));
+  setRandom(25000);
+  EXPECT_EQ(std::chrono::milliseconds(26000),
+            proactiveDrainDelay(context_, event, grace_period, 0.5));
+}
+
+// A connection notified once the window has opened is not drained proactively at all (zero delay):
+// it was accepted during the drain, and closing it before it has sent a request would be wrong.
+TEST_F(DrainCloseUtilTest, ProactiveDrainDelayWhenNotifiedInsideOrAfterWindow) {
+  const ConnectionDrainEvent event = gradualEventStartingNow();
+  const std::chrono::milliseconds grace_period{10000};
+  setRandom(0);
+
+  time_system_.advanceTimeWait(std::chrono::seconds(50));
+  EXPECT_EQ(std::chrono::milliseconds(0), proactiveDrainDelay(context_, event, grace_period, 0.5));
+  time_system_.advanceTimeWait(std::chrono::seconds(40));
+  EXPECT_EQ(std::chrono::milliseconds(0), proactiveDrainDelay(context_, event, grace_period, 0.5));
+  time_system_.advanceTimeWait(std::chrono::seconds(60));
+  EXPECT_EQ(std::chrono::milliseconds(0), proactiveDrainDelay(context_, event, grace_period, 0.5));
+}
+
+// When the grace period leaves no room for the window, nothing is drained proactively (zero delay):
+// there is no time span to spread the connections over.
+TEST_F(DrainCloseUtilTest, ProactiveDrainDelayWithShortDrainTime) {
+  setDrainTime(std::chrono::seconds(10));
+  const ConnectionDrainEvent event = gradualEventStartingNow();
+  setRandom(0);
+
+  // The window would be [8s, 5s].
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            proactiveDrainDelay(context_, event, std::chrono::milliseconds(5000), 0.8));
+  // The grace period does not even fit in the drain time.
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            proactiveDrainDelay(context_, event, std::chrono::milliseconds(15000), 0.8));
+  // A window of exactly zero length counts as empty, while a 1ms one does not.
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            proactiveDrainDelay(context_, event, std::chrono::milliseconds(2000), 0.8));
+  EXPECT_EQ(std::chrono::milliseconds(8000),
+            proactiveDrainDelay(context_, event, std::chrono::milliseconds(1999), 0.8));
+
+  setDrainTime(std::chrono::seconds(0));
+  EXPECT_EQ(std::chrono::milliseconds(0),
+            proactiveDrainDelay(context_, gradualEventStartingNow(),
+                                std::chrono::milliseconds(5000), 0.8));
+}
+
+// The compressed ramp is rounded up to whole seconds, so a short drain time keeps a ramp instead
+// of draining every response at once.
+TEST_F(DrainCloseUtilTest, RampFactorRoundsUp) {
+  setDrainTime(std::chrono::seconds(1));
+  const ConnectionDrainEvent event = gradualEventStartingNow();
+  setRandom(0);
+  // 1s * 0.5 rounds up to a 1s ramp: 0 elapsed is not > random % 1.
+  EXPECT_FALSE(shouldDrainClose(context_, Default, event, 0.5));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
+  EXPECT_TRUE(shouldDrainClose(context_, Default, event, 0.5));
+}
+
+// A start time in the future is clamped to zero elapsed, as for shouldDrainClose().
+TEST_F(DrainCloseUtilTest, ProactiveDrainDelayStartTimeInTheFuture) {
+  const ConnectionDrainEvent event{time_system_.monotonicTime() + std::chrono::seconds(10),
+                                   Server::DrainStrategy::Gradual};
+  setRandom(0);
+  EXPECT_EQ(std::chrono::milliseconds(50000),
+            proactiveDrainDelay(context_, event, std::chrono::milliseconds(10000), 0.5));
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

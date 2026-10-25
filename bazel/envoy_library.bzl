@@ -1,6 +1,5 @@
 # DO NOT LOAD THIS FILE. Load envoy_build_system.bzl instead.
 # Envoy library targets
-load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 load(
     "@envoy_build_config//:extensions_build_config.bzl",
@@ -13,26 +12,20 @@ load(
     "envoy_copts",
     "envoy_external_dep_path",
     "envoy_linkstatic",
-    "repo_label",
+    "tcmalloc_external_deps",
 )
 load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
+load(":envoy_select.bzl", "deprecate_repository")
 load(":sanitizers.bzl", "sanitizer_deps")
 
-# As above, but wrapped in list form for adding to dep lists. This smell seems needed as
-# SelectorValue values have to match the attribute type. See
-# https://github.com/bazelbuild/bazel/issues/2273.
-def tcmalloc_external_deps(repository):
-    _repo = repo_label(repository)
-    return selects.with_or({
-        _repo("//bazel:disable_tcmalloc"): [],
-        (
-            _repo("//bazel:debug_tcmalloc"),
-            _repo("//bazel:gperftools_tcmalloc"),
-        ): [_repo("//bazel/external:gperftools")],
-        (_repo("//bazel:jemalloc_enabled"),): [_repo("//bazel/deps:jemalloc")],
-        "//conditions:default": [_repo("//bazel:tcmalloc_all_libs")],
-    })
+_CHECK_REMOVED_FIPS_DEFINE = Label("//bazel:check_removed_fips_define")
+_CHECK_REMOVED_WASM_DEFINES = Label("//bazel:check_removed_wasm_defines")
+_COMMON_PCH = Label("//source/common/common:common_pch")
+_DISABLE_LIBRARY_AUTOLINK = Label("//bazel:disable_library_autolink")
+_ENGFLOW_RBE_X86_64 = Label("//bazel:engflow_rbe_x86_64")
+_LINUX = Label("//bazel:linux")
+_WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
 # Envoy C++ library targets that need no transformations or additional dependencies before being
 # passed to cc_library should be specified with this function. Note: this exists to ensure that
@@ -104,10 +97,11 @@ def envoy_cc_library(
         local_defines = [],
         linkopts = [],
         target_compatible_with = []):
+    # Deprecated: keep accepting `repository` for compatibility with downstream callers.
     if tcmalloc_dep:
-        deps += tcmalloc_external_deps(repository)
+        deps += tcmalloc_external_deps()
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
+        _ENGFLOW_RBE_X86_64: {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
 
@@ -115,7 +109,7 @@ def envoy_cc_library(
     # alwayslink is defaulted on for envoy_cc_extensions to ensure the REGISTRY macros work.
     if alwayslink == None:
         alwayslink = select({
-            repository + "//bazel:disable_library_autolink": 0,
+            _DISABLE_LIBRARY_AUTOLINK: 0,
             "//conditions:default": 1,
         })
 
@@ -123,24 +117,25 @@ def envoy_cc_library(
         name = name,
         srcs = srcs,
         hdrs = hdrs,
-        copts = envoy_copts(repository) + envoy_pch_copts(repository, "//source/common/common:common_pch") + copts,
+        copts = envoy_copts() + envoy_pch_copts(_COMMON_PCH) + copts,
         data = [
-            repository + "//bazel:check_removed_fips_define",
-            repository + "//bazel:check_removed_wasm_defines",
+            _CHECK_REMOVED_FIPS_DEFINE,
+            _CHECK_REMOVED_WASM_DEFINES,
         ],
         linkopts = linkopts,
         visibility = visibility,
         tags = tags,
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
-               envoy_pch_deps(repository, "//source/common/common:common_pch") +
+               envoy_pch_deps(_COMMON_PCH) +
+               deprecate_repository("envoy_cc_library", repository) +
                sanitizer_deps(),
         exec_properties = exec_properties,
         alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),
         strip_include_prefix = strip_include_prefix,
         include_prefix = include_prefix,
-        defines = envoy_mobile_defines(repository) + defines,
+        defines = envoy_mobile_defines() + defines,
         local_defines = local_defines,
         target_compatible_with = target_compatible_with,
     )
@@ -150,7 +145,7 @@ def envoy_cc_library(
     cc_library(
         name = name + "_with_external_headers",
         hdrs = hdrs,
-        copts = envoy_copts(repository) + copts,
+        copts = envoy_copts() + copts,
         visibility = visibility,
         tags = ["nocompdb"] + tags,
         deps = [":" + name],
@@ -164,11 +159,11 @@ def envoy_cc_posix_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
         name = name + "_posix",
         srcs = select({
-            "@envoy//bazel:windows_x86_64": [],
+            _WINDOWS_X86_64: [],
             "//conditions:default": srcs,
         }),
         hdrs = select({
-            "@envoy//bazel:windows_x86_64": [],
+            _WINDOWS_X86_64: [],
             "//conditions:default": hdrs,
         }),
         **kargs
@@ -179,13 +174,13 @@ def envoy_cc_posix_without_linux_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
         name = name + "_posix",
         srcs = select({
-            "@envoy//bazel:windows_x86_64": [],
-            "@envoy//bazel:linux": [],
+            _WINDOWS_X86_64: [],
+            _LINUX: [],
             "//conditions:default": srcs,
         }),
         hdrs = select({
-            "@envoy//bazel:windows_x86_64": [],
-            "@envoy//bazel:linux": [],
+            _WINDOWS_X86_64: [],
+            _LINUX: [],
             "//conditions:default": hdrs,
         }),
         **kargs
@@ -196,11 +191,11 @@ def envoy_cc_linux_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
         name = name + "_linux",
         srcs = select({
-            "@envoy//bazel:linux": srcs,
+            _LINUX: srcs,
             "//conditions:default": [],
         }),
         hdrs = select({
-            "@envoy//bazel:linux": hdrs,
+            _LINUX: hdrs,
             "//conditions:default": [],
         }),
         **kargs
@@ -211,11 +206,11 @@ def envoy_cc_win32_library(name, srcs = [], hdrs = [], **kargs):
     envoy_cc_library(
         name = name + "_win32",
         srcs = select({
-            "@envoy//bazel:windows_x86_64": srcs,
+            _WINDOWS_X86_64: srcs,
             "//conditions:default": [],
         }),
         hdrs = select({
-            "@envoy//bazel:windows_x86_64": hdrs,
+            _WINDOWS_X86_64: hdrs,
             "//conditions:default": [],
         }),
         **kargs

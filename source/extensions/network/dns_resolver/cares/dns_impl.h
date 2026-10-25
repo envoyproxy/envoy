@@ -111,11 +111,10 @@ private:
       std::string details_{"not_set"};
     };
 
-    // Note: pending_response_ is constructed with ResolutionStatus::Failure by default and
-    // __only__ changed to ResolutionStatus::Completed if there is an `ARES_SUCCESS`
-    // or `ARES_ENODATA` or `ARES_ENOTFOUND`reply. In the dual_resolution case __any__ ARES_SUCCESS
-    // reply will result in a ResolutionStatus::Completed callback.
+    // A successful lookup can supply addresses even if another lookup failed. Without addresses,
+    // however, an empty response must not hide a failure from the other address family.
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
+    bool had_resolution_failure_{false};
   };
 
   class AddrInfoPendingResolution final : public PendingResolution {

@@ -101,6 +101,9 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       // Get a grouping of hosts by locality.
       for (const auto& locality_hosts : hosts->hostsPerLocality().get()) {
+        if (locality_hosts.empty()) {
+          continue;
+        }
         // For this locality, add the response grouping.
         envoy::service::health::v3::LocalityEndpointsHealth* locality_health =
             cluster_health->add_locality_endpoints_health();

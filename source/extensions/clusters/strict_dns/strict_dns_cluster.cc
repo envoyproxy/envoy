@@ -177,8 +177,13 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
           HostVector hosts_added;
           HostVector hosts_removed;
-          if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                            all_hosts_, all_new_hosts)) {
+          if (parent_.updateDynamicHostList(
+                  new_hosts, hosts_, hosts_added, hosts_removed,
+                  [this](const std::string& address) -> HostSharedPtr {
+                    const auto it = all_hosts_.find(address);
+                    return it != all_hosts_.end() ? it->second : nullptr;
+                  },
+                  all_new_hosts)) {
             ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
             ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
               return host->priority() == locality_lb_endpoints_.priority();

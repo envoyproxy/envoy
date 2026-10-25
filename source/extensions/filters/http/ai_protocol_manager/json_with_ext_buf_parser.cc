@@ -149,8 +149,9 @@ void JsonWithExtBufParser::closeStringCapture(absl::string_view, int, size_t tok
     return;
   }
   has_external_refs_ = true;
-  setError(addValue(JsonWithExtBuf::makeExternalRef(
-      {string_token_start_ + 1, token_end - string_token_start_ - 2})));
+  const std::uint64_t ref_len = token_end - string_token_start_ - 2;
+  external_ref_bytes_ += ref_len;
+  setError(addValue(JsonWithExtBuf::makeExternalRef({string_token_start_ + 1, ref_len})));
 }
 
 absl::Status JsonWithExtBufParser::onKey(absl::string_view key, int, size_t) {

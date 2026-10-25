@@ -1,15 +1,23 @@
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
-  wrap_into_c_void_ptr, NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  EnvoyBuffer,
+  NEW_UPSTREAM_HTTP_TCP_BRIDGE_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
+use std::cell::RefCell;
 
 thread_local! {
   // Scratch for the ABI slice descriptors read by `read_buffer_slices`. Reused across body reads on
   // the same worker thread to avoid a per-call allocation. It is only borrowed within a single call
   // and is never held across a re-entrant call.
-  static SLICE_DESCRIPTOR_SCRATCH: std::cell::RefCell<Vec<abi::envoy_dynamic_module_type_envoy_buffer>> =
-    const { std::cell::RefCell::new(Vec::new()) };
+  static SLICE_DESCRIPTOR_SCRATCH: RefCell<Vec<abi::envoy_dynamic_module_type_envoy_buffer>> =
+    const { RefCell::new(Vec::new()) };
 }
 
 /// The module-side bridge configuration.
@@ -68,7 +76,7 @@ pub trait UpstreamHttpTcpBridge: Send {
 }
 
 /// Envoy-side bridge operations available to the module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyUpstreamHttpTcpBridge: Send {
   /// Get a request header value by key at the given index.
@@ -79,8 +87,10 @@ pub trait EnvoyUpstreamHttpTcpBridge: Send {
   /// Get the number of request headers.
   fn get_request_headers_size(&self) -> usize;
 
-  /// Get all request headers as key-value pairs.
-  fn get_request_headers(&self) -> Vec<(Vec<u8>, Vec<u8>)>;
+  /// Get all request headers as key-value [`EnvoyBuffer`] pairs.
+  ///
+  /// Returns an empty vector if there are no headers or the header map is not available.
+  fn get_request_headers<'a>(&'a self) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>;
 
   /// Get the current request buffer contents as a contiguous byte vector.
   fn get_request_buffer(&self) -> Vec<u8>;
@@ -217,40 +227,15 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
     }
   }
 
-  fn get_request_headers(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
-    let size = self.get_request_headers_size();
-    if size == 0 {
-      return Vec::new();
-    }
-    let mut headers: Vec<abi::envoy_dynamic_module_type_envoy_http_header> = vec![
-      abi::envoy_dynamic_module_type_envoy_http_header {
-        key_ptr: std::ptr::null_mut(),
-        key_length: 0,
-        value_ptr: std::ptr::null_mut(),
-        value_length: 0,
-      };
-      size
-    ];
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
-        self.raw,
-        headers.as_mut_ptr(),
-      )
-    };
-    if !ok {
-      return Vec::new();
-    }
-    headers
-      .iter()
-      .map(|h| unsafe {
-        (
-          crate::ffi_helpers::slice_from_raw_or_empty(h.key_ptr as *const u8, h.key_length)
-            .to_vec(),
-          crate::ffi_helpers::slice_from_raw_or_empty(h.value_ptr as *const u8, h.value_length)
-            .to_vec(),
+  fn get_request_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    crate::utility::collect_headers(
+      || self.get_request_headers_size(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_upstream_http_tcp_bridge_get_request_headers(
+          self.raw, headers,
         )
-      })
-      .collect()
+      },
+    )
   }
 
   fn get_request_buffer(&self) -> Vec<u8> {
@@ -464,7 +449,7 @@ ffi_export! {
 #[macro_export]
 macro_rules! declare_upstream_http_tcp_bridge_init_functions {
   ($f:ident, $new_bridge_config_fn:expr) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
@@ -510,7 +495,7 @@ mod tests {
     result_buffer: *mut abi::envoy_dynamic_module_type_envoy_buffer,
     result_buffer_length: *mut usize,
   ) {
-    for i in 0..OVERFLOW_SLICE_COUNT {
+    for i in 0 .. OVERFLOW_SLICE_COUNT {
       *result_buffer.add(i) = abi::envoy_dynamic_module_type_envoy_buffer {
         ptr: &SLICE_BYTE as *const u8 as _,
         length: 1,

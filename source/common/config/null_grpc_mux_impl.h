@@ -23,10 +23,6 @@ public:
     ExceptionUtil::throwEnvoyException("ADS must be configured to support an ADS config source");
   }
 
-  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    ENVOY_BUG(false, "unexpected request for on demand update");
-  }
-
   absl::Status updateMuxSource(
       Grpc::RawAsyncClientSharedPtr&&, Grpc::RawAsyncClientSharedPtr&&, Stats::Scope&,
       BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,

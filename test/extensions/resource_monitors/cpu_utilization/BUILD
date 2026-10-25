@@ -36,6 +36,8 @@ envoy_extension_cc_test(
         "//test/mocks/server:options_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
     ],
 )
 

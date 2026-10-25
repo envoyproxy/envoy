@@ -10,6 +10,7 @@
 #include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -82,6 +83,7 @@ private:
 
 class PostingExternalBufferFactory : public ExternalBufferFactory {
 public:
+  using ExternalBufferFactory::createBuffer;
   ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
     auto buffer = std::make_unique<PostingExternalBuffer>(dispatcher);
     last_ = buffer.get();
@@ -146,6 +148,7 @@ private:
 
 class FailingExternalBufferFactory : public ExternalBufferFactory {
 public:
+  using ExternalBufferFactory::createBuffer;
   explicit FailingExternalBufferFactory(FailingExternalBuffer::FailMode mode) : mode_(mode) {}
   ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
     return std::make_unique<FailingExternalBuffer>(dispatcher, mode_);
@@ -596,6 +599,155 @@ TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
   EXPECT_EQ(bridge_->injected_.toString(), chunk + chunk + chunk);
 }
 
+// The terminal write is the store's commit signal. When the last data write has
+// already drained the backlog before endStream() arrives, the manager still
+// issues one zero-length write carrying end_stream, and replay waits for it.
+TEST_F(BufferManagerTest, EndStreamAfterDrainedBacklogIssuesTerminalWrite) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+  drain();
+
+  manager_->endStream();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk);
+}
+
+// endStream() while a data write is in flight is carried by one zero-length
+// follow-up write.
+TEST_F(BufferManagerTest, EndStreamDuringInFlightWriteIssuesOneTerminalWrite) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  manager_->endStream();
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+  EXPECT_TRUE(replay_done_);
+}
+
+// A last frame passed with end_stream is written once, carrying end_stream.
+TEST_F(BufferManagerTest, FinalFrameWithEndStreamIsWrittenOnce) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame, /*end_stream=*/true);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  manager_->endStream();
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 1);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size()));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(true));
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk);
+}
+
+// A last frame passed with end_stream during an in-flight write goes down in the
+// follow-up write, which carries end_stream.
+TEST_F(BufferManagerTest, FinalFrameWithEndStreamDuringInFlightWriteFoldsIntoFollowUp) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  const std::string tail(16, 'y');
+  Buffer::OwnedImpl frame(chunk);
+  Buffer::OwnedImpl last_frame(tail);
+  manager_->onData(frame);
+  manager_->onData(last_frame, /*end_stream=*/true);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), tail.size()));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk + tail);
+}
+
+// An empty end_stream frame after the backlog has drained is a zero-length
+// terminal write.
+TEST_F(BufferManagerTest, EmptyFinalFrameAfterDrainedBacklogIssuesTerminalWrite) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  drain();
+
+  Buffer::OwnedImpl empty;
+  manager_->onData(empty, /*end_stream=*/true);
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+
+  replayAll();
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk);
+}
+
+// A small body passed with end_stream stays in memory and creates no store.
+TEST_F(BufferManagerTest, FinalFrameWithEndStreamWithinInMemoryTierCreatesNoStore) {
+  manager_config_.max_in_memory_bytes = 1024;
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl body("{}");
+  manager_->onData(body, /*end_stream=*/true);
+  manager_->endStream();
+  EXPECT_EQ(posting_factory_.create_calls_, 0);
+
+  replayAll();
+  ASSERT_NE(replay_cb_, nullptr);
+  replay_cb_->invokeCallback();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{}");
+}
+
+// Data after end of stream is reported and dropped.
+TEST_F(BufferManagerTest, DataAfterEndStreamIsReportedAndDropped) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame, /*end_stream=*/true);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+
+  Buffer::OwnedImpl late("late");
+  EXPECT_ENVOY_BUG(manager_->onData(late), "data after end of stream");
+  drain();
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(true));
+}
+
 // When the chain we replay into is backed up before replay starts, no data is
 // injected until the back-pressure is released.
 TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
@@ -755,8 +907,10 @@ TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
   manager_->endStream();
   replayAll();
 
-  // Run just the write completion: replay starts and posts its first read (now in
+  // Run the data write completion, then the zero-length terminal write it
+  // triggers: replay starts after the second and posts its first read (now in
   // flight, not yet completed).
+  runOnePosted();
   runOnePosted();
 
   // A watermark cycle schedules a resume while the read is still in flight.
@@ -1170,6 +1324,38 @@ TEST_F(BufferManagerTest, SynchronousDetachDuringResumeSourceInOnDestroyDoesNotI
   bridge_->on_resume_source_ = [this]() { bridge_->detachFromFilterChain(); };
 
   manager_->onDestroy();
+  EXPECT_EQ(bridge_->resume_source_calls_, 1);
+}
+
+// When a BufferManager holds a sub-WriteFlushThreshold pending backlog (> low_watermark_) while
+// ingestPaused() is false, and a second charger (such as ScopedUnacked or another BufferManager)
+// subsequently pushes unacked_ over high_watermark_, the bridge notifies registered BufferManagers
+// to flush their pending backlog so unacked_ can fall back below low_watermark_.
+TEST_F(BufferManagerTest, SubThresholdPendingFlushedWhenExternalChargerPausesIngest) {
+  // high_watermark = 40 KiB, low_watermark = 20 KiB, WriteFlushThreshold = 64 KiB.
+  bridge_buffer_limit_ = 40 * 1024;
+  PostingExternalBufferFactory posting_factory;
+  resetManager(posting_factory);
+
+  // 30 KiB (> low_watermark, < high_watermark, < WriteFlushThreshold): queued in pending_ without
+  // issuing a write because ingestPaused() is still false.
+  Buffer::OwnedImpl chunk(std::string(30 * 1024, 'a'));
+  manager_->onData(chunk);
+  EXPECT_FALSE(bridge_->ingestPaused());
+  EXPECT_EQ(posting_factory.last_->write_calls_, 0);
+
+  // An external charger (e.g. pending_items_ ScopedUnacked) pushes unacked_ to 50 KiB > 40 KiB.
+  // Transitioning to source_paused_ = true flushes manager_'s 30 KiB pending_ backlog.
+  {
+    FilterChainBridge::ScopedUnacked unacked(*bridge_, 20 * 1024);
+    EXPECT_TRUE(bridge_->ingestPaused());
+    EXPECT_EQ(posting_factory.last_->write_calls_, 1);
+    drain();
+  }
+
+  // Once both the external ScopedUnacked and the flushed write complete, unacked_ drops to 0 <= 20
+  // KiB and the source resumes instead of deadlocking at 30 KiB > 20 KiB.
+  EXPECT_FALSE(bridge_->ingestPaused());
   EXPECT_EQ(bridge_->resume_source_calls_, 1);
 }
 

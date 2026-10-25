@@ -122,6 +122,23 @@ message ValidationAssert {
 
   // Match the matched route's per-route request timeout (RouteEntry::timeout()).
   google.protobuf.Duration timeout = 14;
+
+  // Match the string values of the matched route's metadata entries. Each entry compares
+  // ``route->metadata().filter_metadata()[namespace].fields()[key]`` against the expected value,
+  // which lets a test assert route metadata independently of the route name.
+  repeated RouteMetadataValidation route_metadata = 15;
+}
+
+// A single expected route metadata entry, comparing the string value of one namespaced key.
+message RouteMetadataValidation {
+  // The filter metadata namespace, for example ``databricks.der``.
+  string namespace = 1;
+
+  // The field key within the namespace.
+  string key = 2;
+
+  // The expected string value of the field.
+  string value = 3;
 }
 
 // The ValidationResult schema contains test results of the envoy router check tool.

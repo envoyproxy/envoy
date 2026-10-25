@@ -189,16 +189,23 @@ void RedisCluster::onClusterSlotUpdate(ClusterSlotsSharedPtr&& slots,
 
   // Get the map of all the latest existing hosts, which is used to filter out the existing
   // hosts in the process of updating cluster memberships.
-  Upstream::HostMapConstSharedPtr all_hosts = priority_set_.crossPriorityHostMap();
+  Upstream::HostLookupMapConstSharedPtr all_hosts = priority_set_.crossPriorityHostMap();
   ASSERT(all_hosts != nullptr);
 
   Upstream::HostVector hosts_added;
   Upstream::HostVector hosts_removed;
-  const bool host_updated = updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                                  *all_hosts, all_new_hosts);
+  const bool host_updated = updateDynamicHostList(
+      new_hosts, hosts_, hosts_added, hosts_removed,
+      [&all_hosts](const std::string& address) { return all_hosts->findHost(address); },
+      all_new_hosts);
 
   // Create a map containing all the latest hosts to determine whether the slots are updated.
-  Upstream::HostMap updated_hosts = *all_hosts;
+  Upstream::HostMap updated_hosts;
+  updated_hosts.reserve(all_hosts->size());
+  all_hosts->forEach(
+      [&updated_hosts](absl::string_view address, const Upstream::HostSharedPtr& host) {
+        updated_hosts.emplace(address, host);
+      });
   for (const auto& host : hosts_removed) {
     updated_hosts.erase(host->address()->asString());
   }

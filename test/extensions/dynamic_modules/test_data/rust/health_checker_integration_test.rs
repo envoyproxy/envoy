@@ -33,8 +33,8 @@ fn parse_mode(config: &[u8]) -> Mode {
   }
 }
 
-/// Health checker factory: dispatches by `health_checker_name`. Returning `None` for an unknown name
-/// causes Envoy to reject the health-check configuration at config load time.
+/// Health checker factory: dispatches by `health_checker_name`. Returning `None` for an unknown
+/// name causes Envoy to reject the health-check configuration at config load time.
 fn new_health_checker_config_fn(name: &str, config: &[u8]) -> Option<Box<dyn HealthCheckerConfig>> {
   match name {
     "test_health_checker" => Some(Box::new(TestHealthCheckerConfig {
