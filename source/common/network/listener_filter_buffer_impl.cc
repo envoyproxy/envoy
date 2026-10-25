@@ -94,15 +94,23 @@ void ListenerFilterBufferImpl::activateFileEvent(uint32_t events) {
 absl::Status ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   ENVOY_LOG(trace, "onFileEvent: {}", events);
 
-  if (events & Event::FileReadyType::Closed) {
+  // Internal sockets can report Read and Closed together when a peer writes
+  // data and then half-closes. Inspect the buffered data before handling EOF.
+  if ((events & Event::FileReadyType::Closed) &&
+      (!(events & Event::FileReadyType::Read) || on_data_cb_disabled_)) {
     on_close_cb_(false);
     return absl::OkStatus();
   }
 
-  ASSERT(events == Event::FileReadyType::Read);
+  ASSERT(events & Event::FileReadyType::Read);
 
   auto state = peekFromSocket();
   if (state == PeekState::Done && !on_data_cb_disabled_) {
+    // If inspection still needs more data, deliver the close notification on
+    // the next iteration. A completed filter chain resets the file event.
+    if (events & Event::FileReadyType::Closed) {
+      io_handle_.activateFileEvents(Event::FileReadyType::Closed);
+    }
     // buffer_size_ will be set to 1 if the first listener filter in
     // filter chain has maxReadBytes() of 0. Bypass onData callback of it.
     // The reason for setting it to 1 is that different platforms have
@@ -114,10 +122,11 @@ absl::Status ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
     on_data_cb_(*this);
   } else if (state == PeekState::Error) {
     on_close_cb_(true);
-  } else if (state == PeekState::RemoteClose) {
+  } else if (state == PeekState::RemoteClose ||
+             (state == PeekState::Again && (events & Event::FileReadyType::Closed))) {
     on_close_cb_(false);
   }
-  // Did nothing for `Api::IoError::IoErrorCode::Again`
+  // With Again and no close event, wait for the socket to become readable.
   return absl::OkStatus();
 }
 

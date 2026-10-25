@@ -121,6 +121,120 @@ TEST_F(ListenerFilterBufferImplTest, Basic) {
   EXPECT_FALSE(is_closed);
 }
 
+TEST_F(ListenerFilterBufferImplTest, ReadAndClosedPreservesBufferedData) {
+  initialize();
+  bool inspected = false;
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Closed));
+  on_close_cb_ = [&](bool) { FAIL() << "buffered data was discarded"; };
+  EXPECT_CALL(io_handle_, recv).WillOnce([](void* buffer, size_t, int flags) {
+    EXPECT_EQ(MSG_PEEK, flags);
+    static_cast<char*>(buffer)[0] = 'a';
+    return Api::IoCallUint64Result(1, Api::IoError::none());
+  });
+  on_data_cb_ = [&](ListenerFilterBuffer& buffer) {
+    EXPECT_EQ(1, buffer.rawSlice().len_);
+    EXPECT_EQ('a', *static_cast<const char*>(buffer.rawSlice().mem_));
+    inspected = true;
+    // Finishing the listener filter chain can destroy this buffer in the
+    // callback.
+    listener_buffer_.reset();
+  };
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read | Event::FileReadyType::Closed));
+  EXPECT_TRUE(inspected);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ReadAndClosedPreservesCloseWhileWaitingForData) {
+  initialize();
+  bool inspected = false;
+  bool closed = false;
+  uint32_t pending_events = 0;
+  EXPECT_CALL(io_handle_, activateFileEvents(Event::FileReadyType::Closed))
+      .WillOnce(SaveArg<0>(&pending_events));
+  EXPECT_CALL(io_handle_, recv).WillOnce([](void* buffer, size_t, int) {
+    static_cast<char*>(buffer)[0] = 'P';
+    return Api::IoCallUint64Result(1, Api::IoError::none());
+  });
+  on_data_cb_ = [&](ListenerFilterBuffer&) { inspected = true; };
+  on_close_cb_ = [&](bool error) {
+    EXPECT_FALSE(error);
+    EXPECT_TRUE(inspected);
+    closed = true;
+  };
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read | Event::FileReadyType::Closed));
+  EXPECT_TRUE(inspected);
+  EXPECT_FALSE(closed);
+  EXPECT_OK(file_event_callback_(pending_events));
+  EXPECT_TRUE(closed);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ReadAndClosedWithReadErrorCloses) {
+  initialize();
+  bool closed = false;
+  on_close_cb_ = [&](bool error) {
+    EXPECT_TRUE(error);
+    closed = true;
+  };
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(
+          Return(ByMove(Api::IoCallUint64Result(-1, IoSocketError::create(SOCKET_ERROR_INTR)))));
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read | Event::FileReadyType::Closed));
+  EXPECT_TRUE(closed);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ReadAndClosedWithoutDataCloses) {
+  initialize();
+  bool closed = false;
+  on_close_cb_ = [&](bool error) {
+    EXPECT_FALSE(error);
+    closed = true;
+  };
+  on_data_cb_ = [&](ListenerFilterBuffer&) { FAIL() << "unexpected data"; };
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(Return(ByMove(Api::IoCallUint64Result(0, Api::IoError::none()))));
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read | Event::FileReadyType::Closed));
+  EXPECT_TRUE(closed);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ReadAndClosedWithAgainCloses) {
+  initialize();
+  bool closed = false;
+  on_close_cb_ = [&](bool error) {
+    EXPECT_FALSE(error);
+    closed = true;
+  };
+  EXPECT_CALL(io_handle_, recv)
+      .WillOnce(
+          Return(ByMove(Api::IoCallUint64Result(0, IoSocketError::getIoSocketEagainError()))));
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read | Event::FileReadyType::Closed));
+  EXPECT_TRUE(closed);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ClosedWithoutReadDoesNotInspect) {
+  initialize();
+  bool closed = false;
+  on_close_cb_ = [&](bool error) {
+    EXPECT_FALSE(error);
+    closed = true;
+  };
+  EXPECT_CALL(io_handle_, recv).Times(0);
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Closed));
+  EXPECT_TRUE(closed);
+}
+
+TEST_F(ListenerFilterBufferImplTest, ReadAndClosedWithDataCallbackDisabledCloses) {
+  buffer_size_ = 0;
+  initialize();
+  bool closed = false;
+  on_close_cb_ = [&](bool error) {
+    EXPECT_FALSE(error);
+    closed = true;
+  };
+  on_data_cb_ = [&](ListenerFilterBuffer&) { FAIL() << "unexpected data callback"; };
+  EXPECT_CALL(io_handle_, recv).Times(0);
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read | Event::FileReadyType::Closed));
+  EXPECT_TRUE(closed);
+}
+
 TEST_F(ListenerFilterBufferImplTest, ZeroBuffer) {
   buffer_size_ = 0;
   initialize();
