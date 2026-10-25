@@ -657,6 +657,10 @@ case $CI_TARGET in
         registry_check
         echo "Check bazel lockfiles ..."
         lockfiles_check
+        echo "Check dependency release dates/releases ..."
+        bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
+              -- -v warn \
+                 -c release_dates releases
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:dependatool
