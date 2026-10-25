@@ -40,6 +40,7 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/common/upstream/snapshot_host_set.h"
 #include "test/common/upstream/test_local_address_selector.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/http/mocks.h"
@@ -4787,6 +4788,168 @@ TEST(PrioritySet, Extend) {
   // We expect to see two priority changes, but only one membership change.
   EXPECT_EQ(3, priority_changes);
   EXPECT_EQ(2, membership_changes);
+}
+
+// A host set factory and the snapshot hooks, exercised with SnapshotHostSet.
+class HostSetHooksTest : public testing::Test {
+protected:
+  // Gives `priority_set`'s priority 0 the flat hosts `hosts`, with no localities.
+  static void setHosts(PrioritySetImpl& priority_set, const HostVector& hosts,
+                       const HostVector& hosts_added, const HostVector& hosts_removed) {
+    priority_set.updateHosts(0,
+                             HostSetImpl::partitionHosts(std::make_shared<HostVector>(hosts),
+                                                         HostsPerLocalityImpl::empty()),
+                             nullptr, hosts_added, hosts_removed, std::nullopt, std::nullopt);
+  }
+
+  HostSharedPtr makeHost(uint32_t index) {
+    return makeTestHost(info_, fmt::format("tcp://10.0.0.{}:80", index));
+  }
+
+  static std::vector<std::string> addresses(const HostVector& hosts) {
+    std::vector<std::string> out;
+    for (const auto& host : hosts) {
+      out.push_back(host->address()->asString());
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+  }
+
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+};
+
+// Setting a factory replaces the existing empty host sets and creates later priorities with it.
+TEST_F(HostSetHooksTest, FactoryCreatesHostSets) {
+  MainPrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  priority_set.setHostSetFactory(SnapshotHostSet::factory());
+  priority_set.getOrCreateHostSet(1);
+  for (const auto& host_set : priority_set.hostSetsPerPriority()) {
+    EXPECT_NE(nullptr, dynamic_cast<const SnapshotHostSet*>(host_set.get()));
+  }
+}
+
+// On the main thread, a snapshot passed to updateHosts() is adopted by the host set, and the delta
+// still runs the callbacks and keeps the cross-priority host map in step.
+TEST_F(HostSetHooksTest, MainThreadAdoptsSnapshot) {
+  MainPrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  priority_set.setHostSetFactory(SnapshotHostSet::factory());
+  HostVector member_added;
+  HostVector member_removed;
+  auto member_cb =
+      priority_set.addMemberUpdateCb([&](const HostVector& added, const HostVector& removed) {
+        member_added = added;
+        member_removed = removed;
+      });
+  uint32_t priority_cb_calls = 0;
+  auto priority_cb = priority_set.addPriorityUpdateCb(
+      [&](uint32_t, const HostVector&, const HostVector&) { ++priority_cb_calls; });
+
+  const HostSharedPtr h1 = makeHost(1);
+  const HostSharedPtr h2 = makeHost(2);
+  const auto adopt = [&](const HostVector& hosts, const HostVector& added,
+                         const HostVector& removed) {
+    auto snapshot = SnapshotHostSet::makeSnapshot(HostSetImpl::partitionHosts(
+        std::make_shared<HostVector>(hosts), HostsPerLocalityImpl::empty()));
+    priority_set.updateHosts(0, HostSetImpl::snapshotUpdateHostsParams(snapshot), nullptr, added,
+                             removed, std::nullopt, std::nullopt);
+    EXPECT_EQ(snapshot, priority_set.hostSetsPerPriority()[0]->persistentPartitions());
+  };
+
+  adopt({h1, h2}, {h1, h2}, {});
+  EXPECT_EQ(addresses({h1, h2}), addresses(member_added));
+  EXPECT_TRUE(member_removed.empty());
+  EXPECT_EQ(1, priority_cb_calls);
+  EXPECT_NE(nullptr, priority_set.crossPriorityHostMap()->findHost(h1->address()->asString()));
+
+  adopt({h2}, {}, {h1});
+  EXPECT_TRUE(member_added.empty());
+  EXPECT_EQ(addresses({h1}), addresses(member_removed));
+  EXPECT_EQ(addresses({h2}), addresses(priority_set.hostSetsPerPriority()[0]->hosts()));
+  EXPECT_EQ(nullptr, priority_set.crossPriorityHostMap()->findHost(h1->address()->asString()));
+  EXPECT_EQ(1, priority_set.hostSetsPerPriority()[0]->hostCount());
+}
+
+// An empty worker priority set adopts a snapshot by creating the host set type that published it.
+TEST_F(HostSetHooksTest, WorkerAdoptsSnapshot) {
+  MainPrioritySetImpl main;
+  main.getOrCreateHostSet(0);
+  main.setHostSetFactory(SnapshotHostSet::factory());
+  const HostVector added{makeHost(1), makeHost(2)};
+  setHosts(main, added, added, {});
+  const auto snapshot = main.hostSetsPerPriority()[0]->persistentPartitions();
+  ASSERT_NE(nullptr, snapshot);
+
+  PrioritySetImpl worker;
+  worker.updateHosts(0, HostSetImpl::snapshotUpdateHostsParams(snapshot), nullptr, added, {},
+                     std::nullopt, std::nullopt);
+  const HostSet& worker_set = *worker.hostSetsPerPriority()[0];
+  EXPECT_NE(nullptr, dynamic_cast<const SnapshotHostSet*>(&worker_set));
+  EXPECT_EQ(snapshot, worker_set.persistentPartitions());
+  EXPECT_EQ(addresses(added), addresses(worker_set.hosts()));
+  EXPECT_EQ(addresses(added), addresses(worker_set.healthyHosts()));
+}
+
+// A worker that already holds flat hosts keeps its host set type and gets the snapshot's flat
+// views.
+TEST_F(HostSetHooksTest, NonEmptyWorkerFlattensSnapshot) {
+  MainPrioritySetImpl main;
+  main.getOrCreateHostSet(0);
+  main.setHostSetFactory(SnapshotHostSet::factory());
+  const HostVector added{makeHost(1), makeHost(2)};
+  setHosts(main, added, added, {});
+
+  PrioritySetImpl worker;
+  auto flat_hosts = std::make_shared<HostVector>(HostVector{makeHost(3)});
+  worker.updateHosts(0, HostSetImpl::partitionHosts(flat_hosts, HostsPerLocalityImpl::empty()),
+                     nullptr, *flat_hosts, {}, std::nullopt, std::nullopt);
+  worker.updateHosts(
+      0,
+      HostSetImpl::snapshotUpdateHostsParams(main.hostSetsPerPriority()[0]->persistentPartitions()),
+      nullptr, added, *flat_hosts, std::nullopt, std::nullopt);
+  const HostSet& worker_set = *worker.hostSetsPerPriority()[0];
+  EXPECT_EQ(nullptr, dynamic_cast<const SnapshotHostSet*>(&worker_set));
+  EXPECT_EQ(nullptr, worker_set.persistentPartitions());
+  EXPECT_EQ(addresses(added), addresses(worker_set.hosts()));
+}
+
+// The snapshot params carry only the snapshot.
+TEST_F(HostSetHooksTest, SnapshotUpdateHostsParams) {
+  MainPrioritySetImpl main;
+  main.getOrCreateHostSet(0);
+  main.setHostSetFactory(SnapshotHostSet::factory());
+  const HostVector added{makeHost(1)};
+  setHosts(main, added, added, {});
+  const auto snapshot = main.hostSetsPerPriority()[0]->persistentPartitions();
+  const auto params = HostSetImpl::snapshotUpdateHostsParams(snapshot);
+  EXPECT_EQ(snapshot, params.persistent_partitions);
+  EXPECT_TRUE(params.hosts->empty());
+  EXPECT_TRUE(params.healthy_hosts->get().empty());
+  EXPECT_TRUE(params.hosts_per_locality->get().empty());
+}
+
+// The count getters match the vector sizes, and the excluded check follows partitionHosts().
+TEST_F(HostSetHooksTest, CountsAndExclusion) {
+  const HostSharedPtr healthy = makeHost(1);
+  const HostSharedPtr degraded = makeHost(2);
+  degraded->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  const HostSharedPtr excluded = makeHost(3);
+  excluded->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  excluded->healthFlagSet(Host::HealthFlag::PENDING_ACTIVE_HC);
+  auto hosts = std::make_shared<HostVector>(HostVector{healthy, degraded, excluded});
+
+  PrioritySetImpl priority_set;
+  priority_set.updateHosts(0, HostSetImpl::partitionHosts(hosts, HostsPerLocalityImpl::empty()),
+                           nullptr, *hosts, {}, std::nullopt, std::nullopt);
+  const HostSet& host_set = *priority_set.hostSetsPerPriority()[0];
+  EXPECT_EQ(host_set.hosts().size(), host_set.hostCount());
+  EXPECT_EQ(host_set.healthyHosts().size(), host_set.healthyHostCount());
+  EXPECT_EQ(host_set.degradedHosts().size(), host_set.degradedHostCount());
+  EXPECT_EQ(host_set.excludedHosts().size(), host_set.excludedHostCount());
+  EXPECT_EQ(1, host_set.excludedHostCount());
+  EXPECT_FALSE(HostSetImpl::excludedByHealthFlags(*healthy));
+  EXPECT_TRUE(HostSetImpl::excludedByHealthFlags(*excluded));
 }
 
 // Adds 100 hosts to P0 and 50 hosts to P1.
