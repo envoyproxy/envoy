@@ -2,8 +2,11 @@
 #include <vector>
 
 #include "envoy/common/logger.h"
+#include "envoy/runtime/extensible_runtime.h"
 #include "envoy/server/filter_config.h"
 
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/extensible_runtime.h"
 #include "source/extensions/listener_managers/validation_listener_manager/validation_listener_manager.h"
 #include "source/server/admin/admin_filter.h"
 #include "source/server/config_validation/server.h"
@@ -13,6 +16,7 @@
 #include "test/integration/server.h"
 #include "test/mocks/common.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/options.h"
 #include "test/mocks/stats/mocks.h"
@@ -24,6 +28,7 @@
 
 using testing::HasSubstr;
 using testing::Invoke;
+using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
@@ -321,6 +326,51 @@ TEST_P(RuntimeFeatureValidationServerTest, ValidRuntimeLoader) {
                           [](Event::PostCb) { FAIL(); });
   server.setSinkPredicates(std::make_unique<testing::NiceMock<Stats::MockSinkPredicates>>());
   server.shutdown();
+}
+
+TEST_P(RuntimeFeatureValidationServerTest, ValidExtensibleRuntime) {
+  NiceMock<ExtensibleRuntime::MockProviderFactory> mock_factory;
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
+    return std::make_unique<test::common::config::DummyConfig>();
+  });
+  EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy.extensible_runtime.test"));
+
+  EXPECT_CALL(mock_factory, createProvider(_)).WillOnce([](const Protobuf::Message& config) {
+    const auto* proto =
+        Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
+    EXPECT_NE(nullptr, proto);
+    EXPECT_EQ(proto->a(), "foo");
+    auto mock_provider = std::make_unique<NiceMock<ExtensibleRuntime::MockProvider>>();
+    EXPECT_CALL(*mock_provider,
+                runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"))
+        .WillOnce(Return(true));
+    return mock_provider;
+  });
+
+  Registry::InjectFactory<ExtensibleRuntime::ProviderFactory> registered_factory(mock_factory);
+
+  options_.config_yaml_ = R"EOF(
+layered_runtime:
+  extensible_runtime:
+    name: envoy.extensible_runtime.test
+    typed_config:
+      "@type": type.googleapis.com/test.common.config.DummyConfig
+      a: foo
+  )EOF";
+
+  Thread::MutexBasicLockable access_log_lock;
+  Stats::IsolatedStoreImpl stats_store;
+  DangerousDeprecatedTestTime time_system;
+  ValidationInstance server(options_, time_system.timeSystem(),
+                            Network::Address::InstanceConstSharedPtr(), stats_store,
+                            access_log_lock, component_factory_, Thread::threadFactoryForTest(),
+                            Filesystem::fileSystemForTest());
+  EXPECT_TRUE(
+      ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
+  server.shutdown();
+  EXPECT_EQ(nullptr, ExtensibleRuntime::ProviderSingleton::getExisting());
+  EXPECT_FALSE(
+      ExtensibleRuntime::runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 }
 
 // Test the admin handler stubs used in validation
