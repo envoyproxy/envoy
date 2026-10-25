@@ -42,7 +42,7 @@ MatchResult Matcher::match(const Envoy::Matcher::DataInputGetResult& input) {
     ENVOY_LOG(debug, "IP matcher: unable to parse address '{}'", *data);
     return MatchResult::NoMatch;
   }
-  if (!trie_.getData(ip).empty()) {
+  if (trie_.getDataSet(ip) != nullptr) {
     return MatchResult::Matched;
   }
   return MatchResult::NoMatch;

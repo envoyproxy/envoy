@@ -184,12 +184,25 @@ public:
    * version of the ip_address.
    */
   std::vector<T> getData(const Network::Address::InstanceConstSharedPtr& ip_address) const {
+    const DataSet* data = getDataSet(ip_address);
+    return data == nullptr ? std::vector<T>() : std::vector<T>(data->begin(), data->end());
+  }
+
+  using DataSet = absl::node_hash_set<T>;
+
+  /**
+   * As getData(), but without copying the data out of the trie.
+   * @param  ip_address supplies the IP address.
+   * @return the data from the CIDR ranges and IP addresses that contain 'ip_address', owned by the
+   * trie, or nullptr where getData() would return an empty vector.
+   */
+  const DataSet* getDataSet(const Network::Address::InstanceConstSharedPtr& ip_address) const {
     if (ip_address->ip()->version() == Address::IpVersion::v4) {
       Ipv4 ip = ntohl(ip_address->ip()->ipv4()->address());
-      return ipv4_trie_->getData(ip);
+      return ipv4_trie_->getDataSet(ip);
     } else {
       Ipv6 ip = Utility::Ip6ntohl(ip_address->ip()->ipv6()->address());
-      return ipv6_trie_->getData(ip);
+      return ipv6_trie_->getDataSet(ip);
     }
   }
 
@@ -233,7 +246,6 @@ private:
   using Ipv4 = uint32_t;
   using Ipv6 = absl::uint128;
 
-  using DataSet = absl::node_hash_set<T>;
   using DataSetSharedPtr = std::shared_ptr<DataSet>;
 
   /**
@@ -430,10 +442,10 @@ private:
     /**
      * Retrieve the data associated with the CIDR range that contains `ip_address`.
      * @param  ip_address supplies the IP address in host byte order.
-     * @return a vector of data from the CIDR ranges and IP addresses that encompasses the input.
-     * An empty vector is returned if the LC Trie is empty.
+     * @return the data from the CIDR ranges and IP addresses that encompass the input, or nullptr
+     * if there is none, including when the LC Trie is empty.
      */
-    std::vector<T> getData(const IpType& ip_address) const;
+    const DataSet* getDataSet(const IpType& ip_address) const;
 
   private:
     /**
@@ -710,11 +722,10 @@ LcTrie<T>::LcTrieInternal<IpType, address_size>::LcTrieInternal(std::vector<IpPr
 
 template <class T>
 template <class IpType, uint32_t address_size>
-std::vector<T>
-LcTrie<T>::LcTrieInternal<IpType, address_size>::getData(const IpType& ip_address) const {
-  std::vector<T> return_vector;
+const typename LcTrie<T>::DataSet*
+LcTrie<T>::LcTrieInternal<IpType, address_size>::getDataSet(const IpType& ip_address) const {
   if (trie_.empty()) {
-    return return_vector;
+    return nullptr;
   }
 
   LcNode node = trie_[0];
@@ -737,10 +748,10 @@ LcTrie<T>::LcTrieInternal<IpType, address_size>::getData(const IpType& ip_addres
   // so it is necessary to check whether the matched prefix really contains the
   // ip_address.
   const auto& prefix = ip_prefixes_[address];
-  if (prefix.contains(ip_address)) {
-    return std::vector<T>(prefix.data_.begin(), prefix.data_.end());
+  if (prefix.contains(ip_address) && !prefix.data_.empty()) {
+    return &prefix.data_;
   }
-  return std::vector<T>();
+  return nullptr;
 }
 
 } // namespace LcTrie
