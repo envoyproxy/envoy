@@ -55,14 +55,21 @@ counts as found when the virtual host (or scoped route configuration) was delive
   route_discovery_not_found, Counter, Route discoveries that completed without the route configuration becoming available.
   route_discovery_cancelled, Counter, Route discoveries abandoned because the stream was destroyed before they completed.
   route_discovery_pending, Gauge, Route discoveries currently in flight.
-  route_discovery_duration, Histogram, Time from request to completion of route discoveries in milliseconds.
+  route_discovery_duration, Histogram, Time from request to completion of successful (found) route discoveries in milliseconds.
   cluster_discovery_requested, Counter, Total on-demand cluster discoveries started.
   cluster_discovery_available, Counter, Cluster discoveries that completed with the cluster available.
   cluster_discovery_missing, Counter, Cluster discoveries where on-demand CDS reported that the cluster does not exist.
   cluster_discovery_timeout, Counter, Cluster discoveries that timed out before any reply.
   cluster_discovery_cancelled, Counter, Cluster discoveries abandoned because the stream was destroyed before they completed.
   cluster_discovery_pending, Gauge, Cluster discoveries currently in flight.
-  cluster_discovery_duration, Histogram, Time from request to completion of cluster discoveries in milliseconds.
+  cluster_discovery_duration, Histogram, Time from request to completion of successful (available) cluster discoveries in milliseconds.
+
+The duration histograms only record successful discoveries. A timed out cluster discovery always lasts
+about the configured timeout, so including it would make the high percentiles meaningless; use the
+``timeout`` and ``missing`` counters, for example ``cluster_discovery_timeout`` over
+``cluster_discovery_requested``, to track failures. Route discovery has no timeout, so while the control
+plane is not answering, requests keep waiting and are not recorded in the histogram until the route is
+found; ``route_discovery_pending`` and ``route_discovery_cancelled`` are the signals to watch then.
 
 Access log timing
 -----------------
@@ -75,7 +82,7 @@ stream's downstream timing, which can be used with the
 * ``envoy.filters.http.on_demand.cluster_discovery_start`` and ``envoy.filters.http.on_demand.cluster_discovery_end``
 
 A key is not set if the corresponding discovery did not happen, so the command renders ``-`` for
-requests that did not wait. The end key is also set when a discovery fails or times out. For example,
+requests that did not wait. The end key is set for every outcome, including a failed or timed out discovery. For example,
 to log the time spent in route discovery in microseconds:
 
 .. code-block:: none

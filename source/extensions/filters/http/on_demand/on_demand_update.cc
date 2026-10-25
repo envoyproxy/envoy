@@ -404,9 +404,13 @@ void OnDemandRouteUpdate::finishRouteDiscovery(bool route_exists) {
   if (auto stats = config_->stats(); stats.has_value()) {
     (route_exists ? stats->route_discovery_found_ : stats->route_discovery_not_found_).inc();
     stats->route_discovery_pending_.dec();
-    stats->route_discovery_duration_.recordValue(
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - route_discovery_start_)
-            .count());
+    // Only successful discoveries are timed, so that the histogram is the latency of a usable
+    // answer rather than a mix with negative answers.
+    if (route_exists) {
+      stats->route_discovery_duration_.recordValue(
+          std::chrono::duration_cast<std::chrono::milliseconds>(end - route_discovery_start_)
+              .count());
+    }
   }
 }
 
@@ -431,6 +435,12 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
     switch (cluster_status) {
     case Upstream::ClusterDiscoveryStatus::Available:
       stats->cluster_discovery_available_.inc();
+      // Only successful discoveries are timed: a timeout always lasts about the configured
+      // timeout, and a missing cluster is a quick negative answer, so neither says anything about
+      // how long it takes to get a usable cluster.
+      stats->cluster_discovery_duration_.recordValue(
+          std::chrono::duration_cast<std::chrono::milliseconds>(end - cluster_discovery_start_)
+              .count());
       break;
     case Upstream::ClusterDiscoveryStatus::Missing:
       stats->cluster_discovery_missing_.inc();
@@ -440,9 +450,6 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
       break;
     }
     stats->cluster_discovery_pending_.dec();
-    stats->cluster_discovery_duration_.recordValue(
-        std::chrono::duration_cast<std::chrono::milliseconds>(end - cluster_discovery_start_)
-            .count());
   }
 }
 

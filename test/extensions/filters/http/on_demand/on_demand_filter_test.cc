@@ -582,10 +582,11 @@ public:
     EXPECT_FALSE(timing(Timing::ClusterDiscoveryEnd).has_value());
   }
 
-  void expectClusterDiscoveryFinished() {
+  void expectClusterDiscoveryFinished(bool expect_duration) {
     EXPECT_EQ(0UL, pending("cluster_discovery_pending"));
     EXPECT_EQ(0UL, counter("cluster_discovery_cancelled"));
-    EXPECT_EQ(1UL, durations("cluster_discovery_duration").size());
+    EXPECT_EQ(expect_duration ? 1UL : 0UL, durations("cluster_discovery_duration").size());
+    // The access log timing is set for every outcome.
     EXPECT_TRUE(timing(Timing::ClusterDiscoveryEnd).has_value());
   }
 
@@ -615,7 +616,8 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotFound) {
   EXPECT_EQ(0UL, counter("route_discovery_found"));
   EXPECT_EQ(1UL, counter("route_discovery_not_found"));
   EXPECT_EQ(0UL, pending("route_discovery_pending"));
-  EXPECT_EQ(1UL, durations("route_discovery_duration").size());
+  // Only found discoveries are timed.
+  EXPECT_TRUE(durations("route_discovery_duration").empty());
   EXPECT_TRUE(timing(Timing::RouteDiscoveryEnd).has_value());
 }
 
@@ -670,7 +672,7 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryAvailable) {
   EXPECT_EQ(1UL, counter("cluster_discovery_available"));
   EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
   EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
-  expectClusterDiscoveryFinished();
+  expectClusterDiscoveryFinished(true);
 }
 
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryMissing) {
@@ -680,7 +682,7 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryMissing) {
   EXPECT_EQ(0UL, counter("cluster_discovery_available"));
   EXPECT_EQ(1UL, counter("cluster_discovery_missing"));
   EXPECT_EQ(0UL, counter("cluster_discovery_timeout"));
-  expectClusterDiscoveryFinished();
+  expectClusterDiscoveryFinished(false);
 }
 
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
@@ -690,7 +692,7 @@ TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryTimeout) {
   EXPECT_EQ(0UL, counter("cluster_discovery_available"));
   EXPECT_EQ(0UL, counter("cluster_discovery_missing"));
   EXPECT_EQ(1UL, counter("cluster_discovery_timeout"));
-  expectClusterDiscoveryFinished();
+  expectClusterDiscoveryFinished(false);
 }
 
 TEST_F(OnDemandFilterStatsTest, ClusterDiscoveryCancelledWhenStreamIsDestroyed) {
