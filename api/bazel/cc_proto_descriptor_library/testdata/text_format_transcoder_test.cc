@@ -4,6 +4,7 @@
 #include <string>
 
 #include "absl/strings/substitute.h"
+#include "bazel/cc_proto_descriptor_library/file_descriptor_info.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test-extension.pb.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test-extension_descriptor.pb.h"
 #include "bazel/cc_proto_descriptor_library/testdata/test.pb.h"
@@ -74,6 +75,26 @@ bar: "hello world"
                                      &concrete_message));
 
   ASSERT_THAT(concrete_message.bar(), Eq("hello world"));
+}
+
+TEST(TextFormatTranscoderTest, InvalidEmbeddedDescriptorBase64Dies) {
+  cc_proto_descriptor_library::TextFormatTranscoder reserializer;
+  const cc_proto_descriptor_library::internal::FileDescriptorInfo* deps[] = {nullptr};
+  const cc_proto_descriptor_library::internal::FileDescriptorInfo file_descriptor_info{
+      "invalid_base64.proto", "!", deps};
+
+  EXPECT_DEATH(reserializer.loadFileDescriptors(file_descriptor_info),
+               "Failed to base64-decode embedded descriptor for invalid_base64.proto");
+}
+
+TEST(TextFormatTranscoderTest, InvalidEmbeddedDescriptorProtoDies) {
+  cc_proto_descriptor_library::TextFormatTranscoder reserializer;
+  const cc_proto_descriptor_library::internal::FileDescriptorInfo* deps[] = {nullptr};
+  const cc_proto_descriptor_library::internal::FileDescriptorInfo file_descriptor_info{
+      "invalid_proto.proto", "gA==", deps};
+
+  EXPECT_DEATH(reserializer.loadFileDescriptors(file_descriptor_info),
+               "Failed to parse embedded descriptor for invalid_proto.proto");
 }
 
 TEST(TextToBinaryReserializerTest, TextFormatWithExtensionWorks) {
