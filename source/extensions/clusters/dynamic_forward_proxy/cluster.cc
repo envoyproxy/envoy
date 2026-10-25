@@ -484,7 +484,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                                                                        force_refresh, *cancelable);
   switch (result.status_) {
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache:
-    return {nullptr, result.host_info_.has_value() ? result.host_info_.value()->details() : ""};
+    return cluster->selectHostFromResolvedEntry(hostname, result.host_info_.value_or(nullptr));
   case Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading:
     // Here the DFP kicks off an async lookup. The DFPHostSelectionHandle will
     // call onLoadDnsCacheComplete and onAsyncHostSelection unless the
@@ -506,6 +506,17 @@ Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::st
     return cluster->findHostByName(host);
   }
   return nullptr;
+}
+
+Upstream::HostSelectionResponse Cluster::selectHostFromResolvedEntry(
+    const std::string& host,
+    const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) const {
+  if (!host_info) {
+    return {nullptr, "no_host"};
+  }
+  // Proxied hosts are published with a null address; failed resolutions are never published.
+  // Use the cluster host map as the sole source of truth rather than checking the address.
+  return {findHostByName(host), host_info->details()};
 }
 
 Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {
