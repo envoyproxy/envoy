@@ -38,7 +38,7 @@ Span::Span(datadog::tracing::Span&& span, bool use_local_decision, bool delegate
            delegate_sampling ? std::make_shared<SamplingState>() : nullptr) {}
 
 Span::Span(datadog::tracing::Span&& span, bool use_local_decision,
-           const SamplingStateSharedPtr& sampling_state)
+           SamplingStateSharedPtr&& sampling_state)
     : span_(std::move(span)), use_local_decision_(use_local_decision),
       sampling_state_(sampling_state) {}
 
