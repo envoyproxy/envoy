@@ -139,6 +139,9 @@ use_repo(mobile_platforms_ext, "mobile_clang_platform")
 llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
 use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
 
+grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grcov_extension")
+use_repo(grcov_ext, "grcov")
+
 remote_android_extensions = use_extension(
     "@bazel_tools//tools/android:android_extensions.bzl",
     "remote_android_tools_extensions",
