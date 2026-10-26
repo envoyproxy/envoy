@@ -155,10 +155,43 @@ genrule(
     tools = ["//tools/windows:gen_dynamic_modules_exports"],
 )
 
+bool_flag(
+    name = "shared_unwind",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "shared_unwind_enabled",
+    flag_values = {":shared_unwind": "True"},
+)
+
+selects.config_setting_group(
+    name = "linux_x86_64_shared_unwind",
+    match_all = [
+        ":shared_unwind_enabled",
+        ":linux_x86_64",
+    ],
+)
+
+# By default, Linux builds use the toolchain's libunwind.a, selected by -unwindlib=libunwind
+# in MODULE.bazel's extra_link_flags. Clang reuses -static-libgcc to link the unwinder
+# statically even when it is LLVM libunwind, not libgcc; the misleading name is intentional.
+# --//bazel:shared_unwind=true (set by build:asan in .bazelrc) disables that unwinder with
+# -unwindlib=none and uses @unwind_libs//:libunwind from envoy_toolshed's unwind_extension
+# instead, on Linux x86_64 only because unwind_libs only ships x86_64.
+# ASAN's dlsym(RTLD_NEXT) lookup cannot see a static unwinder, risking mixed LLVM/libgcc_s
+# unwinders and broken Rust dynamic-module panics.
+# The toolshed build supports our sysroot's older glibc; LLVM's shipped .so requires newer glibc.
+# See https://github.com/envoyproxy/toolshed/blob/bazel-v0.5.6/bazel/compile/README.md#L88-L99
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        "//bazel:linux": ["-static-libgcc"],
+        ":linux_x86_64_shared_unwind": ["-unwindlib=none"],
+        ":linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        ":linux_x86_64_shared_unwind": ["@unwind_libs//:libunwind"],
         "//conditions:default": [],
     }),
 )
