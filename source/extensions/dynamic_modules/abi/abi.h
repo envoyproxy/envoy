@@ -17403,6 +17403,29 @@ typedef enum envoy_dynamic_module_type_route_specifier_rewrite_span {
 } envoy_dynamic_module_type_route_specifier_rewrite_span;
 
 /**
+ * envoy_dynamic_module_type_route_specifier_built_route_lookup_result is what
+ * envoy_dynamic_module_callback_route_specifier_lookup_built_route finds for a request.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_built_route_lookup_result {
+  // The cache is not in effect, for example because the specifier configures none, no template is
+  // selected, the match of the selected template did not hold, or the template resolves its
+  // cluster per request. The module records the route as usual.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Disabled = 0,
+  // No route cached for the key serves the request. The module records the route as usual, and
+  // Envoy caches the route the decision builds unless a route is already cached for the key.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Miss = 1,
+  // A route cached for the key serves the request, which Envoy uses when the decision is left
+  // Unspecified. The module records nothing more, since Envoy ignores the overrides and user data
+  // it records.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Hit = 2,
+  // A route cached for the key serves the request, and the module records the route exactly as on
+  // a miss. When the decision is left Unspecified, Envoy uses the route the recording builds, and
+  // evicts the cached route when the recording differs from the one the cached route was built
+  // from.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_HitVerify = 3,
+} envoy_dynamic_module_type_route_specifier_built_route_lookup_result;
+
+/**
  * envoy_dynamic_module_type_route_specifier_input_route holds the properties of the route the
  * module is resolving that are free to read, so that a module can take all of them in one call
  * instead of one call each. After a template is selected with
@@ -18224,6 +18247,44 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_template(
 bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer template_id);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_lookup_built_route looks up the route a previous
+ * request on this worker built for the key and the selected route template, so that a module whose
+ * routes are a function of a key builds each route once per worker. It is called after
+ * envoy_dynamic_module_callback_route_specifier_set_route_template and returns Disabled when no
+ * template is selected. A later call replaces the lookup, and selecting or unsetting a template
+ * discards it. The cache is configured with the built_route_cache field of the route specifier.
+ *
+ * On a miss Envoy caches the route the decision builds, unless a route is already cached for the
+ * key, the decision fails or its recording depends on the path of the current request through
+ * Envoy. A recording depends on it once the module calls
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite, or once
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule rejects a rule or replaces
+ * one it accepted. A cached route that carries a rule serves only the paths the rule applies to.
+ * For a decision the cache looks up, the regex rewrite of a selected route override applies when
+ * the request headers are finalized, so that the route serves later requests, and records
+ * x-envoy-original-path the way a configured route does.
+ *
+ * The route built for a key must be a function of the key, since it serves the later requests that
+ * look the key up, including those for other routes of a virtual host that shares the specifier.
+ * The key therefore covers whatever else the module reads to decide, and identifies the route
+ * exactly, since a collision serves the route of one key for the other. A module whose routes for a
+ * key change over time folds a version of what they depend on into the key.
+ *
+ * On a hit a decision other than Unspecified and a StopIterationAndSkipRoute status still apply,
+ * while the overrides and user data the module records are ignored. A verified hit uses the route
+ * its recording builds instead, so every user data recorded on a miss or a verified hit stays on a
+ * route of its own, which fires envoy_dynamic_module_on_route_specifier_route_destroy once neither
+ * the cache nor a stream holds it.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the key the module identifies the route with.
+ * @return what the cache found for the request.
+ */
+envoy_dynamic_module_type_route_specifier_built_route_lookup_result
+envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr, uint64_t key);
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_route_user_data records a u64 on the route this
