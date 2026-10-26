@@ -23,6 +23,7 @@ Build and run the focused tests inside the repository's build container:
 bazel test -c fastbuild \
   //contrib/istio/filters/network/hbone/test:config_test \
   //contrib/istio/filters/network/hbone/test:hbone_test \
+  //contrib/istio/filters/network/hbone/test:pool_test \
   //contrib/istio/filters/network/hbone/test:hbone_integration_test
 ```
 

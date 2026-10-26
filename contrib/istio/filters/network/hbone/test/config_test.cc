@@ -2,6 +2,7 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/tcp/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "contrib/istio/filters/network/hbone/source/config.h"
@@ -55,6 +56,12 @@ class TestFilter : public Filter {
 public:
   using Filter::Filter;
   void upstreamEvent(Network::ConnectionEvent event) { upstream_callbacks_->onEvent(event); }
+  std::shared_ptr<TcpProxy::Filter::UpstreamCallbacks>
+  drain(TcpProxy::UpstreamDrainManager& manager, Tcp::ConnectionPool::ConnectionDataPtr data) {
+    manager.add(config_->sharedConfig(), std::move(data), upstream_callbacks_, nullptr,
+                std::nullopt, nullptr);
+    return upstream_callbacks_;
+  }
 };
 
 class HboneFilterTest : public HboneConfigTest {
@@ -117,6 +124,21 @@ TEST_F(HboneFilterTest, EstablishedUpstreamCloseKeepsNormalFlushSemantics) {
       });
   filter_->upstreamEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(ConnectState::Phase::Connected, state_->phase());
+}
+
+TEST_F(HboneFilterTest, DrainingPendingCloseDoesNotAccessParent) {
+  initialize();
+  TcpProxy::UpstreamDrainManager manager;
+  testing::NiceMock<Network::MockClientConnection> upstream;
+  auto data = std::make_unique<testing::StrictMock<Tcp::ConnectionPool::MockConnectionData>>();
+  EXPECT_CALL(*data, connection()).WillRepeatedly(testing::ReturnRef(upstream));
+  auto callbacks = filter_->drain(manager, std::move(data));
+  EXPECT_EQ(nullptr, callbacks->parent_);
+  ASSERT_EQ(ConnectState::Phase::Pending, state_->phase());
+
+  EXPECT_CALL(upstream.dispatcher_, deferredDelete_(testing::_));
+  callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(ConnectState::Phase::Pending, state_->phase());
 }
 
 } // namespace

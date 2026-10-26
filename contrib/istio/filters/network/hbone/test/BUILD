@@ -9,6 +9,26 @@ licenses(["notice"])  # Apache 2
 envoy_contrib_package()
 
 envoy_cc_test(
+    name = "pool_test",
+    srcs = ["pool_test.cc"],
+    deps = [
+        "//contrib/istio/filters/network/hbone/source:pool_config",
+        "//source/common/stream_info:stream_info_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/router:router_filter_interface",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/upstreams/tcp/generic/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "hbone_integration_test",
     size = "large",
     srcs = ["hbone_integration_test.cc"],
@@ -37,6 +57,7 @@ envoy_cc_test(
         "//source/common/stream_info:bool_accessor_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/tcp:tcp_mocks",
         "//test/test_common:utility_lib",
     ],
 )

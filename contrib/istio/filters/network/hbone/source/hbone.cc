@@ -203,7 +203,8 @@ void Filter::ConnectCallbacks::onEvent(Network::ConnectionEvent event) {
   // The newer TCP proxy pool reports pre-CONNECT transport failures through
   // UpstreamCallbacks instead of onGenericPoolFailure. Its upstream StreamInfo
   // still carries the reason, including an outer-HBONE rejection.
-  if (state_ && state_->phase() == ConnectState::Phase::Pending &&
+  // Draining callbacks no longer have a parent filter or a downstream to reject.
+  if (parent_ != nullptr && state_ && state_->phase() == ConnectState::Phase::Pending &&
       (event == Network::ConnectionEvent::LocalClose ||
        event == Network::ConnectionEvent::RemoteClose)) {
     auto& info = parent_->getStreamInfo();

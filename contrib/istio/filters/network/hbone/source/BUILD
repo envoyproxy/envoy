@@ -25,6 +25,7 @@ envoy_cc_contrib_extension(
         "//envoy/router:router_filter_interface",
         "//envoy/router:router_interface",
         "//envoy/tcp:upstream_interface",
+        "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//source/extensions/upstreams/tcp/generic:config",

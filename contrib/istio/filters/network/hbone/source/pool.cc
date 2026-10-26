@@ -2,6 +2,7 @@
 
 #include "envoy/router/router_filter_interface.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 
 #include "contrib/istio/filters/network/hbone/source/hbone.h"
@@ -75,7 +76,8 @@ public:
     }
     // Do not synthesize a ready connection or an upstream HTTP response. Both
     // would enter router accounting and could enable application forwarding or
-    // response-code retries. The local reply terminates all pending attempts.
+    // response-code retries. The local reply terminates all pending attempts;
+    // router cancellation also cancels this deferred reply.
     reject_->scheduleCallbackNextIteration();
   }
 
@@ -149,8 +151,12 @@ Router::GenericConnPoolPtr HttpPoolFactory::createGenericConnPool(
   ASSERT(factory != nullptr);
   auto inner = factory->createGenericConnPool(host, cluster, protocol, priority,
                                               downstream_protocol, context, config);
+  if (!inner) {
+    return nullptr;
+  }
   auto* router = dynamic_cast<Router::RouterFilterInterface*>(context);
-  if (!inner || router == nullptr) {
+  if (router == nullptr) {
+    ENVOY_BUG(false, "HBONE HTTP pool requires a router context");
     return inner;
   }
   return std::make_unique<HttpPool>(std::move(inner), *router->callbacks());
@@ -167,14 +173,18 @@ TcpProxy::GenericConnPoolPtr TcpPoolFactory::createGenericConnPool(
   ASSERT(factory != nullptr);
   auto inner = factory->createGenericConnPool(host, cluster, config, context, upstream_callbacks,
                                               decoder_callbacks, downstream_info);
-  if (!inner || context == nullptr || context->downstreamConnection() == nullptr) {
+  if (!inner) {
+    return nullptr;
+  }
+  const auto* downstream = context == nullptr ? nullptr : context->downstreamConnection();
+  if (downstream == nullptr) {
+    ENVOY_BUG(false, "HBONE TCP pool requires a downstream connection");
     return inner;
   }
   // LoadBalancerContext exposes a const view of the TCP proxy's mutable network
   // connection. Closing that connection is the TCP equivalent of a local reply.
-  return std::make_unique<TcpPool>(
-      std::move(inner), const_cast<Network::Connection&>(*context->downstreamConnection()),
-      downstream_info);
+  return std::make_unique<TcpPool>(std::move(inner), const_cast<Network::Connection&>(*downstream),
+                                   downstream_info);
 }
 
 REGISTER_FACTORY(HttpPoolFactory, Router::GenericConnPoolFactory);
