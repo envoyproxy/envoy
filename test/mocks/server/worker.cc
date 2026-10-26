@@ -39,6 +39,15 @@ MockWorker::MockWorker() {
             }
           }));
 
+  ON_CALL(*this, stopListenerAddresses(_, _, _))
+      .WillByDefault(Invoke([](const Network::ListenerConfig&,
+                               const std::vector<Network::Address::InstanceConstSharedPtr>&,
+                               std::function<void()> completion) -> void {
+        if (completion != nullptr) {
+          completion();
+        }
+      }));
+
   ON_CALL(*this, removeFilterChains(_, _, _))
       .WillByDefault(Invoke([this](uint64_t, const std::list<const Network::FilterChain*>&,
                                    std::function<void()> completion) -> void {

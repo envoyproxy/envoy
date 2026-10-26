@@ -5,6 +5,10 @@
 #![allow(dead_code)]
 #![allow(clippy::unnecessary_cast)]
 
+include!(concat!(env!("OUT_DIR"), "/export_name.rs"));
+#[doc(hidden)]
+pub use __export_name_impl as __export_name;
+
 pub mod access_log;
 pub mod bootstrap;
 pub mod buffer;
@@ -29,8 +33,10 @@ pub mod load_balancer;
 pub mod matcher;
 pub mod matcher_data_input;
 pub mod network;
+pub mod route_specifier;
 pub mod stats_sink;
 pub mod timing;
+pub mod tls_certificate_selector;
 pub mod tracer;
 pub mod transport_socket;
 pub mod udp_listener;
@@ -96,6 +102,9 @@ pub fn log_ffi_panic(function_name: &str, payload: Box<dyn Any + Send>) {
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
 ///
 /// This is not meant to be used directly.
+// bindgen derives `PartialEq` on system header structs that hold function pointers, such as
+// `__darwin_pthread_handler_rec` on macOS.
+#[allow(unpredictable_function_pointer_comparisons)]
 pub mod abi {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -571,7 +580,8 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
 ///
 /// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
 /// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
-/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that
+/// pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],
 ) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
@@ -690,7 +700,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -704,7 +714,7 @@ macro_rules! ffi_export {
     on_panic = $default:expr $(;)?
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) -> $ret {
       ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).unwrap_or_else(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -717,7 +727,7 @@ macro_rules! ffi_export {
     fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -729,7 +739,7 @@ macro_rules! ffi_export {
     unsafe fn $name:ident($($arg:ident: $arg_ty:ty),* $(,)?) $body:block
   ) => {
     $(#[$meta])*
-    #[no_mangle]
+    #[export_name = $crate::__export_name!(stringify!($name))]
     pub unsafe extern "C" fn $name($($arg: $arg_ty),*) {
       let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| $body)).map_err(|panic| {
         $crate::log_ffi_panic(::std::stringify!($name), panic);
@@ -803,11 +813,13 @@ macro_rules! declare_network_filter_init_functions {
 /// - `access_logger:` — [`NewAccessLoggerConfigFunction`] for access loggers
 /// - `formatter:` — [`NewFormatterConfigFunction`] for formatters
 /// - `cluster_specifier:` — [`NewClusterSpecifierConfigFunction`] for cluster specifiers
+/// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
-/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
-///   mutations
+/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header mutations
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
+/// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
+///   selectors
 ///
 /// # Examples
 ///
@@ -1028,6 +1040,13 @@ macro_rules! declare_all_init_functions {
       "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
     );
   };
+  (@register route_specifier : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+      $fn,
+      "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
+    );
+  };
   (@register stat_sink : $fn:expr) => {
     envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
       envoy_proxy_dynamic_modules_rust_sdk::NEW_STAT_SINK_CONFIG_FUNCTION,
@@ -1054,6 +1073,13 @@ macro_rules! declare_all_init_functions {
       envoy_proxy_dynamic_modules_rust_sdk::NEW_HEADER_FORMATTER_CONFIG_FUNCTION,
       $fn,
       "NEW_HEADER_FORMATTER_CONFIG_FUNCTION"
+    );
+  };
+  (@register tls_certificate_selector : $fn:expr) => {
+    envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION,
+      $fn,
+      "NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION"
     );
   };
 }
@@ -1334,8 +1360,8 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 /// # Example
 ///
 /// ```
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true
@@ -1435,6 +1461,89 @@ macro_rules! declare_cluster_specifier_init_functions {
           envoy_proxy_dynamic_modules_rust_sdk::NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION,
           $new_cluster_specifier_config_fn,
           "NEW_CLUSTER_SPECIFIER_CONFIG_FUNCTION"
+        );
+        if ($f()) {
+          envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
+            as *const ::std::os::raw::c_char
+        } else {
+          ::std::ptr::null()
+        }
+      }
+      on_panic = ::std::ptr::null()
+    }
+  };
+}
+
+// =================================================================================================
+// Route Specifier Dynamic Module
+// =================================================================================================
+
+/// The function signature for creating a new route specifier configuration.
+///
+/// The `name` is the value of `specifier_name` from the `dynamic_modules` route specifier
+/// configuration, allowing a single module to dispatch to different route specifier
+/// implementations. The `config` is the raw bytes from the `specifier_config` field. The
+/// `envoy_config` handle reports what the route specifier configuration declares and defines
+/// metrics. Returning `None` causes Envoy to reject the route specifier configuration.
+pub type NewRouteSpecifierConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    envoy_config: std::sync::Arc<dyn route_specifier::EnvoyRouteSpecifierConfig>,
+  ) -> Option<Box<dyn route_specifier::RouteSpecifierConfig>>;
+
+/// The global factory function for route specifiers. This is set via the `route_specifier:` arm of
+/// [`declare_all_init_functions!`] (or the [`declare_route_specifier_init_functions!`] shim) and is
+/// not intended to be set directly.
+pub static NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION: OnceLock<NewRouteSpecifierConfigFunction> =
+  OnceLock::new();
+
+/// Declare the init functions for a route specifier dynamic module.
+///
+/// The first argument is the program init function with [`ProgramInitFunction`] type.
+/// The second argument is the factory function with [`NewRouteSpecifierConfigFunction`] type.
+///
+/// # Example
+///
+/// ```
+/// use envoy_proxy_dynamic_modules_rust_sdk::route_specifier::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
+///
+/// fn program_init() -> bool {
+///   true
+/// }
+///
+/// fn new_route_specifier_config(
+///   _name: &str,
+///   _config: &[u8],
+///   _envoy_config: std::sync::Arc<dyn EnvoyRouteSpecifierConfig>,
+/// ) -> Option<Box<dyn RouteSpecifierConfig>> {
+///   Some(Box::new(MyRouteSpecifierConfig {}))
+/// }
+///
+/// struct MyRouteSpecifierConfig {}
+///
+/// impl RouteSpecifierConfig for MyRouteSpecifierConfig {
+///   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
+///     // With the decision left Unspecified, Envoy generates the final route from the selected
+///     // template, or leaves the route the specifier was given unchanged when the identifier is
+///     // not declared.
+///     let _ = ctx.select_template("canary");
+///     OnRouteStatus::StopIteration
+///   }
+/// }
+///
+/// declare_route_specifier_init_functions!(program_init, new_route_specifier_config);
+/// ```
+#[macro_export]
+macro_rules! declare_route_specifier_init_functions {
+  ($f:ident, $new_route_specifier_config_fn:expr) => {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+        envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(
+          envoy_proxy_dynamic_modules_rust_sdk::NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION,
+          $new_route_specifier_config_fn,
+          "NEW_ROUTE_SPECIFIER_CONFIG_FUNCTION"
         );
         if ($f()) {
           envoy_proxy_dynamic_modules_rust_sdk::abi::envoy_dynamic_modules_abi_version.as_ptr()
@@ -1659,7 +1768,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+///   fn new_load_balancer(
+///     &self,
+///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+///   ) -> Option<Box<dyn ClusterLb>> {
 ///     Some(Box::new(MyClusterLb {}))
 ///   }
 /// }
@@ -1881,6 +1993,30 @@ macro_rules! declare_cert_validator_init_functions {
 }
 
 // =============================================================================
+// TLS Certificate Selector
+// =============================================================================
+
+/// The function signature for creating a new TLS certificate selector configuration.
+///
+/// The `name` is the value of `selector_name` from the `dynamic_modules` TLS certificate selector
+/// configuration, allowing a single module to dispatch to different implementations. The `config`
+/// is the raw bytes from the `selector_config` field. `is_upstream` is true when the configuration
+/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics and provides
+/// the dynamic certificates. Returning `None` causes Envoy to reject the TLS context configuration.
+pub type NewTlsCertificateSelectorConfigFunction =
+  fn(
+    name: &str,
+    config: &[u8],
+    is_upstream: bool,
+    envoy_config: std::sync::Arc<dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig>,
+  ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig>>;
+
+/// Global function for creating TLS certificate selector configurations.
+pub static NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION: OnceLock<
+  NewTlsCertificateSelectorConfigFunction,
+> = OnceLock::new();
+
+// =============================================================================
 // Config Validator
 // =============================================================================
 
@@ -1941,7 +2077,7 @@ pub static NEW_CONFIG_VALIDATOR_CONFIG_FUNCTION: OnceLock<NewConfigValidatorConf
 #[macro_export]
 macro_rules! declare_config_validator_init_functions {
   ($f:ident, $new_config_validator_config_fn:expr) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(

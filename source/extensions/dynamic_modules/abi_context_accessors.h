@@ -76,6 +76,8 @@ public:
   // fill timing_out with the stream's timing snapshot, using -1 for unavailable values
   static void getTimingInfo(const StreamInfo::StreamInfo* stream_info,
                             envoy_dynamic_module_type_timing_info* timing_out);
+  static void getTimingInfoV2(const StreamInfo::StreamInfo* stream_info,
+                              envoy_dynamic_module_type_timing_info_v2* timing_out);
 
   // Get a string value from dynamic metadata by filter name and dotted key path. Returns false
   // when the path is absent or the value is not a string.
@@ -126,11 +128,12 @@ public:
                                 const envoy_dynamic_module_type_module_key_value_pair* entries,
                                 size_t entries_size);
 
-  // Set a string value in filter state. When life_span is set, it is passed to setData.
-  static bool
-  setFilterStateBytes(StreamInfo::StreamInfo& stream_info, absl::string_view key,
-                      absl::string_view value,
-                      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt);
+  // Set a string value in filter state. When life_span or stream_sharing is set, it is passed to
+  // setData.
+  static bool setFilterStateBytes(
+      StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt,
+      std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing = std::nullopt);
 
   // Set a typed filter state object from serialized bytes using the registered ObjectFactory.
   static bool

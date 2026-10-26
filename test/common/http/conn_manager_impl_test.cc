@@ -2749,6 +2749,100 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, SpanTagSetInOnStreamCompleteIsFinalized) {
+  setup(SetupOpts().setTracing(true));
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator())
+      .WillRepeatedly(Return(nullptr));
+
+  // Catch-all first so gmock LIFO gives the specific setTag priority.
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  {
+    InSequence s;
+    EXPECT_CALL(*span, setTag(Eq("custom.endpoint"), Eq("backend-a")));
+    EXPECT_CALL(*span, finishSpan());
+  }
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb factory = createDecoderFilterFactoryCb(filter);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, onStreamComplete()).WillOnce(Invoke([&]() {
+    filter->callbacks_->activeSpan().setTag("custom.endpoint", "backend-a");
+  }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+        decoder_->streamInfo().setResponseCodeDetails("");
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, SpanTagSetInOnStreamCompleteIsFinalizedOnReset) {
+  setup(SetupOpts().setTracing(true));
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator())
+      .WillRepeatedly(Return(nullptr));
+
+  // Catch-all first so gmock LIFO gives the specific setTag priority.
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  {
+    InSequence s;
+    EXPECT_CALL(*span, setTag(Eq("custom.endpoint"), Eq("unknown")));
+    EXPECT_CALL(*span, finishSpan());
+  }
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb factory = createDecoderFilterFactoryCb(filter);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, onStreamComplete()).WillOnce(Invoke([&]() {
+    filter->callbacks_->activeSpan().setTag("custom.endpoint", "unknown");
+  }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
   setup();
 
@@ -5742,6 +5836,79 @@ TEST_F(HttpConnectionManagerImplTest, TransportFailureReasonPropagationLocalClos
   // Verify the transport failure reason is still present in StreamInfo.
   EXPECT_EQ(test_failure_reason,
             filter_callbacks_.connection_.stream_info_.downstreamTransportFailureReason());
+}
+
+// Route resolution time and count are measured per stream and readable through StreamInfo.
+TEST_F(HttpConnectionManagerImplTest, RouteResolutionTimeAndCount) {
+  setup();
+  setupFilterChain(1, 0);
+
+  int route_calls = 0;
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillRepeatedly(Invoke([&](const Router::RouteCallback&, const Http::RequestHeaderMap&,
+                                 const Envoy::StreamInfo::StreamInfo&,
+                                 uint64_t) -> Router::VirtualHostRoute {
+        // Advance the monotonic clock during resolution so the measured time is non-zero.
+        const MonotonicTime now = test_time_.timeSystem().monotonicTime();
+        const std::chrono::microseconds delta =
+            route_calls++ == 0 ? std::chrono::microseconds(100) : std::chrono::microseconds(250);
+        test_time_.timeSystem().setMonotonicTime(now + delta);
+        return Router::VirtualHostRoute{route_config_provider_.route_config_->route_->virtual_host_,
+                                        route_config_provider_.route_config_->route_};
+      }));
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
+        StreamInfo::StreamInfo& stream_info = decoder_filters_[0]->callbacks_->streamInfo();
+        // The first resolution happened during decodeHeaders.
+        EXPECT_EQ(1U, stream_info.routeResolutionCount());
+        EXPECT_EQ(std::chrono::microseconds(100), stream_info.routeResolutionTime());
+
+        // Clearing and refreshing the cache resolves the route a second time.
+        decoder_filters_[0]->callbacks_->downstreamCallbacks()->clearRouteCache();
+        decoder_filters_[0]->callbacks_->clusterInfo();
+        EXPECT_EQ(2U, stream_info.routeResolutionCount());
+        EXPECT_EQ(std::chrono::microseconds(350), stream_info.routeResolutionTime());
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  startRequest(true);
+  doRemoteClose();
+}
+
+// The route resolution histograms are recorded at stream end when the option is enabled.
+TEST_F(HttpConnectionManagerImplTest, RouteResolutionStatsRecordedWhenEnabled) {
+  record_route_resolution_stats_ = true;
+  setup();
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  startRequest(true);
+  doRemoteClose();
+
+  EXPECT_TRUE(
+      fake_stats_.findHistogramByString("downstream_rq_route_resolution_time_us").has_value());
+  EXPECT_TRUE(fake_stats_.histogramRecordedValues("downstream_rq_route_resolution_time_us"));
+  EXPECT_EQ((std::vector<uint64_t>{1}),
+            fake_stats_.histogramValues("downstream_rq_route_resolutions", false));
+}
+
+// The route resolution histograms are absent when the option is left at its default.
+TEST_F(HttpConnectionManagerImplTest, RouteResolutionStatsDisabledByDefault) {
+  setup();
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+
+  startRequest(true);
+  doRemoteClose();
+
+  EXPECT_FALSE(
+      fake_stats_.findHistogramByString("downstream_rq_route_resolution_time_us").has_value());
+  EXPECT_FALSE(fake_stats_.findHistogramByString("downstream_rq_route_resolutions").has_value());
 }
 
 } // namespace Http

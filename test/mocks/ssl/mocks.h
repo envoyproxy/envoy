@@ -92,7 +92,7 @@ public:
 
   MOCK_METHOD(std::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
-  MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
+  MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
   MOCK_METHOD(const TlsContext&, getTlsContext, (), (const));
 

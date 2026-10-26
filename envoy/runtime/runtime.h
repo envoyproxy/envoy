@@ -165,7 +165,7 @@ public:
                               const envoy::type::v3::FractionalPercent& default_value,
                               uint64_t random_value) const PURE;
 
-  using ConstStringOptRef = std::optional<std::reference_wrapper<const std::string>>;
+  using ConstStringOptRef = OptRef<const std::string>;
   /**
    * Fetch raw runtime data based on key.
    * @param key supplies the key to fetch.

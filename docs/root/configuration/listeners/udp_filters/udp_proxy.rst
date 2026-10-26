@@ -33,6 +33,61 @@ source port. On Linux, it requires the ``CAP_NET_ADMIN`` capability. Because ups
 addressed to the original downstream IP, the deployment must use Direct Server Return or configure
 the return routing described in the API documentation.
 
+Upstream source binding
+-----------------------
+
+Native UDP upstream sockets honor the per-cluster :ref:`upstream_bind_config
+<envoy_v3_api_field_config.cluster.v3.Cluster.upstream_bind_config>` and the bootstrap-wide
+:ref:`upstream_bind_config
+<envoy_v3_api_field_config.bootstrap.v3.ClusterManager.upstream_bind_config>`. The per-cluster
+configuration takes precedence over the bootstrap configuration. Envoy applies the selected source
+address and pre-bind socket options before sending the first upstream datagram.
+
+A source address with port ``0`` lets the kernel choose an ephemeral port and is recommended for
+most deployments. A fixed source port can collide when multiple UDP sessions select the same local
+address and port. Configured source-port ranges and port reservation are not currently supported.
+
+When :ref:`use_original_src_ip
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.use_original_src_ip>` is
+enabled, transparent source binding takes precedence over ``upstream_bind_config``. In that mode,
+Envoy uses the downstream peer IP for each upstream datagram and does not bind the configured source
+address.
+
+Upstream batching
+-----------------
+
+Use :ref:`upstream_packet_writer_config
+<envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.upstream_packet_writer_config>`
+to select a writer per upstream UDP socket. Configuring a writer extension absent from the build is
+rejected. For GSO, use a Linux build with the GSO writer extension and configure:
+
+.. code-block:: yaml
+
+  upstream_packet_writer_config:
+    name: envoy.udp_packet_writer.gso
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+
+Batches flush at event-loop iteration end. Oversized, multi-slice and empty datagrams are sent
+separately after flushing older packets. Blocked writers drop new datagrams as send errors and retry
+buffered packets when writable. Other GSO send errors discard the failed batch. Unsupported batching
+or MTU errors (``EINVAL``, ``EMSGSIZE``, ``EOPNOTSUPP`` or ``EIO``) switch the session to individual
+sends for subsequent datagrams; other errors retain the writer. Kernel GSO support is not probed in
+advance, so unsupported kernels use this fallback. Teardown attempts a final flush, then discards any
+remaining data.
+
+Each upstream GSO session allocates a 64 KiB batch buffer, released when the session closes or falls
+back to individual sends.
+
+Upstream send counters include buffered datagrams and do not guarantee delivery. Writer statistics
+use ``cluster.<name>.udp.upstream.``; ``internal_buffer_size`` sums buffered payload bytes across
+sessions, excluding unused buffer capacity. ``sess_tx_errors`` counts failed send or flush operations,
+not discarded datagrams.
+
+This setting is independent of the :ref:`downstream writer
+<envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>` and upstream
+GRO, and cannot be combined with UDP-over-HTTP tunneling. If unset, upstream datagrams are sent individually.
+
 Load balancing and unhealthy host handling
 ------------------------------------------
 

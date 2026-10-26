@@ -360,6 +360,25 @@ TEST_P(DynamicModuleClusterIntegrationTest, WorkerLocalPrioritySetRebuild) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Selects the persistent cross-priority host map during init and resolves the host on each worker
+// through find_host_by_address, which reads the map published to that worker.
+TEST_P(DynamicModuleClusterIntegrationTest, PersistentHostMap) {
+  concurrency_ = 2;
+  initializeWithDecCluster("persistent_host_map");
+
+  // Each worker increments the counter once it has resolved the host through the map.
+  test_server_->waitForCounter("dynamicmodulescustom.persistent_host_map_hits_total",
+                               testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
 // Drives the packed member-update address getter end to end. Each worker load balancer reads the
 // added host's address both as a string and as packed integers and confirms they agree before
 // incrementing the counter, so this runs the real packing under both IPv4 and IPv6 params.

@@ -32,8 +32,11 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.ai_filters.request_info"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/router:string_accessor_interface",
+        "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:buffer_manager_lib",
         "//source/extensions/filters/http/ai_protocol_manager:external_buffer_impl_lib",
         "//source/extensions/filters/http/ai_protocol_manager:filter_manager_lib",

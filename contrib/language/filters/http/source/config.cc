@@ -60,7 +60,8 @@ absl::StatusOr<Http::FilterFactoryCb> LanguageFilterFactory::createHttpFilterFac
 
   auto config = std::make_shared<LanguageFilterConfigImpl>(
       std::make_shared<icu::Locale>(default_locale), locale_matcher,
-      proto_config.clear_route_cache(), extra_context.stats_prefix, extra_context.scopeOr(context));
+      proto_config.clear_route_cache(), extra_context.statsPrefixOr(),
+      extra_context.statsPrefixScopeOr(context));
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter = std::make_shared<LanguageFilter>(config);

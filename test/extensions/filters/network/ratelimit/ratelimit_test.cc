@@ -20,6 +20,7 @@
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -157,6 +158,29 @@ TEST_F(RateLimitFilterTest, OK) {
 
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
+}
+
+TEST_F(RateLimitFilterTest, ShadowModeDescriptor) {
+  InSequence s;
+  setUpTest(filter_config_);
+
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  (*descriptor_statuses)[1].set_shadow_over_limit(true);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
+                               std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);
+
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.shadow_over_limit").value());
 }
 
 TEST_F(RateLimitFilterTest, SubstitutionFormatterTest1) {
@@ -578,6 +602,25 @@ stat_prefix: name
   manager.onRead();
 
   connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(RateLimitFilterTest, StatsAreTagged) {
+  setUpTest(filter_config_);
+
+  const Stats::Counter& total = config_->stats().total_;
+  EXPECT_EQ("ratelimit.name.total", total.name());
+  EXPECT_EQ("ratelimit.total", total.tagExtractedName());
+  ASSERT_EQ(1U, total.tags().size());
+  EXPECT_EQ("envoy.ratelimit_prefix", total.tags()[0].name_);
+  EXPECT_EQ("name", total.tags()[0].value_);
+
+  const Stats::Gauge& active = config_->stats().active_;
+  EXPECT_EQ("ratelimit.name.active", active.name());
+  EXPECT_EQ("ratelimit.active", active.tagExtractedName());
+  ASSERT_EQ(1U, active.tags().size());
+  EXPECT_EQ("envoy.ratelimit_prefix", active.tags()[0].name_);
+  EXPECT_EQ("name", active.tags()[0].value_);
 }
 
 } // namespace RateLimitFilter

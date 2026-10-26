@@ -5,8 +5,9 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 
-#if defined(USE_CEL_PARSER)
 #include "eval/public/value_export_util.h"
+
+#if defined(USE_CEL_PARSER)
 #include "parser/parser.h"
 #endif
 

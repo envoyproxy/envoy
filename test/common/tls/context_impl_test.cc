@@ -23,8 +23,11 @@
 #include "test/common/tls/ocsp/test_data/good_ocsp_resp_info.h"
 #include "test/common/tls/ssl_certs_test.h"
 #include "test/common/tls/ssl_test_utility.h"
+#include "test/common/tls/test_data/ca_cert_info.h"
+#include "test/common/tls/test_data/fake_ca_cert_info.h"
 #include "test/common/tls/test_data/no_san_cert_info.h"
 #include "test/common/tls/test_data/san_dns3_cert_info.h"
+#include "test/common/tls/test_data/san_dns_cert_info.h"
 #include "test/common/tls/test_data/san_ip_cert_info.h"
 #include "test/common/tls/test_data/selfsigned_cert_info.h"
 #include "test/common/tls/test_data/unittest_cert_info.h"
@@ -519,7 +522,8 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -575,7 +579,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -631,7 +636,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithIPSAN) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
   EXPECT_TRUE(
       message_differencer.Compare(cert_chain_details, *context->getCertChainInformation()[0]));
 }
@@ -684,7 +690,8 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithExpiration) {
 
   MessageDifferencer message_differencer;
   message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
-  EXPECT_TRUE(message_differencer.Compare(certificate_details, *context->getCaCertInformation()));
+  EXPECT_TRUE(
+      message_differencer.Compare(certificate_details, *context->getCaCertInformation()[0]));
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
@@ -693,8 +700,59 @@ TEST_F(SslContextImplTest, TestNoCert) {
   Envoy::Ssl::ClientContextSharedPtr context(
       *manager_.createSslClientContext(*store_.rootScope(), *cfg));
   auto cleanup = cleanUpHelper(context);
-  EXPECT_EQ(nullptr, context->getCaCertInformation());
+  EXPECT_TRUE(context->getCaCertInformation().empty());
   EXPECT_TRUE(context->getCertChainInformation().empty());
+}
+
+TEST_F(SslContextImplTest, TestGetCertInformationWithMultipleCaCerts) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  Envoy::Ssl::ClientContextSharedPtr context(
+      *manager_.createSslClientContext(*store_.rootScope(), *cfg));
+  auto cleanup = cleanUpHelper(context);
+
+  auto ca_certs = context->getCaCertInformation();
+  ASSERT_EQ(2, ca_certs.size());
+
+  // The bundle is fake_ca + ca, so the first entry should be fake_ca_cert and the second ca_cert.
+  std::string fake_ca_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem",
+ "serial_number": ")EOF",
+                                          TEST_FAKE_CA_CERT_SERIAL, R"EOF(",
+ "subject_alt_names": []
+ }
+)EOF");
+
+  std::string ca_json = absl::StrCat(R"EOF({
+ "path": "{{ test_rundir }}/test/common/tls/test_data/ca_certificates.pem",
+ "serial_number": ")EOF",
+                                     TEST_CA_CERT_SERIAL, R"EOF(",
+ "subject_alt_names": []
+ }
+)EOF");
+
+  envoy::admin::v3::CertificateDetails fake_ca_details, ca_details;
+  TestUtility::loadFromJson(TestEnvironment::substitute(fake_ca_json), fake_ca_details);
+  TestUtility::loadFromJson(TestEnvironment::substitute(ca_json), ca_details);
+
+  MessageDifferencer message_differencer;
+  message_differencer.set_scope(MessageDifferencer::Scope::PARTIAL);
+  EXPECT_TRUE(message_differencer.Compare(fake_ca_details, *ca_certs[0]));
+  EXPECT_TRUE(message_differencer.Compare(ca_details, *ca_certs[1]));
 }
 
 // Multiple RSA certificates with the same exact DNS SAN are allowed.
@@ -865,6 +923,27 @@ TEST_F(SslContextImplTest, MustHaveSubjectOrSAN) {
                 .status()
                 .message(),
             "Invalid TLS context has neither subject CN nor SAN names");
+}
+
+// A private key whose type differs from the certificate's is rejected rather than accepted
+// alongside it.
+TEST_F(SslContextImplTest, MismatchedCertificateAndPrivateKeyType) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_ecdsa_p256_key.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  EXPECT_THAT(manager_.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr)
+                  .status()
+                  .message(),
+              testing::HasSubstr("Failed to load private key from "));
 }
 
 class SslServerContextImplOcspTest : public SslContextImplTest {
@@ -1388,7 +1467,7 @@ TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineBytes) {
 }
 
 TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHash) {
-  const std::string yaml = R"EOF(
+  std::string yaml = R"EOF(
     common_tls_context:
       tls_certificates:
         certificate_chain:
@@ -1396,7 +1475,9 @@ TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHas
         private_key:
           filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
       validation_context:
-        verify_certificate_hash: "df6ff72fe9116521268f6f2dd4966f51df479883fe7037b39f75916ac3049d1a"
+        verify_certificate_hash: ")EOF";
+  yaml += TEST_SAN_DNS_CERT_256_HASH;
+  yaml += R"EOF("
   )EOF";
   EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
@@ -1927,7 +2008,7 @@ public:
         pool_(scope.symbolTable()), fallback_(pool_.add("fallback")) {}
 
   void incCounter(absl::string_view name, absl::string_view value) {
-    ContextImpl::incCounter(pool_.add(name), value, fallback_);
+    ContextImpl::incCounter(pool_.add(name), pool_.add("test.tag"), value, fallback_);
   }
 
   Stats::StatNamePool pool_;
@@ -1970,7 +2051,12 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
     Stats::CounterOptConstRef stat =
         store_.findCounterByString(absl::StrCat("ssl.ciphers.", cipher));
     ASSERT_TRUE(stat.has_value());
-    EXPECT_EQ(1, stat->get().value());
+    EXPECT_EQ(1, stat->value());
+    // The value is an explicit tag of the stat and leaves the tag-extracted name.
+    EXPECT_EQ("ssl.ciphers", stat->tagExtractedName());
+    ASSERT_EQ(1U, stat->tags().size());
+    EXPECT_EQ("test.tag", stat->tags()[0].name_);
+    EXPECT_EQ(cipher, stat->tags()[0].value_);
   }
 
   // Incrementing a stat for a random unknown cipher does not work. A
@@ -1987,7 +2073,7 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
 #ifdef NDEBUG
   Stats::CounterOptConstRef stat = store_.findCounterByString("ssl.ciphers.fallback");
   ASSERT_TRUE(stat.has_value());
-  EXPECT_EQ(1, stat->get().value());
+  EXPECT_EQ(1, stat->value());
 #endif
 }
 
@@ -2094,8 +2180,14 @@ common_tls_context:
   uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
-  EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  ASSERT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
+
+  // The certificate name is an explicit tag of the gauge and leaves the tag-extracted name.
+  EXPECT_EQ("ssl.certificate.expiration_unix_time_seconds", gauge_opt->tagExtractedName());
+  ASSERT_EQ(1U, gauge_opt->tags().size());
+  EXPECT_EQ("envoy.tls_certificate", gauge_opt->tags()[0].name_);
+  EXPECT_EQ(actual_cert_name, gauge_opt->tags()[0].value_);
 }
 
 TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
@@ -2131,8 +2223,14 @@ common_tls_context:
   uint64_t expected_expiry = absl::ToUnixSeconds(cert_expiry);
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
-  EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  ASSERT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
+
+  // The certificate name is an explicit tag of the gauge and leaves the tag-extracted name.
+  EXPECT_EQ("ssl.certificate.expiration_unix_time_seconds", gauge_opt->tagExtractedName());
+  ASSERT_EQ(1U, gauge_opt->tags().size());
+  EXPECT_EQ("envoy.tls_certificate", gauge_opt->tags()[0].name_);
+  EXPECT_EQ(actual_cert_name, gauge_opt->tags()[0].value_);
 }
 
 // Certificate-level min > context max produces an effective range that can never negotiate.

@@ -455,11 +455,13 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoNoDownstreamOrUpstream) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
-  envoy_dynamic_module_type_timing_info timing;
-  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_access_logger_get_timing_info_v2(env_ptr, &timing);
 
   EXPECT_EQ(-1, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(-1, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(-1, timing.last_downstream_rx_byte_received_ns);
   EXPECT_EQ(-1, timing.first_upstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.last_upstream_tx_byte_sent_ns);
   EXPECT_EQ(-1, timing.first_upstream_rx_byte_received_ns);
@@ -477,6 +479,10 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
       stream_info_.start_time_monotonic_ + std::chrono::milliseconds(2);
   stream_info_.downstream_timing_.last_downstream_tx_byte_sent_ =
       stream_info_.start_time_monotonic_ + std::chrono::milliseconds(3);
+  stream_info_.downstream_timing_.last_downstream_header_rx_byte_received_ =
+      stream_info_.start_time_monotonic_;
+  stream_info_.downstream_timing_.last_downstream_rx_byte_received_ =
+      stream_info_.start_time_monotonic_ + std::chrono::milliseconds(1);
 
   // Upstream timing.
   auto* upstream =
@@ -494,16 +500,30 @@ TEST_F(DynamicModuleAccessLogAbiTest, GetTimingInfoWithValues) {
   Formatter::Context log_context(nullptr, nullptr, nullptr);
   void* env_ptr = createThreadLocalLogger(log_context, stream_info_);
 
-  envoy_dynamic_module_type_timing_info timing;
-  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &timing);
+  envoy_dynamic_module_type_timing_info_v2 timing;
+  envoy_dynamic_module_callback_access_logger_get_timing_info_v2(env_ptr, &timing);
 
   EXPECT_EQ(5'000'000, timing.request_complete_duration_ns); // 5 ms
   EXPECT_EQ(2'000'000, timing.first_downstream_tx_byte_sent_ns);
   EXPECT_EQ(3'000'000, timing.last_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(0, timing.last_downstream_header_rx_byte_received_ns);
+  EXPECT_EQ(1'000'000, timing.last_downstream_rx_byte_received_ns);
   EXPECT_EQ(4'000'000, timing.first_upstream_tx_byte_sent_ns);
   EXPECT_EQ(5'000'000, timing.last_upstream_tx_byte_sent_ns);
   EXPECT_EQ(6'000'000, timing.first_upstream_rx_byte_received_ns);
   EXPECT_EQ(7'000'000, timing.last_upstream_rx_byte_received_ns);
+
+  envoy_dynamic_module_type_timing_info original_timing;
+  envoy_dynamic_module_callback_access_logger_get_timing_info(env_ptr, &original_timing);
+  EXPECT_EQ(8 * sizeof(int64_t), sizeof(original_timing));
+  EXPECT_EQ(10'000'000'000, original_timing.start_time_unix_ns);
+  EXPECT_EQ(5'000'000, original_timing.request_complete_duration_ns);
+  EXPECT_EQ(4'000'000, original_timing.first_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(5'000'000, original_timing.last_upstream_tx_byte_sent_ns);
+  EXPECT_EQ(6'000'000, original_timing.first_upstream_rx_byte_received_ns);
+  EXPECT_EQ(7'000'000, original_timing.last_upstream_rx_byte_received_ns);
+  EXPECT_EQ(2'000'000, original_timing.first_downstream_tx_byte_sent_ns);
+  EXPECT_EQ(3'000'000, original_timing.last_downstream_tx_byte_sent_ns);
 }
 
 TEST_F(DynamicModuleAccessLogAbiTest, GetBytesInfo) {

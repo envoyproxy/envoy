@@ -151,8 +151,8 @@ The following overload actions are supported:
 
   * - envoy.overload_actions.close_idle_http_connections
     - Envoy will close idle downstream HTTP/3 QUIC connections when the action is active.
-      When the action is *saturated*, connections will be closed aggressively (ignoring the idle timer threshold).
-      When the action is in a *scaled active* state, the idle timer threshold is still respected.
+      When the action is *saturated*, connections will be closed more aggressively with a 10-second minimum idle threshold.
+      When the action is in a *scaled active* state, the 1-minute idle timer threshold is respected.
       Note that this action is currently only supported for HTTP/3 QUIC connections.
 
 .. _config_overload_manager_shrink_heap:
@@ -268,6 +268,10 @@ The following core load shed points are supported:
       returns true for both, this takes precedence. This is a disruptive action
       (causes downstream connections to ungracefully close) that should only be
       used with a very high threshold (if at all).
+
+  * - envoy.load_shed_points.http2_server_reset_stream_on_begin_headers
+    - Envoy will reject new HTTP/2 streams at the codec level on the initial header frame
+      by sending a ``RST_STREAM(REFUSED_STREAM)`` before allocating stream or header objects.
 
   * - envoy.load_shed_points.tcp_proxy_on_data
     - Envoy will close the downstream TCP connection in the TCP proxy filter when receiving data

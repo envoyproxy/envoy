@@ -29,11 +29,12 @@ static const std::string& getDefaultPrefix() { CONSTRUCT_ON_FIRST_USE(std::strin
 
 /**
  * Scales a histogram sample to the milliseconds reported for a statsd timer when the histogram's
- * unit requires it. Samples of histograms recording microseconds are scaled. Samples of histograms
- * recording milliseconds are reported unchanged, as are those of histograms without a unit (many
- * of which measure milliseconds already) and of byte histograms, for which statsd has no dedicated
- * metric type; for those the sample keeps its integer representation. With `scale_by_unit` false
- * no sample is scaled, which is the behavior before unit scaling was introduced.
+ * unit requires it. Samples of histograms recording nanoseconds or microseconds are scaled. Samples
+ * of histograms recording milliseconds are reported unchanged, as are those of histograms without a
+ * unit (many of which measure milliseconds already) and of byte histograms, for which statsd has no
+ * dedicated metric type; for those the sample keeps its integer representation. With
+ * `scale_by_unit` false no sample is scaled, which is the behavior before unit scaling was
+ * introduced.
  * @param histogram the histogram the sample was recorded on.
  * @param value the recorded sample in the histogram's unit.
  * @param scale_by_unit whether to scale by the histogram's unit.

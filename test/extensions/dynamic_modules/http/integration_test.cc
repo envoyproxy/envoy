@@ -267,6 +267,33 @@ TEST_P(DynamicModulesIntegrationTest, FilterConstructorFailsClosed) {
   EXPECT_EQ("500", response->headers().Status()->value().getStringView());
 }
 
+TEST_P(DynamicModulesIntegrationTest, GoHttpFilterConstructorPanicFailsClosed) {
+  // A Go module whose filter constructor panics must fail closed with a 500 instead of aborting the
+  // worker. The Go SDK panic barrier recovers the panic at the ABI boundary and returns a null
+  // filter.
+#ifdef __APPLE__
+  if (GetParam() == "go") {
+    GTEST_SKIP() << "Go module deadlocks server teardown on macOS, see #46905";
+  }
+#endif
+  if (GetParam() != "go") {
+    GTEST_SKIP() << "this exercises the Go SDK panic barrier";
+  }
+  initializeFilter("filter_new_panic");
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS("error", "recovered panic at the ABI boundary", {
+    response = codec_client_->makeHeaderOnlyRequest(request_headers);
+    ASSERT_TRUE(response->waitForEndStream());
+  });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+}
+
 TEST_P(DynamicModulesIntegrationTest, HttpFilterConstructorExceptionFailsClosed) {
   // A C++ module whose filter constructor throws must fail closed with a 500 instead of aborting
   // the worker. The C++ SDK barrier catches the exception at the ABI boundary and returns a null
@@ -1264,6 +1291,18 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
   }
 }
 
+TEST_P(DynamicModulesIntegrationTest, UpstreamConnectionAttemptsAreAvailableOnStreamComplete) {
+  initializeFilter("upstream_connection_attempts");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 10, default_response_headers_, 10);
+
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounter("dynamicmodulescustom.upstream_connection_attempts_observed_total",
+                               testing::Eq(1));
+}
+
 TEST_P(DynamicModulesIntegrationTest, CustomMetricsNamespace) {
   // Skip for non-Rust languages to avoid duplication.
   if (GetParam() != "rust") {
@@ -1536,6 +1575,15 @@ TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
     absl::SleepFor(absl::Milliseconds(100));
   }
   FAIL() << "Config was not updated in time";
+}
+
+// A scheduled event emits a metric through the filter config, with no stream involved.
+TEST_P(DynamicModulesIntegrationTest, ConfigSchedulerEmitsMetric) {
+  if (GetParam() != "rust" && GetParam() != "rust_static") {
+    GTEST_SKIP() << "the scheduled event metric is only in the rust test module";
+  }
+  initializeFilter("http_config_scheduler");
+  test_server_->waitForGauge("dynamicmodulescustom.config_scheduled_events", testing::Eq(1));
 }
 
 // Test buffer limit callbacks for non-terminal filters.

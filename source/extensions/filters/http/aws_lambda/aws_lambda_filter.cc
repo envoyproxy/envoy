@@ -28,6 +28,15 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AwsLambdaFilter {
 
+FilterSettingsImpl::~FilterSettingsImpl() {
+  if (signer_ == nullptr || main_dispatcher_.isThreadSafe()) {
+    return;
+  }
+  // A route level configuration builds its own signer, and therefore its own credentials provider
+  // chain, so releasing it may drop the last reference to a metadata based credentials provider.
+  main_dispatcher_.post([signer = std::move(signer_)]() mutable { signer.reset(); });
+}
+
 class LambdaFilterNameValues {
 public:
   Http::LowerCaseString InvocationTypeHeader{std::string{"x-amz-invocation-type"}};

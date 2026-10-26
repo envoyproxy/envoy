@@ -1,3 +1,5 @@
+#include <optional>
+#include <string>
 #include <utility>
 
 #include "source/common/common/macros.h"
@@ -17,6 +19,36 @@ namespace AiProtocolManager {
 
 namespace {
 
+// renderUsage() helpers: write only what the canonical usage carries.
+void putCount(nlohmann::json& out, absl::string_view key, const std::optional<uint64_t>& count) {
+  if (count.has_value()) {
+    out[std::string(key)] = count.value();
+  }
+}
+
+void putObject(nlohmann::json& out, absl::string_view key, nlohmann::json object) {
+  if (!object.empty()) {
+    out[std::string(key)] = std::move(object);
+  }
+}
+
+// A canonical (inclusive) count minus a breakdown bucket that the dialect
+// reports beside it rather than inside it. Saturates at zero, so an
+// inconsistent provider report cannot wrap around.
+std::optional<uint64_t> excludeBucket(const std::optional<uint64_t>& count,
+                                      const std::optional<uint64_t>& bucket) {
+  if (!count.has_value()) {
+    return std::nullopt;
+  }
+  const uint64_t excluded = bucket.value_or(0);
+  return count.value() > excluded ? count.value() - excluded : 0;
+}
+
+// The canonical total when both components are known, else the provider's.
+std::optional<uint64_t> totalForRender(const TokenUsage& usage) {
+  return usage.total_tokens.has_value() ? usage.total_tokens : usage.provider_total_tokens;
+}
+
 // The Unspecified protocol: no schema, no usage, no terminal events. Keeping
 // it a real adapter makes AdapterRegistry::get() total, so callers never
 // null-check.
@@ -26,6 +58,8 @@ public:
   const PayloadSchema* schema() const override { return nullptr; }
   void canonicalizeUsage(TokenUsage&, bool&) const override {}
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
+  absl::string_view usagePath() const override { return ""; }
+  nlohmann::json renderUsage(const TokenUsage&) const override { return nlohmann::json::object(); }
 
 protected:
   void extractUsageInto(const nlohmann::json&, ExtractionResult&) const override {}
@@ -39,8 +73,33 @@ class OpenAiAdapterBase : public LLMProtocolAdapter {
 public:
   // OpenAI's native counts are already inclusive.
   void canonicalizeUsage(TokenUsage&, bool&) const override {}
+  absl::string_view usagePath() const override { return Keys::Usage; }
 
 protected:
+  // The names one of the two dialects gives the shared usage structure.
+  struct UsageKeys {
+    absl::string_view input;
+    absl::string_view output;
+    absl::string_view input_details;
+    absl::string_view output_details;
+  };
+
+  // Native counts are canonical already, so rendering is a rename.
+  static nlohmann::json renderUsageAs(const TokenUsage& usage, const UsageKeys& keys) {
+    nlohmann::json out = nlohmann::json::object();
+    putCount(out, keys.input, usage.input_tokens);
+    putCount(out, keys.output, usage.output_tokens);
+    putCount(out, Keys::TotalTokens, totalForRender(usage));
+    nlohmann::json input_details = nlohmann::json::object();
+    putCount(input_details, Keys::CachedTokens, usage.cached_input_tokens);
+    putCount(input_details, Keys::CacheWriteTokens, usage.cache_creation_input_tokens);
+    putObject(out, keys.input_details, std::move(input_details));
+    nlohmann::json output_details = nlohmann::json::object();
+    putCount(output_details, Keys::ReasoningTokens, usage.reasoning_tokens);
+    putObject(out, keys.output_details, std::move(output_details));
+    return out;
+  }
+
   void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {
     bool& malformed = result.malformed;
     TokenUsage& usage = result.usage;
@@ -102,6 +161,10 @@ public:
   }
   // Terminates with the non-JSON `[DONE]` sentinel, handled before parsing.
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
+  nlohmann::json renderUsage(const TokenUsage& usage) const override {
+    return renderUsageAs(usage, {Keys::PromptTokens, Keys::CompletionTokens,
+                                 Keys::PromptTokensDetails, Keys::CompletionTokensDetails});
+  }
 };
 
 class OpenAiResponsesAdapter : public OpenAiAdapterBase {
@@ -113,6 +176,10 @@ public:
     // extractUsage() first.
     const auto type = readString(json, Keys::Type);
     return type.has_value() && isOpenAiResponsesTerminalEventType(type.value());
+  }
+  nlohmann::json renderUsage(const TokenUsage& usage) const override {
+    return renderUsageAs(usage, {Keys::InputTokens, Keys::OutputTokens, Keys::InputTokensDetails,
+                                 Keys::OutputTokensDetails});
   }
 };
 
@@ -139,6 +206,23 @@ public:
   bool isTerminalEvent(const nlohmann::json& json) const override {
     const auto type = readString(json, Keys::Type);
     return type.has_value() && type.value() == "message_stop";
+  }
+
+  absl::string_view usagePath() const override { return Keys::Usage; }
+
+  // The inverse of canonicalizeUsage(): native input excludes both cache
+  // buckets, which are reported beside it. Reasoning is not rendered: the
+  // documented usage object has no field for it, and `output_tokens` already
+  // includes it.
+  nlohmann::json renderUsage(const TokenUsage& usage) const override {
+    nlohmann::json out = nlohmann::json::object();
+    putCount(out, Keys::InputTokens,
+             excludeBucket(excludeBucket(usage.input_tokens, usage.cached_input_tokens),
+                           usage.cache_creation_input_tokens));
+    putCount(out, Keys::OutputTokens, usage.output_tokens);
+    putCount(out, Keys::CacheReadInputTokens, usage.cached_input_tokens);
+    putCount(out, Keys::CacheCreationInputTokens, usage.cache_creation_input_tokens);
+    return out;
   }
 
 protected:
@@ -208,6 +292,24 @@ public:
 
   // No in-band terminator; extraction finalizes at end of stream.
   bool isTerminalEvent(const nlohmann::json&) const override { return false; }
+
+  absl::string_view usagePath() const override { return Keys::UsageMetadata; }
+
+  // The inverse of canonicalizeUsage(): native prompt/candidates counts
+  // exclude the tool-use and thoughts adjuncts, which are reported beside
+  // them.
+  nlohmann::json renderUsage(const TokenUsage& usage) const override {
+    nlohmann::json out = nlohmann::json::object();
+    putCount(out, Keys::PromptTokenCount,
+             excludeBucket(usage.input_tokens, usage.tool_use_input_tokens));
+    putCount(out, Keys::CandidatesTokenCount,
+             excludeBucket(usage.output_tokens, usage.reasoning_tokens));
+    putCount(out, Keys::TotalTokenCount, totalForRender(usage));
+    putCount(out, Keys::CachedContentTokenCount, usage.cached_input_tokens);
+    putCount(out, Keys::ToolUsePromptTokenCount, usage.tool_use_input_tokens);
+    putCount(out, Keys::ThoughtsTokenCount, usage.reasoning_tokens);
+    return out;
+  }
 
 protected:
   void extractUsageInto(const nlohmann::json& json, ExtractionResult& result) const override {

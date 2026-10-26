@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "source/common/router/retry_state_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -24,6 +26,13 @@ MockDirectResponseEntry::~MockDirectResponseEntry() = default;
 TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
 
 TestRetryPolicy::~TestRetryPolicy() = default;
+
+RetryStatePtr TestRetryPolicy::createRetryState(
+    Http::RequestHeaderMap& request_headers, const Upstream::ClusterInfo& cluster,
+    Server::Configuration::CommonFactoryContext& context, Event::Dispatcher& dispatcher,
+    Upstream::ResourcePriority priority, OptRef<StreamInfo::StreamInfo>) const {
+  return RetryStateImpl::create(*this, request_headers, cluster, context, dispatcher, priority);
+}
 
 MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
   ON_CALL(*this, enabled()).WillByDefault(Return(false));
@@ -204,10 +213,11 @@ MockRoute::~MockRoute() = default;
 MockRouteSpecifier::MockRouteSpecifier() {
   // By default a specifier is transparent: it hands back exactly what it was given and lets the
   // rest of the chain run. Tests override this when they want the specifier to do something.
-  ON_CALL(*this, onRoute(_, _, _, _))
-      .WillByDefault(Invoke([](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
-                               const StreamInfo::StreamInfo&,
-                               uint64_t) -> OnRouteResult { return {std::move(route)}; }));
+  ON_CALL(*this, onRoute(_, _, _, _, _))
+      .WillByDefault(
+          Invoke([](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                    const StreamInfo::StreamInfo&, uint64_t,
+                    OnRouteInputStatus) -> OnRouteResult { return {std::move(route)}; }));
 }
 MockRouteSpecifier::~MockRouteSpecifier() = default;
 

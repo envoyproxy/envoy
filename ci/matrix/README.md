@@ -2,14 +2,14 @@
 
 This directory contains tests that verify Envoy's toolchain detection and selection behavior across different compiler configurations. These tests ensure that Bazel correctly identifies and uses the appropriate compiler toolchains (GCC vs Clang) based on various configuration methods.
 
-> **NOTE**: If running these tests locally, please ensure that you do not have a `user.bazelrc` file as this may interfere with the tests. The tests rely on specific default behavior that can be altered by user-specific Bazel configurations.
+> **NOTE**: If running these tests locally, please ensure that you do not have `ci.bazelrc` or `user.bazelrc` files in the repository root, as these may interfere with the tests. The tests rely on specific default behavior that can be altered by local Bazel configurations.
 
 ## What is Being Tested
 
 The test suite validates toolchain behavior in the following scenarios:
 
 - **Default build**: Testing what toolchain is selected with no explicit configuration
-- **Config-based selection**: Testing `--config=clang` and `--config=gcc` flags
+- **Config-based selection**: Testing the default toolchain (clang + libc++) and `--config=gcc` (gcc + libstdc++)
 - **Environment-based selection**: Testing `CC`/`CXX` environment variable overrides
 - **Compiler availability**: Testing behavior when only specific compilers are available
 
@@ -53,7 +53,6 @@ Successful tests will show output like:
 ```
 ✅ NO_ARGS passed as expected
 ✅ GCC passed as expected
-✅ CLANG passed as expected
 ✅ GCC_ENV passed as expected
 ✅ CLANG_ENV passed as expected
 All test configs passed as expected
@@ -61,7 +60,7 @@ All test configs passed as expected
 
 Failed tests will show which configuration didn't match expectations:
 ```
-❌ CLANG: expected=clang-libc++, got=fail
+❌ GCC: expected=gcc-libstdc++, got=fail
 ```
 
 ### Troubleshooting

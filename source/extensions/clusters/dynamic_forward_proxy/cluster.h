@@ -180,16 +180,15 @@ private:
 
     void
     onLoadDnsCacheComplete(const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& info) override {
-      Upstream::HostConstSharedPtr host;
-      if (auto cluster = cluster_.lock()) {
-        host = cluster->findHostByName(hostname_);
-      }
-      std::string details = info->details();
+      auto cluster = cluster_.lock();
+      auto result =
+          cluster ? cluster->selectHostFromResolvedEntry(hostname_, info)
+                  : Upstream::HostSelectionResponse{nullptr, info ? info->details() : "no_host"};
       if (pending_host_selection_handles_.has_value()) {
         pending_host_selection_handles_->erase(this);
         pending_host_selection_handles_.reset();
       }
-      context_->onAsyncHostSelection(std::move(host), std::move(details));
+      context_->onAsyncHostSelection(std::move(result.host), std::move(result.details));
     }
 
     void setHandle(Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandlePtr&& handle) {
@@ -236,10 +235,14 @@ private:
     std::weak_ptr<const Cluster> cluster_;
   };
 
+  Upstream::HostSelectionResponse selectHostFromResolvedEntry(
+      const std::string& host,
+      const Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info) const;
+
   absl::Status
   addOrUpdateHost(absl::string_view host,
                   const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
-                  std::unique_ptr<Upstream::HostVector>& hosts_added)
+                  Upstream::HostVector& hosts_added, Upstream::HostVector& hosts_removed)
       ABSL_LOCKS_EXCLUDED(host_map_lock_);
 
   void updatePriorityState(const Upstream::HostVector& hosts_added,

@@ -39,7 +39,8 @@ static void noAccountsTracked(MemoryClassesToAccountsSet& memory_classes_to_acco
 
 class BufferMemoryAccountTest : public testing::Test {
 protected:
-  TrackedWatermarkBufferFactory factory_{absl::bit_width(kMinimumBalanceToTrack)};
+  TrackedWatermarkBufferFactory factory_{
+      static_cast<uint32_t>(absl::bit_width(kMinimumBalanceToTrack))};
   Http::MockStreamResetHandler mock_reset_handler_;
 };
 

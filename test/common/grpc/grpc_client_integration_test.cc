@@ -725,6 +725,91 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
   ASSERT_TRUE(request->fake_stream_->waitForReset());
 }
 
+class EnvoyGrpcRetryBufferLimitTest
+    : public EnvoyGrpcClientIntegrationParamTest,
+      public GrpcClientIntegrationTestBase<Event::TestRealTimeSystem> {
+public:
+  Network::Address::IpVersion getIpVersion() const override {
+    return EnvoyGrpcClientIntegrationParamTest::ipVersion();
+  }
+  ClientType getClientType() const override {
+    return EnvoyGrpcClientIntegrationParamTest::clientType();
+  }
+
+  void initializeWithRetry(uint32_t per_stream_buffer_limit_bytes) {
+    ON_CALL(server_factory_context_.runtime_loader_.snapshot_,
+            featureEnabled("upstream.use_retry", 100))
+        .WillByDefault(Return(true));
+    envoy::config::core::v3::RetryPolicy retry_policy;
+    retry_policy.set_retry_on("5xx");
+    retry_policy.mutable_num_retries()->set_value(1);
+    *retry_policy.mutable_retry_back_off()->mutable_base_interval() =
+        Protobuf::util::TimeUtil::MillisecondsToDuration(10);
+    retry_policy_ = retry_policy;
+    per_stream_buffer_limit_bytes_ = per_stream_buffer_limit_bytes;
+    buffer_body_for_retry_stream_option_ = true;
+    initialize();
+  }
+
+  // Sends a message larger than the default 64 KiB async client buffer limit, then fails the
+  // upstream stream with a 503.
+  HelloworldStreamPtr sendLargeMessageAndFail(helloworld::HelloRequest& request_msg) {
+    auto stream = createStream(empty_metadata_);
+    request_msg.set_name(std::string(128 * 1024, 'a'));
+    RequestArgs request_args;
+    request_args.request = &request_msg;
+    stream->sendRequest(request_args);
+    stream->fake_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+    return stream;
+  }
+
+  Upstream::ClusterTrafficStats& trafficStats() {
+    return *cm_.thread_local_cluster_.cluster_.info_->trafficStats();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, EnvoyGrpcRetryBufferLimitTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         EnvoyGrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+// Validate that a stream that sent more than the default buffer limit is retried with the complete
+// message when per_stream_buffer_limit_bytes is above the amount sent.
+TEST_P(EnvoyGrpcRetryBufferLimitTest, StreamRetriedWithinRetryBufferLimit) {
+  initializeWithRetry(1024 * 1024);
+  helloworld::HelloRequest request_msg;
+  auto stream = sendLargeMessageAndFail(request_msg);
+
+  fake_streams_.emplace_back();
+  ASSERT_TRUE(fake_connection_->waitForNewStream(*dispatcher_, fake_streams_.back()));
+  stream->fake_stream_ = fake_streams_.back().get();
+  helloworld::HelloRequest received_msg;
+  ASSERT_TRUE(stream->fake_stream_->waitForGrpcMessage(*dispatcher_, received_msg));
+  EXPECT_THAT(request_msg, ProtoEq(received_msg));
+
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+
+  EXPECT_EQ(1U, trafficStats().upstream_rq_retry_.value());
+  EXPECT_EQ(0U, trafficStats().retry_or_shadow_abandoned_.value());
+}
+
+// Validate that without per_stream_buffer_limit_bytes, a stream that sent more than the default
+// buffer limit gives up on retries and the upstream failure is returned.
+TEST_P(EnvoyGrpcRetryBufferLimitTest, StreamNotRetriedAboveDefaultBufferLimit) {
+  initializeWithRetry(0);
+  helloworld::HelloRequest request_msg;
+  auto stream = sendLargeMessageAndFail(request_msg);
+
+  stream->expectInitialMetadata(empty_metadata_);
+  stream->expectTrailingMetadata(empty_metadata_);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Unavailable);
+  dispatcher_helper_.runDispatcher();
+
+  EXPECT_EQ(0U, trafficStats().upstream_rq_retry_.value());
+  EXPECT_EQ(1U, trafficStats().retry_or_shadow_abandoned_.value());
+}
+
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcSslClientIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,

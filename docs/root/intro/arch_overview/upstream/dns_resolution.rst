@@ -31,6 +31,12 @@ Envoy contains 4 built-in DNS resolver extensions:
 For an example of a built-in DNS typed configuration, see the
 :ref:`HTTP filter configuration documentation <config_http_filters_dynamic_forward_proxy>`.
 
+With the c-ares resolver, ``AUTO`` and ``V4_PREFERRED`` lookups try the other address family when
+the preferred family returns no addresses. If neither lookup provides addresses and a lookup
+fails, the resolution fails even if the other family reports no records. Strict DNS clusters
+retain their existing hosts on resolution failure. A successful fallback still returns its
+addresses, and lookups that both report no records return a successful empty result.
+
 The c-ares-based DNS resolver emits the following statistics rooted in the ``dns.cares`` stats tree:
 
   .. csv-table::
