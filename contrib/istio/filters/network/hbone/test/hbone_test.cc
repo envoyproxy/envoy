@@ -100,6 +100,46 @@ TEST_F(HboneSocketTest, HoldsReadinessAndWritesUntilConnectAccepted) {
   EXPECT_TRUE(transport_->canFlushClose());
 }
 
+TEST_F(HboneSocketTest, PendingEmptyHalfCloseIsDeliveredAfterAcceptance) {
+  connect();
+  connection_->enableHalfClose(true);
+  Buffer::OwnedImpl request;
+  connection_->write(request, true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(peer_->hasReceivedEof());
+
+  accept();
+  EXPECT_EQ(0, peer_->getReceiveBuffer()->length());
+  EXPECT_TRUE(peer_->hasReceivedEof());
+  EXPECT_EQ(Network::Connection::State::Open, connection_->state());
+}
+
+TEST_F(HboneSocketTest, PendingPayloadHalfCloseIsDeliveredAfterAcceptance) {
+  connect();
+  connection_->enableHalfClose(true);
+  Buffer::OwnedImpl request("payload");
+  connection_->write(request, true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_FALSE(peer_->hasReceivedEof());
+  EXPECT_EQ(0, peer_->getReceiveBuffer()->length());
+
+  accept();
+  EXPECT_EQ("payload", peer_->getReceiveBuffer()->toString());
+  EXPECT_TRUE(peer_->hasReceivedEof());
+  EXPECT_EQ(Network::Connection::State::Open, connection_->state());
+}
+
+TEST_F(HboneSocketTest, ConnectedCallbackCanCloseBeforeIoIsResumed) {
+  connect();
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::Connected)).WillOnce([this]() {
+    connection_->close(Network::ConnectionCloseType::NoFlush);
+  });
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  state_->accept();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(Network::Connection::State::Closed, connection_->state());
+}
+
 TEST_F(HboneSocketTest, AcceptBeforeInternalConnect) {
   state_->accept();
   EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::Connected));

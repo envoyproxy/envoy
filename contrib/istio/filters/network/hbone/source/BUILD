@@ -59,6 +59,7 @@ envoy_cc_library(
     hdrs = ["hbone.h"],
     deps = [
         "//envoy/event:dispatcher_interface",
+        "//envoy/event:file_event_interface",
         "//envoy/stream_info:bool_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/network:raw_buffer_socket_lib",

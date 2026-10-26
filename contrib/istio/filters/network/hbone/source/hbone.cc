@@ -1,5 +1,6 @@
 #include "contrib/istio/filters/network/hbone/source/hbone.h"
 
+#include "envoy/event/file_event.h"
 #include "envoy/stream_info/bool_accessor.h"
 
 #include "source/common/network/raw_buffer_socket.h"
@@ -130,9 +131,11 @@ void UpstreamSocket::completeConnect() {
   ASSERT(state_->phase() == ConnectState::Phase::Accepted);
   state_->connected();
   InternalSocket::onConnected();
-  // A server-first protocol may have sent data while readiness was deferred.
   if (callbacks_->connection().state() == Network::Connection::State::Open) {
+    // A server-first protocol may have sent data while readiness was deferred.
     callbacks_->setTransportSocketIsReadable();
+    // Connected only flushes nonempty write buffers; also resume a pending empty half-close.
+    callbacks_->ioHandle().activateFileEvents(Event::FileReadyType::Write);
   }
 }
 
