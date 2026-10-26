@@ -115,6 +115,8 @@ void ConnPoolImplBase::updateQueueOverloadedGauge() {
   }
 
   queue_overloaded_ = queue_overloaded;
+  // TODO(nezdolik): Count transitions into the overloaded state. Short-lived overloads between
+  // stats scrapes are not visible through the gauge alone.
   if (queue_overloaded_) {
     host_->cluster().trafficStats()->upstream_queue_overloaded_.inc();
   } else {
