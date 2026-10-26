@@ -22,7 +22,7 @@ envoy_toolshed:
   project_name: "envoy_toolshed"
   project_desc: "Tooling, libraries, runners and checkers for Envoy proxy's CI"
   project_url: "https://github.com/envoyproxy/toolshed"
-  release_date: "2026-10-15"
+  release_date: "2026-10-24"
   use_category:
   - build
   - controlplane
@@ -126,7 +126,7 @@ xds:
   project_name: "xDS API"
   project_desc: "xDS API Working Group (xDS-WG)"
   project_url: "https://github.com/cncf/xds"
-  release_date: "2025-11-10"
+  release_date: "2025-12-10"
   use_category:
   - api
   license: "Apache-2.0"

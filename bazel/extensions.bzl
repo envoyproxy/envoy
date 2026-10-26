@@ -234,7 +234,7 @@ def _envoy_mod_graph_repo_impl(repository_ctx):
     registry_file_hashes = lockfile.get("registryFileHashes", {})
     deps = {}
 
-    for url in registry_file_hashes:
+    for url, file_hash in registry_file_hashes.items():
         module_dep = _module_dep_from_lock_entry(url)
         if module_dep == None:
             continue
@@ -242,9 +242,17 @@ def _envoy_mod_graph_repo_impl(repository_ctx):
             fail("MODULE.bazel.lock has multiple source.json entries for module %s" % module_dep.module_name)
 
         module_url = "%smodules/%s/%s/" % (module_dep.registry, module_dep.module_name, module_dep.version)
+        source = {}
+        if file_hash:
+            source_path = "sources/%s/%s/source.json" % (module_dep.module_name, module_dep.version)
+            result = repository_ctx.download(url, source_path, sha256 = file_hash, allow_fail = True)
+            if not result.success:
+                fail("Failed to download source.json for module %s@%s from %s" % (module_dep.module_name, module_dep.version, url))
+            source = json.decode(repository_ctx.read(source_path))
         deps[module_dep.module_name] = {
             "module_url": module_url,
             "registry": module_dep.registry,
+            "source": source,
             "urls": [module_url],
             "version": module_dep.version,
         }

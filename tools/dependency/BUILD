@@ -64,13 +64,54 @@ json_merge(
     visibility = ["//visibility:public"],
 )
 
+# Metadata-only repositories absent from the resolved module graph have no
+# version to check.
+# TODO: Skip nested archive tags until envoy.dependency.check can parse nested tag names.
+json_merge(
+    name = "check-dependencies",
+    srcs = [":filtered-dependencies"],
+    filter = """
+    .[0]
+    | with_entries(
+        select(.value.version != null)
+        | .value |= (
+            .source as $source
+            | if $source.url then
+                .urls = ([
+                    $source.url
+                    | sub("^(?<archive>https://github.com/[^/]+/[^/]+/archive/)refs/tags/(?<tag>.+[.](tar[.]gz|zip))$";
+                          "\\(.archive)\\(.tag)")
+                ] + ($source.mirror_urls // []))
+              else . end
+            | .sha256 = ($source.integrity // "")
+        )
+        | select((.value.urls[0] // ""
+                  | test("^https://github.com/[^/]+/[^/]+/archive/.*/.*[.](tar[.]gz|zip)$")) | not)
+      )
+    """,
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "check_dependencies_test",
+    srcs = ["check_dependencies_test.py"],
+    args = [
+        "$(location :filtered-dependencies)",
+        "$(location :check-dependencies)",
+    ],
+    data = [
+        ":check-dependencies",
+        ":filtered-dependencies",
+    ],
+)
+
 py_console_script_binary(
     name = "check",
     args = [
-        "--repository_locations=$(location :filtered-dependencies)",
+        "--repository_locations=$(location :check-dependencies)",
     ],
     data = [
-        ":filtered-dependencies",
+        ":check-dependencies",
     ],
     pkg = "@base_pip3//envoy_dependency_check",
     script = "envoy.dependency.check",
