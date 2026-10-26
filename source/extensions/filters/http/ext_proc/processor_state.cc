@@ -264,9 +264,7 @@ absl::Status ProcessorState::handleHeaderContinue() {
   } else if (body_mode_ == ProcessingMode::STREAMED ||
              body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
     sendBufferedDataInStreamedMode(false);
-    if (body_mode_ == ProcessingMode::STREAMED) {
-      continueIfNecessary();
-    }
+    injectHeadersToFilterChain(false);
     return absl::OkStatus();
   } else if (body_mode_ == ProcessingMode::BUFFERED_PARTIAL) {
     return handleBufferedPartialMode();
@@ -832,6 +830,8 @@ bool DecodingProcessorState::handleStandaloneModeOverride(
   if (callbackState() == ProcessorState::CallbackState::HeadersCallback &&
       (old_body_mode == ProcessingMode::STREAMED || old_body_mode == ProcessingMode::NONE) &&
       body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED && send_trailers_) {
+    // Stop the timer, as per-message timeouts are not applicable in FULL_DUPLEX_STREAMED mode.
+    stopMessageTimer();
     bool end_stream = (complete_body_available_ && trailers_ == nullptr);
     if (hasBufferedData() || (bufferedData() && end_stream)) {
       // Body came in while we were waiting for this response.

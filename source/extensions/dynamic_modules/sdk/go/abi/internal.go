@@ -911,6 +911,23 @@ func (h *dymHttpFilterHandle) SetTypedMetadata(metadataNamespace string, seriali
 	runtime.KeepAlive(serializedAny)
 }
 
+func (h *dymHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
+	var typeURLView C.envoy_dynamic_module_type_envoy_buffer
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	found := C.envoy_dynamic_module_callback_http_get_typed_metadata(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		&typeURLView,
+		&valueView,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	if !bool(found) {
+		return shared.UnsafeEnvoyBuffer{}, shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(typeURLView), envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
 func (h *dymHttpFilterHandle) GetAttributeNumber(
 	attributeID shared.AttributeID,
 ) (float64, bool) {
@@ -1051,6 +1068,19 @@ func (h *dymHttpFilterHandle) SetFilterState(key string, value []byte) {
 	runtime.KeepAlive(value)
 }
 
+func (h *dymHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
+	ret := C.envoy_dynamic_module_callback_http_set_filter_state_value(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		bytesToModuleBuffer(value),
+		C.envoy_dynamic_module_type_filter_state_life_span(lifeSpan),
+		C.envoy_dynamic_module_type_filter_state_stream_sharing(streamSharing),
+	)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(value)
+	return bool(ret)
+}
+
 func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool {
 	ret := C.envoy_dynamic_module_callback_http_set_filter_state_typed(
 		h.hostPluginPtr,
@@ -1059,6 +1089,15 @@ func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool
 	)
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) HasFilterState(key string) bool {
+	ret := C.envoy_dynamic_module_callback_http_has_filter_state(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+	)
+	runtime.KeepAlive(key)
 	return bool(ret)
 }
 
@@ -1327,6 +1366,21 @@ func (h *dymHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.Clus
 func (h *dymHttpFilterHandle) GetUpstreamRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
 	var valueView C.envoy_dynamic_module_type_envoy_buffer
 	ret := C.envoy_dynamic_module_callback_http_get_upstream_remote_address(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
+func (h *dymHttpFilterHandle) GetDownstreamDirectRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
 		h.hostPluginPtr,
 		&valueView,
 	)

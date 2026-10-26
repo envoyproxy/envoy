@@ -188,6 +188,7 @@ public:
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
   Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
+  void usePersistentHostMap();
 
   /**
    * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.

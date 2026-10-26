@@ -3,9 +3,9 @@
 #include <string>
 
 #include "envoy/http/async_client.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/upstream/cluster_update_tracker.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "datadog/http_client.h"
@@ -52,19 +52,30 @@ public:
                   const std::string& reference_host, TracerStats& stats, TimeSource& time_source);
   ~AgentHTTPClient() override;
 
+  /**
+   * Cancel the requests in flight. Subsequent calls to \c post do not send
+   * anything. This is called when the thread
+   * local tracer that created this client is destroyed, after which the
+   * cluster manager of this thread might be torn down.
+   */
+  void shutdown();
+
   // datadog::tracing::HTTPClient
 
   /**
    * Send an HTTP POST request to the cluster, where the requested resource is
-   * \p url.path. Invoke \p set_headers immediately to obtain the HTTP request
-   * headers. Send \p body as the request body. Return a
+   * \p url.path. If this client is shut down, \p deadline has passed, or the
+   * cluster does not exist, return without sending anything or invoking any
+   * callback. Otherwise, invoke \p set_headers immediately to obtain the HTTP
+   * request headers, and send \p body as the request body. Return a
    * \c datadog::tracing::Error if one occurs, otherwise return
    * \c datadog::tracing::nullopt. When a complete response is received,
    * invoke \p on_response with the response status, response headers, and
    * response body. If an error occurs before a complete response is received,
    * invoke \p on_error with a \c datadog::tracing::Error.
    * @param url URL from which the request path is taken
-   * @param set_headers callback invoked immediately to obtain request headers
+   * @param set_headers callback invoked immediately to obtain request headers,
+   * if a request is sent
    * @param body data to send as POST request body
    * @param on_response callback to invoke when a complete response is received
    * @param on_error callback to invoke when an error occurs before a complete
@@ -103,11 +114,15 @@ public:
 
 private:
   absl::flat_hash_map<Http::AsyncClient::Request*, Handlers> handlers_;
-  Upstream::ClusterUpdateTracker collector_cluster_;
+  // The collector cluster is looked up for every report rather than cached: a cached
+  // ThreadLocalCluster can outlive its cluster entry while the thread local cluster manager of a
+  // worker is destroyed.
+  Upstream::ClusterManager& cluster_manager_;
   const std::string cluster_;
   const std::string reference_host_;
   TracerStats& stats_;
   TimeSource& time_source_;
+  bool shut_down_{false};
 };
 
 } // namespace Datadog

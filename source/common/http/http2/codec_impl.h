@@ -265,6 +265,10 @@ protected:
       uint8_t flags;
     };
     FrameHeaderInfo current_frame_ = {};
+    // Latched to avoid runtime lookup on the per-frame hot path.
+    // TODO: remove when removing
+    // `envoy.reloadable_features.http2_mask_continuation_flags`.
+    const bool mask_continuation_flags_;
     size_t padding_length_ = 0;
     size_t remaining_data_payload_ = 0;
     // TODO: remove when removing `envoy.reloadable_features.http2_use_oghttp2`.
@@ -930,6 +934,7 @@ private:
   // Remove when removing runtime feature `http2_fix_goaway_loadshed_point`.
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_reset_stream_on_begin_headers_{nullptr};
   bool sent_go_away_on_dispatch_{false};
 };
 

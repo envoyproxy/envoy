@@ -23,7 +23,7 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-22.04
     steps:
-    - uses: envoyproxy/toolshed/actions/bind-mounts@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+    - uses: envoyproxy/toolshed/actions/bind-mounts@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       if: |
         ! github.event.repository.private
       with:
@@ -37,7 +37,7 @@ jobs:
 
     - name: Free disk space
       if: github.event.repository.private
-      uses: envoyproxy/toolshed/actions/diskspace@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+      uses: envoyproxy/toolshed/actions/diskspace@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       with:
         to_remove: |
           /usr/local/.ghcup

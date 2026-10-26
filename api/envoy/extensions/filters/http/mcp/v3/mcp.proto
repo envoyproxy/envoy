@@ -95,10 +95,10 @@ message Mcp {
   // - In ``PASS_THROUGH`` mode: the request is allowed through with an ``is_exceeding_limit`` marker in the dynamic metadata, indicating that the MCP payload was only partially parsed.
   // - In ``REJECT_NO_MCP`` mode: the request is rejected with ``400 Bad Request`` because the complete root JSON object must fit within the size limit.
   //
-  // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
+  // It defaults to 8KB (8192 bytes).
   //
   // Setting it to 0 would disable the limit. It is not recommended to do so in production.
-  google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {lte: 10485760}];
+  google.protobuf.UInt32Value max_request_body_size = 3;
 
   // Parser configuration, this provide the attribute extraction override.
   ParserConfig parser_config = 4;
@@ -218,8 +218,8 @@ message McpOverride {
 
   // Optional per-route max request body size override.
   // When set, this overrides the global max_request_body_size for this route.
-  // It defaults to 8KB (8192 bytes) and the maximum allowed value is 10MB (10485760 bytes).
-  google.protobuf.UInt32Value max_request_body_size = 2 [(validate.rules).uint32 = {lte: 10485760}];
+  // It defaults to 8KB (8192 bytes).
+  google.protobuf.UInt32Value max_request_body_size = 2;
 
   // Overrides the global clear_route_cache setting for this route.
   bool clear_route_cache = 3;

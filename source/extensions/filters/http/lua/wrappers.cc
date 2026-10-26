@@ -3,6 +3,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/config/metadata.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
@@ -346,9 +347,13 @@ int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
   // so push a copy of the 3rd arg ("value") to the top.
   lua_pushvalue(state, 4);
 
-  Protobuf::Struct value;
-  (*value.mutable_fields())[key] = Filters::Common::Lua::MetadataMapHelper::loadValue(state);
-  streamInfo().setDynamicMetadata(filter_name, value);
+  // Load the value before touching the metadata map: loadValue() raises on a type it cannot
+  // convert, and a map reached first would keep an empty struct for a set that never happened.
+  // Writing the field in place avoids setDynamicMetadata()'s Struct merge, which copies once per
+  // field of the value.
+  Protobuf::Value value = Filters::Common::Lua::MetadataMapHelper::loadValue(state);
+  Config::Metadata::mutableMetadataValue(streamInfo().dynamicMetadata(), filter_name, key) =
+      std::move(value);
 
   // Pop the copy of the metadata value from the stack.
   lua_pop(state, 1);

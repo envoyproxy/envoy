@@ -64,6 +64,7 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
         Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
     if (has_proxy_addr) {
       handleHostMetadataConnect(host);
+      break;
     }
   }
 }

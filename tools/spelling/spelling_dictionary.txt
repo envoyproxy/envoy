@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+aarch
 AI
 Allshard
 FCS
@@ -52,6 +53,7 @@ BOM
 CCL
 CGROUP
 CROSSSLOT
+DLL
 ECN
 ECS
 EdDSA
@@ -108,6 +110,8 @@ cbor
 CDN
 CDS
 CEL
+COMDAT
+COFF
 CWND
 DLE
 DPE
@@ -458,6 +462,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSK
 Postgre
 Postgres
 Prereq
@@ -671,6 +676,7 @@ auths
 authz
 automata
 autoscale
+autosharding
 awaitable
 awaitables
 awaiter
@@ -976,6 +982,7 @@ hackery
 hacky
 handoff
 handshaker
+handshakers
 hardcode
 hardcoded
 hardcodes
@@ -1037,6 +1044,7 @@ ints
 invariance
 invariants
 invoker
+Invocable
 iov
 iovcnt
 iovec
@@ -1063,6 +1071,8 @@ keyset
 ketama
 keyder
 kqueue
+kTLS
+ktls
 kubernetes
 kv
 kvlist
@@ -1323,6 +1333,7 @@ quantiles
 querydetails
 quiesce
 quitquitquit
+quota
 qvalue
 radix
 radixtree
@@ -1378,6 +1389,7 @@ rele
 releasor
 reloadable
 remoting
+renormalize
 renderers
 reparse
 repeatability
@@ -1666,6 +1678,7 @@ vanishingly
 varchar
 variadic
 varint
+Vcluster
 vec
 vectorize
 VBC
@@ -1833,3 +1846,4 @@ X25519MLKEM768
 cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
+vendored

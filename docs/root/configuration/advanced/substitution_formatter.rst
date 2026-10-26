@@ -1451,6 +1451,13 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_PEER_CERT_CHAIN%``
+  HTTP/TCP/THRIFT
+    The client certificate chain used to establish the downstream TLS connection in URL-encoded PEM format.
+    The certificate chain includes the leaf certificate.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%TLS_JA3_FINGERPRINT%``
   HTTP/TCP/Thrift
     The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
@@ -1613,6 +1620,9 @@ Current supported substitution commands include:
 
 ``%HOSTNAME%``
   The system hostname.
+
+``%ENVOY_VERSION%``
+  The version string of the Envoy binary, including the repository revision and the build type.
 
 ``%LOCAL_REPLY_BODY%``
   The body text for the requests rejected by the Envoy.

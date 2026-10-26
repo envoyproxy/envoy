@@ -33,15 +33,41 @@ constexpr absl::string_view kProtocolVersion = "2025-06-18";
 constexpr absl::string_view kContentTypeJson = "application/json";
 constexpr absl::string_view kContentTypeSse = "text/event-stream";
 
-void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest) {
-  // Headers that we set explicitly or should not be forwarded
-  static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {
-      ":method", ":path", ":authority", "host", "content-type", "accept", kSessionIdHeader};
+void copyRequestHeaders(const Http::RequestHeaderMap& source, Http::RequestHeaderMap& dest,
+                        const HeaderForwardingPolicy& header_forwarding) {
+  // Headers that we set explicitly or should not be forwarded. Unaffected by
+  // header_forwarding policy -- these are router-owned/framing/session/hop-by-hop headers,
+  // and can never be forwarded via that mechanism regardless of configuration.
+  //
+  // connection/upgrade/te/keep-alive/transfer-encoding/proxy-connection are already stripped
+  // by the HTTP connection manager before any filter runs (see
+  // ConnectionManagerUtility::mutateRequestHeaders), except on Upgrade-classified requests,
+  // where connection/upgrade are deliberately preserved -- listed here too for defense in
+  // depth. proxy-authenticate/proxy-authorization are never stripped anywhere in Envoy core,
+  // so they must be excluded explicitly here to keep hop-by-hop headers from being forwarded.
+  static const absl::flat_hash_set<absl::string_view> kSkipHeaders = {":method",
+                                                                      ":path",
+                                                                      ":authority",
+                                                                      "host",
+                                                                      "content-type",
+                                                                      "accept",
+                                                                      kSessionIdHeader,
+                                                                      "connection",
+                                                                      "upgrade",
+                                                                      "te",
+                                                                      "keep-alive",
+                                                                      "transfer-encoding",
+                                                                      "trailer",
+                                                                      "proxy-connection",
+                                                                      "proxy-authenticate",
+                                                                      "proxy-authorization"};
 
-  source.iterate([&dest](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
+  source.iterate([&dest,
+                  &header_forwarding](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
     absl::string_view key = header.key().getStringView();
+    std::string lower_key = absl::AsciiStrToLower(key);
 
-    if (!kSkipHeaders.contains(absl::AsciiStrToLower(key))) {
+    if (!kSkipHeaders.contains(lower_key) && headerCanBeForwarded(lower_key, header_forwarding)) {
       dest.addCopy(Http::LowerCaseString(std::string(key)), header.value().getStringView());
     }
     return Http::HeaderMap::Iterate::Continue;
@@ -372,8 +398,19 @@ bool McpRouterFilter::readMetadataFromMcpFilter() {
   return true;
 }
 
+std::string McpRouterFilter::encodeCompositeSession(const std::string& composite) {
+  const std::string& key = config_->sessionSigningKey();
+  if (key.empty()) {
+    return SessionCodec::encode(composite);
+  }
+  return SessionCodec::encodeWithIntegrity(composite, key);
+}
+
 bool McpRouterFilter::decodeAndParseSession() {
-  std::string decoded = SessionCodec::decode(encoded_session_id_);
+  const std::string& key = config_->sessionSigningKey();
+  const std::string decoded = key.empty()
+                                  ? SessionCodec::decode(encoded_session_id_)
+                                  : SessionCodec::decodeWithIntegrity(encoded_session_id_, key);
   if (decoded.empty()) {
     ENVOY_LOG(warn, "Failed to decode session ID");
     config_->stats().rq_session_invalid_.inc();
@@ -952,7 +989,7 @@ void McpRouterFilter::handleInitialize() {
     absl::flat_hash_map<std::string, std::string> empty_sessions;
     std::string composite =
         SessionCodec::buildCompositeSessionId(route_name_, subject, empty_sessions);
-    std::string encoded_session = SessionCodec::encode(composite);
+    std::string encoded_session = encodeCompositeSession(composite);
     encoded_session_id_ = encoded_session;
 
     sendJsonResponse(response_body, encoded_session);
@@ -989,7 +1026,7 @@ void McpRouterFilter::handleInitialize() {
     if (!sessions.empty()) {
       std::string composite =
           SessionCodec::buildCompositeSessionId(self->route_name_, subject, sessions);
-      encoded_session = SessionCodec::encode(composite);
+      encoded_session = self->encodeCompositeSession(composite);
     }
 
     self->sendJsonResponse(response_body, encoded_session);
@@ -1980,9 +2017,8 @@ McpRouterFilter::createUpstreamHeaders(const McpBackendConfig& backend,
     headers->addCopy(Http::LowerCaseString(std::string(kSessionIdHeader)), backend_session_id);
   }
 
-  // TODO(botengyao): Make header forwarding (authorization, etc.) configurable via proto config.
   if (request_headers_) {
-    copyRequestHeaders(*request_headers_, *headers);
+    copyRequestHeaders(*request_headers_, *headers, backend.header_forwarding);
 
     // Adjust content-length when body rewriting changes size.
     if (needs_body_rewrite_ && request_headers_->ContentLength()) {
@@ -2096,7 +2132,7 @@ void McpRouterFilter::resetStreamState() {
 void McpRouterFilter::updateEncodedSessionId() {
   std::string composite =
       SessionCodec::buildCompositeSessionId(route_name_, session_subject_, backend_sessions_);
-  encoded_session_id_ = SessionCodec::encode(composite);
+  encoded_session_id_ = encodeCompositeSession(composite);
 }
 
 void McpRouterFilter::lazyInitSingleBackend(const McpBackendConfig& backend,

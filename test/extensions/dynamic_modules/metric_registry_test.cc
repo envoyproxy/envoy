@@ -1,3 +1,5 @@
+#include <array>
+
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
 
@@ -161,6 +163,39 @@ TEST(MetricRegistryTest, ResolveHistogramVecReturnsStableChild) {
   Stats::Histogram& histogram = handle->resolve(registry.scope(), tags);
   histogram.recordValue(42);
   EXPECT_EQ(&histogram, &handle->resolve(registry.scope(), tags));
+}
+
+TEST(MetricRegistryTest, IdResolvesOnlyItsOwnMetric) {
+  Stats::IsolatedStoreImpl store;
+  MetricRegistry registry(*store.rootScope());
+  Stats::StatNamePool& pool = registry.statNamePool();
+  Stats::StatName label = pool.add("label");
+  const size_t counter_id = registry.addCounter(MetricRegistry::CounterHandle(
+      Stats::Utility::counterFromStatNames(registry.scope(), {pool.add("counter")})));
+  const size_t counter_vec_id =
+      registry.addCounterVec(MetricRegistry::CounterVecHandle(pool.add("counter_vec"), {label}));
+  const size_t gauge_id =
+      registry.addGauge(MetricRegistry::GaugeHandle(Stats::Utility::gaugeFromStatNames(
+          registry.scope(), {pool.add("gauge")}, Stats::Gauge::ImportMode::Accumulate)));
+  const size_t gauge_vec_id = registry.addGaugeVec(MetricRegistry::GaugeVecHandle(
+      pool.add("gauge_vec"), {label}, Stats::Gauge::ImportMode::Accumulate));
+  const size_t histogram_id =
+      registry.addHistogram(MetricRegistry::HistogramHandle(Stats::Utility::histogramFromStatNames(
+          registry.scope(), {pool.add("histogram")}, Stats::Histogram::Unit::Unspecified)));
+  const size_t histogram_vec_id = registry.addHistogramVec(MetricRegistry::HistogramVecHandle(
+      pool.add("histogram_vec"), {label}, Stats::Histogram::Unit::Unspecified));
+
+  // Each id resolves only through the getter of its own metric, whatever the other metrics are.
+  const std::array<size_t, 6> ids = {counter_id,   counter_vec_id, gauge_id,
+                                     gauge_vec_id, histogram_id,   histogram_vec_id};
+  for (size_t i = 0; i < ids.size(); ++i) {
+    EXPECT_EQ(i == 0, registry.getCounterById(ids[i]).has_value());
+    EXPECT_EQ(i == 1, registry.getCounterVecById(ids[i]).has_value());
+    EXPECT_EQ(i == 2, registry.getGaugeById(ids[i]).has_value());
+    EXPECT_EQ(i == 3, registry.getGaugeVecById(ids[i]).has_value());
+    EXPECT_EQ(i == 4, registry.getHistogramById(ids[i]).has_value());
+    EXPECT_EQ(i == 5, registry.getHistogramVecById(ids[i]).has_value());
+  }
 }
 
 } // namespace

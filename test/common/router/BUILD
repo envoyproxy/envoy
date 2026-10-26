@@ -56,6 +56,8 @@ envoy_cc_test_library(
         "//source/common/http:headers_lib",
         "//source/common/router:config_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:upstream_address_lib",
         "//source/extensions/formatter/cel:config",
@@ -241,6 +243,7 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -394,6 +397,23 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_benchmark_binary(
+    name = "router_ratelimit_speed_test",
+    srcs = ["router_ratelimit_speed_test.cc"],
+    deps = [
+        "//source/common/router:router_ratelimit_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "router_ratelimit_speed_test_benchmark_test",
+    benchmark_binary = "router_ratelimit_speed_test",
 )
 
 envoy_cc_test(
@@ -707,4 +727,24 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "scoped_config_benchmark_test",
     benchmark_binary = "scoped_config_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "scoped_rds_speed_test",
+    srcs = ["scoped_rds_speed_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/router:scoped_config_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "scoped_rds_benchmark_test",
+    benchmark_binary = "scoped_rds_speed_test",
 )

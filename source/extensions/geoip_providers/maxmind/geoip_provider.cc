@@ -189,6 +189,9 @@ void GeoipProviderConfig::registerGeoDbStats(const absl::string_view& db_type) {
 
 void GeoipProviderConfig::setFieldKey(GeoField field, const std::string& value) {
   field_keys_[enumToInt(field)] = getOptionalString(value);
+  if (!value.empty()) {
+    field_key_names_.emplace_back(value);
+  }
 }
 
 void GeoipProviderConfig::incCounter(Stats::StatName name) {
@@ -204,10 +207,9 @@ DbFileStats generateDbFileStats(Stats::Scope& scope, GeoDbType db_type,
                                 const std::string& db_path) {
   const std::string db_name = Stats::Utility::sanitizeStatsName(db_path);
   const absl::string_view base_prefix = dbTypeName(db_type);
-  const Stats::TaggedStatName prefix(scope.symbolTable(), base_prefix, {{DB_NAME_TAG, db_name}},
-                                     absl::StrCat(base_prefix, ".", db_name));
-  return {ALL_MAXMIND_DB_FILE_STATS(POOL_COUNTER_TAGGED(scope, prefix),
-                                    POOL_GAUGE_TAGGED(scope, prefix))};
+  Stats::LiteScopeHelper helper(scope, base_prefix, {{DB_NAME_TAG, db_name}},
+                                absl::StrCat(base_prefix, ".", db_name));
+  return {ALL_MAXMIND_DB_FILE_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 
 } // namespace

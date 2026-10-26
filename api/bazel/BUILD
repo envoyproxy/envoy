@@ -1,4 +1,5 @@
 load("@envoy_toolshed//:macros.bzl", "json_data")
+load("@envoy_toolshed//dependency:macros.bzl", "module_deps_json", "module_updater", "registry_updater")
 load("@rules_go//proto:compiler.bzl", "go_proto_compiler")
 load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
 load(
@@ -92,6 +93,24 @@ _JDK_PLATFORMS = {
     )
     for suffix, constraints in _JDK_PLATFORMS.items()
 ]
+
+module_deps_json(
+    name = "module_deps",
+    lockfile = "//:MODULE.bazel.lock",
+    module_file = "//:MODULE.bazel",
+)
+
+module_updater(
+    name = "update_module",
+    bazelrc = "//:.bazelrc",
+    dependencies = ":module_deps",
+    module_file = "//:MODULE.bazel",
+)
+
+registry_updater(
+    name = "update_registry",
+    bazelrc = "//:.bazelrc",
+)
 
 go_proto_compiler(
     name = "vtprotobuf_plugin_go",

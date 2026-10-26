@@ -269,6 +269,10 @@ The following core load shed points are supported:
       (causes downstream connections to ungracefully close) that should only be
       used with a very high threshold (if at all).
 
+  * - envoy.load_shed_points.http2_server_reset_stream_on_begin_headers
+    - Envoy will reject new HTTP/2 streams at the codec level on the initial header frame
+      by sending a ``RST_STREAM(REFUSED_STREAM)`` before allocating stream or header objects.
+
   * - envoy.load_shed_points.tcp_proxy_on_data
     - Envoy will close the downstream TCP connection in the TCP proxy filter when receiving data
       (e.g., during early data buffering or active proxying) if Envoy is under resource pressure,

@@ -20,6 +20,8 @@
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -111,7 +113,7 @@ class ScopedRdsConfigSubscription : public Envoy::Config::DeltaConfigSubscriptio
                                     public Envoy::Config::SubscriptionCallbacks {
 public:
   using ScopedRouteConfigurationMap =
-      std::map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
+      absl::flat_hash_map<std::string, envoy::config::route::v3::ScopedRouteConfiguration>;
 
   ScopedRdsConfigSubscription(
       const envoy::extensions::filters::network::http_connection_manager::v3::ScopedRds& scoped_rds,

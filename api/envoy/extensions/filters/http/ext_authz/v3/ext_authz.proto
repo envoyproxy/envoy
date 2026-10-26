@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 34]
+// [#next-free-field: 35]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -100,6 +100,24 @@ message ExtAuthz {
   //   clear the route cache should run before route-dependent authorization filters. Operators can
   //   also use decoder_header_mutation_rules to restrict sensitive request header mutations.
   bool clear_route_cache = 6;
+
+  // A list of the request header names the routes match on. When this list is not empty and
+  // ``clear_route_cache`` is ``true``, an ``OK`` response clears the route cache only when it sets,
+  // appends, or removes one of these headers, or mutates a query parameter, rather than on any request
+  // mutation. This avoids re-resolving the route when the response only touches headers that no route
+  // matches on.
+  //
+  // If not specified, the route cache is cleared whenever an ``OK`` response sets, appends, or removes
+  // any request header, or mutates a query parameter.
+  //
+  // .. attention::
+  //
+  //   List every request header the routes match on. A route that matches on a header omitted here is
+  //   not re-resolved when the authorization service mutates that header, which can route the request
+  //   as if the mutation had not happened.
+  repeated string clear_route_cache_headers = 34 [(validate.rules).repeated = {
+    items {string {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}}
+  }];
 
   // Sets the HTTP status that is returned to the client when the authorization server returns an error
   // or cannot be reached.

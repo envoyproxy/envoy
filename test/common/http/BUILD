@@ -240,6 +240,24 @@ envoy_benchmark_test(
     benchmark_binary = "filter_manager_benchmark",
 )
 
+envoy_cc_benchmark_binary(
+    name = "header_utility_speed_test",
+    srcs = ["header_utility_speed_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/http:header_map_lib",
+        "//source/common/http:header_utility_lib",
+        "//test/test_common:test_runtime_lib",
+        "@benchmark",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "header_utility_speed_test_benchmark_test",
+    benchmark_binary = "header_utility_speed_test",
+)
+
 envoy_cc_test_library(
     name = "common_lib",
     srcs = ["common.cc"],
@@ -481,6 +499,18 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "route_config_update_requster_test",
+    srcs = ["route_config_update_requster_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/http:rds_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 
