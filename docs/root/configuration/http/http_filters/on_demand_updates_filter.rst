@@ -77,8 +77,8 @@ Filter state
 ------------
 
 When a request has to wait for a discovery, the filter stores what happened in the request's filter state
-under ``envoy.filters.http.on_demand.discovery``, so that an access log can show which host, virtual host,
-route configuration and cluster were involved and how long each discovery took. The object has
+under ``envoy.filters.http.on_demand.discovery``, so that an access log can show which host, virtual host
+and cluster were involved and how long each discovery took. The object has
 ``Request`` life span, so it is carried over to a stream that is recreated after the discovery. It does not
 exist for requests that did not wait, and the access log prints ``-`` for them.
 
@@ -87,8 +87,7 @@ exist for requests that did not wait, and the access log prints ``-`` for them.
   :widths: 1, 3
 
   host, "The ``:authority`` of the request that waited for route discovery."
-  vhost, "The virtual host that was discovered. Only set once a route of the request resolved."
-  route_config, "The name of the route configuration that holds that virtual host."
+  vhost, "The name of the virtual host that was discovered. Only set once a route of the request resolved. For VHDS it has the form ``<route configuration name>/<domain>``, so it also identifies the route configuration."
   cluster, "The cluster that on-demand CDS was asked for."
   route_status, "``pending``, ``found``, ``not_found`` or ``cancelled``."
   cluster_status, "``pending``, ``available``, ``missing``, ``timeout`` or ``cancelled``."

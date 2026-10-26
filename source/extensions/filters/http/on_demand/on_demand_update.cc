@@ -466,8 +466,7 @@ void OnDemandRouteUpdate::recordVirtualHost() {
   // Only called after a route discovery completed, so the state exists. A route can only resolve
   // against the refreshed route config.
   if (auto route = callbacks_->route(); route.has_value()) {
-    const Router::VirtualHost& vhost = route->virtualHost();
-    discoveryState().setVirtualHost(vhost.name(), vhost.routeConfig().name());
+    discoveryState().setVirtualHost(route->virtualHost().name());
   }
 }
 

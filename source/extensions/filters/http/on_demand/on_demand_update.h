@@ -54,8 +54,8 @@ struct OnDemandFilterStats {
  * known (yet) read as unset, which access logs print as "-":
  *
  *   host                          :authority of the request that waited for route discovery.
- *   vhost                         Virtual host that was discovered; set once a route resolved.
- *   route_config                  Name of the route configuration that holds that virtual host.
+ *   vhost                         Virtual host that was discovered; set once a route resolved. For
+ *                                 VHDS it is "<route config name>/<domain>".
  *   cluster                       Cluster that on-demand CDS was asked for.
  *   route_status                  pending | found | not_found | cancelled
  *   cluster_status                pending | available | missing | timeout | cancelled
@@ -85,10 +85,7 @@ public:
     cluster_duration_us_ = duration_us;
   }
   void setHost(absl::string_view host) { host_ = std::string(host); }
-  void setVirtualHost(absl::string_view vhost, absl::string_view route_config) {
-    vhost_ = std::string(vhost);
-    route_config_ = std::string(route_config);
-  }
+  void setVirtualHost(absl::string_view vhost) { vhost_ = std::string(vhost); }
   void setClusterName(absl::string_view cluster) { cluster_ = std::string(cluster); }
 
   // StreamInfo::FilterState::Object
@@ -103,9 +100,6 @@ public:
     }
     if (field_name == "vhost") {
       return stringField(vhost_);
-    }
-    if (field_name == "route_config") {
-      return stringField(route_config_);
     }
     if (field_name == "cluster") {
       return stringField(cluster_);
@@ -135,7 +129,6 @@ private:
 
   std::string host_;
   std::string vhost_;
-  std::string route_config_;
   std::string cluster_;
   absl::string_view route_status_;
   absl::string_view cluster_status_;
@@ -247,7 +240,7 @@ private:
   DiscoveryState& discoveryState();
   void startRouteDiscovery(MonotonicTime start);
   void finishRouteDiscovery(bool route_exists);
-  // Records which virtual host and route config the route discovery resolved to, if any.
+  // Records which virtual host the route discovery resolved to, if any.
   void recordVirtualHost();
   void startClusterDiscovery(MonotonicTime start, absl::string_view cluster_name);
   void finishClusterDiscovery(Upstream::ClusterDiscoveryStatus cluster_status);

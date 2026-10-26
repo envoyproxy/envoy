@@ -687,28 +687,22 @@ TEST_F(OnDemandFilterStatsTest, RouteDiscoveryNotCancelledAfterCompletion) {
   expectField("route_status", "found");
 }
 
-// The virtual host and route config that handled the request are recorded once a route resolves.
-TEST_F(OnDemandFilterStatsTest, RouteDiscoveryRecordsVirtualHostAndRouteConfig) {
+// The virtual host that handled the request is recorded once a route resolves.
+TEST_F(OnDemandFilterStatsTest, RouteDiscoveryRecordsVirtualHost) {
   setupWithStats(false);
   auto callback = startRouteDiscovery();
   EXPECT_FALSE(hasField("vhost"));
-  EXPECT_FALSE(hasField("route_config"));
 
   NiceMock<Router::MockVirtualHost> vhost;
-  NiceMock<Router::MockConfig> route_config;
-  const std::string vhost_name = "foo_vhost";
-  const std::string route_config_name = "foo_routes";
+  const std::string vhost_name = "foo_routes/foo.example.com";
   ON_CALL(vhost, name()).WillByDefault(ReturnRef(vhost_name));
-  ON_CALL(vhost, routeConfig()).WillByDefault(ReturnRef(route_config));
-  ON_CALL(route_config, name()).WillByDefault(ReturnRef(route_config_name));
   EXPECT_CALL(*decoder_callbacks_.route_, virtualHost()).WillRepeatedly(ReturnRef(vhost));
   const Router::Route& route = *decoder_callbacks_.route_;
   EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(makeOptRef(route)));
 
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   (*callback)(true);
-  expectField("vhost", "foo_vhost");
-  expectField("route_config", "foo_routes");
+  expectField("vhost", "foo_routes/foo.example.com");
   expectField("host", "foo.example.com");
 }
 
