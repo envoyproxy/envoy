@@ -82,6 +82,12 @@ protected:
             [this]() -> absl::string_view { return callbacks_.connection_.local_close_reason_; }));
   }
 
+  void TearDown() override {
+    thread_local_.shutdownThread();
+    thread_local_registry_.reset();
+    extension_.reset();
+  }
+
   Network::ConnectionSocketPtr createMockSocket(int fd = 123,
                                                 const std::string& local_addr = "127.0.0.1:8080",
                                                 const std::string& remote_addr = "127.0.0.1:9090") {
