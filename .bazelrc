@@ -292,6 +292,7 @@ test:sanitizer --build_tests_only
 
 # ASAN config with clang runtime
 build:asan --config=asan-common
+build:asan --@envoy//bazel:shared_unwind=true
 # Clang adds the hermetic resource directory's per-target runtime library search path.
 build:asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
