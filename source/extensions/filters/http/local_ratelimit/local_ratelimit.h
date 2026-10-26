@@ -209,10 +209,10 @@ private:
   friend class FilterTest;
 
   void populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
-                           const Http::RequestHeaderMap& headers, bool on_stream_done = false);
+                           Http::RequestHeaderMap& headers);
   void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                            std::vector<RateLimit::Descriptor>& descriptors,
-                           const Http::RequestHeaderMap& headers, bool on_stream_done);
+                           Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(OptRef<const Router::Route> route);
   Filters::Common::LocalRateLimit::LocalRateLimiterImpl& getPerConnectionRateLimiter();
   Filters::Common::LocalRateLimit::LocalRateLimiter::Result
@@ -232,9 +232,7 @@ private:
   const FilterConfig* used_config_{};
   std::shared_ptr<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
   RateLimit::XRateLimitOption x_ratelimit_option_{};
-  // Latch route and virtual-host request/completion behavior at decodeHeaders().
-  bool route_apply_on_stream_done_{false};
-  bool has_stream_done_actions_{false};
+  // Set only when embedded rate limits have apply_on_stream_done entries.
   const Http::RequestHeaderMap* request_headers_{};
   const Http::ResponseHeaderMap* response_headers_{};
   // Retain the route and per-filter config through completion, including route-cache changes.

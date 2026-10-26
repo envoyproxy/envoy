@@ -220,10 +220,6 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
-// Preserve local request-path enforcement for shared global/local route and virtual-host policies.
-// Enabling this moves apply_on_stream_done entries from local request enforcement to completion.
-// TODO(rudrakhp): validate the route-policy migration with maintainers, then flip true.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_local_rate_limit_route_policy_apply_on_stream_done);
 // When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
 // scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
 // TODO: flip to true after sufficient testing.

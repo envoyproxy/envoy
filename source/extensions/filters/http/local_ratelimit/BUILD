@@ -24,7 +24,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/router:header_parser_lib",
-        "//source/common/runtime:runtime_features_lib",
         "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_lib",
