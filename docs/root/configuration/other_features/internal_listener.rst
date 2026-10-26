@@ -69,8 +69,10 @@ form ``internal_listener_close:<local close reason>|internal_listener_upstream_f
 reason>``. Empty fields are omitted.
 
 For example, when a :ref:`tcp_proxy <config_network_filters_tcp_proxy>` filter in the internal listener cannot establish
-an HTTP CONNECT tunnel because the upstream answered ``421``, the client side connection reports
-``internal_listener_close:tcp_initializion_failure:0|internal_listener_upstream_failure:tunnel_response:421``.
+an HTTP CONNECT tunnel because the upstream answered ``421``, an HTTP router that uses the internal listener as its
+upstream reports the response code details
+``upstream_reset_before_response_started{connection_termination|internal_listener_close:tcp_initializion_failure:0|internal_listener_upstream_failure:tunnel_response:421}``,
+and the same reason in ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``.
 
 ``tcp_proxy`` closes a connection with its initialization failure close reason only if it never established its upstream
 connection. A local close reason that starts with ``tcp_initializion_failure:`` therefore means that no data from the

@@ -177,6 +177,10 @@ RUNTIME_GUARD(envoy_reloadable_features_rbac_respect_ignore_path_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_re2_use_latin1_mode);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_for_non_zero_stats);
 RUNTIME_GUARD(envoy_reloadable_features_response_headers_to_remove_on_1xx);
+// When an upstream HTTP stream is reset because its connection to an internal listener failed or
+// closed, report the connection's transport failure reason in the reset details and the upstream
+// transport failure reason.
+RUNTIME_GUARD(envoy_reloadable_features_router_reset_with_connection_failure_reason);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_html_stats_names);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_upstream_stream_duration_header);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);

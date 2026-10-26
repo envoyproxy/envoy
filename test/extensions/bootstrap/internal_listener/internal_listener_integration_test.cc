@@ -3,14 +3,17 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/config/api_version.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/base_integration_test.h"
+#include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 
@@ -310,6 +313,123 @@ TEST_P(InternalListenerResetIntegrationTest, DownstreamHalfClosePreservesNormalC
 INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerResetIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+// An HTTP listener routes to an internal listener whose tcp_proxy tunnels the bytes to the fake
+// upstream over HTTP CONNECT. Verifies that the reason tcp_proxy fails to establish the tunnel is
+// reported to the HTTP router instead of a bare connection termination.
+class InternalListenerTunnelFailureIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  InternalListenerTunnelFailureIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+
+  void initialize() override {
+    useAccessLog("%RESPONSE_CODE% %RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS% "
+                 "%UPSTREAM_TRANSPORT_FAILURE_REASON%");
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
+      bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
+      envoy::extensions::bootstrap::internal_listener::v3::InternalListener
+          internal_listener_config;
+      std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(internal_listener_config);
+
+      // The cluster of the HTTP route, which points to the internal listener.
+      auto* internal_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      internal_cluster->set_name("cluster_internal");
+      auto* load_assignment = internal_cluster->mutable_load_assignment();
+      load_assignment->set_cluster_name("cluster_internal");
+      load_assignment->add_endpoints()
+          ->add_lb_endpoints()
+          ->mutable_endpoint()
+          ->mutable_address()
+          ->mutable_envoy_internal_address()
+          ->set_server_listener_name("internal_listener");
+
+      // The internal listener tunnels the bytes to cluster_0 (the fake upstream) over CONNECT.
+      auto* internal_listener = bootstrap.mutable_static_resources()->add_listeners();
+      internal_listener->set_name("internal_listener");
+      internal_listener->mutable_internal_listener();
+      auto* internal_filter = internal_listener->add_filter_chains()->add_filters();
+      internal_filter->set_name("tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
+      tcp_proxy.set_cluster("cluster_0");
+      tcp_proxy.set_stat_prefix("tcp_proxy_internal");
+      tcp_proxy.mutable_tunneling_config()->set_hostname("actor.example.com:443");
+      std::ignore = internal_filter->mutable_typed_config()->PackFrom(tcp_proxy);
+    });
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_routes(0)
+              ->mutable_route()
+              ->set_cluster("cluster_internal");
+        });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Sends a request, and has the fake upstream reject the CONNECT request of the internal
+  // listener's tcp_proxy with the given status. Returns the access log entry of the request.
+  std::string rejectTunnel(Http::Code status) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+    EXPECT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    EXPECT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    EXPECT_TRUE(upstream_request_->waitForHeadersComplete());
+    EXPECT_EQ("CONNECT", upstream_request_->headers().getMethodValue());
+    upstream_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", std::to_string(enumToInt(status))}}, false);
+    // tcp_proxy resets the rejected CONNECT stream. Wait for the fake upstream to process the reset
+    // before the stream can be destroyed, as the fake upstream runs on its own thread.
+    EXPECT_TRUE(upstream_request_->waitForReset());
+
+    EXPECT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("503", response->headers().getStatusValue());
+    codec_client_->close();
+    return waitForAccessLog(access_log_name_);
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerTunnelFailureIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(InternalListenerTunnelFailureIntegrationTest, TunnelFailureReasonReachesRouter) {
+  initialize();
+  const std::string log = rejectTunnel(Http::Code::MisdirectedRequest);
+  // tcp_proxy closes the internal connection with an initialization failure reason, here
+  // UpstreamFailureReason::ConnectFailed (0), after the upstream rejected its CONNECT request.
+  const std::string close_details =
+      absl::StrCat("internal_listener_close:",
+                   StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
+                   "0|internal_listener_upstream_failure:tunnel_response:421");
+  EXPECT_THAT(log, testing::HasSubstr(absl::StrCat(
+                       "503 UC upstream_reset_before_response_started{connection_termination|",
+                       close_details, "} ", close_details)));
+}
+
+TEST_P(InternalListenerTunnelFailureIntegrationTest, PropagationDisabledOnListenerSide) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.internal_listener_propagate_close_details", "false");
+  initialize();
+  EXPECT_THAT(rejectTunnel(Http::Code::MisdirectedRequest),
+              testing::HasSubstr("503 UC upstream_reset_before_response_started{connection_"
+                                 "termination} -"));
+}
+
+TEST_P(InternalListenerTunnelFailureIntegrationTest, PropagationDisabledOnRouterSide) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.router_reset_with_connection_failure_reason", "false");
+  initialize();
+  EXPECT_THAT(rejectTunnel(Http::Code::MisdirectedRequest),
+              testing::HasSubstr("503 UC upstream_reset_before_response_started{connection_"
+                                 "termination} -"));
+}
 
 } // namespace
 } // namespace Envoy

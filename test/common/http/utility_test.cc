@@ -1425,6 +1425,16 @@ TEST(HttpUtility, ResetReasonToString) {
             Utility::resetReasonToString(Http::StreamResetReason::OverloadManager));
 }
 
+TEST(HttpUtility, IsConnectionResetReason) {
+  EXPECT_TRUE(Utility::isConnectionResetReason(Http::StreamResetReason::LocalConnectionFailure));
+  EXPECT_TRUE(Utility::isConnectionResetReason(Http::StreamResetReason::RemoteConnectionFailure));
+  EXPECT_TRUE(Utility::isConnectionResetReason(Http::StreamResetReason::ConnectionTermination));
+  EXPECT_FALSE(Utility::isConnectionResetReason(Http::StreamResetReason::LocalReset));
+  EXPECT_FALSE(Utility::isConnectionResetReason(Http::StreamResetReason::RemoteReset));
+  EXPECT_FALSE(Utility::isConnectionResetReason(Http::StreamResetReason::ProtocolError));
+  EXPECT_FALSE(Utility::isConnectionResetReason(Http::StreamResetReason::Overflow));
+}
+
 class TestConfig : public Router::RouteSpecificFilterConfig {
 public:
   int state_;

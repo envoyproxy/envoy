@@ -1,4 +1,5 @@
 #include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/router/upstream_request.h"
@@ -82,6 +83,57 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
       Http::TestResponseHeaderMapImpl({{":status", "200"}}));
   EXPECT_CALL(router_filter_interface_, onUpstreamHeaders(_, _, _, _));
   upstream_request_->decodeHeaders(std::move(response_headers), false);
+}
+
+// A reset caused by a connection to an internal listener records the transport failure reason in
+// the upstream info.
+TEST_F(UpstreamRequestTest, ConnectionResetRecordsTransportFailureReason) {
+  initialize();
+  upstream_request_->streamInfo().upstreamInfo()->setUpstreamRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  EXPECT_CALL(router_filter_interface_,
+              onUpstreamReset(Http::StreamResetReason::ConnectionTermination, "failure reason", _));
+  upstream_request_->onResetStream(Http::StreamResetReason::ConnectionTermination,
+                                   "failure reason");
+  EXPECT_EQ("failure reason",
+            upstream_request_->streamInfo().upstreamInfo()->upstreamTransportFailureReason());
+}
+
+// The details of a reset of a connection that is not to an internal listener are not recorded.
+TEST_F(UpstreamRequestTest, NonInternalConnectionResetDoesNotRecordTransportFailureReason) {
+  initialize();
+  upstream_request_->streamInfo().upstreamInfo()->setUpstreamRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 80));
+  EXPECT_CALL(router_filter_interface_,
+              onUpstreamReset(Http::StreamResetReason::ConnectionTermination, "failure reason", _));
+  upstream_request_->onResetStream(Http::StreamResetReason::ConnectionTermination,
+                                   "failure reason");
+  EXPECT_EQ("", upstream_request_->streamInfo().upstreamInfo()->upstreamTransportFailureReason());
+}
+
+// The details of a reset that is not caused by the connection are not a transport failure reason.
+TEST_F(UpstreamRequestTest, StreamResetDoesNotRecordTransportFailureReason) {
+  initialize();
+  upstream_request_->streamInfo().upstreamInfo()->setUpstreamRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  EXPECT_CALL(router_filter_interface_,
+              onUpstreamReset(Http::StreamResetReason::RemoteReset, "details", _));
+  upstream_request_->onResetStream(Http::StreamResetReason::RemoteReset, "details");
+  EXPECT_EQ("", upstream_request_->streamInfo().upstreamInfo()->upstreamTransportFailureReason());
+}
+
+TEST_F(UpstreamRequestTest, ConnectionResetTransportFailureReasonRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.router_reset_with_connection_failure_reason", "false"}});
+  initialize();
+  upstream_request_->streamInfo().upstreamInfo()->setUpstreamRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener"));
+  EXPECT_CALL(router_filter_interface_,
+              onUpstreamReset(Http::StreamResetReason::ConnectionTermination, "failure reason", _));
+  upstream_request_->onResetStream(Http::StreamResetReason::ConnectionTermination,
+                                   "failure reason");
+  EXPECT_EQ("", upstream_request_->streamInfo().upstreamInfo()->upstreamTransportFailureReason());
 }
 
 // UpstreamRequest is responsible for adding proper gRPC annotations to spans.
