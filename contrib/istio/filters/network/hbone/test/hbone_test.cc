@@ -23,7 +23,7 @@ namespace {
 using testing::_;
 using testing::StrictMock;
 
-TEST(ConnectFailureTest, OnlyShimRejectionsArePermanent) {
+TEST(ConnectFailureTest, OnlyAdapterRejectionsArePermanent) {
   for (const auto reason :
        {"tunnel_response:403", "TLS_error:403", "", "istio_hbone_connect_rejected:200",
         "istio_hbone_connect_rejected:500", "istio_hbone_connect_rejected:599",
@@ -218,7 +218,7 @@ TEST_F(HboneSocketTest, RejectsNativeSocketsBeforeConnecting) {
   StrictMock<Network::MockConnectionSocket> connection_socket;
   EXPECT_EQ(-1, socket.connect(connection_socket).return_value_);
   EXPECT_EQ(ConnectState::Phase::Failed, state->phase());
-  EXPECT_EQ("hbone shim requires an internal listener", socket.failureReason());
+  EXPECT_EQ("hbone adapter requires an internal listener", socket.failureReason());
 }
 
 } // namespace

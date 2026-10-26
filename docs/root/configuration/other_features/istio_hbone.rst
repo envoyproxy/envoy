@@ -1,9 +1,9 @@
 .. _config_istio_hbone:
 
 Istio HBONE CONNECT wait
-=======================
+========================
 
-The contrib Istio HBONE CONNECT wait extension delays an internal upstream
+The contrib Istio HBONE CONNECT adapter delays an internal upstream
 connection's readiness until its HTTP/2 CONNECT stream is accepted. A transient
 failure reaches the HTTP router as a connection failure before the router starts
 sending the application request. Routes can retry it using ``connect-failure``,
@@ -40,13 +40,13 @@ transport socket and pool adapter as follows:
      typed_config:
        "@type": type.googleapis.com/envoy.extensions.filters.network.istio_hbone.v3alpha.ConnectionPoolConfig
 
-Keep the service cluster's existing internal endpoints and metadata. Replace the TCP
-proxy on the receiving internal listener with the paired filter, nesting its existing
-TCP proxy settings under ``tcp_proxy``:
+Point the service cluster's internal endpoints at ``connect_originate_hbone_adapter``,
+preserving endpoint identifiers and metadata. On that listener, replace the TCP proxy
+with the paired filter, nesting its existing TCP proxy settings under ``tcp_proxy``:
 
 .. code-block:: yaml
 
-   name: connect_originate
+   name: connect_originate_hbone_adapter
    internal_listener: {}
    filter_chains:
    - filters:
@@ -58,6 +58,10 @@ TCP proxy settings under ``tcp_proxy``:
            cluster: connect_originate
            tunneling_config:
              hostname: "%DOWNSTREAM_LOCAL_ADDRESS%"
+
+Istio's upstream peer-metadata filter recognizes ``connect_originate_hbone_adapter``
+and ``inner_connect_originate_hbone_adapter``. It consumes their metadata preamble
+before forwarding the application response.
 
 Keep any existing original destination listener filter and address restoration needed
 to produce the CONNECT authority. A fixed ``hostname: "app:8080"`` can be used when
@@ -110,12 +114,18 @@ Connection-attempt failure counters can still increase; this does not imply an
 outlier health failure. The local response is not charged as an application response
 in the service cluster's upstream HTTP status counters.
 
+The service cluster's ``upstream_cx_connect_ms`` histogram measures time until the
+application connection becomes ready, including HBONE CONNECT establishment.
+Connection-latency dashboards can therefore show larger values after enabling
+CONNECT wait.
+
 Double HBONE
 ------------
 
-Gate application readiness at the inner CONNECT using the same application
-transport and adapter. Pair a shim filter on the outer origination listener with a
-shim transport on the inner HTTP/2 cluster. Set that transport's ``transport_socket``
+Gate application readiness at the inner CONNECT by pointing the application transport
+at ``inner_connect_originate_hbone_adapter``. Pair an adapter filter on the
+``outer_connect_originate_hbone_adapter`` listener with an adapter transport on the
+``inner_connect_originate`` HTTP/2 cluster. Set that transport's ``transport_socket``
 field to the existing inner TLS transport, retaining all identity validation,
 certificate, SNI and ALPN settings.
 Inner TLS starts only after outer CONNECT acceptance. Its own handshake must still

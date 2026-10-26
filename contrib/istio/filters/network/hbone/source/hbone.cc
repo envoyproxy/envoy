@@ -96,7 +96,7 @@ void UpstreamSocket::setTransportSocketCallbacks(Network::TransportSocketCallbac
       [this]() { completeConnect(); });
   state_->setCallback([this]() { scheduleReady(); });
   if (dynamic_cast<IoSocket::UserSpace::IoHandle*>(&callbacks.ioHandle()) == nullptr) {
-    state_->fail("hbone shim requires an internal listener");
+    state_->fail("hbone adapter requires an internal listener");
   }
 }
 
@@ -228,7 +228,7 @@ void Filter::ConnectCallbacks::onEvent(Network::ConnectionEvent event) {
 Network::FilterStatus Filter::onNewConnection() {
   if (!state_) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                        "hbone shim transport socket is missing");
+                                        "hbone adapter transport socket is missing");
     return Network::FilterStatus::StopIteration;
   }
   const auto* disable_tunneling =
@@ -237,9 +237,9 @@ Network::FilterStatus Filter::onNewConnection() {
           .filterState()
           ->getDataReadOnly<StreamInfo::BoolAccessor>(TcpProxy::DisableTunnelingFilterStateKey);
   if (disable_tunneling != nullptr && disable_tunneling->value()) {
-    state_->fail("hbone shim cannot disable CONNECT tunneling");
+    state_->fail("hbone adapter cannot disable CONNECT tunneling");
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                        "hbone shim cannot disable CONNECT tunneling");
+                                        "hbone adapter cannot disable CONNECT tunneling");
     return Network::FilterStatus::StopIteration;
   }
   return TcpProxy::Filter::onNewConnection();

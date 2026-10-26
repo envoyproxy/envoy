@@ -16,7 +16,7 @@ namespace Extensions {
 namespace Istio {
 namespace Hbone {
 
-// Only shim-generated failures use this marker across connection pool boundaries.
+// Only adapter-generated failures use this marker across connection pool boundaries.
 // Ordinary transport errors and application response codes are never classified here.
 std::optional<uint32_t> permanentConnectRejection(absl::string_view reason);
 

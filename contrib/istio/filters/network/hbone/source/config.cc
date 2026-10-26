@@ -26,12 +26,12 @@ absl::StatusOr<Network::FilterFactoryCb> FilterConfigFactory::createFilterFactor
     const FilterConfig& config, Server::Configuration::FactoryContext& context) {
   const auto& tcp = config.tcp_proxy();
   if (!tcp.has_tunneling_config() || tcp.tunneling_config().use_post()) {
-    return absl::InvalidArgumentError("HBONE shim requires HTTP CONNECT tunneling");
+    return absl::InvalidArgumentError("HBONE adapter requires HTTP CONNECT tunneling");
   }
   if (tcp.upstream_connect_mode() !=
       envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE) {
     return absl::InvalidArgumentError(
-        "HBONE shim requires immediate upstream connection establishment");
+        "HBONE adapter requires immediate upstream connection establishment");
   }
   auto shared_config = std::make_shared<TcpProxy::Config>(tcp, context);
   return Network::FilterFactoryCb([shared_config, &context](Network::FilterManager& manager) {

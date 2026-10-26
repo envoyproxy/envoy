@@ -32,6 +32,8 @@ envoy_cc_contrib_extension(
     ],
 )
 
+# Selecting the filter (or transport alias) also links the application pool
+# factories required by CONNECT wait.
 envoy_cc_contrib_extension(
     name = "config",
     srcs = ["config.cc"],

@@ -28,7 +28,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 message Config {
   // TCP proxy settings. HTTP CONNECT tunneling and immediate upstream connection
   // establishment are required. Application TLS and PROXY protocol wrapping of
-  // the internal connection are not supported by this shim.
+  // the internal connection are not supported by this adapter.
   envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy tcp_proxy = 1
       [(validate.rules).message = {required: true}];
 }
@@ -46,7 +46,7 @@ message UpstreamConfig {
 
   // Optional wrapped transport, started only after CONNECT acceptance. Defaults
   // to raw buffer. Use TLS here on the inner HTTP/2 cluster of double HBONE, with
-  // a paired shim filter on the outer origination listener.
+  // a paired adapter filter on the outer origination listener.
   envoy.config.core.v3.TransportSocket transport_socket = 2;
 }
 
@@ -54,7 +54,7 @@ message UpstreamConfig {
 // permanent CONNECT rejections before router retry and outlier accounting.
 // HTTP callers receive the rejected 4xx status (502 for other non-5xx statuses);
 // TCP callers are closed. Successful connections and transient failures retain
-// the standard pool behavior. Must be deployed together with the shim sockets.
+// the standard pool behavior. Must be deployed together with the adapter sockets.
 // [#extension: envoy.upstreams.istio_hbone]
 message ConnectionPoolConfig {
 }

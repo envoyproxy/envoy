@@ -255,19 +255,19 @@ value:
 INSTANTIATE_TEST_SUITE_P(TcpProxyPoolImplementations, HboneIntegrationTest, testing::Bool());
 
 TEST_P(HboneIntegrationTest, SingleHbonePeerMetadataIsRemovedBeforeHttpResponse) {
-  testPeerMetadataResponse("connect_originate_hbone_shim", true);
+  testPeerMetadataResponse("connect_originate_hbone_adapter", true);
 }
 
 TEST_P(HboneIntegrationTest, InnerHbonePeerMetadataIsRemovedBeforeHttpResponse) {
-  testPeerMetadataResponse("inner_connect_originate_hbone_shim", true);
+  testPeerMetadataResponse("inner_connect_originate_hbone_adapter", true);
 }
 
 TEST_P(HboneIntegrationTest, SingleHboneEmptyPeerMetadataIsRemovedBeforeHttpResponse) {
-  testPeerMetadataResponse("connect_originate_hbone_shim", false);
+  testPeerMetadataResponse("connect_originate_hbone_adapter", false);
 }
 
 TEST_P(HboneIntegrationTest, InnerHboneEmptyPeerMetadataIsRemovedBeforeHttpResponse) {
-  testPeerMetadataResponse("inner_connect_originate_hbone_shim", false);
+  testPeerMetadataResponse("inner_connect_originate_hbone_adapter", false);
 }
 
 TEST_P(HboneIntegrationTest, ConnectRejectionIsConnectionFailureWithoutPayload) {

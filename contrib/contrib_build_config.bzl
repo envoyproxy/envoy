@@ -26,22 +26,27 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.filters.network.client_ssl_auth":                    "//contrib/client_ssl_auth/filters/network/source:config",
+    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
+    "envoy.filters.network.istio_hbone":                        "//contrib/istio/filters/network/hbone/source:config",
     "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source/broker:config_lib",
     "envoy.filters.network.kafka_mesh":                         "//contrib/kafka/filters/network/source/mesh:config_lib",
+    "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
     "envoy.filters.network.mysql_proxy":                        "//contrib/mysql_proxy/filters/network/source:config",
+    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
     "envoy.filters.network.postgres_proxy":                     "//contrib/postgres_proxy/filters/network/source:config",
     "envoy.filters.network.rocketmq_proxy":                     "//contrib/rocketmq_proxy/filters/network/source:config",
-    "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
-    "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",
-    "envoy.filters.network.peer_metadata":                      "//contrib/istio/filters/network/peer_metadata/source:config",
-    "envoy.filters.network.istio_hbone":                        "//contrib/istio/filters/network/hbone/source:config",
 
     #
     # Transport sockets
     #
 
     "envoy.transport_sockets.istio_hbone":                      "//contrib/istio/filters/network/hbone/source:upstream_config",
-    "envoy.upstreams.istio_hbone":                             "//contrib/istio/filters/network/hbone/source:pool_config",
+
+    #
+    # Upstreams
+    #
+
+    "envoy.upstreams.istio_hbone":                              "//contrib/istio/filters/network/hbone/source:pool_config",
 
     #
     # Listener filters

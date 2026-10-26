@@ -89,6 +89,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/client_ssl_auth/v3:pkg",
         "//contrib/envoy/extensions/filters/network/generic_proxy/codecs/kafka/v3:pkg",
         "//contrib/envoy/extensions/filters/network/golang/v3alpha:pkg",
+        "//contrib/envoy/extensions/filters/network/istio_hbone/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_broker/v3:pkg",
         "//contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/metadata_exchange/v3:pkg",

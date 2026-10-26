@@ -631,14 +631,13 @@ TEST_F(PeerMetadataUpstreamFilterTestBase, TestNoPeerPopulatedWhenRegistryEmpty)
   EXPECT_EQ(data.toString(), payload);
 }
 
-INSTANTIATE_TEST_SUITE_P(Modes, PeerMetadataUpstreamFilterTest,
-                         ::testing::Combine(::testing::Values(ExchangePath::DataStreamPreamble,
-                                                              ExchangePath::ThreadLocalRegistry),
-                                            ::testing::Values("connect_originate",
-                                                              "inner_connect_originate",
-                                                              "connect_originate_hbone_shim",
-                                                              "inner_connect_originate_hbone_shim",
-                                                              "internal_outbound")));
+INSTANTIATE_TEST_SUITE_P(
+    Modes, PeerMetadataUpstreamFilterTest,
+    ::testing::Combine(
+        ::testing::Values(ExchangePath::DataStreamPreamble, ExchangePath::ThreadLocalRegistry),
+        ::testing::Values("connect_originate", "inner_connect_originate",
+                          "connect_originate_hbone_adapter",
+                          "inner_connect_originate_hbone_adapter", "internal_outbound")));
 
 } // namespace
 } // namespace PeerMetadata

@@ -41,12 +41,12 @@ bool allowedInternalListener(const Network::Address::Instance& address) {
   if (!name) {
     return false;
   }
-  // The readiness-gated shim listeners retain the same peer-metadata exchange.
+  // The readiness-gated adapter listeners retain the same peer-metadata exchange.
   // Their preamble must also be consumed before reaching the application codec.
   // internal_outbound is a listener name used in proxy e2e tests, so we allow it here as well.
   return *name == "connect_originate" || *name == "inner_connect_originate" ||
-         *name == "connect_originate_hbone_shim" || *name == "inner_connect_originate_hbone_shim" ||
-         *name == "internal_outbound";
+         *name == "connect_originate_hbone_adapter" ||
+         *name == "inner_connect_originate_hbone_adapter" || *name == "internal_outbound";
 }
 
 bool discoveryDisabled(const ::envoy::config::core::v3::Metadata& metadata) {
@@ -311,7 +311,7 @@ void UpstreamFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks&
 
 // We want to enable baggage based peer metadata discovery if all of the following is true
 // - the upstream host is an internal listener, and specifically connect_originate or
-//   inner_connect_originate internal listener (including their shim variants) - those
+//   inner_connect_originate internal listener (including their adapter variants) - those
 //   are the only production listeners that support baggage-based peer metadata discovery
 // - communication with upstream happens in plain text, e.g., there is no TLS upstream
 //   transport socket or PROXY transport socket there - we need it in the current
