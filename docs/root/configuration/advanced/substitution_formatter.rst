@@ -491,6 +491,20 @@ Current supported substitution commands include:
 
   Renders a numeric value in typed JSON logs.
 
+``%ROUTE_RESOLUTION_TIME_US%``
+  HTTP
+    Total wall time in microseconds spent resolving the route for the request. A request that never
+    resolved a route will appear as ``"-"`` in the access logs.
+
+  Renders a numeric value in typed JSON logs.
+
+``%ROUTE_RESOLUTION_COUNT%``
+  HTTP
+    Number of times the route was resolved for the request. A request that never resolved a route
+    will appear as ``0``.
+
+  Renders a numeric value in typed JSON logs.
+
 ``%DOWNSTREAM_HANDSHAKE_DURATION%``
   HTTP
     Not implemented. It will appear as ``"-"`` in the access logs.
@@ -1437,6 +1451,13 @@ Current supported substitution commands include:
   UDP
     Not implemented. It will appear as ``"-"`` in the access logs.
 
+``%DOWNSTREAM_PEER_CERT_CHAIN%``
+  HTTP/TCP/THRIFT
+    The client certificate chain used to establish the downstream TLS connection in URL-encoded PEM format.
+    The certificate chain includes the leaf certificate.
+  UDP
+    Not implemented. It will appear as ``"-"`` in the access logs.
+
 ``%TLS_JA3_FINGERPRINT%``
   HTTP/TCP/Thrift
     The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
@@ -1599,6 +1620,9 @@ Current supported substitution commands include:
 
 ``%HOSTNAME%``
   The system hostname.
+
+``%ENVOY_VERSION%``
+  The version string of the Envoy binary, including the repository revision and the build type.
 
 ``%LOCAL_REPLY_BODY%``
   The body text for the requests rejected by the Envoy.

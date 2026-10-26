@@ -327,6 +327,12 @@ TEST_F(DynamicModuleAccessLogTest, MetricsInvalidId) {
             envoy_dynamic_module_callback_access_logger_set_gauge(static_cast<void*>(config_.get()),
                                                                   999, 1));
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_increment_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
+            envoy_dynamic_module_callback_access_logger_decrement_gauge(
+                static_cast<void*>(config_.get()), 999, 1));
+  EXPECT_EQ(envoy_dynamic_module_type_metrics_result_MetricNotFound,
             envoy_dynamic_module_callback_access_logger_record_histogram_value(
                 static_cast<void*>(config_.get()), 999, 1));
 }

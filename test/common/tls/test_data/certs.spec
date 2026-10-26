@@ -138,6 +138,9 @@ cfg = san_dns_cert.cfg
 issuer = intermediate_ca
 info_header = san_dns4_cert_info.h
 
+[concat san_dns4_chain.pem]
+parts = san_dns4, intermediate_ca
+
 [cert san_wildcard_dns]
 key = san_wildcard_dns_key.pem
 cfg = san_wildcard_dns_cert.cfg
@@ -428,8 +431,8 @@ revoke = san_dns3
 [concat intermediate_ca_cert_chain.crl]
 parts = ca_cert.crl, intermediate_ca_cert.crl
 
-[concat intermediate_ca_cert_chain_with_crl.pem]
-parts = ca, intermediate_ca, intermediate_ca_cert.crl
+[concat ca_cert_with_intermediate_crl.pem]
+parts = ca, intermediate_ca_cert.crl
 
-[concat intermediate_ca_cert_chain_with_crl_chain.pem]
-parts = ca, intermediate_ca, ca_cert.crl, intermediate_ca_cert.crl
+[concat ca_cert_with_both_crls.pem]
+parts = ca, ca_cert.crl, intermediate_ca_cert.crl

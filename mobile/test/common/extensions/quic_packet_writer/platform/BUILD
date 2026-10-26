@@ -9,7 +9,6 @@ envoy_cc_test(
     srcs = [
         "platform_packet_writer_factory_test.cc",
     ],
-    repository = "@envoy",
     deps = [
         "//library/common/extensions/quic_packet_writer/platform:platform_packet_writer_factory",
         "@envoy//source/common/network:udp_packet_writer_handler_lib",

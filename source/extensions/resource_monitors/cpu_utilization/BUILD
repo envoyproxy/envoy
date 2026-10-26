@@ -51,6 +51,8 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/server:cgroup_cpu_util_lib",
+        "//source/server:options_base",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/resource_monitors/cpu_utilization/v3:pkg_cc_proto",
     ],

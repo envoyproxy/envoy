@@ -278,6 +278,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   OptRef<WebTransportSession> webTransportSession() override;
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
   void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+  void injectDecodedHeadersToFilterChain(bool end_stream) override;
   RequestTrailerMap& addDecodedTrailers() override;
   MetadataMapVector& addDecodedMetadata() override;
   void continueDecoding() override;
@@ -369,6 +370,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   // Http::StreamEncoderFilterCallbacks
   void addEncodedData(Buffer::Instance& data, bool streaming) override;
   void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) override;
+  void injectEncodedHeadersToFilterChain(bool end_stream) override;
   ResponseTrailerMap& addEncodedTrailers() override;
   void addEncodedMetadata(MetadataMapPtr&& metadata_map) override;
   void onEncoderFilterAboveWriteBufferHighWatermark() override;
@@ -935,7 +937,9 @@ public:
   uint64_t streamId() const { return stream_id_; }
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
-  Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
+  // Drains all request body buffered in the filter chain, in original stream order. Used to proxy
+  // the already-received body when the stream is recreated.
+  Buffer::InstancePtr takeBufferedRequestData();
 
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 

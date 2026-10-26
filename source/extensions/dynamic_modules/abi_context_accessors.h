@@ -26,8 +26,15 @@ using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
  */
 class ContextAccessor {
 public:
+  struct HttpAttributeContext {
+    const Http::RequestHeaderMap* request_headers{};
+    const Http::ResponseHeaderMap* response_headers{};
+    const Http::ResponseTrailerMap* response_trailers{};
+    const Http::RequestTrailerMap* request_trailers{};
+  };
+
   // Resolve the header map for the given type from the formatting context. Supported types are
-  // RequestHeader, ResponseHeader, and ResponseTrailer.
+  // RequestHeader, RequestTrailer, ResponseHeader, and ResponseTrailer.
   static HeadersMapOptConstRef headerMapByType(const Formatter::Context& context,
                                                envoy_dynamic_module_type_http_header_type type);
 
@@ -51,6 +58,13 @@ public:
   // Get an integer attribute from the stream info. Returns false when the attribute is unavailable
   // or not an integer.
   static bool getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                              envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result,
+                              const HttpAttributeContext* http_context = nullptr);
+
+  // Get an integer attribute using the formatting context for HTTP header state. HTTP-only
+  // attributes are unavailable for non-HTTP streams.
+  static bool getAttributeInt(const StreamInfo::StreamInfo& stream_info,
+                              const Formatter::Context& context,
                               envoy_dynamic_module_type_attribute_id attribute_id,
                               uint64_t* result);
 
@@ -58,6 +72,12 @@ public:
   // or not a boolean.
   static bool getAttributeBool(const StreamInfo::StreamInfo& stream_info,
                                envoy_dynamic_module_type_attribute_id attribute_id, bool* result);
+
+  // fill timing_out with the stream's timing snapshot, using -1 for unavailable values
+  static void getTimingInfo(const StreamInfo::StreamInfo* stream_info,
+                            envoy_dynamic_module_type_timing_info* timing_out);
+  static void getTimingInfoV2(const StreamInfo::StreamInfo* stream_info,
+                              envoy_dynamic_module_type_timing_info_v2* timing_out);
 
   // Get a string value from dynamic metadata by filter name and dotted key path. Returns false
   // when the path is absent or the value is not a string.
@@ -108,11 +128,12 @@ public:
                                 const envoy_dynamic_module_type_module_key_value_pair* entries,
                                 size_t entries_size);
 
-  // Set a string value in filter state. When life_span is set, it is passed to setData.
-  static bool
-  setFilterStateBytes(StreamInfo::StreamInfo& stream_info, absl::string_view key,
-                      absl::string_view value,
-                      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt);
+  // Set a string value in filter state. When life_span or stream_sharing is set, it is passed to
+  // setData.
+  static bool setFilterStateBytes(
+      StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt,
+      std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing = std::nullopt);
 
   // Set a typed filter state object from serialized bytes using the registered ObjectFactory.
   static bool

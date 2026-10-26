@@ -28,6 +28,18 @@ HttpAccessLoggerImpl::HttpAccessLoggerImpl(
     const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
         config,
     Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context)
+    : HttpAccessLoggerImpl(cluster_manager, http_service, std::move(headers_applicator), config,
+                           dispatcher, server_context,
+                           ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{}) {}
+
+HttpAccessLoggerImpl::HttpAccessLoggerImpl(
+    Upstream::ClusterManager& cluster_manager,
+    const envoy::config::core::v3::HttpService& http_service,
+    std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
+    const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+        config,
+    Event::Dispatcher& dispatcher, Server::Configuration::ServerFactoryContext& server_context,
+    const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider)
     : cluster_manager_(cluster_manager), http_service_(http_service),
       headers_applicator_(std::move(headers_applicator)),
       buffer_flush_interval_(getBufferFlushInterval(config)),
@@ -36,7 +48,7 @@ HttpAccessLoggerImpl::HttpAccessLoggerImpl(
           POOL_COUNTER_PREFIX(server_context.serverScope(),
                               absl::StrCat(OtlpAccessLogStatsPrefix, config.stat_prefix())))}) {
 
-  root_ = initOtlpMessageRoot(message_, config, server_context.localInfo());
+  root_ = initOtlpMessageRoot(message_, config, server_context, resource_provider);
 
   // Sets up the flush timer.
   flush_timer_ = dispatcher.createTimer([this]() {
@@ -153,6 +165,16 @@ HttpAccessLoggerImpl::SharedPtr HttpAccessLoggerCacheImpl::getOrCreateLogger(
         config,
     const envoy::config::core::v3::HttpService& http_service,
     std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator) {
+  return getOrCreateLogger(config, http_service, std::move(headers_applicator),
+                           ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProviderImpl{});
+}
+
+HttpAccessLoggerImpl::SharedPtr HttpAccessLoggerCacheImpl::getOrCreateLogger(
+    const envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig&
+        config,
+    const envoy::config::core::v3::HttpService& http_service,
+    std::shared_ptr<const Http::HttpServiceHeadersApplicator> headers_applicator,
+    const ::Envoy::Extensions::Tracers::OpenTelemetry::ResourceProvider& resource_provider) {
   auto& cache = tls_slot_->getTyped<ThreadLocalCache>();
   const std::size_t config_hash = MessageUtil::hash(config) ^ MessageUtil::hash(http_service);
 
@@ -161,9 +183,9 @@ HttpAccessLoggerImpl::SharedPtr HttpAccessLoggerCacheImpl::getOrCreateLogger(
     return it->second;
   }
 
-  auto logger = std::make_shared<HttpAccessLoggerImpl>(server_context_.clusterManager(),
-                                                       http_service, std::move(headers_applicator),
-                                                       config, cache.dispatcher_, server_context_);
+  auto logger = std::make_shared<HttpAccessLoggerImpl>(
+      server_context_.clusterManager(), http_service, std::move(headers_applicator), config,
+      cache.dispatcher_, server_context_, resource_provider);
   cache.access_loggers_.emplace(config_hash, logger);
   return logger;
 }

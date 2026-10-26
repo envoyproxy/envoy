@@ -166,12 +166,29 @@ private:
                        envoy_dynamic_module_type_module_http_header* headers_vector,
                        size_t headers_vector_size);
 
+  // Applies a terminal downstream response captured during a module hook. This may destroy the
+  // bridge, so callers must invoke it last and touch no member afterwards.
+  void applyPendingResponse();
+
+  // A terminal downstream response captured during a module hook.
+  enum class PendingResponse { None, Response, Headers, Data, Trailers };
+
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   BridgeConfigSharedPtr config_;
   envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr in_module_bridge_ = nullptr;
 
   bool downstream_complete_ = false;
+
+  // True only while a module event hook is on the stack. A terminal downstream response requested
+  // during a hook is deferred while this is set and applied after the hook returns, so the router
+  // never resets and destroys this bridge underneath a live module borrow.
+  bool in_module_hook_ = false;
+
+  PendingResponse pending_response_ = PendingResponse::None;
+  Envoy::Http::ResponseHeaderMapPtr pending_headers_;
+  Envoy::Http::ResponseTrailerMapPtr pending_trailers_;
+  std::string pending_body_;
 
   const Envoy::Http::RequestHeaderMap* request_headers_ = nullptr;
   // Owned copies of the data passed to the module so the buffer pointer never outlives its storage.

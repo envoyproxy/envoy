@@ -905,7 +905,8 @@ TEST_F(DynamicModulesLoadBalancerTest, HostHealthByAddressSuccess) {
   host_map->insert({"10.0.0.1:8080", host1_});
   host_map->insert({"10.0.0.2:8080", host2_});
   host_map->insert({"10.0.0.3:8080", host3_});
-  ON_CALL(priority_set_, crossPriorityHostMap()).WillByDefault(Return(host_map));
+  ON_CALL(priority_set_, crossPriorityHostMap())
+      .WillByDefault(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;
@@ -2321,7 +2322,7 @@ TEST_F(DynamicModulesLoadBalancerTest, MetricsFrozenAfterInit) {
 }
 
 // Drives concurrent labeled increments from multiple threads to verify no data race in the
-// shared `stat_name_pool_`. Run under `--config=tsan` to verify.
+// registry's shared stat name pool. Run under `--config=tsan` to verify.
 TEST_F(DynamicModulesLoadBalancerTest, MetricsConcurrentIncrementCounterVecNoRace) {
   envoy::extensions::load_balancing_policies::dynamic_modules::v3::DynamicModulesLoadBalancerConfig
       config;

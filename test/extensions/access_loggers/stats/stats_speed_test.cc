@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "source/common/stats/allocator_impl.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/tag_utility.h"
@@ -30,10 +32,13 @@ public:
       return;
     }
 
-    Stats::TagUtility::TagStatNameJoiner joiner(Stats::StatName(), stat_name,
-                                                Stats::Scope::toTagSpan(tags),
-                                                logger_->scope().symbolTable());
-    Stats::StatName joined_name = joiner.nameWithTags();
+    // The joiner holds the joined bytes in its own footprint and is not movable, so it is
+    // allocated here: joined_name points into it and is used as the map key, which requires the
+    // bytes to keep a stable address once the joiner is owned by the map.
+    auto joiner = std::make_unique<Stats::TagUtility::TagStatNameJoiner>(
+        Stats::StatName(), stat_name, Stats::Scope::toTagSpan(tags),
+        logger_->scope().symbolTable());
+    Stats::StatName joined_name = joiner->nameWithTags();
     auto it = inflight_gauges_.find(joined_name);
     if (it == inflight_gauges_.end()) {
       auto [new_it, inserted] = inflight_gauges_.try_emplace(
@@ -71,13 +76,14 @@ private:
   struct InflightGaugeNew {
     InflightGaugeNew(uint64_t value, Stats::Gauge::ImportMode import_mode,
                      std::vector<Stats::StatNameDynamicStorage> tags_storage,
-                     Stats::TagUtility::TagStatNameJoiner&& joiner)
+                     std::unique_ptr<Stats::TagUtility::TagStatNameJoiner> joiner)
         : value_(value), import_mode_(import_mode), tags_storage_(std::move(tags_storage)),
           joiner_(std::move(joiner)) {}
     uint64_t value_;
     Stats::Gauge::ImportMode import_mode_;
     std::vector<Stats::StatNameDynamicStorage> tags_storage_;
-    Stats::TagUtility::TagStatNameJoiner joiner_;
+    // Owns the bytes that this entry's map key points into; see addInflightGauge().
+    std::unique_ptr<Stats::TagUtility::TagStatNameJoiner> joiner_;
   };
   absl::node_hash_map<Stats::StatName, InflightGaugeNew> inflight_gauges_;
 };

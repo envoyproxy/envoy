@@ -16,11 +16,15 @@ namespace Quic {
 // DER-encoded `certs` are checked against `context`, the server context of the connection's matched
 // filter chain, so validation always uses the trust anchor of the chain that requested the
 // certificate. Sets `*error_details` and `*details`, sets `*out_alert` when a TLS alert is
-// available, and returns `QUIC_SUCCESS` or `QUIC_FAILURE`.
-quic::QuicAsyncStatus verifyQuicClientCertChain(
-    const std::vector<absl::string_view>& certs,
-    Extensions::TransportSockets::Tls::ContextImpl& context, std::string* error_details,
-    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert = nullptr);
+// available, and returns `QUIC_SUCCESS` or `QUIC_FAILURE`. When `cert_validated` is not null, it is
+// set to true only when the certificate chains to the configured trust anchor, and false when the
+// chain is accepted without trust validation such as with `ACCEPT_UNTRUSTED`.
+quic::QuicAsyncStatus
+verifyQuicClientCertChain(const std::vector<absl::string_view>& certs,
+                          Extensions::TransportSockets::Tls::ContextImpl& context,
+                          std::string* error_details,
+                          std::unique_ptr<quic::ProofVerifyDetails>* details,
+                          uint8_t* out_alert = nullptr, bool* cert_validated = nullptr);
 
 } // namespace Quic
 } // namespace Envoy

@@ -70,10 +70,40 @@ envoy_cc_library(
     hdrs = ["decoded_resource_impl.h"],
     deps = [
         "//envoy/config:subscription_interface",
-        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
         "@xds//xds/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "dependent_type_urls_lib",
+    srcs = ["dependent_type_urls.cc"],
+    hdrs = ["dependent_type_urls.h"],
+    deps = [
+        ":resource_name_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings:string_view",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "dependent_type_pausing_subscription_lib",
+    srcs = ["dependent_type_pausing_subscription.cc"],
+    hdrs = ["dependent_type_pausing_subscription.h"],
+    deps = [
+        ":dependent_type_urls_lib",
+        "//envoy/common:exception_lib",
+        "//envoy/config:subscription_interface",
+        "//envoy/config:xds_manager_interface",
+        "@abseil-cpp//absl/functional:function_ref",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )
 
@@ -102,14 +132,17 @@ envoy_cc_library(
     srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
     deps = [
+        "//envoy/common:exception_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/registry",
         "//envoy/singleton:manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:thread_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/shared_pool:shared_pool_lib",
+        "@abseil-cpp//absl/status:statusor",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
     ],
@@ -120,7 +153,6 @@ envoy_cc_library(
     hdrs = ["opaque_resource_decoder_impl.h"],
     deps = [
         "//envoy/config:subscription_interface",
-        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
@@ -189,12 +221,15 @@ envoy_cc_library(
     hdrs = ["subscription_factory_impl.h"],
     deps = [
         ":custom_config_validators_lib",
+        ":dependent_type_pausing_subscription_lib",
+        ":singleton_subscription_adapter_lib",
         ":type_to_endpoint_lib",
         ":utility_lib",
         ":xds_resource_lib",
         "//envoy/config:subscription_factory_interface",
         "//envoy/config:subscription_interface",
         "//envoy/config:xds_config_tracker_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/config:xds_resources_delegate_interface",
         "//envoy/server:instance_interface",
         "//envoy/upstream:cluster_manager_interface",
@@ -278,6 +313,7 @@ envoy_cc_library(
         "//envoy/config:custom_config_validators_interface",
         "//envoy/server:instance_interface",
         "//source/common/config:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
@@ -321,6 +357,7 @@ envoy_cc_library(
     hdrs = ["xds_manager_impl.h"],
     deps = [
         ":null_grpc_mux_lib",
+        ":singleton_subscription_adapter_lib",
         ":subscription_factory_lib",
         ":utility_lib",
         "//envoy/config:xds_manager_interface",

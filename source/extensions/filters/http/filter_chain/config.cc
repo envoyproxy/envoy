@@ -102,11 +102,11 @@ FilterChainFilterFactory::createHttpFilterRouteConfigTyped(
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
-  // TODO(wbpcode): use the route name or vhost name as stats prefix?
-  // The init manager of the enclosing route configuration, if any, is handed to the filters of the
-  // embedded filter chain so that they can warm up their own resources.
-  auto filter_config = std::make_shared<FilterChainPerRouteConfig>(
-      proto_config, context, "filter_chain.", extra_context.init_manager, creation_status);
+  // The filters of the embedded filter chain get the stats prefix and the init manager of the
+  // enclosing context, if any, as they would if they were configured there directly.
+  auto filter_config =
+      std::make_shared<FilterChainPerRouteConfig>(proto_config, context, extra_context.stats_prefix,
+                                                  extra_context.init_manager, creation_status);
   RETURN_IF_NOT_OK(creation_status);
   return filter_config;
 }

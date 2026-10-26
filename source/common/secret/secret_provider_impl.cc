@@ -11,19 +11,34 @@
 namespace Envoy {
 namespace Secret {
 
-absl::StatusOr<std::unique_ptr<ThreadLocalGenericSecretProvider>>
+void ThreadLocalGenericSecretProviderDeleter::operator()(
+    ThreadLocalGenericSecretProvider* provider) const {
+  if (provider == nullptr) {
+    return;
+  }
+  Event::Dispatcher& main_dispatcher = provider->main_dispatcher_;
+  if (main_dispatcher.isThreadSafe()) {
+    delete provider;
+    return;
+  }
+  main_dispatcher.post([owned = std::unique_ptr<ThreadLocalGenericSecretProvider>(
+                            provider)]() mutable { owned.reset(); });
+}
+
+absl::StatusOr<ThreadLocalGenericSecretProviderPtr>
 ThreadLocalGenericSecretProvider::create(GenericSecretConfigProviderSharedPtr&& provider,
-                                         ThreadLocal::SlotAllocator& tls, Api::Api& api) {
+                                         ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                                         Event::Dispatcher& main_dispatcher) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<ThreadLocalGenericSecretProvider>(
-      new ThreadLocalGenericSecretProvider(std::move(provider), tls, api, creation_status));
+  auto ret = ThreadLocalGenericSecretProviderPtr(new ThreadLocalGenericSecretProvider(
+      std::move(provider), tls, api, main_dispatcher, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 ThreadLocalGenericSecretProvider::ThreadLocalGenericSecretProvider(
     GenericSecretConfigProviderSharedPtr&& provider, ThreadLocal::SlotAllocator& tls, Api::Api& api,
-    absl::Status& creation_status)
-    : provider_(provider), api_(api),
+    Event::Dispatcher& main_dispatcher, absl::Status& creation_status)
+    : provider_(provider), api_(api), main_dispatcher_(main_dispatcher),
       tls_(std::make_unique<ThreadLocal::TypedSlot<ThreadLocalSecret>>(tls)),
       cb_(provider_->addUpdateCallback([this] { return update(); })) {
   std::string value;

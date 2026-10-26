@@ -107,7 +107,7 @@ public:
   absl::StatusOr<OpenTelemetryTraceExporterPtr>
   createExporter(const Protobuf::Message& config,
                  Server::Configuration::TracerFactoryContext& /*context*/) const override {
-    EXPECT_NE(dynamic_cast<const Protobuf::Empty*>(&config), nullptr);
+    EXPECT_NE(Envoy::Protobuf::DynamicCastMessage<Protobuf::Empty>(&config), nullptr);
     return std::make_unique<DummyTraceExporter>();
   }
 

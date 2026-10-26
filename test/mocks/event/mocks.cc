@@ -1,5 +1,7 @@
 #include "mocks.h"
 
+#include "source/common/event/worker_id.h"
+
 #include "absl/functional/any_invocable.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,7 +21,8 @@ namespace Event {
 
 MockDispatcher::MockDispatcher() : MockDispatcher("test_thread") {}
 
-MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
+MockDispatcher::MockDispatcher(const std::string& name)
+    : worker_id_(workerIdFromThreadName(name)), name_(name) {
   time_system_ = std::make_unique<GlobalTimeSystem>();
   auto thread_factory = &Api::createApiForTest()->threadFactory();
   Envoy::Thread::ThreadId thread_id = thread_factory->currentThreadId();

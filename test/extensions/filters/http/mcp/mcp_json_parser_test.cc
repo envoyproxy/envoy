@@ -23,6 +23,7 @@ using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Contains;
 using ::testing::DoubleEq;
 using ::testing::HasSubstr;
+using ::testing::IsEmpty;
 using ::testing::Not;
 using ::testing::Pointee;
 using ::testing::UnorderedElementsAre;
@@ -63,6 +64,98 @@ TEST_F(McpJsonParserTest, MetaFieldWithDotInKey) {
   const auto* meta = parser_->getNestedValue("params._meta");
   EXPECT_THAT(meta, Pointee(IsStructValueStruct(UnorderedElementsAre(
                         IsStructString("io.modelcontextprotocol/protocolVersion", "2026-07-28")))));
+}
+
+TEST_F(McpJsonParserTest, DottedObjectKeyFollowedBySiblingField) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "config.json": {"foo": "bar"},
+      "name": "my_tool"
+    }
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->hasAllRequiredFields());
+  EXPECT_THAT(parser_->getNestedValue("params.name"), Pointee(IsStructValueString("my_tool")));
+}
+
+TEST_F(McpJsonParserTest, DottedObjectKeyFollowedByMultipleSiblingFields) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "config.json": {"nested.key": {"foo": "bar"}},
+      "name": "my_tool",
+      "_meta": {"trace_id": "t1"}
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->hasAllRequiredFields());
+
+  // Only the configured fields are extracted; nothing from the dotted object leaks into params.
+  EXPECT_THAT(
+      parser_->getNestedValue("params"),
+      Pointee(IsStructValueStruct(UnorderedElementsAre(
+          IsStructString("name", "my_tool"),
+          IsStructStruct("_meta", UnorderedElementsAre(IsStructString("trace_id", "t1")))))));
+  EXPECT_THAT(parser_->metadata().fields(), Contains(IsStructNumber("id", 1)));
+}
+
+TEST_F(McpJsonParserTest, DottedObjectArgumentKeepsNameAndMetaExtractable) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "arguments": {
+        "config.json": {
+          "foo": "bar"
+        }
+      },
+      "name": "my_tool",
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {}
+      }
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->hasAllRequiredFields());
+
+  EXPECT_THAT(parser_->getNestedValue("params.name"), Pointee(IsStructValueString("my_tool")));
+  EXPECT_THAT(parser_->getNestedValue("params._meta"),
+              Pointee(IsStructValueStruct(UnorderedElementsAre(
+                  IsStructString("io.modelcontextprotocol/protocolVersion", "2026-07-28"),
+                  IsStructStruct("io.modelcontextprotocol/clientCapabilities", IsEmpty())))));
+  EXPECT_EQ(parser_->getNestedValue("params.arguments"), nullptr);
+  EXPECT_THAT(parser_->metadata().fields(), Contains(IsStructNumber("id", 1)));
+}
+
+TEST_F(McpJsonParserTest, DottedObjectKeyInMetaFollowedBySiblingFields) {
+  std::string json = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "_meta": {"io.modelcontextprotocol/clientCapabilities": {}},
+      "name": "my_tool"
+    },
+    "id": 1
+  })";
+
+  EXPECT_OK(parser_->parse(json));
+  EXPECT_TRUE(parser_->isValidMcpRequest());
+  EXPECT_TRUE(parser_->hasAllRequiredFields());
+  EXPECT_THAT(parser_->getNestedValue("params.name"), Pointee(IsStructValueString("my_tool")));
+  EXPECT_THAT(parser_->metadata().fields(), Contains(IsStructNumber("id", 1)));
 }
 
 TEST_F(McpJsonParserTest, ValidJsonRpcRequest) {

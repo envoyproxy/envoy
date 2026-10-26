@@ -61,6 +61,64 @@ TEST(MiscFilesystemSubscriptionImplTest, BadWatch) {
       EnvoyException, "bad path");
 }
 
+TEST(MiscFilesystemSubscriptionImplTest, Polling) {
+  const std::string path = TestEnvironment::temporaryPath("polling_eds.json");
+  TestEnvironment::writeStringToFileForTest(path, R"EOF({"versionInfo": "0", "resources": []})EOF",
+                                            true);
+
+  Event::MockDispatcher dispatcher;
+  auto* timer = new Event::MockTimer(&dispatcher);
+  Stats::MockIsolatedStatsStore stats_store;
+  SubscriptionStats stats{Utility::generateStats(*stats_store.rootScope())};
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks;
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<NiceMock<Config::MockOpaqueResourceDecoder>>());
+  envoy::config::core::v3::PathConfigSource config;
+  config.set_path(path);
+  config.mutable_poll_interval()->set_seconds(1);
+
+  EXPECT_CALL(callbacks, onConfigUpdate(_, "0")).WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(callbacks, onConfigUpdate(_, "1")).WillOnce(Return(absl::OkStatus()));
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1000), _)).Times(3);
+
+  FilesystemSubscriptionImpl subscription(dispatcher, config, callbacks, resource_decoder, stats,
+                                          validation_visitor, *api);
+  subscription.start({});
+
+  // An unchanged response is read but not delivered again.
+  timer->invokeCallback();
+
+  TestEnvironment::writeStringToFileForTest(path, R"EOF({"versionInfo": "1", "resources": []})EOF",
+                                            true);
+  timer->invokeCallback();
+
+  EXPECT_EQ(3, stats.update_attempt_.value());
+  EXPECT_EQ(3, stats.update_success_.value());
+  TestEnvironment::removePath(path);
+}
+
+TEST(MiscFilesystemSubscriptionImplTest, PollingAndWatchedDirectoryAreMutuallyExclusive) {
+  Event::MockDispatcher dispatcher;
+  Stats::MockIsolatedStatsStore stats_store;
+  SubscriptionStats stats{Utility::generateStats(*stats_store.rootScope())};
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Config::MockSubscriptionCallbacks> callbacks;
+  OpaqueResourceDecoderSharedPtr resource_decoder(
+      std::make_shared<NiceMock<Config::MockOpaqueResourceDecoder>>());
+  envoy::config::core::v3::PathConfigSource config;
+  config.set_path("/dev/null");
+  config.mutable_watched_directory()->set_path("/dev");
+  config.mutable_poll_interval()->set_seconds(1);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      FilesystemSubscriptionImpl(dispatcher, config, callbacks, resource_decoder, stats,
+                                 validation_visitor, *api),
+      EnvoyException, "PathConfigSource poll_interval and watched_directory cannot both be set");
+}
+
 // Validate that the update_time statistic isn't changed when the configuration update gets
 // rejected.
 TEST_F(FilesystemSubscriptionImplTest, UpdateTimeNotChangedOnUpdateReject) {
@@ -83,6 +141,13 @@ TEST_F(FilesystemSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS + 1)));
   deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
   EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
+}
+
+TEST_F(FilesystemSubscriptionImplTest, RequestOnDemandNotImplemented) {
+  EXPECT_ENVOY_BUG(subscription_.requestOnDemandUpdate({"cluster0"}),
+                   "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(subscription_.update({"cluster0"}, {"cluster1"}),
+                   "unexpected request for on demand update");
 }
 
 // TODO(htuch): Add generic test harness support for collection subscriptions so that we can test
@@ -198,7 +263,8 @@ resource:
   )EOF",
                   MessageUtil::getJsonStringFromMessageOrError(inline_entry));
   DecodedResourcesWrapper decoded_resources;
-  decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry));
+  decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry,
+                                                                   *decoded_resources.arena_));
   EXPECT_CALL(callbacks_,
               onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), "system.1"));
   updateFile(resource);
@@ -228,8 +294,8 @@ resource:
                   MessageUtil::getJsonStringFromMessageOrError(inline_entry_2));
   {
     DecodedResourcesWrapper decoded_resources_2;
-    decoded_resources_2.pushBack(
-        std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry_2));
+    decoded_resources_2.pushBack(std::make_unique<DecodedResourceImpl>(
+        resource_decoder, inline_entry_2, *decoded_resources_2.arena_));
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(DecodedResourcesEq(decoded_resources_2.refvec_), "system.2"));
     updateFile(resource_2);

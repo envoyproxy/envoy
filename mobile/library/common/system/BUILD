@@ -29,7 +29,6 @@ envoy_cc_library(
         ":use_android_system_helper": ["-landroid"],
         "//conditions:default": [],
     }),
-    repository = "@envoy",
     deps = [
         ":default_system_helper_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
@@ -64,6 +63,5 @@ envoy_cc_library(
         "default_system_helper_android.cc",
         "default_system_helper_apple.cc",
     ],
-    repository = "@envoy",
     deps = [],
 )

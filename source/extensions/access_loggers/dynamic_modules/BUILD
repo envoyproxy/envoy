@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
         "@envoy_api//envoy/extensions/access_loggers/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

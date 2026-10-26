@@ -20,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -168,6 +169,16 @@ public:
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::Connection);
   NiceMock<Server::MockOverloadManager> overload_manager_;
 };
+
+TEST_F(FilterManagerTest, LowWatermarkWithoutHighWatermark) {
+  initialize();
+
+  EXPECT_ENVOY_BUG(
+      filter_manager_->callLowWatermarkCallbacks(),
+      "HTTP filter manager low watermark callback without a preceding high watermark callback");
+  EXPECT_FALSE(filter_manager_->aboveHighWatermark());
+  filter_manager_->destroyFilters();
+}
 
 TEST_F(FilterManagerTest, RequestHeadersOrResponseHeadersAccess) {
   initialize();

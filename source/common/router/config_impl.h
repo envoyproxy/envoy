@@ -39,6 +39,7 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/per_filter_config.h"
 #include "source/common/router/retry_policy_impl.h"
+#include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
@@ -181,11 +182,10 @@ public:
    * @param stream_info supplies the stream info for the request.
    * @param random_value supplies the random seed to use if a runtime choice is required. This
    *        allows stable choices between calls if desired.
-   * @return RouteConstSharedPtr if input matches this object, nullptr otherwise.
+   * @return true if input matches this object, false otherwise.
    */
-  virtual RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                                      const StreamInfo::StreamInfo& stream_info,
-                                      uint64_t random_value) const PURE;
+  virtual bool matches(const RouteMatchContext& route_match_context,
+                       const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const PURE;
 
   // By default, matchers do not support null Path headers.
   virtual bool supportsPathlessHeaders() const { return false; }
@@ -219,6 +219,28 @@ public:
 
 class CommonVirtualHostImpl;
 using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
+
+/**
+ * Builds routes of a virtual host for the route specifiers configured on it.
+ */
+class RouteBuilderImpl : public RouteBuilder {
+public:
+  RouteBuilderImpl(const CommonVirtualHostSharedPtr& vhost,
+                   Server::Configuration::ServerFactoryContext& factory_context,
+                   ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager)
+      : vhost_(vhost), factory_context_(factory_context), validator_(validator),
+        init_manager_(init_manager) {}
+
+  // Router::RouteBuilder
+  absl::StatusOr<MatchableRouteConstSharedPtr> build(const envoy::config::route::v3::Route& route,
+                                                     bool validate_clusters) override;
+
+private:
+  const CommonVirtualHostSharedPtr vhost_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  ProtobufMessage::ValidationVisitor& validator_;
+  Init::Manager& init_manager_;
+};
 
 class SslRedirectRoute : public Route {
 public:
@@ -344,7 +366,7 @@ public:
   static absl::StatusOr<std::shared_ptr<CommonVirtualHostImpl>>
   create(const envoy::config::route::v3::VirtualHost& virtual_host,
          const CommonConfigSharedPtr& global_route_config,
-         Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+         Server::Configuration::ServerFactoryContext& factory_context, Stats::ScopeSharedPtr scope,
          ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager);
 
   const VirtualCluster* virtualClusterFromEntries(const Http::HeaderMap& headers) const;
@@ -395,12 +417,13 @@ public:
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
     return virtualClusterFromEntries(headers);
   }
+  const Stats::ScopeSharedPtr& statsScope() const { return stats_scope_; }
 
 private:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                         const CommonConfigSharedPtr& global_route_config,
                         Server::Configuration::ServerFactoryContext& factory_context,
-                        Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                        Stats::ScopeSharedPtr scope, ProtobufMessage::ValidationVisitor& validator,
                         Init::Manager& init_manager, absl::Status& creation_status);
   struct StatNameProvider {
     StatNameProvider(absl::string_view name, Stats::SymbolTable& symbol_table)
@@ -411,9 +434,10 @@ private:
   struct VirtualClusterBase : public VirtualCluster {
   public:
     VirtualClusterBase(const std::optional<std::string>& name, Stats::StatName stat_name,
-                       Stats::ScopeSharedPtr&& scope, const VirtualClusterStatNames& stat_names)
-        : name_(name), stat_name_(stat_name), scope_(std::move(scope)),
-          stats_(generateStats(*scope_, stat_names)) {}
+                       Stats::Scope& scope, const VirtualClusterStatNames& stat_names,
+                       Stats::StatName vhost_stat_name)
+        : name_(name), stat_name_(stat_name),
+          stats_(createVclusterStats(scope, stat_names, vhost_stat_name, stat_name_)) {}
 
     // Router::VirtualCluster
     // name_ and stat_name_ are two different representations for the same string, retained in
@@ -423,28 +447,35 @@ private:
     VirtualClusterStats& stats() const override { return stats_; }
 
   private:
+    // Creates the stats of one virtual cluster directly in the shared vhost scope, with the
+    // virtual host and the virtual cluster attached as tags.
+    static VirtualClusterStats createVclusterStats(Stats::Scope& scope,
+                                                   const VirtualClusterStatNames& stat_names,
+                                                   Stats::StatName vhost_stat_name,
+                                                   Stats::StatName vcluster_stat_name);
+
     const std::optional<std::string> name_;
     const Stats::StatName stat_name_;
-    Stats::ScopeSharedPtr scope_;
     mutable VirtualClusterStats stats_;
   };
 
   struct VirtualClusterEntry : public StatNameProvider, public VirtualClusterBase {
     VirtualClusterEntry(const envoy::config::route::v3::VirtualCluster& virtual_cluster,
                         Stats::Scope& scope, Server::Configuration::CommonFactoryContext& context,
-                        const VirtualClusterStatNames& stat_names);
+                        const VirtualClusterStatNames& stat_names, Stats::StatName vhost_stat_name);
     std::vector<Http::HeaderUtility::HeaderDataPtr> headers_;
   };
 
   struct CatchAllVirtualCluster : public VirtualClusterBase {
-    CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names)
-        : VirtualClusterBase(std::nullopt, stat_names.other_,
-                             scope.scopeFromStatName(stat_names.other_), stat_names) {}
+    CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names,
+                           Stats::StatName vhost_stat_name);
   };
 
   const std::string name_;
   const Stats::StatNameManagedStorage stat_name_storage_;
-  Stats::ScopeSharedPtr vcluster_scope_;
+  // Owns the unprefixed scope that the virtual cluster and route stats are created in. A route
+  // keeps its virtual host alive, and with it this scope, across config swaps.
+  Stats::ScopeSharedPtr stats_scope_;
   std::vector<VirtualClusterEntry> virtual_clusters_;
   std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
@@ -468,32 +499,49 @@ private:
 };
 
 /**
+ * The outcome of route matching within a single virtual host: the resolved route and whether the
+ * route specifier chains already ran on it. The chains of all three levels run on a route entry
+ * as soon as it matched.
+ *
+ * `route` may be nullptr while `specifiers_applied` is true: the specifiers accepted the match and
+ * dropped the route, which leaves the request with no route for good.
+ */
+struct VirtualHostMatchResult {
+  RouteConstSharedPtr route;
+  bool specifiers_applied{false};
+};
+
+/**
  * Virtual host that holds a collection of routes.
  */
 class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
 public:
   VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                   const CommonConfigSharedPtr& global_route_config,
-                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-                  ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-                  bool validate_clusters, absl::Status& creation_status);
+                  Server::Configuration::ServerFactoryContext& factory_context,
+                  Stats::ScopeSharedPtr scope, ProtobufMessage::ValidationVisitor& validator,
+                  Init::Manager& init_manager, bool validate_clusters,
+                  absl::Status& creation_status);
 
-  RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
-                                          const Http::RequestHeaderMap& headers,
-                                          const StreamInfo::StreamInfo& stream_info,
-                                          uint64_t random_value) const;
+  VirtualHostMatchResult getRouteFromEntries(const RouteCallback& cb,
+                                             const Http::RequestHeaderMap& headers,
+                                             const StreamInfo::StreamInfo& stream_info,
+                                             uint64_t random_value) const;
 
-  RouteConstSharedPtr
+  VirtualHostMatchResult
   getRouteFromRoutes(const RouteCallback& cb, const RouteMatchContext& route_match_context,
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
   VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
   CommonVirtualHostSharedPtr shared_virtual_host_;
+  // Created after the shared virtual host so that the specifiers can build routes in it.
+  RouteSpecifierList route_specifiers_;
 
   std::shared_ptr<const SslRedirectRoute> ssl_redirect_route_;
   SslRequirements ssl_requirements_;
@@ -595,6 +643,11 @@ class RouteTracingImpl : public RouteTracing {
 public:
   explicit RouteTracingImpl(const envoy::config::route::v3::Tracing& tracing);
 
+  // Builds a RouteTracingImpl, returning an error instead of throwing when an operation formatter
+  // is invalid, so a caller that must not throw can validate the configuration.
+  static absl::StatusOr<std::unique_ptr<RouteTracingImpl>>
+  create(const envoy::config::route::v3::Tracing& tracing);
+
   // RouteTracing
   const envoy::type::v3::FractionalPercent& getClientSampling() const override;
   const envoy::type::v3::FractionalPercent& getRandomSampling() const override;
@@ -693,6 +746,12 @@ public:
   bool matchRoute(const RouteMatchContext& route_match_context,
                   const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
   absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
+  // Resolves the route of a request that matched this entry, which is the entry itself unless a
+  // cluster specifier plugin is configured.
+  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -883,9 +942,6 @@ protected:
   std::unique_ptr<ConnectConfig> connect_config_;
 
   bool case_sensitive() const { return case_sensitive_; }
-  RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
-                                   const StreamInfo::StreamInfo& stream_info,
-                                   uint64_t random_value) const;
 
   // Common logic for rewritePathHeader() of DirectResponseEntry.
   void finalizePathHeaderForRedirect(Http::RequestHeaderMap& headers,
@@ -1016,6 +1072,7 @@ private:
   Envoy::Config::DataSource::DataSourceProviderPtr<std::string> direct_response_body_provider_;
   Formatter::FormatterPtr direct_response_body_formatter_;
   std::string direct_response_content_type_;
+  RouteSpecifierList route_specifiers_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   const std::string route_name_;
   TimeSource& time_source_;
@@ -1044,9 +1101,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Template; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1079,9 +1135,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1114,9 +1169,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Exact; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1149,9 +1203,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::Regex; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1184,9 +1237,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::None; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap&, bool) const override;
@@ -1217,9 +1269,8 @@ public:
   PathMatchType matchType() const override { return PathMatchType::PathSeparatedPrefix; }
 
   // Router::Matchable
-  RouteConstSharedPtr matches(const RouteMatchContext& route_match_context,
-                              const StreamInfo::StreamInfo& stream_info,
-                              uint64_t random_value) const override;
+  bool matches(const RouteMatchContext& route_match_context,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
 
   // Router::DirectResponseEntry
   void rewritePathHeader(Http::RequestHeaderMap& headers,
@@ -1335,6 +1386,11 @@ private:
                                                  SubstringFunction substring_function) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
+  // Keeps the shared part of the route config alive and gives access to the route configuration
+  // level extensions, which run even when no virtual host matches.
+  const CommonConfigSharedPtr global_route_config_;
+  // Unprefixed scope that only bounds the lifetime of the virtual cluster stats; see the
+  // constructor.
   Stats::ScopeSharedPtr vhost_scope_;
   absl::flat_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
@@ -1383,6 +1439,7 @@ public:
   std::optional<bool> filterDisabled(absl::string_view config_name) const {
     return per_filter_configs_->disabled(config_name);
   }
+  RouteSpecifierSpan routeSpecifiers() const { return route_specifiers_; }
 
   // Router::CommonConfig
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
@@ -1420,6 +1477,7 @@ private:
   absl::flat_hash_map<std::string, ClusterSpecifierPluginSharedPtr> cluster_specifier_plugins_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
   RouteMetadataPackPtr metadata_;
+  RouteSpecifierList route_specifiers_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t max_direct_response_body_size_bytes_;
   const bool uses_vhds_ : 1;

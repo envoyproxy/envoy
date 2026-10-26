@@ -321,13 +321,14 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
     // Copy the sockaddr and update the port to preserve all address properties.
     sockaddr_in addr = *reinterpret_cast<const sockaddr_in*>(address.sockAddr());
     addr.sin_port = htons(static_cast<uint16_t>(port));
-    return std::make_shared<Address::Ipv4Instance>(&addr);
+    return std::make_shared<Address::Ipv4Instance>(&addr, &address.socketInterface());
   }
   case Address::IpVersion::v6: {
     // Copy the sockaddr and update the port to preserve all address properties including scope ID.
     sockaddr_in6 addr = *reinterpret_cast<const sockaddr_in6*>(address.sockAddr());
     addr.sin6_port = htons(static_cast<uint16_t>(port));
-    return std::make_shared<Address::Ipv6Instance>(addr, address.ip()->ipv6()->v6only());
+    return std::make_shared<Address::Ipv6Instance>(addr, address.ip()->ipv6()->v6only(),
+                                                   &address.socketInterface());
   }
   }
   PANIC("not handled");

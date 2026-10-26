@@ -7,7 +7,6 @@ envoy_mobile_package()
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
-    repository = "@envoy",
     deps = [
         "//library/common:internal_engine_lib_no_stamp",
         "//library/common/bridge:utility_lib",

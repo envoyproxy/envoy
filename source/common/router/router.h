@@ -194,7 +194,6 @@ public:
                Router::Context& router_context)
       : factory_context_(factory_context), router_context_(router_context), scope_(scope), cm_(cm),
         runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
-        async_stats_(router_context_.statNames(), scope, http_context.asyncClientStatPrefix()),
         random_(random), emit_dynamic_stats_(emit_dynamic_stats),
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
@@ -261,7 +260,6 @@ public:
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   FilterStats default_stats_;
-  FilterStats async_stats_;
   Random::RandomGenerator& random_;
   const bool emit_dynamic_stats_ : 1;
   const bool start_child_span_ : 1;

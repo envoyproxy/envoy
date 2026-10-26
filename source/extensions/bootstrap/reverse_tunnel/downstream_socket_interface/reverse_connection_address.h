@@ -111,6 +111,9 @@ private:
   std::string address_string_;
   std::string logical_name_;
   ReverseConnectionIp ip_;
+  // Pre-built loopback sockaddr returned by `sockAddr()`. Holding it per instance avoids
+  // the data race of a function-local static written by every worker that reads the address.
+  sockaddr_in sockaddr_in_{};
 };
 
 } // namespace ReverseConnection

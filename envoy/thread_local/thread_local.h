@@ -205,7 +205,7 @@ private:
   }
 
   Slot::UpdateCb makeSlotUpdateCb(UpdateCb cb) {
-    return [cb](ThreadLocalObjectSharedPtr obj) { cb(getOpt(obj)); };
+    return [cb = std::move(cb)](ThreadLocalObjectSharedPtr obj) { cb(getOpt(obj)); };
   }
 
   const SlotSharedPtr slot_;

@@ -21,19 +21,11 @@ namespace Http {
 const absl::string_view AsyncClientImpl::ResponseBufferLimit = "http.async_response_buffer_limit";
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 Stats::Store& stats_store, Event::Dispatcher& dispatcher,
-                                 Upstream::ClusterManager& cm,
-                                 Server::Configuration::CommonFactoryContext& factory_context,
-                                 Router::ShadowWriterPtr&& shadow_writer,
-                                 Http::Context& http_context, Router::Context& router_context)
-    : factory_context_(factory_context), cluster_(cluster),
-      config_(std::make_shared<Router::FilterConfig>(
-          factory_context, http_context.asyncClientStatPrefix(), *stats_store.rootScope(), cm,
-          factory_context.runtime(), factory_context.api().randomGenerator(),
-          std::move(shadow_writer), true, false, false, false, false, false, false,
-          Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(), http_context,
-          router_context)),
-      dispatcher_(dispatcher), local_reply_(LocalReply::Factory::createDefault()) {}
+                                 Event::Dispatcher& dispatcher,
+                                 Router::FilterConfigSharedPtr config)
+    : factory_context_(config->factory_context_), cluster_(std::move(cluster)),
+      config_(std::move(config)), dispatcher_(dispatcher),
+      local_reply_(LocalReply::Factory::createDefault()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -112,7 +104,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       buffer_limit_(options.buffer_limit_), stream_callbacks_(callbacks),
       stream_id_(parent.config_->random_.random()),
       router_(options.filter_config_ ? options.filter_config_ : parent.config_,
-              parent.config_->async_stats_),
+              parent.config_->default_stats_),
       stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr,
                    options.filter_state != nullptr
                        ? options.filter_state

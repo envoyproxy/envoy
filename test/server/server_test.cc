@@ -15,6 +15,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/notification.h"
+#include "source/common/http/codes.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -538,8 +539,9 @@ TEST_P(ServerInstanceImplTest, WithCustomInlineHeaders) {
 // first.
 //
 // With the runtime guard enabled and a default stats config (no custom tags), server initialization
-// turns on the explicit-tags logic on the real stats store. Guards against a regression where an
-// early scope creation would silently cause setUseExplicitTags() to be ignored.
+// turns on the explicit-tags logic on the real stats store, and hands the http context the matching
+// CodeStats implementation. Guards against a regression where an early scope creation would
+// silently cause setUseExplicitTags() to be ignored.
 TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
   Stats::SymbolTableImpl symbol_table;
@@ -557,6 +559,7 @@ TEST_P(ServerInstanceImplTest, ExplicitTagsEnabledByRuntimeGuard) {
   server_->initialize(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
                       component_factory_);
   EXPECT_TRUE(real_store->useExplicitTags());
+  EXPECT_NE(nullptr, dynamic_cast<Http::TaggedCodeStatsImpl*>(&server_->httpContext().codeStats()));
 
   // Tear down the server (which shuts down threading on real_store) before real_store is destroyed,
   // and restore the process-global runtime flag so it does not leak into other tests.
@@ -1040,6 +1043,56 @@ TEST_P(ServerInstanceImplTest, EvictStats) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_evict_runtime_bootstrap.yaml", true);
+  EXPECT_EQ(2, server_->statsConfig().evictOnFlush());
+  EXPECT_EQ("stats.eviction_interval_ms", server_->statsConfig().evictionIntervalRuntimeKey());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  // Runtime sets a 10s interval with a 5s flush: evict every second flush.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+  EXPECT_EQ(0, stats_store_.evictionCount());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(2L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  // A value that is not a multiple of the flush interval falls back to the 10s default.
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "7500"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(4L, counter->value());
+  EXPECT_EQ(2, stats_store_.evictionCount());
+
+  // A 5s interval evicts on every flush. Stop at 28s to avoid racing the flush at 30s.
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "5000"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
+  time_system_.advanceTimeWait(std::chrono::seconds(4));
+  EXPECT_EQ(5L, counter->value());
+  EXPECT_EQ(3, stats_store_.evictionCount());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
@@ -1305,7 +1358,7 @@ TEST_P(ServerInstanceImplTest, RtdsOverAdsShutdown) {
   options_.service_node_name_ = "some_node_name";
   auto server_thread =
       startTestServer("test/server/test_data/server/runtime_bootstrap_rtds_ads.yaml", false);
-  server_->shutdown();
+  server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
 }
 
@@ -1585,7 +1638,7 @@ TEST_P(ServerInstanceImplTest, WithProcessContext) {
   EXPECT_NO_THROW(initialize("test/server/test_data/server/empty_bootstrap.yaml"));
 
   auto context = server_->processContext();
-  auto& object_from_context = dynamic_cast<TestObject&>(context->get().get());
+  auto& object_from_context = dynamic_cast<TestObject&>(context->get());
   EXPECT_EQ(&object_from_context, &object);
   EXPECT_TRUE(object_from_context.boolean_flag_);
 

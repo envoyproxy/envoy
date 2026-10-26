@@ -56,6 +56,15 @@ public:
   }
 
   /**
+   * Set or overwrite the request trailers.
+   * @param request_trailers supplies the request trailers.
+   */
+  Context& setRequestTrailers(const Http::RequestTrailerMap& request_trailers) {
+    request_trailers_ = request_trailers;
+    return *this;
+  }
+
+  /**
    * Set or overwrite the response headers.
    * @param response_headers supplies the response headers.
    */
@@ -95,6 +104,11 @@ public:
    * @return OptRef<const Http::RequestHeaderMap> the request headers.
    */
   OptRef<const Http::RequestHeaderMap> requestHeaders() const { return request_headers_; }
+
+  /**
+   * @return OptRef<const Http::RequestTrailerMap> the request trailers.
+   */
+  OptRef<const Http::RequestTrailerMap> requestTrailers() const { return request_trailers_; }
 
   /**
    * @return OptRef<const Http::ResponseHeaderMap> the response headers.
@@ -156,6 +170,7 @@ public:
 private:
   absl::string_view local_reply_body_;
   OptRef<const Http::RequestHeaderMap> request_headers_;
+  OptRef<const Http::RequestTrailerMap> request_trailers_;
   OptRef<const Http::ResponseHeaderMap> response_headers_;
   OptRef<const Http::ResponseTrailerMap> response_trailers_;
   OptRef<const Extension> extension_;

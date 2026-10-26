@@ -25,8 +25,8 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     : cluster_manager_(context.clusterManager()),
       main_thread_dispatcher_(context.mainThreadDispatcher()),
       stats_scope_(stats_scope.createScope(absl::StrCat(metrics_namespace, "."))),
-      stat_name_pool_(stats_scope_->symbolTable()), init_manager_(init_manager),
-      server_context_(context), filter_name_(filter_name), filter_config_(filter_config),
+      metrics_(*stats_scope_), init_manager_(init_manager), server_context_(context),
+      filter_name_(filter_name), filter_config_(filter_config),
       metrics_namespace_(metrics_namespace), dynamic_module_(std::move(dynamic_module)) {}
 
 size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view name,
@@ -78,7 +78,7 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
     // and make it return a StatusOr instead, so that the exception handling can be removed here.
     TRY_ASSERT_MAIN_THREAD {
       provider = server_context_.secretManager().findOrCreateGenericSecretProvider(
-          sds_config, std::string(name), server_context_, init_manager_);
+          sds_config, std::string(name), server_context_, init_manager_, true);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -99,7 +99,8 @@ size_t DynamicModuleHttpFilterConfig::subscribeGenericSecret(absl::string_view n
   }
 
   auto thread_local_provider = Secret::ThreadLocalGenericSecretProvider::create(
-      std::move(provider), server_context_.threadLocal(), server_context_.api());
+      std::move(provider), server_context_.threadLocal(), server_context_.api(),
+      server_context_.mainThreadDispatcher());
   if (!thread_local_provider.ok()) {
     ENVOY_LOG(error, "{} '{}': {}", failure_prefix, name, thread_local_provider.status().message());
     return 0;
@@ -145,13 +146,31 @@ DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
 }
 
 DynamicModuleHttpPerRouteFilterConfig::~DynamicModuleHttpPerRouteFilterConfig() {
-  (*destroy_)(config_);
+  if (main_dispatcher_.isThreadSafe()) {
+    (*destroy_)(config_);
+    return;
+  }
+  // The module builds its per-route configuration on the main thread, and the destroy hook is
+  // documented to run there as well: a module is free to use configuration callbacks from it, and
+  // those require the main thread. A route configuration can be released on a worker thread when
+  // an RDS update replaces it, so hand the in-module configuration to the main dispatcher, along
+  // with the module handle that has to outlive the call.
+  //
+  // If the main dispatcher has already exited then the posted callback is destroyed together with
+  // the dispatcher and the hook runs at that point instead, still on the main thread.
+  main_dispatcher_.post(
+      [config = config_, destroy = destroy_, module = std::move(dynamic_module_)]() mutable {
+        (*destroy)(config);
+        // The module is unloaded only after its destroy hook has returned.
+        module.reset();
+      });
 }
 
 absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
 newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
                                    const absl::string_view filter_config,
-                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module) {
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module,
+                                   Event::Dispatcher& main_dispatcher) {
   auto constructor =
       dynamic_module
           ->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_per_route_config_new)>(
@@ -169,7 +188,7 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view filter_name,
   }
 
   return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(
-      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module));
+      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module), main_dispatcher);
 }
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(

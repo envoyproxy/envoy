@@ -218,6 +218,7 @@ public:
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
   bool shouldStripTrailingHostDot() const override { return false; }
+  bool recordRouteResolutionStats() const override { return false; }
   Http::StripPortType stripPortType() const override { return Http::StripPortType::None; }
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
   headersWithUnderscoresAction() const override {

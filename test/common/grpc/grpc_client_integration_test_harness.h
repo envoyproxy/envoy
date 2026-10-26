@@ -23,6 +23,7 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/router.h"
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stats/symbol_table.h"
 #include "source/common/tls/client_ssl_socket.h"
@@ -404,9 +405,14 @@ public:
     }));
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
+    router_config_ = std::make_shared<Router::FilterConfig>(
+        server_factory_context_, http_context_.asyncClientStatPrefix(), *stats_store_.rootScope(),
+        cm_, server_factory_context_.runtime(), api_->randomGenerator(),
+        std::move(shadow_writer_ptr_), true, false, false, false, false, false, false,
+        Protobuf::RepeatedPtrField<std::string>{}, dispatcher_->timeSource(), http_context_,
+        router_context_);
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cm_.thread_local_cluster_.cluster_.info_, stats_store_, *dispatcher_, cm_,
-        server_factory_context_, std::move(shadow_writer_ptr_), http_context_, router_context_);
+        cm_.thread_local_cluster_.cluster_.info_, *dispatcher_, router_config_);
     EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient())
         .WillRepeatedly(ReturnRef(*http_async_client_));
     envoy::config::core::v3::GrpcService config;
@@ -417,6 +423,13 @@ public:
     }
 
     config.mutable_envoy_grpc()->set_skip_envoy_headers(skip_envoy_headers_);
+    if (retry_policy_.has_value()) {
+      *config.mutable_retry_policy() = *retry_policy_;
+    }
+    if (per_stream_buffer_limit_bytes_ != 0) {
+      config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(
+          per_stream_buffer_limit_bytes_);
+    }
 
     fillServiceWideInitialMetadata(config);
     return *AsyncClientImpl::create(config, server_factory_context_);
@@ -551,6 +564,7 @@ public:
     options.setMetadata(m);
     options.setSendInternal(send_internal_header_stream_option_);
     options.setSendXff(send_xff_header_stream_option_);
+    options.setBufferBodyForRetry(buffer_body_for_retry_stream_option_);
     if (watermark_callbacks_ != nullptr) {
       options.setSidestreamWatermarkCallbacks(watermark_callbacks_);
     }
@@ -626,6 +640,7 @@ public:
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;
+  Router::FilterConfigSharedPtr router_config_;
   envoy::config::core::v3::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =
@@ -636,8 +651,12 @@ public:
   Router::ShadowWriterPtr shadow_writer_ptr_{mock_shadow_writer_};
   Network::ClientConnectionPtr client_connection_;
   bool skip_envoy_headers_{false};
+  std::optional<envoy::config::core::v3::RetryPolicy> retry_policy_;
+  // Envoy gRPC per-stream buffer limit, 0 means the field is not set.
+  uint32_t per_stream_buffer_limit_bytes_{0};
   bool send_internal_header_stream_option_{true};
   bool send_xff_header_stream_option_{true};
+  bool buffer_body_for_retry_stream_option_{false};
   // Connection buffer limits, 0 means default limit from config is used.
   uint32_t connection_buffer_limits_{0};
   testing::NiceMock<Http::MockSidestreamWatermarkCallbacks>* watermark_callbacks_{nullptr};

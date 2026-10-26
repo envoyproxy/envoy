@@ -11,8 +11,10 @@ DynamicModuleHealthChecker::DynamicModuleHealthChecker(
     const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
     DynamicModuleHealthCheckerConfigSharedPtr module_config, Event::Dispatcher& dispatcher,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    Upstream::HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+    Upstream::HealthCheckEventLoggerPtr&& event_logger,
+    Upstream::HealthFlagCallbacks& health_flag_callbacks)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
+                            health_flag_callbacks),
       module_config_(std::move(module_config)) {}
 
 void DynamicModuleHealthCheckerScheduler::report(envoy_dynamic_module_type_host_health health) {

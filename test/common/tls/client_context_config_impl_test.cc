@@ -41,8 +41,6 @@
 #include "openssl/crypto.h"
 #include "openssl/x509v3.h"
 
-using Envoy::Protobuf::util::MessageDifferencer;
-using testing::EndsWith;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -392,10 +390,55 @@ TEST_F(ClientContextConfigImplTest, MultipleTlsCertificatesWhenCustomTlsCertSele
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             *tls_context.mutable_common_tls_context()->add_tls_certificates());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  // Deliberately uses its own symbol table, distinct from the factory context's: regression
+  // test for the context stats crashing when the scope does not share the server's table.
   Stats::IsolatedStoreImpl store;
   auto context_or = manager_.createSslClientContext(*store.rootScope(), *client_context_config);
   EXPECT_OK(context_or);
   auto cleanup = cleanUpHelper(*context_or);
+}
+
+// A configuration that fails before its custom certificate selector is created does not create
+// the selector, which could otherwise build TLS contexts from the partly created configuration.
+TEST_F(ClientContextConfigImplTest, InvalidConfigDoesNotCreateCustomTlsCertSelector) {
+  class TestUpstreamTlsCertificateSelectorConfigFactory
+      : public Ssl::UpstreamTlsCertificateSelectorConfigFactory {
+  public:
+    absl::StatusOr<Ssl::UpstreamTlsCertificateSelectorFactoryPtr>
+    createUpstreamTlsCertificateSelectorFactory(const Protobuf::Message&,
+                                                Server::Configuration::GenericFactoryContext&,
+                                                const Ssl::ClientContextConfig&) override {
+      ADD_FAILURE() << "the selector factory is created for an invalid configuration";
+      return nullptr;
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Protobuf::StringValue>();
+    }
+
+    std::string name() const override { return "test-tls-context-provider"; }
+  };
+
+  TestUpstreamTlsCertificateSelectorConfigFactory provider_factory;
+  Registry::InjectFactory<Ssl::UpstreamTlsCertificateSelectorConfigFactory> registered_factory(
+      provider_factory);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    key_log:
+      path: /dev/null
+      local_address_range:
+      - address_prefix: not-an-ip
+        prefix_len: 8
+    custom_tls_certificate_selector:
+      name: test-tls-context-provider
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+  TestUtility::loadFromYaml(tls_context_yaml, tls_context);
+  EXPECT_EQ(ClientContextConfigImpl::create(tls_context, factory_context_).status().message(),
+            "invalid ip/mask combo 'not-an-ip/8' (format is <ip>/<# mask bits>)");
 }
 
 // Validate context config does not support handling both static TLS certificate and dynamic TLS
@@ -915,27 +958,58 @@ TEST_F(ClientContextConfigImplTest, TestLoadCorruptPkcs12) {
             "Failed to load pkcs12 from <inline>");
 }
 
-// Verify that X25519MLKEM768 can be explicitly configured as an ECDH curve
-// and that the resulting SSL context initializes successfully (non-FIPS only).
-// This proves PQC key exchange works via explicit opt-in configuration even
-// though it is not part of the default curve list.
-TEST_F(ClientContextConfigImplTest, ExplicitX25519Mlkem768Curve) {
+// Verify that X25519MLKEM768 is included in the default ECDH curves.
+TEST_F(ClientContextConfigImplTest, DefaultCurvesIncludePqc) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  if (FIPS_mode()) {
+    EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:P-256");
+  } else {
+    EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
+  }
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_TRUE(context_or_error.status().ok());
+}
+
+// Verify that disabling the runtime flag reverts to classical defaults.
+TEST_F(ClientContextConfigImplTest, DefaultCurvesNoPqcWithRuntimeFlag) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.pqc_default_ecdh_curves", "false"}});
+
+  const std::string yaml = R"EOF(
+  common_tls_context:
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  if (FIPS_mode()) {
+    EXPECT_EQ(cfg->ecdhCurves(), "P-256");
+  } else {
+    EXPECT_EQ(cfg->ecdhCurves(), "X25519:P-256");
+  }
+  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  EXPECT_TRUE(context_or_error.status().ok());
+}
+
+// Explicit ecdh_curves config overrides defaults regardless of runtime flag.
+TEST_F(ClientContextConfigImplTest, ExplicitCurvesOverrideDefaults) {
   const std::string yaml = R"EOF(
   common_tls_context:
     tls_params:
       ecdh_curves:
-      - X25519MLKEM768
-      - X25519
       - P-256
   )EOF";
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
   auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
-  EXPECT_EQ(cfg->ecdhCurves(), "X25519MLKEM768:X25519:P-256");
-  // Verify the SSL context can be created successfully with X25519MLKEM768.
-  auto context_or_error = manager_.createSslClientContext(*store_.rootScope(), *cfg);
-  EXPECT_TRUE(context_or_error.status().ok());
+  EXPECT_EQ(cfg->ecdhCurves(), "P-256");
 }
 
 } // namespace Tls

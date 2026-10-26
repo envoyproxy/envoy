@@ -21,7 +21,6 @@ envoy_cc_extension(
         "c_types.h",
         "config.h",
     ],
-    repository = "@envoy",
     deps = [
         ":platform_cc_proto",
         "//library/common/api:external_api_lib",

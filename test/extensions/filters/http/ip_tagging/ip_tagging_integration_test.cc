@@ -72,8 +72,8 @@ ip_tags:
                                      {"x-forwarded-for", "1.2.3.4"}});
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().EnvoyIpTags)[0]->value(),
-            "external_request");
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().EnvoyIpTags, "external_request"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -95,6 +95,8 @@ ip_tags:
 
   // There is only one useful reload in this test.
   test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(1));
+  // The counter is incremented before the new data is posted to thread-local slots.
+  test_server_->waitForWorkerThreads();
 
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -104,13 +106,8 @@ ip_tags:
                                      {"x-forwarded-for", "1.2.3.4"}});
 
   waitForNextUpstreamRequest();
-  std::cerr << upstream_request_->headers()
-                   .get(Http::Headers::get().EnvoyIpTags)[0]
-                   ->value()
-                   .getStringView()
-            << std::endl;
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().EnvoyIpTags)[0]->value(),
-            "external_updated_request");
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().EnvoyIpTags, "external_updated_request"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
@@ -183,6 +180,8 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
   test_server_->waitForCounter("http.config_test.ip_tagging.reload_success", testing::Ge(1));
+  // The counter is incremented before the new data is posted to thread-local slots.
+  test_server_->waitForWorkerThreads();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
@@ -193,8 +192,8 @@ ip_tags:
                                      {"x-forwarded-for", "1.2.3.4"}});
 
   waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().get(Http::Headers::get().EnvoyIpTags)[0]->value(),
-            "external_updated_request");
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().EnvoyIpTags, "external_updated_request"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());

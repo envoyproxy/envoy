@@ -12,14 +12,81 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-# TODO(jwendell): Remove after https://github.com/protocolbuffers/protobuf/issues/20760 is fixed.
+# Envoy has no first-class Java, but protobuf's Java tooling still needs a hermetic JDK and a
+# javabuilder workaround while https://github.com/protocolbuffers/protobuf/issues/20760 is open.
+# MODULE.bazel registers this compile toolchain plus the runtime toolchains below so downstream
+# bzlmod consumers get the same hermetic Java setup without copying .bazelrc flags.
 default_java_toolchain(
     name = "envoy_java_toolchain",
     java_runtime = "@rules_java//toolchains:remotejdk_25",
     javabuilder_jvm_opts = ["--sun-misc-unsafe-memory-access=allow"],
+    # protobuf-java's UnsafeUtil uses sun.misc.Unsafe memory accessors that JDK 23+ marks
+    # forRemoval (JEP 471). Compile-time counterpart of
+    # --sun-misc-unsafe-memory-access=allow above; remove once protobuf migrates off Unsafe.
+    misc = ["-Xlint:-removal"],
     source_version = "11",
     target_version = "11",
 )
+
+# Hermetic default Java runtime. Registered from MODULE.bazel so that consumers of @envoy do not
+# need to set --java_runtime_version / --tool_java_runtime_version. The
+# @rules_java//toolchains:remotejdk_25 target is a java_runtime_version_alias that resolves its
+# runtime via toolchain resolution, so these wrappers must point at the concrete per-platform
+# @remotejdk25_*//:jdk targets to avoid a self-cycle through runtime toolchain resolution.
+_JDK_PLATFORMS = {
+    "linux": [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    "linux_aarch64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    "linux_ppc64le": [
+        "@platforms//os:linux",
+        "@platforms//cpu:ppc64le",
+    ],
+    "linux_s390x": [
+        "@platforms//os:linux",
+        "@platforms//cpu:s390x",
+    ],
+    "macos": [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+    "macos_aarch64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+    "win": [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
+    "win_arm64": [
+        "@platforms//os:windows",
+        "@platforms//cpu:aarch64",
+    ],
+}
+
+[
+    toolchain(
+        name = "envoy_java_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
+
+[
+    toolchain(
+        name = "envoy_java_bootstrap_runtime_toolchain_" + suffix,
+        target_compatible_with = constraints,
+        toolchain = "@remotejdk25_%s//:jdk" % suffix,
+        toolchain_type = "@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type",
+    )
+    for suffix, constraints in _JDK_PLATFORMS.items()
+]
 
 exports_files([
     "gen_sh_test_runner.sh",
@@ -79,6 +146,15 @@ genrule(
     stamp = 1,
 )
 
+# For Windows, which must list each exported symbol individually.
+genrule(
+    name = "exported_symbols_windows",
+    srcs = ["//source/extensions/dynamic_modules/abi:abi.h"],
+    outs = ["exported_symbols_windows.def"],
+    cmd = "$(location //tools/windows:gen_dynamic_modules_exports) $(location //source/extensions/dynamic_modules/abi:abi.h) $@",
+    tools = ["//tools/windows:gen_dynamic_modules_exports"],
+)
+
 cc_library(
     name = "static_stdlib",
     linkopts = select({
@@ -97,40 +173,47 @@ config_setting(
 
 config_setting(
     name = "windows_opt_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "opt",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "opt"},
 )
 
 config_setting(
     name = "windows_dbg_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "dbg",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "dbg"},
 )
 
 config_setting(
     name = "windows_fastbuild_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "fastbuild",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "fastbuild"},
 )
 
 config_setting(
     name = "clang_cl_build",
-    values = {
-        "cpu": "x64_windows",
-        "define": "clang_cl=1",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"define": "clang_cl=1"},
 )
 
 config_setting(
     name = "clang_cl_opt_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "opt",
     },
@@ -138,8 +221,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_dbg_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "dbg",
     },
@@ -147,8 +233,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_fastbuild_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "fastbuild",
     },
@@ -176,14 +265,6 @@ config_setting(
 
 config_setting(
     name = "asan_build",
-    values = {"define": "ENVOY_CONFIG_ASAN=1"},
-)
-
-config_setting(
-    name = "local_asan_build",
-    flag_values = {
-        "@envoy_repo//:use_local_llvm_flag": "True",
-    },
     values = {"define": "ENVOY_CONFIG_ASAN=1"},
 )
 
@@ -246,6 +327,16 @@ config_setting(
 bool_flag(
     name = "jemalloc",
     build_setting_default = False,
+)
+
+bool_flag(
+    name = "deprecated_repo_arg_allowed",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "deprecated_repo_arg_is_allowed",
+    flag_values = {":deprecated_repo_arg_allowed": "True"},
 )
 
 config_setting(
@@ -509,19 +600,32 @@ config_setting(
     values = {"define": "perf_annotation=enabled"},
 )
 
+bool_flag(
+    name = "execution_context",
+    build_setting_default = False,
+)
+
 config_setting(
-    name = "enable_execution_context",
+    name = "enable_execution_context_flag",
+    flag_values = {":execution_context": "True"},
+)
+
+config_setting(
+    name = "enable_execution_context_define",
     values = {"define": "execution_context=enabled"},
+)
+
+selects.config_setting_group(
+    name = "enable_execution_context",
+    match_any = [
+        ":enable_execution_context_flag",
+        ":enable_execution_context_define",
+    ],
 )
 
 config_setting(
     name = "enable_perf_tracing",
     values = {"define": "perf_tracing=enabled"},
-)
-
-config_setting(
-    name = "force_libcpp",
-    values = {"define": "force_libcpp=enabled"},
 )
 
 # SSL library selection using label_flag and bool_flag
@@ -535,17 +639,29 @@ label_flag(
     build_setting_default = "@boringssl//:crypto",
 )
 
+label_flag(
+    name = "test_main",
+    build_setting_default = "//test:main",
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "test_pch",
+    build_setting_default = "//test:test_pch",
+    visibility = ["//visibility:public"],
+)
+
 # wee8 engine: envoy_toolshed prebuilt by default, source for configs the
 # prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
 alias(
     name = "wee8_engine",
     actual = select({
-        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         "//conditions:default": "@envoy_toolshed//v8:wee8",
     }),
+    visibility = ["//visibility:public"],
 )
 
 bool_flag(
@@ -693,14 +809,19 @@ config_setting(
 
 config_setting(
     name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
 )
 
 # Configuration settings to make doing selects for Apple vs non-Apple platforms
 # easier. More details: https://docs.bazel.build/versions/master/configurable-attributes.html#config_settingaliasing
 config_setting(
     name = "darwin",
-    values = {"cpu": "darwin"},
+    constraint_values = [
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
@@ -721,37 +842,65 @@ config_setting(
 
 config_setting(
     name = "ios_i386",
-    values = {"cpu": "ios_i386"},
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_x86_64",
-    values = {"cpu": "ios_x86_64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_armv7",
-    values = {"cpu": "ios_armv7"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
+# armv7s has no platforms constraint, so this matches the same platforms as `ios_armv7`.
 config_setting(
     name = "ios_armv7s",
-    values = {"cpu": "ios_armv7s"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64",
-    values = {"cpu": "ios_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_sim_arm64",
-    values = {"cpu": "ios_sim_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64e",
-    values = {"cpu": "ios_arm64e"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64e",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
@@ -950,11 +1099,6 @@ selects.config_setting_group(
 )
 
 alias(
-    name = "remote_jdk11",
-    actual = "@rules_java//toolchains:remote_jdk11",
-)
-
-alias(
     name = "windows",
     actual = "@bazel_tools//src/conditions:windows",
 )
@@ -1065,28 +1209,26 @@ config_setting(
     },
 )
 
-bool_flag(
-    name = "libc++",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "libc++_enabled",
-    flag_values = {
-        ":libc++": "True",
-    },
-)
-
-bool_flag(
-    name = "libstdc++",
-    build_setting_default = False,
-)
-
-config_setting(
+# The C++ standard library is derived from the compiler: clang and Apple builds use libc++,
+# gcc uses libstdc++. Other combinations (e.g. clang + libstdc++) are not supported; if you
+# need one you must provide your own cc_toolchain.
+alias(
     name = "libstdc++_enabled",
-    flag_values = {
-        ":libstdc++": "True",
-    },
+    actual = ":gcc_build",
+)
+
+selects.config_setting_group(
+    name = "libc++_enabled",
+    match_any = [
+        ":apple",
+        ":clang_build",
+    ],
+)
+
+# Back-compat for existing //bazel:force_libcpp label references.
+alias(
+    name = "force_libcpp",
+    actual = ":libc++_enabled",
 )
 
 alias(

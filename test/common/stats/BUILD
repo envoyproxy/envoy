@@ -191,6 +191,7 @@ envoy_cc_test(
     deps = [
         ":stat_test_utility_lib",
         "//source/common/common:mutex_tracer_lib",
+        "//source/common/config:well_known_names",
         "//source/common/memory:stats_lib",
         "//source/common/stats:symbol_table_lib",
         "//test/common/memory:memory_test_utility_lib",

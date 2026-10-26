@@ -234,6 +234,7 @@ public:
   virtual void addBufferedData(Buffer::Instance& data) const PURE;
   virtual void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const PURE;
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void injectHeadersToFilterChain(bool end_stream) PURE;
   virtual uint32_t bufferLimit() const PURE;
 
   ChunkQueue& chunkQueue() { return chunk_queue_; }
@@ -582,6 +583,10 @@ public:
     decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
 
+  void injectHeadersToFilterChain(bool end_stream) override {
+    decoder_callbacks_->injectDecodedHeadersToFilterChain(end_stream);
+  }
+
   uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
@@ -678,6 +683,14 @@ public:
     return !local_response_started_ && ProcessorState::noExternalProcess();
   }
 
+  // Standalone mode override is only supported when Envoy is in the waiting for request
+  // header response state, and the old request body mode is STREAMED or NONE;
+  // and the new request body mode is FULL_DUPLEX_STREAMED, and the new request
+  // trailer mode is SEND.
+  bool handleStandaloneModeOverride(
+      const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
+          old_body_mode);
+
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
@@ -730,6 +743,10 @@ public:
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
+  }
+
+  void injectHeadersToFilterChain(bool end_stream) override {
+    encoder_callbacks_->injectEncodedHeadersToFilterChain(end_stream);
   }
 
   uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }

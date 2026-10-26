@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -24,10 +23,11 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = ["//test/proto:apikeys_proto_descriptor"],
+    extension_names = ["envoy.filters.http.grpc_field_extraction"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",
@@ -42,13 +42,14 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
     data = [
         "//test/config/integration/certs",
         "//test/proto:apikeys_proto_descriptor",
     ],
+    extension_names = ["envoy.filters.http.grpc_field_extraction"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/grpc_field_extraction:extractor",

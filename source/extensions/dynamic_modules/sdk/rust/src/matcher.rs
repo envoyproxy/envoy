@@ -3,7 +3,7 @@
 //! This module provides traits and types for implementing custom input matchers as dynamic modules.
 //! A matcher evaluates HTTP request/response data and returns a boolean match result.
 
-use crate::abi;
+use crate::{abi, EnvoyBuffer};
 use std::ffi::c_void;
 use std::ptr;
 
@@ -20,6 +20,15 @@ impl MatchContext {
   #[doc(hidden)]
   pub fn new(envoy_ptr: *mut c_void) -> Self {
     Self { envoy_ptr }
+  }
+
+  /// Reports through the ABI that the module could not complete this evaluation, so Envoy applies
+  /// its configured on_error policy instead of reading a match result. Used by the panic barrier.
+  #[doc(hidden)]
+  pub fn report_error(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_matcher_set_error(self.envoy_ptr);
+    }
   }
 
   /// Get a request header value by key.
@@ -52,46 +61,18 @@ impl MatchContext {
     }
   }
 
-  /// Get all headers from the specified header map as key-value pairs.
+  /// Get all headers from the specified header map as key-value [`EnvoyBuffer`] pairs.
   ///
-  /// Returns a vector of `(key, value)` byte slices, or `None` if the header map
-  /// is not available.
+  /// Returns an empty vector if there are no headers or the header map is not available.
   pub fn get_all_headers(
     &self,
     header_type: abi::envoy_dynamic_module_type_http_header_type,
-  ) -> Option<Vec<(&[u8], &[u8])>> {
-    let size = self.get_headers_size(header_type);
-    if size == 0 {
-      return None;
-    }
-
-    let mut headers: Vec<abi::envoy_dynamic_module_type_envoy_http_header> =
-      Vec::with_capacity(size);
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_matcher_get_headers(
-        self.envoy_ptr,
-        header_type,
-        headers.as_mut_ptr(),
-      )
-    };
-
-    if !success {
-      return None;
-    }
-    unsafe {
-      headers.set_len(size);
-    }
-
-    Some(
-      headers
-        .iter()
-        .map(|h| unsafe {
-          (
-            crate::ffi_helpers::slice_from_raw_or_empty(h.key_ptr as *const u8, h.key_length),
-            crate::ffi_helpers::slice_from_raw_or_empty(h.value_ptr as *const u8, h.value_length),
-          )
-        })
-        .collect(),
+  ) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
+    crate::utility::collect_headers(
+      || self.get_headers_size(header_type),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_matcher_get_headers(self.envoy_ptr, header_type, headers)
+      },
     )
   }
 
@@ -194,13 +175,12 @@ pub trait MatcherConfig: Sized + Send + Sync + 'static {
 #[macro_export]
 macro_rules! declare_matcher {
   ($config_type:ty) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_config_new(
-      _config_envoy_ptr: *mut ::std::ffi::c_void,
-      name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-      config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
-    ) -> *const ::std::ffi::c_void {
-      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_config_new(
+        _config_envoy_ptr: *mut ::std::ffi::c_void,
+        name: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
+        config: $crate::abi::envoy_dynamic_module_type_envoy_buffer,
+      ) -> *const ::std::ffi::c_void {
         // Safe under `(nullptr, 0)` via `ffi_helpers`. The matcher name is used as a registry
         // lookup key by user `MatcherConfig::new` implementations, so invalid UTF-8 must map to
         // the empty string rather than being rewritten with `U+FFFD` substitutions; the latter
@@ -217,40 +197,34 @@ macro_rules! declare_matcher {
           Ok(c) => Box::into_raw(Box::new(c)) as *const ::std::ffi::c_void,
           Err(_) => ::std::ptr::null(),
         }
-      }))
-      .unwrap_or_else(|panic| {
-        $crate::log_ffi_panic("envoy_dynamic_module_on_matcher_config_new", panic);
-        ::std::ptr::null()
-      })
+      }
+      on_panic = ::std::ptr::null()
     }
 
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_config_destroy(
-      config_ptr: *const ::std::ffi::c_void,
-    ) {
-      let _ = ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| unsafe {
-        drop(Box::from_raw(config_ptr as *mut $config_type));
-      }))
-      .map_err(|panic| {
-        $crate::log_ffi_panic("envoy_dynamic_module_on_matcher_config_destroy", panic);
-      });
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_config_destroy(config_ptr: *const ::std::ffi::c_void) {
+        unsafe {
+          drop(Box::from_raw(config_ptr as *mut $config_type));
+        }
+      }
     }
 
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_matcher_match(
-      config_ptr: *const ::std::ffi::c_void,
-      matcher_input_envoy_ptr: *mut ::std::ffi::c_void,
-    ) -> bool {
-      ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
+    $crate::ffi_export! {
+      fn envoy_dynamic_module_on_matcher_match(
+        config_ptr: *const ::std::ffi::c_void,
+        matcher_input_envoy_ptr: *mut ::std::ffi::c_void,
+      ) -> bool {
         let config = unsafe { &*(config_ptr as *const $config_type) };
         let ctx = $crate::matcher::MatchContext::new(matcher_input_envoy_ptr);
-        config.on_matcher_match(&ctx)
-      }))
-      .unwrap_or_else(|panic| {
-        $crate::log_ffi_panic("envoy_dynamic_module_on_matcher_match", panic);
-        // Fail-closed: a panic during match evaluation must not look like "matched".
+        <$config_type as $crate::matcher::MatcherConfig>::on_matcher_match(config, &ctx)
+      }
+      // A panic cannot report a match result, so tell Envoy the evaluation did not complete and let
+      // the matcher apply its configured on_error policy. The returned value is unused once the
+      // error is reported.
+      on_panic = {
+        $crate::matcher::MatchContext::new(matcher_input_envoy_ptr).report_error();
         false
-      })
+      }
     }
   };
 }

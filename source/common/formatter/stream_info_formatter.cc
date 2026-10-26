@@ -10,6 +10,7 @@
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
+#include "source/common/version/version.h"
 
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
@@ -163,8 +164,10 @@ MetadataFormatter::format(const Context&, const StreamInfo::StreamInfo& stream_i
 Protobuf::Value MetadataFormatter::formatValue(const Context&,
                                                const StreamInfo::StreamInfo& stream_info) const {
   auto metadata = get_func_(stream_info);
-  return formatMetadataValue((metadata != nullptr) ? *metadata
-                                                   : envoy::config::core::v3::Metadata());
+  if (metadata == nullptr) {
+    return SubstitutionFormatUtils::unspecifiedValue();
+  }
+  return formatMetadataValue(*metadata);
 }
 
 bool MetadataFormatter::formatTo(std::string& sink, const Context& context,
@@ -1070,60 +1073,71 @@ public:
   using FieldExtractor =
       std::function<std::optional<std::chrono::nanoseconds>(const StreamInfo::StreamInfo&)>;
 
-  StreamInfoDurationFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
+  StreamInfoDurationFormatterProvider(FieldExtractor f,
+                                      DurationPrecision precision = DurationPrecision::Milliseconds)
+      : field_extractor_(f), precision_(precision) {}
 
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&,
                                     const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return std::nullopt;
     }
 
-    return fmt::format_int(millis.value()).str();
+    return fmt::format_int(duration.value()).str();
   }
   bool formatTo(std::string& sink, const Context&,
                 const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return false;
     }
 
-    const fmt::format_int formatted(millis.value());
+    const fmt::format_int formatted(duration.value());
     sink.append(formatted.data(), formatted.size());
     return true;
   }
   Protobuf::Value formatValue(const Context&,
                               const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
 
-    return ValueUtil::numberValue(millis.value());
+    return ValueUtil::numberValue(duration.value());
   }
   void formatValueTo(ValueSink& sink, const Context&,
                      const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
+    const auto duration = extractDuration(stream_info);
+    if (!duration) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
       // handle the missing value.
       return;
     }
 
-    sink.addNumber(millis.value());
+    sink.addNumber(duration.value());
   }
 
 private:
-  std::optional<int64_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
+  std::optional<int64_t> extractDuration(const StreamInfo::StreamInfo& stream_info) const {
     const auto time = field_extractor_(stream_info);
-    if (time) {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+    if (!time) {
+      return std::nullopt;
     }
-    return std::nullopt;
+    switch (precision_) {
+    case DurationPrecision::Milliseconds:
+      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+    case DurationPrecision::Microseconds:
+      return std::chrono::duration_cast<std::chrono::microseconds>(time.value()).count();
+    case DurationPrecision::Nanoseconds:
+      return std::chrono::duration_cast<std::chrono::nanoseconds>(time.value()).count();
+    }
+    PANIC("Invalid duration precision");
   }
 
   FieldExtractor field_extractor_;
+  DurationPrecision precision_;
 };
 
 // StreamInfo uint64_t field extractor.
@@ -1295,131 +1309,117 @@ private:
   const std::optional<int> mask_prefix_len_;
 };
 
-// Ssl::ConnectionInfo std::string field extractor.
-class StreamInfoSslConnectionInfoFormatterProvider : public StreamInfoFormatterProvider {
+// Ssl::ConnectionInfo field extractor. The `StringType` is either `std::string` for the fields
+// that must be built on the fly, or `absl::string_view` for the fields that are backed by the
+// connection info itself and needn't be copied. The `ConnectionInfoGetter` provides the SSL
+// connection info (downstream or upstream) of the stream.
+template <class StringType, class ConnectionInfoGetter>
+class StreamInfoSslConnectionInfoFormatterProviderBase : public StreamInfoFormatterProvider {
 public:
-  // TODO(wbpcode): Most of attributes of SSL connection info need to create a new string.
-  using FieldExtractor =
-      std::function<std::optional<std::string>(const Ssl::ConnectionInfo& connection_info)>;
+  // NOTE: if the `StringType` is `absl::string_view`, the returned view must be backed by the
+  // connection info itself. Use the `std::string` variant for any command that builds its value
+  // on the fly.
+  using FieldExtractor = std::function<std::optional<StringType>(const Ssl::ConnectionInfo&)>;
 
-  StreamInfoSslConnectionInfoFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
+  StreamInfoSslConnectionInfoFormatterProviderBase(FieldExtractor f)
+      : field_extractor_(std::move(f)) {}
 
   // StreamInfoFormatterProvider
   std::optional<std::string> format(const Context&,
                                     const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
+    // Keep the connection info alive until the extracted value is consumed because the value
+    // may only be a view of the connection info.
+    const auto connection_info = ConnectionInfoGetter::get(stream_info);
+    if (connection_info == nullptr) {
       return std::nullopt;
     }
 
-    const auto value = field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
-    if (value && value->empty()) {
+    auto value = field_extractor_(*connection_info);
+    if (!value.has_value() || value->empty()) {
       return std::nullopt;
     }
 
-    return value;
+    return std::string(std::move(*value));
+  }
+
+  bool formatTo(std::string& sink, const Context&,
+                const StreamInfo::StreamInfo& stream_info) const override {
+    const auto connection_info = ConnectionInfoGetter::get(stream_info);
+    if (connection_info == nullptr) {
+      return false;
+    }
+
+    const auto value = field_extractor_(*connection_info);
+    if (!value.has_value() || value->empty()) {
+      return false;
+    }
+
+    sink.append(*value);
+    return true;
   }
 
   Protobuf::Value formatValue(const Context&,
                               const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
+    const auto connection_info = ConnectionInfoGetter::get(stream_info);
+    if (connection_info == nullptr) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
 
-    const auto value = field_extractor_(*stream_info.downstreamAddressProvider().sslConnection());
-    if (value && value->empty()) {
+    const auto value = field_extractor_(*connection_info);
+    if (!value.has_value() || value->empty()) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
 
-    return ValueUtil::optionalStringValue(value);
+    return ValueUtil::stringValue(*value);
   }
-  bool formatTo(std::string& sink, const Context& context,
-                const StreamInfo::StreamInfo& stream_info) const override {
-    const auto value = format(context, stream_info);
-    if (!value.has_value()) {
-      return false;
-    }
-    sink.append(*value);
-    return true;
-  }
-  void formatValueTo(ValueSink& sink, const Context& context,
+
+  void formatValueTo(ValueSink& sink, const Context&,
                      const StreamInfo::StreamInfo& stream_info) const override {
-    const auto value = formatValue(context, stream_info);
-    if (value.kind_case() == Protobuf::Value::kNullValue ||
-        value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
+    const auto connection_info = ConnectionInfoGetter::get(stream_info);
+    if (connection_info == nullptr) {
       // Keep the sink unmodified if no value is extracted and the caller can decide how to
       // handle the missing value.
       return;
     }
-    sink.addValue(value);
+
+    const auto value = field_extractor_(*connection_info);
+    if (!value.has_value() || value->empty()) {
+      return;
+    }
+
+    sink.addString(*value);
   }
 
 private:
   FieldExtractor field_extractor_;
 };
 
-class StreamInfoUpstreamSslConnectionInfoFormatterProvider : public StreamInfoFormatterProvider {
-public:
-  using FieldExtractor =
-      std::function<std::optional<std::string>(const Ssl::ConnectionInfo& connection_info)>;
-
-  StreamInfoUpstreamSslConnectionInfoFormatterProvider(FieldExtractor f) : field_extractor_(f) {}
-
-  // StreamInfoFormatterProvider
-  std::optional<std::string> format(const Context&,
-                                    const StreamInfo::StreamInfo& stream_info) const override {
-    if (!stream_info.upstreamInfo() ||
-        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
-      return std::nullopt;
-    }
-
-    const auto value = field_extractor_(*(stream_info.upstreamInfo()->upstreamSslConnection()));
-    if (value && value->empty()) {
-      return std::nullopt;
-    }
-
-    return value;
+struct DownstreamSslConnectionInfoGetter {
+  static Ssl::ConnectionInfoConstSharedPtr get(const StreamInfo::StreamInfo& stream_info) {
+    return stream_info.downstreamAddressProvider().sslConnection();
   }
-
-  Protobuf::Value formatValue(const Context&,
-                              const StreamInfo::StreamInfo& stream_info) const override {
-    if (!stream_info.upstreamInfo() ||
-        stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
-      return SubstitutionFormatUtils::unspecifiedValue();
-    }
-
-    const auto value = field_extractor_(*(stream_info.upstreamInfo()->upstreamSslConnection()));
-    if (value && value->empty()) {
-      return SubstitutionFormatUtils::unspecifiedValue();
-    }
-
-    return ValueUtil::optionalStringValue(value);
-  }
-
-  bool formatTo(std::string& sink, const Context& context,
-                const StreamInfo::StreamInfo& stream_info) const override {
-    const auto value = format(context, stream_info);
-    if (!value.has_value()) {
-      return false;
-    }
-    sink.append(*value);
-    return true;
-  }
-
-  void formatValueTo(ValueSink& sink, const Context& context,
-                     const StreamInfo::StreamInfo& stream_info) const override {
-    const auto value = formatValue(context, stream_info);
-    if (value.kind_case() == Protobuf::Value::kNullValue ||
-        value.kind_case() == Protobuf::Value::KIND_NOT_SET) {
-      // Keep the sink unmodified if no value is extracted and the caller can decide how to
-      // handle the missing value.
-      return;
-    }
-    sink.addValue(value);
-  }
-
-private:
-  FieldExtractor field_extractor_;
 };
+
+struct UpstreamSslConnectionInfoGetter {
+  static Ssl::ConnectionInfoConstSharedPtr get(const StreamInfo::StreamInfo& stream_info) {
+    if (!stream_info.upstreamInfo()) {
+      return nullptr;
+    }
+    return stream_info.upstreamInfo()->upstreamSslConnection();
+  }
+};
+
+using StreamInfoSslConnectionInfoFormatterProvider =
+    StreamInfoSslConnectionInfoFormatterProviderBase<std::string,
+                                                     DownstreamSslConnectionInfoGetter>;
+using StreamInfoSslConnectionInfoViewFormatterProvider =
+    StreamInfoSslConnectionInfoFormatterProviderBase<absl::string_view,
+                                                     DownstreamSslConnectionInfoGetter>;
+using StreamInfoUpstreamSslConnectionInfoFormatterProvider =
+    StreamInfoSslConnectionInfoFormatterProviderBase<std::string, UpstreamSslConnectionInfoGetter>;
+using StreamInfoUpstreamSslConnectionInfoViewFormatterProvider =
+    StreamInfoSslConnectionInfoFormatterProviderBase<absl::string_view,
+                                                     UpstreamSslConnectionInfoGetter>;
 
 using StreamInfoFormatterProviderLookupTable =
     absl::flat_hash_map<absl::string_view, std::pair<CommandSyntaxChecker::CommandSyntaxFlags,
@@ -1737,6 +1737,27 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                  return std::make_unique<StreamInfoDurationFormatterProvider>(
                                      [](const StreamInfo::StreamInfo& stream_info) {
                                        return stream_info.currentDuration();
+                                     });
+                               }}},
+                             {"ROUTE_RESOLUTION_TIME_US",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoDurationFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info)
+                                         -> std::optional<std::chrono::nanoseconds> {
+                                       if (stream_info.routeResolutionCount() == 0) {
+                                         return std::nullopt;
+                                       }
+                                       return stream_info.routeResolutionTime();
+                                     },
+                                     DurationPrecision::Microseconds);
+                               }}},
+                             {"ROUTE_RESOLUTION_COUNT",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                                     [](const StreamInfo::StreamInfo& stream_info) -> uint64_t {
+                                       return stream_info.routeResolutionCount();
                                      });
                                }}},
                              {"COMMON_DURATION",
@@ -2092,38 +2113,36 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return std::make_optional<std::string>(
-                                           connection_info.ciphersuiteString());
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.ciphersuiteString();
                                      });
                                }}},
                              {"UPSTREAM_TLS_GROUP",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return std::make_optional<std::string>(
-                                           connection_info.tlsGroupString());
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.tlsGroupString();
                                      });
                                }}},
                              {"UPSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.tlsVersion();
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.tlsVersion();
                                      });
                                }}},
                              {"UPSTREAM_TLS_SESSION_ID",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.sessionId();
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.sessionId();
                                      });
                                }}},
                              {"UPSTREAM_SERVER_NAME",
@@ -2150,27 +2169,27 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.issuerPeerCertificate();
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.issuerPeerCertificate();
                                      });
                                }}},
                              {"UPSTREAM_PEER_CERT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.urlEncodedPemEncodedPeerCertificate();
                                      });
                                }}},
                              {"UPSTREAM_PEER_SUBJECT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoUpstreamSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.subjectPeerCertificate();
+                                     StreamInfoUpstreamSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.subjectPeerCertificate();
                                      });
                                }}},
                              {"DOWNSTREAM_LOCAL_ADDRESS",
@@ -2538,83 +2557,81 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.subjectPeerCertificate();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.subjectPeerCertificate();
                                      });
                                }}},
                              {"DOWNSTREAM_LOCAL_SUBJECT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.subjectLocalCertificate();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.subjectLocalCertificate();
                                      });
                                }}},
                              {"DOWNSTREAM_TLS_SESSION_ID",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.sessionId();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.sessionId();
                                      });
                                }}},
                              {"DOWNSTREAM_TLS_CIPHER",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return std::make_optional<std::string>(
-                                           connection_info.ciphersuiteString());
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.ciphersuiteString();
                                      });
                                }}},
                              {"DOWNSTREAM_TLS_GROUP",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return std::make_optional<std::string>(
-                                           connection_info.tlsGroupString());
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.tlsGroupString();
                                      });
                                }}},
                              {"DOWNSTREAM_TLS_VERSION",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.tlsVersion();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.tlsVersion();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_FINGERPRINT_256",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.sha256PeerCertificateDigest();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.sha256PeerCertificateDigest();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_FINGERPRINT_1",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.sha1PeerCertificateDigest();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.sha1PeerCertificateDigest();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_SERIAL",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.serialNumberPeerCertificate();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.serialNumberPeerCertificate();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_CHAIN_FINGERPRINTS_256",
@@ -2652,36 +2669,45 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.issuerPeerCertificate();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.issuerPeerCertificate();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_ISSUER_FINGERPRINT_256",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.sha256PeerCertificateIssuerDigest();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.sha256PeerCertificateIssuerDigest();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_ISSUER_SERIAL",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.serialNumberPeerCertificateIssuer();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.serialNumberPeerCertificateIssuer();
                                      });
                                }}},
                              {"DOWNSTREAM_PEER_CERT",
                               {CommandSyntaxChecker::COMMAND_ONLY,
                                [](absl::string_view, std::optional<size_t>) {
                                  return std::make_unique<
-                                     StreamInfoSslConnectionInfoFormatterProvider>(
-                                     [](const Ssl::ConnectionInfo& connection_info) {
-                                       return connection_info.urlEncodedPemEncodedPeerCertificate();
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.urlEncodedPemEncodedPeerCertificate();
+                                     });
+                               }}},
+                             {"DOWNSTREAM_PEER_CERT_CHAIN",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<
+                                     StreamInfoSslConnectionInfoViewFormatterProvider>(
+                                     [](const Ssl::ConnectionInfo& info) -> absl::string_view {
+                                       return info.urlEncodedPemEncodedPeerCertificateChain();
                                      });
                                }}},
                              {"DOWNSTREAM_TRANSPORT_FAILURE_REASON",
@@ -2787,6 +2813,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                                          return std::nullopt;
                                        }
                                        return absl::string_view(*hostname);
+                                     });
+                               }}},
+                             {"ENVOY_VERSION",
+                              {CommandSyntaxChecker::COMMAND_ONLY,
+                               [](absl::string_view, std::optional<size_t>) {
+                                 return std::make_unique<StreamInfoStringViewFormatterProvider>(
+                                     [](const StreamInfo::StreamInfo&)
+                                         -> std::optional<absl::string_view> {
+                                       // Static storage that lives for the process lifetime.
+                                       return absl::string_view(VersionInfo::version());
                                      });
                                }}},
                              {"FILTER_CHAIN_NAME",

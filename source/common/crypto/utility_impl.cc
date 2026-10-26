@@ -26,6 +26,14 @@ std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer
   return digest;
 }
 
+std::vector<uint8_t> UtilityImpl::getSha256Digest(absl::string_view text) {
+  std::vector<uint8_t> digest(SHA256_DIGEST_LENGTH);
+  const auto rc =
+      EVP_Digest(text.data(), text.size(), digest.data(), nullptr, EVP_sha256(), nullptr);
+  RELEASE_ASSERT(rc == 1, "Failed to compute digest");
+  return digest;
+}
+
 std::vector<uint8_t> UtilityImpl::getSha256Hmac(absl::Span<const uint8_t> key,
                                                 absl::string_view message) {
   std::vector<uint8_t> hmac(SHA256_DIGEST_LENGTH);

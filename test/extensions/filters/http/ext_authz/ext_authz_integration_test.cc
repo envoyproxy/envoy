@@ -73,6 +73,26 @@ struct WaitForSuccessfulUpstreamResponseOpts {
   bool failure_mode_allowed_header = false;
 };
 
+namespace {
+
+void cleanupExtAuthzConnection(FakeHttpConnectionPtr& connection) {
+  if (connection == nullptr) {
+    return;
+  }
+
+  AssertionResult result = connection->close();
+  RELEASE_ASSERT(result, result.message());
+  result = connection->waitForDisconnect();
+  RELEASE_ASSERT(result, result.message());
+  // The disconnect notification can run inside another fake-upstream event callback. Wait for
+  // that callback to unwind before destroying the connection wrapper it may still reference.
+  result = connection->waitForDispatcherBarrier();
+  RELEASE_ASSERT(result, result.message());
+  connection.reset();
+}
+
+} // namespace
+
 class ExtAuthzGrpcIntegrationTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public HttpIntegrationTest,
@@ -82,6 +102,18 @@ class ExtAuthzGrpcIntegrationTest
 public:
   ExtAuthzGrpcIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, ExtAuthzGrpcIntegrationTest::ipVersion()) {}
+
+  // The stat names asserted below must be the same whether or not the HTTP filters are created
+  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
+  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
+    HttpIntegrationTest::initialize();
+  }
 
   static std::string testParamsToString(
       const ::testing::TestParamInfo<
@@ -615,10 +647,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -682,6 +711,11 @@ attributes:
     };
     waitForSuccessfulUpstreamResponse("200", opts);
 
+    // The filter creates its stats in the connection manager's scope, so they carry its stat
+    // prefix. The per-cluster stats asserted elsewhere in this file live in the cluster's scope
+    // instead and are not prefixed by it.
+    test_server_->waitForCounter("http.config_test.ext_authz.ok", Eq(1));
+
     cleanup();
   }
 
@@ -699,6 +733,99 @@ attributes:
     if (!deny_at_disable) {
       waitForSuccessfulUpstreamResponse(expected_status);
     }
+    test_server_->waitForCounter("http.config_test.ext_authz.disabled", Eq(1));
+    cleanup();
+  }
+
+  // Runs an OK authorization response that sets x-route-key and asserts which route the request
+  // resolves to. The route table has a route that only matches when x-route-key is present, so the
+  // resolved route is observable through the request header it adds to the upstream request. The
+  // keyed route is only reached when the route cache is cleared after the header mutation.
+  void runClearRouteCacheHeadersScenario(const std::vector<std::string>& clear_route_cache_headers,
+                                         const std::string& expected_route_selection) {
+    config_helper_.addConfigModifier([this, clear_route_cache_headers](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ext_authz_cluster->set_name("ext_authz_cluster");
+      ConfigHelper::setHttp2(*ext_authz_cluster);
+
+      envoy::extensions::filters::http::ext_authz::v3::ExtAuthz ext_authz_config;
+      setGrpcService(*ext_authz_config.mutable_grpc_service(), "ext_authz_cluster",
+                     fake_upstreams_.back()->localAddress());
+      ext_authz_config.set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      ext_authz_config.set_clear_route_cache(true);
+      for (const auto& header : clear_route_cache_headers) {
+        ext_authz_config.add_clear_route_cache_headers(header);
+      }
+
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_authz_filter;
+      ext_authz_filter.set_name(ExtAuthzFilterName);
+      std::ignore = ext_authz_filter.mutable_typed_config()->PackFrom(ext_authz_config);
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_authz_filter));
+    });
+
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+          virtual_host->clear_routes();
+
+          auto* keyed_route = virtual_host->add_routes();
+          keyed_route->mutable_match()->set_prefix("/");
+          auto* header_matcher = keyed_route->mutable_match()->add_headers();
+          header_matcher->set_name("x-route-key");
+          header_matcher->mutable_string_match()->set_exact("cleared");
+          keyed_route->mutable_route()->set_cluster("cluster_0");
+          auto* keyed_header = keyed_route->add_request_headers_to_add()->mutable_header();
+          keyed_header->set_key("x-route-selected");
+          keyed_header->set_value("by-key");
+
+          auto* default_route = virtual_host->add_routes();
+          default_route->mutable_match()->set_prefix("/");
+          default_route->mutable_route()->set_cluster("cluster_0");
+          auto* default_header = default_route->add_request_headers_to_add()->mutable_header();
+          default_header->set_key("x-route-selected");
+          default_header->set_value("default");
+        });
+
+    setDownstreamProtocol(Http::CodecType::HTTP1);
+    HttpIntegrationTest::initialize();
+
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    response_ = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+        {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
+
+    AssertionResult result =
+        fake_upstreams_.back()->waitForHttpConnection(*dispatcher_, fake_ext_authz_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_ext_authz_connection_->waitForNewStream(*dispatcher_, ext_authz_request_);
+    RELEASE_ASSERT(result, result.message());
+    envoy::service::auth::v3::CheckRequest check_request;
+    result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
+    RELEASE_ASSERT(result, result.message());
+
+    ext_authz_request_->startGrpcStream();
+    envoy::service::auth::v3::CheckResponse check_response;
+    check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+    auto* mutation = check_response.mutable_ok_response()->mutable_headers()->Add();
+    mutation->mutable_append()->set_value(false);
+    mutation->mutable_header()->set_key("x-route-key");
+    mutation->mutable_header()->set_value("cleared");
+    ext_authz_request_->sendGrpcMessage(check_response);
+    ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+    waitForNextUpstreamRequest();
+    // The mutation is always applied and only the route decision differs between scenarios.
+    EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-route-key", "cleared"));
+    EXPECT_THAT(upstream_request_->headers(),
+                ContainsHeader("x-route-selected", expected_route_selection));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+    ASSERT_TRUE(response_->waitForEndStream());
+    EXPECT_TRUE(response_->complete());
+    EXPECT_EQ("200", response_->headers().getStatusValue());
+
     cleanup();
   }
 
@@ -740,6 +867,18 @@ class ExtAuthzHttpIntegrationTest
 public:
   ExtAuthzHttpIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  // The stat names asserted below must be the same whether or not the HTTP filters are created
+  // with the connection manager's prefixed scope. Exercise both modes of the runtime guard without
+  // doubling the test matrix: the two IP versions run the server with the guard on and off.
+  bool prefixedScope() const { return version_ != Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    config_helper_.addRuntimeOverride(
+        "envoy.reloadable_features.use_stats_prefix_scope_for_http_filter",
+        prefixedScope() ? "true" : "false");
+    HttpIntegrationTest::initialize();
+  }
 
   static std::string testParamsToString(
       const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
@@ -851,12 +990,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -1474,6 +1608,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailOpen) {
   upstream_opts.failure_mode_allowed_header = true;
   waitForSuccessfulUpstreamResponse("200", upstream_opts);
 
+  test_server_->waitForCounter("http.config_test.ext_authz.error", Eq(1));
+  test_server_->waitForCounter("http.config_test.ext_authz.failure_mode_allowed", Eq(1));
+
   cleanup();
 }
 
@@ -1871,6 +2008,8 @@ TEST_P(ExtAuthzHttpIntegrationTest, DeniedResponseHeadersForwarding) {
 
   // Verify the body is forwarded.
   EXPECT_EQ("Found", response_->body());
+
+  test_server_->waitForCounter("http.config_test.ext_authz.denied", Eq(1));
 
   cleanup();
 }
@@ -2606,12 +2745,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 
@@ -3412,6 +3546,18 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ExtensionWithMatcherDynamicMetadata) {
   }
 }
 
+// Verifies that when clear_route_cache_headers lists the header the authorization response mutates,
+// the route cache is cleared and the request re-resolves to the route that matches on that header.
+TEST_P(ExtAuthzGrpcIntegrationTest, ClearRouteCacheHeadersClearsOnListedHeader) {
+  runClearRouteCacheHeadersScenario({"x-route-key"}, "by-key");
+}
+
+// Verifies that when clear_route_cache_headers does not list the header the authorization response
+// mutates, the route cache is not cleared and the request keeps its originally resolved route.
+TEST_P(ExtAuthzGrpcIntegrationTest, ClearRouteCacheHeadersKeepsRouteOnUnlistedHeader) {
+  runClearRouteCacheHeadersScenario({"x-unrelated-header"}, "default");
+}
+
 // Verify that in shadow mode a denied response does not terminate the request — the request
 // reaches the upstream and the client gets a 200 — and that the ShadowDecision is readable
 // via %FILTER_STATE(<filter name>)% in access logs.
@@ -3522,12 +3668,7 @@ public:
   }
 
   void cleanup() {
-    if (fake_ext_authz_connection_ != nullptr) {
-      AssertionResult result = fake_ext_authz_connection_->close();
-      RELEASE_ASSERT(result, result.message());
-      result = fake_ext_authz_connection_->waitForDisconnect();
-      RELEASE_ASSERT(result, result.message());
-    }
+    cleanupExtAuthzConnection(fake_ext_authz_connection_);
     cleanupUpstreamAndDownstream();
   }
 

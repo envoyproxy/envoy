@@ -32,6 +32,7 @@ envoy_cc_library(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/dynamic_modules:abi_context_accessors_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
         "//source/extensions/dynamic_modules/abi",
         "@abseil-cpp//absl/strings:string_view",
         "@abseil-cpp//absl/types:span",

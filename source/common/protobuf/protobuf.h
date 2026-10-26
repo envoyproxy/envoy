@@ -7,6 +7,7 @@
 #include "envoy/common/platform.h"
 
 #include "google/protobuf/any.pb.h"
+#include "google/protobuf/arena.h"
 #include "google/protobuf/descriptor.h"
 #include "google/protobuf/descriptor.pb.h"
 #include "google/protobuf/descriptor_database.h"
@@ -69,6 +70,7 @@ using Closure = ::google::protobuf::Closure;
 
 using ::google::protobuf::Any;                          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Arena;                        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::ArenaOptions;                 // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::BoolValue;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::BytesValue;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Descriptor;                   // NOLINT(misc-unused-using-decls)

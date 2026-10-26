@@ -18,6 +18,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/tracing:null_span_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 

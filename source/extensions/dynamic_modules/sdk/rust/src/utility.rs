@@ -1,4 +1,70 @@
+use crate::buffer::EnvoyBuffer;
 use crate::EnvoyHttpFilter;
+use std::mem::MaybeUninit;
+
+type AbiHeader = crate::abi::envoy_dynamic_module_type_envoy_http_header;
+
+/// Fills `buf` with all the entries of a header map and returns them.
+///
+/// `size` reports the header count of the map and `fill` writes that many entries into the given
+/// array. Both are called here, one right after the other, so the array handed to `fill` always has
+/// room for the count that `size` reported. A caller only names the two callbacks and can never
+/// pair a fill with a count taken from another header map or from an earlier state of the same
+/// one.
+///
+/// `buf` is cleared first and only grows when it is too small, so a caller that reads headers
+/// repeatedly can reuse it. Returns `None` when the header map is unavailable.
+pub(crate) fn fill_headers<S, F>(
+  buf: &mut Vec<MaybeUninit<AbiHeader>>,
+  size: S,
+  fill: F,
+) -> Option<&[AbiHeader]>
+where
+  S: FnOnce() -> usize,
+  F: FnOnce(*mut AbiHeader) -> bool,
+{
+  buf.clear();
+  let count = size();
+  buf.reserve(count);
+  if !fill(buf.as_mut_ptr() as *mut AbiHeader) {
+    return None;
+  }
+  // Safety: Envoy initialized count entries starting at index zero, and the buffer has room for
+  // them.
+  unsafe {
+    buf.set_len(count);
+    Some(std::slice::from_raw_parts(
+      buf.as_ptr() as *const AbiHeader,
+      count,
+    ))
+  }
+}
+
+/// Builds the key and value pair of a filled header entry field by field, so the Rust tuple is
+/// never reinterpreted as the C struct. The buffers point into Envoy owned memory valid for the
+/// current event hook.
+fn header_pair<'a>(header: &AbiHeader) -> (EnvoyBuffer<'a>, EnvoyBuffer<'a>) {
+  unsafe {
+    (
+      EnvoyBuffer::new_from_raw(header.key_ptr as *const u8, header.key_length),
+      EnvoyBuffer::new_from_raw(header.value_ptr as *const u8, header.value_length),
+    )
+  }
+}
+
+/// Reads all the entries of a header map as key and value pairs through the given size and fill
+/// callbacks. See [`fill_headers`]. Returns an empty vector when there are no headers or the header
+/// map is unavailable.
+pub(crate) fn collect_headers<'a, S, F>(size: S, fill: F) -> Vec<(EnvoyBuffer<'a>, EnvoyBuffer<'a>)>
+where
+  S: FnOnce() -> usize,
+  F: FnOnce(*mut AbiHeader) -> bool,
+{
+  let mut buf = Vec::new();
+  fill_headers(&mut buf, size, fill).map_or_else(Vec::new, |headers| {
+    headers.iter().map(header_pair).collect()
+  })
+}
 
 fn get_body_content<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF, request: bool) -> Vec<u8> {
   // If the received body is the same as the buffered body (a previous filter did StopAndBuffer
@@ -9,12 +75,8 @@ fn get_body_content<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF, request: bool)
     envoy_filter.received_buffered_response_body()
   };
 
-  let buffered_size = if request {
-    envoy_filter.get_buffered_request_body_size()
-  } else {
-    envoy_filter.get_buffered_response_body_size()
-  };
-
+  // The received size still uses a cheap size call so the result is allocated once at the exact
+  // total. The buffered size is summed from its chunk lengths below to drop a redundant crossing.
   let received_size = if is_buffered {
     0
   } else if request {
@@ -23,13 +85,19 @@ fn get_body_content<EHF: EnvoyHttpFilter>(envoy_filter: &mut EHF, request: bool)
     envoy_filter.get_received_response_body_size()
   };
 
-  let mut result = Vec::with_capacity(buffered_size + received_size);
-
   let buffered = if request {
     envoy_filter.get_buffered_request_body()
   } else {
     envoy_filter.get_buffered_response_body()
   };
+  let buffered_size = buffered.as_ref().map_or(0, |chunks| {
+    chunks
+      .iter()
+      .map(|chunk| chunk.as_slice().len())
+      .sum::<usize>()
+  });
+
+  let mut result = Vec::with_capacity(buffered_size + received_size);
   if let Some(chunks) = buffered {
     for chunk in &chunks {
       result.extend_from_slice(chunk.as_slice());
@@ -152,10 +220,6 @@ mod tests {
       .times(1)
       .returning(|| true);
     mock
-      .expect_get_buffered_request_body_size()
-      .times(1)
-      .returning(|| 11);
-    mock
       .expect_get_buffered_request_body()
       .times(1)
       .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut BUFFER) }]));
@@ -174,10 +238,6 @@ mod tests {
       .expect_received_buffered_request_body()
       .times(1)
       .returning(|| false);
-    mock
-      .expect_get_buffered_request_body_size()
-      .times(1)
-      .returning(|| 6);
     mock
       .expect_get_received_request_body_size()
       .times(1)
@@ -204,10 +264,6 @@ mod tests {
       .times(1)
       .returning(|| false);
     mock
-      .expect_get_buffered_request_body_size()
-      .times(1)
-      .returning(|| 0);
-    mock
       .expect_get_received_request_body_size()
       .times(1)
       .returning(|| 5);
@@ -224,6 +280,29 @@ mod tests {
   }
 
   #[test]
+  fn test_read_whole_request_body_multi_chunk_buffered() {
+    // A multi-chunk buffered body is summed from its chunk lengths and concatenated in order.
+    static mut CHUNK_ONE: [u8; 6] = *b"hello ";
+    static mut CHUNK_TWO: [u8; 5] = *b"world";
+    let mut mock = MockEnvoyHttpFilter::default();
+    mock
+      .expect_received_buffered_request_body()
+      .times(1)
+      .returning(|| true);
+    mock
+      .expect_get_buffered_request_body()
+      .times(1)
+      .returning(|| {
+        Some(vec![
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_ONE) },
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_TWO) },
+        ])
+      });
+
+    assert_eq!(read_whole_request_body(&mut mock), b"hello world");
+  }
+
+  #[test]
   fn test_read_whole_response_body_received_is_buffered() {
     // When received_buffered_response_body() returns true, only the buffered body should be read.
     static mut BUFFER: [u8; 11] = *b"hello world";
@@ -232,10 +311,6 @@ mod tests {
       .expect_received_buffered_response_body()
       .times(1)
       .returning(|| true);
-    mock
-      .expect_get_buffered_response_body_size()
-      .times(1)
-      .returning(|| 11);
     mock
       .expect_get_buffered_response_body()
       .times(1)
@@ -256,10 +331,6 @@ mod tests {
       .expect_received_buffered_response_body()
       .times(1)
       .returning(|| false);
-    mock
-      .expect_get_buffered_response_body_size()
-      .times(1)
-      .returning(|| 6);
     mock
       .expect_get_received_response_body_size()
       .times(1)
@@ -286,10 +357,6 @@ mod tests {
       .times(1)
       .returning(|| false);
     mock
-      .expect_get_buffered_response_body_size()
-      .times(1)
-      .returning(|| 0);
-    mock
       .expect_get_received_response_body_size()
       .times(1)
       .returning(|| 5);
@@ -303,5 +370,28 @@ mod tests {
       .returning(|| Some(vec![unsafe { EnvoyMutBuffer::new(&raw mut RECEIVED) }]));
 
     assert_eq!(read_whole_response_body(&mut mock), b"world");
+  }
+
+  #[test]
+  fn test_read_whole_response_body_multi_chunk_buffered() {
+    // A multi-chunk buffered body is summed from its chunk lengths and concatenated in order.
+    static mut CHUNK_ONE: [u8; 6] = *b"hello ";
+    static mut CHUNK_TWO: [u8; 5] = *b"world";
+    let mut mock = MockEnvoyHttpFilter::default();
+    mock
+      .expect_received_buffered_response_body()
+      .times(1)
+      .returning(|| true);
+    mock
+      .expect_get_buffered_response_body()
+      .times(1)
+      .returning(|| {
+        Some(vec![
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_ONE) },
+          unsafe { EnvoyMutBuffer::new(&raw mut CHUNK_TWO) },
+        ])
+      });
+
+    assert_eq!(read_whole_response_body(&mut mock), b"hello world");
   }
 }

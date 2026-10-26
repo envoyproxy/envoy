@@ -123,6 +123,26 @@ filter_name: test_filter
       "resolve symbol envoy_dynamic_module_on_udp_listener_filter_config_new");
 }
 
+// A module whose config_new returns null must be rejected at config load rather than passing a null
+// config to a later hook that would dereference it.
+TEST_F(DynamicModuleUdpListenerFilterFactoryTest, NullInModuleConfigRejected) {
+  NiceMock<Server::Configuration::MockListenerFactoryContext> context;
+
+  const std::string yaml = R"EOF(
+dynamic_module_config:
+  name: udp_null_config
+  do_not_close: true
+filter_name: test_filter
+)EOF";
+
+  envoy::extensions::filters::udp::dynamic_modules::v3::DynamicModuleUdpListenerFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  EXPECT_THROW_WITH_MESSAGE(factory_.createFilterFactoryFromProto(proto_config, context),
+                            EnvoyException,
+                            "Failed to initialize dynamic module UDP listener filter");
+}
+
 TEST_F(DynamicModuleUdpListenerFilterFactoryTest, MultipleFactoryCallsSameModule) {
   NiceMock<Server::Configuration::MockListenerFactoryContext> context;
 

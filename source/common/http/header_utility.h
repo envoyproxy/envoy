@@ -83,11 +83,8 @@ public:
           present_(explicit_present) {}
 
     bool matchesHeaders(const HeaderMap& request_headers) const override {
-      const auto header_value = getAllOfHeaderAsString(request_headers, name_);
-
-      // If treat_missing_as_empty is false, and the header_value is empty,
-      // return true iff invert_match is the same as present_.
-      if (!header_value.result().has_value() && !treat_missing_as_empty_) {
+      // Missing-as-empty makes presence independent of the actual header entries.
+      if (!treat_missing_as_empty_ && request_headers.get(name_).empty()) {
         return invert_match_ == present_;
       }
 
@@ -445,8 +442,7 @@ public:
    * @param headers to validate
    * @return details of the error if an error is present, otherwise std::nullopt
    */
-  static std::optional<std::reference_wrapper<const absl::string_view>>
-  requestHeadersValid(const RequestHeaderMap& headers);
+  static OptRef<const absl::string_view> requestHeadersValid(const RequestHeaderMap& headers);
 
   /**
    * Determines if the response should be framed by Connection: Close based on protocol

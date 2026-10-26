@@ -453,6 +453,9 @@ TEST_F(GcpAuthnFilterTest, CacheHit) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer cached_token");
+  EXPECT_EQ(filter_config_->stats().token_cache_hit_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_cache_miss_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().token_fetch_success_.value(), 0);
 }
 
 TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
@@ -489,6 +492,11 @@ TEST_F(GcpAuthnFilterTest, CacheMissAndInsert) {
   auto cached_val = filter_config_->tokenCache()->lookUp(audience, std::nullopt);
   EXPECT_TRUE(cached_val.has_value());
   EXPECT_EQ(cached_val.value(), std::string(GoodTokenStr));
+
+  EXPECT_EQ(filter_config_->stats().token_cache_miss_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_cache_hit_.value(), 0);
+  EXPECT_EQ(filter_config_->stats().token_fetch_success_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_fetch_failed_.value(), 0);
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtCacheMissAndInsert) {
@@ -636,6 +644,7 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
   EXPECT_FALSE(filter_->fingerprint().has_value());
+  EXPECT_EQ(filter_config_->stats().bound_token_fingerprint_unavailable_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, GetClientCertFingerprintWithNullClusterReturnsNullopt) {
@@ -1239,6 +1248,7 @@ TEST_F(GcpAuthnFilterTest, IamAccessTokenResolutionFailed) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  EXPECT_EQ(filter_config_->stats().iam_token_resolution_failed_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, IamAccessTokenInClusterMetadataRejected) {
@@ -1264,6 +1274,7 @@ TEST_F(GcpAuthnFilterTest, IamAccessTokenInClusterMetadataRejected) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  EXPECT_EQ(filter_config_->stats().iam_token_config_error_.value(), 1);
 }
 
 TEST_F(GcpAuthnFilterTest, IamAccessTokenCacheMissAndHit) {
@@ -1343,6 +1354,285 @@ TEST_F(GcpAuthnFilterTest, AudiencePrecedenceIamAccessToken) {
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingHeaderPresent) {
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("Authorization");
+  token_header->set_value_prefix("Bearer ");
+  token_header->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  default_headers_.setCopy(authorizationHeaderKey(), "Bearer existing_token");
+
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer existing_token");
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingHeaderEmptyValue) {
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("Authorization");
+  token_header->set_value_prefix("Bearer ");
+  token_header->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  default_headers_.setCopy(authorizationHeaderKey(), "");
+
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(default_headers_.get_("Authorization"), "");
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingHeaderAbsent) {
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("Authorization");
+  token_header->set_value_prefix("Bearer ");
+  token_header->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("Authorization"), absl::StrCat("Bearer ", GoodTokenStr));
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingCustomHeaderPresent) {
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("X-Serverless-Authorization");
+  token_header->set_value_prefix("Bearer ");
+  token_header->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  default_headers_.setCopy(Http::LowerCaseString("X-Serverless-Authorization"),
+                           "Bearer custom_existing_token");
+
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(default_headers_.get_("x-serverless-authorization"), "Bearer custom_existing_token");
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingCustomHeaderAbsent) {
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("X-Serverless-Authorization");
+  token_header->set_value_prefix("Bearer ");
+  token_header->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("x-serverless-authorization"),
+            absl::StrCat("Bearer ", GoodTokenStr));
+}
+
+TEST_F(GcpAuthnFilterTest, WithoutPreserveExistingOverwritesHeader) {
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  default_headers_.setCopy(authorizationHeaderKey(), "Bearer old_token");
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("Authorization"), absl::StrCat("Bearer ", GoodTokenStr));
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingWithIamAccessToken) {
+  auto* iam_access_token = config_.mutable_audience()->mutable_iam_access_token();
+  iam_access_token->set_account("sa@proj.iam.gserviceaccount.com");
+  iam_access_token->set_authorization("Bearer gce_token");
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("Authorization");
+  token_header->set_value_prefix("Bearer ");
+  token_header->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  default_headers_.setCopy(authorizationHeaderKey(), "Bearer end_user_token");
+
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer end_user_token");
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingIgnoredWhenTokenMetadataKeySet) {
+  config_.set_token_metadata_key("custom_token_key");
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("Authorization");
+  token_header->set_value_prefix("Bearer ");
+  token_header->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  EXPECT_CALL(decoder_callbacks_, filterConfigName())
+      .WillRepeatedly(Return("envoy.filters.http.gcp_authn"));
+  setupMockFilterMetadata(/*valid=*/true);
+
+  default_headers_.setCopy(authorizationHeaderKey(), "Bearer existing_token");
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Protobuf::Struct expected_metadata;
+  (*expected_metadata.mutable_fields())["custom_token_key"].set_string_value(
+      std::string(GoodTokenStr));
+  EXPECT_CALL(decoder_callbacks_.stream_info_,
+              setDynamicMetadata("envoy.filters.http.gcp_authn", ProtoEq(expected_metadata)));
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer existing_token");
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingDefaultHeaderPresent) {
+  config_.mutable_token_header()->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  default_headers_.setCopy(authorizationHeaderKey(), "Bearer existing_token");
+
+  EXPECT_CALL(thread_local_cluster_.async_client_, send_(_, _, _)).Times(0);
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(default_headers_.get_("Authorization"), "Bearer existing_token");
+}
+
+TEST_F(GcpAuthnFilterTest, PreserveExistingDefaultHeaderAbsent) {
+  config_.mutable_token_header()->mutable_preserve_existing();
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("Authorization"), absl::StrCat("Bearer ", GoodTokenStr));
+}
+
+TEST_F(GcpAuthnFilterTest, CustomTokenHeaderWithoutPrefix) {
+  auto* token_header = config_.mutable_token_header();
+  token_header->set_name("x-goog-iap-jwt-assertion");
+  refreshConfig();
+
+  setupMockObjects();
+  setupFilterAndCallback();
+  setupMockFilterMetadata(/*valid=*/true);
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
+      {":status", "200"},
+  }));
+  Envoy::Http::ResponseMessagePtr response(
+      new Envoy::Http::ResponseMessageImpl(std::move(resp_headers)));
+  response->body().add(std::string(GoodTokenStr));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  client_callback_->onSuccess(client_request_, std::move(response));
+
+  EXPECT_EQ(default_headers_.get_("x-goog-iap-jwt-assertion"), GoodTokenStr);
+}
+
+TEST_F(GcpAuthnFilterTest, TokenFetchFailure) {
+  setupFilterAndCallback();
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  // A failed fetch is not fatal: the request continues upstream without a token, so the counter
+  // is the only signal that this happened.
+  filter_->onComplete(absl::InternalError("failed to fetch token"));
+
+  EXPECT_EQ(filter_->state(), GcpAuthnFilter::State::Complete);
+  EXPECT_EQ(filter_config_->stats().token_fetch_failed_.value(), 1);
+  EXPECT_EQ(filter_config_->stats().token_fetch_success_.value(), 0);
+}
+
+// Stats are namespaced under the filter name, below the prefix supplied by the connection manager.
+TEST_F(GcpAuthnFilterTest, StatsNamespacedUnderFilterName) {
+  absl::Status status;
+  FilterConfig filter_config(config_, context_.server_factory_context_, "http.foo.",
+                             context_.scope_, status);
+  ASSERT_OK(status);
+
+  filter_config.stats().token_fetch_failed_.inc();
+  EXPECT_EQ(context_.scope_.counterFromString("http.foo.gcp_authn.token_fetch_failed").value(), 1);
 }
 
 } // namespace GcpAuthn

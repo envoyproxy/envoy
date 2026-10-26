@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gmock/gmock.h"
@@ -895,6 +896,60 @@ TEST_F(AwsLambdaFilterTest, DecodeDataCredentialsPending) {
   // We should see continueDecoding called when the captured callback is triggered
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   capture();
+}
+
+// A signer that records its own destruction, so that tests can observe exactly when the
+// credentials provider chain owned by a route level configuration is released.
+class DestructionTrackingSigner : public MockSigner {
+public:
+  explicit DestructionTrackingSigner(bool& destroyed) : destroyed_(destroyed) {}
+  ~DestructionTrackingSigner() override { destroyed_ = true; }
+
+private:
+  bool& destroyed_;
+};
+
+// A configuration released off the main thread hands its signer, and therefore its credentials
+// provider chain, to the main dispatcher rather than destroying it in place.
+TEST_F(AwsLambdaFilterTest, SettingsReleasedOffMainThreadArePostedToMainDispatcher) {
+  NiceMock<Event::MockDispatcher> main_dispatcher;
+  ON_CALL(main_dispatcher, isThreadSafe()).WillByDefault(Return(false));
+
+  bool signer_destroyed = false;
+  auto settings = std::make_unique<FilterSettingsImpl>(
+      parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value(), InvocationMode::Synchronous,
+      true /*payload_passthrough*/, "",
+      std::make_unique<DestructionTrackingSigner>(signer_destroyed), main_dispatcher);
+
+  Event::PostCb posted;
+  EXPECT_CALL(main_dispatcher, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  settings.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  // The signer outlives the configuration, and is released only once the main thread runs the
+  // posted callback.
+  EXPECT_FALSE(signer_destroyed);
+  posted();
+  EXPECT_TRUE(signer_destroyed);
+}
+
+// A configuration released on the main thread is destroyed in place, with nothing posted to the
+// dispatcher.
+TEST_F(AwsLambdaFilterTest, SettingsReleasedOnMainThreadAreDestroyedInPlace) {
+  NiceMock<Event::MockDispatcher> main_dispatcher;
+  ON_CALL(main_dispatcher, isThreadSafe()).WillByDefault(Return(true));
+
+  bool signer_destroyed = false;
+  auto settings = std::make_unique<FilterSettingsImpl>(
+      parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value(), InvocationMode::Synchronous,
+      true /*payload_passthrough*/, "",
+      std::make_unique<DestructionTrackingSigner>(signer_destroyed), main_dispatcher);
+
+  EXPECT_CALL(main_dispatcher, post(_)).Times(0);
+  settings.reset();
+  EXPECT_TRUE(signer_destroyed);
 }
 
 } // namespace
