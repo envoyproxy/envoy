@@ -91,11 +91,12 @@ public:
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
     THROW_IF_NOT_OK_REF(context_or_error.status());
-    // Derive the explicit identity check flag from the validation context the same way
+    // Derive the explicit identity check flags from the validation context the same way
     // QuicClientTransportSocketFactory does.
     verifier_ = std::make_unique<EnvoyQuicProofVerifier>(
         std::move(*context_or_error), /*accept_untrusted=*/false,
-        EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&cert_validation_ctx_config_));
+        EnvoyQuicProofVerifier::hasExplicitIdentityCheck(&cert_validation_ctx_config_),
+        auto_sni_san_match_);
   }
 
   // Adds a DNS SAN matcher for one of the SANs of the QUICHE test leaf certificate, so chain
@@ -434,6 +435,36 @@ TEST_F(EnvoyQuicProofVerifierTest, SubjectAltNameListOverrideSkipsHostnameCheck)
   EXPECT_EQ(quic::QUIC_SUCCESS, verifySync("unknown.org", error_details, verify_details))
       << error_details;
   EXPECT_TRUE(static_cast<CertVerifyResult&>(*verify_details).isValid());
+}
+
+// auto_sni_san_validation keeps the hostname check even when a per-connection SAN list override is
+// set, although the validator then matches the override in place of the SNI.
+TEST_F(EnvoyQuicProofVerifierTest, AutoSniSanMatchKeepsHostnameCheckWithSubjectAltNameOverride) {
+  auto_sni_san_match_ = true;
+  // NOLINTNEXTLINE(modernize-make-shared)
+  transport_socket_options_.reset(new Network::TransportSocketOptionsImpl("", {"www.example.org"}));
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_FAILURE, verifySync("unknown.org", error_details, verify_details));
+  EXPECT_EQ("Leaf certificate doesn't match hostname: unknown.org", error_details);
+  EXPECT_EQ(quic::QUIC_SUCCESS, verifySync("www.example.org", error_details, verify_details))
+      << error_details;
+}
+
+// Without a trusted CA or any other validation configuration the validator does not run, so it does
+// not check a per-connection SAN list override either. The hostname check is kept in that case.
+TEST_F(EnvoyQuicProofVerifierTest, SubjectAltNameListOverrideWithoutValidationKeepsHostnameCheck) {
+  root_ca_cert_.clear();
+  // NOLINTNEXTLINE(modernize-make-shared)
+  transport_socket_options_.reset(new Network::TransportSocketOptionsImpl("", {"unknown.org"}));
+  configCertVerificationDetails(true);
+  std::string error_details;
+  std::unique_ptr<quic::ProofVerifyDetails> verify_details;
+  EXPECT_EQ(quic::QUIC_FAILURE, verifySync("bad.example.com", error_details, verify_details));
+  EXPECT_EQ("Leaf certificate doesn't match hostname: bad.example.com", error_details);
+  EXPECT_EQ(quic::QUIC_SUCCESS, verifySync("www.example.org", error_details, verify_details))
+      << error_details;
 }
 
 // Async validation through a custom validator: the validator owns the identity check.

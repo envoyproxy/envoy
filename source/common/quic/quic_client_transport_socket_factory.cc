@@ -177,11 +177,13 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
                                                  CertificateValidationContext::ACCEPT_UNTRUSTED;
     const bool explicit_identity_check =
         Quic::EnvoyQuicProofVerifier::hasExplicitIdentityCheck(validation_context);
+    const bool auto_sni_san_match =
+        validation_context != nullptr && validation_context->autoSniSanMatch();
     // If the context has been updated, update the crypto config.
     tls_config.client_context_ = context;
     tls_config.crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted,
-                                                       explicit_identity_check),
+                                                       explicit_identity_check, auto_sni_san_match),
         std::make_unique<quic::QuicClientSessionCache>());
 
     registerCertCompression(tls_config.crypto_config_->ssl_ctx());

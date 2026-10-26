@@ -59,9 +59,10 @@ class EnvoyQuicProofVerifier : public EnvoyQuicProofVerifierBase {
 public:
   explicit EnvoyQuicProofVerifier(Envoy::Ssl::ClientContextSharedPtr&& context,
                                   bool accept_untrusted = false,
-                                  bool explicit_identity_check = false)
+                                  bool explicit_identity_check = false,
+                                  bool auto_sni_san_match = false)
       : context_(std::move(context)), accept_untrusted_(accept_untrusted),
-        explicit_identity_check_(explicit_identity_check) {
+        explicit_identity_check_(explicit_identity_check), auto_sni_san_match_(auto_sni_san_match) {
     ASSERT(context_.get());
   }
 
@@ -94,6 +95,9 @@ private:
   // True if the validation context configures an explicit peer identity check; see
   // hasExplicitIdentityCheck().
   bool explicit_identity_check_;
+  // True if the validation context sets ``auto_sni_san_validation``, in which case a per-connection
+  // SAN override does not replace the hostname check.
+  bool auto_sni_san_match_;
 };
 
 } // namespace Quic
