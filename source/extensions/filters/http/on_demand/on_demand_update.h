@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <optional>
 #include <string>
 
@@ -86,12 +87,23 @@ public:
   }
   bool hasFieldSupport() const override { return true; }
   FieldType getField(absl::string_view field_name) const override {
-    // All the fields in one place: adding one is a single line.
-    struct Field {
-      absl::string_view name;
-      FieldType (*get)(const DiscoveryState&);
-    };
-    static constexpr Field Fields[] = {
+    for (const Field& field : fields()) {
+      if (field.name == field_name) {
+        return field.get(*this);
+      }
+    }
+    return absl::monostate{};
+  }
+
+private:
+  struct Field {
+    absl::string_view name;
+    FieldType (*get)(const DiscoveryState&);
+  };
+
+  // All the fields getField() supports in one place: adding one is a single line.
+  static const std::array<Field, 7>& fields() {
+    static const std::array<Field, 7> Fields{{
         {"host", [](const DiscoveryState& s) { return stringField(s.host_); }},
         {"vhost", [](const DiscoveryState& s) { return stringField(s.vhost_); }},
         {"cluster", [](const DiscoveryState& s) { return stringField(s.cluster_); }},
@@ -101,16 +113,10 @@ public:
          [](const DiscoveryState& s) { return durationField(s.route_duration_us_); }},
         {"cluster_discovery_duration_us",
          [](const DiscoveryState& s) { return durationField(s.cluster_duration_us_); }},
-    };
-    for (const Field& field : Fields) {
-      if (field.name == field_name) {
-        return field.get(*this);
-      }
-    }
-    return absl::monostate{};
+    }};
+    return Fields;
   }
 
-private:
   static FieldType stringField(absl::string_view value) {
     return value.empty() ? FieldType{absl::monostate{}} : FieldType{value};
   }
