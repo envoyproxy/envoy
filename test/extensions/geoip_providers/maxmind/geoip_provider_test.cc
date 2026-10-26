@@ -304,8 +304,7 @@ TEST_F(GeoipProviderTest, CityDbExtendedFieldsLookup) {
   auto lookup_cb_std = lookup_cb.AsStdFunction();
   EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
   provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
-  // country, region, city + city_geoname_id, latitude, longitude, time_zone,
-  // region_name, region_geoname_id, country_geoname_id, continent_geoname_id, country_name = 12
+  // All 12 keys configured above resolve for this address.
   ASSERT_EQ(12, captured_lookup_response_.size());
   EXPECT_EQ("SE", captured_lookup_response_["x-geo-country"]);
   EXPECT_EQ("Sweden", captured_lookup_response_["x-geo-country-name"]);
@@ -408,7 +407,7 @@ TEST_F(GeoipProviderTest, CityDbExtendedFieldsUsAddress) {
 
 TEST_F(GeoipProviderTest, CityDbSubregionAndFixedPrecisionLookup) {
   // 2.125.160.216 (Boxford, GB) has two subdivisions (England + West Berkshire),
-  // postal code, and round lat/lon that distinguish {:.4f} from shortest round-trip
+  // a postal code, and round latitude/longitude that distinguish {:.4f} from shortest round-trip
   // (51.7500 vs 51.75, -1.2500 vs -1.25).
   const std::string config_yaml = R"EOF(
     common_provider_config:
