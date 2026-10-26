@@ -10,6 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "OpentelemetryProto";
@@ -21,8 +22,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 11]
+// [#next-free-field: 13]
 message OpenTelemetryConfig {
+  // Trace context formats that can be extracted from downstream requests and injected into
+  // upstream requests.
+  enum TraceContextFormat {
+    // W3C Trace Context: the :ref:`traceparent <config_http_conn_man_headers_traceparent>` and
+    // ``tracestate`` headers.
+    // See `W3C Trace Context <https://www.w3.org/TR/trace-context/>`_.
+    TRACE_CONTEXT = 0;
+
+    // B3 single header: the :ref:`b3 <config_http_conn_man_headers_b3>` header.
+    // See `B3 propagation <https://github.com/openzipkin/b3-propagation>`_.
+    //
+    // When extracting, both the single header and the multiple header encodings are accepted, with
+    // the single header taking precedence. When injecting, only the single header is written.
+    B3 = 1;
+
+    // B3 multiple headers: the :ref:`x-b3-traceid <config_http_conn_man_headers_x-b3-traceid>`,
+    // ``x-b3-spanid``, ``x-b3-sampled`` and ``x-b3-flags`` headers.
+    // See `B3 propagation <https://github.com/openzipkin/b3-propagation>`_.
+    //
+    // When extracting, both the single header and the multiple header encodings are accepted, with
+    // the single header taking precedence. When injecting, ``x-b3-traceid``, ``x-b3-spanid`` and
+    // ``x-b3-sampled`` are written.
+    B3_MULTI = 2;
+  }
+
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
   // This field can be left empty to disable reporting traces to the gRPC service.
@@ -88,4 +114,23 @@ message OpenTelemetryConfig {
   // Specifies whether to set the instrumentation scope name ("envoy") and version on emitted traces.
   // If not specified, the default is to set the instrumentation scope name and version.
   google.protobuf.BoolValue set_instrumentation_scope = 9;
+
+  // The trace context formats to extract from downstream requests, in order of precedence.
+  // The first format whose headers are present and valid is used as the parent of the span; the
+  // remaining formats are ignored. A format whose headers are malformed is skipped. If headers
+  // were present but none of them could be extracted, the request is not traced.
+  //
+  // B3 trace context without a sampling decision joins the trace, and the span's sampling
+  // decision is made by Envoy as if it were the first span in the trace.
+  //
+  // Each format may be listed at most once. If not specified, the default is ``[TRACE_CONTEXT]``.
+  repeated TraceContextFormat incoming_trace_context = 11
+      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
+
+  // The trace context formats to inject into upstream requests. Headers of formats that are not
+  // listed are left unchanged.
+  //
+  // Each format may be listed at most once. If not specified, the default is ``[TRACE_CONTEXT]``.
+  repeated TraceContextFormat outgoing_trace_context = 12
+      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 }
