@@ -1459,6 +1459,80 @@ TEST_P(StreamDoneFilterTest, EmptyCompletionUsageDoesNotSkipLaterPolicy) {
   expectRemainingAfterRequest({&descriptor, 1}, 2);
 }
 
+TEST_P(StreamDoneFilterTest, CompletionUsesRequestHeadersAtStreamDone) {
+  static constexpr absl::string_view yaml = R"(
+stat_prefix: test
+token_bucket:
+  max_tokens: 100
+  tokens_per_fill: 1
+  fill_interval: 1000s
+filter_enabled:
+  runtime_key: test_enabled
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+filter_enforced:
+  runtime_key: test_enforced
+  default_value:
+    numerator: 100
+    denominator: HUNDRED
+local_rate_limit_per_downstream_connection: {}
+descriptors:
+- entries:
+  - key: tenant
+    value: public
+  token_bucket:
+    max_tokens: 6
+    tokens_per_fill: 1
+    fill_interval: 1000s
+- entries:
+  - key: tenant
+    value: internal
+  token_bucket:
+    max_tokens: 6
+    tokens_per_fill: 1
+    fill_interval: 1000s
+rate_limits:
+- actions:
+  - request_headers:
+      header_name: x-tenant
+      descriptor_key: tenant
+- actions:
+  - request_headers:
+      header_name: x-tenant
+      descriptor_key: tenant
+  apply_on_stream_done: true
+  hits_addend:
+    format: "%RESP(x-cost)%"
+)";
+  setup(fmt::format(yaml, GetParam()));
+  RateLimit::Descriptor public_descriptor;
+  public_descriptor.entries_ = {{"tenant", "public"}};
+  RateLimit::Descriptor internal_descriptor;
+  internal_descriptor.entries_ = {{"tenant", "internal"}};
+  Http::TestRequestHeaderMapImpl request_headers{{"x-tenant", "public"}};
+  Http::TestResponseHeaderMapImpl response_headers{{"x-cost", "3"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  expectRemaining(5);
+  // A later filter or route rewrites the identity header before completion.
+  request_headers.setCopy(Http::LowerCaseString("x-tenant"), "internal");
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  filter_->onDestroy();
+  // As in global rate limiting, completion charges the descriptor derived at stream completion.
+  expectRemainingAfterRequest({&public_descriptor, 1}, 4);
+  expectRemainingAfterRequest({&internal_descriptor, 1}, 2);
+
+  // Removing the identity header leaves completion with no descriptor to charge.
+  Filter next_filter(config_);
+  next_filter.setDecoderFilterCallbacks(decoder_callbacks_);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, next_filter.decodeHeaders(request_headers, true));
+  request_headers.remove(Http::LowerCaseString("x-tenant"));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, next_filter.encodeHeaders(response_headers, true));
+  next_filter.onDestroy();
+  expectRemainingAfterRequest({&internal_descriptor, 1}, 0);
+}
+
 TEST_P(StreamDoneFilterTest, DisabledOrNotDecodedDoesNotAccount) {
   setupStreamDone();
   filter_->onDestroy();
