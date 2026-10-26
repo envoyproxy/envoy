@@ -185,6 +185,37 @@ TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
 }
 
 TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
+       ConnectionLifecycleLogSkippedWhenThreadLocalShutdown) {
+  const int fd = 321;
+  auto socket = createMockSocket(fd);
+  socket_manager_->addConnectionSocket("node-c", "cluster-c", std::move(socket),
+                                       std::chrono::seconds(30), false, "tenant-c",
+                                       /*initiator_worker_id=*/"worker_5",
+                                       /*initiator_connection_id=*/"42");
+  handed_off_socket_ = socket_manager_->getConnectionSocket("node-c");
+  ASSERT_NE(handed_off_socket_, nullptr);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket()).WillRepeatedly(ReturnRef(handed_off_socket_));
+  EXPECT_CALL(callbacks_.connection_, addConnectionCallbacks(_));
+
+  ReverseTunnelUpstreamLifecycleFilter filter;
+  filter.initializeReadFilterCallbacks(callbacks_);
+  EXPECT_EQ(filter.onNewConnection(), Network::FilterStatus::Continue);
+
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+  callbacks_.connection_.local_close_reason_ =
+      std::string(StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+
+  thread_local_.shutdownGlobalThreading();
+
+  EXPECT_CALL(*access_log, log(_, _)).Times(0);
+  filter.onEvent(Network::ConnectionEvent::LocalClose);
+
+  extension_->setTestOnlyAccessLogs({});
+}
+
+TEST_F(ReverseTunnelUpstreamLifecycleFilterTest,
        LocalCloseAfterSocketDeathReusesHttp2PingTimeoutForTunnelClosed) {
   const int fd = 654;
   auto socket = createMockSocket(fd);

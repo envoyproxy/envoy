@@ -2152,6 +2152,39 @@ TEST_F(TestUpstreamSocketManager, DestructorEmitsDeferredCloseLogs) {
   extension_->setTestOnlyAccessLogs({});
 }
 
+TEST_F(TestUpstreamSocketManager, DestructorSkipsDeferredCloseLogsWhenThreadLocalShutdown) {
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  const int fd = 555;
+  auto socket = createMockSocket(fd);
+
+  // Expect tunnel_setup on add, then socket_handoff on get.
+  EXPECT_CALL(*access_log, log(_, _)).Times(2).RetiresOnSaturation();
+  socket_manager_->addConnectionSocket("node-x", "cluster-x", std::move(socket),
+                                       std::chrono::seconds(30), false, "tenant-x");
+  auto handed_off = socket_manager_->getConnectionSocket("node-x");
+  ASSERT_NE(handed_off, nullptr);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  // Attach the lifecycle filter flag so markSocketDead defers the close log.
+  socket_manager_->markUpstreamLifecycleFilterAttached(fd);
+
+  // markSocketDead with empty close reason + filter attached = deferred.
+  // This should NOT emit the close log yet.
+  EXPECT_CALL(*access_log, log(_, _)).Times(0);
+  socket_manager_->markSocketDead(fd);
+  testing::Mock::VerifyAndClearExpectations(access_log.get());
+
+  thread_local_.shutdownGlobalThreading();
+
+  // Destructor should skip emitting the deferred tunnel_closed log when thread-local is shutdown.
+  EXPECT_CALL(*access_log, log(_, _)).Times(0);
+
+  socket_manager_.reset(); // Triggers destructor.
+  extension_->setTestOnlyAccessLogs({});
+}
+
 TEST_F(TestUpstreamSocketManager, FindStartTimeReturnsNulloptIfNotFound) {
   EXPECT_EQ(findStartTime(123).has_value(), false);
 }

@@ -158,7 +158,7 @@ void ReverseTunnelAcceptorExtension::emitSyntheticLifecycleLog(
     absl::string_view event, const ReverseTunnelLifecycleInfo& lifecycle, TimeSource& time_source,
     AccessLog::AccessLogType access_log_type, absl::string_view handoff_kind,
     absl::string_view close_reason, const LifecycleLogMetadata& extra_metadata) const {
-  if (access_logs_.empty()) {
+  if (access_logs_.empty() || context_.threadLocal().isShutdown()) {
     return;
   }
 
@@ -178,7 +178,7 @@ void ReverseTunnelAcceptorExtension::emitConnectionLifecycleLog(
     const ReverseTunnelLifecycleInfo& lifecycle, AccessLog::AccessLogType access_log_type,
     absl::string_view handoff_kind, absl::string_view close_reason,
     const LifecycleLogMetadata& extra_metadata) const {
-  if (access_logs_.empty()) {
+  if (access_logs_.empty() || context_.threadLocal().isShutdown()) {
     return;
   }
 
@@ -269,15 +269,6 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Initialize the reporter.
   if (reporter_) {
     reporter_->onServerInitialized();
-  }
-
-  // Set the extension reference in the socket interface.
-  if (socket_interface_) {
-    socket_interface_->extension_ = this;
-  }
-
-  if (!tls_slot_) {
-    onWorkerThreadInitialized();
   }
 }
 
