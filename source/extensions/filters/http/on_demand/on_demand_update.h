@@ -46,21 +46,12 @@ struct OnDemandFilterStats {
 };
 
 /**
- * What the on-demand filter did for one request, stored in the request's filter state under
- * DiscoveryState::key() with LifeSpan::Request, which is carried over to a recreated stream. The
- * object only exists if a discovery was started. Other filters and access logs can read it through
- * the generic Object interface, for example
- * %FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:cluster)%. Fields that are not
- * known (yet) read as unset, which access logs print as "-":
- *
- *   host                          :authority of the request that waited for route discovery.
- *   vhost                         Virtual host that was discovered; set once a route resolved. For
- *                                 VHDS it is "<route config name>/<domain>".
- *   cluster                       Cluster that on-demand CDS was asked for.
- *   route_status                  pending | found | not_found | cancelled
- *   cluster_status                pending | available | missing | timeout | cancelled
- *   route_discovery_duration_us   Set once the route discovery finished, whatever the outcome.
- *   cluster_discovery_duration_us Set once the cluster discovery finished, whatever the outcome.
+ * Request filter state with the details of the discoveries a request waited for, for access logs
+ * (%FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:<field>)%) and other filters. It only
+ * exists if a discovery started, and unset fields read as absent. Fields: host (:authority), vhost
+ * (discovered virtual host, "<route config>/<domain>" for VHDS), cluster, route_status,
+ * cluster_status, route_discovery_duration_us and cluster_discovery_duration_us (set for every
+ * outcome once finished).
  */
 class DiscoveryState : public StreamInfo::FilterState::Object {
 public:
