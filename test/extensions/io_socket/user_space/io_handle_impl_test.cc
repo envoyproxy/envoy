@@ -1439,6 +1439,32 @@ TEST(IoHandleFactoryTest, UseExistingPassthroughState) {
   }
 }
 
+// Close details recorded through one handle are visible through its peer, even after the
+// recording handle is closed.
+TEST(PassthroughStateImplTest, CloseDetails) {
+  auto [io_handle, io_handle_peer] = IoHandleFactory::createIoHandlePair();
+  EXPECT_EQ("", io_handle->passthroughState()->closeDetails());
+
+  io_handle_peer->passthroughState()->setCloseDetails("local_close_reason",
+                                                      "upstream_failure_reason");
+  io_handle_peer->close();
+  EXPECT_EQ("internal_listener_close:local_close_reason|"
+            "internal_listener_upstream_failure:upstream_failure_reason",
+            io_handle->passthroughState()->closeDetails());
+
+  io_handle_peer->passthroughState()->setCloseDetails("local_close_reason", "");
+  EXPECT_EQ("internal_listener_close:local_close_reason",
+            io_handle->passthroughState()->closeDetails());
+
+  io_handle_peer->passthroughState()->setCloseDetails("", "upstream_failure_reason");
+  EXPECT_EQ("internal_listener_upstream_failure:upstream_failure_reason",
+            io_handle->passthroughState()->closeDetails());
+
+  io_handle_peer->passthroughState()->setCloseDetails("", "");
+  EXPECT_EQ("", io_handle->passthroughState()->closeDetails());
+  io_handle->close();
+}
+
 TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(

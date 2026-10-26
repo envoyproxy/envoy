@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/extensions/bootstrap/internal_listener:client_connection_factory",
         "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
     ],
 )
@@ -86,6 +87,7 @@ envoy_extension_cc_test(
         "//source/common/stats:stats_lib",
         "//source/extensions/bootstrap/internal_listener:active_internal_listener",
         "//source/extensions/bootstrap/internal_listener:thread_local_registry",
+        "//source/extensions/io_socket/user_space:io_handle_impl_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/network:network_mocks",

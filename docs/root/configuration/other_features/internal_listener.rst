@@ -58,6 +58,26 @@ This extension emits the following statistics:
    no_metadata, Counter, Metadata key is absent from the import location.
 
 
+.. _config_internal_listener_close_details:
+
+Close details
+-------------
+
+When an internal listener closes a connection, it records why: the local close reason and the upstream transport failure
+reason of its side of the connection. The client side connection reports them as its transport failure reason, in the
+form ``internal_listener_close:<local close reason>|internal_listener_upstream_failure:<upstream transport failure
+reason>``. Empty fields are omitted.
+
+For example, when a :ref:`tcp_proxy <config_network_filters_tcp_proxy>` filter in the internal listener cannot establish
+an HTTP CONNECT tunnel because the upstream answered ``421``, the client side connection reports
+``internal_listener_close:tcp_initializion_failure:0|internal_listener_upstream_failure:tunnel_response:421``.
+
+``tcp_proxy`` closes a connection with its initialization failure close reason only if it never established its upstream
+connection. A local close reason that starts with ``tcp_initializion_failure:`` therefore means that no data from the
+client side reached the upstream. The upstream transport failure reason alone does not mean that: it may have been
+recorded by an earlier connection attempt before a later attempt succeeded.
+
+
 Endpoint disambiguation
 -----------------------
 
