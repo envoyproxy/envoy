@@ -119,7 +119,7 @@ private:
                                              const datadog::tracing::SpanConfig& span_config,
                                              const datadog::tracing::DictReader& reader);
 
-  const bool delegate_sampling_;
+  const bool delegate_sampling_ = false;
   TracerStats tracer_stats_;
   ThreadLocal::TypedSlotPtr<ThreadLocalTracer> thread_local_slot_;
 };
