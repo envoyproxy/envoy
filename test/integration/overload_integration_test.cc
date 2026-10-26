@@ -1677,6 +1677,8 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDecodeHeadersDoesNotAffectHttp2O
   EXPECT_TRUE(response->complete());
   EXPECT_EQ(response->headers().getStatusValue(), "200");
   test_server_->waitForCounter("http.config_test.downstream_rq_overload_close", Eq(0));
+  test_server_->waitForCounter(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.shed_load_count", Eq(0));
 }
 
 TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreatingCodec) {

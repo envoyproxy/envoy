@@ -1360,6 +1360,7 @@ TEST_F(HttpConnectionManagerImplTest,
       .WillOnce(Return(nullptr));
 
   setup();
+  setupFilterChain(1, 0);
 
   // When codec_->protocol_ is HTTP/1 and shouldShedLoad() returns true,
   // it sends a 503 local reply ("envoy overloaded") and increments downstream_rq_overload_close_.
@@ -1376,6 +1377,20 @@ TEST_F(HttpConnectionManagerImplTest,
 
   EXPECT_EQ("envoy overloaded", response_body);
   EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
+
+  // Let the load shed point allow a new stream.
+  EXPECT_CALL(http1_decode_headers_point, shouldShedLoad()).WillOnce(Return(false));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  startRequest(true);
+
+  // Clean up.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  expectOnDestroy();
+
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
 }
 
 TEST_F(HttpConnectionManagerImplTest, Http1DecodeHeadersLoadShedPointIgnoredForHttp2) {

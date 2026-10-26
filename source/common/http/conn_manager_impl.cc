@@ -1647,8 +1647,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   const bool drop_request_due_to_overload =
       (connection_manager_.accept_new_http_stream_ != nullptr &&
        connection_manager_.accept_new_http_stream_->shouldShedLoad()) ||
-      (connection_manager_.http1_decode_headers_ != nullptr &&
-       connection_manager_.codec_->protocol() < Protocol::Http2 &&
+      (connection_manager_.http1_decode_headers_ != nullptr && protocol < Protocol::Http2 &&
        connection_manager_.http1_decode_headers_->shouldShedLoad()) ||
       connection_manager_.random_generator_.bernoulli(
           connection_manager_.overload_stop_accepting_requests_ref_.value());
