@@ -30,6 +30,7 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/upstream:od_cds_api_lib",
         "//source/extensions/filters/http:well_known_names",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@envoy_api//envoy/extensions/filters/http/on_demand/v3:pkg_cc_proto",
     ],
 )

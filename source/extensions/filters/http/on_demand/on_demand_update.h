@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <optional>
 #include <string>
 
@@ -12,6 +11,7 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -87,23 +87,17 @@ public:
   }
   bool hasFieldSupport() const override { return true; }
   FieldType getField(absl::string_view field_name) const override {
-    for (const Field& field : fields()) {
-      if (field.name == field_name) {
-        return field.get(*this);
-      }
-    }
-    return absl::monostate{};
+    const auto& fields = fieldGetters();
+    const auto it = fields.find(field_name);
+    return it == fields.end() ? FieldType{absl::monostate{}} : it->second(*this);
   }
 
 private:
-  struct Field {
-    absl::string_view name;
-    FieldType (*get)(const DiscoveryState&);
-  };
+  using FieldGetter = FieldType (*)(const DiscoveryState&);
 
   // All the fields getField() supports in one place: adding one is a single line.
-  static const std::array<Field, 7>& fields() {
-    static const std::array<Field, 7> Fields{{
+  static const absl::flat_hash_map<absl::string_view, FieldGetter>& fieldGetters() {
+    static const absl::flat_hash_map<absl::string_view, FieldGetter> Getters{
         {"host", [](const DiscoveryState& s) { return stringField(s.host_); }},
         {"vhost", [](const DiscoveryState& s) { return stringField(s.vhost_); }},
         {"cluster", [](const DiscoveryState& s) { return stringField(s.cluster_); }},
@@ -113,8 +107,8 @@ private:
          [](const DiscoveryState& s) { return durationField(s.route_duration_us_); }},
         {"cluster_discovery_duration_us",
          [](const DiscoveryState& s) { return durationField(s.cluster_duration_us_); }},
-    }};
-    return Fields;
+    };
+    return Getters;
   }
 
   static FieldType stringField(absl::string_view value) {
