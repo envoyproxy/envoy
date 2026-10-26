@@ -106,6 +106,32 @@ TEST_F(BrotliDecompressorImplTest, CompressAndDecompress) {
   EXPECT_EQ(original_text, decompressed_text);
 }
 
+// Decompresses a fixed brotli stream and compares the output to the known plaintext. Unlike the
+// round-trip tests, this does not depend on the compressor, so it catches decoder regressions
+// after a brotli upgrade.
+TEST_F(BrotliDecompressorImplTest, DecompressFixedVector) {
+  const std::string compressed{"\x1b\x79\x00\x00\x1c\x09\x36\x8e\x72\xbb\x26\x4e"
+                               "\xb9\x82\x4a\xdd\x96\xea\x42\x12\x8d\x51\xfc\xfd"
+                               "\x85\xe3\x82\x22\xaa\x0e\x0e\x7d\x86\xbf\x1c\xe3"
+                               "\x80\xf9\x06\x1c\xf6\x81\x70\x9a\x69\xf0\x90\xbd"
+                               "\x24\x66\x8a\x48\xfe\x38\xc4\x5d\x4c\xe7\x45\x0f"
+                               "\x2f\xa4\xdc\x8a\xfa\x1f\x84\x96\xe0\x06\xc8\xe6"
+                               "\x8e\x01\x63\x88\x4e\x1c\x6d\x9b\xb4\x5c\x28\xa7"
+                               "\xbb\x07",
+                               86};
+  const std::string expected{"The quick brown fox jumps over the lazy dog. The quick brown fox "
+                             "jumps over the lazy dog. brotli golden vector 0123456789\n"};
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(compressed);
+  Buffer::OwnedImpl output_buffer;
+  Stats::IsolatedStoreImpl stats_store{};
+  BrotliDecompressorImpl decompressor{*stats_store.rootScope(), "test.", 16, false};
+  decompressor.decompress(buffer, output_buffer);
+  EXPECT_EQ(expected, output_buffer.toString());
+  EXPECT_EQ(0, stats_store.counterFromString("test.brotli_error").value());
+}
+
 TEST_F(BrotliDecompressorImplTest, CompressAndDecompressWithRedundantInput) {
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl accumulation_buffer;

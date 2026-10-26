@@ -77,6 +77,30 @@ TEST_F(BrotliCompressorImplTest, CompressorDeathTest) {
       "BROTLI_MAX_INPUT_BLOCK_BITS");
 }
 
+// Compresses a fixed input and compares the output to a fixed byte pattern. Unlike the round-trip
+// tests, this fails if the encoder output changes after a brotli upgrade. If the change is
+// intended, check that the new bytes still decode to the plaintext, then update the pattern.
+TEST_F(BrotliCompressorImplTest, CompressFixedVector) {
+  const std::string plaintext{"The quick brown fox jumps over the lazy dog. The quick brown fox "
+                              "jumps over the lazy dog. brotli golden vector 0123456789\n"};
+  const std::string expected{"\x1b\x79\x00\x00\x1c\x09\x36\x8e\x72\xbb\x26\x4e"
+                             "\xb9\x82\x4a\xdd\x96\xea\x42\x12\x8d\x51\xfc\xfd"
+                             "\x85\xe3\x82\x22\xaa\x0e\x0e\x7d\x86\xbf\x1c\xe3"
+                             "\x80\xf9\x06\x1c\xf6\x81\x70\x9a\x69\xf0\x90\xbd"
+                             "\x24\x66\x8a\x48\xfe\x38\xc4\x5d\x4c\xe7\x45\x0f"
+                             "\x2f\xa4\xdc\x8a\xfa\x1f\x84\x96\xe0\x06\xc8\xe6"
+                             "\x8e\x01\x63\x88\x4e\x1c\x6d\x9b\xb4\x5c\x28\xa7"
+                             "\xbb\x07",
+                             86};
+
+  Buffer::OwnedImpl buffer;
+  buffer.add(plaintext);
+  BrotliCompressorImpl compressor(default_quality, default_window_bits, default_input_block_bits,
+                                  false, BrotliCompressorImpl::EncoderMode::Default, 4096);
+  compressor.compress(buffer, Envoy::Compression::Compressor::State::Finish);
+  EXPECT_EQ(expected, buffer.toString());
+}
+
 TEST_F(BrotliCompressorImplTest, CallingFinishOnly) {
   Buffer::OwnedImpl buffer;
   BrotliCompressorImpl compressor(default_quality, default_window_bits, default_input_block_bits,
