@@ -142,7 +142,57 @@ TEST_P(WasmCommonTest, PrecompiledSectionStrippedWhenNotAllowed) {
   if (std::get<0>(GetParam()) == "null") {
     GTEST_SKIP() << "Requires a sandbox runtime";
   }
-  loadTestModule("test_cpp.wasm", false);
+  if (std::get<0>(GetParam()) != "v8") {
+    loadTestModule("test_cpp.wasm", false);
+    return;
+  }
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto* vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime("envoy.wasm.runtime.v8");
+  vm_config->mutable_configuration()->set_value("source-canary");
+  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
+  ASSERT_FALSE(code.empty());
+  auto plugin = std::make_shared<Plugin>(plugin_config, local_info_);
+  auto make_wasm = [&] {
+    return std::make_shared<Wasm>(plugin->wasmConfig(), "", scope_, *api_, cluster_manager_,
+                                  *dispatcher_);
+  };
+  auto wasm = make_wasm();
+  std::string_view precompiled;
+  ASSERT_TRUE(proxy_wasm::BytecodeUtil::getCustomSection(
+      code, wasm->wasm_vm()->getPrecompiledSectionName(), precompiled));
+  ASSERT_FALSE(precompiled.empty());
+
+  // proxy-wasm-cpp-host 0.0.0-260704-f2db56a.envoy.1 passes this payload to V8 14.6.202.10's
+  // wasm::Module::deserialize (src/wasm/c-api.cc): [LEB128 wire size][wire bytes][native module].
+  // Preserve the size (trusted before allocation) and wire bytes; flip only the native magic.
+  // HeaderMatches in src/wasm/wasm-serialization.cc rejects it before decoding the wire bytes
+  // or reading native-code sizes, even if the module is already cached.
+  uint64_t wire_size = 0;
+  size_t prefix_size = 0;
+  for (uint32_t shift = 0;; shift += 7) {
+    ASSERT_LT(prefix_size, precompiled.size());
+    ASSERT_LT(shift, 64);
+    const auto byte = static_cast<uint8_t>(precompiled[prefix_size++]);
+    ASSERT_TRUE(shift != 63 || byte <= 1);
+    wire_size |= static_cast<uint64_t>(byte & 0x7f) << shift;
+    if ((byte & 0x80) == 0) {
+      break;
+    }
+  }
+  ASSERT_LT(wire_size, precompiled.size() - prefix_size);
+  ASSERT_GE(precompiled.size() - prefix_size - wire_size, sizeof(uint32_t));
+  const size_t native_offset = precompiled.data() - code.data() + prefix_size + wire_size;
+  code[native_offset] ^= 1;
+
+  ASSERT_TRUE(wasm->load(code, /*allow_precompiled=*/false));
+  ASSERT_TRUE(wasm->initialize());
+  EXPECT_LOG_CONTAINS("info", "on_vm_start source-canary", ASSERT_NE(wasm->start(plugin), nullptr));
+
+  auto wasm_precompiled = make_wasm();
+  EXPECT_FALSE(wasm_precompiled->load(code, /*allow_precompiled=*/true));
 }
 
 TEST_P(WasmCommonTest, PrecompiledModuleIsUsedWhenAllowed) {
