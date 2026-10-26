@@ -136,10 +136,10 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
                   this->id(), id));
     return nullptr;
   }
-  if (!quic::QuicUtils::IsBidirectionalStreamId(id, version())) {
-    // Never shed unidirectional control/QPACK streams.
-  } else if (should_reset_stream_on_creating_stream_ != nullptr &&
-             should_reset_stream_on_creating_stream_->shouldShedLoad()) {
+  // Never shed unidirectional control/QPACK streams.
+  if (quic::QuicUtils::IsBidirectionalStreamId(id, version()) &&
+      should_reset_stream_on_creating_stream_ != nullptr &&
+      should_reset_stream_on_creating_stream_->shouldShedLoad()) {
     codec_stats_->tx_reset_.inc();
     incrementSentQuicResetStreamErrorStats(
         quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_REQUEST_REJECTED),

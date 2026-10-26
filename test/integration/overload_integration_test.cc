@@ -1600,6 +1600,9 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerResetStreamOnCreatingStream) {
   ASSERT_TRUE(response->waitForReset());
   EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
   test_server_->waitForCounter("http3.tx_reset", Eq(1));
+  test_server_->waitForCounter("overload.envoy.load_shed_points.http3_server_reset_stream_on_"
+                               "creating_stream.shed_load_count",
+                               Eq(1));
 
   updateResource(0.80);
   test_server_->waitForGauge(
