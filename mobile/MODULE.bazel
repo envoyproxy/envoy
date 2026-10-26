@@ -108,6 +108,20 @@ single_version_override(
     version = "3.5.7.envoy",
 )
 
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "a4a49e5d9d0cac7ed963dd64d5a87575ba9d3ae1",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "a4a49e5d9d0cac7ed963dd64d5a87575ba9d3ae1",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
     is_default = True,

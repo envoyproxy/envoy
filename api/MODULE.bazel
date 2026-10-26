@@ -45,6 +45,24 @@ bazel_dep(name = "googletest", version = "1.18.0.bcr.1", dev_dependency = True)
 bazel_dep(name = "protoc-gen-jsonschema", version = "0.0.0-20230530-7680e49.envoy", dev_dependency = True)
 
 ####################################################################################
+# deps: Overrides
+####################################################################################
+
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "a4a49e5d9d0cac7ed963dd64d5a87575ba9d3ae1",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "a4a49e5d9d0cac7ed963dd64d5a87575ba9d3ae1",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)
+
+####################################################################################
 # setup: Languages
 ####################################################################################
 

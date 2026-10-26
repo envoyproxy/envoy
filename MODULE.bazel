@@ -152,25 +152,19 @@ single_version_override(
     version = "3.5.9.envoy",
 )
 
-# testing/debugging
-# local_path_override(
-#     module_name = "envoy_toolshed",
-#     path = "../toolshed/bazel",
-# )
-#
-# git_override(
-#     module_name = "envoy_toolshed",
-#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
-#     remote = "https://github.com/envoyproxy/toolshed",
-#     strip_prefix = "bazel",
-# )
-#
-# git_override(
-#     module_name = "envoy_toolshed_jq",
-#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
-#     remote = "https://github.com/envoyproxy/toolshed",
-#     strip_prefix = "jq",
-# )
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "a4a49e5d9d0cac7ed963dd64d5a87575ba9d3ae1",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "a4a49e5d9d0cac7ed963dd64d5a87575ba9d3ae1",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)
 
 ####################################################################################
 # setup: Compilers

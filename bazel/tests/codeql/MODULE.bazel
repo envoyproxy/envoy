@@ -25,6 +25,13 @@ local_path_override(
     path = "../../../api",
 )
 
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "a4a49e5d9d0cac7ed963dd64d5a87575ba9d3ae1",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
 LLVM_PREFIX = "/usr/lib/llvm-22"
 
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
