@@ -58,8 +58,25 @@ COPY --chown=0:0 --chmod=755 \
     "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" "${TARGETPLATFORM}/config_load_check_tool" /usr/local/bin/
 
 
+# STAGE: distroless-ca-certificates
+# TODO(jwendell): Remove this stage once the distroless debian12 image ships
+#   ca-certificates 20250419~deb12u2, which distrusts the roots of the
+#   compromised eMudhra intermediate CAs.
+FROM --platform=$BUILDPLATFORM debian:bookworm@sha256:854dd8ab51d62866dbd8f5431d15ce77b12983a2a4a1e1fe43a2395dc7ef9f61 AS distroless-ca-certificates
+RUN --mount=type=tmpfs,target=/var/cache/apt \
+    --mount=type=tmpfs,target=/var/lib/apt/lists \
+    apt-get -qq update \
+    && DEBIAN_FRONTEND=noninteractive apt-get -qq install --no-install-recommends -y ca-certificates \
+    && mkdir -p /out/etc/ssl/certs /out/usr/share/doc/ca-certificates /out/var/lib/dpkg/status.d \
+    && cp /etc/ssl/certs/ca-certificates.crt /out/etc/ssl/certs/ \
+    && cp /usr/share/doc/ca-certificates/copyright /out/usr/share/doc/ca-certificates/ \
+    && dpkg-query -s ca-certificates | grep -v '^Status:' > /out/var/lib/dpkg/status.d/ca-certificates \
+    && cp /var/lib/dpkg/info/ca-certificates.md5sums /out/var/lib/dpkg/status.d/
+
+
 # STAGE: envoy-distroless
 FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:be40c00dfabd86576d92666e87e406714d5618342de1a0c213ad232de255172e AS envoy-distroless
+COPY --from=distroless-ca-certificates --chown=0:0 /out/ /
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
