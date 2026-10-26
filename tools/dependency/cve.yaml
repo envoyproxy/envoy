@@ -13,4 +13,4 @@ ignored_cves:
 - CVE-2026-85046
 
 # We don't use the affected feature in Envoy's context.
-- CVE-2026-58055
+# - CVE-2026-58055
