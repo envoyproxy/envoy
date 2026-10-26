@@ -111,13 +111,16 @@ envoy_cc_library(
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
+        "//envoy/config:typed_config_interface",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/protobuf:message_validator_interface",
         "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:retry_interface",
         "//envoy/upstream:upstream_interface",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/types:span",
     ],
 )

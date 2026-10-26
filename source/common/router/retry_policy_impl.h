@@ -8,6 +8,7 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
+#include "envoy/registry/registry.h"
 #include "envoy/router/retry.h"
 #include "envoy/server/factory_context.h"
 
@@ -95,6 +96,26 @@ private:
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
   const bool refresh_cluster_on_retry_{false};
 };
+
+/**
+ * Default implementation of RetryPolicyFactory that creates a RetryPolicyImpl from
+ * envoy::config::route::v3::RetryPolicy.
+ */
+class DefaultRetryPolicyFactory : public RetryPolicyFactory {
+public:
+  absl::StatusOr<RetryPolicyConstSharedPtr>
+  createRetryPolicy(const Protobuf::Message& config,
+                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                    Server::Configuration::CommonFactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::route::v3::RetryPolicy>();
+  }
+
+  std::string name() const override { return "envoy.retry_policy.default"; }
+};
+
+DECLARE_FACTORY(DefaultRetryPolicyFactory);
 
 } // namespace Router
 } // namespace Envoy
