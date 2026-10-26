@@ -127,6 +127,34 @@ entry properties. Module selected route metadata can change authorization decisi
 descriptors and access log fields, so the override set is static configuration chosen by trusted in
 process code.
 
+Rewriting the path
+------------------
+
+``set_prefix_rewrite`` records the path a prefix rewrite produces for the current request, so the
+route it produces is specific to that request. ``set_prefix_rewrite_rule`` records the rewrite as a
+rule instead, which Envoy applies to the path the request carries when the request headers are
+finalized, the way a configured route applies its
+:ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`. A rule
+replaces a literal prefix of the path without its query string, or all of that path, with a
+replacement that starts with a slash, and it is checked against the request the decision is taken
+for.
+
+Envoy takes the path sent upstream from the first of these that yields one, whatever the call
+order.
+
+* The path recorded with ``set_path`` or ``set_prefix_rewrite``.
+* The rule recorded with ``set_prefix_rewrite_rule``.
+* The regex rewrite of the selected route override.
+* The rewrites of the route.
+
+The regex rewrite applies when the decision resolves, or when the request headers are finalized
+once a rule is recorded, and like a configured regex rewrite it yields the path unchanged when its
+pattern does not match. A rewrite applied when the request headers are finalized records
+``x-envoy-original-path`` the way a configured route does, replacing one the request carries. A
+request for which neither the rule nor the regex rewrite after it yields a path at that point, for
+example because a filter changed the path without clearing the route cache, is counted in
+``rewrite_not_applied``.
+
 Notes
 -----
 
@@ -168,6 +196,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   failure_route_metadata, Counter, Decisions not honored because a typed metadata factory rejected the recorded metadata.
   reuse_previous_rejected, Counter, ReusePrevious decisions rejected because the stream had no previous route.
   route_destroy, Counter, Routes built with user data that were destroyed and fired the route destroy hook.
+  rewrite_not_applied, Counter, Requests for which neither the prefix rewrite rule nor the route override regex rewrite yielded a path when the request headers were finalized.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.
   specifier_duration, Histogram, Time in microseconds the specifier spent on a request.
 

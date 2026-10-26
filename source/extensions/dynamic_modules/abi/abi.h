@@ -17385,6 +17385,24 @@ typedef enum envoy_dynamic_module_type_route_specifier_header_append_action {
 } envoy_dynamic_module_type_route_specifier_header_append_action;
 
 /**
+ * envoy_dynamic_module_type_route_specifier_rewrite_span is the part of the request path that a
+ * rule recorded with envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule
+ * replaces.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_rewrite_span {
+  // A literal prefix of the path, which is what a prefix or a path route replaces with its
+  // prefix_rewrite.
+  envoy_dynamic_module_type_route_specifier_rewrite_span_Literal = 0,
+  // The whole path without its query string and fragment, which is what a regex route replaces
+  // with its prefix_rewrite.
+  envoy_dynamic_module_type_route_specifier_rewrite_span_WholePath = 1,
+  // Not a span. Pins the type to a stable 32 bit size and widens its value range, so that a span a
+  // newer ABI defines can be held and rejected by an Envoy that does not know it without undefined
+  // behavior.
+  envoy_dynamic_module_type_route_specifier_rewrite_span_Sentinel = 0x7FFFFFFF,
+} envoy_dynamic_module_type_route_specifier_rewrite_span;
+
+/**
  * envoy_dynamic_module_type_route_specifier_input_route holds the properties of the route the
  * module is resolving that are free to read, so that a module can take all of them in one call
  * instead of one call each. After a template is selected with
@@ -18236,6 +18254,39 @@ void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
  */
 bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule records a prefix rewrite of
+ * the request path sent upstream as a rule. Envoy applies the rule to the path the request carries
+ * when the request headers are finalized, the way it applies the prefix_rewrite of a configured
+ * route, so the produced route is not specific to the current request.
+ *
+ * With the Literal span, matched must be a case insensitive prefix of the current path without its
+ * query string and fragment, and is replaced by replacement. With the WholePath span, matched must
+ * be empty and replacement replaces the whole path, keeping its query string and fragment. The
+ * replacement starts with a slash and carries no query string or fragment of its own.
+ *
+ * A path recorded with set_path or set_prefix_rewrite takes precedence over the rule, and the rule
+ * takes precedence over the regex rewrite of a selected route override and the rewrites of the
+ * route, whatever the call order. With a rule recorded, the regex rewrite applies when the request
+ * headers are finalized rather than when the decision resolves. A rule that does not apply to the
+ * path when the request headers are finalized leaves the next of these in effect. A later call
+ * replaces the rule of an earlier one.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param span is the part of the path the rule replaces.
+ * @param matched is the prefix to replace for the Literal span, and must be empty for the WholePath
+ * span. The buffer is owned by the module.
+ * @param replacement is the replacement. The buffer is owned by the module.
+ * @return true when the span is known and matched fits it, the replacement is a valid header value
+ * that starts with a slash and carries no query string or fragment, and the rule applies to the
+ * current path within the configured maximum, false otherwise, in which case nothing is recorded.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_rewrite_span span,
     envoy_dynamic_module_type_module_buffer matched,
     envoy_dynamic_module_type_module_buffer replacement);
 
