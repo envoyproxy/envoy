@@ -160,6 +160,26 @@ build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:libstdc++ --@envoy//bazel:libc++=false
 build:libstdc++ --@envoy//bazel:libstdc++=true
 
+build:gcc --per_file_copt=external/com_google_absl/absl/log/die_if_null\.cc@-w
+build:gcc --host_per_file_copt=external/com_google_absl/absl/log/die_if_null\.cc@-w
+build:gcc --per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --host_per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --per_file_copt=external/antlr4-cpp-runtime/.*@-Wno-overloaded-virtual
+build:gcc --per_file_copt=external/com_google_cel_cpp/.*@-Wno-sign-compare,-Wno-return-type,-Wno-unused-function,-Wno-unused-but-set-variable
+
+# TODO(phlax): patch in registry
+build:gcc --per_file_copt=external/com_google_protoprocessinglib/.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/com_github_grpc_grpc/.*@-Wno-attributes,-Wno-return-type,-Wno-sign-compare,-Wno-unused-function
+build:gcc --per_file_copt=external/com_github_grpc_grpc/.*\.cc@-Wno-redundant-move,-Wno-pessimizing-move,-Wno-class-memaccess
+build:gcc --per_file_copt=external/grpc_httpjson_transcoding/.*@-Wno-range-loop-construct
+build:gcc --per_file_copt=external/com_google_protobuf/upb/.*@-Wno-maybe-uninitialized
+build:gcc --host_per_file_copt=external/com_google_protobuf/upb/.*@-Wno-maybe-uninitialized
+build:gcc --per_file_copt=external/com_google_protobuf/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --host_per_file_copt=external/com_google_protobuf/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --per_file_copt=external/com_github_google_tcmalloc/.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/v8.*@-Wno-dangling-else
+# This branch's GCC (the build image's) also warns in dd-trace-cpp at `-c opt`.
+build:gcc --per_file_copt=external/com_github_datadog_dd_trace_cpp/.*@-Wno-maybe-uninitialized
 
 #############################################################################
 # tests
