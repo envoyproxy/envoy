@@ -3,12 +3,12 @@
 #include <iterator>
 #include <span>
 
-#include "fmt/format.h"
-
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
+
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,11 +35,15 @@ constexpr const char* MMDB_LATITUDE_LOOKUP_PATH[] = {"location", "latitude", nul
 constexpr const char* MMDB_LONGITUDE_LOOKUP_PATH[] = {"location", "longitude", nullptr};
 constexpr const char* MMDB_TIME_ZONE_LOOKUP_PATH[] = {"location", "time_zone", nullptr};
 constexpr const char* MMDB_POSTAL_CODE_LOOKUP_PATH[] = {"postal", "code", nullptr};
-constexpr const char* MMDB_REGION_NAME_LOOKUP_PATH[] = {"subdivisions", "0", "names", "en", nullptr};
-constexpr const char* MMDB_REGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "0", "geoname_id", nullptr};
-constexpr const char* MMDB_SUBREGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "1", "geoname_id", nullptr};
+constexpr const char* MMDB_REGION_NAME_LOOKUP_PATH[] = {"subdivisions", "0", "names", "en",
+                                                        nullptr};
+constexpr const char* MMDB_REGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "0", "geoname_id",
+                                                              nullptr};
+constexpr const char* MMDB_SUBREGION_GEONAME_ID_LOOKUP_PATH[] = {"subdivisions", "1", "geoname_id",
+                                                                 nullptr};
 constexpr const char* MMDB_COUNTRY_GEONAME_ID_LOOKUP_PATH[] = {"country", "geoname_id", nullptr};
-constexpr const char* MMDB_CONTINENT_GEONAME_ID_LOOKUP_PATH[] = {"continent", "geoname_id", nullptr};
+constexpr const char* MMDB_CONTINENT_GEONAME_ID_LOOKUP_PATH[] = {"continent", "geoname_id",
+                                                                 nullptr};
 constexpr const char* MMDB_METRO_CODE_LOOKUP_PATH[] = {"location", "metro_code", nullptr};
 
 enum class LookupValueTransform { None, ApplePrivateRelay };

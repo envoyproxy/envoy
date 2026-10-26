@@ -1223,8 +1223,9 @@ TEST_F(GeoipProviderTest, CountryFieldsWithoutAnyDbRejected) {
         country: "x-geo-country"
     asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
   )EOF";
-  EXPECT_THROW_WITH_REGEX(initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
-                          "country_db_path or city_db_path is required for the configured geo_field_keys");
+  EXPECT_THROW_WITH_REGEX(
+      initializeProvider(config_yaml, cb_added_nullopt), EnvoyException,
+      "country_db_path or city_db_path is required for the configured geo_field_keys");
 }
 
 TEST_F(GeoipProviderTest, CityDbLookupWithNullDb) {
