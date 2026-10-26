@@ -271,10 +271,10 @@ void OnDemandRouteUpdate::onDestroy() {
   cluster_discovery_handle_.reset();
   // A discovery still in flight here was abandoned, e.g. the client went away while waiting.
   if (route_discovery_in_flight_) {
-    discoveryState().setRoute(DiscoveryState::Cancelled);
+    discoveryState().routeCancelled();
   }
   if (cluster_discovery_in_flight_) {
-    discoveryState().setCluster(DiscoveryState::Cancelled);
+    discoveryState().clusterCancelled();
   }
   if (auto stats = config_->stats(); stats.has_value()) {
     if (route_discovery_in_flight_) {
@@ -408,18 +408,6 @@ DiscoveryState& OnDemandRouteUpdate::discoveryState() {
 }
 
 namespace {
-absl::string_view clusterStatusName(Upstream::ClusterDiscoveryStatus status) {
-  switch (status) {
-  case Upstream::ClusterDiscoveryStatus::Available:
-    return DiscoveryState::Available;
-  case Upstream::ClusterDiscoveryStatus::Missing:
-    return DiscoveryState::Missing;
-  case Upstream::ClusterDiscoveryStatus::Timeout:
-    return DiscoveryState::Timeout;
-  }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
-
 int64_t microseconds(MonotonicTime::duration duration) {
   return std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
 }
@@ -433,7 +421,7 @@ void OnDemandRouteUpdate::startRouteDiscovery(MonotonicTime start) {
   route_discovery_in_flight_ = true;
   route_discovery_start_ = start;
   auto& state = discoveryState();
-  state.setRoute(DiscoveryState::Pending);
+  state.routePending();
   if (request_headers_ != nullptr) {
     state.setHost(request_headers_->getHostValue());
   }
@@ -449,8 +437,7 @@ void OnDemandRouteUpdate::finishRouteDiscovery(bool route_exists) {
   }
   route_discovery_in_flight_ = false;
   const auto elapsed = now() - route_discovery_start_;
-  discoveryState().setRoute(route_exists ? DiscoveryState::Found : DiscoveryState::NotFound,
-                            microseconds(elapsed));
+  discoveryState().routeFinished(route_exists, microseconds(elapsed));
   if (auto stats = config_->stats(); stats.has_value()) {
     (route_exists ? stats->route_discovery_found_ : stats->route_discovery_not_found_).inc();
     stats->route_discovery_pending_.dec();
@@ -475,7 +462,7 @@ void OnDemandRouteUpdate::startClusterDiscovery(MonotonicTime start,
   cluster_discovery_in_flight_ = true;
   cluster_discovery_start_ = start;
   auto& state = discoveryState();
-  state.setCluster(DiscoveryState::Pending);
+  state.clusterPending();
   state.setClusterName(cluster_name);
   if (auto stats = config_->stats(); stats.has_value()) {
     stats->cluster_discovery_requested_.inc();
@@ -489,7 +476,7 @@ void OnDemandRouteUpdate::finishClusterDiscovery(Upstream::ClusterDiscoveryStatu
   }
   cluster_discovery_in_flight_ = false;
   const auto elapsed = now() - cluster_discovery_start_;
-  discoveryState().setCluster(clusterStatusName(cluster_status), microseconds(elapsed));
+  discoveryState().clusterFinished(cluster_status, microseconds(elapsed));
   if (auto stats = config_->stats(); stats.has_value()) {
     switch (cluster_status) {
     case Upstream::ClusterDiscoveryStatus::Available:

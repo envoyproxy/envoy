@@ -58,24 +58,28 @@ class DiscoveryState : public StreamInfo::FilterState::Object {
 public:
   static constexpr absl::string_view key() { return "envoy.filters.http.on_demand.discovery"; }
 
-  // The string views returned by getField() point at these literals.
-  static constexpr absl::string_view Pending = "pending";
-  static constexpr absl::string_view Cancelled = "cancelled";
-  static constexpr absl::string_view Found = "found";
-  static constexpr absl::string_view NotFound = "not_found";
-  static constexpr absl::string_view Available = "available";
-  static constexpr absl::string_view Missing = "missing";
-  static constexpr absl::string_view Timeout = "timeout";
-
-  // The status is one of the constants above. A finished discovery carries a duration.
-  void setRoute(absl::string_view status, std::optional<int64_t> duration_us = std::nullopt) {
-    route_status_ = status;
+  void routePending() { route_status_ = Pending; }
+  void routeFinished(bool found, int64_t duration_us) {
+    route_status_ = found ? Found : NotFound;
     route_duration_us_ = duration_us;
   }
-  void setCluster(absl::string_view status, std::optional<int64_t> duration_us = std::nullopt) {
-    cluster_status_ = status;
+  void routeCancelled() { route_status_ = Cancelled; }
+  void clusterPending() { cluster_status_ = Pending; }
+  void clusterFinished(Upstream::ClusterDiscoveryStatus status, int64_t duration_us) {
+    switch (status) {
+    case Upstream::ClusterDiscoveryStatus::Available:
+      cluster_status_ = Available;
+      break;
+    case Upstream::ClusterDiscoveryStatus::Missing:
+      cluster_status_ = Missing;
+      break;
+    case Upstream::ClusterDiscoveryStatus::Timeout:
+      cluster_status_ = Timeout;
+      break;
+    }
     cluster_duration_us_ = duration_us;
   }
+  void clusterCancelled() { cluster_status_ = Cancelled; }
   void setHost(absl::string_view host) { host_ = std::string(host); }
   void setVirtualHost(absl::string_view vhost) { vhost_ = std::string(vhost); }
   void setClusterName(absl::string_view cluster) { cluster_ = std::string(cluster); }
@@ -93,6 +97,16 @@ public:
   }
 
 private:
+  // The status views point at these literals, which live for the whole program, so the object
+  // never holds a view into memory that goes away before the request does.
+  static constexpr absl::string_view Pending = "pending";
+  static constexpr absl::string_view Cancelled = "cancelled";
+  static constexpr absl::string_view Found = "found";
+  static constexpr absl::string_view NotFound = "not_found";
+  static constexpr absl::string_view Available = "available";
+  static constexpr absl::string_view Missing = "missing";
+  static constexpr absl::string_view Timeout = "timeout";
+
   using FieldGetter = FieldType (*)(const DiscoveryState&);
 
   // All the fields getField() supports in one place: adding one is a single line.
