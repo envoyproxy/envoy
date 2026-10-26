@@ -40,7 +40,7 @@ Span::Span(datadog::tracing::Span&& span, bool use_local_decision, bool delegate
 Span::Span(datadog::tracing::Span&& span, bool use_local_decision,
            SamplingStateSharedPtr&& sampling_state)
     : span_(std::move(span)), use_local_decision_(use_local_decision),
-      sampling_state_(sampling_state) {}
+      sampling_state_(std::move(sampling_state)) {}
 
 const datadog::tracing::Optional<datadog::tracing::Span>& Span::impl() const { return span_; }
 
@@ -94,7 +94,7 @@ void Span::finalizeSampling() {
   if (!sampling_state_ || sampling_state_->finalized) {
     return;
   }
-  if (sampling_state_->sampled == false) {
+  if (sampling_state_->drop) {
     span_->trace_segment().override_sampling_priority(
         static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
   }
@@ -137,7 +137,8 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   config.resource = name;
   config.start = estimateTime(start_time);
 
-  return Tracing::SpanPtr(new Span(span_->create_child(config), false, sampling_state_));
+  return Tracing::SpanPtr(
+      new Span(span_->create_child(config), false, SamplingStateSharedPtr(sampling_state_)));
 }
 
 void Span::setSampled(bool sampled) {
@@ -147,7 +148,7 @@ void Span::setSampled(bool sampled) {
 
   if (sampling_state_) {
     if (!sampling_state_->finalized) {
-      sampling_state_->sampled = sampled;
+      sampling_state_->drop = !sampled;
     }
     return;
   }

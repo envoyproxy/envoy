@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/tracing/trace_driver.h"
@@ -59,13 +58,13 @@ private:
   struct SamplingState {
     // dd-trace-cpp cannot clear an override. Defer the drop so a route refresh
     // can undo it, and share the state because children use the same segment.
-    std::optional<bool> sampled;
+    bool drop{false};
     bool finalized{false};
   };
   using SamplingStateSharedPtr = std::shared_ptr<SamplingState>;
 
   Span(datadog::tracing::Span&& span, bool use_local_decision,
-       const SamplingStateSharedPtr& sampling_state);
+       SamplingStateSharedPtr&& sampling_state);
   void finalizeSampling();
 
   datadog::tracing::Optional<datadog::tracing::Span> span_;
