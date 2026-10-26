@@ -420,6 +420,8 @@ rust.toolchain(
     sha256s = {
         "2026-10-01/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz": "1d954ab36bcf943913bda4dfee0174f1cac84060aed948e57b43df38790e2fee",
         "2026-10-01/rustc-nightly-x86_64-unknown-linux-gnu.tar.xz": "e5be3443efda4a8e6fe3b9ab81cebff29a539cd12932faa37df8a6ad2d8684b2",
+        "2026-10-01/rustfmt-nightly-aarch64-unknown-linux-gnu.tar.xz": "b295395704fbd7af046cbd495a1f3313b1d78e75a61d4c5b337af889a71d8dd9",
+        "2026-10-01/rustc-nightly-aarch64-unknown-linux-gnu.tar.xz": "a7faaf267839af1bf2364a3a4aae36486de340c26f61ae6c31575802231cee41",
     },
     versions = ["1.97.1"],
 )
