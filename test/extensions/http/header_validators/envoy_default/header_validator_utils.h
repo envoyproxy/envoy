@@ -82,8 +82,30 @@ protected:
       skip_path_normalization: true
       path_with_escaped_slashes_action: REJECT_REQUEST
     )EOF";
-};
 
+  static constexpr absl::string_view no_path_normalization_skip_merging_slashes = R"EOF(
+    uri_path_normalization_options:
+      skip_path_normalization: true
+      skip_merging_slashes: true
+      path_with_escaped_slashes_action: KEEP_UNCHANGED
+    )EOF";
+
+  static constexpr absl::string_view no_path_normalization_decode_slashes_and_skip_merging_slashes =
+      R"EOF(
+    uri_path_normalization_options:
+      skip_path_normalization: true
+      skip_merging_slashes: true
+      path_with_escaped_slashes_action: UNESCAPE_AND_FORWARD
+    )EOF";
+
+  static constexpr absl::string_view
+      no_path_normalization_redirect_slashes_and_skip_merging_slashes = R"EOF(
+    uri_path_normalization_options:
+      skip_path_normalization: true
+      skip_merging_slashes: true
+      path_with_escaped_slashes_action: UNESCAPE_AND_REDIRECT
+    )EOF";
+};
 } // namespace EnvoyDefault
 } // namespace HeaderValidators
 } // namespace Http
