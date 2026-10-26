@@ -170,6 +170,24 @@ common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
 
+build:gcc --per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --host_per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --host_per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-overloaded-virtual
+build:gcc --per_file_copt=external/cel-cpp.*@-Wno-sign-compare,-Wno-return-type,-Wno-unused-function,-Wno-unused-but-set-variable
+
+# TODO(phlax): patch in registry
+build:gcc --per_file_copt=external/proto-processing.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/grpc\+.*@-Wno-attributes,-Wno-return-type,-Wno-sign-compare,-Wno-unused-function
+build:gcc --per_file_copt=external/grpc\+.*\.cc@-Wno-redundant-move,-Wno-pessimizing-move,-Wno-class-memaccess
+build:gcc --per_file_copt=external/grpc-httpjson-transcoding.*@-Wno-range-loop-construct
+build:gcc --per_file_copt=external/protobuf.*/upb/.*@-Wno-maybe-uninitialized
+build:gcc --host_per_file_copt=external/protobuf.*/upb/.*@-Wno-maybe-uninitialized
+build:gcc --per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --host_per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --per_file_copt=external/tcmalloc.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/v8.*@-Wno-dangling-else
 
 #############################################################################
 # tests
