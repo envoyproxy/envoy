@@ -1,5 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/extensions/bootstrap/internal_listener/v3/internal_listener.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/retry/host/previous_hosts/v3/previous_hosts.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 
@@ -198,6 +199,48 @@ value:
   }
 
   void TearDown() override { cleanupUpstreamAndDownstream(); }
+
+  void initializeWithInnerTlsPeer() {
+    nested_ = true;
+    upstream_tls_ = true;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* resources = bootstrap.mutable_static_resources();
+      // Terminate the outer CONNECT locally and forward its opaque TLS bytes to the fake
+      // upstream. The fake upstream can then accept or reject the inner CONNECT after TLS.
+      auto* outer_cluster = resources->mutable_clusters(0);
+      auto* inner_peer = resources->add_clusters();
+      *inner_peer = *outer_cluster;
+      inner_peer->set_name("inner_peer");
+      inner_peer->mutable_load_assignment()->set_cluster_name("inner_peer");
+      inner_peer->clear_typed_extension_protocol_options();
+      outer_cluster->mutable_load_assignment()
+          ->mutable_endpoints(0)
+          ->mutable_lb_endpoints(0)
+          ->mutable_endpoint()
+          ->mutable_address()
+          ->mutable_envoy_internal_address()
+          ->set_server_listener_name("outer_terminate");
+
+      auto* listener = resources->add_listeners();
+      *listener = resources->listeners(0);
+      listener->set_name("outer_terminate");
+      listener->clear_address();
+      listener->mutable_internal_listener();
+      auto* filter = listener->mutable_filter_chains(0)->mutable_filters(0);
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+      ASSERT_TRUE(filter->typed_config().UnpackTo(&hcm));
+      hcm.set_stat_prefix("outer_terminate");
+      hcm.set_codec_type(decltype(hcm)::HTTP2);
+      ConfigHelper::setConnectConfig(hcm, true, false);
+      hcm.mutable_route_config()
+          ->mutable_virtual_hosts(0)
+          ->mutable_routes(0)
+          ->mutable_route()
+          ->set_cluster("inner_peer");
+      ASSERT_TRUE(filter->mutable_typed_config()->PackFrom(hcm));
+    });
+    initialize();
+  }
 
   void waitForConnect(FakeStreamPtr& stream) {
     if (!fake_upstream_connection_) {
@@ -522,6 +565,49 @@ TEST_P(HboneIntegrationTest, OuterConnectUnauthorizedMapsToForbiddenThroughInner
   // Even inner TLS bytes are held until the outer CONNECT succeeds.
   EXPECT_EQ(0, upstream_request_->bodyLength());
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.service.upstream_rq_retry")->value());
+  for (const auto cluster : {"service", "cluster_0", "inner_0", "inner_1"}) {
+    EXPECT_EQ(0, test_server_
+                     ->counter(absl::StrCat(
+                         "cluster.", cluster,
+                         ".outlier_detection.ejections_detected_consecutive_local_origin_failure"))
+                     ->value());
+  }
+}
+
+TEST_P(HboneIntegrationTest, NestedConnectWaitsForInnerAcceptance) {
+  initializeWithInnerTlsPeer();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(request_headers_, "payload");
+  // Receiving the inner CONNECT requires outer acceptance and a completed TLS handshake.
+  waitForConnect(upstream_request_);
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.service.upstream_rq_pending_active")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.service.upstream_rq_total")->value());
+  EXPECT_EQ(0, upstream_request_->bodyLength());
+
+  acceptAndRespond(*upstream_request_, *response);
+  EXPECT_EQ(0, test_server_->gauge("cluster.service.upstream_rq_pending_active")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.service.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.service.upstream_cx_protocol_error")->value());
+}
+
+TEST_P(HboneIntegrationTest, InnerConnectUnauthorizedMapsToForbiddenAfterTlsHandshake) {
+  outlier_detection_ = true;
+  tunnel_attempts_ = 3;
+  retry_ = true;
+  retry_on_ = "connect-failure,retriable-status-codes";
+  initializeWithInnerTlsPeer();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(request_headers_, "payload");
+  waitForConnect(upstream_request_);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "401"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("403", response->headers().getStatusValue());
+  EXPECT_EQ(0, upstream_request_->bodyLength());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.inner_0.upstream_rq_total")->value() +
+                   test_server_->counter("cluster.inner_1.upstream_rq_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.service.upstream_rq_retry")->value());
   for (const auto cluster : {"service", "cluster_0", "inner_0", "inner_1"}) {
     EXPECT_EQ(0, test_server_
