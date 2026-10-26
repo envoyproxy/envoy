@@ -18,7 +18,21 @@ namespace Envoy {
 namespace {
 
 using ::testing::IsEmpty;
+using ::testing::SizeIs;
 using ::testing::StrEq;
+
+void expectJsonRpcParseErrorResponse(IntegrationStreamDecoder& response) {
+  EXPECT_TRUE(response.complete());
+  EXPECT_FALSE(response.reset());
+  EXPECT_THAT(response.headers().getStatusValue(), StrEq("400"));
+  EXPECT_THAT(response.headers().getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response.headers().getContentLengthValue(),
+              StrEq(std::to_string(response.body().size())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response.body()),
+      nlohmann::json::parse(
+          R"json({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"JSON parse error"}})json"));
+}
 
 class McpJsonRestBridgeIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                          public HttpIntegrationTest {
@@ -137,11 +151,13 @@ TEST_P(McpJsonRestBridgeIntegrationTest, MethodNotAllowed) {
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET"}, {":path", "/mcp"}, {":scheme", "http"}, {":authority", "host"}});
 
-  // Since the filter calls sendLocalReply and stops iteration early in decodeHeaders,
-  // the stream might be reset rather than ending cleanly. We use waitForAnyTermination
-  // to ensure we wait for the response headers regardless of how the stream terminates.
-  ASSERT_TRUE(response->waitForAnyTermination());
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("405"));
+  ASSERT_THAT(response->headers().get(Http::LowerCaseString("allow")), SizeIs(1));
+  EXPECT_THAT(response->headers().get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
+              StrEq("POST"));
+  EXPECT_THAT(response->headers().getContentLengthValue(), StrEq("23"));
+  EXPECT_THAT(response->body(), StrEq("HTTP Method Not Allowed"));
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, InvalidJsonBody) {
@@ -171,6 +187,75 @@ TEST_P(McpJsonRestBridgeIntegrationTest, InvalidJsonBody) {
       nlohmann::json::parse(response->body()),
       nlohmann::json::parse(
           R"json({"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"JSON parse error"}})json"));
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, HeadersOnlyPostReturnsParseError) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  expectJsonRpcParseErrorResponse(*response);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, StatelessHeadersOnlyPostReturnsParseError) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+      server_info:
+        max_supported_protocol_version: "2026-07-28"
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-method", "tools/call"},
+                                     {"mcp-name", "create_api_key"},
+                                     {"mcp-protocol-version", "2026-07-28"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  expectJsonRpcParseErrorResponse(*response);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+}
+
+TEST_P(McpJsonRestBridgeIntegrationTest, EmptyBodyPostReturnsParseError) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      /*body=*/"");
+
+  ASSERT_TRUE(response->waitForEndStream());
+  expectJsonRpcParseErrorResponse(*response);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
 }
 
 TEST_P(McpJsonRestBridgeIntegrationTest, MissingMethod) {
@@ -2747,6 +2832,30 @@ TEST_P(McpJsonRestBridgeHttp1IntegrationTest, InitializedAckHasContentLengthZero
   EXPECT_THAT(response->headers().getStatusValue(), StrEq("202"));
   EXPECT_THAT(response->headers().getContentLengthValue(), StrEq("0"));
   EXPECT_THAT(response->body(), IsEmpty());
+}
+
+// An HTTP/1 POST request with "Content-Length: 0" has no body, so the codec ends the request at the
+// headers and the filter never sees decodeData().
+TEST_P(McpJsonRestBridgeHttp1IntegrationTest, ContentLengthZeroPostReturnsParseError) {
+  initializeFilter(R"EOF(
+    name: envoy.filters.http.mcp_json_rest_bridge
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_json_rest_bridge.v3.McpJsonRestBridge
+  )EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"content-length", "0"}});
+
+  ASSERT_TRUE(response->waitForEndStream());
+  expectJsonRpcParseErrorResponse(*response);
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
 }
 
 } // namespace

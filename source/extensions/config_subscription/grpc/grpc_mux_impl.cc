@@ -324,6 +324,10 @@ absl::Status GrpcMuxImpl::updateMuxSource(
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
 
   load_stats_reporter_factory_ = std::move(load_stats_reporter_factory);
+  if (lrs_server_ != nullptr) {
+    lrs_server_.reset();
+    maybeCreateLoadStatsReporter();
+  }
 
   // No need to update the config_validators_ as they may contain some state
   // that needs to be kept across different GrpcMux objects.

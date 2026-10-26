@@ -7,7 +7,6 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/router/router.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -171,9 +170,7 @@ void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
     if (host->disableActiveHealthCheck()) {
       continue;
     }
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.health_check_after_cluster_warming") &&
-        active_sessions_.contains(host)) {
+    if (active_sessions_.contains(host)) {
       continue;
     }
     active_sessions_[host] = makeSession(host);
@@ -187,8 +184,7 @@ void HealthCheckerImplBase::onClusterMemberUpdate(const HostVector& hosts_added,
                                                   const HostVector& hosts_removed) {
   // Skip processing updates while cluster is still warming (e.g., waiting for SDS secrets).
   // All existing hosts will be added when start() is called.
-  if (!started_ && Runtime::runtimeFeatureEnabled(
-                       "envoy.reloadable_features.health_check_after_cluster_warming")) {
+  if (!started_) {
     return;
   }
   addHosts(hosts_added);

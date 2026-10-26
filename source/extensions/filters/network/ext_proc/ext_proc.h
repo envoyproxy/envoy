@@ -126,6 +126,8 @@ public:
     return untyped_receiving_namespaces_;
   }
 
+  bool sendOnce() const { return send_once_; }
+
   const NetworkExtProcStats& stats() const { return stats_; }
 
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
@@ -146,6 +148,7 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   const absl::flat_hash_set<std::string> untyped_receiving_namespaces_;
+  const bool send_once_;
   NetworkExtProcStats stats_;
   const std::chrono::milliseconds message_timeout_;
   const ExpressionManager expression_manager_;
@@ -278,6 +281,7 @@ private:
 
   bool processing_complete_{false};
   bool attributes_sent_{false};
+  bool metadata_sent_{false};
 
   bool read_pending_{false};
   bool write_pending_{false};
