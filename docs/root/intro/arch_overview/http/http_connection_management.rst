@@ -257,6 +257,11 @@ A third predicate :ref:`safe_cross_scheme
 <envoy_v3_api_msg_extensions.internal_redirect.safe_cross_scheme.v3.SafeCrossSchemeConfig>`
 can be used to prevent HTTP -> HTTPS redirect.
 
+A fourth predicate :ref:`filter_state
+<envoy_v3_api_msg_extensions.internal_redirect.filter_state.v3.FilterStateConfig>`
+can be used to gate the redirect on a filter state value set earlier in the request by another
+filter, allowing a per-request decision about whether an internal redirect is followed.
+
 Once the redirect has passed these checks, the request headers which were shipped to the original
 upstream will be modified by:
 

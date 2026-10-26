@@ -1,9 +1,9 @@
-load("@build_bazel_rules_apple//apple:apple.bzl", "local_provisioning_profile")
 load(
     "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:defs.bzl",
     "xcode_provisioning_profile",
 )
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@rules_apple//apple:apple.bzl", "local_provisioning_profile")
 
 licenses(["notice"])  # Apache 2
 

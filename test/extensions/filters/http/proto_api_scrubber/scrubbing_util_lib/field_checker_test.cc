@@ -177,7 +177,8 @@ protected:
                               const std::string& descriptor_path = kApiKeysDescriptorRelativePath) {
     loadDescriptors(config, descriptor_path);
     absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
-        ProtoApiScrubberFilterConfig::create(config, factory_context_);
+        ProtoApiScrubberFilterConfig::create(config, server_factory_context_,
+                                             factory_context_.scope());
     ASSERT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     ASSERT_NE(filter_config.value(), nullptr);
     filter_config_ = std::move(filter_config.value());

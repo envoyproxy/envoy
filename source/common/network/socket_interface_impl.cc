@@ -38,7 +38,8 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
     const SocketCreationOptions& options,
     [[maybe_unused]] Io::IoUringWorkerFactory* io_uring_worker_factory) {
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
-    return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
+    return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain,
+                                                   options.max_addresses_cache_size_);
   }
 #if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
   // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has

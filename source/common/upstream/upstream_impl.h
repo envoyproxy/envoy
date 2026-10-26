@@ -46,6 +46,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/logger.h"
+#include "source/common/common/matchers.h"
 #include "source/common/common/packed_struct.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/metadata.h"
@@ -59,6 +60,7 @@
 #include "source/common/orca/orca_load_metrics.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/host_lookup_map.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/locality_pool.h"
 #include "source/common/upstream/resource_manager_impl.h"
@@ -70,6 +72,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/functional/function_ref.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -279,6 +282,17 @@ protected:
   makeAddressListOrNull(const Network::Address::InstanceConstSharedPtr& address,
                         const AddressVector& address_list);
 
+  /**
+   * @return nullptr if address_list has fewer than 2 addresses (happy eyeballs does not
+   * apply), otherwise a shared_ptr to a copy of address_list sorted with
+   * Network::HappyEyeballsConnectionProvider::sortAddresses() using the cluster's happy
+   * eyeballs config, or the default config if the cluster does not specify one. This is
+   * computed once when the address list is created or refreshed so that connection
+   * attempts do not re-sort it.
+   */
+  static SharedConstAddressVector makeSortedAddressListOrNull(const ClusterInfo& cluster,
+                                                              const AddressVector& address_list);
+
 private:
   ClusterInfoConstSharedPtr cluster_;
   const std::string hostname_;
@@ -346,6 +360,11 @@ protected:
       std::shared_ptr<const envoy::config::core::v3::Locality> locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority, const AddressVector& address_list = {}, absl::string_view stat_name = {});
+
+  // Happy eyeballs sorted copy of the address list, or nullptr if the host does not have
+  // multiple addresses. Set at construction and never changed; read by
+  // HostImpl::sortedAddressListOrNull().
+  const SharedConstAddressVector sorted_address_list_or_null_;
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -478,10 +497,17 @@ public:
   }
 
 protected:
+  /**
+   * @return the address list sorted for happy eyeballs connection attempts, or nullptr if
+   * the host does not have multiple addresses. The list is computed once when the address
+   * list is created or refreshed rather than on every connection attempt.
+   */
+  virtual SharedConstAddressVector sortedAddressListOrNull() const PURE;
+
   static CreateConnectionData
   createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& cluster,
                    const Network::Address::InstanceConstSharedPtr& address,
-                   const SharedConstAddressVector& address_list,
+                   const SharedConstAddressVector& sorted_address_list,
                    Network::UpstreamTransportSocketFactory& socket_factory,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
@@ -497,7 +523,7 @@ protected:
                        Network::UpstreamTransportSocketFactory& factory,
                        Network::Address::InstanceConstSharedPtr orca_address,
                        const Network::Address::InstanceConstSharedPtr& host_address,
-                       const SharedConstAddressVector& address_list,
+                       const SharedConstAddressVector& sorted_address_list,
                        HostDescriptionConstSharedPtr host) const;
 
 private:
@@ -556,6 +582,11 @@ protected:
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
                             locality_metadata, locality, health_check_config, priority,
                             address_list, stat_name) {}
+
+  // Upstream::HostImplBase
+  SharedConstAddressVector sortedAddressListOrNull() const override {
+    return sorted_address_list_or_null_;
+  }
 };
 
 class HostsPerLocalityImpl : public HostsPerLocality {
@@ -736,12 +767,14 @@ public:
                    const HostVector& hosts_removed,
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt,
-                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
+                   HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
-  HostMapConstSharedPtr crossPriorityHostMap() const override {
-    return const_cross_priority_host_map_;
+  bool batchUpdateActive() const override { return batch_update_; }
+
+  HostLookupMapConstSharedPtr crossPriorityHostMap() const override {
+    return cross_priority_host_map_;
   }
 
 protected:
@@ -766,7 +799,8 @@ protected:
   std::vector<std::unique_ptr<HostSet>> host_sets_;
 
   // Read only all host map for fast host searching. This will never be null.
-  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
+  mutable HostLookupMapConstSharedPtr cross_priority_host_map_{
+      std::make_shared<FlatHostLookupMap>(std::make_shared<HostMap>())};
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -793,7 +827,8 @@ private:
     void updateHosts(uint32_t priority, PrioritySet::UpdateHostsParams&& update_hosts_params,
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                      const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
-                     std::optional<uint32_t> overprovisioning_factor) override;
+                     std::optional<uint32_t> overprovisioning_factor,
+                     HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
     absl::node_hash_set<HostSharedPtr> all_hosts_removed_;
@@ -816,14 +851,30 @@ public:
                    const HostVector& hosts_removed,
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt,
-                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
-  HostMapConstSharedPtr crossPriorityHostMap() const override;
+                   HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) override;
+  HostLookupMapConstSharedPtr crossPriorityHostMap() const override;
+
+  /**
+   * Backs the cross priority host map with a PersistentHostMap instead of the default flat HostMap,
+   * so that a host update costs O(log N) rather than an O(N) copy of the map. Hosts are not carried
+   * over from the flat map, so this is only honored before any host has been added.
+   */
+  void usePersistentCrossPriorityHostMap();
 
 protected:
   void updateCrossPriorityHostMap(uint32_t priority, const HostVector& hosts_added,
                                   const HostVector& hosts_removed);
 
+  // Flat backing of the cross priority host map. The read only map will never be null and is
+  // published through cross_priority_host_map_ when it is next read.
+  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
+
+private:
+  // Persistent backing of the cross priority host map, used after
+  // usePersistentCrossPriorityHostMap() is called. A snapshot is published on every update.
+  PersistentHostMap persistent_cross_priority_host_map_;
+  bool use_persistent_cross_priority_host_map_{false};
 };
 
 /**
@@ -902,6 +953,7 @@ public:
 
   float perUpstreamPreconnectRatio() const override { return per_upstream_preconnect_ratio_; }
   float peekaheadRatio() const override { return peekahead_ratio_; }
+  bool shouldPreconnect(const Host& host) const override;
   uint32_t perConnectionBufferLimitBytes() const override {
     return per_connection_buffer_limit_bytes_;
   }
@@ -917,7 +969,7 @@ public:
   ProtocolOptionsConfigConstSharedPtr
   extensionProtocolOptions(const std::string& name) const override;
   OptRef<const Http::ClientCodecFactory> upstreamHttpClientCodecFactory() const override {
-    return makeOptRefFromPtr(upstream_client_codec_factory_.get());
+    return makeOptRefFromPtr(upstream_client_codec_factory_);
   }
   envoy::config::cluster::v3::Cluster::DiscoveryType type() const override { return type_; }
 
@@ -961,7 +1013,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->request_response_size_stats_));
+    return *optional_cluster_stats_->request_response_size_stats_;
   }
 
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -972,7 +1024,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
+    return *optional_cluster_stats_->timeout_budget_stats_;
   }
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
@@ -995,11 +1047,19 @@ public:
     CONSTRUCT_ON_FIRST_USE(ClusterTypedMetadata, DefaultMetadata::get());
   }
 
+  OptRef<const PendingRqQueuePolicy> pendingRqQueuePolicy() const override {
+    if (pending_rq_queue_policy_ == nullptr) {
+      return std::nullopt;
+    }
+    return *pending_rq_queue_policy_;
+  }
+
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool connectionPoolPerDownstreamConnection() const override {
     return connection_pool_per_downstream_connection_;
   }
   bool warmHosts() const override { return warm_hosts_; }
+  bool waitForWarmOnInit() const override { return wait_for_warm_on_init_; }
   bool setLocalInterfaceNameOnUpstreamConnections() const override {
     return set_local_interface_name_on_upstream_connections_;
   }
@@ -1102,9 +1162,9 @@ private:
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   // Per-cluster upstream (client) codec factory, recovered from extension_protocol_options_ (an
-  // options entry that also implements the factory interface). Held to pin lifetime;
-  // upstreamHttpClientCodecFactory() returns a view into it.
-  const std::shared_ptr<const Http::ClientCodecFactory> upstream_client_codec_factory_;
+  // options entry that also implements the factory interface). Lifetime is pinned by
+  // extension_protocol_options_; upstreamHttpClientCodecFactory() returns a view into it.
+  const Http::ClientCodecFactory* upstream_client_codec_factory_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
   const uint32_t max_requests_per_connection_;
@@ -1112,6 +1172,7 @@ private:
   OptionalTimeouts optional_timeouts_;
   const float per_upstream_preconnect_ratio_;
   const float peekahead_ratio_;
+  const std::unique_ptr<const Matchers::MetadataMatcher> preconnect_enabled_matcher_;
   TransportSocketMatcherPtr socket_matcher_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable DeferredCreationCompatibleClusterTrafficStats traffic_stats_;
@@ -1128,6 +1189,7 @@ private:
   const std::unique_ptr<const envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   const std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
   const std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
+  std::unique_ptr<const PendingRqQueuePolicy> pending_rq_queue_policy_;
   LoadBalancerConfigPtr load_balancer_config_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
@@ -1147,6 +1209,8 @@ private:
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
+  // Factory context for upstream network and HTTP filters, scoped to stats_scope_
+  // ("cluster.<name>.").
   UpstreamFactoryContextImpl upstream_context_;
   const std::unique_ptr<
       const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
@@ -1164,6 +1228,7 @@ private:
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
   const bool warm_hosts_ : 1;
+  const bool wait_for_warm_on_init_ : 1;
   const bool set_local_interface_name_on_upstream_connections_ : 1;
   const bool added_via_api_ : 1;
   const bool per_endpoint_stats_ : 1;
@@ -1283,7 +1348,6 @@ protected:
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
-  const bool wait_for_warm_on_init_;
 
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
 
@@ -1302,15 +1366,15 @@ private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 
-  bool initialization_started_{};
   std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
-  const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   ConstLocalitySharedPoolSharedPtr const_locality_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  UnitFloat drop_overload_{0};
   std::string drop_category_;
+  UnitFloat drop_overload_{0};
+  bool initialization_started_{};
+  const bool local_cluster_;
   static constexpr int kDropOverloadSize = 1;
 };
 
@@ -1381,14 +1445,15 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param all_hosts all known hosts prior to this host update across all priorities.
+   * @param host_lookup returns the known host for a host address string across all priorities
+   * prior to this host update, or nullptr if there is none.
    * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
    */
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             const HostMap& all_hosts,
+                             absl::FunctionRef<HostSharedPtr(const std::string&)> host_lookup,
                              const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 

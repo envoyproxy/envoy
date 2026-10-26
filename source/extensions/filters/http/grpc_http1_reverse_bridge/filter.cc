@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/grpc_http1_reverse_bridge/filter.h"
 
+#include <limits>
+
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 
@@ -159,7 +161,8 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
             absl::SimpleAtoi(length_headers[0]->value().getStringView().substr(
                                  0, length_headers[0]->value().getStringView().find(',')),
                              &response_message_length_)) {
-          headers.setContentLength(response_message_length_ + Grpc::GRPC_FRAME_HEADER_SIZE);
+          headers.setContentLength(static_cast<uint64_t>(response_message_length_) +
+                                   Grpc::GRPC_FRAME_HEADER_SIZE);
         } else {
           // If the response from upstream does not specify the content length, stand in an error
           // message.
@@ -170,10 +173,30 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
           return Http::FilterHeadersStatus::StopIteration;
         }
       } else {
-        // If we are buffering the response, adjust content-length to account for the frame header
-        // that's added.
-        adjustContentLength(headers,
-                            [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
+        // If the upstream provided a Content-Length header, use it to stream the response
+        // instead of buffering the entire body. This avoids releasing all data in a single
+        // encodeData call which can overwhelm the H2 codec with too many frames at once.
+        auto length_header = headers.getContentLengthValue();
+        uint64_t content_length = 0;
+        if (!length_header.empty() && absl::SimpleAtoi(length_header, &content_length) &&
+            content_length > 0) {
+          // A single protobuf message cannot exceed 2GB.
+          if (content_length > std::numeric_limits<uint32_t>::max()) {
+            decoder_callbacks_->sendLocalReply(
+                Http::Code::OK, "envoy reverse bridge: upstream response too large for gRPC frame",
+                nullptr, Grpc::Status::WellKnownGrpcStatus::Internal,
+                RcDetails::get().GrpcBridgeFailedWrongContentLength);
+            return Http::FilterHeadersStatus::StopIteration;
+          }
+          response_message_length_ = static_cast<uint32_t>(content_length);
+          content_length_from_header_ = true;
+          headers.setContentLength(static_cast<uint64_t>(response_message_length_) +
+                                   Grpc::GRPC_FRAME_HEADER_SIZE);
+        } else {
+          // No Content-Length available; fall back to buffering the entire response.
+          adjustContentLength(headers,
+                              [](auto length) { return length + Grpc::GRPC_FRAME_HEADER_SIZE; });
+        }
       }
     }
     // We can only insert trailers at the end of data, so keep track of this value
@@ -209,9 +232,10 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
     return Http::FilterDataStatus::Continue;
   }
 
-  // If we're getting the response size from an upstream header, we can stream the response. The
-  // first chunk of data we encode needs the gRPC frame header prepended.
-  if (withhold_grpc_frames_ && response_size_header_ && !frame_header_added_) {
+  // If we know the response size (from response_size_header or Content-Length), we can stream
+  // the response. The first chunk of data we encode needs the gRPC frame header prepended.
+  if (withhold_grpc_frames_ && (response_size_header_ || content_length_from_header_) &&
+      !frame_header_added_) {
     buildGrpcFrameHeader(buffer, response_message_length_);
     frame_header_added_ = true;
   }
@@ -222,7 +246,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
     trailers.setGrpcStatus(grpc_status_);
 
     if (withhold_grpc_frames_) {
-      if (response_size_header_) {
+      if (response_size_header_ || content_length_from_header_) {
         if (upstream_response_bytes_ != response_message_length_) {
           encoder_callbacks_->sendLocalReply(
               Http::Code::OK, "envoy reverse bridge: upstream set incorrect content length",
@@ -240,7 +264,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
   }
 
   if (withhold_grpc_frames_) {
-    if (response_size_header_) {
+    if (response_size_header_ || content_length_from_header_) {
       return Http::FilterDataStatus::Continue;
     }
 
@@ -260,7 +284,7 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
 
   trailers.setGrpcStatus(grpc_status_);
 
-  if (withhold_grpc_frames_ && !response_size_header_) {
+  if (withhold_grpc_frames_ && !response_size_header_ && !content_length_from_header_) {
     buildGrpcFrameHeader(buffer_, buffer_.length());
     encoder_callbacks_->addEncodedData(buffer_, false);
   }

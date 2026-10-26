@@ -252,7 +252,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
-        "//bazel/foreign_cc:librdkafka",
+        "//bazel/deps:librdkafka",
         "//envoy/common:pure_lib",
         "@abseil-cpp//absl/strings",
     ],
@@ -269,7 +269,7 @@ envoy_cc_library(
     tags = ["skip_on_windows"],
     deps = [
         ":librdkafka_utils_lib",
-        "//bazel/foreign_cc:librdkafka",
+        "//bazel/deps:librdkafka",
         "//source/common/common:macros",
     ],
 )

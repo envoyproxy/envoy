@@ -48,7 +48,7 @@ public:
   size_t getProducerCountForTest() const;
 
 private:
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
 };
 
 } // namespace Mesh

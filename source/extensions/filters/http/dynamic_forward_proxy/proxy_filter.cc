@@ -84,12 +84,10 @@ ProxyFilterConfig::ProxyFilterConfig(
     Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr&& cache,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr&& cache_manager,
     Extensions::Common::DynamicForwardProxy::DFPClusterStoreFactory& cluster_store_factory,
-    Server::Configuration::FactoryContext& context)
+    Server::Configuration::ServerFactoryContext& context)
     : cluster_store_(cluster_store_factory.get()), dns_cache_manager_(std::move(cache_manager)),
-      dns_cache_(std::move(cache)),
-      cluster_manager_(context.serverFactoryContext().clusterManager()),
-      main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
-      tls_slot_(context.serverFactoryContext().threadLocal()),
+      dns_cache_(std::move(cache)), cluster_manager_(context.clusterManager()),
+      main_thread_dispatcher_(context.mainThreadDispatcher()), tls_slot_(context.threadLocal()),
       cluster_init_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config.sub_cluster_config(),
                                                        cluster_init_timeout, 5000)),
       save_upstream_address_(proto_config.save_upstream_address()),
@@ -181,10 +179,6 @@ void ProxyFilter::onDestroy() {
 }
 
 bool ProxyFilter::isProxying() {
-  if (!(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"))) {
-    return false;
-  }
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
   return filter_state && filter_state->hasData<Network::Http11ProxyInfoFilterState>(
@@ -303,7 +297,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   latchTime(decoder_callbacks_, DNS_START);
   const bool is_proxying = isProxying();
-  if (headers.Host()->value().getStringView().empty()) {
+  if (headers.getHostValue().empty()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
                                        ResponseStrings::get().EmptyHostHeader, nullptr,
                                        std::nullopt, RcDetails::get().EmptyHostHeader);
@@ -311,8 +305,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   }
 
   // Get host value from the request headers.
-  const auto host_attributes =
-      Http::Utility::parseAuthority(headers.Host()->value().getStringView());
+  const auto host_attributes = Http::Utility::parseAuthority(headers.getHostValue());
   // For IPv6 numeric addresses, use a copy with square brackets added around the host.
   // For any other address type just use the existing unmodified host string.
   std::string host_str;

@@ -10,16 +10,23 @@ fn init() -> bool {
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewListenerFilterConfigFunction`]
 /// signature.
 fn new_listener_filter_config_fn<EC: EnvoyListenerFilterConfig, ELF: EnvoyListenerFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
-  _config: &[u8],
+  config: &[u8],
 ) -> Option<Box<dyn ListenerFilterConfig<ELF>>> {
   match name {
     "write_to_socket" => Some(Box::new(WriteToSocketFilterConfig)),
     "buffer_read" => Some(Box::new(BufferReadFilterConfig)),
     "http_callout_on_accept" => Some(Box::new(HttpCalloutOnAcceptFilterConfig)),
+    "http_callout_reentrancy_probe" => Some(Box::new(HttpCalloutReentrancyProbeFilterConfig::new(
+      envoy_filter_config,
+    ))),
     "dynamic_metadata" => Some(Box::new(DynamicMetadataFilterConfig)),
     "read_attributes" => Some(Box::new(ReadAttributesFilterConfig)),
+    "filter_state_typed" => Some(Box::new(FilterStateTypedFilterConfig)),
+    "filter_chain_selector" => Some(Box::new(FilterChainSelectorFilterConfig {
+      selection: config.to_vec(),
+    })),
     _ => panic!("unknown filter name: {name}"),
   }
 }
@@ -87,7 +94,7 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for BufferReadFilter {
     let chunk = envoy_filter
       .get_buffer_chunk()
       .expect("expected buffer chunk");
-    assert_eq!(&chunk.as_slice()[..4], b"ping");
+    assert_eq!(&chunk.as_slice()[.. 4], b"ping");
     assert_eq!(envoy_filter.max_read_bytes(), 4);
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
@@ -148,6 +155,69 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutOnAcceptFilter
     _response_body: Vec<EnvoyBuffer>,
   ) {
     envoy_filter.continue_filter_chain(true);
+  }
+}
+
+// =============================================================================
+// HTTP Callout Reentrancy Probe Test Filter
+// =============================================================================
+
+// Issues an HTTP callout on accept and increments a counter from on_http_callout_done. The unit
+// tests complete the callout inline, so the gate must keep on_http_callout_done from running and
+// the counter must stay at zero.
+struct HttpCalloutReentrancyProbeFilterConfig {
+  callout_done_total: EnvoyCounterId,
+}
+
+impl HttpCalloutReentrancyProbeFilterConfig {
+  fn new<EC: EnvoyListenerFilterConfig>(config: &mut EC) -> Self {
+    Self {
+      callout_done_total: config.define_counter("callout_done_total").unwrap(),
+    }
+  }
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF>
+  for HttpCalloutReentrancyProbeFilterConfig
+{
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(HttpCalloutReentrancyProbeFilter {
+      callout_done_total: self.callout_done_total,
+    })
+  }
+}
+
+struct HttpCalloutReentrancyProbeFilter {
+  callout_done_total: EnvoyCounterId,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutReentrancyProbeFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    let _ = envoy_filter.send_http_callout(
+      "callout_cluster",
+      vec![
+        (":method", b"GET"),
+        (":path", b"/"),
+        ("host", b"example.com"),
+      ],
+      None,
+      1000,
+    );
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut ELF,
+    _callout_id: u64,
+    _result: abi::envoy_dynamic_module_type_http_callout_result,
+    _response_headers: Vec<(EnvoyBuffer, EnvoyBuffer)>,
+    _response_body: Vec<EnvoyBuffer>,
+  ) {
+    let _ = envoy_filter.increment_counter(self.callout_done_total, 1);
   }
 }
 
@@ -242,6 +312,86 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for ReadAttributesFilter {
     assert!(envoy_filter
       .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::DestinationAddress)
       .is_some());
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Typed Filter State Test Filter
+// =============================================================================
+
+// Writes a typed filter state on accept via set_filter_state_typed, using a key backed by an
+// ObjectFactory the C++ test harness registers, then reads it back with get_filter_state_typed to
+// prove the typed write/read round trips through the ABI. A failed assertion stops the chain and
+// the echo upstream never returns the payload.
+struct FilterStateTypedFilterConfig;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for FilterStateTypedFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(FilterStateTypedFilter)
+  }
+}
+
+struct FilterStateTypedFilter;
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for FilterStateTypedFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    const TYPED_KEY: &[u8] = b"envoy.test.listener_written_typed_object";
+    const TYPED_VALUE: &[u8] = b"typed_value";
+
+    // Writing without a registered ObjectFactory fails.
+    assert!(!envoy_filter.set_filter_state_typed(b"nonexistent.factory.key", TYPED_VALUE));
+
+    // Writing through the registered factory succeeds and round trips via the typed getter.
+    assert!(envoy_filter.set_filter_state_typed(TYPED_KEY, TYPED_VALUE));
+    assert_eq!(
+      envoy_filter
+        .get_filter_state_typed(TYPED_KEY)
+        .map(|value| value.as_slice().to_vec()),
+      Some(TYPED_VALUE.to_vec())
+    );
+
+    abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
+  }
+}
+
+// =============================================================================
+// Filter Chain Selector Test Filter
+// =============================================================================
+
+// Writes a per-connection selection value into typed filter state on accept, so a filter chain
+// matcher running after the listener filters can pick a filter chain from it via
+// envoy.matching.inputs.filter_state. The value is taken verbatim from the filter's config, letting
+// a caller steer a connection to a different chain without changing the module. This is the pattern
+// used to gate traffic between two otherwise-identical chains from a listener filter.
+struct FilterChainSelectorFilterConfig {
+  selection: Vec<u8>,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilterConfig<ELF> for FilterChainSelectorFilterConfig {
+  fn new_listener_filter(&self, _envoy: &mut ELF) -> Box<dyn ListenerFilter<ELF>> {
+    Box::new(FilterChainSelectorFilter {
+      selection: self.selection.clone(),
+    })
+  }
+}
+
+// Key backed by an ObjectFactory the C++ test harness registers. The matcher reads the same key.
+const SELECTOR_KEY: &[u8] = b"envoy.test.filter_chain_selector";
+
+struct FilterChainSelectorFilter {
+  selection: Vec<u8>,
+}
+
+impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for FilterChainSelectorFilter {
+  fn on_accept(
+    &mut self,
+    envoy_filter: &mut ELF,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
+    assert!(envoy_filter.set_filter_state_typed(SELECTOR_KEY, &self.selection));
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
 }

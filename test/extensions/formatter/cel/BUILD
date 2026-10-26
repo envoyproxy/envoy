@@ -21,7 +21,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = ["envoy.formatter.cel"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/formatter:substitution_formatter_lib",
@@ -29,6 +29,7 @@ envoy_extension_cc_test(
         "//source/common/router:string_accessor_lib",
         "//source/extensions/formatter/cel:cel_lib",
         "//source/extensions/formatter/cel:config",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:status_utility_lib",

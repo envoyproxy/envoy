@@ -7,15 +7,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace PlatformBridge {
 
-Http::FilterFactoryCb PlatformBridgeFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+PlatformBridgeFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
 
   PlatformBridgeFilterConfigSharedPtr filter_config =
-      std::make_shared<PlatformBridgeFilterConfig>(context, proto_config);
-  return [filter_config, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<PlatformBridgeFilter>(
-        filter_config, context.serverFactoryContext().mainThreadDispatcher()));
+      std::make_shared<PlatformBridgeFilterConfig>(extra_context.scopeOr(context), proto_config);
+  Event::Dispatcher& dispatcher = context.mainThreadDispatcher();
+  return [filter_config, &dispatcher](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<PlatformBridgeFilter>(filter_config, dispatcher));
   };
 }
 

@@ -16,6 +16,7 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/server/active_udp_listener.h"
 
+#include "quiche/quic/core/quic_packet_writer.h"
 #include "quiche/quic/load_balancer/load_balancer_encoder.h"
 
 namespace Envoy {
@@ -58,6 +59,7 @@ public:
     // No-op. Quic can't do anything upon listener error.
   }
   Network::UdpPacketWriter& udpPacketWriter() override { return *udp_packet_writer_; }
+  quic::QuicPacketWriter* quicPacketWriter() { return quic_packet_writer_; }
   void onDataWorker(Network::UdpRecvData&& data) override;
   uint32_t destination(const Network::UdpRecvData& data) const override;
   size_t numPacketsExpectedPerEventLoop() const override;
@@ -72,9 +74,9 @@ public:
   void updateListenerConfig(Network::ListenerConfig& config) override;
   void onFilterChainDraining(
       const std::list<const Network::FilterChain*>& draining_filter_chains) override;
-  void onFilterChainDrainStart(
-      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
-  void onListenerDrainStart() override;
+  void onFilterChainDrainStart(const std::list<const Network::FilterChain*>& draining_filter_chains,
+                               Network::ConnectionDrainEvent drain_event) override;
+  void onListenerDrainStart(Network::ConnectionDrainEvent drain_event) override;
 
   void onCloseIdleHttpConnections(bool is_saturated) override;
 
@@ -94,6 +96,7 @@ private:
   const bool kernel_worker_routing_;
   std::optional<Runtime::FeatureFlag> enabled_;
   Network::UdpPacketWriter* udp_packet_writer_;
+  quic::QuicPacketWriter* quic_packet_writer_{nullptr};
 
   // The number of runs of the event loop in which at least one CHLO was buffered.
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
@@ -122,7 +125,8 @@ public:
   ActiveQuicListenerFactory(const envoy::config::listener::v3::QuicProtocolOptions& config,
                             uint32_t concurrency, QuicStatNames& quic_stat_names,
                             ProtobufMessage::ValidationVisitor& validation_visitor,
-                            Server::Configuration::ListenerFactoryContext& context);
+                            Server::Configuration::ListenerFactoryContext& context,
+                            absl::Status& creation_status);
 
   // Network::ActiveUdpListenerFactory.
   Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -132,6 +136,9 @@ public:
                           Event::Dispatcher& dispatcher, Network::ListenerConfig& config) override;
   bool isTransportConnectionless() const override { return false; }
   const Network::Socket::OptionsSharedPtr& socketOptions() const override { return options_; }
+  absl::Status initializeCidGeneratorAndWorkerRouting();
+  absl::Status initializeWorkerRouting(
+      absl::Span<const Network::ListenSocketFactoryPtr> socket_factories) override;
 
   static void setDisableKernelBpfPacketRoutingForTest(bool val) {
     disable_kernel_bpf_packet_routing_for_test_ = val;
@@ -152,10 +159,10 @@ protected:
 private:
   friend class ActiveQuicListenerFactoryPeer;
 
-  std::optional<std::reference_wrapper<EnvoyQuicCryptoServerStreamFactoryInterface>>
-      crypto_server_stream_factory_;
-  std::optional<std::reference_wrapper<EnvoyQuicProofSourceFactoryInterface>> proof_source_factory_;
+  OptRef<EnvoyQuicCryptoServerStreamFactoryInterface> crypto_server_stream_factory_;
+  OptRef<EnvoyQuicProofSourceFactoryInterface> proof_source_factory_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfacePtr connection_debug_visitor_factory_;
+  envoy::config::core::v3::TypedExtensionConfig cid_generator_config_;
   EnvoyQuicConnectionIdGeneratorFactoryPtr quic_cid_generator_factory_;
   EnvoyQuicServerPreferredAddressConfigPtr server_preferred_address_config_;
   quic::QuicConfig quic_config_;

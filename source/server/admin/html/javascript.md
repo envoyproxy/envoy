@@ -41,7 +41,7 @@ endpoint to the admin port, enabling the test files to run in the same origin as
 the endpoint under test. This is needed for deep inspection of the document
 model during tests, which is possible only for same-origin iframes. For more
 details on testing mechanics, see
-[admin_web_test.sh](https://github.com/envoyproxy/envoy/blob/main/test/integration/admin_web_test.sh). Note
+[web_test.sh](https://github.com/envoyproxy/envoy/blob/main/test/integration/admin_html/web_test.sh). Note
 that the test is semi-automatic using a browser, and is not run in blaze tests
 or CI.  A human must manually inspect the test results page for pass/fail logs,
 and the UI to make sure all looks good.

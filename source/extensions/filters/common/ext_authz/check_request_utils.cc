@@ -253,16 +253,22 @@ void CheckRequestUtils::createHttpCheck(
   // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
 
-  setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
-                     include_peer_certificate);
-  setAttrContextPeer(*attrs->mutable_destination(), *cb->connection(), EMPTY_STRING, true,
-                     include_peer_certificate);
+  // The downstream connection is absent in some contexts, for example when the filter runs in an
+  // upstream filter chain driven by the async client. The peer and TLS session attributes are
+  // derived from the connection, so they are left unset without one.
+  const auto connection = cb->connection();
+  if (connection.has_value()) {
+    setAttrContextPeer(*attrs->mutable_source(), *connection, service, false,
+                       include_peer_certificate);
+    setAttrContextPeer(*attrs->mutable_destination(), *connection, EMPTY_STRING, true,
+                       include_peer_certificate);
+  }
   setAttrContextRequest(*attrs->mutable_request(), cb->streamId(), cb->streamInfo(),
                         cb->decodingBuffer(), headers, max_request_bytes, pack_as_bytes,
                         encode_raw_headers, allowed_headers_matcher, disallowed_headers_matcher);
 
-  if (include_tls_session) {
-    setTLSSession(*attrs->mutable_tls_session(), *cb->connection());
+  if (include_tls_session && connection.has_value()) {
+    setTLSSession(*attrs->mutable_tls_session(), *connection);
   }
   (*attrs->mutable_destination()->mutable_labels()) = destination_labels;
   // Fill in the context extensions and metadata context.

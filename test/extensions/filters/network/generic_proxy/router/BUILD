@@ -1,19 +1,23 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "router_test",
     srcs = [
         "router_test.cc",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.generic.router"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy/router:router_lib",
@@ -26,12 +30,13 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "upstream_test",
     srcs = [
         "upstream_test.cc",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.generic.router"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/generic_proxy/router:router_lib",
@@ -45,12 +50,13 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = [
         "config_test.cc",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.generic.router"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/network/generic_proxy/router:config",
         "//test/extensions/filters/network/generic_proxy/mocks:filter_mocks",

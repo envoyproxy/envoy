@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/local_info/local_info.h"
 
@@ -39,23 +38,19 @@ using WasmConfigPtr = std::unique_ptr<WasmConfig>;
 class Plugin : public proxy_wasm::PluginBase {
 public:
   Plugin(const envoy::extensions::wasm::v3::PluginConfig& config,
-         envoy::config::core::v3::TrafficDirection direction,
          const LocalInfo::LocalInfo& local_info)
       : PluginBase(
             config.name(), config.root_id(), config.vm_config().vm_id(),
             config.vm_config().runtime(),
             THROW_OR_RETURN_VALUE(MessageUtil::anyToBytes(config.configuration()), std::string),
-            config.fail_open(), createPluginKey(config, direction)),
+            config.fail_open(), createPluginKey(config)),
         local_info_(local_info), wasm_config_(std::make_unique<WasmConfig>(config)) {}
 
   const LocalInfo::LocalInfo& localInfo() { return local_info_; }
   WasmConfig& wasmConfig() { return *wasm_config_; }
 
 private:
-  static std::string createPluginKey(const envoy::extensions::wasm::v3::PluginConfig& config,
-                                     envoy::config::core::v3::TrafficDirection direction) {
-    return config.name() + "||" + envoy::config::core::v3::TrafficDirection_Name(direction);
-  }
+  static std::string createPluginKey(const envoy::extensions::wasm::v3::PluginConfig& config);
 
 private:
   const LocalInfo::LocalInfo& local_info_;

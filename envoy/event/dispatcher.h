@@ -3,11 +3,13 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher_thread_deletable.h"
+#include "envoy/event/evwatch.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/scaled_timer.h"
 #include "envoy/event/schedulable_cb.h"
@@ -109,6 +111,13 @@ public:
   virtual const std::string& name() PURE;
 
   /**
+   * Returns the id of the worker this dispatcher services ("worker_<id>" dispatchers), or
+   * std::nullopt for any other dispatcher (e.g. the main thread's).
+   * @return std::optional<uint32_t> the id of the worker this dispatcher services.
+   */
+  virtual std::optional<uint32_t> workerId() const PURE;
+
+  /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
    * can be used for any file like interface (files, sockets, etc.).
    * @param fd supplies the fd to watch.
@@ -156,6 +165,20 @@ public:
    */
   virtual void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                                 std::chrono::milliseconds min_touch_interval) PURE;
+
+  /**
+   * Registers a non-owning Evwatch observer with this dispatcher.
+   * This should only be called on the dispatcher's thread.
+   * @param observer supplies the observer to register.
+   */
+  virtual void registerEvwatchObserver(Evwatch::Observer& observer) PURE;
+
+  /**
+   * Unregisters an Evwatch observer from this dispatcher and calls observer.onClose().
+   * This should only be called on the dispatcher's thread.
+   * @param observer supplies the observer to unregister.
+   */
+  virtual void unregisterEvwatchObserver(Evwatch::Observer& observer) PURE;
 
   /**
    * Returns a time-source to use with this dispatcher.

@@ -28,7 +28,7 @@ using testing::_;
 using testing::ByMove;
 using testing::Return;
 
-constexpr Logger::Logger::Levels LOG_LEVEL = Logger::Logger::Levels::debug;
+constexpr Logger::Levels LOG_LEVEL = Logger::Levels::debug;
 constexpr int kDefaultTimeoutSec = 3 * TIMEOUT_FACTOR;
 
 struct EngineTestContext {
@@ -44,7 +44,7 @@ struct EngineTestContext {
 // between the main thread and the engine thread both writing to the
 // Envoy::Logger::current_log_context global.
 struct TestEngine {
-  TestEngine(std::unique_ptr<EngineCallbacks> callbacks, const Logger::Logger::Levels log_level) {
+  TestEngine(std::unique_ptr<EngineCallbacks> callbacks, const Logger::Levels log_level) {
     engine_ = std::make_unique<InternalEngine>(std::move(callbacks), /*logger=*/nullptr,
                                                /*event_tracker=*/nullptr);
     Platform::EngineBuilder builder;
@@ -111,8 +111,7 @@ public:
   }
 
   envoy_status_t runEngine(const std::unique_ptr<InternalEngine>& engine,
-                           const Platform::EngineBuilder& builder,
-                           const Logger::Logger::Levels log_level) {
+                           const Platform::EngineBuilder& builder, const Logger::Levels log_level) {
     auto bootstrap = builder.generateBootstrap();
     auto options = std::make_shared<Envoy::OptionsImplBase>();
     options->setConfigProto(std::move(bootstrap));
@@ -188,7 +187,7 @@ TEST_F(InternalEngineTest, RecordCounter) {
 TEST_F(InternalEngineTest, Logger) {
   EngineTestContext test_context{};
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Logger::Levels, const std::string&) {
+  logger->on_log_ = [&](Logger::Levels, const std::string&) {
     if (!test_context.on_log.HasBeenNotified()) {
       test_context.on_log.Notify();
     }

@@ -24,7 +24,7 @@ MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(absl::AnyInvocable<void()>,
 }
 
 // NOLINTNEXTLINE(modernize-use-equals-default)
-template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase(){};
+template <> MockBufferBase<Buffer::OwnedImpl>::MockBufferBase() {};
 
 MockBufferFactory::MockBufferFactory() = default;
 MockBufferFactory::~MockBufferFactory() = default;

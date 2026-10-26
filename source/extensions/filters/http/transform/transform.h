@@ -62,8 +62,14 @@ public:
                                     const StreamInfo::StreamInfo&) const override;
   Protobuf::Value formatValue(const Formatter::Context& context,
                               const StreamInfo::StreamInfo&) const override;
+  bool formatTo(std::string& sink, const Formatter::Context& context,
+                const StreamInfo::StreamInfo&) const override;
+  void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context& context,
+                     const StreamInfo::StreamInfo&) const override;
 
 private:
+  OptRef<const Protobuf::Value> getBodyValue(const Formatter::Context& context) const;
+
   const std::vector<std::string> path_;
   const bool request_body_{};
 };
@@ -146,9 +152,10 @@ using TransformConfigSharedPtr = std::shared_ptr<TransformConfig>;
 class FilterConfig : public TransformConfig {
 public:
   FilterConfig(const ProtoConfig& config, const std::string& stats_prefix,
-               Server::Configuration::FactoryContext& context, absl::Status& creation_status)
-      : TransformConfig(config, context.serverFactoryContext(), creation_status),
-        stats_(generateStats(stats_prefix, context.scope())) {}
+               Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope,
+               absl::Status& creation_status)
+      : TransformConfig(config, context, creation_status),
+        stats_(generateStats(stats_prefix, scope)) {}
 
   TransformFilterStats& stats() { return stats_; }
 

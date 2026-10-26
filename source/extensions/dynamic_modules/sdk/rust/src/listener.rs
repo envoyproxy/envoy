@@ -1,16 +1,23 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, drop_wrapped_c_void_ptr, str_to_module_buffer, wrap_into_c_void_ptr, EnvoyCounterId,
-  EnvoyGaugeId, EnvoyHistogramId, NewListenerFilterConfigFunction,
+  abi,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  EnvoyCounterId,
+  EnvoyGaugeId,
+  EnvoyHistogramId,
+  NewListenerFilterConfigFunction,
   NEW_LISTENER_FILTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 /// The trait that represents the Envoy listener filter configuration.
 /// This is used in [`NewListenerFilterConfigFunction`] to pass the Envoy filter configuration
 /// to the dynamic module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyListenerFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
   fn define_counter(
@@ -168,7 +175,7 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
 
 /// The trait that represents the Envoy listener filter.
 /// This is used in [`ListenerFilter`] to interact with the underlying Envoy listener filter object.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyListenerFilter {
   /// Get the current buffer chunk available for reading.
@@ -227,6 +234,22 @@ pub trait EnvoyListenerFilter {
   /// Get a bytes value from filter state.
   /// Returns None if the value is not found.
   fn get_filter_state_bytes<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
+
+  /// Set a typed filter state value with the given key and connection life span. The value is
+  /// deserialized by a registered `StreamInfo::FilterState::ObjectFactory` on the Envoy side. This
+  /// is useful for setting filter state objects that other Envoy filters expect to read as specific
+  /// C++ types (e.g., `PerConnectionCluster` used by TCP Proxy).
+  ///
+  /// Returns true if the operation is successful. This can fail if no ObjectFactory is registered
+  /// for the key or if deserialization fails.
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool;
+
+  /// Get the serialized value of a typed filter state object with the given key. The object must
+  /// support `serializeAsString()` on the Envoy side.
+  ///
+  /// Returns None if the key does not exist, the object does not support serialization, or the
+  /// filter state is not accessible.
+  fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
   /// Set the downstream transport failure reason.
   fn set_downstream_transport_failure_reason(&mut self, reason: &str);
@@ -491,7 +514,7 @@ pub trait EnvoyListenerFilter {
 /// the [`Box<dyn EnvoyListenerFilterScheduler>`] can be sent across threads.
 ///
 /// It is also safe to be called concurrently, so it is marked as `Sync` as well.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyListenerFilterScheduler: Send + Sync {
   /// Commit the scheduled event to the worker thread where [`ListenerFilter`] is running.
   ///
@@ -543,7 +566,7 @@ impl EnvoyListenerFilterScheduler for Box<dyn EnvoyListenerFilterScheduler> {
 
 /// This represents a thread-safe object that can be used to schedule a generic event to the
 /// Envoy listener filter config on the main thread.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyListenerFilterConfigScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);
@@ -951,6 +974,35 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
     }
   }
 
+  fn set_filter_state_typed(&mut self, key: &[u8], value: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_filter_state_typed(
+        self.raw,
+        crate::bytes_to_module_buffer(key),
+        crate::bytes_to_module_buffer(value),
+      )
+    }
+  }
+
+  fn get_filter_state_typed(&self, key: &[u8]) -> Option<EnvoyBuffer<'_>> {
+    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let success = unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
+        self.raw,
+        crate::bytes_to_module_buffer(key),
+        &mut result as *mut _ as *mut _,
+      )
+    };
+    if success && !result.ptr.is_null() && result.length > 0 {
+      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
+    } else {
+      None
+    }
+  }
+
   fn set_downstream_transport_failure_reason(&mut self, reason: &str) {
     unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_set_downstream_transport_failure_reason(
@@ -1009,25 +1061,28 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
   }
 
   fn set_dynamic_metadata_string_batch(&mut self, namespace: &str, entries: &[(&str, &str)]) {
-    // `pairs` borrows the key/value bytes of `entries`, which outlive this call. Envoy copies the
-    // bytes into the metadata Struct synchronously, so the pointers never dangle. An empty
-    // `entries` yields an empty Vec paired with a zero length the callback treats as a no-op.
-    let mut pairs: Vec<abi::envoy_dynamic_module_type_module_key_value_pair> =
-      Vec::with_capacity(entries.len());
-    for (key, value) in entries {
-      pairs.push(abi::envoy_dynamic_module_type_module_key_value_pair {
-        key_ptr: key.as_ptr() as *const _,
-        key_length: key.len(),
-        value_ptr: value.as_ptr() as *const _,
-        value_length: value.len(),
-      });
-    }
+    type KvPair<'a> = (&'a str, &'a str);
+
+    debug_assert!({
+      let pair: KvPair<'_> = ("test", "value");
+      let constructed = abi::envoy_dynamic_module_type_module_key_value_pair {
+        key_ptr: pair.0.as_ptr() as *const _,
+        key_length: pair.0.len(),
+        value_ptr: pair.1.as_ptr() as *const _,
+        value_length: pair.1.len(),
+      };
+      let punned = unsafe {
+        std::mem::transmute::<KvPair, abi::envoy_dynamic_module_type_module_key_value_pair>(pair)
+      };
+      constructed == punned
+    });
+
     unsafe {
       abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
         self.raw,
         str_to_module_buffer(namespace),
-        pairs.as_ptr(),
-        pairs.len(),
+        entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
+        entries.len(),
       )
     }
   }
@@ -1565,13 +1620,12 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
 
 // Listener Filter Event Hook Implementations
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
-  envoy_filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
-  name: abi::envoy_dynamic_module_type_envoy_buffer,
-  config: abi::envoy_dynamic_module_type_envoy_buffer,
-) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_config_new(
+    envoy_filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+    name: abi::envoy_dynamic_module_type_envoy_buffer,
+    config: abi::envoy_dynamic_module_type_envoy_buffer,
+  ) -> abi::envoy_dynamic_module_type_listener_filter_config_module_ptr {
     let mut envoy_filter_config = EnvoyListenerFilterConfigImpl::new(envoy_filter_config_ptr);
     let name_str =
       unsafe { crate::ffi_helpers::str_lossy_from_raw(name.ptr as *const u8, name.length) };
@@ -1586,11 +1640,8 @@ pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_new(
         .get()
         .expect("NEW_LISTENER_FILTER_CONFIG_FUNCTION must be set"),
     )
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_config_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 pub(crate) fn init_listener_filter_config<
@@ -1609,38 +1660,30 @@ pub(crate) fn init_listener_filter_config<
   }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_config_destroy(
-  filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_listener_filter_config_destroy(
+    filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
+  ) {
     drop_wrapped_c_void_ptr!(
       filter_config_ptr,
       ListenerFilterConfig<EnvoyListenerFilterImpl>
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_listener_filter_config_destroy",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
-/// by the Envoy dynamic module ABI.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_new(
-  filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
-  envoy_filter_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
-) -> abi::envoy_dynamic_module_type_listener_filter_module_ptr {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_listener_filter_new(
+    filter_config_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
+    envoy_filter_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+  ) -> abi::envoy_dynamic_module_type_listener_filter_module_ptr {
     let mut envoy_filter = EnvoyListenerFilterImpl::new(envoy_filter_ptr);
     let filter_config = {
       let raw =
@@ -1648,11 +1691,8 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_new(
       &**raw
     };
     envoy_dynamic_module_on_listener_filter_new_impl(&mut envoy_filter, filter_config)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_new", panic);
-    std::ptr::null()
-  })
+  }
+  on_panic = std::ptr::null()
 }
 
 pub(crate) fn envoy_dynamic_module_on_listener_filter_new_impl(
@@ -1663,138 +1703,103 @@ pub(crate) fn envoy_dynamic_module_on_listener_filter_new_impl(
   wrap_into_c_void_ptr!(filter)
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_accept(
-  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
-) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_on_accept(
+    envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+    filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
     let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
     filter.on_accept(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_on_accept", panic);
-    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
-  })
+  }
+  on_panic = abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_data(
-  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
-  data_length: usize,
-) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_on_data(
+    envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+    filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+    data_length: usize,
+  ) -> abi::envoy_dynamic_module_type_on_listener_filter_status {
     let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
     filter.on_data(&mut EnvoyListenerFilterImpl::new(envoy_ptr), data_length)
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_on_data", panic);
-    abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
-  })
+  }
+  on_panic = abi::envoy_dynamic_module_type_on_listener_filter_status::StopIteration
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
-  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
-) -> usize {
-  catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_get_max_read_bytes(
+    envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+    filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+  ) -> usize {
     let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
     filter.max_read_bytes(&mut EnvoyListenerFilterImpl::new(envoy_ptr))
-  }))
-  .unwrap_or_else(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_listener_filter_get_max_read_bytes",
-      panic,
-    );
-    0
-  })
+  }
+  on_panic = 0
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_on_close(
-  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_on_close(
+    envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+    filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+  ) {
     let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
     filter.on_close(&mut EnvoyListenerFilterImpl::new(envoy_ptr));
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_on_close", panic);
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_destroy(
-  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_destroy(
+    filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+  ) {
     let _ =
       unsafe { Box::from_raw(filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>) };
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_destroy", panic);
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_scheduled(
-  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
-  event_id: u64,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_scheduled(
+    envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+    filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+    event_id: u64,
+  ) {
     let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
     filter.on_scheduled(&mut EnvoyListenerFilterImpl::new(envoy_ptr), event_id);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic("envoy_dynamic_module_on_listener_filter_scheduled", panic);
-  });
+  }
 }
 
-#[no_mangle]
-pub extern "C" fn envoy_dynamic_module_on_listener_filter_config_scheduled(
-  _filter_config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
-  filter_config_module_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
-  event_id: u64,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  fn envoy_dynamic_module_on_listener_filter_config_scheduled(
+    _filter_config_envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_config_envoy_ptr,
+    filter_config_module_ptr: abi::envoy_dynamic_module_type_listener_filter_config_module_ptr,
+    event_id: u64,
+  ) {
     let filter_config =
       filter_config_module_ptr as *const *const dyn ListenerFilterConfig<EnvoyListenerFilterImpl>;
     let filter_config = unsafe { &**filter_config };
     filter_config.on_config_scheduled(event_id);
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_listener_filter_config_scheduled",
-      panic,
-    );
-  });
+  }
 }
 
-/// # Safety
-///
-/// Caller must ensure `filter_ptr`, `headers`, and `body_chunks` point to valid memory for the
-/// provided sizes, and that the pointed-to data lives for the duration of this call.
-#[no_mangle]
-pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_http_callout_done(
-  envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
-  filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
-  callout_id: u64,
-  result: abi::envoy_dynamic_module_type_http_callout_result,
-  headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
-  headers_size: usize,
-  body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
-  body_chunks_size: usize,
-) {
-  let _ = catch_unwind(AssertUnwindSafe(|| {
+ffi_export! {
+  /// # Safety
+  ///
+  /// Caller must ensure `filter_ptr`, `headers`, and `body_chunks` point to valid memory for the
+  /// provided sizes, and that the pointed-to data lives for the duration of this call.
+  unsafe fn envoy_dynamic_module_on_listener_filter_http_callout_done(
+    envoy_ptr: abi::envoy_dynamic_module_type_listener_filter_envoy_ptr,
+    filter_ptr: abi::envoy_dynamic_module_type_listener_filter_module_ptr,
+    callout_id: u64,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    headers: *const abi::envoy_dynamic_module_type_envoy_http_header,
+    headers_size: usize,
+    body_chunks: *const abi::envoy_dynamic_module_type_envoy_buffer,
+    body_chunks_size: usize,
+  ) {
     let filter = filter_ptr as *mut Box<dyn ListenerFilter<EnvoyListenerFilterImpl>>;
     let filter = unsafe { &mut *filter };
 
@@ -1826,11 +1831,5 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_listener_filter_http_callout_do
       header_vec,
       body_vec,
     );
-  }))
-  .map_err(|panic| {
-    crate::log_ffi_panic(
-      "envoy_dynamic_module_on_listener_filter_http_callout_done",
-      panic,
-    );
-  });
+  }
 }

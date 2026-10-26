@@ -2,13 +2,17 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codec.h"
+#include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/network/drain_close_util.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -58,11 +62,14 @@ private:
   bool peer_goaway_handled_{false};
 };
 
-// Wraps an Http::ServerConnection and proactively sends an HTTP/2 GOAWAY frame when
-// the listener that owns this connection begins draining. Drain is detected by polling
-// DrainDecision::drainClose() on a short timer; this avoids calling addOnDrainCloseCb()
-// which is intentionally unsupported on PerFilterChainFactoryContextImpl.
+// Wraps an Http::ServerConnection and proactively sends an HTTP/2 GOAWAY frame when the listener
+// that owns this connection begins draining. Drain is detected on a short timer. When the runtime
+// feature "envoy.reloadable_features.use_connection_event_drain" is enabled, the drain decision is
+// derived from the connection-level drain event delivered via Network::Connection::onDrain();
+// otherwise it falls back to polling DrainDecision::drainClose() (which avoids calling
+// addOnDrainCloseCb(), intentionally unsupported on PerFilterChainFactoryContextImpl).
 class DrainAwareServerConnection : public Http::ServerConnection,
+                                   public Network::ConnectionCallbacks,
                                    public Logger::Loggable<Logger::Id::filter> {
 public:
   // `on_local_drain` (optional) fires once when this connection begins draining locally (the HCM
@@ -70,18 +77,30 @@ public:
   // drains). For reverse tunnels this asks the initiator to dial a replacement tunnel immediately
   // while the old one finishes in-flight streams.
   DrainAwareServerConnection(
-      Http::ServerConnectionPtr inner, Event::Dispatcher& dispatcher,
-      const Network::DrainDecision& drain_decision, std::function<void()> on_local_drain = nullptr,
+      Http::ServerConnectionPtr inner, Network::Connection& connection,
+      const Network::DrainDecision& drain_decision,
+      Server::Configuration::ServerFactoryContext& server_context,
+      std::function<void()> on_local_drain = nullptr,
       std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper = nullptr)
       : callbacks_wrapper_(std::move(callbacks_wrapper)), inner_(std::move(inner)),
-        drain_decision_(drain_decision), on_local_drain_(std::move(on_local_drain)) {
+        connection_(connection), drain_decision_(drain_decision), server_context_(server_context),
+        drain_type_(Network::listenerDrainType(connection)),
+        on_local_drain_(std::move(on_local_drain)) {
     ENVOY_LOG(debug, "drain_aware_hcm: created server connection wrapper, protocol={}",
               static_cast<int>(inner_->protocol()));
-    drain_check_timer_ = dispatcher.createTimer([this]() { onDrainCheckTimer(); });
+    // Observe connection-level drain notifications so onDrainCheckTimer() can react to them.
+    connection_.addConnectionCallbacks(*this);
+    drain_check_timer_ = connection_.dispatcher().createTimer([this]() { onDrainCheckTimer(); });
     drain_check_timer_->enableTimer(std::chrono::milliseconds(100));
   }
 
+  // `connection_` is guaranteed to outlive this wrapper: the wrapper is owned by
+  // ConnectionManagerImpl::codec_, the connection manager is a read filter owned by the
+  // connection's FilterManagerImpl, and that filter manager is a member of ConnectionImpl, which
+  // is destroyed before its ConnectionImplBase subobject (where the callback list lives). The
+  // codec is never reset before the connection is destroyed.
   ~DrainAwareServerConnection() override {
+    connection_.removeConnectionCallbacks(*this);
     if (drain_check_timer_ != nullptr) {
       drain_check_timer_->disableTimer();
     }
@@ -112,12 +131,33 @@ public:
     inner_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
 
+  // Network::ConnectionCallbacks
+  // Only the drain notification is of interest here; the other events are handled by the
+  // connection manager through its own connection callbacks.
+  void onEvent(Network::ConnectionEvent) override {}
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+  void onDrain(Network::ConnectionDrainEvent drain_event) override {
+    if (!connection_drain_event_.has_value()) {
+      connection_drain_event_ = drain_event;
+    }
+  }
+
 private:
+  // Returns true if the connection should begin draining (send GOAWAY).
+  bool shouldDrainClose() {
+    if (!use_connection_event_drain_) {
+      return drain_decision_.drainClose(Network::DrainDirection::All);
+    }
+
+    return Network::shouldDrainClose(server_context_, drain_type_, connection_drain_event_);
+  }
+
   void onDrainCheckTimer() {
     if (drain_goaway_sent_) {
       return;
     }
-    if (drain_decision_.drainClose(Network::DrainDirection::All)) {
+    if (shouldDrainClose()) {
       ENVOY_LOG(info, "drain_aware_hcm: drain detected, sending GOAWAY");
       drain_goaway_sent_ = true;
       notifyLocalDrain();
@@ -140,7 +180,19 @@ private:
   // before the wrapper. Null when the peer-GOAWAY re-dial path is disabled.
   std::unique_ptr<DrainAwareServerConnectionCallbacks> callbacks_wrapper_;
   Http::ServerConnectionPtr inner_;
+  Network::Connection& connection_;
   const Network::DrainDecision& drain_decision_;
+  Server::Configuration::ServerFactoryContext& server_context_;
+  // The drain type of the listener owning this connection, used to decide whether
+  // /healthcheck/fail should drain-close it.
+  const envoy::config::listener::v3::Listener::DrainType drain_type_{
+      envoy::config::listener::v3::Listener::DEFAULT};
+  // Set when the connection is notified of a drain sequence via onDrain().
+  std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
+  // Latched when the wrapper is created so it is not re-read on every timer tick. See
+  // shouldDrainClose().
+  const bool use_connection_event_drain_{
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_connection_event_drain")};
   std::function<void()> on_local_drain_;
   Event::TimerPtr drain_check_timer_;
   bool drain_goaway_sent_{false};

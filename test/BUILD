@@ -44,8 +44,10 @@ envoy_cc_test_library(
         "test_runner.h",
     ],
     deps = [
+        "//bazel:cpp_runfiles",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/coroutine:backtrace_lib",
         "//source/common/event:libevent_lib",
         "//source/exe:process_wide_lib",
         "//source/server:backtrace_lib",

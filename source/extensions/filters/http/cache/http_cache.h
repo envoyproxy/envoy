@@ -316,11 +316,11 @@ public:
   // Returns an HttpCache that will remain valid indefinitely (at least as long
   // as the calling CacheFilter).
   //
-  // Pass factory context to allow HttpCache to use async client, stats scope
+  // Pass the server factory context to allow HttpCache to use async client, stats scope
   // etc.
   virtual std::shared_ptr<HttpCache>
   getCache(const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
-           Server::Configuration::FactoryContext& context) PURE;
+           Server::Configuration::ServerFactoryContext& context) PURE;
 
 private:
   const std::string name_;

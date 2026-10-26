@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -18,7 +18,7 @@ envoy_extension_cc_test(
     name = "proxy_protocol_test",
     srcs = ["proxy_protocol_test.cc"],
     extension_names = ["envoy.filters.listener.proxy_protocol"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/network:proxy_protocol_options_lib",
         "//source/common/buffer:buffer_lib",
@@ -37,6 +37,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:listener_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
@@ -54,11 +55,12 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "proxy_protocol_fuzz_test",
     srcs = ["proxy_protocol_fuzz_test.cc"],
     corpus = "proxy_protocol_corpus",
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.listener.proxy_protocol"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":proxy_protocol_fuzz_test_proto_cc_proto",
         "//source/extensions/filters/listener/proxy_protocol:proxy_protocol_lib",
@@ -77,11 +79,13 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["proxy_proto_integration_test.cc"],
     extension_names = ["envoy.filters.listener.proxy_protocol"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":proxy_proto_integration_test_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/listener/proxy_protocol:config",

@@ -74,7 +74,7 @@ public:
   std::chrono::milliseconds nextTokenAvailable() override;
   // Actual bucket belongs to the factory and is reset at create-time,
   // so maybeReset is a no-op.
-  void maybeReset(uint64_t) override{};
+  void maybeReset(uint64_t) override {};
   std::chrono::milliseconds fillInterval() const;
 
 private:

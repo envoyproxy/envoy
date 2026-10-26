@@ -1,3 +1,4 @@
+//go:generate mockgen -source=listener_base.go -destination=mocks/mock_listener_base.go -package=mocks
 package shared
 
 // ListenerFilterStatus controls whether Envoy continues listener filter iteration.
@@ -149,6 +150,8 @@ type ListenerFilterHandle interface {
 
 // ListenerFilterConfigHandle exposes host services during listener filter config creation.
 type ListenerFilterConfigHandle interface {
+	CommonHandle
+
 	// DefineHistogram defines a histogram metric during config creation.
 	DefineHistogram(name string) (MetricID, MetricsResult)
 	// DefineGauge defines a gauge metric during config creation.

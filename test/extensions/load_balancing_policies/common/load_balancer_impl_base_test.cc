@@ -589,9 +589,13 @@ public:
 
 // Tests the source type static methods in zone aware load balancer.
 TEST_F(ZoneAwareLoadBalancerBaseTest, SourceTypeMethods) {
-  { EXPECT_ENVOY_BUG(lbx_.runInvalidLocalitySourceType(), "unexpected locality source type enum"); }
+  {
+    EXPECT_ENVOY_BUG(lbx_.runInvalidLocalitySourceType(), "unexpected locality source type enum");
+  }
 
-  { EXPECT_ENVOY_BUG(lbx_.runInvalidSourceType(), "unexpected source type enum"); }
+  {
+    EXPECT_ENVOY_BUG(lbx_.runInvalidSourceType(), "unexpected source type enum");
+  }
 }
 
 TEST_F(ZoneAwareLoadBalancerBaseTest, BaseMethods) {

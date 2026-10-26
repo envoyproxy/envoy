@@ -9,12 +9,14 @@
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 
 #include "source/common/http/codec_client.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/network/filter_impl.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -267,6 +269,13 @@ protected:
                                                     const std::string& overwrite_authority = "");
   void testRouterNotFound();
   void testRouterNotFoundWithBody();
+  // Whether the stats store derives tags with the explicit-tags logic (the tag-friendly scope API)
+  // rather than with the legacy tag-extraction rules. Both modes must produce identical stat
+  // names, tag-extracted names and tags for the stats asserted with expectStatTags().
+  bool useExplicitStatsTags() const { return version_ == Network::Address::IpVersion::v6; }
+  // Checks a counter's flat name, the name it is tag-extracted to, and the tags attached to it.
+  void expectStatTags(const std::string& name, const std::string& tag_extracted_name,
+                      const std::vector<std::pair<std::string, std::string>>& tags);
   void testRouterVirtualClusters();
   void testRouteStats();
   void testRouterUpstreamProtocolError(const std::string&, const std::string&);
@@ -385,6 +394,17 @@ protected:
   // Set this to true when sending malformed requests to avoid test client codec rejecting it.
   // This flag is only valid when UHV build flag is enabled.
   bool disable_client_header_validation_{false};
+
+  // Stops the codecs from validating the request headers they encode, so that a test can use
+  // Envoy's own client codecs to send a deliberately malformed request at Envoy. Only needed in
+  // non-UHV builds, where the codecs do this check themselves; the destructor restores it. Call
+  // this before initialize(), so that the write is ordered before the workers that read the flag
+  // are created.
+  // TODO(yanavlasov): fold this into `disable_client_header_validation_`.
+  void disableCodecHeaderValidation() {
+    Http::HeaderUtility::disable_request_header_validation_for_tests_.store(
+        true, std::memory_order_relaxed);
+  }
 
 #ifdef ENVOY_ENABLE_QUIC
   quic::DeterministicConnectionIdGenerator connection_id_generator_{

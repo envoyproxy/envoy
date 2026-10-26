@@ -6,7 +6,7 @@ licenses(["notice"])  # Apache 2
 
 api_proto_package(
     deps = [
-        "@com_google_googleapis//google/api/expr/v1alpha1:syntax_proto",
+        "@googleapis//google/api/expr/v1alpha1:syntax_proto",
         "@xds//udpa/annotations:pkg",
     ],
 )

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/network/listener.h"
@@ -78,6 +79,20 @@ public:
 
   void closeConnectionsWithFilterChain(const Network::FilterChain* filter_chain);
 
+  /**
+   * Notify the sessions belonging to the given filter chains that they are being drained, without
+   * closing them. Filter chains with no sessions are skipped.
+   */
+  void drainConnectionsWithFilterChains(const std::list<const Network::FilterChain*>& filter_chains,
+                                        Network::ConnectionDrainEvent drain_event);
+
+  /**
+   * Notify every session on this listener that it is being drained, without closing any. The event
+   * is also retained so that sessions created later, while the drain is still in progress, are
+   * notified as they are created.
+   */
+  void drainAllConnections(Network::ConnectionDrainEvent drain_event);
+
   void updateListenerConfig(Network::ListenerConfig& new_listener_config);
 
   // Similar to quic::QuicDispatcher's ProcessPacket, but returns a bool.
@@ -106,6 +121,11 @@ private:
   // NOLINTNEXTLINE(readability-identifier-naming)
   Http::SessionIdleListInterface* idle_session_list() { return session_idle_list_.get(); }
 
+  // Notify every session belonging to `filter_chain` of the drain, without closing any. A no-op if
+  // the filter chain has no sessions.
+  void drainSessionsOfFilterChain(const Network::FilterChain* filter_chain,
+                                  Network::ConnectionDrainEvent drain_event);
+
   Network::ConnectionHandler& connection_handler_;
   Network::ListenerConfig* listener_config_{nullptr};
   Server::ListenerStats& listener_stats_;
@@ -115,6 +135,11 @@ private:
   QuicStatNames& quic_stat_names_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   FilterChainToConnectionMap connections_by_filter_chain_;
+  // Set once the listener as a whole begins draining. Retained so that sessions created after the
+  // drain has started are also notified: the onDrain() notification is one-shot, so newly created
+  // sessions would otherwise miss it. Mirrors
+  // Server::ActiveStreamListenerBase::drain_event_ for the TCP path.
+  std::optional<Network::ConnectionDrainEvent> drain_event_;
   QuicDispatcherStats quic_stats_;
   QuicConnectionStats connection_stats_;
   bool current_packet_dispatch_success_;

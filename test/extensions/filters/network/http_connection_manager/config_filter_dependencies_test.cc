@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -107,7 +108,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnregisteredFilterException) {
       HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
                                   route_config_provider_manager_,
                                   &scoped_routes_config_provider_manager_, tracer_manager_,
-                                  filter_config_provider_manager_, creation_status_),
+                                  *filter_config_provider_manager_, creation_status_),
       EnvoyException,
       "Didn't find a registered implementation for 'test.pantry' with type URL: ''");
 }
@@ -126,9 +127,9 @@ TEST_F(HttpConnectionManagerConfigTest, AllDependenciesSatisfiedOk) {
 
   HttpConnectionManagerConfig give_me_a_name(
       hcm_config, context_, date_provider_, route_config_provider_manager_,
-      &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
+      &scoped_routes_config_provider_manager_, tracer_manager_, *filter_config_provider_manager_,
       creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 }
 
 // PantryFilter provides a potato, which is not required by any other filter.
@@ -142,9 +143,9 @@ TEST_F(HttpConnectionManagerConfigTest, UnusedProvidencyOk) {
 
   HttpConnectionManagerConfig give_me_a_name(
       hcm_config, context_, date_provider_, route_config_provider_manager_,
-      &scoped_routes_config_provider_manager_, tracer_manager_, filter_config_provider_manager_,
+      &scoped_routes_config_provider_manager_, tracer_manager_, *filter_config_provider_manager_,
       creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_OK(creation_status_);
 }
 
 // ChefFilter requires a potato, but no filter provides it.
@@ -159,7 +160,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnmetDependencyError) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
+                                     *filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -180,7 +181,7 @@ TEST_F(HttpConnectionManagerConfigTest, MisorderedDependenciesError) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
+                                     *filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -199,7 +200,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeUnmetDependencyError) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
+                                     *filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -220,8 +221,8 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeDependencyOK) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+                                     *filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
 }
 
 // Dependencies provided in the HCM config filter chain do not satisfy
@@ -244,7 +245,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
+                                     *filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }
@@ -271,7 +272,7 @@ TEST_F(HttpConnectionManagerConfigTest, UpgradeFilterChainDependenciesIsolatedFr
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
+                                     *filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "Dependency violation: filter 'test.chef' requires a FILTER_STATE_KEY named 'potato'");
 }

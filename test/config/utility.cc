@@ -343,6 +343,24 @@ typed_config:
 )EOF";
 }
 
+std::string ConfigHelper::defaultBodySizeLimitFilter() {
+  return R"EOF(
+name: body_size_limit
+typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.body_size_limit.v3.BodySizeLimit
+    max_request_bytes : 5242880
+)EOF";
+}
+
+std::string ConfigHelper::smallBodySizeLimitFilter() {
+  return R"EOF(
+name: body_size_limit
+typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.body_size_limit.v3.BodySizeLimit
+    max_request_bytes : 1024
+)EOF";
+}
+
 std::string ConfigHelper::clustersNoListenerBootstrap(const std::string& api_type) {
   return fmt::format(
       R"EOF(
@@ -1420,6 +1438,9 @@ void ConfigHelper::addQuicDownstreamTransportSocketConfig() {
       [&](envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& common_tls_context) {
         initializeTls(ServerSslOptions().setRsaCert(true).setTlsV13(true), common_tls_context,
                       true);
+        // Drop the validation context added by `initializeTls()` so QUIC listeners do not request
+        // client certificates by default. mTLS tests configure their own validation context.
+        common_tls_context.clear_validation_context();
       },
       /*enable_quic_early_data=*/true,
       /*enable_quic_resumption=*/true);

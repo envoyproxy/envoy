@@ -1,3 +1,5 @@
+#include <format>
+
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -23,6 +25,7 @@
 #include "openssl/pem.h"
 
 using testing::Ge;
+using testing::NiceMock;
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -53,14 +56,17 @@ class MySQLSSLIntegrationTest : public testing::TestWithParam<Network::Address::
                                 public MySQLTestUtils,
                                 public BaseIntegrationTest {
   std::string mysqlSslConfig() {
-    return fmt::format(
-        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/mysql_proxy/filters/network/test/mysql_ssl_require_test_config.yaml"))),
-        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getAnyAddressString(GetParam()),
-        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    std::string loopback_address = Network::Test::getLoopbackAddressString(GetParam());
+    std::string any_address = Network::Test::getAnyAddressString(GetParam());
+    std::string cert_path =
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem");
+    std::string key_path =
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem");
+    return std::vformat(
+        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/mysql_proxy/filters/network/test/mysql_ssl_require_test_config.yaml")),
+        std::make_format_args(Platform::null_device_path, loopback_address, loopback_address,
+                              any_address, cert_path, key_path));
   }
 
 public:
@@ -98,7 +104,8 @@ public:
 
     tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
+    tls_context_ = Ssl::createClientSslTransportSocketFactory(
+        {}, *tls_context_manager_, *api_, &server_factory_context_.serverScope());
 
     payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 
@@ -541,12 +548,13 @@ class MySQLDisableIntegrationTest : public testing::TestWithParam<Network::Addre
                                     public MySQLTestUtils,
                                     public BaseIntegrationTest {
   std::string mysqlConfig() {
-    return fmt::format(
-        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/mysql_proxy/filters/network/test/mysql_ssl_disable_test_config.yaml"))),
-        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getAnyAddressString(GetParam()));
+    std::string loopback_address = Network::Test::getLoopbackAddressString(GetParam());
+    std::string any_address = Network::Test::getAnyAddressString(GetParam());
+    return std::vformat(
+        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/mysql_proxy/filters/network/test/mysql_ssl_disable_test_config.yaml")),
+        std::make_format_args(Platform::null_device_path, loopback_address, loopback_address,
+                              any_address));
   }
 
 public:
@@ -633,14 +641,17 @@ class MySQLAllowIntegrationTest : public testing::TestWithParam<Network::Address
                                   public MySQLTestUtils,
                                   public BaseIntegrationTest {
   std::string mysqlSslConfig() {
-    return fmt::format(
-        fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
-            "contrib/mysql_proxy/filters/network/test/mysql_ssl_allow_test_config.yaml"))),
-        Platform::null_device_path, Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getLoopbackAddressString(GetParam()),
-        Network::Test::getAnyAddressString(GetParam()),
-        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
-        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
+    std::string loopback_address = Network::Test::getLoopbackAddressString(GetParam());
+    std::string any_address = Network::Test::getAnyAddressString(GetParam());
+    std::string cert_path =
+        TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem");
+    std::string key_path =
+        TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem");
+    return std::vformat(
+        TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
+            "contrib/mysql_proxy/filters/network/test/mysql_ssl_allow_test_config.yaml")),
+        std::make_format_args(Platform::null_device_path, loopback_address, loopback_address,
+                              any_address, cert_path, key_path));
   }
 
 public:
@@ -677,7 +688,8 @@ public:
 
     tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
         server_factory_context_);
-    tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
+    tls_context_ = Ssl::createClientSslTransportSocketFactory(
+        {}, *tls_context_manager_, *api_, &server_factory_context_.serverScope());
 
     payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 

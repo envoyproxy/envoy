@@ -25,6 +25,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
@@ -35,8 +36,11 @@
 #include "source/common/http/mixed_conn_pool.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/router/router.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
+#include "source/common/stats/utility.h"
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
@@ -225,14 +229,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
-      // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
-      // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
-      // avoid double pause ClusterLoadAssignment.
-      const std::vector<std::string> paused_xds_types{
-          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-          Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-      Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
+      // Secondary cluster initialization may create EDS, LEDS, and SDS subscriptions.
+      const auto cluster_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+      Config::ScopedResume resume = xds_manager_.pause(Config::dependentTypeUrls(cluster_type_url));
       initializeSecondaryClusters();
     }
     return;
@@ -315,6 +314,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
                        ? std::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : std::nullopt),
       local_info_(context.localInfo()), cm_stats_(generateStats(*stats_.rootScope())),
+      odcds_discovery_stats_(generateOdCdsDiscoveryStats(*stats_.rootScope())),
       init_helper_(xds_manager_,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
       time_source_(context.timeSource()), dispatcher_(context.mainThreadDispatcher()),
@@ -332,6 +332,15 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
               const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
               dispatcher_)),
       shutdown_(false) {
+  // The router filter config used by async clients depends on server-wide state only, so build a
+  // single instance here and share it with the async client of every cluster on every worker
+  // thread. This must happen on the main thread, before any worker can call httpAsyncClient().
+  async_client_router_config_ = std::make_shared<Router::FilterConfig>(
+      context_, http_context_.asyncClientStatPrefix(), *stats_.rootScope(), *this, runtime_,
+      random_, std::make_unique<Router::ShadowWriterImpl>(*this), true, false, false, false, false,
+      false, false, Protobuf::RepeatedPtrField<std::string>{}, time_source_, http_context_,
+      router_context_);
+
   if (auto admin = context.admin(); admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {
@@ -540,11 +549,19 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
+OdCdsDiscoveryStats ClusterManagerImpl::generateOdCdsDiscoveryStats(Stats::Scope& scope) {
+  return {ALL_ODCDS_DISCOVERY_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.odcds."))};
+}
+
 ThreadLocalClusterManagerStats
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::generateStats(Stats::Scope& scope,
                                                                  const std::string& thread_name) {
-  const std::string final_prefix = absl::StrCat("thread_local_cluster_manager.", thread_name);
-  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE_PREFIX(scope, final_prefix))};
+  // thread_local_cluster_manager.(worker_<id>.)*: a worker thread contributes the
+  // envoy.worker_id tag; any other thread name (the main thread) stays a plain segment.
+  const auto prefix =
+      Stats::workerStatPrefix(scope.symbolTable(), "thread_local_cluster_manager.", thread_name);
+  Stats::LiteScopeHelper helper(scope, prefix.baseName(), prefix.tags(), prefix.name());
+  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE(helper))};
 }
 
 absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
@@ -559,6 +576,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
+    cds_pauses_.erase(cluster.info()->name());
     updateClusterCounts();
   }
   cluster_data = active_clusters_.find(cluster.info()->name());
@@ -567,11 +585,33 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
     RETURN_IF_NOT_OK(cluster_data->second->thread_aware_lb_->initialize());
   }
 
+  // When enabled, per-priority updates that arrive during a main-thread batch host update are
+  // accumulated and posted to the worker threads as a single batched update at the end of the
+  // batch (see the callbacks below). This is captured once here so the member and priority update
+  // callbacks agree, and so it stays consistent with the thread-aware load balancer, which reads
+  // the same flag in its initialize() above.
+  const bool batch_aware_update =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
+  ClusterData& cluster_data_ref = *cluster_data->second;
+
   // Now setup for cross-thread updates.
   // This is used by cluster types such as EDS clusters to drain the connection pools of removed
   // hosts.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](const HostVector&, const HostVector& hosts_removed) {
+      [&cluster, &cluster_data_ref, this](const HostVector&, const HostVector& hosts_removed) {
+        // If per-priority updates were accumulated during a main-thread batch host update (see the
+        // priority update callback below), post them to the worker threads now as a single batched
+        // update. This MemberUpdateCb fires once at the end of the batch, after the thread-aware
+        // load balancer's own end-of-batch callback (registered earlier) has rebuilt its factory,
+        // so workers never snapshot a stale factory. Posting here, before the connection draining
+        // below, preserves the membership-update-then-drain ordering of the non-batch path.
+        auto& pending = cluster_data_ref.pending_update_params_;
+        if (!pending.per_priority_update_params_.empty()) {
+          cm_stats_.cluster_updated_.inc();
+          postThreadLocalClusterUpdate(cluster_data_ref, std::move(pending));
+          pending.per_priority_update_params_.clear();
+        }
+
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
@@ -593,8 +633,8 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // This is used by cluster types such as EDS clusters to update the cluster
   // without draining the cluster.
   cluster_data->second->priority_update_cb_ = cluster.prioritySet().addPriorityUpdateCb(
-      [&cm_cluster, this](uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed) {
+      [&cm_cluster, &cluster, &cluster_data_ref, batch_aware_update,
+       this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
         // This fires when a cluster is about to have an updated member set. We need to send this
         // out to all of the thread local configurations.
 
@@ -613,6 +653,35 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         bool scheduled = false;
         const auto merge_timeout = PROTOBUF_GET_MS_OR_DEFAULT(
             cm_cluster.cluster().info()->lbConfig(), update_merge_window, 1000);
+
+        // If batch-aware updates are enabled, accumulate this per-priority update instead of
+        // posting it now. The whole batch is posted to the worker threads as a single update at the
+        // end of the batch, from the member update callback above. This avoids one cross-thread
+        // post per priority and, paired with the thread-aware load balancer deferring its factory
+        // rebuild to the end of the batch, ensures workers never observe a partially-updated
+        // cluster.
+        if (batch_aware_update) {
+          // If there are any hosts added or removed, or if the cluster is currently in a batch
+          // update, we cannot merge this update with any other updates.
+          const bool is_mergeable = hosts_added.empty() && hosts_removed.empty() &&
+                                    !cluster.prioritySet().batchUpdateActive();
+
+          if (merge_timeout > 0) {
+            scheduled = scheduleUpdate(cm_cluster, priority, is_mergeable, merge_timeout);
+          }
+
+          if (!scheduled) {
+            // If this update was not scheduled for later, then we push it to the pending update
+            // params so that it will be delivered to the worker threads at the following member
+            // update callback. If we are in a batch update, the member update callback will be
+            // called at the end of the batch. If we are not in a batch update, the member update
+            // callback will be called after the priority update callback.
+            cluster_data_ref.pending_update_params_.per_priority_update_params_.emplace_back(
+                priority, hosts_added, hosts_removed);
+          }
+          return;
+        }
+
         // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
         const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
 
@@ -807,8 +876,12 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   // Otherwise, applyUpdates() will fire with a dangling cluster reference.
   updates_map_.erase(cluster_name);
 
-  active_clusters_[cluster_name] = std::move(warming_it->second);
+  // Move the new ClusterData into active and erase from warming before destroying the old
+  // active ClusterData.
+  ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
+  ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
+  // old_active is destroyed here, after both maps are consistent.
 }
 
 bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const bool remove_ignored) {
@@ -850,6 +923,7 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
     removed = true;
     init_helper_.removeCluster(*existing_warming_cluster->second);
     warming_clusters_.erase(existing_warming_cluster);
+    cds_pauses_.erase(cluster_name);
     ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
   }
 
@@ -952,32 +1026,38 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
+  updateCdsPause(*cluster_entry_it->second);
   updateClusterCounts();
   return result;
 }
 
-void ClusterManagerImpl::updateClusterCounts() {
-  // This if/else block implements a control flow mechanism that can be used by an ADS
-  // implementation to properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can
-  // use it to detect when a previously sent cluster becomes warm before sending routes that depend
-  // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
-  // it's supporting cluster is ready.
-  //
-  // We achieve that by leaving CDS in the paused state as long as there is at least
-  // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
-  // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
-  // signal to ADS to proceed with RDS updates.
-  // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
-  const bool all_clusters_initialized =
-      init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  if (all_clusters_initialized && xds_manager_.adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-    if (resume_cds_ == nullptr && !warming_clusters_.empty()) {
-      resume_cds_ = xds_manager_.pause(type_url);
-    } else if (warming_clusters_.empty()) {
-      resume_cds_.reset();
-    }
+void ClusterManagerImpl::updateCdsPause(const ClusterData& cluster_data) {
+  if (init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized ||
+      shutdown_ || !xds_manager_.adsMux()) {
+    return;
   }
+  const auto& name = cluster_data.cluster_->info()->name();
+  if (!cluster_data.cluster_->info()->waitForWarmOnInit()) {
+    cds_pauses_.erase(name);
+  } else if (!cds_pauses_.contains(name)) {
+    cds_pauses_.emplace(
+        name, xds_manager_.pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()));
+  }
+}
+
+void ClusterManagerImpl::updateClusterCounts() {
+  // This implements a control flow mechanism that can be used by an ADS implementation to
+  // properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can use it to
+  // detect when a previously sent cluster becomes warm before sending routes that depend on it.
+  // This can improve incidence of HTTP 503 responses from Envoy when a route is used before
+  // its supporting cluster is ready.
+  //
+  // We achieve that by leaving CDS in the paused state as long as there is at least one
+  // warming cluster that has not opted out of CDS gating (wait_for_warm_on_init: true).
+  // CDS pause handles are acquired per-cluster via updateCdsPause(), called from loadCluster().
+  // Once all blocking clusters are warmed up, CDS is resumed and ACK is sent to ADS, providing
+  // a signal to ADS to proceed with RDS updates.
+  //
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }
@@ -1196,9 +1276,18 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
   }
 
-  HostMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
+  HostLookupMapConstSharedPtr host_map = cm_cluster.cluster().prioritySet().crossPriorityHostMap();
 
-  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
+  // When enabled, a multi-priority update is applied to each worker thread's priority set as a
+  // single batch (see ClusterEntry::updateHosts()) so the worker-local load balancer rebuilds
+  // once for the whole update instead of once per priority. Captured once here so all worker
+  // threads make the same decision for this update.
+  const bool enable_batch_aware_update =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
+
+  if (pending_cluster_creations_.erase(cm_cluster.cluster().info()->name()) != 0) {
+    odcds_discovery_stats_.discovery_success_.inc();
+  }
 
   const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
   const std::string drop_category = cm_cluster.cluster().dropCategory();
@@ -1211,7 +1300,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
                         add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
                         cluster_initialization_object = std::move(cluster_initialization_object),
-                        drop_overload, drop_category = std::move(drop_category)](
+                        drop_overload, drop_category = std::move(drop_category),
+                        enable_batch_aware_update](
                            OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
     ASSERT(cluster_manager.has_value(),
            "Expected the ThreadLocalClusterManager to be set during ClusterManagerImpl creation.");
@@ -1272,11 +1362,24 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
         cluster_manager->thread_local_clusters_[info->name()]->setDropOverload(drop_overload);
         cluster_manager->thread_local_clusters_[info->name()]->setDropCategory(drop_category);
       }
-      for (const auto& per_priority : params.per_priority_update_params_) {
-        cluster_manager->updateClusterMembership(
-            info->name(), per_priority.priority_, per_priority.update_hosts_params_,
-            per_priority.locality_weights_, per_priority.hosts_added_, per_priority.hosts_removed_,
-            per_priority.weighted_priority_health_, per_priority.overprovisioning_factor_, map);
+      if (enable_batch_aware_update) {
+        // Apply the whole update to the worker thread's priority set as a single batch so the
+        // worker-local load balancer coalesces its rebuild across all the updated priorities.
+        std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>
+            updates;
+        updates.reserve(params.per_priority_update_params_.size());
+        for (const auto& per_priority : params.per_priority_update_params_) {
+          updates.emplace_back(per_priority);
+        }
+        cluster_manager->thread_local_clusters_[info->name()]->updateHosts(updates, map);
+      } else {
+        for (const auto& per_priority : params.per_priority_update_params_) {
+          cluster_manager->updateClusterMembership(
+              info->name(), per_priority.priority_, per_priority.update_hosts_params_,
+              per_priority.locality_weights_, per_priority.hosts_added_,
+              per_priority.hosts_removed_, per_priority.weighted_priority_health_,
+              per_priority.overprovisioning_factor_, map);
+        }
       }
 
       if (new_cluster != nullptr) {
@@ -1306,7 +1409,7 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 ClusterManagerImpl::ClusterInitializationObjectConstSharedPtr
 ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category) {
   if (!deferralIsSupportedForCluster(cluster_info)) {
     return nullptr;
@@ -1369,13 +1472,24 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
   thread_local_clusters_[cluster] = std::move(cluster_entry);
   local_stats_.clusters_inflated_.set(thread_local_clusters_.size());
 
-  for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
-    updateClusterMembership(initialization_object->cluster_info_->name(), per_priority.priority_,
-                            per_priority.update_hosts_params_, per_priority.locality_weights_,
-                            per_priority.hosts_added_, per_priority.hosts_removed_,
-                            per_priority.weighted_priority_health_,
-                            per_priority.overprovisioning_factor_,
-                            initialization_object->cross_priority_host_map_);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update")) {
+    // Apply the whole update to the worker thread's priority set as a single batch so the
+    // worker-local load balancer coalesces its rebuild across all the updated priorities.
+    std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>> updates;
+    updates.reserve(initialization_object->per_priority_state_.size());
+    for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
+      updates.emplace_back(per_priority);
+    }
+    cluster_entry_ptr->updateHosts(updates, initialization_object->cross_priority_host_map_);
+  } else {
+    for (const auto& [_, per_priority] : initialization_object->per_priority_state_) {
+      updateClusterMembership(initialization_object->cluster_info_->name(), per_priority.priority_,
+                              per_priority.update_hosts_params_, per_priority.locality_weights_,
+                              per_priority.hosts_added_, per_priority.hosts_removed_,
+                              per_priority.weighted_priority_health_,
+                              per_priority.overprovisioning_factor_,
+                              initialization_object->cross_priority_host_map_);
+    }
   }
   thread_local_clusters_[cluster]->setDropOverload(initialization_object->drop_overload_);
   thread_local_clusters_[cluster]->setDropCategory(initialization_object->drop_category_);
@@ -1388,7 +1502,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
 
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category)
     : cluster_info_(std::move(cluster_info)), load_balancer_factory_(load_balancer_factory),
       cross_priority_host_map_(map), drop_overload_(drop_overload), drop_category_(drop_category) {
@@ -1401,7 +1515,7 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>& per_priority_state,
     const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
     UnitFloat drop_overload, absl::string_view drop_category)
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
       load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map),
@@ -1432,14 +1546,11 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
       // overwriting hosts_added.
       if (!update.hosts_removed_.empty()) {
         // Remove all hosts to be removed from the old host_added.
-        auto& host_added = priority_state.hosts_added_;
-        auto removed_section = std::remove_if(
-            host_added.begin(), host_added.end(),
-            [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
-              return std::find(hosts_removed.get().begin(), hosts_removed.get().end(), ptr) !=
-                     hosts_removed.get().end();
-            });
-        priority_state.hosts_added_.erase(removed_section, priority_state.hosts_added_.end());
+        std::erase_if(priority_state.hosts_added_,
+                      [hosts_removed = std::cref(update.hosts_removed_)](const HostSharedPtr& ptr) {
+                        return std::find(hosts_removed.get().begin(), hosts_removed.get().end(),
+                                         ptr) != hosts_removed.get().end();
+                      });
       }
 
       // Add updated host_added.
@@ -1493,11 +1604,9 @@ Host::CreateConnectionData ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cl
 Http::AsyncClient&
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient() {
   if (lazy_http_async_client_ == nullptr) {
-    lazy_http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_, parent_.parent_,
-        parent_.parent_.context_,
-        Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
-        parent_.parent_.http_context_, parent_.parent_.router_context_);
+    lazy_http_async_client_ =
+        std::make_unique<Http::AsyncClientImpl>(cluster_info_, parent_.thread_local_dispatcher_,
+                                                parent_.parent_.async_client_router_config_);
   }
   return *lazy_http_async_client_;
 }
@@ -1515,7 +1624,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
     std::optional<uint32_t> overprovisioning_factor,
-    HostMapConstSharedPtr cross_priority_host_map) {
+    HostLookupMapConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
@@ -1531,6 +1640,36 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
         "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
         "to not require this",
         name);
+    lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
+  }
+}
+
+void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHosts(
+    const std::vector<std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>&
+        updates,
+    HostLookupMapConstSharedPtr cross_priority_host_map) {
+  // Nothing to apply. Return early so we match the per-priority path, which simply iterates an
+  // empty update list and does nothing: no batch host update (and so no end-of-batch member update
+  // callback fired with an empty diff) and no load balancer recreation.
+  if (updates.empty()) {
+    return;
+  }
+
+  ENVOY_LOG(debug, "batch membership update for TLS cluster {} across {} priorities",
+            cluster_info_->name(), updates.size());
+  BatchUpdateHelper helper(updates, std::move(cross_priority_host_map));
+  priority_set_.batchHostUpdate(helper);
+
+  // Mirror the individual updateHosts() path: if an LB is thread aware, create a new worker local
+  // LB on membership changes. In the batch path we recreate it once for the whole batch rather than
+  // once per priority.
+  if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChangeDeprecated()) {
+    ENVOY_LOG(debug, "re-creating local LB for TLS cluster {}", cluster_info_->name());
+    ENVOY_LOG_FIRST_N(
+        warn, 200,
+        "Re-creating local LB for TLS cluster ({}) is deprecated and the LB should be refactored "
+        "to not require this",
+        cluster_info_->name());
     lb_ = lb_factory_->create({priority_set_, parent_.local_priority_set_});
   }
 }
@@ -1649,8 +1788,28 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
       // it means that it was other worker thread that requested the discovery.
       return;
     }
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_missing_cluster_cache") &&
+        !warming_clusters_.contains(name) && odcds->isKnownMissing(name)) {
+      ENVOY_LOG(debug,
+                "cm odcds: the requested cluster {} is already known to be missing, posting the "
+                "answer back to {}",
+                name, worker_dispatcher.name());
+      // The config source behind this handle has already answered that the cluster doesn't
+      // exist. A cluster that is warming (delivered by another config source meanwhile) is
+      // deliberately not answered from the remembered answer: the cluster lifecycle callbacks
+      // resolve the request with Available once the warm-up completes.
+      //
+      // Nothing is left pending on the main thread, so only the requesting worker is answered;
+      // any other worker that asks posts here and gets its own answer.
+      odcds->recordKnownMissingAnswer();
+      worker_dispatcher.post([invoker = std::move(invoker)] {
+        invoker.invokeAllCallbacks(ClusterDiscoveryStatus::Missing);
+      });
+      return;
+    }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
     // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
+    odcds_discovery_stats_.discovery_attempt_.inc();
     odcds->updateOnDemand(name);
     // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
     auto timer = dispatcher_.createTimer([this, name] { notifyExpiredDiscovery(name); });
@@ -1686,7 +1845,17 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
-  // Let all the worker threads know that the discovery timed out.
+  switch (status) {
+  case ClusterDiscoveryStatus::Available:
+    break;
+  case ClusterDiscoveryStatus::Missing:
+    odcds_discovery_stats_.discovery_missing_.inc();
+    break;
+  case ClusterDiscoveryStatus::Timeout:
+    odcds_discovery_stats_.discovery_timeout_.inc();
+    break;
+  }
+  // Let all worker threads know how the discovery completed.
   tls_.runOnAllThreads(
       [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         ENVOY_LOG(
@@ -1826,7 +1995,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::removeHosts(
         parent_.deferred_cluster_creation_,
         fmt::format("Cannot find ThreadLocalCluster {}, but deferred cluster creation is disabled.",
                     name));
-    ASSERT(thread_local_deferred_clusters_.find(name) != thread_local_deferred_clusters_.end(),
+    ASSERT(thread_local_deferred_clusters_.contains(name),
            "Cluster with removed host is neither deferred or inflated!");
     return;
   }
@@ -1843,8 +2012,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, bool weighted_priority_health,
-    uint64_t overprovisioning_factor, HostMapConstSharedPtr cross_priority_host_map) {
-  ASSERT(thread_local_clusters_.find(name) != thread_local_clusters_.end());
+    uint64_t overprovisioning_factor, HostLookupMapConstSharedPtr cross_priority_host_map) {
+  ASSERT(thread_local_clusters_.contains(name));
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,
@@ -2297,7 +2466,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
       getOrigin(transport_socket_options, host);
   if (protocols.size() == 3 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http3", 100) &&
-      !transport_socket_options->http11ProxyInfo()) {
+      (!transport_socket_options || !transport_socket_options->http11ProxyInfo())) {
     ASSERT(contains(protocols,
                     {Http::Protocol::Http11, Http::Protocol::Http2, Http::Protocol::Http3}));
     ASSERT(alternate_protocol_options.has_value());
@@ -2310,7 +2479,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
-        quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry,
+        quic_stat_names_, *stats_.rootScope(), quic_info, network_observer_registry,
         context_.overloadManager());
 #else
     (void)quic_info;
@@ -2348,7 +2517,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     }
     return Http::Http3::allocateConnPool(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info,
+        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, quic_info,
         network_observer_registry, context_.overloadManager(), false);
 #else
     UNREFERENCED_PARAMETER(source);

@@ -1,5 +1,6 @@
 #include "test/integration/http_integration.h"
 
+#include <algorithm>
 #include <functional>
 #include <list>
 #include <memory>
@@ -20,11 +21,15 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/thread_annotations.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_impl.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #ifdef ENVOY_ENABLE_QUIC
@@ -46,6 +51,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/status_utility.h"
 
 #include "absl/time/time.h"
 #include "base_integration_test.h"
@@ -383,6 +389,11 @@ HttpIntegrationTest::~HttpIntegrationTest() {
         << "test requires explicit cleanupUpstreamAndDownstream";
   }
   cleanupUpstreamAndDownstream();
+  // Reset last, once the connections are torn down. The server's workers outlive this destructor
+  // (`test_server_` belongs to the base class), so they may still read the flag; it is atomic for
+  // that reason.
+  Http::HeaderUtility::disable_request_header_validation_for_tests_.store(
+      false, std::memory_order_relaxed);
 }
 
 void HttpIntegrationTest::initialize() {
@@ -506,13 +517,35 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // will interpret that as an unexpected disconnect. The codec client is not
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
-    AssertionResult result = fake_upstream_connection_->close();
+    AssertionResult result = AssertionSuccess();
+    const bool is_http3 = fake_upstream_connection_->type() == Http::CodecType::HTTP3;
+    if (is_http3) {
+      // QUIC connections do not support half-close.
+      result = fake_upstream_connection_->close();
+    } else {
+      // A local close only proves that the fake upstream dispatcher closed its socket. Initiate a
+      // fake-upstream FIN; closing the downstream below also makes TCP proxy and CONNECT paths that
+      // enable upstream half-close fully close their paired upstream.
+      result = fake_upstream_connection_->halfCloseForCleanup();
+    }
     RELEASE_ASSERT(result, result.message());
+    if (codec_client_) {
+      codec_client_->close();
+    }
     result = fake_upstream_connection_->waitForDisconnect();
     RELEASE_ASSERT(result, result.message());
+
+    // Envoy closes its socket before raising connection callbacks, so run a worker barrier after
+    // observing its close to ensure the callback has removed the connection from its connection
+    // pool. Some fixtures stop the server before cleaning up their fake upstreams; they cannot
+    // issue another request, so no worker barrier is needed.
+    if (!is_http3 && test_server_) {
+      test_server_->waitForWorkerThreads();
+    }
+    result = fake_upstream_connection_->waitForNoPost();
+    RELEASE_ASSERT(result, result.message());
     fake_upstream_connection_.reset();
-  }
-  if (codec_client_) {
+  } else if (codec_client_) {
     codec_client_->close();
   }
 }
@@ -755,6 +788,26 @@ void HttpIntegrationTest::testRouterNotFoundWithBody() {
             "envoy; error=destination_not_found; details=\"route_not_found; NR\"");
 }
 
+void HttpIntegrationTest::expectStatTags(
+    const std::string& name, const std::string& tag_extracted_name,
+    const std::vector<std::pair<std::string, std::string>>& tags) {
+  Stats::CounterSharedPtr counter = test_server_->counter(name);
+  ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
+
+  EXPECT_EQ(counter->tagExtractedName(), tag_extracted_name) << " for stat '" << name << "'";
+
+  // Tag order is not part of a stat's identity: the explicit tags are attached in a different
+  // order than the tag extraction rules happen to produce them in.
+  std::vector<std::pair<std::string, std::string>> actual_tags;
+  for (const Stats::Tag& tag : counter->tags()) {
+    actual_tags.emplace_back(tag.name_, tag.value_);
+  }
+  std::sort(actual_tags.begin(), actual_tags.end());
+  std::vector<std::pair<std::string, std::string>> expected_tags = tags;
+  std::sort(expected_tags.begin(), expected_tags.end());
+  EXPECT_EQ(actual_tags, expected_tags) << " for stat '" << name << "'";
+}
+
 // Make sure virtual cluster stats are charged to the appropriate virtual cluster.
 void HttpIntegrationTest::testRouterVirtualClusters() {
   const std::string matching_header = "x-use-test-vcluster";
@@ -773,7 +826,19 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
           headers->set_present_match(true);
         }
       });
+
+  // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+  // server in different modes. The mode is read during server initialization, before the runtime
+  // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                useExplicitStatsTags());
   initialize();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+  // would silently be exercising the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), useExplicitStatsTags());
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -794,6 +859,26 @@ void HttpIntegrationTest::testRouterVirtualClusters() {
 
   test_server_->waitForCounter("vhost.integration.vcluster.test_vcluster.upstream_rq_total", Eq(1));
   test_server_->waitForCounter("vhost.integration.vcluster.other.upstream_rq_total", Eq(1));
+
+  // Both the stats created through the virtual cluster's scope (upstream_rq_total) and the ones
+  // charged by the code-stats path (upstream_rq_completed, upstream_rq_200) carry the virtual
+  // host and the virtual cluster as tags.
+  const std::string& vhost_tag = Config::TagNames::get().VIRTUAL_HOST;
+  const std::string& vcluster_tag = Config::TagNames::get().VIRTUAL_CLUSTER;
+  expectStatTags("vhost.integration.vcluster.test_vcluster.upstream_rq_total",
+                 "vhost.vcluster.upstream_rq_total",
+                 {{vhost_tag, "integration"}, {vcluster_tag, "test_vcluster"}});
+  expectStatTags("vhost.integration.vcluster.other.upstream_rq_total",
+                 "vhost.vcluster.upstream_rq_total",
+                 {{vhost_tag, "integration"}, {vcluster_tag, "other"}});
+  expectStatTags("vhost.integration.vcluster.test_vcluster.upstream_rq_completed",
+                 "vhost.vcluster.upstream_rq_completed",
+                 {{vhost_tag, "integration"}, {vcluster_tag, "test_vcluster"}});
+  expectStatTags("vhost.integration.vcluster.test_vcluster.upstream_rq_200",
+                 "vhost.vcluster.upstream_rq",
+                 {{vhost_tag, "integration"},
+                  {vcluster_tag, "test_vcluster"},
+                  {Config::TagNames::get().RESPONSE_CODE, "200"}});
 }
 
 // Make sure route level stats are generated correctly.
@@ -807,7 +892,19 @@ void HttpIntegrationTest::testRouteStats() {
         auto* route = virtual_host->mutable_routes(0);
         route->set_stat_prefix("test_route");
       });
+
+  // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+  // server in different modes. The mode is read during server initialization, before the runtime
+  // loader exists, so it has to be set directly rather than with addRuntimeOverride().
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                useExplicitStatsTags());
   initialize();
+
+  // Sanity check that the parameterized mode really took effect; otherwise both IP versions
+  // would silently be exercising the same thing.
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), useExplicitStatsTags());
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
@@ -820,6 +917,22 @@ void HttpIntegrationTest::testRouteStats() {
 
   test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_total", Eq(1));
   test_server_->waitForCounter("vhost.integration.route.test_route.upstream_rq_completed", Eq(1));
+
+  // Both the stats created through the route's scope (upstream_rq_total) and the ones charged by
+  // the code-stats path (upstream_rq_completed, upstream_rq_200) carry the virtual host and the
+  // route stat prefix as tags.
+  const std::string& vhost_tag = Config::TagNames::get().VIRTUAL_HOST;
+  const std::string& route_tag = Config::TagNames::get().ROUTE;
+  expectStatTags("vhost.integration.route.test_route.upstream_rq_total",
+                 "vhost.route.upstream_rq_total",
+                 {{vhost_tag, "integration"}, {route_tag, "test_route"}});
+  expectStatTags("vhost.integration.route.test_route.upstream_rq_completed",
+                 "vhost.route.upstream_rq_completed",
+                 {{vhost_tag, "integration"}, {route_tag, "test_route"}});
+  expectStatTags("vhost.integration.route.test_route.upstream_rq_200", "vhost.route.upstream_rq",
+                 {{vhost_tag, "integration"},
+                  {route_tag, "test_route"},
+                  {Config::TagNames::get().RESPONSE_CODE, "200"}});
 }
 
 void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
@@ -1006,7 +1119,7 @@ void HttpIntegrationTest::testRouterRetryOnResetBeforeRequestAfterHeaders() {
   auto response = std::move(encoder_decoder.second);
   auto status = request_encoder_->encodeHeaders(headers, false);
   // Make sure we transmit headers successfully
-  ASSERT_TRUE(status.ok());
+  ASSERT_OK(status);
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   // Reset the upstream connection after the headers have been sent
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -1419,6 +1532,12 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
         hcm.mutable_max_request_headers_kb()->set_value(max_size);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
+        // Disable route timeout to prevent 504 on slow CI (#44416).
+        auto* route = hcm.mutable_route_config()
+                          ->mutable_virtual_hosts(0)
+                          ->mutable_routes(0)
+                          ->mutable_route();
+        route->mutable_timeout()->set_seconds(0);
       });
   setMaxRequestHeadersKb(max_size);
   setMaxRequestHeadersCount(max_count);

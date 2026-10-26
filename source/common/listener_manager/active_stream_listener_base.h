@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <optional>
 
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
@@ -138,6 +139,11 @@ protected:
   // collection is removed. This state is maintained in base class because this state is independent
   // from concrete connection type.
   bool is_deleting_{false};
+  // Set once the listener as a whole begins draining (onListenerDrainStart). Persisted so that
+  // connections accepted after drain has started are also notified via onDrain(): unlike the pull
+  // model of DrainDecision::drainClose(), the onDrain() notification is one-shot, so newly accepted
+  // connections would otherwise miss it.
+  std::optional<Network::ConnectionDrainEvent> drain_event_;
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -204,9 +210,9 @@ public:
   void removeConnection(ActiveTcpConnection& connection);
 
   // Network::ConnectionHandler::ActiveListener
-  void onFilterChainDrainStart(
-      const std::list<const Network::FilterChain*>& draining_filter_chains) override;
-  void onListenerDrainStart() override;
+  void onFilterChainDrainStart(const std::list<const Network::FilterChain*>& draining_filter_chains,
+                               Network::ConnectionDrainEvent drain_event) override;
+  void onListenerDrainStart(Network::ConnectionDrainEvent drain_event) override;
 
 protected:
   /**

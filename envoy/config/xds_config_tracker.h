@@ -5,14 +5,17 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
+#include "envoy/common/pure.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/stats/scope.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "google/rpc/status.pb.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Config {

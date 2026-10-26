@@ -17,7 +17,7 @@ envoy_extension_cc_test(
         "set_metadata_filter_test.cc",
     ],
     extension_names = ["envoy.filters.http.set_metadata"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/set_metadata:config",
         "//test/integration:http_integration_lib",
@@ -30,10 +30,11 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.set_metadata"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/set_metadata:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
     ],

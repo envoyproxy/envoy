@@ -1,14 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_benchmark_binary",
-    "envoy_cc_fuzz_test",
-    "envoy_cc_test",
     "envoy_package",
     "envoy_proto_descriptor",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_benchmark_binary",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -31,17 +30,19 @@ envoy_proto_descriptor(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_config_test",
     srcs = ["filter_config_test.cc"],
     data = [
         "//test/config/integration/certs",
         "//test/proto:apikeys_proto_descriptor",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.http.proto_api_scrubber"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
+        "//source/extensions/filters/http/proto_api_scrubber:config",
         "//source/extensions/filters/http/proto_api_scrubber:filter_config",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
         "//source/extensions/matching/input_matchers/cel_matcher:config",
@@ -58,7 +59,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "filter_test",
     srcs = ["filter_test.cc"],
     data = [
@@ -66,7 +67,8 @@ envoy_cc_test(
         "//test/proto:apikeys_proto_descriptor",
         "//test/proto:bookstore_proto_descriptor",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.http.proto_api_scrubber"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -85,6 +87,7 @@ envoy_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/log",
         "@abseil-cpp//absl/strings",
@@ -102,7 +105,7 @@ envoy_extension_cc_test(
         "//test/proto:apikeys_proto_descriptor",
     ],
     extension_names = ["envoy.filters.http.proto_api_scrubber"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/grpc:common_lib",
@@ -123,12 +126,13 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "filter_benchmark_test",
     srcs = ["filter_benchmark_test.cc"],
     data = [
         ":scrubber_test_proto_descriptor",
     ],
+    extension_names = ["envoy.filters.http.proto_api_scrubber"],
     deps = [
         ":scrubber_test_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
@@ -143,6 +147,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@benchmark",
         "@cel-cpp//parser",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
         "@xds//xds/type/matcher/v3:pkg_cc_proto",
@@ -154,10 +159,11 @@ envoy_proto_library(
     srcs = ["filter_fuzz.proto"],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "filter_fuzz_test",
     srcs = ["filter_fuzz_test.cc"],
     corpus = "fuzz_corpus",
+    extension_names = ["envoy.filters.http.proto_api_scrubber"],
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/common:assert_lib",

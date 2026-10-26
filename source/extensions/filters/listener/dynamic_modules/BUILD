@@ -17,8 +17,8 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:utility_lib",
-        "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules:metric_registry",
     ],
 )
 
@@ -35,6 +35,7 @@ envoy_cc_library(
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_filter_buffer_interface",
+        "//envoy/registry",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:message_lib",

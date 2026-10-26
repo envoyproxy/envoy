@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "envoy/network/parent_drained_callback_registrar.h"
 #include "envoy/server/instance.h"
 
@@ -22,9 +24,10 @@ public:
     using ForwardEntry = std::pair<Network::Address::InstanceConstSharedPtr,
                                    std::shared_ptr<Network::UdpListenerConfig>>;
 
-    // Returns the address and UdpListenerConfig associated with the given address.
-    // The addresses are not necessarily identical, as e.g. the listener might be listening on
-    // 0.0.0.0.
+    // Returns the address and UdpListenerConfig associated with the given address, within the
+    // address's network namespace (listeners without one are only matched by addresses without
+    // one). The addresses are not necessarily identical, as e.g. the listener might be listening
+    // on 0.0.0.0.
     // This is called from the thread to which the hot restart Event::Dispatcher
     // dispatches, which is expected to be the same main thread as registerListener
     // is called from.
@@ -38,7 +41,11 @@ public:
                           std::shared_ptr<Network::UdpListenerConfig> listener_config);
 
   private:
-    // Map keyed on address as a string, because Network::Address::Instance isn't hashable.
+    // Builds the map key for an address string within a network namespace.
+    static std::string key(absl::string_view network_namespace, absl::string_view address);
+
+    // Map keyed on network namespace and address as a string, because
+    // Network::Address::Instance isn't hashable.
     absl::flat_hash_map<std::string, ForwardEntry> listener_map_;
   };
 
@@ -59,6 +66,7 @@ public:
                                      absl::AnyInvocable<void()> action) override;
   std::unique_ptr<envoy::HotRestartMessage> getParentStats();
   void drainParentListeners();
+  bool parentStopAcceptingRequested() const { return parent_stop_accepting_requested_.load(); }
   std::optional<HotRestart::AdminShutdownResponse> sendParentAdminShutdownRequest();
   void sendParentTerminateRequest();
   void mergeParentStats(Stats::Store& stats_store,
@@ -66,7 +74,11 @@ public:
 
 protected:
   absl::Status onSocketEventUdpForwarding();
-  void onForwardedUdpPacket(uint32_t worker_index, Network::UdpRecvData&& data);
+  // Delivers a packet forwarded by the parent to the listener bound to `listener_address`, or to
+  // the listener for the packet's destination when the parent did not send the listener address.
+  void onForwardedUdpPacket(uint32_t worker_index,
+                            const Network::Address::Instance& listener_address,
+                            Network::UdpRecvData&& data);
   // When call to terminate parent is sent, or parent is already terminated,
   void allDrainsImplicitlyComplete();
 
@@ -87,6 +99,10 @@ private:
   // when the parent is drained, so a multimap is used to contain them.
   std::unordered_multimap<std::string, absl::AnyInvocable<void()>>
       on_drained_actions_ ABSL_GUARDED_BY(registry_mu_);
+  // Whether this child has already asked the parent to stop accepting new connections, i.e. whether
+  // drainParentListeners() has sent the drain-listeners request. Set on the main thread and polled
+  // from worker threads, so it is atomic. Initialized true when there is no parent.
+  std::atomic<bool> parent_stop_accepting_requested_;
   Event::FileEventPtr socket_event_udp_forwarding_;
   UdpForwardingContext udp_forwarding_context_;
 };

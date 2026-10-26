@@ -24,7 +24,7 @@ public:
   static absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>>
   create(const ClusterWeightProto& cluster, uint64_t index,
          const MetadataMatchCriteria* parent_metadata_match, absl::string_view runtime_key_prefix,
-         Server::Configuration::ServerFactoryContext& context);
+         Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager);
 
   uint64_t clusterWeight(Runtime::Loader& loader) const {
     return runtime_key_.empty() ? cluster_weight_
@@ -40,7 +40,8 @@ private:
   WeightedClustersConfigEntry(const ClusterWeightProto& cluster, uint64_t index,
                               const MetadataMatchCriteria* parent_metadata_match,
                               absl::string_view runtime_key_prefix,
-                              Server::Configuration::ServerFactoryContext& context);
+                              Server::Configuration::ServerFactoryContext& context,
+                              Init::Manager& init_manager);
 
   const std::string runtime_key_;
   const uint64_t cluster_weight_{};
@@ -66,7 +67,7 @@ public:
                                  const MetadataMatchCriteria* parent_metadata_match,
                                  absl::string_view route_name,
                                  Server::Configuration::ServerFactoryContext& context,
-                                 absl::Status& creation_status);
+                                 Init::Manager& init_manager, absl::Status& creation_status);
 
   RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
                             const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo&,

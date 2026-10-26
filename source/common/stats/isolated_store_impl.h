@@ -150,7 +150,7 @@ private:
         const TagUtility::TagStatNameJoiner& joiner, Histogram::Unit)>;
     using TextReadoutAllocator = std::function<RefcountPtr<Base>(
         const TagUtility::TagStatNameJoiner& joiner, TextReadout::Type)>;
-    using BaseOptConstRef = std::optional<std::reference_wrapper<const Base>>;
+    using BaseOptConstRef = OptRef<const Base>;
 
     IsolatedStatsCache(CounterAllocator alloc) : counter_alloc_(alloc) {}
     IsolatedStatsCache(GaugeAllocator alloc) : gauge_alloc_(alloc) {}
@@ -267,7 +267,7 @@ private:
       if (stat == stats_.end()) {
         return std::nullopt;
       }
-      return std::cref(*stat->second);
+      return makeOptRefFromPtr(stat->second.get());
     }
 
   private:
@@ -338,6 +338,8 @@ public:
                                                tagged_name, symbolTable());
     return store_.counters_.get(joiner, matcher).value_or(store_.null_counter_);
   }
+  Counter& counterFromMergedStatName(StatName tagged_name, StatName base_name,
+                                     std::optional<StatNameTagSpan> tags) override;
   Gauge& gaugeFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                              StatName tagged_name, Gauge::ImportMode import_mode) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());
@@ -351,6 +353,9 @@ public:
     gauge->mergeImportMode(import_mode);
     return *gauge;
   }
+  Gauge& gaugeFromMergedStatName(StatName tagged_name, StatName base_name,
+                                 std::optional<StatNameTagSpan> tags,
+                                 Gauge::ImportMode import_mode) override;
   Histogram& histogramFromTaggedName(StatName base_name, std::optional<StatNameTagSpan> name_tags,
                                      StatName tagged_name, Histogram::Unit unit) override {
     const OptRef<const StatsMatcher> matcher = makeOptRefFromPtr(scope_matcher_.get());

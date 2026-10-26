@@ -157,7 +157,7 @@ void DrainManagerImpl::startDrainSequence(Network::DrainDirection direction,
     addDrainCompleteCallback(direction, drain_complete_cb);
     return;
   }
-  ASSERT(drain_tick_timers_.count(direction) == 0,
+  ASSERT(!drain_tick_timers_.contains(direction),
          "cannot run two drain sequences for the same direction.");
 
   const std::chrono::seconds drain_delay(server_.options().drainTime());

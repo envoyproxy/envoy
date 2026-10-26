@@ -1,9 +1,18 @@
 #pragma once
 
+#include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/typed_config.h"
 
+#include "absl/status/statusor.h"
+
 namespace Envoy {
+namespace Server {
+namespace Configuration {
+class GenericFactoryContext;
+} // namespace Configuration
+} // namespace Server
+
 namespace Http {
 
 /**
@@ -70,8 +79,39 @@ using StatefulHeaderKeyFormatterFactorySharedPtr =
  */
 class StatefulHeaderKeyFormatterFactoryConfig : public Config::TypedFactory {
 public:
+  [[deprecated("Use createFactoryFromProto instead")]]
   virtual StatefulHeaderKeyFormatterFactorySharedPtr
-  createFromProto(const Protobuf::Message& config) PURE;
+  createFromProto(const Protobuf::Message& /* config */) {
+    // This is the terminal of the delegation below, so it must not delegate back: an extension
+    // that implements neither method lands here.
+    throwEnvoyExceptionOrPanic(
+        "Stateful header key formatter factory implements neither createFactoryFromProto nor the "
+        "deprecated createFromProto");
+    return nullptr;
+  }
+
+  /**
+   * Create a factory from the given configuration. This is the method Envoy calls, and the one new
+   * extensions should implement.
+   *
+   * The factory is created on the main thread, but the formatters it produces are used - and
+   * released - by worker threads, so an implementation owning state that must not be torn down off
+   * the main thread needs the context (specifically
+   * serverFactoryContext().mainThreadDispatcher()) to schedule its own destruction.
+   *
+   * @param config the extension specific configuration.
+   * @param context the factory context of whatever owns the protocol options - a listener for the
+   * downstream connection manager, a cluster for upstream protocol options - which is why this is
+   * the generic context rather than a listener-scoped one.
+   * @return the formatter factory, or an error status if the configuration is invalid.
+   */
+  virtual absl::StatusOr<StatefulHeaderKeyFormatterFactorySharedPtr>
+  createFactoryFromProto(const Protobuf::Message& config,
+                         Server::Configuration::GenericFactoryContext&) {
+    // Delegate to the legacy entry point so that extensions which only implement it - out-of-tree
+    // extensions written before the context was threaded through - keep working.
+    return createFromProto(config);
+  }
 
   std::string category() const override { return "envoy.http.stateful_header_formatters"; }
 };

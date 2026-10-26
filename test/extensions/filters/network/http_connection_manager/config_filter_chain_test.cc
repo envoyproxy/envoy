@@ -7,6 +7,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -51,8 +52,8 @@ TEST_F(FilterChainTest, CreateFilterChain) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+                                     *filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   EXPECT_CALL(callbacks, addStreamFilter(_));        // Buffer
@@ -86,8 +87,8 @@ http_filters:
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(basic_config_), context_,
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+                                     *filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
@@ -159,8 +160,8 @@ http_filters:
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+                                     *filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
   Http::StreamDecoderFilterSharedPtr missing_config_filter;
@@ -187,8 +188,8 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChain) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+                                     *filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
@@ -237,13 +238,15 @@ TEST_F(FilterChainTest, CreateUpgradeFilterChainHCMDisabled) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+                                     *filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
 
   NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
 
   // Check the case where WebSockets are off in the HCM, and no router config is present.
-  { EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks)); }
+  {
+    EXPECT_FALSE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
+  }
 
   // Check the case where WebSockets are off in the HCM and in router config.
   {
@@ -306,8 +309,8 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChain) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
+                                     *filter_config_provider_manager_, creation_status_);
+  ASSERT_OK(creation_status_);
 
   {
     NiceMock<Http::MockFilterChainFactoryCallbacks> callbacks;
@@ -360,7 +363,7 @@ TEST_F(FilterChainTest, CreateCustomUpgradeFilterChainWithRouterNotLast) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
+                                     *filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(
       creation_status_.message(),
       "Error: terminal filter named envoy.filters.http.router of type envoy.filters.http.router "
@@ -375,7 +378,7 @@ TEST_F(FilterChainTest, InvalidConfig) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_,
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
+                                     *filter_config_provider_manager_, creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "Error: multiple upgrade configs with the same name: 'websocket'");
 }

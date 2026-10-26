@@ -7,8 +7,7 @@
 
 #include "envoy/network/udp_packet_writer_handler.h"
 
-#include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_protos.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
 
 #include "quiche/quic/core/batch_writer/quic_gso_batch_writer.h"
 
@@ -57,6 +56,7 @@ struct UdpGsoBatchWriterStats {
 class UdpGsoBatchWriter : public quic::QuicGsoBatchWriter, public Network::UdpPacketWriter {
 public:
   UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope);
+  ~UdpGsoBatchWriter() override;
 
   // writePacket perform batched sends based on QuicGsoBatchWriter::WritePacket
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
@@ -64,8 +64,13 @@ public:
                                       const Network::Address::Instance& peer_address) override;
 
   // UdpPacketWriter Implementations
-  bool isWriteBlocked() const override { return IsWriteBlocked(); }
-  void setWritable() override { return SetWritable(); }
+  bool isWriteBlocked() const override {
+    return IsWriteBlocked() || default_writer_.isWriteBlocked();
+  }
+  void setWritable() override {
+    SetWritable();
+    default_writer_.setWritable();
+  }
   bool isBatchMode() const override { return IsBatchMode(); }
   uint64_t getMaxPacketSize(const Network::Address::Instance& peer_address) const override;
   Network::UdpPacketWriterBuffer
@@ -87,7 +92,9 @@ private:
    */
   UdpGsoBatchWriterStats generateStats(Stats::Scope& scope);
   UdpGsoBatchWriterStats stats_;
-  uint64_t gso_size_;
+  Network::UdpDefaultWriter default_writer_;
+  uint64_t gso_size_{0};
+  uint64_t buffered_bytes_{0};
 };
 
 class UdpGsoBatchWriterFactory : public Network::UdpPacketWriterFactory {
@@ -96,9 +103,6 @@ public:
   createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope,
                         Envoy::Event::Dispatcher& dispatcher,
                         absl::AnyInvocable<void() &&> on_can_write_cb) override;
-
-private:
-  envoy::config::core::v3::RuntimeFeatureFlag enabled_;
 };
 
 } // namespace Quic

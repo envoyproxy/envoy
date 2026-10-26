@@ -21,8 +21,9 @@ namespace GrpcFieldExtraction {
 
 using TypeFinder = std::function<const Protobuf::Type*(const std::string&)>;
 struct RequestField {
-  // The request field path.
-  absl::string_view path;
+  // The dynamic metadata key that the value is written to. This is the configured
+  // metadata_key, or the request field path if it isn't set.
+  absl::string_view metadata_key;
 
   // The request field value.
   Protobuf::Value value;

@@ -1,7 +1,5 @@
 #include "contrib/istio/filters/http/peer_metadata/source/peer_metadata.h"
 
-#include <optional>
-
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
@@ -24,8 +22,7 @@ public:
       : downstream_(downstream),
         metadata_provider_(Extensions::Common::WorkloadDiscovery::GetProvider(factory_context)),
         local_info_(factory_context.localInfo()) {}
-  std::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                                         Context&) const override;
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
 
 private:
   const bool downstream_;
@@ -33,8 +30,8 @@ private:
   const LocalInfo::LocalInfo& local_info_;
 };
 
-std::optional<PeerInfo> XDSMethod::derivePeerInfo(const StreamInfo::StreamInfo& info,
-                                                  Http::HeaderMap& headers, Context&) const {
+PeerInfo XDSMethod::derivePeerInfo(const StreamInfo::StreamInfo& info, Http::HeaderMap& headers,
+                                   Context&) const {
   if (!metadata_provider_) {
     return {};
   }
@@ -110,8 +107,8 @@ MXMethod::MXMethod(bool downstream, const absl::flat_hash_set<std::string> addit
   tls_.set([](Event::Dispatcher&) { return std::make_shared<MXCache>(); });
 }
 
-std::optional<PeerInfo> MXMethod::derivePeerInfo(const StreamInfo::StreamInfo&,
-                                                 Http::HeaderMap& headers, Context& ctx) const {
+PeerInfo MXMethod::derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap& headers,
+                                  Context& ctx) const {
   const auto peer_id_header = headers.get(Headers::get().ExchangeMetadataHeaderId);
   if (downstream_) {
     ctx.request_peer_id_received_ = !peer_id_header.empty();
@@ -135,7 +132,7 @@ void MXMethod::remove(Http::HeaderMap& headers) const {
   headers.remove(Headers::get().ExchangeMetadataHeader);
 }
 
-std::optional<PeerInfo> MXMethod::lookup(absl::string_view id, absl::string_view value) const {
+PeerInfo MXMethod::lookup(absl::string_view id, absl::string_view value) const {
   // This code is copied from:
   // https://github.com/istio/proxy/blob/release-1.18/extensions/metadata_exchange/plugin.cc#L116
   auto& cache = tls_->cache_;
@@ -148,17 +145,17 @@ std::optional<PeerInfo> MXMethod::lookup(absl::string_view id, absl::string_view
   const auto bytes = Base64::decodeWithoutPadding(value);
   Envoy::Protobuf::Struct metadata;
   if (!metadata.ParseFromString(bytes)) {
-    return {};
+    return nullptr;
   }
-  auto out = Istio::Common::convertStructToWorkloadMetadata(metadata, additional_labels_);
+  PeerInfo out = Istio::Common::convertStructToWorkloadMetadata(metadata, additional_labels_);
   if (max_peer_cache_size_ > 0 && !id.empty()) {
     // do not let the cache grow beyond max cache size.
     if (static_cast<uint32_t>(cache.size()) > max_peer_cache_size_) {
       cache.erase(cache.begin(), std::next(cache.begin(), max_peer_cache_size_ / 4));
     }
-    cache.emplace(id, *out);
+    cache.emplace(id, out);
   }
-  return *out;
+  return out;
 }
 
 class UpstreamFilterStateMethod : public DiscoveryMethod {
@@ -166,16 +163,14 @@ public:
   UpstreamFilterStateMethod(
       const io::istio::http::peer_metadata::Config_UpstreamFilterState& config)
       : peer_metadata_key_(config.peer_metadata_key()) {}
-  std::optional<PeerInfo> derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&,
-                                         Context&) const override;
+  PeerInfo derivePeerInfo(const StreamInfo::StreamInfo&, Http::HeaderMap&, Context&) const override;
 
 private:
   std::string peer_metadata_key_;
 };
 
-std::optional<PeerInfo>
-UpstreamFilterStateMethod::derivePeerInfo(const StreamInfo::StreamInfo& info, Http::HeaderMap&,
-                                          Context&) const {
+PeerInfo UpstreamFilterStateMethod::derivePeerInfo(const StreamInfo::StreamInfo& info,
+                                                   Http::HeaderMap&, Context&) const {
   const auto upstream = info.upstreamInfo();
   if (!upstream) {
     return {};
@@ -198,12 +193,7 @@ UpstreamFilterStateMethod::derivePeerInfo(const StreamInfo::StreamInfo& info, Ht
     return {};
   }
 
-  std::unique_ptr<PeerInfo> peer_info = ::Istio::Common::convertStructToWorkloadMetadata(obj);
-  if (!peer_info) {
-    return {};
-  }
-
-  return *peer_info;
+  return ::Istio::Common::convertStructToWorkloadMetadata(obj);
 }
 
 MXPropagationMethod::MXPropagationMethod(
@@ -258,23 +248,18 @@ void BaggagePropagationMethod::inject(const StreamInfo::StreamInfo&, Http::Heade
 
 BaggageDiscoveryMethod::BaggageDiscoveryMethod() = default;
 
-std::optional<PeerInfo> BaggageDiscoveryMethod::derivePeerInfo(const StreamInfo::StreamInfo&,
-                                                               Http::HeaderMap& headers,
-                                                               Context&) const {
+PeerInfo BaggageDiscoveryMethod::derivePeerInfo(const StreamInfo::StreamInfo&,
+                                                Http::HeaderMap& headers, Context&) const {
   const auto baggage_header = headers.get(Headers::get().Baggage);
   if (baggage_header.empty()) {
     return {};
   }
   const auto baggage_value = baggage_header[0]->value().getStringView();
-  const auto workload = Istio::Common::convertBaggageToWorkloadMetadata(baggage_value);
-  if (workload) {
-    return *workload;
-  }
-  return {};
+  return Istio::Common::convertBaggageToWorkloadMetadata(baggage_value);
 }
 
 FilterConfig::FilterConfig(const io::istio::http::peer_metadata::Config& config,
-                           Server::Configuration::FactoryContext& factory_context)
+                           Server::Configuration::ServerFactoryContext& factory_context)
     : shared_with_upstream_(config.shared_with_upstream()),
       downstream_discovery_(buildDiscoveryMethods(config.downstream_discovery(),
                                                   buildAdditionalLabels(config.additional_labels()),
@@ -293,20 +278,18 @@ std::vector<DiscoveryMethodPtr> FilterConfig::buildDiscoveryMethods(
     const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::DiscoveryMethod>&
         config,
     const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-    Server::Configuration::FactoryContext& factory_context) const {
+    Server::Configuration::ServerFactoryContext& factory_context) const {
   std::vector<DiscoveryMethodPtr> methods;
   methods.reserve(config.size());
   for (const auto& method : config) {
     switch (method.method_specifier_case()) {
     case io::istio::http::peer_metadata::Config::DiscoveryMethod::MethodSpecifierCase::
         kWorkloadDiscovery:
-      methods.push_back(
-          std::make_unique<XDSMethod>(downstream, factory_context.serverFactoryContext()));
+      methods.push_back(std::make_unique<XDSMethod>(downstream, factory_context));
       break;
     case io::istio::http::peer_metadata::Config::DiscoveryMethod::MethodSpecifierCase::
         kIstioHeaders:
-      methods.push_back(std::make_unique<MXMethod>(downstream, additional_labels,
-                                                   factory_context.serverFactoryContext()));
+      methods.push_back(std::make_unique<MXMethod>(downstream, additional_labels, factory_context));
       break;
     case io::istio::http::peer_metadata::Config::DiscoveryMethod::MethodSpecifierCase::kBaggage:
       if (downstream) {
@@ -337,20 +320,19 @@ std::vector<PropagationMethodPtr> FilterConfig::buildPropagationMethods(
     const Protobuf::RepeatedPtrField<io::istio::http::peer_metadata::Config::PropagationMethod>&
         config,
     const absl::flat_hash_set<std::string>& additional_labels, bool downstream,
-    Server::Configuration::FactoryContext& factory_context) const {
+    Server::Configuration::ServerFactoryContext& factory_context) const {
   std::vector<PropagationMethodPtr> methods;
   methods.reserve(config.size());
   for (const auto& method : config) {
     switch (method.method_specifier_case()) {
     case io::istio::http::peer_metadata::Config::PropagationMethod::MethodSpecifierCase::
         kIstioHeaders:
-      methods.push_back(
-          std::make_unique<MXPropagationMethod>(downstream, factory_context.serverFactoryContext(),
-                                                additional_labels, method.istio_headers()));
+      methods.push_back(std::make_unique<MXPropagationMethod>(
+          downstream, factory_context, additional_labels, method.istio_headers()));
       break;
     case io::istio::http::peer_metadata::Config::PropagationMethod::MethodSpecifierCase::kBaggage:
-      methods.push_back(std::make_unique<BaggagePropagationMethod>(
-          factory_context.serverFactoryContext(), method.baggage()));
+      methods.push_back(
+          std::make_unique<BaggagePropagationMethod>(factory_context, method.baggage()));
       break;
     default:
       break;
@@ -383,7 +365,7 @@ void FilterConfig::discover(StreamInfo::StreamInfo& info, bool downstream, Http:
   for (const auto& method : downstream ? downstream_discovery_ : upstream_discovery_) {
     const auto result = method->derivePeerInfo(info, headers, ctx);
     if (result) {
-      setFilterState(info, downstream, *result);
+      setFilterState(info, downstream, result);
       break;
     }
   }
@@ -414,7 +396,7 @@ void FilterConfig::setFilterState(StreamInfo::StreamInfo& info, bool downstream,
       downstream ? Istio::Common::DownstreamPeerObj : Istio::Common::UpstreamPeerObj;
   if (!info.filterState()->hasDataWithName(key)) {
     // Store CelState for CEL expressions like filter_state.downstream_peer.labels['role']
-    auto pb = value.serializeAsProto();
+    auto pb = value->serializeAsProto();
     auto cel_state = std::make_unique<CelState>(FilterConfig::peerInfoPrototype());
     cel_state->setValue(absl::string_view(pb->SerializeAsString()));
     info.filterState()->setData(key, std::move(cel_state),
@@ -424,7 +406,7 @@ void FilterConfig::setFilterState(StreamInfo::StreamInfo& info, bool downstream,
     // Also store WorkloadMetadataObject under a separate key for FIELD accessor support.
     // WorkloadMetadataObject implements hasFieldSupport() + getField() for
     // formatters using %FILTER_STATE(downstream_peer_obj:FIELD:fieldname)% syntax.
-    auto workload_metadata = std::make_unique<PeerInfo>(value);
+    auto workload_metadata = std::make_unique<Istio::Common::WorkloadMetadataObject>(*value);
     info.filterState()->setData(obj_key, std::move(workload_metadata),
                                 StreamInfo::FilterState::LifeSpan::FilterChain,
                                 sharedWithUpstream());
@@ -479,11 +461,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   return Http::FilterHeadersStatus::Continue;
 }
 
-absl::StatusOr<Http::FilterFactoryCb> FilterConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& config, const std::string&,
-    Server::Configuration::FactoryContext& factory_context) {
-  auto filter_config = std::make_shared<FilterConfig>(
-      dynamic_cast<const io::istio::http::peer_metadata::Config&>(config), factory_context);
+absl::StatusOr<Http::FilterFactoryCb> FilterConfigFactory::createHttpFilterFactoryFromProtoTyped(
+    const io::istio::http::peer_metadata::Config& config,
+    Server::Configuration::ServerFactoryContext& factory_context,
+    Server::Configuration::ExtraFactoryContext&) {
+  auto filter_config = std::make_shared<FilterConfig>(config, factory_context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) {
     auto filter = std::make_shared<Filter>(filter_config);
     callbacks.addStreamFilter(filter);

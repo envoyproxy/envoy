@@ -7,6 +7,10 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/datasource.h"
+#include "source/common/tls/utility.h"
+
+#include "absl/strings/str_join.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -41,6 +45,7 @@ std::vector<uint8_t> maybeReadOcspStaple(const envoy::config::core::v3::DataSour
 
   return {staple.begin(), staple.end()};
 }
+
 } // namespace
 
 static const std::string INLINE_STRING = "<inline>";
@@ -124,6 +129,19 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       creation_status = absl::InvalidArgumentError(
           fmt::format("Failed to load incomplete private key from path: {}", private_key_path_));
     }
+  }
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+  if (config.has_tls_params()) {
+    const auto& params = config.tls_params();
+    tls_params_ = TlsParams{
+        .min_protocol_version = params.tls_minimum_protocol_version(),
+        .max_protocol_version = params.tls_maximum_protocol_version(),
+        .cipher_suites = absl::StrJoin(params.cipher_suites(), ":"),
+        .ecdh_curves = absl::StrJoin(params.ecdh_curves(), ":"),
+        .signature_algorithms = absl::StrJoin(params.signature_algorithms(), ":"),
+        .compliance_policy =
+            Extensions::TransportSockets::Tls::Utility::compliancePolicyFromProto(params),
+    };
   }
 }
 

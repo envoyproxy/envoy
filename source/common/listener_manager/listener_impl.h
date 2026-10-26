@@ -20,8 +20,12 @@
 #include "source/common/common/logger.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_info_impl.h"
+#ifdef ENVOY_ENABLE_QUIC
+#include "source/common/quic/quic_packet_writer_interface.h"
+#endif
 #include "source/common/quic/quic_stat_names.h"
 #include "source/server/factory_context_impl.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -56,6 +60,20 @@ public:
    */
   static bool filterChainOnlyChange(const envoy::config::listener::v3::Listener& lhs,
                                     const envoy::config::listener::v3::Listener& rhs);
+
+  /**
+   * @return true if listener message lhs and rhs are exactly the same if ignoring the filter chain
+   * and address fields.
+   */
+  static bool filterChainAndAddressOnlyChange(const envoy::config::listener::v3::Listener& lhs,
+                                              const envoy::config::listener::v3::Listener& rhs);
+
+  /**
+   * @return true if listener message lhs and rhs have the same address fields, in any order of the
+   * additional addresses.
+   */
+  static bool addressesEqual(const envoy::config::listener::v3::Listener& lhs,
+                             const envoy::config::listener::v3::Listener& rhs);
 };
 
 class ListenerManagerImpl;
@@ -70,14 +88,28 @@ public:
          ListenerComponentFactory::BindType bind_type,
          const Network::SocketCreationOptions& creation_options, uint32_t num_sockets);
 
+  // Creates a socket factory that uses the sockets of `socket_factory` instead of new ones, so that
+  // a listener updated in place keeps listening on the address of `socket_factory`.
+  static std::unique_ptr<ListenSocketFactoryImpl> createWithSharedSockets(
+      ListenerComponentFactory& factory, Network::ListenSocketFactory& socket_factory,
+      const Network::Socket::OptionsSharedPtr& options, const std::string& listener_name,
+      uint32_t tcp_backlog_size, ListenerComponentFactory::BindType bind_type,
+      const Network::SocketCreationOptions& creation_options, uint32_t num_sockets);
+
   // Network::ListenSocketFactory
   Network::Socket::Type socketType() const override { return socket_type_; }
   const Network::Address::InstanceConstSharedPtr& localAddress() const override {
     return local_address_;
   }
   Network::SocketSharedPtr getListenSocket(uint32_t worker_index) override;
-  Network::ListenSocketFactoryPtr clone() const override {
-    return absl::WrapUnique(new ListenSocketFactoryImpl(*this));
+  // Clone this factory for a new listener, overriding tcp_backlog_size with the new listener's
+  // configured value. tcp_backlog_size is passed explicitly (rather than carried over from this
+  // factory) because it is the one listener option that can be re-applied to an already-listening
+  // socket via a second listen() call: cloneSocketFactoryFrom() relies on that so that
+  // doFinalPreWorkerInit() calls listen() with the new listener's backlog rather than the one the
+  // existing socket factory was created with.
+  Network::ListenSocketFactoryPtr clone(uint32_t tcp_backlog_size) const override {
+    return absl::WrapUnique(new ListenSocketFactoryImpl(*this, tcp_backlog_size));
   }
   void closeAllSockets() override {
     for (auto& socket : sockets_) {
@@ -96,7 +128,16 @@ private:
                           const Network::SocketCreationOptions& creation_options,
                           uint32_t num_sockets, absl::Status& creation_status);
 
-  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
+  ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone,
+                          uint32_t tcp_backlog_size);
+
+  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                          Network::ListenSocketFactory& socket_factory,
+                          const Network::Socket::OptionsSharedPtr& options,
+                          const std::string& listener_name, uint32_t tcp_backlog_size,
+                          ListenerComponentFactory::BindType bind_type,
+                          const Network::SocketCreationOptions& creation_options,
+                          uint32_t num_sockets);
 
   absl::StatusOr<Network::SocketSharedPtr>
   createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
@@ -113,10 +154,11 @@ private:
   ListenerComponentFactory::BindType bind_type_;
   const Network::SocketCreationOptions socket_creation_options_;
   // One socket for each worker, pre-created before the workers fetch the sockets. There are
-  // 3 different cases:
+  // 4 different cases:
   // 1) All are null when doing config validation.
   // 2) A single socket has been duplicated for each worker (no reuse_port).
   // 3) A unique socket for each worker (reuse_port).
+  // 4) The sockets of another socket factory, which an in place update of the addresses keeps.
   //
   // TODO(mattklein123): If a listener does not bind, it still has a socket. This is confusing
   // and not needed and can be cleaned up.
@@ -204,6 +246,7 @@ private:
  */
 class ListenerImpl final : public Network::ListenerConfig,
                            public Network::FilterChainFactory,
+                           public FcdsClientCallbacks,
                            Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -224,20 +267,47 @@ public:
          bool workers_started, uint64_t hash);
   ~ListenerImpl() override;
 
+  // The kind of in place update that supportUpdateFilterChain() allows.
+  enum class InPlaceUpdate { None, FilterChains, FilterChainsAndAddresses };
+
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
   // update.
   /**
-   * Execute in place filter chain update. The filter chain update is less expensive than full
-   * listener update because connections may not need to be drained.
+   * Execute in place filter chain update, which may also add and remove addresses. The filter
+   * chain update is less expensive than full listener update because connections may not need to
+   * be drained.
    */
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
-                             bool workers_started, uint64_t hash);
+                             const std::string& version_info, bool workers_started, uint64_t hash,
+                             InPlaceUpdate in_place_update);
   /**
    * Determine if in place filter chain update could be executed at this moment.
+   * @return the kind of in place update to the new config, or None if it must replace the entire
+   * listener.
    */
-  bool supportUpdateFilterChain(const envoy::config::listener::v3::Listener& new_config,
-                                bool worker_started);
+  InPlaceUpdate supportUpdateFilterChain(const envoy::config::listener::v3::Listener& new_config,
+                                         bool worker_started);
+
+  /**
+   * @return true if this listener is an in place update that changes the addresses of the
+   * listener it updates.
+   */
+  bool inPlaceAddressUpdate() const { return in_place_address_update_; }
+
+  /**
+   * @return the socket factory whose local address is the address, or nullptr if there is none.
+   */
+  Network::ListenSocketFactory*
+  listenSocketFactory(const Network::Address::Instance& address) const;
+
+  /**
+   * @return the socket factory of `listener`, an earlier version of this listener, whose local
+   * address is the address at the index, if `listener` configures the address the same way and the
+   * sockets are still open, or nullptr.
+   */
+  Network::ListenSocketFactory* reusableSocketFactory(const ListenerImpl& listener,
+                                                      uint32_t address_index) const;
 
   /**
    * Run the callback on each filter chain that exists in this listener but not in the passed
@@ -247,13 +317,23 @@ public:
                        std::function<void(Network::DrainableFilterChain&)> callback);
 
   /**
+   * Run the callback on each active FCDS filter chain that this listener uses but the passed
+   * listener does not.
+   */
+  void
+  diffFcdsFilterChain(const ListenerImpl& another_listener,
+                      std::function<void(Network::DrainableFilterChainSharedPtr&&)> callback) const;
+
+  /**
+   * @return the active FCDS filter chains that this listener uses.
+   */
+  absl::flat_hash_set<const Network::FilterChain*> activeFcdsFilterChains() const;
+
+  /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
   bool blockLdsUpdate(uint64_t new_hash) {
-    // Receiving LDS update with FCDS config will cause full listener update. Therefore,
-    // we should not block the update if FCDS is configured, regardless of the hash.
-    return (!configInternal().has_fcds_config() && new_hash == maybe_stale_hash_) ||
-           !added_via_api_;
+    return (new_hash == maybe_stale_hash_) || !added_via_api_;
   }
   bool blockRemove() { return !added_via_api_; }
 
@@ -286,6 +366,12 @@ public:
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.
   bool hasDuplicatedAddress(const ListenerImpl& other) const;
+
+  // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
+  // Must be called only after this listener's children entities registered their targets with their
+  // parent's initManager, which happens either during construction or in
+  // ListenerManagerImpl::addOrUpdateListenerInternal.
+  void registerInitTargetIfWorkersNotStarted();
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *filter_chain_manager_; }
@@ -341,6 +427,9 @@ public:
     return listener_factory_context_->listener_factory_context_base_->listener_info_;
   }
 
+  // FilterChainUpdateCallbacks
+  void drainFilterChain(Network::DrainableFilterChainSharedPtr draining) override;
+
   void ensureSocketOptions(Network::Socket::OptionsSharedPtr& options) {
     if (options == nullptr) {
       options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
@@ -374,6 +463,13 @@ private:
     // Network::UdpListenerConfig
     Network::ActiveUdpListenerFactory& listenerFactory() override { return *listener_factory_; }
     Network::UdpPacketWriterFactory& packetWriterFactory() override { return *writer_factory_; }
+#ifdef ENVOY_ENABLE_QUIC
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override {
+      return quic_writer_factory_.get();
+    }
+#else
+    Envoy::Quic::QuicPacketWriterFactory* quicPacketWriterFactory() override { return nullptr; }
+#endif
     Network::UdpListenerWorkerRouter&
     listenerWorkerRouter(const Network::Address::Instance& address) override {
       auto iter = listener_worker_routers_.find(address.asString());
@@ -385,6 +481,9 @@ private:
     const envoy::config::listener::v3::UdpListenerConfig config_;
     Network::ActiveUdpListenerFactoryPtr listener_factory_;
     Network::UdpPacketWriterFactoryPtr writer_factory_;
+#ifdef ENVOY_ENABLE_QUIC
+    Quic::QuicPacketWriterFactoryPtr quic_writer_factory_;
+#endif
     absl::flat_hash_map<std::string, Network::UdpListenerWorkerRouterPtr> listener_worker_routers_;
   };
 
@@ -408,8 +507,12 @@ private:
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               absl::Status& creation_status);
+               bool in_place_address_update, absl::Status& creation_status);
+  // Determine if the in place update could also change the addresses of this listener.
+  bool supportUpdateAddresses(const envoy::config::listener::v3::Listener& new_config) const;
   // Helpers for constructor.
+  absl::Status buildAddresses(const envoy::config::listener::v3::Listener& config,
+                              std::vector<Network::Socket::OptionsSharedPtr>& address_opts_list);
   void buildAccessLog(const envoy::config::listener::v3::Listener& config);
   absl::Status buildInternalListener(const envoy::config::listener::v3::Listener& config);
   absl::Status validateConfig();
@@ -446,6 +549,8 @@ private:
   const envoy::config::listener::v3::Listener& configInternal() const {
     return config_maybe_partial_filter_chains_;
   }
+  std::shared_ptr<FcdsSharedFilterChainManager>
+  maybeCreateFilterChainManager(const envoy::config::listener::v3::Listener& config);
 
   ListenerManagerImpl& parent_;
   std::vector<Network::Address::InstanceConstSharedPtr> addresses_;
@@ -461,10 +566,12 @@ private:
   const std::string name_;
   const bool added_via_api_;
   const bool workers_started_;
-  // Note: when FCDS is enabled and filter chains change, the stored hash may become stale.
-  // We deliberately skip recomputing it for performance, since the hash is only used
-  // to decide on in-place LDS updates, and when FCDS is configured, LDS update force a full
-  // listener update anyway.
+  const bool in_place_address_update_{false};
+  // True if a filter chain only update changed fields other than the filter chains, some of which
+  // it does not apply to the sockets and the worker listeners.
+  bool has_unapplied_config_change_{false};
+  // The hash does not cover the FCDS filter chains. It is only used to skip the LDS updates that
+  // do not change the listener config.
   const uint64_t maybe_stale_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;
@@ -511,6 +618,7 @@ private:
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
   // watcher callback during the destroy of ListenerImpl.
   Init::WatcherImpl local_init_watcher_;
+
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;
 

@@ -21,3 +21,8 @@ Envoy's builtin config validators are listed :ref:`here <v3_config_config_valida
 To use a config validation extension, it needs to be added to the
 :ref:`config_validators list <envoy_v3_api_field_config.core.v3.ApiConfigSource.config_validators>`
 field of the API configuration source that will be validated.
+
+The :ref:`dynamic modules config validator
+<envoy_v3_api_msg_extensions.config.validators.dynamic_modules.v3.DynamicModuleConfigValidator>`
+lets a trusted in-process module inspect decoded State-of-the-World and delta xDS resources before
+Envoy accepts an update. A module rejection follows the normal xDS NACK path.

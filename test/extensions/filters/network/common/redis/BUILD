@@ -34,20 +34,21 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "codec_impl_test",
     srcs = ["codec_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":redis_mocks",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/strings",
     ],
 )
 
 envoy_cc_test(
     name = "client_impl_test",
     srcs = ["client_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":redis_mocks",
         ":test_utils_lib",
@@ -56,6 +57,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/filters/network/common/redis:client_lib",
+        "//test/extensions/common/aws:aws_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:simulated_time_system_lib",
@@ -66,7 +68,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "fault_test",
     srcs = ["fault_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":redis_mocks",
         "//source/common/common:assert_lib",

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "envoy/api/api.h"
@@ -33,6 +34,9 @@ public:
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr privateKeyMethod() const override {
     return private_key_method_;
   }
+  const TlsParams* tlsParams() const override {
+    return tls_params_.has_value() ? &tls_params_.value() : nullptr;
+  }
 
 private:
   TlsCertificateConfigImpl(
@@ -52,6 +56,7 @@ private:
   const std::vector<uint8_t> ocsp_staple_;
   const std::string ocsp_staple_path_;
   Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_;
+  std::optional<TlsParams> tls_params_;
 };
 
 } // namespace Ssl

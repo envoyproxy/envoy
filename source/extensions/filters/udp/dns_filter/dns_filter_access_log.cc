@@ -37,6 +37,26 @@ public:
     return str.has_value() ? ValueUtil::stringValue(str.value()) : ValueUtil::nullValue();
   }
 
+  bool formatTo(std::string& sink, const Formatter::Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override {
+    const auto str = field_extractor_(context, stream_info);
+    if (!str.has_value()) {
+      return false;
+    }
+    sink.append(*str);
+    return true;
+  }
+
+  void formatValueTo(Formatter::ValueSink& sink, const Formatter::Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override {
+    const auto str = field_extractor_(context, stream_info);
+    if (!str.has_value()) {
+      // Keep the sink unmodified so the caller can decide how to handle the missing value.
+      return;
+    }
+    sink.addString(*str);
+  }
+
 private:
   const FieldExtractor field_extractor_;
 };

@@ -61,11 +61,8 @@ class AsyncRequestSharedImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
-                  Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
-                  Server::Configuration::CommonFactoryContext& factory_context,
-                  Router::ShadowWriterPtr&& shadow_writer, Http::Context& http_context,
-                  Router::Context& router_context);
+  AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Event::Dispatcher& dispatcher,
+                  Router::FilterConfigSharedPtr config);
   ~AsyncClientImpl() override;
 
   // Http::AsyncClient
@@ -134,14 +131,14 @@ public:
     ENVOY_BUG(!watermark_callbacks_, "Watermark callbacks should not already be registered!");
     watermark_callbacks_.emplace(callbacks);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
+      watermark_callbacks_->onSidestreamAboveHighWatermark();
     }
   }
 
   void removeWatermarkCallbacks() override {
     ENVOY_BUG(watermark_callbacks_, "Watermark callbacks should already be registered!");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
+      watermark_callbacks_->onSidestreamBelowLowWatermark();
     }
     watermark_callbacks_.reset();
   }
@@ -166,10 +163,9 @@ protected:
   // Callback to listen for stream destruction.
   std::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
-  std::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
+  OptRef<SidestreamWatermarkCallbacks> watermark_callbacks_;
   bool complete_{};
   const bool discard_response_body_;
-  const bool new_async_client_retry_logic_{};
   std::optional<uint64_t> buffer_limit_{std::nullopt};
 
 private:
@@ -199,14 +195,6 @@ private:
   void continueDecoding() override {}
   RequestTrailerMap& addDecodedTrailers() override { PANIC("not implemented"); }
   void addDecodedData(Buffer::Instance& data, bool) override {
-    if (!new_async_client_retry_logic_) {
-      // This should only be called if the user has set up buffering. The request is already fully
-      // buffered. Note that this is only called via the async client's internal use of the router
-      // filter which uses this function for buffering.
-      ASSERT(buffered_body_ != nullptr);
-      return;
-    }
-
     // This will only be used by internal router filter for buffering for retries.
 
     // If the buffer limit is reached, the router filter will ignore the retry and the following
@@ -219,6 +207,7 @@ private:
   }
   MetadataMapVector& addDecodedMetadata() override { PANIC("not implemented"); }
   void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
+  void injectDecodedHeadersToFilterChain(bool) override {}
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
   void sendLocalReply(Code code, absl::string_view body,
@@ -235,14 +224,14 @@ private:
   void onDecoderFilterAboveWriteBufferHighWatermark() override {
     ++high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
+      watermark_callbacks_->onSidestreamAboveHighWatermark();
     }
   }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
     ASSERT(high_watermark_calls_ != 0);
     --high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
+      watermark_callbacks_->onSidestreamBelowLowWatermark();
     }
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
@@ -254,13 +243,7 @@ private:
   void setBufferLimit(uint64_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }
-  uint64_t bufferLimit() override {
-    if (new_async_client_retry_logic_) {
-      return buffer_limit_.value_or(kDefaultDecoderBufferLimit);
-    } else {
-      return buffer_limit_.value_or(0);
-    }
-  }
+  uint64_t bufferLimit() override { return buffer_limit_.value_or(kDefaultDecoderBufferLimit); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
@@ -423,12 +406,8 @@ private:
   }
   const Buffer::Instance* decodingBuffer() override { return &request_->body(); }
   uint64_t bufferLimit() override {
-    if (new_async_client_retry_logic_) {
-      // 0 means no limit because the whole body is already buffered in request message.
-      return 0;
-    } else {
-      return buffer_limit_.value_or(0);
-    }
+    // 0 means no limit because the whole body is already buffered in request message.
+    return 0;
   }
 
   RequestMessagePtr request_;

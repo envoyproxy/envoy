@@ -7,9 +7,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace TestKeyValueStore {
 
-Http::FilterFactoryCb TestKeyValueStoreFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb>
+TestKeyValueStoreFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::test_kv_store::TestKeyValueStore& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    Server::Configuration::ServerFactoryContext&, Server::Configuration::ExtraFactoryContext&) {
 
   auto config = std::make_shared<TestKeyValueStoreFilterConfig>(proto_config);
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

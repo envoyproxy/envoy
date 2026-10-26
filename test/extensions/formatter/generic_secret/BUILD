@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -16,23 +15,26 @@ envoy_extension_cc_test(
     name = "generic_secret_test",
     srcs = ["generic_secret_test.cc"],
     extension_names = ["envoy.formatter.generic_secret"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/secret:secret_provider_impl_lib",
         "//source/extensions/formatter/generic_secret:config",
+        "//test/common/formatter:formatter_test_utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/formatter/generic_secret/v3:pkg_cc_proto",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "generic_secret_integration_test",
     size = "large",
     srcs = ["generic_secret_integration_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.formatter.generic_secret"],
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],

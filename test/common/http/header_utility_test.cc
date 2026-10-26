@@ -10,6 +10,7 @@
 
 #include "test/mocks/http/header_validator.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -719,6 +720,88 @@ present_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST_F(MatchHeadersTest, HeaderPresenceWithEmptyAndRepeatedValues) {
+  struct TestCase {
+    bool present;
+    bool invert;
+    bool missing_as_empty;
+    bool absent_matches;
+    bool present_matches;
+  };
+  const TestCase cases[] = {
+      {false, false, false, true, false}, {false, false, true, false, false},
+      {false, true, false, false, true},  {false, true, true, true, true},
+      {true, false, false, false, true},  {true, false, true, true, true},
+      {true, true, false, true, false},   {true, true, true, false, false},
+  };
+  for (const auto& test : cases) {
+    SCOPED_TRACE(fmt::format("present={} invert={} missing_as_empty={}", test.present, test.invert,
+                             test.missing_as_empty));
+    // Exercise ordinary, inline, and pseudo-header lookup paths.
+    for (const auto* name : {"match-header", "content-type", ":path"}) {
+      SCOPED_TRACE(name);
+      const LowerCaseString key(name);
+      envoy::config::route::v3::HeaderMatcher config;
+      config.set_name(name);
+      config.set_present_match(test.present);
+      config.set_invert_match(test.invert);
+      config.set_treat_missing_header_as_empty(test.missing_as_empty);
+      HeaderUtility::HeaderDataPresentMatch matcher(config);
+      for (const auto& value : {std::string(), std::string(128, 'x')}) {
+        TestRequestHeaderMapImpl headers{{"unrelated-header", "value"}};
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeadersIndividually(headers));
+        for (int count = 1; count <= 4; ++count) {
+          headers.addCopy(key, value);
+          EXPECT_EQ(test.present_matches, matcher.matchesHeaders(headers));
+          EXPECT_EQ(test.present_matches, matcher.matchesHeadersIndividually(headers));
+        }
+        // Presence must not depend on which repeated entry has an empty value.
+        headers.addCopy(key, value.empty() ? "nonempty" : "");
+        EXPECT_EQ(test.present_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.present_matches, matcher.matchesHeadersIndividually(headers));
+
+        headers.remove(key);
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.absent_matches, matcher.matchesHeadersIndividually(headers));
+        headers.addCopy(key, "");
+        EXPECT_EQ(test.present_matches, matcher.matchesHeaders(headers));
+        EXPECT_EQ(test.present_matches, matcher.matchesHeadersIndividually(headers));
+      }
+    }
+  }
+}
+
+TEST_F(MatchHeadersTest, ImplicitHeaderPresenceWithInversionAndMissingAsEmpty) {
+  struct TestCase {
+    bool invert;
+    bool missing_as_empty;
+    bool absent_matches;
+    bool present_matches;
+  };
+  const TestCase cases[] = {
+      {false, false, false, true},
+      {false, true, true, true},
+      {true, false, true, false},
+      {true, true, false, false},
+  };
+  for (const auto& test : cases) {
+    SCOPED_TRACE(fmt::format("invert={} missing_as_empty={}", test.invert, test.missing_as_empty));
+    envoy::config::route::v3::HeaderMatcher config;
+    config.set_name("match-header");
+    config.set_invert_match(test.invert);
+    config.set_treat_missing_header_as_empty(test.missing_as_empty);
+    // No match specifier means present_match=true, despite the proto bool's false default.
+    const auto matcher = HeaderUtility::createHeaderData(config, context_);
+    TestRequestHeaderMapImpl headers{{"unrelated-header", "value"}};
+    EXPECT_EQ(test.absent_matches, matcher->matchesHeaders(headers));
+    EXPECT_EQ(test.absent_matches, matcher->matchesHeadersIndividually(headers));
+    headers.addCopy(LowerCaseString("match-header"), "");
+    EXPECT_EQ(test.present_matches, matcher->matchesHeaders(headers));
+    EXPECT_EQ(test.present_matches, matcher->matchesHeadersIndividually(headers));
+  }
+}
+
 // Test the case present_match is true and treat_missing_header_as_empty is
 // true. Expected always return match.
 TEST_F(MatchHeadersTest, HeaderPresentMatchWithTrueValueTreatMissingAsEmpty) {
@@ -1238,6 +1321,15 @@ TEST(HeaderIsValidTest, IsConnect) {
   EXPECT_FALSE(HeaderUtility::isConnect(Http::TestRequestHeaderMapImpl{}));
 }
 
+TEST(HeaderIsValidTest, IsQuery) {
+  EXPECT_TRUE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "QUERY"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "GET"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "POST"}}));
+  // Methods are case-sensitive.
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{{":method", "query"}}));
+  EXPECT_FALSE(HeaderUtility::isQuery(Http::TestRequestHeaderMapImpl{}));
+}
+
 TEST(HeaderIsValidTest, IsConnectUdpRequest) {
   EXPECT_TRUE(HeaderUtility::isConnectUdpRequest(
       Http::TestRequestHeaderMapImpl{{"upgrade", "connect-udp"}}));
@@ -1498,7 +1590,7 @@ TEST(ValidateHeaders, ForbiddenCharacters) {
     Http::HeaderString invalid_key(absl::string_view("x-MiXeD-CaSe"));
     headers.addViaMove(std::move(invalid_key),
                        Http::HeaderString(absl::string_view("hello world")));
-    EXPECT_TRUE(HeaderUtility::checkValidRequestHeaders(headers).ok());
+    EXPECT_OK(HeaderUtility::checkValidRequestHeaders(headers));
   }
 
   {
@@ -1585,6 +1677,17 @@ TEST(ValidateHeaders, ModifyAcceptEncodingHeader) {
 
   // Add encoding to an empty header
   EXPECT_EQ(HeaderUtility::addEncodingToAcceptEncoding("", "one"), "one");
+}
+
+TEST(HeaderIsValidTest, IsSpecial1xx) {
+  // A response map without a :status header must not crash and must return false.
+  EXPECT_FALSE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{}));
+
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "100"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "102"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "103"}}));
+  EXPECT_TRUE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "104"}}));
+  EXPECT_FALSE(HeaderUtility::isSpecial1xx(TestResponseHeaderMapImpl{{":status", "200"}}));
 }
 
 } // namespace Http

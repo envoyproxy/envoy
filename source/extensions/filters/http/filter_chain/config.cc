@@ -96,14 +96,17 @@ absl::StatusOr<Http::FilterFactoryCb> FilterChainFilterFactory::createFilterFact
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-FilterChainFilterFactory::createRouteSpecificFilterConfigTyped(
+FilterChainFilterFactory::createHttpFilterRouteConfigTyped(
     const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute&
         proto_config,
-    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
   absl::Status creation_status = absl::OkStatus();
-  // TODO(wbpcode): use the route name or vhost name as stats prefix?
-  auto filter_config = std::make_shared<FilterChainPerRouteConfig>(
-      proto_config, context, "filter_chain.", creation_status);
+  // The filters of the embedded filter chain get the stats prefix and the init manager of the
+  // enclosing context, if any, as they would if they were configured there directly.
+  auto filter_config =
+      std::make_shared<FilterChainPerRouteConfig>(proto_config, context, extra_context.stats_prefix,
+                                                  extra_context.init_manager, creation_status);
   RETURN_IF_NOT_OK(creation_status);
   return filter_config;
 }

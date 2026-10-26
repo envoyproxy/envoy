@@ -38,7 +38,7 @@ public:
       : setting_(std::move(settings)) {}
 
   absl::StatusOr<BucketId> generateBucketId(const Http::Matching::HttpMatchingDataImpl& data,
-                                            Server::Configuration::FactoryContext& factory_context,
+                                            ProtobufMessage::ValidationVisitor& validation_visitor,
                                             RateLimitQuotaValidationVisitor& visitor) const;
 
   const RateLimitQuotaBucketSettings& bucketSettings() const { return setting_; }

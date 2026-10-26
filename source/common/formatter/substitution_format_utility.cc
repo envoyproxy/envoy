@@ -34,16 +34,16 @@ absl::Status CommandSyntaxChecker::verifySyntax(CommandSyntaxChecker::CommandSyn
   return absl::OkStatus();
 }
 
-const std::optional<std::reference_wrapper<const std::string>>
-SubstitutionFormatUtils::protocolToString(const std::optional<Http::Protocol>& protocol) {
+std::optional<absl::string_view>
+SubstitutionFormatUtils::protocolToString(std::optional<Http::Protocol> protocol) {
   if (protocol) {
-    return Http::Utility::getProtocolString(protocol.value());
+    return absl::string_view(Http::Utility::getProtocolString(protocol.value()));
   }
   return std::nullopt;
 }
 
-const std::string&
-SubstitutionFormatUtils::protocolToStringOrDefault(const std::optional<Http::Protocol>& protocol) {
+absl::string_view
+SubstitutionFormatUtils::protocolToStringOrDefault(std::optional<Http::Protocol> protocol) {
   if (protocol) {
     return Http::Utility::getProtocolString(protocol.value());
   }

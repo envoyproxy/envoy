@@ -208,6 +208,8 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
                  const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_TRUE(options.parent_span_ == &this->parent_span_);
             EXPECT_TRUE(options.child_span_name_ == "JWT Remote PubKey Fetch");
+            // Sampled is left unset so the fetch span inherits the parent's sampling decision.
+            EXPECT_FALSE(options.sampled_.has_value());
             return nullptr;
           }));
 
@@ -215,15 +217,18 @@ TEST_F(JwksFetcherTest, TestSpanPassedDown) {
   fetcher_->fetch(parent_span_, receiver);
 }
 struct RetryingParameters {
-  RetryingParameters(const std::string& config, uint32_t n, int64_t base_ms, int64_t max_ms)
+  RetryingParameters(const std::string& config, uint32_t n, int64_t base_ms, int64_t max_ms,
+                     int64_t per_try_timeout_ms = 0)
       : config_(config), expected_num_retries_(n), expected_backoff_base_interval_ms_(base_ms),
-        expected_backoff_max_interval_ms_(max_ms) {}
+        expected_backoff_max_interval_ms_(max_ms),
+        expected_per_try_timeout_ms_(per_try_timeout_ms) {}
 
   std::string config_;
 
   uint32_t expected_num_retries_;
   int64_t expected_backoff_base_interval_ms_;
   int64_t expected_backoff_max_interval_ms_;
+  int64_t expected_per_try_timeout_ms_;
 };
 
 class JwksFetcherRetryingTest : public testing::TestWithParam<RetryingParameters> {
@@ -277,7 +282,21 @@ http_uri:
 retry_policy:
   num_retries: 2
 )",
-                                                            2, 1000, 10000}));
+                                                            2, 1000, 10000},
+                                         RetryingParameters{R"(
+http_uri:
+  uri: https://pubkey_server/pubkey_path
+  cluster: pubkey_cluster
+  timeout:
+    seconds: 30
+retry_policy:
+  retry_back_off:
+    base_interval: 1s
+    max_interval: 10s
+  per_try_timeout: 20s
+  num_retries: 2
+)",
+                                                            2, 1000, 10000, 20000}));
 
 TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
 
@@ -310,8 +329,8 @@ TEST_P(JwksFetcherRetryingTest, TestCompleteRetryPolicy) {
             EXPECT_EQ(options.parsed_retry_policy->maxInterval()->count(),
                       rp.expected_backoff_max_interval_ms_);
 
-            EXPECT_LE(options.parsed_retry_policy->maxInterval()->count(),
-                      options.parsed_retry_policy->perTryTimeout().count());
+            EXPECT_EQ(options.parsed_retry_policy->perTryTimeout().count(),
+                      rp.expected_per_try_timeout_ms_);
 
             const auto retry_on = options.parsed_retry_policy->retryOn();
 

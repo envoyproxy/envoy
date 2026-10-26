@@ -16,6 +16,8 @@
 #include "source/common/router/config_impl.h"
 #include "source/extensions/filters/common/processing_effect/processing_effect.h"
 
+#include "absl/strings/ascii.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -30,6 +32,58 @@ using MetadataProto = ::envoy::config::core::v3::Metadata;
 using Filters::Common::MutationRules::CheckOperation;
 using Filters::Common::MutationRules::CheckResult;
 using Filters::Common::ProcessingEffect::Effect;
+
+// Lower cases the configured header names so mutated header names can be matched case
+// insensitively.
+absl::flat_hash_set<std::string>
+lowerCasedHeaderSet(const Protobuf::RepeatedPtrField<std::string>& headers) {
+  absl::flat_hash_set<std::string> result;
+  result.reserve(headers.size());
+  for (const auto& header : headers) {
+    result.insert(absl::AsciiStrToLower(header));
+  }
+  return result;
+}
+
+// Returns whether the mutations in the response should clear the route cache. A query parameter
+// mutation always clears it, since query parameters affect routing and are not covered by
+// clear_headers. A header mutation clears it when clear_headers is empty, or when a mutated header
+// name is one of clear_headers. Headers added via headers_to_add are not considered, matching the
+// existing clear condition.
+bool shouldClearRouteCache(const absl::flat_hash_set<std::string>& clear_headers,
+                           const Filters::Common::ExtAuthz::Response& response) {
+  if (!response.query_parameters_to_set.empty() || !response.query_parameters_to_remove.empty()) {
+    return true;
+  }
+  const bool has_header_mutation = !response.headers_to_set.empty() ||
+                                   !response.headers_to_append.empty() ||
+                                   !response.headers_to_remove.empty();
+  if (!has_header_mutation) {
+    return false;
+  }
+  if (clear_headers.empty()) {
+    return true;
+  }
+  const auto matches = [&clear_headers](absl::string_view name) {
+    return clear_headers.contains(absl::AsciiStrToLower(name));
+  };
+  for (const auto& header : response.headers_to_set) {
+    if (matches(header.first)) {
+      return true;
+    }
+  }
+  for (const auto& header : response.headers_to_append) {
+    if (matches(header.first)) {
+      return true;
+    }
+  }
+  for (const auto& name : response.headers_to_remove) {
+    if (matches(name)) {
+      return true;
+    }
+  }
+  return false;
+}
 
 void fillMetadataContext(const std::vector<const MetadataProto*>& source_metadata,
                          const std::vector<std::string>& metadata_context_namespaces,
@@ -80,6 +134,41 @@ Http::Code zeroHttpCode() {
   return static_cast<Http::Code>(0);
 }
 
+absl::StatusOr<std::optional<Http::Utility::QueryParamsMulti>> modifyQueryParameters(
+    const Http::RequestHeaderMap& request_headers,
+    const std::vector<std::pair<std::string, std::string>>& query_parameters_to_set,
+    const std::vector<std::string>& query_parameters_to_remove, bool validate_mutations) {
+  if (query_parameters_to_set.empty() && query_parameters_to_remove.empty()) {
+    return std::optional<Http::Utility::QueryParamsMulti>();
+  }
+
+  if (request_headers.Path() == nullptr) {
+    if (validate_mutations) {
+      return absl::InvalidArgumentError("Query parameter mutations on a path-less request.");
+    }
+    return std::optional<Http::Utility::QueryParamsMulti>();
+  }
+
+  Http::Utility::QueryParamsMulti modified_query_parameters =
+      Http::Utility::QueryParamsMulti::parseQueryString(
+          request_headers.Path()->value().getStringView());
+
+  for (const auto& [key, value] : query_parameters_to_set) {
+    if (validate_mutations &&
+        (!Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(key) ||
+         !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(value))) {
+      return absl::InvalidArgumentError("Invalid query parameter " + key + "=" + value + ".");
+    }
+    modified_query_parameters.overwrite(key, value);
+  }
+
+  for (const auto& key : query_parameters_to_remove) {
+    modified_query_parameters.remove(key);
+  }
+
+  return std::optional<Http::Utility::QueryParamsMulti>(std::move(modified_query_parameters));
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
@@ -90,6 +179,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       failure_mode_allow_(config.failure_mode_allow()),
       failure_mode_allow_header_add_(config.failure_mode_allow_header_add()),
       shadow_mode_(config.shadow_mode()), clear_route_cache_(config.clear_route_cache()),
+      clear_route_cache_headers_(lowerCasedHeaderSet(config.clear_route_cache_headers())),
       max_request_bytes_(config.with_request_body().max_request_bytes()),
       max_denied_response_body_bytes_(config.max_denied_response_body_bytes()),
 
@@ -142,6 +232,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       include_tls_session_(config.include_tls_session()),
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
+      emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
       ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
       ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
@@ -196,6 +287,9 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   for (auto it = begin_it; it != end_it; ++it) {
     context_extensions_[it->first] = it->second;
   }
+  if (other.emit_client_span_.has_value()) {
+    emit_client_span_ = other.emit_client_span_;
+  }
 }
 
 // Constructor used for merging configurations from different levels (vhost, route, etc.)
@@ -209,7 +303,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
                                                             : std::nullopt),
       http_service_(more_specific.http_service_.has_value() ? more_specific.http_service_
-                                                            : std::nullopt) {
+                                                            : std::nullopt),
+      emit_client_span_(more_specific.emit_client_span_.has_value()
+                            ? more_specific.emit_client_span_
+                            : less_specific.emit_client_span_) {
   // Merge context extensions from more specific configuration, overriding less specific ones.
   for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
@@ -372,9 +469,12 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   // If metadata key is set in both the connection and request metadata,
   // then the value will be the request metadata value.
   envoy::config::core::v3::Metadata metadata_context;
-  fillMetadataContext({&decoder_callbacks_->streamInfo().dynamicMetadata(),
-                       &decoder_callbacks_->connection()->streamInfo().dynamicMetadata()},
-                      config_->metadataContextNamespaces(),
+  std::vector<const MetadataProto*> metadata_sources{
+      &decoder_callbacks_->streamInfo().dynamicMetadata()};
+  if (const auto connection = decoder_callbacks_->connection(); connection.has_value()) {
+    metadata_sources.push_back(&connection->streamInfo().dynamicMetadata());
+  }
+  fillMetadataContext(metadata_sources, config_->metadataContextNamespaces(),
                       config_->typedMetadataContextNamespaces(), metadata_context);
 
   // Fill route_metadata_context from the selected route's metadata.
@@ -394,6 +494,13 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server.", *decoder_callbacks_);
   // Store start time of ext_authz filter call
   start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
+
+  bool emit_client_span = config_->emitClientSpan();
+  if (maybe_merged_per_route_config &&
+      maybe_merged_per_route_config->emitClientSpan().has_value()) {
+    emit_client_span = maybe_merged_per_route_config->emitClientSpan().value();
+  }
+  client_to_use->setEmitClientSpan(emit_client_span);
 
   state_ = State::Calling;
   filter_return_ = FilterReturn::StopDecoding; // Don't let the filter chain continue as we are
@@ -711,9 +818,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     // routed. If we are changing the headers we also need to clear the route
     // cache.
     if (config_->clearRouteCache() &&
-        (!response->headers_to_set.empty() || !response->headers_to_append.empty() ||
-         !response->headers_to_remove.empty() || !response->query_parameters_to_set.empty() ||
-         !response->query_parameters_to_remove.empty())) {
+        shouldClearRouteCache(config_->clearRouteCacheHeaders(), *response)) {
       ENVOY_STREAM_LOG(debug, "ext_authz is clearing route cache", *decoder_callbacks_);
       decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
     }
@@ -936,43 +1041,19 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                              response->response_headers_to_overwrite_if_exists.end()};
     }
 
-    std::optional<Http::Utility::QueryParamsMulti> modified_query_parameters;
-    if (!response->query_parameters_to_set.empty()) {
-      modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
-          request_headers_->Path()->value().getStringView());
-      ENVOY_STREAM_LOG(
-          trace, "ext_authz filter set query parameter(s) on the request:", *decoder_callbacks_);
-      for (const auto& [key, value] : response->query_parameters_to_set) {
-        if (config_->validateMutations() &&
-            (!Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(key) ||
-             !Http::Utility::PercentEncoding::queryParameterIsUrlEncoded(value))) {
-          ENVOY_STREAM_LOG(trace, "Rejected invalid query parameter {}={}.", *decoder_callbacks_,
-                           key, value);
-          rejectResponse();
-          updateEffect(Effect::InvalidMutationRejected);
-          return;
-        }
-        ENVOY_STREAM_LOG(trace, "'{}={}'", *decoder_callbacks_, key, value);
-        modified_query_parameters->overwrite(key, value);
-      }
+    auto status_or_query_parameters =
+        modifyQueryParameters(*request_headers_, response->query_parameters_to_set,
+                              response->query_parameters_to_remove, config_->validateMutations());
+    if (!status_or_query_parameters.ok()) {
+      ENVOY_STREAM_LOG(trace, "Rejected query parameter mutations: {}", *decoder_callbacks_,
+                       status_or_query_parameters.status().message());
+      rejectResponse();
+      updateEffect(Effect::InvalidMutationRejected);
+      return;
     }
 
-    if (!response->query_parameters_to_remove.empty()) {
-      if (!modified_query_parameters) {
-        modified_query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(
-            request_headers_->Path()->value().getStringView());
-      }
-      ENVOY_STREAM_LOG(trace, "ext_authz filter removed query parameter(s) from the request:",
-                       *decoder_callbacks_);
-      for (const auto& key : response->query_parameters_to_remove) {
-        ENVOY_STREAM_LOG(trace, "'{}'", *decoder_callbacks_, key);
-        modified_query_parameters->remove(key);
-      }
-    }
-
-    // We modified the query parameters in some way, so regenerate the `path` header and set it
-    // here.
-    if (modified_query_parameters) {
+    auto& modified_query_parameters = status_or_query_parameters.value();
+    if (modified_query_parameters.has_value()) {
       const auto new_path =
           modified_query_parameters->replaceQueryString(request_headers_->Path()->value());
       ENVOY_STREAM_LOG(

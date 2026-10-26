@@ -16,6 +16,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+
 namespace Envoy {
 
 thread_local const Http::FilterContext* current_filter_context = nullptr;
@@ -78,11 +80,27 @@ public:
     stream_info_.filter_state_->setData(kConnectionExecutionContextFilterStateName, context_,
                                         StreamInfo::FilterState::LifeSpan::Connection);
   }
+  void setWithIndexedContext() {
+    context_ = std::make_shared<TestExecutionContext>();
+    stream_info_.filter_state_ = std::make_shared<StreamInfo::FilterStateImpl>(
+        StreamInfo::FilterState::LifeSpan::Connection);
+    stream_info_.filter_state_->setIndexedData(
+        StreamInfo::FilterStateIndex::ConnectionExecutionContext, context_,
+        StreamInfo::FilterState::LifeSpan::Connection);
+  }
 
   testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   testing::NiceMock<MockScopeTrackedObject> tracked_object_;
   std::shared_ptr<TestExecutionContext> context_;
 };
+
+TEST_F(ExecutionContextTest, IndexedFilterState) {
+  setWithIndexedContext();
+  EXPECT_TRUE(stream_info_.filter_state_->hasIndexedData(
+      StreamInfo::FilterStateIndex::ConnectionExecutionContext));
+  EXPECT_EQ(ExecutionContext::fromStreamInfo(OptRef<const StreamInfo::StreamInfo>(stream_info_)),
+            context_.get());
+}
 
 TEST_F(ExecutionContextTest, NullContext) {
   {
@@ -154,7 +172,9 @@ TEST_F(ExecutionContextTest, InScopeTrackerScopeState) {
   EXPECT_EQ(context_->activationGenerations(), 1);
 
   setWithoutContext();
-  { ScopeTrackerScopeState scope(&tracked_object_, *dispatcher); }
+  {
+    ScopeTrackerScopeState scope(&tracked_object_, *dispatcher);
+  }
 }
 
 TEST_F(ExecutionContextTest, NoopScope) {
@@ -208,3 +228,16 @@ TEST_F(ExecutionContextTest, FilterManagerCompiles) {
 }
 
 } // namespace Envoy
+
+#else
+
+namespace Envoy {
+
+TEST(ExecutionContextDisabledTest, FeatureIsDisabled) {
+  // Confirm that the test suite runs and succeeds when execution context is disabled.
+  SUCCEED();
+}
+
+} // namespace Envoy
+
+#endif

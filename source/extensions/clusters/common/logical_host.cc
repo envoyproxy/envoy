@@ -38,7 +38,8 @@ LogicalHost::LogicalHost(
           lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority(),
           creation_status),
       override_transport_socket_options_(override_transport_socket_options), address_(address),
-      address_list_or_null_(makeAddressListOrNull(address, address_list)) {
+      address_list_or_null_(makeAddressListOrNull(address, address_list)),
+      sorted_address_list_or_null_(makeSortedAddressListOrNull(*cluster, address_list)) {
   health_check_address_ =
       resolveHealthCheckAddress(lb_endpoint.endpoint().health_check_config(), address);
 }
@@ -59,10 +60,13 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
     shared_address_list = std::make_shared<AddressVector>(address_list);
     ASSERT(*address_list.front() == *address);
   }
+  SharedConstAddressVector sorted_address_list =
+      makeSortedAddressListOrNull(cluster(), address_list);
   {
     absl::MutexLock lock(address_lock_);
     address_ = address;
     address_list_or_null_ = std::move(shared_address_list);
+    sorted_address_list_or_null_ = std::move(sorted_address_list);
     health_check_address_ = std::move(health_check_address);
   }
 }
@@ -70,6 +74,11 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
 HostDescription::SharedConstAddressVector LogicalHost::addressListOrNull() const {
   absl::MutexLock lock(address_lock_);
   return address_list_or_null_;
+}
+
+HostDescription::SharedConstAddressVector LogicalHost::sortedAddressListOrNull() const {
+  absl::MutexLock lock(address_lock_);
+  return sorted_address_list_or_null_;
 }
 
 Network::Address::InstanceConstSharedPtr LogicalHost::address() const {
@@ -86,11 +95,11 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     Network::TransportSocketOptionsConstSharedPtr transport_socket_options) const {
   Network::Address::InstanceConstSharedPtr address;
-  SharedConstAddressVector address_list_or_null;
+  SharedConstAddressVector sorted_address_list_or_null;
   {
     absl::MutexLock lock(address_lock_);
     address = address_;
-    address_list_or_null = address_list_or_null_;
+    sorted_address_list_or_null = sorted_address_list_or_null_;
   }
 
   // Use override_transport_socket_options if set, otherwise use the passed options.
@@ -109,8 +118,8 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
           : transportSocketFactory();
 
   return HostImplBase::createConnection(
-      dispatcher, cluster(), address, address_list_or_null, factory, options, effective_options,
-      std::make_shared<RealHostDescription>(address, shared_from_this()));
+      dispatcher, cluster(), address, sorted_address_list_or_null, factory, options,
+      effective_options, std::make_shared<RealHostDescription>(address, shared_from_this()));
 }
 
 Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
@@ -119,17 +128,17 @@ Upstream::Host::CreateConnectionData LogicalHost::createOrcaReportingConnection(
     Network::UpstreamTransportSocketFactory& factory,
     Network::Address::InstanceConstSharedPtr orca_address) const {
   Network::Address::InstanceConstSharedPtr host_address;
-  SharedConstAddressVector address_list_or_null;
+  SharedConstAddressVector sorted_address_list_or_null;
   {
     absl::MutexLock lock(address_lock_);
     host_address = address_;
-    address_list_or_null = address_list_or_null_;
+    sorted_address_list_or_null = sorted_address_list_or_null_;
   }
   // The caller's options pass through unchanged; as with health checks,
   // override_transport_socket_options_ is not consulted here.
   return createOrcaConnection(
       dispatcher, transport_socket_options, factory, orca_address, host_address,
-      address_list_or_null,
+      sorted_address_list_or_null,
       std::make_shared<RealHostDescription>(orca_address, shared_from_this()));
 }
 

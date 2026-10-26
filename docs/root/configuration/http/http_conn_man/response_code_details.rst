@@ -39,6 +39,7 @@ Below are the list of reasons the HttpConnectionManager or Router filter may sen
    missing_path_rejected, The request was rejected due to a missing Path or :path header field.
    no_healthy_upstream, The request was rejected by the router filter because there was no healthy upstream found.
    overload, The request was rejected due to the Overload Manager reaching configured resource limits.
+   query_missing_content_type, "The QUERY request was rejected because it had no Content-Type field. RFC 10008 Section 2 requires servers to fail such requests."
    rejecting_because_detection_failed, The request was rejected because the original IP couldn't be detected.
    path_normalization_failed, "The request was rejected because path normalization was configured on and failed, probably due to an invalid path."
    request_headers_failed_strict_check, The request was rejected due to x-envoy-* headers failing strict header validation.

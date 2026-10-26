@@ -250,7 +250,7 @@ private:
   Random::RandomGenerator& generator_;
   RuntimeStats stats_;
   AdminLayerPtr admin_layer_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocal::SlotSharedPtr tls_;
   const envoy::config::bootstrap::v3::LayeredRuntime config_;
   const std::string service_cluster_;
   Filesystem::WatcherPtr watcher_;

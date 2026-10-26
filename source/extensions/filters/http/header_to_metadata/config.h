@@ -14,15 +14,23 @@ namespace HeaderToMetadataFilter {
  * Config registration for the header-to-metadata filter. @see NamedHttpFilterConfigFactory.
  */
 class HeaderToMetadataConfig
-    : public Common::ExceptionFreeFactoryBase<
+    : public Common::UnifiedFactoryBase<
           envoy::extensions::filters::http::header_to_metadata::v3::Config> {
 public:
-  HeaderToMetadataConfig() : ExceptionFreeFactoryBase("envoy.filters.http.header_to_metadata") {}
+  HeaderToMetadataConfig() : UnifiedFactoryBase("envoy.filters.http.header_to_metadata") {}
 
 private:
-  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+      Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
+
+  // Shared factory creation used by the listener/cluster and route/vhost-level paths. Stats are
+  // scoped to the given scope.
+  static absl::StatusOr<Http::FilterFactoryCb> createFilterFactory(
+      const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
+      Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
+
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,

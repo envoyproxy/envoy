@@ -15,11 +15,15 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
+#include "gmock/gmock.h"
 using testing::_;
+using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+
+#include "test/test_common/struct_matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -171,8 +175,7 @@ public:
           Protobuf::Struct message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
-          EXPECT_TRUE(message.fields().contains(key));
-          EXPECT_EQ(message.fields().at(key).number_value(), count);
+          EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
         }));
   }
 
@@ -486,8 +489,7 @@ public:
               Protobuf::Struct message;
               Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
               EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
-              EXPECT_TRUE(message.fields().contains(key));
-              EXPECT_EQ(message.fields().at(key).number_value(), count);
+              EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
               return nullptr; // We don't care about the returned request.
             }));
   }

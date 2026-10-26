@@ -6,6 +6,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@
 #endif
 
 namespace Envoy {
-#if !defined OPENSSL_IS_BORINGSSL && !defined OPENSSL_IS_AWSLC
+#ifndef OPENSSL_IS_BORINGSSL
 #error Envoy requires BoringSSL
 #endif
 
@@ -46,6 +47,13 @@ struct TlsContext {
   // safely substituted via SSL_set_SSL_CTX() during the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello.
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
+  // Per-certificate TLS params applied to the SSL* after SSL_set_SSL_CTX, which only transfers
+  // certificate material and does not propagate cipher/version/curve settings.
+  std::optional<Ssl::TlsParams> tls_params_;
+  // Mirrors ContextImpl::capabilities_ so applyTlsParamsToSsl can skip fields that a custom
+  // handshaker manages instead of BoringSSL.
+  bool provides_ciphers_and_curves_{false};
+  bool provides_sigalgs_{false};
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;
@@ -103,7 +111,7 @@ public:
   static int sslSocketIndex();
   // Ssl::Context
   std::optional<uint32_t> daysUntilFirstCertExpires() const override;
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
 
@@ -147,8 +155,9 @@ protected:
   std::vector<uint8_t> parseAlpnProtocols(const std::string& alpn_protocols,
                                           absl::Status& parse_status);
 
-  void incCounter(const Stats::StatName name, absl::string_view value,
-                  const Stats::StatName fallback) const;
+  // Increments the "<name>.<value>" counter of the scope, with the value as its tag_name tag.
+  void incCounter(const Stats::StatName name, const Stats::StatName tag_name,
+                  absl::string_view value, const Stats::StatName fallback) const;
 
   // Helper function to validate cert for TCP connections asynchronously.
   ValidationResults customVerifyCertChain(
@@ -157,7 +166,8 @@ protected:
 
   void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
 
-  absl::Status setCompliancePolicy(enum ssl_compliance_policy_t policy);
+  absl::Status setCompliancePolicy(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy policy);
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
@@ -172,15 +182,8 @@ protected:
   std::string cert_chain_file_path_;
   Server::Configuration::CommonFactoryContext& factory_context_;
   const unsigned tls_max_version_;
-  mutable Stats::StatNameSetPtr stat_name_set_;
-  const Stats::StatName unknown_ssl_cipher_;
-  const Stats::StatName unknown_ssl_curve_;
-  const Stats::StatName unknown_ssl_algorithm_;
-  const Stats::StatName unknown_ssl_version_;
-  const Stats::StatName ssl_ciphers_;
-  const Stats::StatName ssl_versions_;
-  const Stats::StatName ssl_curves_;
-  const Stats::StatName ssl_sigalgs_;
+  // Server-wide shared TLS stat name builtins, kept alive for this context's lifetime.
+  const std::shared_ptr<TlsBuiltinStatNames> builtin_stat_names_;
   const Ssl::HandshakerCapabilities capabilities_;
   const Network::Address::IpList tls_keylog_local_;
   const Network::Address::IpList tls_keylog_remote_;

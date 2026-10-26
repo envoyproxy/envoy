@@ -134,7 +134,7 @@ private:
 
   // Returns the minimum time before a session can be terminated.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  absl::Duration MinTimeBeforeTerminationAllowed() const;
+  absl::Duration MinTimeBeforeTerminationAllowed(bool is_saturated) const;
 
   Event::Dispatcher& dispatcher_;
   // The sessions currently tracked.

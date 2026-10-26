@@ -1,7 +1,5 @@
 #pragma once
 
-#include <unistd.h>
-
 #include <atomic>
 #include <cstdint>
 #include <memory>
@@ -25,6 +23,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_lifecycle_info.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -73,7 +72,14 @@ public:
   Stats::Gauge* total_clusters_gauge_{nullptr};
   Stats::Gauge* total_nodes_gauge_{nullptr};
 
+  Stats::Histogram* cx_upgrade_time_{nullptr};
+  Stats::Histogram* cx_idle_expire_time_{nullptr};
+  Stats::Histogram* cx_post_upgrade_lifetime_{nullptr};
+
 private:
+  Stats::Histogram* getHistogram(absl::string_view name, Stats::Scope& stats_store,
+                                 absl::string_view stat_prefix);
+
   // Thread-local dispatcher.
   Event::Dispatcher& dispatcher_;
   // Thread-local socket manager.
@@ -116,6 +122,11 @@ public:
    * @return pointer to the thread-local registry, or nullptr if not available.
    */
   UpstreamSocketThreadLocal* getLocalRegistry() const;
+
+  /**
+   * @return the thread-local socket manager for the upstream acceptor, or nullptr if unavailable.
+   */
+  static UpstreamSocketManager* getThreadLocalSocketManager();
 
   /**
    * @return reference to the stat prefix string.
@@ -187,6 +198,11 @@ public:
   bool enableTenantIsolation() const { return enable_tenant_isolation_; }
 
   /**
+   * @return the configured maximum number of concurrently accepted reverse connections per node.
+   */
+  uint32_t maxConnectionsPerNode() const { return max_connections_per_node_; }
+
+  /**
    * @return whether lifecycle access logs are configured.
    */
   bool hasAccessLogs() const { return !access_logs_.empty(); }
@@ -218,9 +234,9 @@ public:
    * @param tenant_id tenant identifier supplied by the peer.
    */
   void reportConnection(absl::string_view node_id, absl::string_view cluster_id,
-                        absl::string_view tenant_id, int64_t initiation_time_ms) {
+                        absl::string_view tenant_id, int64_t initiation_time_ms, int fd) {
     if (reporter_ != nullptr) {
-      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms);
+      reporter_->reportConnectionEvent(node_id, cluster_id, tenant_id, initiation_time_ms, fd);
     }
   }
 
@@ -230,9 +246,32 @@ public:
    * @param node_id node to which the connection is made.
    * @param cluster_id cluster which the node belongs to.
    */
-  void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id) {
+  void reportDisconnection(absl::string_view node_id, absl::string_view cluster_id, int fd) {
     if (reporter_ != nullptr) {
-      reporter_->reportDisconnectionEvent(node_id, cluster_id);
+      reporter_->reportDisconnectionEvent(node_id, cluster_id, fd);
+    }
+  }
+
+  /**
+   * Forward a go away event to the configured reporter.
+   * If no reporter is present, the call is ignored.
+   * @param fd the file descriptor of the connection that sent the go away.
+   */
+  void reportGoAway(absl::string_view node_id, absl::string_view cluster_id, int fd) {
+    if (reporter_ != nullptr) {
+      reporter_->reportGoAwayEvent(node_id, cluster_id, fd);
+    }
+  }
+
+  void updateIdleExpireTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_idle_expire_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
+    }
+  }
+
+  void updateUpgradeTime(const Envoy::MonotonicTime& start, const Envoy::MonotonicTime& end) {
+    if (auto registry = getLocalRegistry()) {
+      registry->cx_upgrade_time_->recordValue(ReverseConnectionUtility::diffMs(start, end));
     }
   }
 
@@ -268,6 +307,7 @@ private:
   uint32_t ping_failure_threshold_{3};
   bool enable_detailed_stats_{false};
   bool enable_tenant_isolation_{false};
+  const uint32_t max_connections_per_node_{0};
   AccessLog::InstanceSharedPtrVector access_logs_;
   ReverseTunnelReporterPtr reporter_{nullptr};
 

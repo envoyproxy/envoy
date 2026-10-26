@@ -23,9 +23,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the downstream reverse connection socket interface.
 // This interface initiates reverse connections to upstream Envoys and provides
 // them as socket connections for downstream requests.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message DownstreamReverseConnectionSocketInterface {
   // HTTP handshake settings for initiator envoy initiated reverse tunnels.
+  // [#next-free-field: 6]
   message HttpHandshakeConfig {
     // Request path used when issuing the HTTP reverse-connection handshake. Defaults to
     // "/reverse_connections/request".
@@ -45,6 +46,14 @@ message DownstreamReverseConnectionSocketInterface {
     // as substitution format strings; when empty, the values are sent literally.
     // [#extension-category: envoy.formatter]
     repeated config.core.v3.TypedExtensionConfig formatters = 4;
+
+    // Maximum time to receive the handshake response after the connection opens. If not specified,
+    // defaults to ``15s``. On expiry the attempt is closed, recorded with failure reason
+    // ``timeout``, and normal backoff applies.
+    google.protobuf.Duration handshake_timeout = 5 [(validate.rules).duration = {
+      lte {seconds: 300}
+      gt {}
+    }];
   }
 
   // Stat prefix to be used for downstream reverse connection socket interface stats.
@@ -60,9 +69,10 @@ message DownstreamReverseConnectionSocketInterface {
   HttpHandshakeConfig http_handshake = 3;
 
   // Access log configuration for reverse tunnel initiator lifecycle events.
-  // Logs are emitted on handshake success, handshake failure, and connection close.
-  // Reverse tunnel metadata (``node_id``, ``cluster_id``, ``tenant_id``, upstream cluster, etc.)
-  // is available via ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:*)%`` substitutions.
+  // Logs are emitted on handshake success, handshake failure, connection draining, and
+  // connection close. Reverse tunnel metadata (``node_id``, ``cluster_id``, ``tenant_id``,
+  // upstream cluster, ``connection_key``, ``connection_id``, etc.) is available via
+  // ``%DYNAMIC_METADATA(envoy.reverse_tunnel.initiator:*)%`` substitutions.
   repeated config.accesslog.v3.AccessLog access_log = 4;
 
   // Upper bound on the per-host reconnect backoff. The initiator retries a failed handshake on a
@@ -70,4 +80,10 @@ message DownstreamReverseConnectionSocketInterface {
   // that schedule.
   google.protobuf.Duration max_reconnect_backoff = 5
       [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // How often the initiator re-checks each host and dials any missing reverse tunnels.
+  // Defaults to 10s. The re-check is jittered upward so agents that start together do not
+  // redial in lockstep. The minimum value is 100ms.
+  google.protobuf.Duration maintain_interval = 6
+      [(validate.rules).duration = {gte {nanos: 100000000}}];
 }

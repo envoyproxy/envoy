@@ -500,10 +500,11 @@ TEST_F(AsyncDataSourceTest, BaseIntervalGreaterThanMaxInterval) {
   TestUtility::loadFromYamlAndValidate(yaml, config);
   EXPECT_TRUE(config.has_remote());
 
-  EXPECT_THROW_WITH_MESSAGE(
-      std::make_unique<RemoteAsyncDataProvider>(cm_, init_manager_, config.remote(), dispatcher_,
-                                                random_, true, [&](const std::string&) {}),
-      EnvoyException, "max_interval must be greater than or equal to the base_interval");
+  EXPECT_THROW_WITH_MESSAGE(std::ignore = std::make_unique<RemoteAsyncDataProvider>(
+                                cm_, init_manager_, config.remote(), dispatcher_, random_, true,
+                                [&](const std::string&) {}),
+                            EnvoyException,
+                            "max_interval must be greater than or equal to the base_interval");
 }
 
 TEST_F(AsyncDataSourceTest, BaseIntervalTest) {

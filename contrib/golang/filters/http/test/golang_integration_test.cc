@@ -970,7 +970,8 @@ typed_config:
     Network::Address::InstanceConstSharedPtr address =
         Ssl::getSslAddress(version_, lookupPort("http"));
     auto client_transport_socket_factory_ptr = Ssl::createClientSslTransportSocketFactory(
-        Ssl::ClientSslTransportOptions(), *ssl_context_manager_, *api_);
+        Ssl::ClientSslTransportOptions(), *ssl_context_manager_, *api_,
+        &server_factory_context_.serverScope());
     return dispatcher_->createClientConnection(
         address, Network::Address::InstanceConstSharedPtr(),
         client_transport_socket_factory_ptr->createTransportSocket({}, nullptr), nullptr, nullptr);
@@ -1395,6 +1396,13 @@ TEST_P(GolangIntegrationTest, DataBuffer_DecodeData) { testBasic("/test?databuff
 // buffer all data in decode data phase with async mode.
 TEST_P(GolangIntegrationTest, Async_DataBuffer_DecodeData) {
   testBasic("/test?async=1&databuffer=decode-data");
+}
+
+// Only DecodeData is async, and it sleeps so that the trailers arrive before it returns
+// StopAndBuffer. The trailers are then handled synchronously, and the buffered data must still be
+// forwarded before them.
+TEST_P(GolangIntegrationTest, AsyncData_DataBuffer_DecodeData_SyncTrailers) {
+  testBasic("/test?async_data=1&data_sleep=1&databuffer=decode-data");
 }
 
 // Go send local reply in decode header phase.
@@ -2080,6 +2088,18 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
   testUpstreamOverrideHost(
       "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
       false);
+}
+
+// Same as SetUpstreamOverrideHost_InvalidHost_Strict_NotFound, but called from a goroutine so the
+// override is applied through the dispatcher post. Without strict mode the request would fall back
+// to a valid host and return 200.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound_Async) {
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+
+  testUpstreamOverrideHost(
+      "503", "",
+      "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true&async=1", false);
 }
 
 // Set an unavailable host with strict mode and retry, and the host is in the cluster.

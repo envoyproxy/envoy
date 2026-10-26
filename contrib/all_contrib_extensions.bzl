@@ -16,7 +16,6 @@ def envoy_contrib_linux_aarch64_constraints():
 ARM64_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.cryptomb",
     "envoy.tls.key_providers.qat",
-    "envoy.network.connection_balance.dlb",
     "envoy.compression.qatzip.compressor",
     "envoy.compression.qatzstd.compressor",
 ]
@@ -28,7 +27,6 @@ PPC_SKIP_CONTRIB_TARGETS = [
     "envoy.tls.key_providers.qat",
     "envoy.tls.key_providers.kae",
     "envoy.matching.input_matchers.hyperscan",
-    "envoy.network.connection_balance.dlb",
     "envoy.regex_engines.hyperscan",
     "envoy.compression.qatzip.compressor",
     "envoy.compression.qatzstd.compressor",
@@ -38,15 +36,6 @@ PPC_SKIP_CONTRIB_TARGETS = [
 BORINGSSL_FIPS_SKIP_CONTRIB_TARGETS = [
     "envoy.compression.qatzip.compressor",
     "envoy.tls.key_providers.kae",
-]
-
-# AWS-LC needs to skip additional Intel-specific crypto providers
-AWS_LC_SKIP_CONTRIB_TARGETS = [
-    "envoy.tls.key_providers.cryptomb",
-    "envoy.tls.key_providers.qat",
-    "envoy.tls.key_providers.kae",
-    "envoy.compression.qatzip.compressor",
-    "envoy.compression.qatzstd.compressor",
 ]
 
 # OpenSSL is incompatible with Intel-specific private key providers
@@ -62,7 +51,6 @@ def envoy_all_contrib_extensions(denylist = []):
 SELECTED_CONTRIB_EXTENSIONS = select({
     "//bazel:linux_aarch64": envoy_all_contrib_extensions(ARM64_SKIP_CONTRIB_TARGETS),
     "//bazel:linux_ppc": envoy_all_contrib_extensions(PPC_SKIP_CONTRIB_TARGETS),
-    "//contrib:using_aws_lc_on_linux_x86_64": envoy_all_contrib_extensions(AWS_LC_SKIP_CONTRIB_TARGETS),
     "//contrib:using_boringssl_fips_on_linux_x86_64": envoy_all_contrib_extensions(BORINGSSL_FIPS_SKIP_CONTRIB_TARGETS),
     "//contrib:using_openssl_on_linux_x86_64": envoy_all_contrib_extensions(OPENSSL_SKIP_CONTRIB_TARGETS),
     "//conditions:default": envoy_all_contrib_extensions(X86_SKIP_CONTRIB_TARGETS),

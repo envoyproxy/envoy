@@ -28,8 +28,21 @@ envoy_cc_library(
         ":fatal_error_handler_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:non_copyable",
+        "//source/common/coroutine:backtrace_lib",
         "//source/common/singleton:threadsafe_singleton",
         "//source/server:backtrace_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "non_fatal_signal_handler_lib",
+    srcs = ["non_fatal_signal_handler.cc"],
+    hdrs = ["non_fatal_signal_handler.h"],
+    tags = ["backtrace"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//source/common/common:thread_lib",
     ],
 )
 

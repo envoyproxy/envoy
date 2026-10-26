@@ -5,10 +5,12 @@
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/struct_matchers.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -19,7 +21,7 @@ namespace ZooKeeperProxy {
 bool protoMapEq(const Protobuf::Struct& obj, const std::map<std::string, std::string>& rhs) {
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
-    EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
+    EXPECT_THAT(obj.fields(), Contains(IsStructString(entry.first, entry.second)));
   }
   return true;
 }
@@ -39,7 +41,8 @@ public:
     config_ = std::make_shared<ZooKeeperFilterConfig>(
         stat_prefix_, 1048576, enable_per_opcode_request_bytes_metrics,
         enable_per_opcode_response_bytes_metrics, enable_per_opcode_decoder_error_metrics,
-        enable_latency_threshold_metrics, default_latency_threshold, latency_threshold_overrides,
+        enable_latency_threshold_metrics, default_latency_threshold,
+        ZooKeeperFilterConfig::parseLatencyThresholdOverrides(latency_threshold_overrides).value(),
         scope_);
     filter_ = std::make_unique<ZooKeeperFilter>(config_, time_system_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);

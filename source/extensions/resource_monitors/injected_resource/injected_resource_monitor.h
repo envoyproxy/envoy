@@ -24,6 +24,8 @@ public:
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context);
 
+  absl::Status init();
+
   // Server::ResourceMonitor
   void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
@@ -35,7 +37,7 @@ private:
   bool file_changed_{true};
   Filesystem::WatcherPtr watcher_;
   std::optional<double> pressure_;
-  std::optional<EnvoyException> error_;
+  std::optional<absl::Status> error_;
   Api::Api& api_;
 };
 

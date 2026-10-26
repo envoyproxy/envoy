@@ -81,6 +81,12 @@ For example, if your secret file contains just the token ``xyz123`` and you conf
 
 The resulting header will be: ``Authorization: Bearer xyz123``
 
+.. note::
+  Trailing newline and carriage return characters are stripped from the credential before it is
+  injected, since HTTP header values cannot contain them. This is particularly relevant for
+  file-based secrets, which commonly end with a trailing newline. A credential consisting only
+  of such characters is treated as missing.
+
 OAuth2 credential injector (client credential grant)
 ----------------------------------------------------
 * This extension should be configured with the type URL ``type.googleapis.com/envoy.extensions.http.injected_credentials.oauth2.v3.OAuth2``.

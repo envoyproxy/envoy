@@ -30,9 +30,10 @@ private:
       credential_file_data_source_provider_;
   bool has_watched_directory_ = false;
 
-  bool needsRefresh() override;
-  void refresh() override;
-  void extractCredentials(absl::string_view credentials_string, absl::string_view profile);
+  bool needsRefresh() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  void refresh() override ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  void extractCredentials(absl::string_view credentials_string, absl::string_view profile)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
 };
 
 } // namespace Aws

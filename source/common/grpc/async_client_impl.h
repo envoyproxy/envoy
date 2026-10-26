@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -49,6 +50,7 @@ protected:
 private:
   const uint32_t max_recv_message_length_;
   const bool skip_envoy_headers_;
+  const std::optional<uint32_t> per_stream_buffer_limit_bytes_;
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
   // The host header value in the http transport.
@@ -128,7 +130,10 @@ protected:
   std::string method_name_;
   Tracing::SpanPtr current_span_;
 
-  RawAsyncStreamCallbacks& callbacks_;
+  // Optional reference to the stream callbacks. This is reset once the stream is cleaned up or the
+  // owner detaches via waitForRemoteCloseAndDelete(), after which no further callbacks may be
+  // invoked. All call sites must check has_value() before invoking.
+  OptRef<RawAsyncStreamCallbacks> callbacks_;
   Http::AsyncClient::StreamOptions options_;
   bool http_reset_{};
   bool waiting_to_delete_on_remote_close_{};

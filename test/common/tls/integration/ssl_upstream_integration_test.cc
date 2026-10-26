@@ -188,10 +188,9 @@ public:
     auto cfg_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
     RELEASE_ASSERT(cfg_or_error.ok(), std::string(cfg_or_error.status().message()));
-    auto cfg = std::move(*cfg_or_error);
-    static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     auto factory_or_error = Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), BaseIntegrationTest::context_manager_, *upstream_stats_store->rootScope());
+        std::move(*cfg_or_error), BaseIntegrationTest::context_manager_,
+        server_factory_context_.serverScope());
     RELEASE_ASSERT(factory_or_error.ok(), std::string(factory_or_error.status().message()));
     return std::move(*factory_or_error);
   }

@@ -57,11 +57,12 @@ absl::Status validateProto(const ProtoFileServerConfig& config) {
 } // namespace
 
 FileServerFilterFactory::FileServerFilterFactory()
-    : DualFactoryBase(FileServerFilter::filterName()) {}
+    : UnifiedFactoryBase(FileServerFilter::filterName()) {}
 
-absl::StatusOr<Http::FilterFactoryCb> FileServerFilterFactory::createFilterFactoryFromProtoTyped(
-    const ProtoFileServerConfig& config, const std::string&, DualInfo,
-    Server::Configuration::ServerFactoryContext& context) {
+absl::StatusOr<Http::FilterFactoryCb>
+FileServerFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const ProtoFileServerConfig& config, Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
   RETURN_IF_NOT_OK(validateProto(config));
   auto file_server_config = FileServerConfig::create(config, context);
   if (!file_server_config.ok()) {

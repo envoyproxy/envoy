@@ -1,6 +1,10 @@
 #include "source/common/event/libevent_scheduler.h"
 
+#include <algorithm>
+#include <chrono>
+
 #include "source/common/common/assert.h"
+#include "source/common/event/evwatch_observer_manager_impl.h"
 #include "source/common/event/schedulable_cb_impl.h"
 #include "source/common/event/timer_impl.h"
 
@@ -15,7 +19,7 @@ void recordTimeval(Stats::Histogram& histogram, const timeval& tv) {
 }
 } // namespace
 
-LibeventScheduler::LibeventScheduler() {
+LibeventScheduler::LibeventScheduler(TimeSource& time_source) : time_source_(time_source) {
 #ifdef WIN32
   event_config* event_config = event_config_new();
   RELEASE_ASSERT(event_config != nullptr,
@@ -33,6 +37,30 @@ LibeventScheduler::LibeventScheduler() {
 
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
+
+  evwatch_manager_ = std::make_unique<EvwatchObserverManagerImpl>(*libevent_, time_source_);
+}
+
+LibeventScheduler::LibeventScheduler(TimeSource& time_source,
+                                     EvwatchObserverManagerPtr evwatch_manager)
+    : LibeventScheduler(time_source) {
+  if (evwatch_manager != nullptr) {
+    evwatch_manager_ = std::move(evwatch_manager);
+  }
+}
+
+LibeventScheduler::~LibeventScheduler() = default;
+
+void LibeventScheduler::registerEvwatchObserver(Evwatch::Observer& observer) {
+  if (evwatch_manager_ != nullptr) {
+    evwatch_manager_->registerObserver(observer);
+  }
+}
+
+void LibeventScheduler::unregisterEvwatchObserver(Evwatch::Observer& observer) {
+  if (evwatch_manager_ != nullptr) {
+    evwatch_manager_->unregisterObserver(observer);
+  }
 }
 
 TimerPtr LibeventScheduler::createTimer(const TimerCb& cb, Dispatcher& dispatcher) {

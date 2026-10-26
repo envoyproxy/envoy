@@ -54,6 +54,7 @@ uncomment.sh "$1" --comment -h \
   --uncomment-func-decl X509_PUBKEY_get \
   --uncomment-func-decl X509_INFO_free \
   --uncomment-func-decl X509_cmp \
+  --uncomment-func-decl X509_cmp_current_time \
   --uncomment-func-decl X509_NAME_cmp \
   --uncomment-func-decl X509_CRL_cmp \
   --uncomment-func-decl X509_NAME_print_ex \

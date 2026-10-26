@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary")
+load("@rules_go//go:def.bzl", "go_binary")
 
 # This declares a cc_library target that is used to build a shared library.
 # name + ".c" is the source file that is compiled to create the shared library.

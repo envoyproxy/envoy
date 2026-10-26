@@ -46,7 +46,7 @@ private:
 
   TracerConfig config_;
   SkyWalkingTracerStatsSharedPtr tracing_stats_;
-  ThreadLocal::SlotPtr tls_slot_ptr_;
+  ThreadLocal::SlotSharedPtr tls_slot_ptr_;
   std::unique_ptr<TracingContextFactory> tracing_context_factory_;
 };
 

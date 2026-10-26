@@ -5,6 +5,7 @@
 #include "source/extensions/filters/network/zookeeper_proxy/filter.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -14,6 +15,9 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ZooKeeperProxy {
+
+using StatusHelpers::HasStatus;
+using testing::HasSubstr;
 
 using ZooKeeperProxyProtoConfig =
     envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy;
@@ -167,9 +171,23 @@ latency_threshold_overrides:
   )EOF";
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config_);
-  EXPECT_THROW_WITH_REGEX(
-      ZooKeeperConfigFactory().createFilterFactoryFromProto(proto_config_, context_).IgnoreError(),
-      EnvoyException, "Duplicated opcode find in config");
+  EXPECT_THAT(
+      ZooKeeperConfigFactory().createFilterFactoryFromProto(proto_config_, context_),
+      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("Duplicated opcode find in config")));
+}
+
+// The unknown opcode error path is unreachable through a validated proto config (the opcode
+// enum is validated as defined_only and every defined value is mapped), so call the parse
+// helper directly with an out-of-range opcode.
+TEST_F(ZookeeperFilterConfigTest, UnknownOpcodeInLatencyThresholdOverrides) {
+  LatencyThresholdOverrideList latency_threshold_overrides;
+  LatencyThresholdOverride* threshold_override = latency_threshold_overrides.Add();
+  threshold_override->set_opcode(static_cast<LatencyThresholdOverride_Opcode>(999));
+  threshold_override->mutable_threshold()->set_nanos(150000000);
+
+  EXPECT_THAT(
+      ZooKeeperFilterConfig::parseLatencyThresholdOverrides(latency_threshold_overrides),
+      HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("Unknown opcode from config: 999")));
 }
 
 TEST_F(ZookeeperFilterConfigTest, SimpleConfig) {

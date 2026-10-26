@@ -21,12 +21,17 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/config/metadata.h"
+#include "source/common/conn_pool/pending_stream.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/queue_policy/fifo_queue_policy.h"
+#include "source/common/queue_policy/queue_policy_base.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/host_lookup_map.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
@@ -52,12 +57,15 @@
 #include "test/mocks/upstream/typed_load_balancer_factory.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
@@ -66,6 +74,10 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Upstream {
@@ -1419,10 +1431,10 @@ TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
 
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
     auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
-    EXPECT_FALSE(cluster_or_error.ok());
-    EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_EQ(cluster_or_error.status().message(),
-              "STRICT_DNS clusters must NOT have a custom resolver name set");
+    EXPECT_THAT(
+        cluster_or_error,
+        HasStatus(absl::StatusCode::kInvalidArgument,
+                  testing::Eq("STRICT_DNS clusters must NOT have a custom resolver name set")));
   } else {
     EXPECT_THROW_WITH_MESSAGE(
         auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
@@ -2033,6 +2045,30 @@ TEST_F(HostImplTest, CreateConnection) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+// The dispatcher can fail to create a client connection (e.g. when binding the upstream socket to
+// a configured network namespace fails at runtime). createConnection must surface the null
+// connection to the caller rather than crash on a null dereference.
+TEST_F(HostImplTest, CreateConnectionFailure) {
+  MockClusterMockPrioritySet cluster;
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+      cluster.info_, "lyft.com", address, nullptr, nullptr, 1,
+      std::make_shared<const envoy::config::core::v3::Locality>(),
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN));
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  EXPECT_CALL(dispatcher, createClientConnection_(_, _, _, _)).WillOnce(Return(nullptr));
+  Envoy::Upstream::Host::CreateConnectionData connection_data =
+      host->createConnection(dispatcher, options, transport_socket_options);
+  EXPECT_EQ(nullptr, connection_data.connection_);
+  EXPECT_EQ(host.get(), connection_data.host_description_.get());
+}
+
 TEST_F(HostImplTest, OrcaReportingAddressDefaultsToDataAddress) {
   MockClusterMockPrioritySet cluster;
   Network::Address::InstanceConstSharedPtr address =
@@ -2359,6 +2395,68 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
   EXPECT_EQ(host, connection->stream_info_.upstreamInfo()->upstreamHost());
 }
 
+// Verifies that the happy eyeballs sort of the address list runs once when the host is
+// created, and not again on each connection attempt.
+TEST_F(HostImplTest, HappyEyeballsSortsAddressListOncePerHost) {
+  MockClusterMockPrioritySet cluster;
+  envoy::config::core::v3::Metadata metadata;
+  Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                         Config::MetadataEnvoyLbKeys::get().CANARY)
+      .set_bool_value(true);
+  envoy::config::core::v3::Locality locality;
+  locality.set_region("oceania");
+  locality.set_zone("hello");
+  locality.set_sub_zone("world");
+  Network::Address::InstanceConstSharedPtr address =
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
+  AddressVector address_list = {
+      address,
+      *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
+  };
+
+  // Creating the host sorts the address list exactly once.
+  std::shared_ptr<Upstream::HostImpl> host;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 1, {
+    host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
+        cluster.info_, "lyft.com", address,
+        std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
+        std::make_shared<const envoy::config::core::v3::Locality>(locality),
+        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+        envoy::config::core::v3::UNKNOWN, address_list));
+  });
+
+  testing::StrictMock<Event::MockDispatcher> dispatcher;
+  Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
+  Network::ConnectionSocket::OptionsSharedPtr options;
+
+  auto connection1 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection1, setBufferLimits(0));
+  EXPECT_CALL(*connection1, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection1, connectionInfoSetter());
+  EXPECT_CALL(*connection1, streamInfo());
+  auto connection2 = new testing::StrictMock<Network::MockClientConnection>();
+  EXPECT_CALL(*connection2, setBufferLimits(0));
+  EXPECT_CALL(*connection2, addConnectionCallbacks(_));
+  EXPECT_CALL(*connection2, connectionInfoSetter());
+  EXPECT_CALL(*connection2, streamInfo());
+  // Both connections should be created with the first address in the list.
+  EXPECT_CALL(dispatcher, createClientConnection_(address_list[0], _, _, _))
+      .WillOnce(Return(connection1))
+      .WillOnce(Return(connection2));
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
+
+  // Creating connections reuses the sorted list and does not sort again.
+  Envoy::Upstream::Host::CreateConnectionData connection_data1;
+  Envoy::Upstream::Host::CreateConnectionData connection_data2;
+  EXPECT_LOG_CONTAINS_N_TIMES("trace", "sort address with happy_eyeballs config", 0, {
+    connection_data1 = host->createConnection(dispatcher, options, transport_socket_options);
+    connection_data2 = host->createConnection(dispatcher, options, transport_socket_options);
+  });
+  // The created connections will be wrapped in HappyEyeballsConnectionImpls.
+  EXPECT_NE(connection1, connection_data1.connection_.get());
+  EXPECT_NE(connection2, connection_data2.connection_.get());
+}
+
 TEST_F(HostImplTest, HealthFlags) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
@@ -2519,6 +2617,19 @@ TEST_F(HostImplTest, HealthcheckHostname) {
           envoy::config::core::v3::Locality().default_instance()),
       config, 1);
   EXPECT_EQ("foo", descr->hostnameForHealthChecks());
+}
+
+std::optional<Network::Socket::Option::Details>
+findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
+                  envoy::config::core::v3::SocketOption::SocketState state,
+                  Network::Socket& socket) {
+  for (const auto& option : options) {
+    const auto details = option->getOptionDetails(socket, state);
+    if (details.has_value() && details->name_ == name) {
+      return details;
+    }
+  }
+  return std::nullopt;
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -3064,6 +3175,109 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
+}
+
+// A health change re-partitions only the host's priority, or every priority with the guard off.
+TEST_F(StaticClusterImplTest, HealthChangeRepartitionsOnlyHostPriority) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - priority: 0
+        lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+      - priority: 1
+        lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.2
+                port_value: 443
+  )EOF";
+
+  for (const bool guard : {true, false}) {
+    SCOPED_TRACE(guard);
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.incremental_health_transition", guard ? "true" : "false"}});
+
+    envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+
+    Outlier::MockDetector* detector = new Outlier::MockDetector();
+    EXPECT_CALL(*detector, addChangedStateCb(_));
+    cluster->setOutlierDetector(Outlier::DetectorSharedPtr{detector});
+    cluster->initialize([] { return absl::OkStatus(); });
+
+    const auto& host_sets = cluster->prioritySet().hostSetsPerPriority();
+    ASSERT_EQ(2UL, host_sets.size());
+    const auto p0_healthy = host_sets[0]->healthyHostsPtr();
+    const HostSharedPtr p1_host = host_sets[1]->hosts()[0];
+
+    std::vector<uint32_t> updated_priorities;
+    MockPriorityUpdateCallback priority_update_cb;
+    EXPECT_CALL(priority_update_cb, Call)
+        .WillRepeatedly([&](uint32_t priority, const HostVector&, const HostVector&) {
+          updated_priorities.push_back(priority);
+          return absl::OkStatus();
+        });
+    auto priority_update_handle =
+        cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
+
+    p1_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+    detector->runCallbacks(p1_host);
+
+    EXPECT_TRUE(host_sets[1]->healthyHosts().empty());
+    if (guard) {
+      EXPECT_EQ(std::vector<uint32_t>{1}, updated_priorities);
+      EXPECT_EQ(p0_healthy, host_sets[0]->healthyHostsPtr());
+    } else {
+      EXPECT_EQ((std::vector<uint32_t>{0, 1}), updated_priorities);
+      EXPECT_NE(p0_healthy, host_sets[0]->healthyHostsPtr());
+    }
+  }
+}
+
+// A health change for a host whose priority has no host set re-partitions every priority.
+TEST_F(StaticClusterImplTest, HealthChangeForUnknownPriorityRepartitionsAll) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+
+  Outlier::MockDetector* detector = new Outlier::MockDetector();
+  EXPECT_CALL(*detector, addChangedStateCb(_));
+  cluster->setOutlierDetector(Outlier::DetectorSharedPtr{detector});
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  const HostSharedPtr host = cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  host->priority(5);
+  EXPECT_ENVOY_BUG(detector->runCallbacks(host), "health change for host at priority 5");
 }
 
 TEST_F(StaticClusterImplTest, HealthyStat) {
@@ -3996,6 +4210,65 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   }
 }
 
+#if defined(__linux__)
+// With validate_network_namespaces set, a cluster whose upstream bind config references a
+// non-existent network namespace is rejected at config load time.
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespace) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  config.mutable_upstream_bind_config()->set_validate_network_namespaces(true);
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(std::shared_ptr<StaticClusterImpl> cluster =
+                              createCluster(config, factory_context),
+                          EnvoyException, "failed to open network namespace file");
+}
+
+// Without validate_network_namespaces, the invalid network namespace is not validated at config
+// load time, so cluster creation succeeds (preserving the pre-existing behavior).
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespaceNotValidated) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_NO_THROW(createCluster(config, factory_context));
+}
+
+// With validate_network_namespaces set, extra source addresses are validated as well.
+TEST_F(StaticClusterImplTest, UpstreamBindConfigInvalidNetworkNamespaceExtraSourceAddress) {
+  envoy::config::cluster::v3::Cluster config;
+  config.set_name("staticcluster");
+  config.mutable_connect_timeout();
+  config.mutable_upstream_bind_config()->set_validate_network_namespaces(true);
+  auto* source_address = config.mutable_upstream_bind_config()->mutable_source_address();
+  source_address->set_address("1.2.3.4");
+  source_address->set_port_value(0);
+  auto* extra_source_address =
+      config.mutable_upstream_bind_config()->add_extra_source_addresses()->mutable_address();
+  extra_source_address->set_address("2001::1");
+  extra_source_address->set_port_value(0);
+  extra_source_address->set_network_namespace_filepath("/run/netns/envoy_does_not_exist_test_ns");
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(std::shared_ptr<StaticClusterImpl> cluster =
+                              createCluster(config, factory_context),
+                          EnvoyException, "failed to open network namespace file");
+}
+#endif
+
 TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourceAddress) {
   envoy::config::cluster::v3::Cluster config;
   config.set_name("staticcluster");
@@ -4333,6 +4606,101 @@ public:
   TestRandomGenerator random_;
 };
 
+TEST_F(StaticClusterImplTest, AppendBindAddressNoPortOption) {
+  NiceMock<Network::MockSocket> socket;
+
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    GTEST_SKIP() << "IP_BIND_ADDRESS_NO_PORT is not supported on this platform";
+  }
+
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: static
+    upstream_bind_config:
+      source_address:
+        address: 127.0.0.6
+        port_value: 0
+    load_assignment:
+      cluster_name: staticcluster
+      endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 80
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster config;
+  TestUtility::loadFromYaml(yaml, config);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+
+  Network::Address::InstanceConstSharedPtr remote_address =
+      std::make_shared<Network::Address::Ipv4Instance>("3.4.5.6", 80, nullptr);
+
+  {
+    // port 0, guard ON -> option present.
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_TRUE(option.has_value());
+  }
+
+  {
+    // port 0, guard OFF -> option absent.
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.upstream_bind_config_fix_port_exhaustion", "false"}});
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_FALSE(option.has_value());
+  }
+
+  {
+    // non-zero port -> option absent regardless of guard.
+    const std::string yaml_nonzero_port = R"EOF(
+      name: staticcluster
+      connect_timeout: 0.25s
+      type: static
+      upstream_bind_config:
+        source_address:
+          address: 127.0.0.6
+          port_value: 5000
+      load_assignment:
+        cluster_name: staticcluster
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 80
+    )EOF";
+    envoy::config::cluster::v3::Cluster config_nonzero_port;
+    TestUtility::loadFromYaml(yaml_nonzero_port, config_nonzero_port);
+    std::shared_ptr<StaticClusterImpl> cluster =
+        createCluster(config_nonzero_port, factory_context);
+    auto upstream_local_address =
+        cluster->info()->getUpstreamLocalAddressSelector()->getUpstreamLocalAddress(remote_address,
+                                                                                    nullptr, {});
+    auto option = findOptionDetails(*upstream_local_address.socket_options_,
+                                    ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                                    envoy::config::core::v3::SocketOption::STATE_PREBIND, socket);
+    EXPECT_FALSE(option.has_value());
+  }
+}
+
 // Test creating and extending a priority set.
 TEST(PrioritySet, Extend) {
   PrioritySetImpl priority_set;
@@ -4375,7 +4743,8 @@ TEST(PrioritySet, Extend) {
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
   HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostMapConstSharedPtr fake_cross_priority_host_map = std::make_shared<HostMap>();
+  HostLookupMapConstSharedPtr fake_cross_priority_host_map =
+      std::make_shared<FlatHostLookupMap>(std::make_shared<HostMap>());
   {
     HostVector hosts_added{hosts->front()};
     HostVector hosts_removed{};
@@ -4476,9 +4845,7 @@ TEST(PrioritySet, BatchUpdateMemberCallbackFiresOnce) {
 
   auto member_update_cb = priority_set.addMemberUpdateCb([&](const HostVector&, const HostVector&) {
     member_cb_count++;
-    EXPECT_EQ(2, dirty_priorities.size());
-    EXPECT_TRUE(dirty_priorities.contains(0));
-    EXPECT_TRUE(dirty_priorities.contains(1));
+    EXPECT_THAT(dirty_priorities, UnorderedElementsAre(0, 1));
     dirty_priorities.clear();
   });
 
@@ -4536,7 +4903,8 @@ TEST(PrioritySet, MainPrioritySetTest) {
 
   // Mutable host map will be moved to read only host map after `crossPriorityHostMap` is called.
   HostMapSharedPtr host_map = priority_set.mutableHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  priority_set.crossPriorityHostMap();
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
 
   {
@@ -4559,8 +4927,176 @@ TEST(PrioritySet, MainPrioritySetTest) {
   // Again, mutable host map will be moved to read only host map after `crossPriorityHostMap` is
   // called.
   host_map = priority_set.mutableHostMapForTest();
-  EXPECT_EQ(host_map.get(), priority_set.crossPriorityHostMap().get());
+  priority_set.crossPriorityHostMap();
+  EXPECT_EQ(host_map.get(), priority_set.constHostMapForTest().get());
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
+}
+
+// Test the cross priority host map of the main thread priority set with both the flat and the
+// persistent backing.
+class MainPrioritySetCrossPriorityHostMapTest : public testing::TestWithParam<bool> {
+protected:
+  MainPrioritySetCrossPriorityHostMapTest() {
+    if (GetParam()) {
+      priority_set_.usePersistentCrossPriorityHostMap();
+    }
+    priority_set_.getOrCreateHostSet(0);
+  }
+
+  HostSharedPtr makeHost(const std::string& url, uint32_t priority = 0) {
+    return makeTestHost(info_, url, 1, priority);
+  }
+
+  void updateHosts(uint32_t priority, const HostVector& hosts, const HostVector& hosts_added,
+                   const HostVector& hosts_removed) {
+    auto hosts_ptr = std::make_shared<const HostVector>(hosts);
+    priority_set_.updateHosts(priority,
+                              updateHostsParams(hosts_ptr, hosts_per_locality_,
+                                                std::make_shared<const HealthyHostVector>(hosts),
+                                                hosts_per_locality_),
+                              {}, hosts_added, hosts_removed, std::nullopt);
+  }
+
+  MainPrioritySetImpl priority_set_;
+  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
+  HostsPerLocalitySharedPtr hosts_per_locality_{std::make_shared<HostsPerLocalityImpl>()};
+};
+
+INSTANTIATE_TEST_SUITE_P(PersistentBacking, MainPrioritySetCrossPriorityHostMapTest,
+                         testing::Bool());
+
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, AddRemoveAndSnapshotIsolation) {
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+
+  HostSharedPtr host_a = makeHost("tcp://127.0.0.1:80");
+  HostSharedPtr host_b = makeHost("tcp://127.0.0.1:81");
+  updateHosts(0, {host_a, host_b}, {host_a, host_b}, {});
+  HostLookupMapConstSharedPtr snapshot = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(GetParam(), dynamic_cast<const PersistentHostLookupMap*>(snapshot.get()) != nullptr);
+  EXPECT_FALSE(snapshot->empty());
+  EXPECT_EQ(2, snapshot->size());
+  EXPECT_EQ(host_a, snapshot->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, snapshot->findHost("127.0.0.1:81"));
+  EXPECT_EQ(nullptr, snapshot->findHost("127.0.0.1:82"));
+  HostMap visited;
+  snapshot->forEach([&visited](absl::string_view address, const HostSharedPtr& host) {
+    visited.emplace(address, host);
+  });
+  EXPECT_EQ((HostMap{{"127.0.0.1:80", host_a}, {"127.0.0.1:81", host_b}}), visited);
+
+  // A snapshot taken before a removal keeps the removed host.
+  updateHosts(0, {host_b}, {}, {host_a});
+  HostLookupMapConstSharedPtr after_remove = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(1, after_remove->size());
+  EXPECT_EQ(nullptr, after_remove->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, after_remove->findHost("127.0.0.1:81"));
+  EXPECT_EQ(2, snapshot->size());
+  EXPECT_EQ(host_a, snapshot->findHost("127.0.0.1:80"));
+
+  updateHosts(0, {}, {}, {host_b});
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+  EXPECT_EQ(1, after_remove->size());
+}
+
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, RemoveAbsentAddressIsNoOp) {
+  HostSharedPtr host_a = makeHost("tcp://127.0.0.1:80");
+  HostSharedPtr host_absent = makeHost("tcp://127.0.0.1:81");
+  updateHosts(0, {host_a}, {host_a}, {});
+  updateHosts(0, {host_a}, {}, {host_absent});
+
+  HostLookupMapConstSharedPtr lookup_map = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(1, lookup_map->size());
+  EXPECT_EQ(host_a, lookup_map->findHost("127.0.0.1:80"));
+  EXPECT_EQ(nullptr, lookup_map->findHost("127.0.0.1:81"));
+}
+
+// Hosts at different priorities can share an address. The first host added keeps the entry and a
+// removal at another priority must not evict it.
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, FirstHostWinsAndRemovalIsPriorityGuarded) {
+  HostSharedPtr host_p0 = makeHost("tcp://127.0.0.1:80", 0);
+  HostSharedPtr host_p1 = makeHost("tcp://127.0.0.1:80", 1);
+  updateHosts(0, {host_p0}, {host_p0}, {});
+  updateHosts(1, {host_p1}, {host_p1}, {});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host_p0, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  updateHosts(1, {}, {}, {host_p1});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host_p0, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  updateHosts(0, {}, {}, {host_p0});
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+}
+
+// The guard protects the real path where a single host object moves to a lower priority. The add
+// at the new priority runs first and updates the host's priority, so the later removal from the
+// old priority must not evict the entry the host now owns.
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, SameHostMovedToLowerPriorityIsNotEvicted) {
+  HostSharedPtr host = makeHost("tcp://127.0.0.1:80", 1);
+  updateHosts(1, {host}, {host}, {});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // updateDynamicHostList moves the same host object to the new priority and re-adds it there
+  // before removing it from the old priority, so mirror that order here.
+  host->priority(0);
+  updateHosts(0, {host}, {host}, {});
+  updateHosts(1, {}, {}, {host});
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // Removing the host from the priority it now owns clears the entry.
+  updateHosts(0, {}, {}, {host});
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+}
+
+// Selecting the persistent backing after a host was added is reported as a bug for both backings
+// and leaves the backing in use unchanged.
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, SelectPersistentBackingAfterHostsAdded) {
+  HostSharedPtr host_a = makeHost("tcp://127.0.0.1:80");
+  updateHosts(0, {host_a}, {host_a}, {});
+  HostLookupMapConstSharedPtr lookup_map = priority_set_.crossPriorityHostMap();
+  EXPECT_ENVOY_BUG(priority_set_.usePersistentCrossPriorityHostMap(),
+                   "persistent cross priority host map selected after hosts were added");
+
+  HostSharedPtr host_b = makeHost("tcp://127.0.0.1:81");
+  updateHosts(0, {host_a, host_b}, {host_b}, {});
+  lookup_map = priority_set_.crossPriorityHostMap();
+  EXPECT_EQ(GetParam(), dynamic_cast<const PersistentHostLookupMap*>(lookup_map.get()) != nullptr);
+  EXPECT_EQ(host_a, lookup_map->findHost("127.0.0.1:80"));
+  EXPECT_EQ(host_b, lookup_map->findHost("127.0.0.1:81"));
+}
+
+// Selecting the persistent backing after a host was added is ignored and the flat backing keeps
+// serving the hosts.
+TEST(PrioritySet, UsePersistentCrossPriorityHostMapAfterHostsAdded) {
+  TestMainPrioritySetImpl priority_set;
+  priority_set.getOrCreateHostSet(0);
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_removed;
+  priority_set.updateHosts(0,
+                           updateHostsParams(hosts, hosts_per_locality,
+                                             std::make_shared<const HealthyHostVector>(*hosts),
+                                             hosts_per_locality),
+                           {}, *hosts, hosts_removed, std::nullopt);
+
+  // Rejected while the update is still pending in the mutable host map.
+  EXPECT_ENVOY_BUG(priority_set.usePersistentCrossPriorityHostMap(),
+                   "persistent cross priority host map selected after hosts were added");
+  EXPECT_EQ(hosts->front(), priority_set.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // Rejected after the update was published to the read only host map.
+  EXPECT_ENVOY_BUG(priority_set.usePersistentCrossPriorityHostMap(),
+                   "persistent cross priority host map selected after hosts were added");
+  priority_set.updateHosts(0,
+                           updateHostsParams(hosts, hosts_per_locality,
+                                             std::make_shared<const HealthyHostVector>(*hosts),
+                                             hosts_per_locality),
+                           {}, {}, *hosts, std::nullopt);
+  EXPECT_NE(nullptr, priority_set.mutableHostMapForTest());
+  EXPECT_TRUE(priority_set.crossPriorityHostMap()->empty());
 }
 
 class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {
@@ -4619,7 +5155,7 @@ public:
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const Protobuf::Struct& d) const override {
-    if (d.fields().find("name") != d.fields().end()) {
+    if (d.fields().contains("name")) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
     throw EnvoyException("Cannot create a Baz when metadata is empty.");
@@ -4934,11 +5470,8 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherRejectAll) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          reject_all: true
+    stats_matcher:
+      reject_all: true
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4965,13 +5498,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherInclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          inclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_cx"
+    stats_matcher:
+      inclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_cx"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -4999,13 +5529,10 @@ TEST_P(ParametrizedClusterInfoImplTest, StatsMatcherExclusionList) {
     connect_timeout: 0.25s
     type: STRICT_DNS
     lb_policy: ROUND_ROBIN
-    metadata:
-      typed_filter_metadata:
-        envoy.stats_matcher:
-          "@type": type.googleapis.com/envoy.config.metrics.v3.StatsMatcher
-          exclusion_list:
-            patterns:
-              - prefix: "cluster.name.upstream_rq"
+    stats_matcher:
+      exclusion_list:
+        patterns:
+          - prefix: "cluster.name.upstream_rq"
     load_assignment:
         endpoints:
           - lb_endpoints:
@@ -5125,8 +5652,8 @@ TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizes) {
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->requestResponseSizeStats().has_value());
 
-  Upstream::ClusterRequestResponseSizeStats req_resp_stats =
-      cluster->info()->requestResponseSizeStats()->get();
+  Upstream::ClusterRequestResponseSizeStats& req_resp_stats =
+      cluster->info()->requestResponseSizeStats().ref();
 
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_headers_size_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rq_body_size_.unit());
@@ -5390,7 +5917,7 @@ TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  Upstream::ClusterTimeoutBudgetStats& tb_stats = cluster->info()->timeoutBudgetStats().ref();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
@@ -5423,7 +5950,7 @@ TEST_P(ParametrizedClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeout
   // The stats should be created.
   ASSERT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
 
-  Upstream::ClusterTimeoutBudgetStats tb_stats = cluster->info()->timeoutBudgetStats()->get();
+  Upstream::ClusterTimeoutBudgetStats& tb_stats = cluster->info()->timeoutBudgetStats().ref();
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
             tb_stats.upstream_rq_timeout_budget_percent_used_.unit());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
@@ -5720,7 +6247,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
         const auto& msg_struct = Envoy::Protobuf::DynamicCastMessage<Protobuf::Struct>(msg);
-        EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
+        EXPECT_THAT(msg_struct.fields(), Contains(Key("option")));
 
         return protocol_options;
       });
@@ -6694,6 +7221,104 @@ TEST_F(ClusterInfoImplTest, MaxRequestsPerConnectionValidation) {
   EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
                             "Only one of max_requests_per_connection from Cluster or "
                             "HttpProtocolOptions can be specified");
+}
+
+using PendingStreamQueueFactory =
+    Extensions::QueuePolicy::QueuePolicyFactory<ConnectionPool::PendingStream>;
+
+class RejectingQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return absl::InvalidArgumentError("queue policy creation failed");
+  }
+
+  std::string name() const override { return "envoy.queue_policy.rejecting"; }
+  std::string stat_prefix_;
+};
+
+class SuccessfulQueuePolicyFactory : public PendingStreamQueueFactory {
+public:
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Extensions::QueuePolicy::QueuePolicyUniquePtr<ConnectionPool::PendingStream>>
+  createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
+                    ProtobufMessage::ValidationVisitor&) override {
+    stat_prefix_ = stat_prefix;
+    return std::make_unique<Extensions::QueuePolicy::FifoQueue<ConnectionPool::PendingStream>>();
+  }
+
+  std::string name() const override { return "envoy.queue_policy.successful"; }
+  std::string stat_prefix_;
+};
+
+TEST_F(ClusterInfoImplTest, InvalidQueuePolicyConfig) {
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.invalid
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered queue policy implementation for name: "
+                            "'envoy.queue_policy.invalid'");
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationFailure) {
+  RejectingQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.rejecting
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException, "queue policy creation failed");
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.rejecting", factory.stat_prefix_);
+}
+
+TEST_F(ClusterInfoImplTest, QueuePolicyCreationSuccess) {
+  SuccessfulQueuePolicyFactory factory;
+  Registry::InjectFactory<PendingStreamQueueFactory> registered_factory(factory);
+
+  const std::string yaml = R"EOF(
+  name: cluster1
+  type: STRICT_DNS
+  lb_policy: ROUND_ROBIN
+  queuing_policies:
+    pending_rq_policy:
+      name: envoy.queue_policy.successful
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  auto cluster = makeCluster(yaml);
+  const auto policy = cluster->info()->pendingRqQueuePolicy();
+  ASSERT_TRUE(policy.has_value());
+  EXPECT_EQ(&factory, policy->factory_);
+  ASSERT_NE(nullptr, policy->config_);
+  EXPECT_EQ("google.protobuf.Struct", policy->config_->GetTypeName());
+  EXPECT_EQ("cluster.cluster1.envoy.queue_policy.successful", policy->stat_prefix_);
+  EXPECT_EQ(policy->stat_prefix_, factory.stat_prefix_);
 }
 
 TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {

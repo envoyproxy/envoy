@@ -12,7 +12,6 @@
 #include "source/common/matcher/address_matcher.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_resource_manager.h"
-#include "source/server/generic_factory_context.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -51,7 +50,7 @@ class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy
 public:
   // Create a DnsCacheImpl or return a failed status;
   static absl::StatusOr<std::shared_ptr<DnsCacheImpl>> createDnsCacheImpl(
-      Server::Configuration::GenericFactoryContext& context,
+      Server::Configuration::ServerFactoryContext& server_context,
       const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config);
 
   ~DnsCacheImpl() override;
@@ -76,7 +75,7 @@ public:
   void stop() override;
 
 private:
-  DnsCacheImpl(Server::Configuration::GenericFactoryContext& context,
+  DnsCacheImpl(Server::Configuration::ServerFactoryContext& server_context,
                const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
                Network::DnsResolverSharedPtr&& resolver,
                Envoy::Matcher::AddressMatcherPtr resolved_address_filter);

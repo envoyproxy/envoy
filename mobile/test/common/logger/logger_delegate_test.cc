@@ -1,3 +1,5 @@
+#include "envoy/common/logger.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "library/common/api/external.h"
@@ -19,7 +21,7 @@ public:
     Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker);
   }
 
-  void SetUp() override { Context::changeAllLogLevels(spdlog::level::info); }
+  void SetUp() override { Context::changeAllLogLevels(Levels::info); }
 };
 
 std::unique_ptr<EnvoyEventTracker> LambdaDelegateTest::event_tracker =
@@ -30,7 +32,7 @@ TEST_F(LambdaDelegateTest, LogCb) {
   std::string actual_msg;
 
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  logger->on_log_ = [&](Levels, const std::string& message) { actual_msg = message; };
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   ENVOY_LOG_MISC(error, expected_msg);
@@ -43,21 +45,21 @@ TEST_F(LambdaDelegateTest, LogCbWithLevels) {
   std::string actual_msg;
 
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Levels, const std::string& message) { actual_msg = message; };
+  logger->on_log_ = [&](Levels, const std::string& message) { actual_msg = message; };
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
   // Set the log to critical. The message should not be logged.
-  Context::changeAllLogLevels(spdlog::level::critical);
+  Context::changeAllLogLevels(Levels::critical);
   ENVOY_LOG_MISC(error, unexpected_msg);
   EXPECT_THAT(actual_msg, Not(HasSubstr(unexpected_msg)));
 
   // Change to error. The message should be logged.
-  Context::changeAllLogLevels(spdlog::level::err);
+  Context::changeAllLogLevels(Levels::error);
   ENVOY_LOG_MISC(error, expected_msg);
   EXPECT_THAT(actual_msg, HasSubstr(expected_msg));
 
   // Change back to critical and test one more time.
-  Context::changeAllLogLevels(spdlog::level::critical);
+  Context::changeAllLogLevels(Levels::critical);
   ENVOY_LOG_MISC(error, expected_msg);
   EXPECT_THAT(actual_msg, Not(HasSubstr(unexpected_msg)));
 }
@@ -74,51 +76,44 @@ TEST_F(LambdaDelegateTest, ReleaseCb) {
   EXPECT_TRUE(released);
 }
 
-class LambdaDelegateWithLevelTest
-    : public testing::TestWithParam<std::tuple<Logger::Levels, spdlog::level::level_enum>> {};
+class LambdaDelegateWithLevelTest : public testing::TestWithParam<Levels> {};
 
-INSTANTIATE_TEST_SUITE_P(
-    LogLevel, LambdaDelegateWithLevelTest,
-    testing::Values(std::make_tuple<>(Logger::Levels::trace, spdlog::level::trace),
-                    std::make_tuple<>(Logger::Levels::debug, spdlog::level::debug),
-                    std::make_tuple<>(Logger::Levels::info, spdlog::level::info),
-                    std::make_tuple<>(Logger::Levels::warn, spdlog::level::warn),
-                    std::make_tuple<>(Logger::Levels::error, spdlog::level::err),
-                    std::make_tuple<>(Logger::Levels::critical, spdlog::level::critical)));
+INSTANTIATE_TEST_SUITE_P(LogLevel, LambdaDelegateWithLevelTest,
+                         testing::Values(Levels::trace, Levels::debug, Levels::info, Levels::warn,
+                                         Levels::error, Levels::critical));
 
 TEST_P(LambdaDelegateWithLevelTest, Log) {
   std::string expected_msg = "Hello LambdaDelegate";
-  Logger::Levels actual_level;
+  Levels actual_level;
   std::string actual_msg;
   auto logger = std::make_unique<EnvoyLogger>();
-  logger->on_log_ = [&](Logger::Levels level, const std::string& message) {
+  logger->on_log_ = [&](Levels level, const std::string& message) {
     actual_level = level;
     actual_msg = message;
   };
 
   LambdaDelegate delegate(std::move(logger), Registry::getSink());
 
-  Logger::Levels envoy_log_level = std::get<0>(GetParam());
-  spdlog::level::level_enum spd_log_level = std::get<1>(GetParam());
+  Levels envoy_log_level = GetParam();
 
-  Context::changeAllLogLevels(spd_log_level);
+  Context::changeAllLogLevels(envoy_log_level);
   switch (envoy_log_level) {
-  case Logger::Levels::trace:
+  case Levels::trace:
     ENVOY_LOG_MISC(trace, expected_msg);
     break;
-  case Logger::Levels::debug:
+  case Levels::debug:
     ENVOY_LOG_MISC(debug, expected_msg);
     break;
-  case Logger::Levels::info:
+  case Levels::info:
     ENVOY_LOG_MISC(info, expected_msg);
     break;
-  case Logger::Levels::warn:
+  case Levels::warn:
     ENVOY_LOG_MISC(warn, expected_msg);
     break;
-  case Logger::Levels::error:
+  case Levels::error:
     ENVOY_LOG_MISC(error, expected_msg);
     break;
-  case Logger::Levels::critical:
+  case Levels::critical:
     ENVOY_LOG_MISC(critical, expected_msg);
     break;
   default:

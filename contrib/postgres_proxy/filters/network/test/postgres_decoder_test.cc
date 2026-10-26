@@ -109,9 +109,9 @@ TEST_F(PostgresProxyDecoderTest, StartupMessage) {
   // Some other attribute
   data_.add("attribute"); // 9 bytes
   data_.add(buf_, 1);
-  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
   data_.add("blah"); // 4 bytes
-  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::NeedMoreData);
+  ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::Stopped);
   data_.add(buf_, 1);
   ASSERT_THAT(decoder_->onData(data_, true), Decoder::Result::ReadyForNext);
   ASSERT_THAT(data_.length(), 0);
@@ -717,7 +717,9 @@ public:
   MOCK_METHOD(Buffer::RawSliceVector, getRawSlices, (std::optional<uint64_t>), (const, override));
   MOCK_METHOD(Buffer::RawSlice, frontSlice, (), (const, override));
   MOCK_METHOD(Buffer::SliceDataPtr, extractMutableFrontSlice, (), (override));
+  MOCK_METHOD(Buffer::SliceDataPtr, extractImmutableFrontSlice, (), (override));
   MOCK_METHOD(uint64_t, length, (), (const, override));
+  MOCK_METHOD(uint64_t, sliceCount, (), (const, override));
   MOCK_METHOD(void*, linearize, (uint32_t), (override));
   MOCK_METHOD(void, move, (Instance&), (override));
   MOCK_METHOD(void, move, (Instance&, uint64_t), (override));

@@ -114,9 +114,9 @@ MultiStream::~MultiStream() { multicastReset(); }
 absl::Status MultiStream::addStream(const AsyncClient::StreamOptions& options,
                                     absl::string_view cluster_name,
                                     std::weak_ptr<AsyncClient::StreamCallbacks> callbacks,
-                                    Server::Configuration::FactoryContext& factory_context) {
+                                    Server::Configuration::ServerFactoryContext& factory_context) {
   Envoy::Upstream::ThreadLocalCluster* cluster =
-      factory_context.serverFactoryContext().clusterManager().getThreadLocalCluster(cluster_name);
+      factory_context.clusterManager().getThreadLocalCluster(cluster_name);
   if (cluster == nullptr) {
     // Allow missing clusters in case control plane did not converge yet.
     // TODO(yanavlasov): We can possibly fail request here as well.
@@ -146,7 +146,8 @@ void MultiStream::maybeSwitchToIdle() {
   }
 }
 
-MuxDemux::MuxDemux(Server::Configuration::FactoryContext& context) : factory_context_(context) {}
+MuxDemux::MuxDemux(Server::Configuration::ServerFactoryContext& context)
+    : factory_context_(context) {}
 
 MuxDemux::~MuxDemux() = default;
 

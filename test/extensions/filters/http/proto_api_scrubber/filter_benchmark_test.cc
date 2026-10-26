@@ -99,7 +99,8 @@ public:
       }
     }
 
-    auto config_or_error = ConfigType::create(config, context_);
+    auto config_or_error =
+        ConfigType::create(config, context_.serverFactoryContext(), context_.scope());
     RELEASE_ASSERT(config_or_error.ok(), std::string(config_or_error.status().message()));
     config_ = config_or_error.value();
     payload_ = generatePayload(num_entries);

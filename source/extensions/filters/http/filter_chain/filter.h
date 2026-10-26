@@ -4,8 +4,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/filter_chain/v3/filter_chain.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/init/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -38,7 +41,7 @@ class FilterChain {
 public:
   FilterChain(const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
               Server::Configuration::ServerFactoryContext& context, const std::string& stats_prefix,
-              absl::Status& creation_status);
+              OptRef<Init::Manager> init_manager, absl::Status& creation_status);
   FilterChain(const envoy::extensions::filters::http::filter_chain::v3::FilterChain& proto_config,
               Server::Configuration::FactoryContext& context, const std::string& stats_prefix,
               absl::Status& creation_status);
@@ -60,11 +63,14 @@ class FilterChainPerRouteConfig : public Router::RouteSpecificFilterConfig {
 public:
   FilterChainPerRouteConfig(const FilterChainConfigProtoPerRoute& proto_config,
                             Server::Configuration::ServerFactoryContext& context,
-                            const std::string& stats_prefix, absl::Status& creation_status);
+                            const std::string& stats_prefix, OptRef<Init::Manager> init_manager,
+                            absl::Status& creation_status);
+  ~FilterChainPerRouteConfig() override;
 
   OptRef<const FilterChain> filterChain() const { return makeOptRefFromPtr(filter_chain_.get()); }
 
 private:
+  Event::Dispatcher& main_dispatcher_;
   FilterChainConstSharedPtr filter_chain_;
 };
 

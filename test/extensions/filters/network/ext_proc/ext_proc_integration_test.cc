@@ -9,8 +9,17 @@
 #include "test/integration/base_integration_test.h"
 #include "test/integration/fake_upstream.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
+
+#include "gmock/gmock.h"
+
+using testing::Contains;
+using testing::IsSupersetOf;
+using testing::Key;
+using testing::Pair;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -195,8 +204,9 @@ public:
   }
 
   void initializeWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
-                                     const std::vector<std::string>& typed_namespaces) {
-    initializeWithModifier([&untyped_namespaces, &typed_namespaces](auto& config) {
+                                     const std::vector<std::string>& typed_namespaces,
+                                     std::optional<bool> send_once = std::nullopt) {
+    initializeWithModifier([&untyped_namespaces, &typed_namespaces, send_once](auto& config) {
       auto* metadata_options = config.mutable_metadata_options();
       auto* forwarding_namespaces = metadata_options->mutable_forwarding_namespaces();
 
@@ -206,6 +216,10 @@ public:
 
       for (const auto& ns : typed_namespaces) {
         forwarding_namespaces->add_typed(ns);
+      }
+
+      if (send_once.has_value()) {
+        metadata_options->mutable_send_once()->set_value(send_once.value());
       }
     });
   }
@@ -858,14 +872,10 @@ TEST_P(NetworkExtProcFilterIntegrationTest, UntypedMetadataForwarding) {
 
   // Verify metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("test-namespace"));
-
-  // Verify metadata values
-  const auto& metadata = request.metadata().filter_metadata().at("test-namespace");
-  EXPECT_TRUE(metadata.fields().contains("key1"));
-  EXPECT_TRUE(metadata.fields().contains("key2"));
-  EXPECT_EQ(metadata.fields().at("key1").string_value(), "value1");
-  EXPECT_EQ(metadata.fields().at("key2").string_value(), "value2");
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              Contains(Pair("test-namespace", HasStructFields(UnorderedElementsAre(
+                                                  IsStructString("key1", "value1"),
+                                                  IsStructString("key2", "value2"))))));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -895,18 +905,14 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleUntypedNamespaces) {
 
   // Verify metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("namespace1"));
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("namespace2"));
-  EXPECT_FALSE(request.metadata().filter_metadata().contains("namespace3"));
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              UnorderedElementsAre(Key("namespace1"), Key("namespace2")));
 
   // Verify metadata values
-  const auto& metadata1 = request.metadata().filter_metadata().at("namespace1");
-  EXPECT_TRUE(metadata1.fields().contains("key1"));
-  EXPECT_EQ(metadata1.fields().at("key1").string_value(), "value1");
-
-  const auto& metadata2 = request.metadata().filter_metadata().at("namespace2");
-  EXPECT_TRUE(metadata2.fields().contains("key2"));
-  EXPECT_EQ(metadata2.fields().at("key2").string_value(), "value2");
+  EXPECT_THAT(request.metadata().filter_metadata(),
+              UnorderedElementsAre(
+                  Pair("namespace1", HasStructFields(Contains(IsStructString("key1", "value1")))),
+                  Pair("namespace2", HasStructFields(Contains(IsStructString("key2", "value2"))))));
 
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
@@ -987,7 +993,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TypedMetadataForwarding) {
 
   // Verify typed metadata is present
   EXPECT_TRUE(request.has_metadata());
-  EXPECT_TRUE(request.metadata().typed_filter_metadata().contains("typed-namespace"));
+  EXPECT_THAT(request.metadata().typed_filter_metadata(), Contains(Key("typed-namespace")));
 
   // Verify typed metadata values
   const auto& typed_metadata = request.metadata().typed_filter_metadata().at("typed-namespace");
@@ -1029,13 +1035,12 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   EXPECT_TRUE(request.has_metadata());
 
   // Verify untyped metadata
-  EXPECT_TRUE(request.metadata().filter_metadata().contains("untyped-ns"));
-  const auto& untyped_metadata = request.metadata().filter_metadata().at("untyped-ns");
-  EXPECT_TRUE(untyped_metadata.fields().contains("key1"));
-  EXPECT_EQ(untyped_metadata.fields().at("key1").string_value(), "value1");
+  EXPECT_THAT(
+      request.metadata().filter_metadata(),
+      Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
 
   // Verify typed metadata
-  EXPECT_TRUE(request.metadata().typed_filter_metadata().contains("typed-ns"));
+  EXPECT_THAT(request.metadata().typed_filter_metadata(), Contains(Key("typed-ns")));
   const auto& typed_metadata = request.metadata().typed_filter_metadata().at("typed-ns");
   EXPECT_EQ(typed_metadata.type_url(), "type.googleapis.com/google.protobuf.StringValue");
 
@@ -1047,6 +1052,44 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   // Continue normal flow
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test dynamic metadata forwarding with send_once = true
+TEST_P(NetworkExtProcFilterIntegrationTest, MetadataForwardingSendOnce) {
+  setConnectionMetadata("untyped-ns", {{"key1", "value1"}});
+  setConnectionMetadata("typed-ns", {}, "typed-test-value");
+  initializeWithMetadataOptions({"untyped-ns"}, {"typed-ns"}, true);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // First ProcessingRequest should include dynamic metadata.
+  ProcessingRequest request1;
+  waitForFirstGrpcMessage(request1);
+  EXPECT_TRUE(request1.has_metadata());
+  EXPECT_THAT(
+      request1.metadata().filter_metadata(),
+      Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
+  EXPECT_THAT(request1.metadata().typed_filter_metadata(), Contains(Key("typed-ns")));
+
+  sendReadGrpcMessage("client_data_inspected", false, true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+
+  // Subsequent ProcessingRequest on the same stream should NOT include dynamic metadata.
+  ASSERT_TRUE(fake_upstream_connection->write("server_response", false));
+  ProcessingRequest write_request;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
+  EXPECT_TRUE(write_request.has_write_data());
+  EXPECT_FALSE(write_request.has_metadata());
+
+  sendWriteGrpcMessage("server_data_inspected", false);
+  tcp_client->waitForData("server_data_inspected");
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();

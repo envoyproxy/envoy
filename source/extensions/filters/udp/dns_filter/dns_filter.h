@@ -10,13 +10,16 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/radix_tree.h"
 #include "source/common/config/config_provider_impl.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/stats/utility.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
 #include "source/extensions/filters/udp/dns_filter/dns_parser.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/strings/ascii.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -105,12 +108,17 @@ public:
   Api::Api& api() const { return api_; }
   const RadixTree<DnsVirtualDomainConfigSharedPtr>& getDnsTrie() const { return dns_lookup_trie_; }
   const AccessLog::InstanceSharedPtrVector& accessLogs() const { return access_logs_; }
+  bool caseInsensitive() const { return case_insensitive_; }
 
 private:
   static DnsFilterStats generateStats(const std::string& stat_prefix, Stats::Scope& scope) {
-    const auto final_prefix = absl::StrCat("dns_filter.", stat_prefix);
-    return {ALL_DNS_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
-                                 POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
+    // dns_filter.(<stat_prefix>.)*: the stat prefix is a tag of the stats.
+    const Stats::TagStringView tag{Envoy::Config::TagNames::get().DNS_FILTER_PREFIX, stat_prefix};
+    Stats::LiteScopeHelper helper(scope, "dns_filter",
+                                  stat_prefix.empty() ? Stats::TagStringViewSpan{}
+                                                      : Stats::TagStringViewSpan{tag},
+                                  absl::StrCat("dns_filter.", stat_prefix), /*sanitize=*/false);
+    return {ALL_DNS_FILTER_STATS(POOL_COUNTER(helper), POOL_HISTOGRAM(helper))};
   }
 
   bool loadServerConfig(
@@ -131,6 +139,7 @@ private:
   RadixTree<DnsVirtualDomainConfigSharedPtr> dns_lookup_trie_;
   absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
+  bool case_insensitive_;
   uint64_t retry_count_;
   std::chrono::milliseconds resolver_timeout_;
   Random::RandomGenerator& random_;
@@ -354,6 +363,18 @@ private:
     default:
       config_->stats().external_unsupported_answers_.inc();
       break;
+    }
+  }
+
+  // Populates lookup_name_ with a lowercase copy for case-insensitive matching; a no-op (no
+  // allocation) on the default case-sensitive path.
+  void maybeNormalizeQuery(DnsQueryRecord& query) const {
+    if (!config_->caseInsensitive()) {
+      return;
+    }
+    std::string lower = absl::AsciiStrToLower(query.name_);
+    if (lower != query.name_) {
+      query.lookup_name_ = std::move(lower);
     }
   }
 

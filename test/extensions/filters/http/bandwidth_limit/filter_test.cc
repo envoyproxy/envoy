@@ -3,6 +3,7 @@
 #include "source/extensions/filters/http/bandwidth_limit/bandwidth_limit.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -27,7 +28,7 @@ public:
     TestUtility::loadFromYaml(yaml, config);
     auto config_or_status =
         FilterConfig::create(config, *stats_.rootScope(), runtime_, time_system_, true);
-    EXPECT_TRUE(config_or_status.ok());
+    EXPECT_OK(config_or_status);
     config_ = *config_or_status;
     filter_ = std::make_shared<BandwidthLimiter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);

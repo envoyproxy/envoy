@@ -19,6 +19,7 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         "//source/common/common:hex_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -29,7 +30,6 @@ envoy_cc_library(
     external_deps = ["ssl"],
     deps = [
         ":ja4_fingerprint_lib",
-        "//envoy/common:exception_lib",
         "//envoy/network:filter_interface",
         "//envoy/network:listen_socket_interface",
         "//envoy/network:listener_filter_buffer_interface",

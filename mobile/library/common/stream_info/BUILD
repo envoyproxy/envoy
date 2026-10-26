@@ -8,7 +8,6 @@ envoy_cc_library(
     name = "extra_stream_info_lib",
     srcs = ["extra_stream_info.cc"],
     hdrs = ["extra_stream_info.h"],
-    repository = "@envoy",
     deps = [
         "//library/common/network:connectivity_manager_lib",
         "//library/common/types:c_types_lib",

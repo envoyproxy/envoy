@@ -197,6 +197,12 @@ const (
 	AttributeIDXdsFilterChainName
 	// health_check
 	AttributeIDHealthCheck
+	// upstream.server_name
+	AttributeIDUpstreamRequestedServerName
+	// xds.virtual_cluster_name
+	AttributeIDXdsVirtualClusterName
+	// upstream.protocol
+	AttributeIDUpstreamProtocol
 )
 
 // LogLevel is the log level for messages logged via the host environment's logging mechanism.
@@ -310,6 +316,51 @@ type ClusterHostCounts struct {
 	Degraded uint64
 }
 
+// TimingInfo contains stream timing from Envoy. StartTimeUnixNs is a Unix timestamp in nanoseconds;
+// the other numeric fields are nanosecond offsets from the monotonic request start. Use each Has*
+// field to check availability. When the flag is false, the numeric value is -1. Zero and negative
+// offsets are valid.
+type TimingInfo struct {
+	StartTimeUnixNs                       int64
+	DownstreamConnectionBeginNs           int64
+	DownstreamHandshakeStartNs            int64
+	DownstreamHandshakeCompleteNs         int64
+	LastDownstreamHeaderRxByteReceivedNs  int64
+	LastDownstreamRxByteReceivedNs        int64
+	UpstreamConnectStartNs                int64
+	UpstreamConnectCompleteNs             int64
+	UpstreamHandshakeCompleteNs           int64
+	FirstUpstreamTxByteSentNs             int64
+	LastUpstreamTxByteSentNs              int64
+	FirstUpstreamRxByteReceivedNs         int64
+	FirstUpstreamRxBodyByteReceivedNs     int64
+	LastUpstreamRxByteReceivedNs          int64
+	FirstDownstreamTxByteSentNs           int64
+	LastDownstreamTxByteSentNs            int64
+	LastDownstreamAckReceivedNs           int64
+	RequestCompleteDurationNs             int64
+	DownstreamConnectionEndNs             int64
+	HasStartTime                          bool
+	HasDownstreamConnectionBegin          bool
+	HasDownstreamHandshakeStart           bool
+	HasDownstreamHandshakeComplete        bool
+	HasLastDownstreamHeaderRxByteReceived bool
+	HasLastDownstreamRxByteReceived       bool
+	HasUpstreamConnectStart               bool
+	HasUpstreamConnectComplete            bool
+	HasUpstreamHandshakeComplete          bool
+	HasFirstUpstreamTxByteSent            bool
+	HasLastUpstreamTxByteSent             bool
+	HasFirstUpstreamRxByteReceived        bool
+	HasFirstUpstreamRxBodyByteReceived    bool
+	HasLastUpstreamRxByteReceived         bool
+	HasFirstDownstreamTxByteSent          bool
+	HasLastDownstreamTxByteSent           bool
+	HasLastDownstreamAckReceived          bool
+	HasRequestComplete                    bool
+	HasDownstreamConnectionEnd            bool
+}
+
 // MetricID is an opaque identifier for a metric defined via Define{Counter,Gauge,Histogram}.
 type MetricID uint64
 
@@ -322,6 +373,11 @@ const (
 	MetricsInvalidTags
 	MetricsFrozen
 )
+
+// GenericSecretID is an opaque identifier for a generic secret subscribed to via
+// HttpFilterConfigHandle.SubscribeGenericSecret. The zero value is never valid and is what
+// SubscribeGenericSecret returns when the subscription could not be created.
+type GenericSecretID uint64
 
 // HttpHeaderType identifies which HTTP header map to access. It corresponds to
 // envoy_dynamic_module_type_http_header_type. The values match the ABI's enum order:

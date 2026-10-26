@@ -20,7 +20,7 @@ SniDynamicForwardProxyNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
     const FilterConfig& proto_config, Server::Configuration::FactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context);
+      context.serverFactoryContext());
 
   absl::Status status = absl::OkStatus();
   ProxyFilterConfigSharedPtr filter_config(

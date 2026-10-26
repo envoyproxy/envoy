@@ -55,8 +55,7 @@ public:
           auto subscription = THROW_OR_RETURN_VALUE(
               RdsRouteConfigSubscription::create(
                   std::move(config_update), std::move(resource_decoder), rds.config_source(),
-                  rds.route_config_name(), manager_identifier, factory_context,
-                  stat_prefix + absl::AsciiStrToLower(getRdsName()) + ".",
+                  rds.route_config_name(), manager_identifier, factory_context, stat_prefix,
                   absl::AsciiStrToUpper(getRdsName()), manager_),
               std::unique_ptr<RdsRouteConfigSubscription>);
           auto provider = std::make_shared<RdsRouteConfigProviderImpl>(std::move(subscription),
@@ -65,12 +64,13 @@ public:
         });
   }
 
-  RouteConfigProviderPtr createStaticRouteConfigProvider(
-      const RouteConfiguration& route_config,
-      Server::Configuration::ServerFactoryContext& factory_context) override {
-    return manager_.addStaticProvider([&factory_context, &route_config, this]() {
-      return std::make_unique<StaticRouteConfigProviderImpl>(route_config, config_traits_,
-                                                             factory_context, manager_);
+  RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const RouteConfiguration& route_config,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  Init::Manager& init_manager) override {
+    return manager_.addStaticProvider([&factory_context, &init_manager, &route_config, this]() {
+      return std::make_unique<StaticRouteConfigProviderImpl>(
+          route_config, config_traits_, factory_context, init_manager, manager_);
     });
   }
 

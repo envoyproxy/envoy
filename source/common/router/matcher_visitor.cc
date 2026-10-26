@@ -26,8 +26,13 @@ absl::Status RouteActionValidationVisitor::performDataInputValidation(
                                    HttpDynamicModuleMatchInput::default_instance())
           ->GetDescriptor()
           ->full_name());
+  static const std::string dynamic_module_data_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+      createReflectableMessage(envoy::extensions::matching::http::dynamic_modules::v3::
+                                   DynamicModuleDataInput::default_instance())
+          ->GetDescriptor()
+          ->full_name());
   if (type_url == request_header_input_name || type_url == filter_state_input_name ||
-      type_url == dynamic_module_input_name) {
+      type_url == dynamic_module_input_name || type_url == dynamic_module_data_input_name) {
     return absl::OkStatus();
   }
 

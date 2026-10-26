@@ -15,7 +15,7 @@
 
 namespace Envoy {
 
-using ResponsePtr = std::unique_ptr<helloworld::HelloReply>;
+using ResponsePtr = Grpc::ResponsePtr<helloworld::HelloReply>;
 using FilterConfigSharedPtr =
     std::shared_ptr<const test::integration::filters::ServerFactoryContextFilterConfig>;
 
@@ -138,7 +138,8 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfig& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext&) override {
     FilterConfigSharedPtr filter_config =
         std::make_shared<test::integration::filters::ServerFactoryContextFilterConfig>(
             proto_config);
@@ -177,7 +178,8 @@ private:
 
   absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProtoTyped(
       const test::integration::filters::ServerFactoryContextFilterConfigDual& proto_config,
-      const std::string&, Server::Configuration::ServerFactoryContext& server_context) override {
+      Server::Configuration::ServerFactoryContext& server_context,
+      Server::Configuration::ExtraFactoryContext&) override {
     auto filter_config =
         std::make_shared<test::integration::filters::ServerFactoryContextFilterConfigDual>(
             proto_config);

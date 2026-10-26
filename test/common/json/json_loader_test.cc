@@ -14,7 +14,10 @@ namespace Envoy {
 namespace Json {
 namespace {
 
-using ::Envoy::StatusHelpers::StatusIs;
+using ::Envoy::StatusHelpers::HasStatus;
+using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 class JsonLoaderTest : public testing::Test {
 protected:
@@ -48,16 +51,14 @@ protected:
   }
 
   template <typename Type> Type getValid(const absl::StatusOr<Type>& status_or) {
-    EXPECT_TRUE(status_or.ok());
+    EXPECT_OK(status_or);
     return status_or.value();
   }
 
   template <typename StatusOrType>
   void expectError(const StatusOrType& status_or, absl::StatusCode status_code,
                    const std::string& message) {
-    EXPECT_FALSE(status_or.ok());
-    EXPECT_THAT(status_or, StatusIs(status_code));
-    EXPECT_EQ(status_or.status().message(), message);
+    EXPECT_THAT(status_or, HasStatus(status_code, message));
   }
   Api::ApiPtr api_;
 };
@@ -74,10 +75,9 @@ TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflow) {
   }
 
   auto status_or_object = Factory::loadFromString(json);
-  EXPECT_FALSE(status_or_object.ok());
-  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(status_or_object.status().message(),
-              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+  EXPECT_THAT(status_or_object,
+              HasStatus(absl::StatusCode::kInternal,
+                        testing::HasSubstr("JSON nesting depth exceeds limit of")));
 }
 
 TEST_F(JsonLoaderTest, DeeplyNestedJsonObjectDestructorStackOverflowConfigurable) {
@@ -93,10 +93,9 @@ TEST_F(JsonLoaderTest, DeeplyNestedJsonObjectDestructorStackOverflowConfigurable
   }
 
   auto status_or_object = Factory::loadFromString(json);
-  EXPECT_FALSE(status_or_object.ok());
-  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(status_or_object.status().message(),
-              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+  EXPECT_THAT(status_or_object,
+              HasStatus(absl::StatusCode::kInternal,
+                        testing::HasSubstr("JSON nesting depth exceeds limit of")));
 }
 
 // Verify that with the default nesting depth limit relaxed, Envoy still does not crash when
@@ -115,32 +114,30 @@ TEST_F(JsonLoaderTest, DeeplyNestedJsonDestructorStackOverflowRuntimeOff) {
   }
 
   auto status_or_object = Factory::loadFromString(json);
-  EXPECT_FALSE(status_or_object.ok());
-  EXPECT_EQ(status_or_object.status().code(), absl::StatusCode::kInternal);
-  EXPECT_THAT(status_or_object.status().message(),
-              testing::HasSubstr("JSON nesting depth exceeds limit of"));
+  EXPECT_THAT(status_or_object,
+              HasStatus(absl::StatusCode::kInternal,
+                        testing::HasSubstr("JSON nesting depth exceeds limit of")));
 }
 
 TEST_F(JsonLoaderTest, Basic) {
-  EXPECT_FALSE(Factory::loadFromString("{").status().ok());
+  EXPECT_THAT(Factory::loadFromString("{").status(), Not(IsOk()));
 
   {
     ObjectSharedPtr json = *Factory::loadFromString("{\"hello\":123}");
     EXPECT_TRUE(json->hasObject("hello"));
     EXPECT_FALSE(json->hasObject("world"));
     EXPECT_FALSE(json->empty());
-    EXPECT_FALSE(json->getObject("world").status().ok());
+    EXPECT_THAT(json->getObject("world").status(), Not(IsOk()));
     expectErrorObject(*json, "world", absl::StatusCode::kNotFound,
                       "key 'world' missing from lines 1-1");
-    EXPECT_FALSE(json->getObject("hello").status().ok());
+    EXPECT_THAT(json->getObject("hello").status(), Not(IsOk()));
     expectErrorObject(*json, "hello", absl::StatusCode::kInternal,
                       "key 'hello' not an object from line 1");
-    EXPECT_FALSE(json->getBoolean("hello").status().ok());
-    EXPECT_FALSE(json->getObjectArray("hello").status().ok());
-    EXPECT_FALSE(json->getString("hello").status().ok());
+    EXPECT_THAT(json->getBoolean("hello").status(), Not(IsOk()));
+    EXPECT_THAT(json->getObjectArray("hello").status(), Not(IsOk()));
+    EXPECT_THAT(json->getString("hello"),
+                HasStatusMessage("key 'hello' missing or not a string from lines 1-1"));
     EXPECT_EQ(json->getString("hello", "").status().message(),
-              "key 'hello' missing or not a string from lines 1-1");
-    EXPECT_EQ(json->getString("hello").status().message(),
               "key 'hello' missing or not a string from lines 1-1");
   }
 
@@ -163,8 +160,8 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": [\"a\", \"b\", 3]}");
-    EXPECT_FALSE(json->getStringArray("hello").status().ok());
-    EXPECT_FALSE(json->getStringArray("world").status().ok());
+    EXPECT_THAT(json->getStringArray("hello").status(), Not(IsOk()));
+    EXPECT_THAT(json->getStringArray("world").status(), Not(IsOk()));
   }
 
   {
@@ -211,21 +208,20 @@ TEST_F(JsonLoaderTest, Basic) {
     ObjectSharedPtr json =
         *Factory::loadFromString("{\"1\":{\"11\":\"111\"},\"2\":{\"22\":\"222\"}}");
     int pos = 0;
-    ASSERT_TRUE(json->iterate([this, &pos](const std::string& key, const Json::Object& value) {
-                      EXPECT_TRUE(key == "1" || key == "2");
+    ASSERT_OK(json->iterate([this, &pos](const std::string& key, const Json::Object& value) {
+      EXPECT_TRUE(key == "1" || key == "2");
 
-                      if (key == "1") {
-                        EXPECT_EQ("111", *value.getString("11"));
-                        EXPECT_EQ("111", absl::get<std::string>(getValidValue(value, "11")));
-                      } else {
-                        EXPECT_EQ("222", *value.getString("22"));
-                        EXPECT_EQ("222", absl::get<std::string>(getValidValue(value, "22")));
-                      }
+      if (key == "1") {
+        EXPECT_EQ("111", *value.getString("11"));
+        EXPECT_EQ("111", absl::get<std::string>(getValidValue(value, "11")));
+      } else {
+        EXPECT_EQ("222", *value.getString("22"));
+        EXPECT_EQ("222", absl::get<std::string>(getValidValue(value, "22")));
+      }
 
-                      pos++;
-                      return true;
-                    })
-                    .ok());
+      pos++;
+      return true;
+    }));
 
     EXPECT_EQ(2, pos);
   }
@@ -234,19 +230,18 @@ TEST_F(JsonLoaderTest, Basic) {
     ObjectSharedPtr json =
         *Factory::loadFromString("{\"1\":{\"11\":\"111\"},\"2\":{\"22\":\"222\"}}");
     int pos = 0;
-    ASSERT_TRUE(json->iterate([&pos](const std::string& key, const Json::Object& value) {
-                      EXPECT_TRUE(key == "1" || key == "2");
+    ASSERT_OK(json->iterate([&pos](const std::string& key, const Json::Object& value) {
+      EXPECT_TRUE(key == "1" || key == "2");
 
-                      if (key == "1") {
-                        EXPECT_EQ("111", *value.getString("11"));
-                      } else {
-                        EXPECT_EQ("222", *value.getString("22"));
-                      }
+      if (key == "1") {
+        EXPECT_EQ("111", *value.getString("11"));
+      } else {
+        EXPECT_EQ("222", *value.getString("22"));
+      }
 
-                      pos++;
-                      return false;
-                    })
-                    .ok());
+      pos++;
+      return false;
+    }));
 
     EXPECT_EQ(1, pos);
   }
@@ -275,7 +270,7 @@ TEST_F(JsonLoaderTest, Basic) {
 
     ObjectSharedPtr config = *Factory::loadFromString(json);
     std::vector<ObjectSharedPtr> array = *config->getObjectArray("descriptors");
-    EXPECT_FALSE(array[0]->asObjectArray().status().ok());
+    EXPECT_THAT(array[0]->asObjectArray().status(), Not(IsOk()));
 
     // Object Array is not supported as an value.
     expectErrorValue(*config, "descriptors", absl::StatusCode::kInternal,
@@ -305,7 +300,7 @@ TEST_F(JsonLoaderTest, Basic) {
   {
     std::string json = R"EOF({})EOF";
     ObjectSharedPtr config = *Factory::loadFromString(json);
-    EXPECT_FALSE(config->getStringArray("foo").status().ok());
+    EXPECT_THAT(config->getStringArray("foo").status(), Not(IsOk()));
   }
 
   {
@@ -316,17 +311,19 @@ TEST_F(JsonLoaderTest, Basic) {
 
   {
     ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": \n[2.0]}");
-    EXPECT_FALSE(json->getObjectArray("hello").value().at(0)->getDouble("foo").status().ok());
+    EXPECT_THAT(json->getObjectArray("hello").value().at(0)->getDouble("foo").status(),
+                Not(IsOk()));
   }
 
   {
     ObjectSharedPtr json = *Factory::loadFromString("{\"hello\": \n[null]}");
-    EXPECT_FALSE(json->getObjectArray("hello").value().at(0)->getDouble("foo").status().ok());
+    EXPECT_THAT(json->getObjectArray("hello").value().at(0)->getDouble("foo").status(),
+                Not(IsOk()));
   }
 
   {
     ObjectSharedPtr json = *Factory::loadFromString("{}");
-    EXPECT_FALSE((json->getObjectArray("hello").status().ok()));
+    EXPECT_THAT(json->getObjectArray("hello").status(), Not(IsOk()));
   }
 
   {
@@ -384,20 +381,20 @@ TEST_F(JsonLoaderTest, Integer) {
                 "JSON supplied is not valid. Error(line: 1): JSON value from line 1 is larger than "
                 "int64_t (not supported)\n");
     ObjectSharedPtr json = *Factory::loadFromString("{\"val\":-9223372036854775809}");
-    EXPECT_FALSE(json->getInteger("val").status().ok());
+    EXPECT_THAT(json->getInteger("val").status(), Not(IsOk()));
   }
   // Number overflow exception.
   {
-    EXPECT_FALSE(Factory::loadFromString("-"
-                                         "521111111111111111111111111111111111111111111111111111111"
-                                         "111111111111111111111111111111111111111111111111111111111"
-                                         "111111111111111111111111111111111111111111111111111111111"
-                                         "111111111111111111111111111111111111111111111111111111111"
-                                         "111111111111111111111111111111111111111111111111111111111"
-                                         "111111111111111111111111111111111111111111111111111111111"
-                                         "1111111111111111111111111111111111111111111111111")
-                     .status()
-                     .ok());
+    EXPECT_THAT(Factory::loadFromString("-"
+                                        "521111111111111111111111111111111111111111111111111111111"
+                                        "111111111111111111111111111111111111111111111111111111111"
+                                        "111111111111111111111111111111111111111111111111111111111"
+                                        "111111111111111111111111111111111111111111111111111111111"
+                                        "111111111111111111111111111111111111111111111111111111111"
+                                        "111111111111111111111111111111111111111111111111111111111"
+                                        "1111111111111111111111111111111111111111111111111")
+                    .status(),
+                Not(IsOk()));
   }
 }
 
@@ -419,7 +416,7 @@ TEST_F(JsonLoaderTest, Double) {
   }
   {
     ObjectSharedPtr json = *Factory::loadFromString("{\"foo\": \"bar\"}");
-    EXPECT_FALSE(json->getDouble("foo").status().ok());
+    EXPECT_THAT(json->getDouble("foo").status(), Not(IsOk()));
   }
 }
 
@@ -489,17 +486,16 @@ TEST_F(JsonLoaderTest, MissingEnclosingDocument) {
 
 TEST_F(JsonLoaderTest, AsString) {
   ObjectSharedPtr json = *Factory::loadFromString("{\"name1\": \"value1\", \"name2\": true}");
-  ASSERT_TRUE(json->iterate([&](const std::string& key, const Json::Object& value) {
-                    EXPECT_TRUE(key == "name1" || key == "name2");
+  ASSERT_OK(json->iterate([&](const std::string& key, const Json::Object& value) {
+    EXPECT_TRUE(key == "name1" || key == "name2");
 
-                    if (key == "name1") {
-                      EXPECT_EQ("value1", *value.asString());
-                    } else {
-                      EXPECT_FALSE(value.asString().status().ok());
-                    }
-                    return true;
-                  })
-                  .ok());
+    if (key == "name1") {
+      EXPECT_EQ("value1", *value.asString());
+    } else {
+      EXPECT_THAT(value.asString().status(), Not(IsOk()));
+    }
+    return true;
+  }));
 }
 
 TEST_F(JsonLoaderTest, LoadFromStruct) {

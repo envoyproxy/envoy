@@ -28,6 +28,28 @@ upstreams and control plane xDS clusters.
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
 
+.. _config_cluster_manager_odcds_stats:
+
+On-demand CDS
+-------------
+
+When :ref:`on-demand cluster discovery <config_http_filters_on_demand>` is configured, its config
+sources emit, next to the usual :ref:`subscription statistics <subscription_statistics>`, the
+following statistics rooted at *cluster_manager.odcds.*.
+
+The discovery counters increment once per discovery, even when multiple requests wait for its
+result. The subscription statistics on this prefix count xDS stream updates instead.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  discovery_attempt, Counter, On-demand cluster discoveries started
+  discovery_missing, Counter, On-demand cluster discoveries completed because the requested cluster was missing
+  discovery_success, Counter, On-demand cluster discoveries completed when the requested cluster became available
+  discovery_timeout, Counter, On-demand cluster discoveries that timed out
+  known_missing_answers, Counter, Total on-demand cluster discovery requests answered immediately from a remembered "cluster doesn't exist" answer
+
 
 In addition to the cluster manager stats, there are per worker thread local
 cluster manager statistics tree rooted at
@@ -73,6 +95,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_cx_tx_bytes_total, Counter, Total sent connection bytes
   upstream_cx_tx_bytes_buffered, Gauge, Send connection bytes currently buffered
   upstream_cx_pool_overflow, Counter, Total times that the cluster's connection pool circuit breaker overflowed
+  upstream_cx_preconnect_skipped, Counter, Total anticipatory connections not opened because the host was ineligible for preconnect
   upstream_cx_protocol_error, Counter, Total connection protocol errors
   upstream_cx_max_requests, Counter, Total connections closed due to maximum requests
   upstream_cx_none_healthy, Counter, Total times connection not established due to no healthy hosts

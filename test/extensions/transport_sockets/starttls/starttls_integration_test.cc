@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+using testing::NiceMock;
 
 // Simple filter for test purposes. This filter will be injected into the filter chain during
 // tests. The filter reacts only to few keywords. If received payload does not contain
@@ -213,7 +214,8 @@ void StartTlsIntegrationTest::initialize() {
   // Setup factories and contexts for tls transport socket.
   tls_context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
       server_factory_context_);
-  tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_);
+  tls_context_ = Ssl::createClientSslTransportSocketFactory({}, *tls_context_manager_, *api_,
+                                                            &server_factory_context_.serverScope());
   payload_reader_ = std::make_shared<WaitForPayloadReader>(*dispatcher_);
 
   BaseIntegrationTest::initialize();

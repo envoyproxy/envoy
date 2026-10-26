@@ -1,8 +1,12 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 
+#include "absl/base/attributes.h"
+#include "absl/status/status.h"
 #include "absl/strings/string_view.h"
 #include "xds/core/v3/context_params.pb.h"
 

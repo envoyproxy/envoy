@@ -21,6 +21,13 @@ public:
 };
 
 using XRateLimitHeaders = ConstSingleton<XRateLimitHeaderValues>;
+
+class RetryAfterHeaderValues {
+public:
+  const Http::LowerCaseString RetryAfter{"retry-after"};
+};
+
+using RetryAfterHeaders = ConstSingleton<RetryAfterHeaderValues>;
 } // namespace RateLimit
 } // namespace Common
 } // namespace HttpFilters

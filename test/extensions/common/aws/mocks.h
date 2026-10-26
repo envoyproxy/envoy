@@ -163,6 +163,8 @@ public:
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds) {
     provider_->setCredentialsToAllThreads(std::move(creds));
   }
+  void setCredentialsPendingToAllThreads() { provider_->setCredentialsPendingToAllThreads(); }
+  void credentialsRetrievalError() { provider_->credentialsRetrievalError(); }
   void invalidateStats() { provider_->stats_.reset(); }
   size_t getSubscribersCount() {
     Thread::LockGuard lock(provider_->mu_);

@@ -73,8 +73,8 @@ jobs:
             .
           shell: bash
       target: ${{ matrix.target }}
-      upload-name: ${{ matrix.output }}_android_aar_sources
-      upload-path: /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz
+      uploads: |
+        ${{ matrix.output }}_android_aar_sources: /tmp/output/${{ matrix.output }}_android_aar_sources.tar.gz
     strategy:
       fail-fast: false
       matrix:
@@ -201,8 +201,8 @@ jobs:
             auditwheel repair "$WHEEL_PATH" --wheel-dir /tmp/dist
           shell: bash
       target: ${{ matrix.target }}
-      upload-name: python-wheel
-      upload-path: /tmp/dist/*.whl
+      uploads: |
+        python-wheel: /tmp/dist/*.whl
     strategy:
       fail-fast: false
       matrix:

@@ -9,6 +9,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -19,6 +20,7 @@ namespace StatSinks {
 namespace DynamicModules {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
@@ -33,6 +35,9 @@ struct CallRecorder {
   int histogram_complete_calls = 0;
   std::vector<std::string> histogram_names;
   std::vector<uint64_t> histogram_values;
+  // Used by the `re-entrancy` test so the outer histogram callback can record a nested histogram.
+  DynamicModuleStatsSink* sink = nullptr;
+  Stats::Histogram* reentrant_histogram = nullptr;
 };
 
 // Globally-addressable recorder so our test-time lambda-style hook
@@ -45,11 +50,11 @@ public:
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
         /*do_not_close=*/false);
-    ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+    ASSERT_OK(dynamic_module);
 
     auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                   std::move(dynamic_module.value()), context_);
-    ASSERT_TRUE(config.ok()) << config.status().message();
+    ASSERT_OK(config);
     config_ = std::move(config.value());
   }
 
@@ -210,6 +215,77 @@ TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompletePassesNameAndValue) {
   g_recorder = nullptr;
 }
 
+// The reused name buffer grows when a longer name is serialized and reports the exact length for a
+// shorter name afterwards, so no stale bytes leak from a previous sample.
+TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompleteReusesAndGrowsNameBuffer) {
+  CallRecorder recorder;
+  g_recorder = &recorder;
+
+  config_->on_histogram_complete_ = [](envoy_dynamic_module_type_stat_sink_config_module_ptr,
+                                       envoy_dynamic_module_type_envoy_buffer name,
+                                       uint64_t value) {
+    g_recorder->histogram_complete_calls++;
+    g_recorder->histogram_names.emplace_back(name.ptr, name.length);
+    g_recorder->histogram_values.push_back(value);
+  };
+
+  DynamicModuleStatsSink sink(config_);
+  NiceMock<Stats::MockHistogram> short_histogram;
+  short_histogram.name_ = "hh";
+  NiceMock<Stats::MockHistogram> long_histogram;
+  long_histogram.name_ = "a_much_longer_histogram_name_than_before";
+
+  sink.onHistogramComplete(short_histogram, 1);
+  sink.onHistogramComplete(long_histogram, 2);
+  sink.onHistogramComplete(short_histogram, 3);
+
+  ASSERT_EQ(3, recorder.histogram_names.size());
+  EXPECT_EQ("hh", recorder.histogram_names[0]);
+  EXPECT_EQ("a_much_longer_histogram_name_than_before", recorder.histogram_names[1]);
+  EXPECT_EQ("hh", recorder.histogram_names[2]);
+  g_recorder = nullptr;
+}
+
+// A module that records a histogram from inside on_histogram_complete re-enters onHistogramComplete
+// on the same thread. The nested call must not clobber the name the outer callback still reads.
+TEST_F(DynamicModuleStatsSinkTest, OnHistogramCompleteReentrantCallKeepsOuterName) {
+  CallRecorder recorder;
+  g_recorder = &recorder;
+
+  DynamicModuleStatsSink sink(config_);
+  NiceMock<Stats::MockHistogram> outer_histogram;
+  outer_histogram.name_ = "outer_histogram_name";
+  NiceMock<Stats::MockHistogram> inner_histogram;
+  inner_histogram.name_ = "inner";
+  recorder.sink = &sink;
+  recorder.reentrant_histogram = &inner_histogram;
+
+  config_->on_histogram_complete_ = [](envoy_dynamic_module_type_stat_sink_config_module_ptr,
+                                       envoy_dynamic_module_type_envoy_buffer name,
+                                       uint64_t value) {
+    // The outer call records a nested histogram before reading its own name back, so a shared
+    // buffer would clobber the outer name here.
+    if (g_recorder->reentrant_histogram != nullptr) {
+      Stats::Histogram* nested = g_recorder->reentrant_histogram;
+      g_recorder->reentrant_histogram = nullptr;
+      g_recorder->sink->onHistogramComplete(*nested, 999);
+    }
+    g_recorder->histogram_complete_calls++;
+    g_recorder->histogram_names.emplace_back(name.ptr, name.length);
+    g_recorder->histogram_values.push_back(value);
+  };
+
+  sink.onHistogramComplete(outer_histogram, 123);
+
+  ASSERT_EQ(2, recorder.histogram_complete_calls);
+  // The nested call is recorded first, and the outer name survives it intact.
+  EXPECT_EQ("inner", recorder.histogram_names[0]);
+  EXPECT_EQ("outer_histogram_name", recorder.histogram_names[1]);
+  EXPECT_EQ(999u, recorder.histogram_values[0]);
+  EXPECT_EQ(123u, recorder.histogram_values[1]);
+  g_recorder = nullptr;
+}
+
 // =============================================================================
 // Gauge and scheduler config tests
 // =============================================================================
@@ -245,10 +321,10 @@ TEST_F(DynamicModuleStatsSinkGaugeTest, DefineGaugeAfterFrozenIsRejected) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_no_op", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
   auto config = newDynamicModuleStatsSinkConfig("test_sink", "test_config",
                                                 std::move(dynamic_module.value()), context_);
-  ASSERT_TRUE(config.ok()) << config.status().message();
+  ASSERT_OK(config);
 
   size_t id = 0;
   EXPECT_EQ(envoy_dynamic_module_type_metrics_result_Frozen,
@@ -417,14 +493,12 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionMissingSymbol) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_missing_config_new", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::ContainsRegex("config_new"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::ContainsRegex("config_new")));
 }
 
 // When on_stat_sink_config_new returns null, newDynamicModuleStatsSinkConfig
@@ -433,14 +507,13 @@ TEST(DynamicModuleStatsSinkConfigTest, FactoryFunctionModuleReturnsNull) {
   auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
       Extensions::DynamicModules::testSharedObjectPath("stat_sink_config_new_fail", "c"),
       /*do_not_close=*/false);
-  ASSERT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  ASSERT_OK(dynamic_module);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto config_or_error = newDynamicModuleStatsSinkConfig(
       "test_sink", "test_config", std::move(dynamic_module.value()), context);
-  EXPECT_FALSE(config_or_error.ok());
-  EXPECT_THAT(std::string(config_or_error.status().message()),
-              testing::HasSubstr("Failed to initialize dynamic module stats sink config"));
+  EXPECT_THAT(config_or_error, HasStatusMessage(testing::HasSubstr(
+                                   "Failed to initialize dynamic module stats sink config")));
 }
 
 } // namespace

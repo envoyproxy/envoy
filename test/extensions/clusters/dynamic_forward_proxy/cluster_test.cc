@@ -22,6 +22,7 @@
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
@@ -29,6 +30,7 @@ using testing::DoAll;
 using testing::InSequence;
 using testing::Return;
 using testing::SizeIs;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -254,7 +256,7 @@ TEST_F(ClusterTest, ClusterDestroyedInMainThread) {
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
@@ -349,7 +351,7 @@ TEST_F(ClusterTest, BasicFlow) {
 
   // LB will immediately resolve host1.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("1.2.3.4:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
@@ -357,9 +359,11 @@ TEST_F(ClusterTest, BasicFlow) {
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
-  // After changing the address, LB will immediately resolve the new address with a refresh.
+  // After changing the address, the host is replaced with a new instance and the change is
+  // published as a regular membership update. LB will immediately resolve the new address.
   updateTestHostAddress("host1:0", "2.3.4.5");
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(1)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ("2.3.4.5:0",
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
@@ -382,13 +386,13 @@ TEST_F(ClusterTest, OutlierDetection) {
   InSequence s;
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
             lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]));
   EXPECT_CALL(*host_map_["host2:0"], touch());
   EXPECT_EQ("5.6.7.8:0",
             lb_->chooseHost(setHostAndReturnContext("host2:0")).host->address()->asString());
@@ -414,6 +418,166 @@ TEST_F(ClusterTest, InvalidLbContext) {
   ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(nullptr));
   EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_).host);
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
+}
+
+TEST_F(ClusterTest, LoadBalancer_ResolutionCompletesBetweenHostAndCacheLookups) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:80", "1.2.3.4");
+  auto host_info = host_map_["host1:80"];
+  EXPECT_CALL(*host_info, details()).WillOnce(Return("Unknown_error"));
+  NiceMock<Upstream::MockBasicResourceLimit> resource_limit;
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(new Upstream::ResourceAutoIncDec(resource_limit)));
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_("host1", 80, _, _))
+      .WillOnce(Invoke([&](auto, auto, auto, auto&) {
+        // The initial cluster lookup has missed; publish the host before returning the cache hit.
+        EXPECT_OK(cluster_->onDnsHostAddOrUpdate("host1:80", host_info));
+        return Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+            Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache, nullptr,
+            host_info};
+      }));
+  EXPECT_CALL(*host_info, touch());
+
+  auto result = lb_->chooseHost(setHostAndReturnContext("host1"));
+  ASSERT_NE(nullptr, result.host);
+  EXPECT_EQ(*host_info->address_, *result.host->address());
+  EXPECT_EQ(nullptr, result.cancelable);
+}
+
+TEST_F(ClusterTest, LoadBalancer_CachedDnsFailurePreservesDetails) {
+  initialize(default_yaml_config_, false);
+  auto host_info = std::make_shared<StrictMock<Common::DynamicForwardProxy::MockDnsHostInfo>>();
+  const std::string details = "dns_resolution_failure{test_failure}";
+  EXPECT_CALL(*host_info, details()).WillOnce(Return(details));
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _)).Times(0);
+  NiceMock<Upstream::MockBasicResourceLimit> resource_limit;
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(new Upstream::ResourceAutoIncDec(resource_limit)));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_("host1", 80, _, _))
+      .WillOnce(Return(Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+          Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache, nullptr,
+          host_info}));
+
+  auto result = lb_->chooseHost(setHostAndReturnContext("host1"));
+  EXPECT_EQ(nullptr, result.host);
+  EXPECT_EQ(details, result.details);
+  EXPECT_EQ(nullptr, result.cancelable);
+}
+
+TEST_F(ClusterTest, LoadBalancer_ProxiedHostWithNullAddressIsSelected) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:80", "1.2.3.4");
+  auto host_info = host_map_["host1:80"];
+  host_info->address_.reset();
+  EXPECT_CALL(*host_info, details()).WillRepeatedly(Return("proxy_resolve"));
+  NiceMock<Upstream::MockBasicResourceLimit> resource_limit;
+  Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks* callbacks = nullptr;
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(new Upstream::ResourceAutoIncDec(resource_limit)))
+      .WillOnce(Return(new Upstream::ResourceAutoIncDec(resource_limit)));
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_("host1", 80, _, _))
+      .WillOnce(Invoke([&](auto, auto, auto, auto& cb) {
+        callbacks = &cb;
+        return Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+            Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
+            new NiceMock<Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle>(), std::nullopt};
+      }))
+      .WillOnce(Invoke([&](auto, auto, auto, auto&) {
+        // Publish after the initial host-map miss so the synchronous path must consult the cache.
+        EXPECT_OK(cluster_->onDnsHostAddOrUpdate("host1:80", host_info));
+        return Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+            Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache, nullptr,
+            host_info};
+      }));
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_CALL(*host_info, touch()).Times(2);
+
+  auto async_result = lb_->chooseHost(setHostAndReturnContext("host1"));
+  EXPECT_EQ(nullptr, async_result.host);
+  ASSERT_NE(nullptr, async_result.cancelable);
+  ASSERT_NE(nullptr, callbacks);
+  auto sync_result = lb_->chooseHost(setHostAndReturnContext("host1"));
+  ASSERT_NE(nullptr, sync_result.host);
+  EXPECT_EQ("host1:80", sync_result.host->hostname());
+  EXPECT_EQ(nullptr, sync_result.host->address());
+  EXPECT_EQ("proxy_resolve", sync_result.details);
+  EXPECT_EQ(nullptr, sync_result.cancelable);
+  EXPECT_CALL(lb_context_, onAsyncHostSelection(_, _))
+      .WillOnce([&](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+        ASSERT_NE(nullptr, host);
+        EXPECT_EQ("host1:80", host->hostname());
+        EXPECT_EQ(sync_result.host, host);
+        EXPECT_EQ(host_info->details(), details);
+      });
+  callbacks->onLoadDnsCacheComplete(host_info);
+}
+
+TEST_F(ClusterTest, LoadBalancer_SyncAndAsyncResolvedEntryResultsMatch) {
+  initialize(default_yaml_config_, false);
+  NiceMock<Upstream::MockBasicResourceLimit> resource_limit;
+  for (const auto& scenario :
+       {"success", "missing_host", "dns_failure", "null_info", "absent_info"}) {
+    SCOPED_TRACE(scenario);
+    const std::string hostname = absl::StrCat(scenario, ":80");
+    const bool success = std::string(scenario) == "success";
+    const bool has_info =
+        std::string(scenario) != "null_info" && std::string(scenario) != "absent_info";
+    Common::DynamicForwardProxy::DnsHostInfoSharedPtr info;
+    if (has_info) {
+      makeTestHost(hostname, "1.2.3.4");
+      auto mock_info = host_map_[hostname];
+      if (std::string(scenario) == "dns_failure") {
+        mock_info->address_.reset();
+      }
+      EXPECT_CALL(*mock_info, details())
+          .WillRepeatedly(Return(std::string(scenario) == "dns_failure"
+                                     ? "dns_resolution_failure{test_failure}"
+                                     : "Unknown_error"));
+      info = mock_info;
+    }
+    Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks* callbacks = nullptr;
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+        .WillOnce(Return(new Upstream::ResourceAutoIncDec(resource_limit)))
+        .WillOnce(Return(new Upstream::ResourceAutoIncDec(resource_limit)));
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(scenario, 80, _, _))
+        .WillOnce(Invoke([&](auto, auto, auto, auto& cb) {
+          callbacks = &cb;
+          return Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+              Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::Loading,
+              new NiceMock<Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle>(),
+              std::nullopt};
+        }))
+        .WillOnce(Invoke([&](auto, auto, auto, auto&) {
+          if (success) {
+            EXPECT_OK(cluster_->onDnsHostAddOrUpdate(hostname, info));
+          }
+          std::optional<Common::DynamicForwardProxy::DnsHostInfoSharedPtr> cached_info = info;
+          if (std::string(scenario) == "absent_info") {
+            cached_info.reset();
+          }
+          return Common::DynamicForwardProxy::MockDnsCache::MockLoadDnsCacheEntryResult{
+              Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus::InCache, nullptr,
+              cached_info};
+        }));
+    if (success) {
+      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+      EXPECT_CALL(*host_map_[hostname], touch()).Times(2);
+    }
+
+    auto async_result = lb_->chooseHost(setHostAndReturnContext(scenario));
+    ASSERT_NE(nullptr, async_result.cancelable);
+    ASSERT_NE(nullptr, callbacks);
+    auto sync_result = lb_->chooseHost(setHostAndReturnContext(scenario));
+    EXPECT_EQ(success, sync_result.host != nullptr);
+    EXPECT_EQ(has_info ? info->details() : "no_host", sync_result.details);
+    EXPECT_CALL(lb_context_, onAsyncHostSelection(_, _))
+        .WillOnce([&](Upstream::HostConstSharedPtr&& host, std::string&& details) {
+          EXPECT_EQ(sync_result.host, host);
+          EXPECT_EQ(sync_result.details, details);
+        });
+    callbacks->onLoadDnsCacheComplete(info);
+  }
 }
 
 TEST_F(ClusterTest, LoadBalancer_CleansUpPendingAsyncHostSelectionOnDestroy) {
@@ -455,7 +619,7 @@ TEST_F(ClusterTest, FilterStateHostOverride) {
   makeTestHost("host1:0", "1.2.3.4");
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
-  EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ(
       "1.2.3.4:0",
@@ -894,6 +1058,58 @@ TEST(ObjectFactory, DynamicPort) {
   ASSERT_NE(nullptr, object);
   EXPECT_EQ(port, object->serializeAsString());
   ASSERT_EQ(nullptr, factory->createFromBytes("blah"));
+}
+
+TEST_F(ClusterTest, HostReplacedOnAddressChange) {
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  const auto original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_CALL(*this, onMemberUpdateCb(_, _))
+      .WillOnce(Invoke(
+          [&](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
+            ASSERT_EQ(1UL, hosts_added.size());
+            ASSERT_EQ(1UL, hosts_removed.size());
+            EXPECT_EQ(original_host, hosts_removed[0]);
+            EXPECT_NE(original_host, hosts_added[0]);
+            EXPECT_EQ("2.3.4.5:0", hosts_added[0]->address()->asString());
+          }));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+
+  // The old instance kept its original address and only the new instance is in the host set.
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+  EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ("2.3.4.5:0",
+            cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
+}
+
+// With the runtime guard disabled, the legacy behavior is retained: the address is swapped in
+// place on the existing host instance and no membership update is published.
+TEST_F(ClusterTest, LegacyInPlaceAddressUpdate) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.dfp_cluster_replace_host_on_address_change", "false"}});
+
+  initialize(default_yaml_config_, false);
+  makeTestHost("host1:0", "1.2.3.4");
+  InSequence s;
+
+  EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  const auto original_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_EQ("1.2.3.4:0", original_host->address()->asString());
+
+  // No onMemberUpdateCb expectation: an unexpected call on the mock would fail the test.
+  updateTestHostAddress("host1:0", "2.3.4.5");
+  EXPECT_OK(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]));
+  EXPECT_EQ(original_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
+  EXPECT_EQ("2.3.4.5:0", original_host->address()->asString());
 }
 
 } // namespace DynamicForwardProxy

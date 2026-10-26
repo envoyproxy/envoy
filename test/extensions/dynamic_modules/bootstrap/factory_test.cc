@@ -6,6 +6,7 @@
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -47,8 +48,10 @@ TEST_F(FactoryTestBase, DynamicModuleLoadFail) {
   proto_config.mutable_dynamic_module_config()->set_name("nonexistent_module");
   proto_config.set_extension_name("test");
 
-  EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
-                          "Failed to load dynamic module:.*");
+  EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module libnonexistent_module", {
+    EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_),
+                            EnvoyException, "Failed to load dynamic module:.*");
+  });
 
   EXPECT_EQ(1U, failureCounter(context_.serverScope(), "module_load_error", "test"));
 
@@ -66,6 +69,24 @@ TEST_F(FactoryTestBase, ExtensionConfigCreateFail) {
 
   EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
                           "Failed to create extension config:.*");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test"));
+
+  TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+}
+
+TEST_F(FactoryTestBase, NullInModuleExtensionRejected) {
+  // A module whose on_bootstrap_extension_new returns null must be rejected at load rather than
+  // kept as an extension whose hooks silently no-op.
+  DynamicModuleBootstrapExtensionFactory factory;
+  TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", testDataDir(), 1);
+
+  envoy::extensions::bootstrap::dynamic_modules::v3::DynamicModuleBootstrapExtension proto_config;
+  proto_config.mutable_dynamic_module_config()->set_name("bootstrap_extension_new_null");
+  proto_config.set_extension_name("test");
+
+  EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
+                          "Failed to initialize dynamic module bootstrap extension");
 
   EXPECT_EQ(1U, failureCounter(context_.serverScope(), "config_init_error", "test"));
 
@@ -110,7 +131,8 @@ TEST_F(FactoryTestBase, LocalFileLoading) {
 }
 
 TEST_F(FactoryTestBase, RemoteSourceRejected) {
-  // Remote module sources are not supported for bootstrap extensions (no init manager is wired up).
+  // Remote module sources are not supported for bootstrap extensions because the cluster manager
+  // does not exist yet when the extension is created.
   DynamicModuleBootstrapExtensionFactory factory;
 
   envoy::extensions::bootstrap::dynamic_modules::v3::DynamicModuleBootstrapExtension proto_config;
@@ -121,7 +143,33 @@ TEST_F(FactoryTestBase, RemoteSourceRejected) {
   remote->set_sha256("abc123");
   proto_config.set_extension_name("test");
 
-  EXPECT_THROW(factory.createBootstrapExtension(proto_config, context_), EnvoyException);
+  EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
+                          "does not support remote module sources");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "remote_fetch_error", "test"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test"));
+}
+
+// A remote source is rejected the same way when nack_on_cache_miss is set, since the guard runs
+// before either remote code path.
+TEST_F(FactoryTestBase, RemoteSourceWithNackRejected) {
+  DynamicModuleBootstrapExtensionFactory factory;
+
+  envoy::extensions::bootstrap::dynamic_modules::v3::DynamicModuleBootstrapExtension proto_config;
+  auto* module_config = proto_config.mutable_dynamic_module_config();
+  auto* remote = module_config->mutable_module()->mutable_remote();
+  remote->mutable_http_uri()->set_uri("https://example.com/module.so");
+  remote->mutable_http_uri()->set_cluster("cluster_1");
+  remote->mutable_http_uri()->mutable_timeout()->set_seconds(5);
+  remote->set_sha256("abc123");
+  module_config->set_nack_on_cache_miss(true);
+  proto_config.set_extension_name("test");
+
+  EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
+                          "does not support remote module sources");
+
+  EXPECT_EQ(1U, failureCounter(context_.serverScope(), "remote_fetch_error", "test"));
+  EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test"));
 }
 
 } // namespace DynamicModules

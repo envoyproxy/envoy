@@ -5,7 +5,6 @@
 
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/mcp/constants.h"
 
 namespace Envoy {
@@ -13,13 +12,6 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Mcp {
-
-inline absl::string_view metadataNamespace() {
-  return Runtime::runtimeFeatureEnabled(
-             "envoy.reloadable_features.mcp_filter_use_new_metadata_namespace")
-             ? McpConstants::McpfilterNamespace
-             : McpConstants::LegacyMetadataNamespace;
-}
 
 enum class Status { Ok, ParseError, NoMcp, NotJsonRpc, DuplicateKeys, BodyTooLarge };
 
@@ -30,7 +22,7 @@ inline absl::string_view statusToString(Status status) {
   case Status::ParseError:
     return McpConstants::StatusValues::PARSE_ERROR;
   case Status::NoMcp:
-    return McpConstants::StatusValues::NO_MCP;
+    return McpConstants::StatusValues::REJECT_NO_MCP;
   case Status::NotJsonRpc:
     return McpConstants::StatusValues::NOT_JSONRPC;
   case Status::DuplicateKeys:

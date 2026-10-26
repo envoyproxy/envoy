@@ -15,9 +15,10 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/path/rewrite/uri_template:config",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -26,12 +27,13 @@ envoy_extension_cc_test(
     name = "library_test",
     srcs = ["library_test.cc"],
     extension_names = ["envoy.path.rewrite.uri_template.uri_template_rewriter"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/match/uri_template:uri_template_match_lib",
         "//source/extensions/path/rewrite/uri_template:config",
         "//source/extensions/path/rewrite/uri_template:uri_template_rewrite_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )

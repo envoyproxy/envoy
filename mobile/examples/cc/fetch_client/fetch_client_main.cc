@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
   absl::Notification engine_running;
   Envoy::Platform::EngineSharedPtr engine =
       Envoy::Platform::EngineBuilder()
-          .setLogLevel(Envoy::Logger::Logger::trace)
+          .setLogLevel(Envoy::Logger::Levels::trace)
           .addRuntimeGuard("dns_cache_set_ip_version_to_remove", true)
           .addRuntimeGuard("quic_no_tcp_delay", true)
           .setOnEngineRunning([&engine_running]() { engine_running.Notify(); })

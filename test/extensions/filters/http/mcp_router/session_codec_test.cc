@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/mcp_router/session_codec.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -9,6 +11,8 @@ namespace HttpFilters {
 namespace McpRouter {
 namespace {
 
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 
@@ -34,7 +38,7 @@ TEST(SessionCodecTest, ParseCompositeSessionId) {
 
   auto result = SessionCodec::parseCompositeSessionId(composite);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "route1");
   EXPECT_EQ(result->subject, "user1");
   EXPECT_THAT(result->backend_sessions,
@@ -49,7 +53,7 @@ TEST(SessionCodecTest, SubjectWithAtSymbol) {
 
   auto result = SessionCodec::parseCompositeSessionId(id);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "my_route");
   EXPECT_EQ(result->subject, subject_with_at);
   EXPECT_THAT(result->backend_sessions, UnorderedElementsAre(Pair("backend1", "session1")));
@@ -57,13 +61,14 @@ TEST(SessionCodecTest, SubjectWithAtSymbol) {
 
 TEST(SessionCodecTest, ParseInvalidCustomFormat) {
   const std::vector<std::string> invalid_inputs = {
-      "invalid", "no_backends@user",
+      "invalid",
+      "no_backends@user",
       "route@user@backend",  // Missing colon
       "route@user@:session", // Empty backend name
   };
 
   for (const auto& input : invalid_inputs) {
-    EXPECT_FALSE(SessionCodec::parseCompositeSessionId(input).ok()) << "Input: " << input;
+    EXPECT_THAT(SessionCodec::parseCompositeSessionId(input), Not(IsOk())) << "Input: " << input;
   }
 }
 
@@ -73,7 +78,7 @@ TEST(SessionCodecTest, ParseEmptyBackendSessions) {
 
   auto result = SessionCodec::parseCompositeSessionId(composite);
 
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "route1");
   EXPECT_EQ(result->subject, "user1");
   EXPECT_TRUE(result->backend_sessions.empty());
@@ -86,13 +91,56 @@ TEST(SessionCodecTest, BuildAndParsePartialBackendSessions) {
   std::string composite = SessionCodec::buildCompositeSessionId("route1", "user1", sessions);
 
   auto result = SessionCodec::parseCompositeSessionId(composite);
-  ASSERT_TRUE(result.ok());
+  ASSERT_OK(result);
   EXPECT_EQ(result->route, "route1");
   EXPECT_EQ(result->subject, "user1");
   // Only backend1 should be present; backend2 is absent (session-less).
   EXPECT_EQ(result->backend_sessions.size(), 1);
   EXPECT_EQ(result->backend_sessions["backend1"], "session-abc");
   EXPECT_EQ(result->backend_sessions.count("backend2"), 0);
+}
+
+TEST(SessionCodecTest, IntegrityRoundTrip) {
+  const std::string key = "server-held-secret";
+  const std::string composite =
+      SessionCodec::buildCompositeSessionId("route1", "user1", {{"backend1", "s1"}});
+
+  const std::string token = SessionCodec::encodeWithIntegrity(composite, key);
+
+  // Wire format is "<base64 payload>.<base64 mac>".
+  EXPECT_THAT(token, testing::StartsWith(SessionCodec::encode(composite) + "."));
+  EXPECT_EQ(composite, SessionCodec::decodeWithIntegrity(token, key));
+}
+
+// An attacker who holds a valid token can read and rewrite the payload (Base64 only), but cannot
+// recompute the MAC without the server-held key, so a rebound subject is rejected.
+TEST(SessionCodecTest, IntegrityRejectsForgedSubject) {
+  const std::string key = "server-held-secret";
+  const std::string token = SessionCodec::encodeWithIntegrity(
+      SessionCodec::buildCompositeSessionId("route1", "alice", {{"backend1", "s1"}}), key);
+
+  const size_t sep = token.rfind('.');
+  ASSERT_NE(sep, std::string::npos);
+  const std::string stale_mac = token.substr(sep + 1);
+  const std::string forged = SessionCodec::encode(SessionCodec::buildCompositeSessionId(
+                                 "route1", "bob", {{"backend1", "s1"}})) +
+                             "." + stale_mac;
+
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity(forged, key));
+}
+
+TEST(SessionCodecTest, IntegrityRejectsWrongKey) {
+  const std::string token =
+      SessionCodec::encodeWithIntegrity("route1@dXNlcjE=@backend1:czE=", "server-held-secret");
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity(token, "attacker-guessed-key"));
+}
+
+TEST(SessionCodecTest, IntegrityRejectsMalformedTokens) {
+  const std::string key = "server-held-secret";
+  // No MAC separator, including the legacy unsigned format, is rejected when a key is set.
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity("aGVsbG8=", key));
+  // Empty MAC.
+  EXPECT_EQ("", SessionCodec::decodeWithIntegrity("aGVsbG8=.", key));
 }
 
 } // namespace

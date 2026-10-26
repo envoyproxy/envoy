@@ -92,8 +92,6 @@ public:
                           quic::ConnectionCloseSource source) override;
   void CloseWriteSide() override;
 
-  void clearWatermarkBuffer();
-
   // EnvoyQuicStream
   Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view header_name, absl::string_view header_value) override;

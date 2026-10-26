@@ -1,3 +1,4 @@
+#include <iterator>
 #include <vector>
 
 #include "source/common/common/mem_block_builder.h"
@@ -12,7 +13,7 @@ TEST(MemBlockBuilderTest, AppendUint8) {
   mem_block.appendOne(5);
   EXPECT_EQ(9, mem_block.capacityRemaining());
   const uint8_t foo[] = {6, 7};
-  mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo)));
+  mem_block.appendData(absl::MakeConstSpan(foo, std::size(foo)));
   EXPECT_EQ(7, mem_block.capacityRemaining());
 
   MemBlockBuilder<uint8_t> append;
@@ -43,7 +44,7 @@ TEST(MemBlockBuilderTest, AppendUint32) {
   mem_block.appendOne(100005);
   EXPECT_EQ(9, mem_block.capacityRemaining());
   const uint32_t foo[] = {100006, 100007};
-  mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo)));
+  mem_block.appendData(absl::MakeConstSpan(foo, std::size(foo)));
   EXPECT_EQ(7, mem_block.capacityRemaining());
 
   MemBlockBuilder<uint32_t> append;
@@ -85,8 +86,7 @@ TEST(MemBlockBuilderTest, AppendDataTooMuch) {
   MemBlockBuilder<uint8_t> mem_block(1);
   const uint8_t foo[] = {1, 2};
   EXPECT_DEATH(
-      { mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo))); },
-      expected_death_regex);
+      { mem_block.appendData(absl::MakeConstSpan(foo, std::size(foo))); }, expected_death_regex);
 }
 
 } // namespace Envoy

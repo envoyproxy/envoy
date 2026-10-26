@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "cluster_test",
     srcs = ["cluster_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/clusters/aggregate:cluster",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
@@ -37,7 +37,7 @@ envoy_extension_cc_test(
     name = "cluster_update_test",
     srcs = ["cluster_update_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/router:context_lib",
         "//source/common/upstream:cluster_factory_lib",
@@ -53,6 +53,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:cluster_update_callbacks_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/aggregate/v3:pkg_cc_proto",
     ],
@@ -63,7 +64,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["cluster_integration_test.cc"],
     extension_names = ["envoy.clusters.aggregate"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

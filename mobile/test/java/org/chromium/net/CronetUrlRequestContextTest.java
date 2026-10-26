@@ -1099,8 +1099,7 @@ public class CronetUrlRequestContextTest {
   @Feature({"Cronet"})
   @Ignore("Multiple Engines are not yet supported: "
           + "https://github.com/envoyproxy/envoy-mobile/issues/332")
-  public void
-  testInitTwoEnginesSimultaneously() throws Exception {
+  public void testInitTwoEnginesSimultaneously() throws Exception {
     // Threads will block on runBlocker to ensure simultaneous execution.
     ConditionVariable runBlocker = new ConditionVariable(false);
     RequestThread thread1 = new RequestThread(mUrl, runBlocker);
@@ -1136,8 +1135,7 @@ public class CronetUrlRequestContextTest {
   @Feature({"Cronet"})
   @Ignore("Multiple Engines are not yet supported: "
           + "https://github.com/envoyproxy/envoy-mobile/issues/332")
-  public void
-  testInitDifferentEngines() throws Exception {
+  public void testInitDifferentEngines() throws Exception {
     // Test that concurrently instantiating Cronet context's upon various
     // different versions of the same Android Context does not cause crashes
     // like crbug.com/453845
@@ -1344,9 +1342,10 @@ public class CronetUrlRequestContextTest {
   /**
    * Runs {@code r} on {@code engine}'s network thread.
    */
-  private static void postToNetworkThread(final CronetEngine engine, final Runnable r) {
-    // Works by requesting an invalid URL which results in onFailed() being called, which is
-    // done through a direct executor which causes onFailed to be run on the network thread.
+  private void postToNetworkThread(final CronetEngine engine, final Runnable r) {
+    // Works by requesting an URL that returns a 500 status, which results in onFailed() being
+    // called, which is done through a direct executor which causes onFailed to be run on the
+    // network thread.
     Executor directExecutor = new Executor() {
       @Override
       public void execute(Runnable runnable) {
@@ -1371,7 +1370,7 @@ public class CronetUrlRequestContextTest {
         r.run();
       }
     };
-    engine.newUrlRequestBuilder("http://invalid", callback, directExecutor).build().start();
+    engine.newUrlRequestBuilder(mUrl500, callback, directExecutor).build().start();
   }
 
   /**

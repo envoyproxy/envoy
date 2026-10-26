@@ -129,7 +129,8 @@ TestServer::TestServer()
       port_(0) {
   std::string runfiles_error;
   runfiles_ = std::unique_ptr<bazel::tools::cpp::runfiles::Runfiles>{
-      bazel::tools::cpp::runfiles::Runfiles::CreateForTest(&runfiles_error)};
+      bazel::tools::cpp::runfiles::Runfiles::CreateForTest(BAZEL_CURRENT_REPOSITORY,
+                                                           &runfiles_error)};
   RELEASE_ASSERT(TestEnvironment::getOptionalEnvVar("NORUNFILES").has_value() ||
                      runfiles_ != nullptr,
                  runfiles_error);
@@ -347,9 +348,8 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
   }
   auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
       tls_context, factory_context, {}, false);
-  static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-      std::move(cfg), context_manager_, *upstream_stats_store->rootScope());
+      std::move(cfg), context_manager_, *stats_store_.rootScope());
 }
 
 } // namespace Envoy

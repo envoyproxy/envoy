@@ -22,6 +22,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/upstream/load_stats_reporter.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -33,12 +34,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
+using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -1060,13 +1063,13 @@ TEST_P(GrpcMuxImplTest, DynamicContextParameters) {
   expectSendMessage("bar", {}, "");
   grpc_mux_->start();
   // Unknown type, shouldn't do anything.
-  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz").ok());
+  ASSERT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("baz"));
   // Update to foo type should resend Node.
   expectSendMessage("foo", {"x", "y"}, "", true);
-  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo").ok());
+  ASSERT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("foo"));
   // Update to bar type should resend Node.
   expectSendMessage("bar", {}, "", true);
-  ASSERT_TRUE(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar").ok());
+  ASSERT_OK(local_info_.context_provider_.update_cb_handler_.runCallbacks("bar"));
   // only destruction of foo watch is going to result in an unsubscribe message.
   // bar watch is empty and its destruction doesn't change it resource list.
   expectSendMessage("foo", {}, "", false);
@@ -1281,6 +1284,10 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
 
 // Updating the mux object while being connected sends the correct requests.
 TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
+  TestScopedRuntime scoped_runtime;
+  // This is needed to validate that the LRS-factory is updated.
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "true"}});
+
   replaced_async_client_ = new Grpc::MockAsyncClient();
   setup();
   InSequence s;
@@ -1305,6 +1312,12 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
                     "", &replaced_async_stream_);
   expectSendMessage("type_url_bar", {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     &replaced_async_stream_);
+  bool factory_called = false;
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
@@ -1312,7 +1325,12 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
       /*backoff_strategy=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
-      empty_ads_config));
+      empty_ads_config, lrs_factory));
+
+  // Verify that the factory is stored and used.
+  EXPECT_FALSE(factory_called);
+  grpc_mux_->maybeCreateLoadStatsReporter();
+  EXPECT_TRUE(factory_called);
   // Ending test, removing subscriptions for type_url_foo.
   expectSendMessage("type_url_foo", {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     &replaced_async_stream_);
@@ -1419,29 +1437,126 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
   // No disconnect and replacement of the original async_client.
   EXPECT_CALL(async_stream_, resetStream()).Times(0);
   EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _)).Times(0);
-  EXPECT_FALSE(grpc_mux_
-                   ->updateMuxSource(
-                       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(
-                           replaced_async_client_),
-                       /*failover_async_client=*/nullptr,
-                       /*scope=*/*stats_.rootScope(),
-                       /*backoff_strategy=*/
-                       std::make_unique<JitteredExponentialBackOffStrategy>(
-                           SubscriptionFactory::RetryInitialDelayMs,
-                           SubscriptionFactory::RetryMaxDelayMs, random_),
-                       ads_config_wrong_settings)
-                   .ok());
+  EXPECT_THAT(
+      grpc_mux_->updateMuxSource(
+          /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+          /*failover_async_client=*/nullptr,
+          /*scope=*/*stats_.rootScope(),
+          /*backoff_strategy=*/
+          std::make_unique<JitteredExponentialBackOffStrategy>(
+              SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs,
+              random_),
+          ads_config_wrong_settings),
+      Not(IsOk()));
   // Ending test, removing subscriptions for type_url_foo.
   expectSendMessage(type_url, {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     &async_stream_);
 }
 
-// A temp test to increase coverage. The test will be modified once the
-// implementation will be added.
-TEST_P(GrpcMuxImplTest, LrsCoverageIncrease) {
-  setup();
-  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
-  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+// Ensures that the load-stats-reporter is created if enabled.
+TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "true"}});
+
+  bool factory_called = false;
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+
+  grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
+
+  // Initial state: not created.
+  EXPECT_EQ(nullptr, grpc_mux_->loadStatsReporter());
+  EXPECT_FALSE(factory_called);
+
+  // First call to maybeCreate: creates it.
+  Upstream::LoadStatsReporter* reporter = grpc_mux_->maybeCreateLoadStatsReporter();
+  EXPECT_NE(nullptr, reporter);
+  EXPECT_TRUE(factory_called);
+  EXPECT_EQ(reporter, grpc_mux_->loadStatsReporter());
+
+  // Second call: returns existing one, doesn't call factory again.
+  factory_called = false;
+  EXPECT_EQ(reporter, grpc_mux_->maybeCreateLoadStatsReporter());
+  EXPECT_FALSE(factory_called);
+
+  // Updating the mux source when the reporter already exists recreates it using the new factory.
+  replaced_async_client_ = new Grpc::MockAsyncClient();
+  EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _))
+      .WillOnce(Return(&replaced_async_stream_));
+  bool new_factory_called = false;
+  auto new_lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    new_factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+  envoy::config::core::v3::ApiConfigSource empty_ads_config;
+  EXPECT_OK(grpc_mux_->updateMuxSource(
+      /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+      /*failover_async_client=*/nullptr,
+      /*scope=*/*stats_.rootScope(),
+      /*backoff_strategy=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      empty_ads_config, new_lrs_factory));
+  EXPECT_TRUE(new_factory_called);
+  EXPECT_NE(nullptr, grpc_mux_->loadStatsReporter());
+}
+
+// Ensures that the load-stats-reporter is not created if disabled.
+TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporterRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "false"}});
+
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    return nullptr; // Should not be called.
+  };
+
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+
+  grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
+
+  EXPECT_EQ(nullptr, grpc_mux_->maybeCreateLoadStatsReporter());
 }
 
 class NullGrpcMuxImplTest : public testing::Test {
@@ -1464,11 +1579,6 @@ TEST_F(NullGrpcMuxImplTest, PauseMultipleArgsImplemented) {
   EXPECT_NO_THROW(scoped = null_mux_->pause(params));
 }
 
-TEST_F(NullGrpcMuxImplTest, RequestOnDemandNotImplemented) {
-  EXPECT_ENVOY_BUG(null_mux_->requestOnDemandUpdate("type_url", {"for_update"}),
-                   "unexpected request for on demand update");
-}
-
 TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
   NiceMock<MockSubscriptionCallbacks> callbacks;
   OpaqueResourceDecoderSharedPtr resource_decoder(
@@ -1481,7 +1591,7 @@ TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
 
 TEST_F(NullGrpcMuxImplTest, NoEdsResourcesCache) { EXPECT_EQ({}, null_mux_->edsResourcesCache()); }
 
-TEST_F(NullGrpcMuxImplTest, LrsCoverageIncrease) {
+TEST_F(NullGrpcMuxImplTest, LrsReturnsNull) {
   EXPECT_EQ(null_mux_->loadStatsReporter(), nullptr);
   EXPECT_EQ(null_mux_->maybeCreateLoadStatsReporter(), nullptr);
 }

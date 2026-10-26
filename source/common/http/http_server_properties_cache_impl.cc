@@ -236,6 +236,9 @@ HttpServerPropertiesCacheImpl::setPropertiesImpl(const Origin& origin,
     if (origin_data.h3_status_tracker) {
       entry_it->second.h3_status_tracker = std::move(origin_data.h3_status_tracker);
     }
+    if (origin_data.concurrent_streams != 0) {
+      entry_it->second.concurrent_streams = origin_data.concurrent_streams;
+    }
 
     return entry_it;
   }
@@ -274,11 +277,8 @@ HttpServerPropertiesCacheImpl::findAlternatives(const Origin& origin) {
 
   auto original_size = protocols.size();
   const MonotonicTime now = dispatcher_.timeSource().monotonicTime();
-  protocols.erase(std::remove_if(protocols.begin(), protocols.end(),
-                                 [now](const AlternateProtocol& protocol) {
-                                   return (now > protocol.expiration_);
-                                 }),
-                  protocols.end());
+  std::erase_if(protocols,
+                [now](const AlternateProtocol& protocol) { return (now > protocol.expiration_); });
 
   if (protocols.empty()) {
     if (key_value_store_) {

@@ -12,11 +12,15 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Contains;
 
 namespace Envoy {
 namespace Extensions {
@@ -107,6 +111,38 @@ TEST_F(ThriftFilterConfigTest, ValidProtoConfiguration) {
   config.set_stat_prefix("my_stat_prefix");
 
   testConfig(config);
+}
+
+// The connection manager's stats carry the stat prefix as an explicit tag.
+TEST_F(ThriftFilterConfigTest, StatsAreTagged) {
+  envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config{};
+  config.set_stat_prefix("thrift_prefix");
+  testConfig(config);
+
+  const Stats::CounterSharedPtr request =
+      TestUtility::findCounter(context_.store_, "thrift.thrift_prefix.request");
+  ASSERT_NE(request, nullptr);
+  EXPECT_EQ("thrift.request", request->tagExtractedName());
+  ASSERT_EQ(1U, request->tags().size());
+  EXPECT_EQ("envoy.thrift_prefix", request->tags()[0].name_);
+  EXPECT_EQ("thrift_prefix", request->tags()[0].value_);
+
+  // The isolated store does not list its histograms, so look the existing one up by name.
+  const Stats::Histogram& request_time = context_.scope().histogramFromString(
+      "thrift.thrift_prefix.request_time_ms", Stats::Histogram::Unit::Milliseconds);
+  EXPECT_EQ("thrift.request_time_ms", request_time.tagExtractedName());
+  ASSERT_EQ(1U, request_time.tags().size());
+  EXPECT_EQ("envoy.thrift_prefix", request_time.tags()[0].name_);
+  EXPECT_EQ("thrift_prefix", request_time.tags()[0].value_);
+
+  // The default router filter's stats are tagged the same way.
+  const Stats::CounterSharedPtr route_missing =
+      TestUtility::findCounter(context_.store_, "thrift.thrift_prefix.route_missing");
+  ASSERT_NE(route_missing, nullptr);
+  EXPECT_EQ("thrift.route_missing", route_missing->tagExtractedName());
+  ASSERT_EQ(1U, route_missing->tags().size());
+  EXPECT_EQ("envoy.thrift_prefix", route_missing->tags()[0].name_);
+  EXPECT_EQ("thrift_prefix", route_missing->tags()[0].value_);
 }
 
 TEST_P(ThriftFilterTransportConfigTest, ValidProtoConfiguration) {
@@ -231,7 +267,7 @@ thrift_filters:
   testConfig(config);
 
   EXPECT_EQ(1, factory.config_struct_.fields_size());
-  EXPECT_EQ("value", factory.config_struct_.fields().at("key").string_value());
+  EXPECT_THAT(factory.config_struct_.fields(), Contains(IsStructString("key", "value")));
   EXPECT_EQ("thrift.ingress.", factory.config_stat_prefix_);
 }
 
@@ -279,9 +315,8 @@ resources:
       TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response_yaml);
   const auto decoded_resources = TestUtility::decodeResources<
       envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration>(response);
-  EXPECT_TRUE(context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
-                  ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
-                  .ok());
+  EXPECT_OK(context_.server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                ->onConfigUpdate(decoded_resources.refvec_, response.version_info()));
   auto message_ptr = context_.server_factory_context_.admin_.config_tracker_
                          .config_tracker_callbacks_["trds_routes"](universal_name_matcher);
   const auto& dump =

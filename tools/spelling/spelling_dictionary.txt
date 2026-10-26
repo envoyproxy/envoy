@@ -3,6 +3,8 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+aarch
+AI
 Allshard
 FCS
 FLUSHALL
@@ -12,6 +14,7 @@ RANDOMKEY
 SLOWLOG
 addend
 addrlen
+connectionless
 defragmentation
 evictable
 flushdb
@@ -35,6 +38,7 @@ ARRAYSIZE
 ARN
 ASAN
 ASCII
+ASLR
 ASM
 ASN
 ASSERTed
@@ -49,6 +53,7 @@ BOM
 CCL
 CGROUP
 CROSSSLOT
+DLL
 ECN
 ECS
 EdDSA
@@ -64,6 +69,7 @@ BSON
 BPF
 Bdecoded
 Bencoded
+bzlmod
 CIO
 CBC
 cbc
@@ -77,6 +83,7 @@ DFP
 Dynatrace
 DOM
 DONTFRAG
+dotdot
 Gasd
 GiB
 IPTOS
@@ -103,6 +110,8 @@ cbor
 CDN
 CDS
 CEL
+COMDAT
+COFF
 CWND
 DLE
 DPE
@@ -124,6 +133,7 @@ FIXME
 decrypted
 decrypts
 gperf
+gperftools
 HEXDIG
 HEXDIGIT
 HPE
@@ -198,6 +208,7 @@ ECDH
 ECDHE
 ECDS
 ECDSA
+sigalgs
 ECONNREFUSED
 ECONNRESET
 EDESTRUCTION
@@ -219,6 +230,7 @@ EVP
 EWOULDBLOCK
 EXPECTs
 EXPR
+FAPI
 FAQ
 FASTOPEN
 FB
@@ -383,6 +395,7 @@ NOCHECKRESP
 NODATA
 NODELAY
 NODELETE
+NOERROR
 NOLINT
 NOLINTBEGIN
 NOLINTEND
@@ -449,6 +462,7 @@ PostCBs
 PREBIND
 PRNG
 PROT
+PSK
 Postgre
 Postgres
 Prereq
@@ -462,6 +476,7 @@ qatzip
 qatzstd
 RAII
 RANLUX
+RBE
 RBAC
 RDN
 RDS
@@ -509,6 +524,7 @@ SIGINT
 SIGPIPE
 SIGSEGV
 SIGTERM
+SIGUSR
 SIMD
 SIO
 SSE
@@ -594,6 +610,7 @@ WRR
 WS
 WSA
 WSABUF
+WSAEMSGSIZE
 WSS
 WUFFS
 Welford's
@@ -606,6 +623,7 @@ XN
 XNOR
 XSS
 YAML
+YYYY
 ZXID
 absl
 accesslog
@@ -658,6 +676,10 @@ auths
 authz
 automata
 autoscale
+autosharding
+awaitable
+awaitables
+awaiter
 backend
 backends
 backgrounded
@@ -720,6 +742,7 @@ canonicalization
 canonicalize
 canonicalized
 canonicalizer
+canonicalizes
 canonicalizing
 cardinality
 casted
@@ -752,6 +775,7 @@ combinatorial
 comparator
 compat
 completable
+computable
 cond
 condvar
 conf
@@ -762,6 +786,7 @@ conns
 const
 constexpr
 constructible
+cooldown
 copyable
 coroutine
 coroutines
@@ -894,6 +919,7 @@ extrahelp
 faceplant
 facto
 failover
+faketime
 fallbacks
 fanout
 fastbuild
@@ -956,6 +982,8 @@ hackery
 hacky
 handoff
 handshaker
+handshakers
+hardcode
 hardcoded
 hardcodes
 hardcoding
@@ -1016,6 +1044,7 @@ ints
 invariance
 invariants
 invoker
+Invocable
 iov
 iovcnt
 iovec
@@ -1042,6 +1071,8 @@ keyset
 ketama
 keyder
 kqueue
+kTLS
+ktls
 kubernetes
 kv
 kvlist
@@ -1163,6 +1194,7 @@ netmask
 netns
 NLB
 NLMSG
+nodiscard
 nonblocking
 noncopyable
 nonresponsive
@@ -1183,6 +1215,7 @@ oauth
 observability
 observations
 ocagent
+offloadable
 offsetof
 oneof
 oneway
@@ -1232,6 +1265,7 @@ pfctl
 pipelined
 pipelining
 pkey
+pkix
 plaintext
 pluggable
 pointee
@@ -1299,6 +1333,7 @@ quantiles
 querydetails
 quiesce
 quitquitquit
+quota
 qvalue
 radix
 radixtree
@@ -1354,6 +1389,7 @@ rele
 releasor
 reloadable
 remoting
+renormalize
 renderers
 reparse
 repeatability
@@ -1361,6 +1397,7 @@ reperform
 repicked
 replayable
 repo
+repos
 representable
 reproducibility
 requirepass
@@ -1384,6 +1421,7 @@ retransmitting
 retriable
 retriggers
 retryable
+revalidate
 revalidated
 revalidation
 reverify
@@ -1399,6 +1437,7 @@ rtest
 rtrim
 rtt
 ruleset
+runfile
 runfiles
 runtime
 runtimes
@@ -1423,6 +1462,7 @@ serializable
 serializer
 serv
 servercert
+setarch
 setenv
 SETNAME
 setsockopt
@@ -1443,6 +1483,7 @@ sim
 sinked
 sint
 sizeof
+skippable
 smatch
 snapshotted
 sockaddr
@@ -1499,6 +1540,7 @@ submatch
 submessages
 subnet
 subnets
+subobject
 suboptimal
 subprocess
 subsecond
@@ -1552,6 +1594,7 @@ testcase
 testcases
 testdata
 testee
+tgkill
 threadsafe
 thru
 timespan
@@ -1594,6 +1637,7 @@ udpa
 uint
 un-
 unacked
+uname
 unary
 unconfigurable
 undef
@@ -1634,6 +1678,7 @@ vanishingly
 varchar
 variadic
 varint
+Vcluster
 vec
 vectorize
 VBC
@@ -1666,6 +1711,7 @@ wildcard
 wildcards
 winsock
 workspace
+workspaces
 writev
 wrsq
 www
@@ -1679,6 +1725,9 @@ xid
 xmodem
 xxhash
 xxs
+xxxx
+xxxxxxxx
+xxxxxxxxxxxx
 xyz
 xyzwebservices
 yml
@@ -1717,6 +1766,7 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+fifo
 hotplug
 cgroup
 cgroupv1
@@ -1786,3 +1836,14 @@ acq
 interleavings
 millis
 msgs
+CRYSTALS
+encapsulation
+Kyber
+MLKEM
+PQC
+quantum
+X25519MLKEM768
+cpaths
+SynchronousFeedbackResourceMonitor
+bernoulli
+vendored

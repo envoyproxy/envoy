@@ -1,10 +1,13 @@
 #include "source/common/common/backoff_strategy.h"
 
 #include "test/mocks/common.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
+using Envoy::StatusHelpers::IsOk;
 using testing::NiceMock;
+using testing::Not;
 using testing::Return;
 
 namespace Envoy {
@@ -111,7 +114,7 @@ TEST(BackOffStrategyUtilsTest, InvalidConfig) {
     envoy::config::core::v3::BackoffStrategy backoff_strategy;
     backoff_strategy.mutable_base_interval()->set_seconds(2);
     backoff_strategy.mutable_max_interval()->set_seconds(3);
-    EXPECT_TRUE(BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10).ok());
+    EXPECT_OK(BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10));
   }
 
   {
@@ -119,14 +122,16 @@ TEST(BackOffStrategyUtilsTest, InvalidConfig) {
     envoy::config::core::v3::BackoffStrategy backoff_strategy;
     backoff_strategy.mutable_base_interval()->set_seconds(3);
     backoff_strategy.mutable_max_interval()->set_seconds(2);
-    EXPECT_TRUE(!BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10).ok());
+    EXPECT_THAT(BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 1, 10),
+                Not(IsOk()));
   }
 
   {
     // Max interval is lower than base interval.
     envoy::config::core::v3::BackoffStrategy backoff_strategy;
     backoff_strategy.mutable_max_interval()->set_nanos(2000000);
-    EXPECT_TRUE(!BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 3, 10).ok());
+    EXPECT_THAT(BackOffStrategyUtils::validateBackOffStrategyConfig(backoff_strategy, 3, 10),
+                Not(IsOk()));
   }
 }
 

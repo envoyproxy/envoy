@@ -66,7 +66,7 @@ void ContainerCredentialsProvider::refresh() {
   };
 
   // mark credentials as pending while async completes
-  credentials_pending_.store(true);
+  setCredentialsPendingToAllThreads();
 
   metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
 }

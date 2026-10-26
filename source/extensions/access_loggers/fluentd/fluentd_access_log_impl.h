@@ -79,7 +79,7 @@ private:
                const StreamInfo::StreamInfo& stream_info) override;
 
   FluentdFormatterPtr formatter_;
-  const ThreadLocal::SlotPtr tls_slot_;
+  const ThreadLocal::SlotSharedPtr tls_slot_;
   const FluentdAccessLogConfigSharedPtr config_;
   const FluentdAccessLoggerCacheSharedPtr access_logger_cache_;
 };

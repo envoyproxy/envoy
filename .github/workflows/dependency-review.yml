@@ -1,0 +1,23 @@
+name: Dependency review
+
+on:
+  pull_request:
+    branches:
+    - main
+    - release/v*
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-24.04
+    steps:
+    # No checkout: this action reads the dependency graph via the GitHub API.
+    - name: Dependency Review
+      uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48  # v4.9.0

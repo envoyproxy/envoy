@@ -145,6 +145,11 @@ public:
 
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
+  void setAbortiveClose() override {
+    if (io_handle_ && io_handle_->isOpen()) {
+      io_handle_->setAbortiveClose();
+    }
+  }
   void close() override {
     if (io_handle_ && io_handle_->isOpen()) {
       io_handle_->close();

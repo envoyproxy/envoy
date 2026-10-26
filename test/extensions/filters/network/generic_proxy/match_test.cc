@@ -160,7 +160,9 @@ TEST(RequestMatchInputMatcherTest, RequestMatchInputMatcherTest) {
   EXPECT_TRUE(matcher->supportsDataInputType(
       "Envoy::Extensions::NetworkFilters::GenericProxy::RequestMatchData"));
 
-  { EXPECT_EQ(matcher->match(DataInputGetResult::NoData()), Matcher::MatchResult::NoMatch); }
+  {
+    EXPECT_EQ(matcher->match(DataInputGetResult::NoData()), Matcher::MatchResult::NoMatch);
+  }
 
   {
     EXPECT_EQ(matcher->match(DataInputGetResult::CreateString("fake_data")),

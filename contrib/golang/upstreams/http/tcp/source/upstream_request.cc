@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <memory>
 #include <utility>
 
@@ -59,7 +60,7 @@ void BridgeConfig::newGoPluginConfig() {
   config_id_ = dso_lib_->envoyGoHttpTcpBridgeOnConfig(this);
 
   if (config_id_ == 0) {
-    PANIC(fmt::format("golang http-tcp bridge failed to parse plugin config: {} {}", so_id_,
+    PANIC(std::format("golang http-tcp bridge failed to parse plugin config: {} {}", so_id_,
                       so_path_));
   }
 
@@ -74,11 +75,11 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
   envoy::extensions::upstreams::http::tcp::golang::v3alpha::Config c;
   std::string serialized_config;
   if (!config.SerializeToString(&serialized_config)) {
-    PANIC(fmt::format(
+    PANIC(std::format(
         "golang http-tcp bridge: failed to serialize input Protobuf::Message to string."));
   }
   if (!c.ParseFromString(serialized_config)) {
-    PANIC(fmt::format(
+    PANIC(std::format(
         "golang http-tcp bridge: failed to parse serialized data into target config object."));
   }
 
@@ -88,7 +89,7 @@ TcpConnPool::TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
   dynamic_lib_ = Dso::DsoManager<Dso::HttpTcpBridgeDsoImpl>::load(c.library_id(), c.library_path(),
                                                                   c.plugin_name());
   if (dynamic_lib_ == nullptr) {
-    PANIC(fmt::format("golang http-tcp bridge: load library failed: {} {}", c.library_id(),
+    PANIC(std::format("golang http-tcp bridge: load library failed: {} {}", c.library_id(),
                       c.library_path()));
   };
 
@@ -208,7 +209,7 @@ void HttpTcpBridge::encodeData(Buffer::Instance& data, bool end_stream) {
     break;
 
   default:
-    PANIC(fmt::format("golang http-tcp bridge encodeData, unexpected state: {}",
+    PANIC(std::format("golang http-tcp bridge encodeData, unexpected state: {}",
                       encoding_state_.stateStr()));
   }
 }
@@ -277,14 +278,14 @@ void HttpTcpBridge::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 
     if (end_stream) {
       // we will catch this unexpected behaviour from users in Golang side, this should not happens.
-      PANIC(fmt::format(
+      PANIC(std::format(
           "golang http-tcp bridge onUpstreamData unexpected go_tatus when end_stream is true: {}",
           int(go_status)));
     }
     break;
 
   default:
-    PANIC(fmt::format("golang http-tcp bridge onUpstreamData, unexpected go_tatus: {}", go_status));
+    PANIC(std::format("golang http-tcp bridge onUpstreamData, unexpected go_tatus: {}", go_status));
   }
 }
 
@@ -431,7 +432,7 @@ CAPIStatus HttpTcpBridge::copyHeaders(ProcessorState& state, GoString* go_strs, 
     }
     copyHeaderMapToGo(*decoding_state->resp_headers, go_strs, go_buf);
   } else {
-    PANIC(fmt::format("unexpected process state type: {}", std::type_index(typeid(state)).name()));
+    PANIC(std::format("unexpected process state type: {}", std::type_index(typeid(state)).name()));
   }
 
   return CAPIStatus::CAPIOK;
@@ -469,7 +470,7 @@ CAPIStatus HttpTcpBridge::setRespHeader(ProcessorState& state, absl::string_view
     break;
 
   default:
-    PANIC(fmt::format("unknown header action: {}", int(act)));
+    PANIC(std::format("unknown header action: {}", int(act)));
   }
   return CAPIStatus::CAPIOK;
 }
@@ -554,7 +555,7 @@ CAPIStatus HttpTcpBridge::getStringValue(int id, uint64_t* value_data, int* valu
     break;
   }
   default:
-    PANIC(fmt::format("golang http-tcp bridge getStringValue invalid string value id: {}", id));
+    PANIC(std::format("golang http-tcp bridge getStringValue invalid string value id: {}", id));
   }
 
   *value_data = reinterpret_cast<uint64_t>(str_value_.data());

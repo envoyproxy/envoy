@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "csrf_filter_test",
     srcs = ["csrf_filter_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/csrf:config",
@@ -33,7 +33,7 @@ envoy_extension_cc_test(
     name = "csrf_config_test",
     srcs = ["csrf_config_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/mocks/protobuf:protobuf_mocks",
@@ -48,7 +48,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["csrf_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.csrf"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/csrf:config",
         "//test/config:utility_lib",

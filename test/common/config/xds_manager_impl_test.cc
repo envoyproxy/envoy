@@ -60,6 +60,20 @@ public:
   const std::string name_;
 };
 
+// A fake config validator that reports a fixed type url. The xDS tests only exercise the
+// config_validators wiring, so the validate() methods are no-ops.
+class FakeConfigValidator : public Config::ConfigValidator {
+public:
+  absl::string_view typeUrl() const override {
+    return "type.googleapis.com/envoy.fake_validator.v3.FakeValidator";
+  }
+
+  void validate(const Server::Instance&, const std::vector<Config::DecodedResourcePtr>&) override {}
+
+  void validate(const Server::Instance&, const std::vector<Config::DecodedResourcePtr>&,
+                const Protobuf::RepeatedPtrField<std::string>&) override {}
+};
+
 // A fake cluster validator that exercises the code that uses ADS with
 // config_validators.
 class FakeConfigValidatorFactory : public Config::ConfigValidatorFactory {
@@ -68,7 +82,7 @@ public:
 
   Config::ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
                                                    ProtobufMessage::ValidationVisitor&) override {
-    return nullptr;
+    return std::make_unique<FakeConfigValidator>();
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -77,10 +91,6 @@ public:
   }
 
   std::string name() const override { return "envoy.fake_validator"; }
-
-  std::string typeUrl() const override {
-    return "type.googleapis.com/envoy.fake_validator.v3.FakeValidator";
-  }
 };
 
 // A ConfigSubscriptionFactory for the xDS-TP based config-sources.
@@ -262,7 +272,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
             return absl::OkStatus();
           }));
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
-  EXPECT_TRUE(res.ok());
+  EXPECT_OK(res);
 }
 
 // Validates that ADS replacement with primary and failover sources works.
@@ -358,7 +368,7 @@ TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
             return absl::OkStatus();
           }));
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
-  EXPECT_TRUE(res.ok());
+  EXPECT_OK(res);
 }
 
 // Validates that setAdsConfigSource validation failure is detected.
@@ -1521,7 +1531,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {
 
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
-  ASSERT_TRUE(resource_urn_or_error.ok());
+  ASSERT_OK(resource_urn_or_error);
   NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
   Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
   testing::NiceMock<MockSubscription>* mock_subscription =
@@ -1603,7 +1613,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseFirstConfig
 
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
-  ASSERT_TRUE(resource_urn_or_error.ok());
+  ASSERT_OK(resource_urn_or_error);
 
   NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
   Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
@@ -1688,7 +1698,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseSecondConfi
 
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
-  ASSERT_TRUE(resource_urn_or_error.ok());
+  ASSERT_OK(resource_urn_or_error);
 
   NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
   Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
@@ -1772,7 +1782,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
 
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
-  ASSERT_TRUE(resource_urn_or_error.ok());
+  ASSERT_OK(resource_urn_or_error);
 
   NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
   Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
@@ -1797,6 +1807,70 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
       std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
   EXPECT_OK(result.status());
   EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that subscribeToSingletonResource with SingletonSubscriptionCallbacks succeeds with
+// authority.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionSuccessWithAuthority) {
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_A.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_A_cluster
+  static_resources:
+    clusters:
+    - name: config_source_A_cluster
+      connect_timeout: 0.250s
+      type: static
+  )EOF",
+             true);
+
+  NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "xdstp://authority_A.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  auto* mock_subscription = new testing::NiceMock<MockSubscription>();
+  EXPECT_CALL(config_sub_factory, create(_))
+      .WillOnce(testing::Invoke(
+          [this, mock_subscription](
+              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
+            return SubscriptionPtr(mock_subscription);
+          }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_NE(result.value(), nullptr);
+}
+
+// Validates that a non-xDS-TP singleton subscription without config fails.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionNonXdstpWithoutConfigFails) {
+  initialize();
+  NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      "non_xdstp_resource", {}, "type_url", *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), {});
+  EXPECT_THAT(result.status(), StatusCodeIs(absl::StatusCode::kInvalidArgument));
+}
+
+// Validates that an invalid xDS-TP URN fails.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SingletonSubscriptionInvalidXdstpUrnFails) {
+  initialize();
+  NiceMock<MockSingletonSubscriptionCallbacks> callbacks;
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      "xdstp://", {}, "type_url", *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), {});
+  EXPECT_THAT(result.status(), StatusCodeIs(absl::StatusCode::kInvalidArgument));
 }
 
 // Validates that when config_sources is empty and a valid default_config_source is provided,
@@ -1839,7 +1913,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenConfigSourcesI
 
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
-  ASSERT_TRUE(resource_urn_or_error.ok());
+  ASSERT_OK(resource_urn_or_error);
 
   NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
   Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
@@ -1946,7 +2020,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenAllConfigSourc
 
   absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
       XdsResourceIdentifier::decodeUrn(resource_name);
-  ASSERT_TRUE(resource_urn_or_error.ok());
+  ASSERT_OK(resource_urn_or_error);
 
   NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
   Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);

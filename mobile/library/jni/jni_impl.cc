@@ -1,6 +1,8 @@
 #include <cstddef>
 #include <string>
 
+#include "envoy/common/logger.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 #include "library/cc/mobile_engine_builder.h"
@@ -31,7 +33,7 @@ extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void* /* reserved */) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jclass, jint level) {
-  Envoy::Logger::Context::changeAllLogLevels(static_cast<spdlog::level::level_enum>(level));
+  Envoy::Logger::Context::changeAllLogLevels(static_cast<Envoy::Logger::Levels>(level));
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
@@ -67,7 +69,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   std::unique_ptr<Envoy::EnvoyLogger> logger = std::make_unique<Envoy::EnvoyLogger>();
   if (envoy_logger != nullptr) {
     jobject envoy_logger_global_ref = env->NewGlobalRef(envoy_logger);
-    logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Logger::Levels level,
+    logger->on_log_ = [envoy_logger_global_ref](Envoy::Logger::Levels level,
                                                 const std::string& message) {
       Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
       Envoy::JNI::LocalRefUniquePtr<jstring> java_message =

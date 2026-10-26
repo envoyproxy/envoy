@@ -1,10 +1,15 @@
-# Enable bzlmod for modern dependency management with MODULE.bazel
-common --enable_bzlmod
 
-# Java runtime configuration for bzlmod
-# Use remote JDK to avoid dependency on local Java installation
-build --java_runtime_version=remotejdk_11
-build --tool_java_runtime_version=remotejdk_11
+common --registry=https://bcr.bazel.build/
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/9e987830a91b7611f2e6091697126c4a72c89cb8
 
 # Build settings
 build --incompatible_strict_action_env
+
+
+#############################################################################
+# ci
+#############################################################################
+
+common:ci --noshow_progress
+common:ci --noshow_loading_progress
+common:ci --test_output=errors

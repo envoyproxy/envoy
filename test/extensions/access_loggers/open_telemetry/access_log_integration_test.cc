@@ -2,6 +2,7 @@
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/tracers/opentelemetry/resource_detectors/v3/environment_resource_detector.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/grpc/codec.h"
@@ -10,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -35,6 +37,9 @@ constexpr char EXPECTED_REQUEST_MESSAGE[] = R"EOF(
           - key: "node_name"
             value:
               string_value: "node_name"
+          - key: "service.name"
+            value:
+              string_value: "my-service"
       scope_logs:
         - log_records:
             body:
@@ -74,6 +79,7 @@ public:
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {
     skip_tag_extraction_rule_check_ = true;
     driver_ = (std::get<2>(GetParam()) == ExporterType::GRPC) ? makeGrpcDriver() : makeHttpDriver();
+    TestEnvironment::setEnvVar("OTEL_RESOURCE_ATTRIBUTES", "service.name=my-service", 1);
   }
 
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
@@ -102,6 +108,11 @@ public:
           envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig
               config;
           config.set_log_name("foo");
+          auto* detector = config.add_resource_detectors();
+          detector->set_name("envoy.tracers.opentelemetry.resource_detectors.environment");
+          envoy::extensions::tracers::opentelemetry::resource_detectors::v3::
+              EnvironmentResourceDetectorConfig env_config;
+          std::ignore = detector->mutable_typed_config()->PackFrom(env_config);
           driver_.configureExporter(config, fake_upstreams_.back()->localAddress());
           auto* body_config = config.mutable_body();
           body_config->set_string_value("%REQ(:METHOD)% %PROTOCOL% %RESPONSE_CODE%");
@@ -249,6 +260,9 @@ TEST_P(AccessLogIntegrationTest, AccessLoggerStatsAreIndependentOfListener) {
           - key: "node_name"
             value:
               string_value: "node_name"
+          - key: "service.name"
+            value:
+              string_value: "my-service"
       scope_logs:
         - log_records:
             body:

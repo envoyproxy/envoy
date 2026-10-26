@@ -7,20 +7,26 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
 
 #include "test/common/tls/mock_ssl_handshaker.h"
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/server/instance.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gmock/gmock.h"
@@ -33,6 +39,10 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
+
+using testing::Contains;
+using testing::Key;
+using testing::UnorderedElementsAre;
 
 namespace Envoy {
 namespace Extensions {
@@ -76,6 +86,9 @@ protected:
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockTimer>>());
     EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, _))
         .WillRepeatedly(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
+
+    // Keep getSocket() ReturnRef targets stable across multiple setupMockConnection() calls.
+    held_sockets_.reserve(16);
   }
 
   void TearDown() override {
@@ -83,6 +96,7 @@ protected:
     while (!dispatcher_.to_delete_.empty()) {
       dispatcher_.to_delete_.pop_front();
     }
+    held_sockets_.clear();
     extension_.reset();
     socket_interface_.reset();
     while (!dispatcher_.to_delete_.empty()) {
@@ -95,8 +109,9 @@ protected:
   createTestIOHandle(const ReverseConnectionSocketConfig& config,
                      ReverseTunnelInitiatorExtension* extension_override = nullptr) {
     // Create a test socket file descriptor.
-    int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    EXPECT_GE(test_fd, 0);
+    const os_fd_t test_fd =
+        Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+    EXPECT_TRUE(SOCKET_VALID(test_fd));
 
     // Create the IO handle.
     ReverseTunnelInitiatorExtension* extension_ptr =
@@ -140,8 +155,11 @@ protected:
   // Set log level to debug for this test class.
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 
-  // Mock socket for testing.
-  std::unique_ptr<Network::ConnectionSocket> mock_socket_;
+  // Mock sockets for testing. Each setupMockConnection() appends one so multiple queued
+  // connections can keep live getSocket() references. Reserve capacity so push_back never
+  // reallocates and invalidates ReturnRef()/Invoke bindings to earlier elements.
+  std::vector<std::unique_ptr<Network::ConnectionSocket>> held_sockets_;
+  std::unique_ptr<Network::ConnectionSocket> mock_socket_; // legacy alias for last socket
 
   // Thread Local Setup Helpers.
 
@@ -182,20 +200,16 @@ protected:
     extension_->setTestOnlyTLSRegistry(std::move(another_tls_slot_));
   }
 
-  // Trigger Pipe Management Helpers.
-
-  bool isTriggerPipeReady() const { return io_handle_->isTriggerPipeReady(); }
-
-  void createTriggerPipe() { io_handle_->createTriggerPipe(); }
-
-  int getTriggerPipeReadFd() const { return io_handle_->trigger_pipe_read_fd_; }
-
-  int getTriggerPipeWriteFd() const { return io_handle_->trigger_pipe_write_fd_; }
-
   // Connection Management Helpers.
 
+  bool listenerWantRead() const { return io_handle_->listener_want_read_; }
+
+  bool isReverseConnStarted() const { return io_handle_->is_reverse_conn_started_; }
+
+  void maybePushConn() { io_handle_->maybePushConn(); }
+
   void addConnectionToEstablishedQueue(Network::ClientConnectionPtr connection) {
-    io_handle_->established_connections_.push(std::move(connection));
+    io_handle_->established_connections_.push({std::move(connection), nullptr});
   }
 
   bool initiateOneReverseConnection(const std::string& cluster_name,
@@ -319,6 +333,9 @@ protected:
   std::unique_ptr<NiceMock<Network::MockClientConnection>> getDeletableConn() {
     auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
     EXPECT_CALL(*mock_connection, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
+    // shutdown() calls getSocket() before close(); the mock has no default for a reference return.
+    static Network::ConnectionSocketPtr empty_socket;
+    EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(empty_socket));
 
     return mock_connection;
   }
@@ -347,11 +364,17 @@ protected:
     // Store the mock_io_handle in the socket before casting.
     mock_socket_ptr->io_handle_ = std::move(mock_io_handle);
 
-    // Cast the mock to the base ConnectionSocket type and store it in member variable.
-    mock_socket_ = std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release());
+    // Cast the mock to the base ConnectionSocket type and keep it alive for getSocket().
+    held_sockets_.push_back(std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release()));
+    mock_socket_ = nullptr;
+    const size_t socket_index = held_sockets_.size() - 1;
 
-    // Set up connection expectations for getSocket()
-    EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(mock_socket_));
+    // Set up connection expectations for getSocket(). Index-based Invoke stays valid even if the
+    // vector reallocates (unlike ReturnRef(held_sockets_.back())).
+    EXPECT_CALL(*mock_connection, getSocket())
+        .WillRepeatedly(Invoke([this, socket_index]() -> Network::ConnectionSocketPtr& {
+          return held_sockets_[socket_index];
+        }));
 
     return mock_connection;
   }
@@ -361,7 +384,29 @@ protected:
     io_handle_->conn_wrapper_to_host_map_[wrapper] = host_address;
   }
 
+  // Transfer ownership of a wrapper into the io handle so onConnectionDone() can find and remove
+  // it.
+  void pushConnectionWrapper(std::unique_ptr<RCConnectionWrapper> wrapper) {
+    io_handle_->connection_wrappers_.push_back(std::move(wrapper));
+  }
+
   void cleanup() { io_handle_->cleanup(); }
+
+  void emitAccessLog(const std::string& event, const std::string& host_address,
+                     const std::string& cluster_name, const std::string& connection_key,
+                     const std::string& error_message) {
+    io_handle_->emitAccessLog(event, host_address, cluster_name, connection_key, 0, error_message);
+  }
+
+  Event::Dispatcher& getThreadLocalDispatcher() const {
+    return io_handle_->getThreadLocalDispatcher();
+  }
+
+  bool isThreadLocalDispatcherAvailable() const {
+    return io_handle_->isThreadLocalDispatcherAvailable();
+  }
+
+  TimeSource& getTimeSource() const { return io_handle_->getTimeSource(); }
 
   void removeStaleHostAndCloseConnections(const std::string& host) {
     io_handle_->removeStaleHostAndCloseConnections(host);
@@ -391,7 +436,7 @@ TEST_F(ReverseConnectionIOHandleTest, BasicSetup) {
   EXPECT_NE(io_handle_, nullptr);
 
   // Verify the IO handle has a valid file descriptor.
-  EXPECT_GE(io_handle_->fdDoNotUse(), 0);
+  EXPECT_TRUE(SOCKET_VALID(io_handle_->fdDoNotUse()));
 }
 
 TEST_F(ReverseConnectionIOHandleTest, RequestPathDefaultsAndOverrides) {
@@ -420,110 +465,43 @@ TEST_F(ReverseConnectionIOHandleTest, ListenNoOp) {
   EXPECT_EQ(result.errno_, 0);
 }
 
-// Test isTriggerPipeReady() behavior.
-TEST_F(ReverseConnectionIOHandleTest, IsTriggerPipeReady) {
+// initializeFileEvent arms a zero-mask file event and records listener read intent.
+TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventArmsZeroMaskAndWantsRead) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
+  EXPECT_FALSE(listenerWantRead());
 
-  // Initially, trigger pipe should not be ready.
-  EXPECT_FALSE(isTriggerPipeReady());
-
-  // Create the trigger pipe.
-  createTriggerPipe();
-
-  // Now trigger pipe should be ready.
-  EXPECT_TRUE(isTriggerPipeReady());
-
-  // Verify the file descriptors are valid.
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
-}
-
-// Test createTriggerPipe() basic pipe creation.
-TEST_F(ReverseConnectionIOHandleTest, CreateTriggerPipe) {
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  EXPECT_NE(io_handle_, nullptr);
-
-  // Initially, trigger pipe should not be ready.
-  EXPECT_FALSE(isTriggerPipeReady());
-
-  // Manually call createTriggerPipe.
-  createTriggerPipe();
-
-  // Verify that the trigger pipe was created successfully.
-  EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
-
-  // Verify getPipeMonitorFd returns the correct file descriptor.
-  EXPECT_EQ(io_handle_->getPipeMonitorFd(), getTriggerPipeReadFd());
-
-  // Verify the file descriptors are different.
-  EXPECT_NE(getTriggerPipeReadFd(), getTriggerPipeWriteFd());
-}
-
-// Test initializeFileEvent() creates trigger pipe.
-TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventCreatesTriggerPipe) {
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  EXPECT_NE(io_handle_, nullptr);
-
-  // Initially, trigger pipe should not be ready.
-  EXPECT_FALSE(isTriggerPipeReady());
-
-  // Mock file event callback.
   Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
-
-  // Call initializeFileEvent - this should create the trigger pipe.
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
 
-  // Verify that the trigger pipe was created successfully.
-  EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
-
-  // Verify getPipeMonitorFd returns the correct file descriptor.
-  EXPECT_EQ(io_handle_->getPipeMonitorFd(), getTriggerPipeReadFd());
+  EXPECT_TRUE(listenerWantRead());
+  // FD stays the original socket; wakeups are synthetic events, not kernel events.
+  EXPECT_GE(io_handle_->fdDoNotUse(), 0);
 }
 
-// Test that subsequent calls to initializeFileEvent do not create new pipes.
-TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventDoesNotCreateNewPipes) {
+// Listener swap path: resetFileEvents then re-initialize without restarting maintenance.
+TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventAfterResetSkipsMaintenanceRestart) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Initially, trigger pipe should not be ready.
-  EXPECT_FALSE(isTriggerPipeReady());
-
-  // Mock file event callback.
   Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
-
-  // First call to initializeFileEvent - should create the trigger pipe.
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
+  EXPECT_TRUE(isReverseConnStarted());
+  const int fd_before = io_handle_->fdDoNotUse();
 
-  // Verify that the trigger pipe was created.
-  EXPECT_TRUE(isTriggerPipeReady());
-  int first_read_fd = getTriggerPipeReadFd();
-  int first_write_fd = getTriggerPipeWriteFd();
-  EXPECT_GE(first_read_fd, 0);
-  EXPECT_GE(first_write_fd, 0);
+  // Mimic ~TcpListenerImpl then a new TcpListenerImpl on the same socket.
+  io_handle_->resetFileEvents();
+  EXPECT_FALSE(listenerWantRead());
 
-  // Second call to initializeFileEvent - should NOT create new pipes because.
-  // is_reverse_conn_started_ is true
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
-
-  // Verify that the same file descriptors are still used (no new pipes created)
-  EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_EQ(getTriggerPipeReadFd(), first_read_fd);
-  EXPECT_EQ(getTriggerPipeWriteFd(), first_write_fd);
-
-  // Verify getPipeMonitorFd still returns the correct file descriptor.
-  EXPECT_EQ(io_handle_->getPipeMonitorFd(), first_read_fd);
+  EXPECT_TRUE(listenerWantRead());
+  EXPECT_TRUE(isReverseConnStarted());
+  EXPECT_EQ(fd_before, io_handle_->fdDoNotUse());
 }
 
 // Test that we do NOT update stats for the cluster if src_node_id is empty.
@@ -591,7 +569,8 @@ TEST_F(ReverseConnectionIOHandleTest, RetryTimerWhenReverseConnStarted) {
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
 
-  // Call initializeFileEvent again to ensure the timer is not created again.
+  // Listener swap: reset then re-init. Maintenance must not restart (timer already exists).
+  io_handle_->resetFileEvents();
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
 }
@@ -644,7 +623,8 @@ TEST_F(ReverseConnectionIOHandleTest, NoHostsInClusterCannotConnect) {
 
   // Set up empty cross priority host map.
   auto empty_host_map = std::make_shared<Upstream::HostMap>();
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(empty_host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(empty_host_map)));
 
   // Call maintainClusterConnections with empty cluster.
   RemoteClusterConnectionConfig cluster_config("empty-cluster", 2);
@@ -653,6 +633,21 @@ TEST_F(ReverseConnectionIOHandleTest, NoHostsInClusterCannotConnect) {
   // Verify that CannotConnect gauge was updated for the cluster.
   auto stat_map = extension_->getCrossWorkerStatMap();
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.empty-cluster.cannot_connect"], 1);
+}
+
+// Test that a connection count of 0 returns before the cluster lookup, so idle ticks are not
+// reported as failed connection attempts.
+TEST_F(ReverseConnectionIOHandleTest, ZeroConnectionCountSkipsClusterLookup) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  RemoteClusterConnectionConfig cluster_config("idle-cluster", 0);
+  maintainClusterConnections("idle-cluster", cluster_config);
 }
 
 // Test maybeUpdateHostsMappingsAndConnections with valid hosts.
@@ -681,7 +676,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsValidHosts) {
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host1);
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Call maintainClusterConnections which will create HostConnectionInfo entries and call.
   // maybeUpdateHostsMappingsAndConnections
@@ -690,9 +686,7 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsValidHosts) {
 
   // Verify that hosts were added to the mapping.
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map.size(), 2);
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.1"), host_to_conn_info_map.end());
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.2"), host_to_conn_info_map.end());
+  EXPECT_THAT(host_to_conn_info_map, UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2")));
 }
 
 // Test maybeUpdateHostsMappingsAndConnections with no new hosts.
@@ -723,7 +717,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
   (*host_map)["192.168.1.3"] = std::const_pointer_cast<Upstream::Host>(mock_host3);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Call maintainClusterConnections which will create HostConnectionInfo entries and call.
   // maybeUpdateHostsMappingsAndConnections
@@ -732,10 +727,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
 
   // Verify that all three host entries exist after maintainClusterConnections.
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map.size(), 3);
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.1"), host_to_conn_info_map.end());
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.2"), host_to_conn_info_map.end());
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.3"), host_to_conn_info_map.end());
+  EXPECT_THAT(host_to_conn_info_map,
+              UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2"), Key("192.168.1.3")));
 
   // Now test partial host removal by calling maybeUpdateHostsMappingsAndConnections with fewer.
   // hosts
@@ -744,11 +737,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsMappingsNoNewHosts) {
 
   // Verify that the removed host was cleaned up but others remain.
   const auto& updated_host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(updated_host_to_conn_info_map.size(), 2);
-  EXPECT_NE(updated_host_to_conn_info_map.find("192.168.1.1"), updated_host_to_conn_info_map.end());
-  EXPECT_EQ(updated_host_to_conn_info_map.find("192.168.1.2"),
-            updated_host_to_conn_info_map.end()); // Should be removed
-  EXPECT_NE(updated_host_to_conn_info_map.find("192.168.1.3"), updated_host_to_conn_info_map.end());
+  EXPECT_THAT(updated_host_to_conn_info_map,
+              UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.3")));
 }
 
 // Test shouldAttemptConnectionToHost with valid host and no existing connections.
@@ -775,11 +765,13 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionToHostValidHost) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
-  // Call maintainClusterConnections to create HostConnectionInfo entries.
+  // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
+  // and defeat the fresh-host assertion below. cluster_config is reused for the disabled handle.
   RemoteClusterConnectionConfig cluster_config("test-cluster", 2);
-  maintainClusterConnections("test-cluster", cluster_config);
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
 
   // Test with valid host and no existing connections.
   bool should_attempt = shouldAttemptConnectionToHost("192.168.1.1", "test-cluster");
@@ -801,7 +793,8 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionToHostValidHost) {
   // Set up the same thread local cluster for the new IO handle.
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
       .WillRepeatedly(Return(mock_thread_local_cluster.get()));
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Call maintainClusterConnections to create HostConnectionInfo entries in the new IO handle.
   maintainClusterConnections("test-cluster", cluster_config);
@@ -837,11 +830,12 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailurePutsHostInBackoff) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
-  // First call maintainClusterConnections to create HostConnectionInfo entries.
-  RemoteClusterConnectionConfig cluster_config("test-cluster", 2);
-  maintainClusterConnections("test-cluster", cluster_config);
+  // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
+  // and defeat the fresh-host assertion below.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
 
   // Verify host is initially not in backoff.
   bool should_attempt_before = shouldAttemptConnectionToHost("192.168.1.1", "test-cluster");
@@ -868,10 +862,8 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailurePutsHostInBackoff) {
       stat_map_after_non_existent["test_scope.reverse_connections.host.non-existent-host.backoff"],
       0);
 
-  // Test that maintainClusterConnections skips hosts in backoff.
-  // Call maintainClusterConnections again - should skip the host in backoff.
-  // and not attempt any new connections
-  maintainClusterConnections("test-cluster", cluster_config);
+  // maintainClusterConnections skips hosts in backoff, so the backed-off host is not re-dialed.
+  maintainClusterConnections("test-cluster", RemoteClusterConnectionConfig("test-cluster", 2));
 
   // Verify that the host is still in backoff state.
   EXPECT_FALSE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
@@ -901,11 +893,12 @@ TEST_F(ReverseConnectionIOHandleTest, ResetHostBackoff) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
-  // First call maintainClusterConnections to create HostConnectionInfo entries.
-  RemoteClusterConnectionConfig cluster_config("test-cluster", 2);
-  maintainClusterConnections("test-cluster", cluster_config);
+  // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
+  // and defeat the fresh-host assertion below.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
 
   // Verify host is initially not in backoff.
   bool should_attempt_before = shouldAttemptConnectionToHost("192.168.1.1", "test-cluster");
@@ -979,11 +972,12 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) 
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
-  // First call maintainClusterConnections to create HostConnectionInfo entries.
-  RemoteClusterConnectionConfig cluster_config("test-cluster", 2);
-  maintainClusterConnections("test-cluster", cluster_config);
+  // Populate the host entry directly. A dial-based setup would install backoff on the null tcpConn
+  // and start the exponential schedule from a non-zero failure count.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
 
   // Get initial host info.
   const auto& host_info_initial = getHostConnectionInfo("192.168.1.1");
@@ -1112,7 +1106,8 @@ TEST_F(ReverseConnectionIOHandleTest, HostMappingAndBackoffIntegration) {
   (*host_map_a)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host_a2);
   (*host_map_a)["192.168.1.3"] = std::const_pointer_cast<Upstream::Host>(mock_host_a3);
 
-  EXPECT_CALL(*mock_priority_set_a, crossPriorityHostMap()).WillRepeatedly(Return(host_map_a));
+  EXPECT_CALL(*mock_priority_set_a, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map_a)));
 
   // Set up mock thread local cluster for cluster-B.
   auto mock_thread_local_cluster_b = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -1131,25 +1126,20 @@ TEST_F(ReverseConnectionIOHandleTest, HostMappingAndBackoffIntegration) {
   (*host_map_b)["192.168.2.1"] = std::const_pointer_cast<Upstream::Host>(mock_host_b1);
   (*host_map_b)["192.168.2.2"] = std::const_pointer_cast<Upstream::Host>(mock_host_b2);
 
-  EXPECT_CALL(*mock_priority_set_b, crossPriorityHostMap()).WillRepeatedly(Return(host_map_b));
+  EXPECT_CALL(*mock_priority_set_b, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map_b)));
 
-  // Step 1: Create initial host mappings for cluster-A.
-  RemoteClusterConnectionConfig cluster_config_a("cluster-A", 2);
-  maintainClusterConnections("cluster-A", cluster_config_a);
-
-  // Step 2: Create initial host mappings for cluster-B.
-  RemoteClusterConnectionConfig cluster_config_b("cluster-B", 2);
-  maintainClusterConnections("cluster-B", cluster_config_b);
+  // Steps 1 and 2 create initial host mappings directly without dialing. A dial-based setup would
+  // install backoff on the null tcpConn and defeat the normal-host assertions below.
+  maybeUpdateHostsMappingsAndConnections("cluster-A",
+                                         {"192.168.1.1", "192.168.1.2", "192.168.1.3"});
+  maybeUpdateHostsMappingsAndConnections("cluster-B", {"192.168.2.1", "192.168.2.2"});
 
   // Verify all hosts exist initially.
   const auto& host_to_conn_info_map_initial = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map_initial.size(),
-            5); // 192.168.1.1, 192.168.1.2, 192.168.1.3, 192.168.2.1, 192.168.2.2
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.1.1"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.1.2"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.1.3"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.2.1"), host_to_conn_info_map_initial.end());
-  EXPECT_NE(host_to_conn_info_map_initial.find("192.168.2.2"), host_to_conn_info_map_initial.end());
+  EXPECT_THAT(host_to_conn_info_map_initial,
+              UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2"), Key("192.168.1.3"),
+                                   Key("192.168.2.1"), Key("192.168.2.2")));
 
   // Step 3: Put some hosts in backoff.
   trackConnectionFailure("192.168.1.1", "cluster-A"); // 192.168.1.1 in backoff
@@ -1216,7 +1206,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionFailure) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // First call maintainClusterConnections to create HostConnectionInfo entries.
   RemoteClusterConnectionConfig cluster_config("test-cluster", 2);
@@ -1265,7 +1256,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionSuccess) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry using helper method.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -1316,7 +1308,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateReverseConnectionWithCustomScope) 
 
   // Replace the class member io_handle_ with our custom one for this test
   auto original_io_handle = std::move(io_handle_);
-  io_handle_ = std::make_unique<ReverseConnectionIOHandle>(8, // dummy fd
+  io_handle_ = std::make_unique<ReverseConnectionIOHandle>(-1, // dummy fd
                                                            custom_prefix_config, cluster_manager_,
                                                            custom_extension.get(), *stats_scope_);
 
@@ -1340,7 +1332,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateReverseConnectionWithCustomScope) 
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry using helper method.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -1391,7 +1384,8 @@ TEST_F(ReverseConnectionIOHandleTest, MaintainClusterConnectionsSkipsHostsWithEn
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // First call maintainClusterConnections to create HostConnectionInfo entries.
   RemoteClusterConnectionConfig cluster_config("test-cluster", 1); // Only need 1 connection
@@ -1514,7 +1508,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
   (*host_map)["192.168.1.3"] = std::const_pointer_cast<Upstream::Host>(mock_host3);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entries for all hosts with target count of 3.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1); // Host 1
@@ -1666,10 +1661,7 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
   for (const auto& [wrapper, host] : wrapper_to_host_map) {
     mapped_hosts.insert(host);
   }
-  EXPECT_EQ(mapped_hosts.size(), 2);                               // Should have 2 successful hosts
-  EXPECT_NE(mapped_hosts.find("192.168.1.1"), mapped_hosts.end()); // Success
-  EXPECT_EQ(mapped_hosts.find("192.168.1.2"), mapped_hosts.end()); // Failed - not in map
-  EXPECT_NE(mapped_hosts.find("192.168.1.3"), mapped_hosts.end()); // Success
+  EXPECT_THAT(mapped_hosts, UnorderedElementsAre("192.168.1.1", "192.168.1.3"));
 }
 
 // Test removeStaleHostAndCloseConnections removes host and closes connections.
@@ -1698,7 +1690,8 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host1);
   (*host_map)["192.168.1.2"] = std::const_pointer_cast<Upstream::Host>(mock_host2);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Set up successful connections for both hosts.
   auto mock_connection1 = getDeletableConn();
@@ -1744,9 +1737,7 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   maintainClusterConnections("test-cluster", cluster_config);
 
   // Verify both hosts are initially present.
-  EXPECT_EQ(getHostToConnInfoMap().size(), 2);
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.1"), getHostToConnInfoMap().end());
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.2"), getHostToConnInfoMap().end());
+  EXPECT_THAT(getHostToConnInfoMap(), UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2")));
 
   // Verify that connection wrappers were created by maintainClusterConnections.
   const auto& connection_wrappers = getConnectionWrappers();
@@ -1758,11 +1749,9 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
 
   // Verify that host 192.168.1.1 is still in host_to_conn_info_map_
   // (removeStaleHostAndCloseConnections doesn't remove it)
-  EXPECT_EQ(getHostToConnInfoMap().size(), 2);
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.1"), getHostToConnInfoMap().end());
-  EXPECT_NE(getHostToConnInfoMap().find("192.168.1.2"), getHostToConnInfoMap().end());
+  EXPECT_THAT(getHostToConnInfoMap(), UnorderedElementsAre(Key("192.168.1.1"), Key("192.168.1.2")));
 
-  // Verify that connection wrappers for the removed host are removed.
+  // Tracking drops immediately; the wrapper is deferred-deleted.
   EXPECT_EQ(getConnectionWrappers().size(), 1);   // Only host 192.168.1.2's wrapper remains
   EXPECT_EQ(getConnWrapperToHostMap().size(), 1); // Only host 192.168.1.2's mapping remains
 
@@ -1770,6 +1759,9 @@ TEST_F(ReverseConnectionIOHandleTest, RemoveStaleHostAndCloseConnections) {
   const auto& wrapper_to_host_map = getConnWrapperToHostMap();
   EXPECT_EQ(wrapper_to_host_map.size(), 1);
   EXPECT_EQ(wrapper_to_host_map.begin()->second, "192.168.1.2"); // Only 192.168.1.2 should remain
+
+  // Drain deferred deletes so the removed wrapper is destroyed without leaking into TearDown.
+  dispatcher_.clearDeferredDeleteList();
 }
 
 // Test read() method - should delegate to base class.
@@ -1811,14 +1803,10 @@ TEST_F(ReverseConnectionIOHandleTest, ConnectMethod) {
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Create a mock address.
-  auto address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
-
-  // Call connect() - should delegate to base class implementation.
-  auto result = io_handle_->connect(address);
-
-  // Should return a valid result.
-  EXPECT_NE(result.errno_, 0); // Should fail since we're not actually connecting
+  // connect() is unused for reverse tunnels; it only forwards to the base socket. Do not assert
+  // errno — the outcome depends on whatever happens to be listening on the target address.
+  auto address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1);
+  io_handle_->connect(address);
 }
 
 // Test onEvent() method - should delegate to base class.
@@ -1911,9 +1899,10 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccess) {
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Create trigger pipe BEFORE initiating connection to ensure it's ready.
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+  EXPECT_TRUE(listenerWantRead());
 
   // Set up mock thread local cluster.
   auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -1930,7 +1919,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccess) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -1972,31 +1962,22 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccess) {
 
   // Verify that connection was pushed to established_connections_
   EXPECT_EQ(getEstablishedConnectionsSize(), 1);
-
-  // Verify that trigger mechanism was executed.
-  // Read 1 byte from the pipe to verify the trigger was written.
-  char trigger_byte;
-  int pipe_read_fd = getTriggerPipeReadFd();
-  EXPECT_GE(pipe_read_fd, 0);
-
-  ssize_t bytes_read = ::read(pipe_read_fd, &trigger_byte, 1);
-  EXPECT_EQ(bytes_read, 1) << "Expected to read 1 byte from trigger pipe, got " << bytes_read;
-  EXPECT_EQ(trigger_byte, 1) << "Expected trigger byte to be 1, got "
-                             << static_cast<int>(trigger_byte);
 }
 
-// Success path where trigger write fails: still enqueues connection and cleans up wrapper.
-TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessTriggerWriteFailure) {
+// Success still enqueues even when the listener does not currently want reads.
+TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessWhenListenerDisabled) {
   setupThreadLocalSlot();
 
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Prepare trigger pipe, then close write end so ::write fails.
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
-  ::close(getTriggerPipeWriteFd());
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+  // Overload-manager style disable: cancel pending events and clear want-read.
+  io_handle_->enableFileEvents(0);
+  EXPECT_FALSE(listenerWantRead());
 
   // Mock cluster and single host.
   auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -2008,7 +1989,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessTriggerWriteFailure
   auto host_map = std::make_shared<Upstream::HostMap>();
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
@@ -2019,39 +2001,13 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccessTriggerWriteFailure
   EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).WillOnce(Return(success_conn_data));
   mock_connection.release();
 
-  // Create wrapper via initiation, then complete as success.
   EXPECT_TRUE(initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host));
   RCConnectionWrapper* wrapper_ptr = getConnectionWrappers()[0].get();
   io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
 
-  // Even though trigger write failed, connection should be queued for accept.
+  // Queued even though the listener is disabled; re-enable will re-arm via maybePushConn.
   EXPECT_EQ(getEstablishedConnectionsSize(), 1);
-}
-
-// Internal address with zero hosts should early fail and update CannotConnect state.
-TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionInternalAddressNoHosts) {
-  setupThreadLocalSlot();
-
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  EXPECT_NE(io_handle_, nullptr);
-
-  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
-  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
-      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
-
-  // Provide non-null info and an empty host set to yield host_count == 0.
-  auto mock_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
-  EXPECT_CALL(*mock_thread_local_cluster, info()).WillRepeatedly(Return(mock_cluster_info));
-  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
-  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
-      .WillRepeatedly(ReturnRef(*mock_priority_set));
-  std::vector<Upstream::HostSetPtr> host_sets; // empty
-  EXPECT_CALL(*mock_priority_set, hostSetsPerPriority()).WillRepeatedly(ReturnRef(host_sets));
-
-  auto mock_host = createMockPipeHost("/tmp/rev.sock");
-  bool ok = initiateOneReverseConnection("test-cluster", "envoy://internal", mock_host);
-  EXPECT_FALSE(ok);
+  EXPECT_FALSE(listenerWantRead());
 }
 
 // Pipe address host exercises the log branch that prints address without a port.
@@ -2069,7 +2025,8 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionLogsWithoutPor
   EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
       .WillRepeatedly(ReturnRef(*mock_priority_set));
   auto host_map = std::make_shared<Upstream::HostMap>();
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   auto mock_host = createMockPipeHost("/tmp/rev.sock");
   auto mock_connection = setupMockConnection();
@@ -2107,7 +2064,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -2189,7 +2147,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   RCConnectionWrapper* wrapper_ptr2 = connection_wrappers2[0].get();
   EXPECT_EQ(wrapper_to_host_map2.at(wrapper_ptr2), "192.168.1.1");
 
-  // Verify stats after recovery connection initiation.
+  // Verify stats after the recovery dial. The dial does not reset the backoff, so the host stays in
+  // backoff and is not yet recovered until the verified success in Step 4.
   stat_map = extension_->getCrossWorkerStatMap();
 
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connecting"],
@@ -2197,13 +2156,13 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"],
             1); // New connection
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.backoff"],
-            0); // Reset by initiateOneReverseConnection
+            1); // Still in backoff until success
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.backoff"],
-            0); // Reset by initiateOneReverseConnection
+            1); // Still in backoff until success
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.recovered"],
-            1); // Recovery recorded
+            0); // Not recovered until success
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.recovered"],
-            1); // Recovery recorded
+            0); // Not recovered until success
 
   // Step 4: Simulate connection success (recovery) by calling onConnectionDone with success.
   io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr2, false);
@@ -2221,14 +2180,14 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connecting"],
             0); // Should be decremented
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.failed"],
-            0); // Reset by initiateOneReverseConnection
+            1); // Terminal failure gauge is cumulative, so the earlier failure is retained
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connected"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.recovered"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.backoff"], 0);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"],
             0); // Should be decremented
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.failed"],
-            0); // Reset by initiateOneReverseConnection
+            1); // Terminal failure gauge is cumulative, so the earlier failure is retained
 
   // Verify host is no longer in backoff.
   EXPECT_TRUE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
@@ -2239,8 +2198,7 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
 
   // Verify host info is still present (should not be removed)
   const auto& host_to_conn_info_map = getHostToConnInfoMap();
-  EXPECT_EQ(host_to_conn_info_map.size(), 1);
-  EXPECT_NE(host_to_conn_info_map.find("192.168.1.1"), host_to_conn_info_map.end());
+  EXPECT_THAT(host_to_conn_info_map, UnorderedElementsAre(Key("192.168.1.1")));
 }
 
 // Test downstream connection closure and re-initiation.
@@ -2252,9 +2210,9 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Create trigger pipe BEFORE initiating connection to ensure it's ready.
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
 
   // Set up mock thread local cluster.
   auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -2271,7 +2229,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   // Create HostConnectionInfo entry.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
@@ -2314,16 +2273,6 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   // Verify that connection was pushed to established_connections_
   EXPECT_EQ(getEstablishedConnectionsSize(), 1);
 
-  // Verify that trigger mechanism was executed.
-  char trigger_byte;
-  int pipe_read_fd = getTriggerPipeReadFd();
-  EXPECT_GE(pipe_read_fd, 0);
-
-  ssize_t bytes_read = ::read(pipe_read_fd, &trigger_byte, 1);
-  EXPECT_EQ(bytes_read, 1) << "Expected to read 1 byte from trigger pipe, got " << bytes_read;
-  EXPECT_EQ(trigger_byte, 1) << "Expected trigger byte to be 1, got "
-                             << static_cast<int>(trigger_byte);
-
   // Step 3: Get the actual connection key that was used for tracking.
   // The connection key should be the local address of the connection.
   auto host_it = getHostToConnInfoMap().find("192.168.1.1");
@@ -2342,12 +2291,12 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   }
 
   // Step 4: Simulate downstream connection closure.
-  io_handle_->onDownstreamConnectionClosed(connection_key);
+  io_handle_->onDownstreamConnectionClosed(connection_key, /*connection_id=*/12345);
 
   // Verify connection key is removed from host tracking.
   host_it = getHostToConnInfoMap().find("192.168.1.1");
   EXPECT_NE(host_it, getHostToConnInfoMap().end());
-  EXPECT_EQ(host_it->second.connection_keys.count(connection_key), 0);
+  EXPECT_FALSE(host_it->second.connection_keys.contains(connection_key));
 
   // Step 5: Set up expectation for new connection attempts.
   auto mock_connection2 = setupMockConnection();
@@ -2384,6 +2333,50 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connecting"], 1);
 }
 
+// For a host that needs N>1 connections, the establishment episode timestamp must survive the
+// 2..N-1 handshake completions and only clear once the target connection count is reached.
+TEST_F(ReverseConnectionIOHandleTest, EpisodeInitiationTimeClearedOnlyAtTargetCount) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // Host wants two connections; simulate the first dial already having stamped the episode time.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
+  getMutableHostConnectionInfo("192.168.1.1").episode_initiation_time_ms = 1000;
+
+  // Completes one handshake with a distinct local address (so it yields a distinct connection key).
+  auto complete_one_handshake = [&](uint32_t local_port) {
+    auto mock_connection = setupMockConnection();
+    auto local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", local_port);
+    auto remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+    auto provider = std::make_shared<Network::ConnectionInfoSetterImpl>(local, remote);
+    EXPECT_CALL(*mock_connection, connectionInfoProvider())
+        .WillRepeatedly(
+            Invoke([provider]() -> const Network::ConnectionInfoProvider& { return *provider; }));
+
+    auto host = createMockHost("192.168.1.1");
+    auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                         host, "test-cluster");
+    RCConnectionWrapper* wrapper_ptr = wrapper.get();
+    addWrapperToHostMap(wrapper_ptr, "192.168.1.1");
+    pushConnectionWrapper(std::move(wrapper));
+    io_handle_->onConnectionDone("reverse connection accepted", wrapper_ptr, false);
+  };
+
+  // First handshake completes: still below target, timestamp must remain.
+  complete_one_handshake(11111);
+  ASSERT_EQ(getHostConnectionInfo("192.168.1.1").connection_keys.size(), 1u);
+  EXPECT_TRUE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
+  EXPECT_EQ(*getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms, 1000);
+
+  // Second handshake reaches the target: timestamp is cleared, ending the episode.
+  complete_one_handshake(22222);
+  ASSERT_EQ(getHostConnectionInfo("192.168.1.1").connection_keys.size(), 2u);
+  EXPECT_FALSE(getHostConnectionInfo("192.168.1.1").episode_initiation_time_ms.has_value());
+}
+
 TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
   // Set up thread local slot first so stats can be properly tracked.
   setupThreadLocalSlot();
@@ -2391,10 +2384,6 @@ TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
-
-  // Create trigger pipe BEFORE initiating connection to ensure it's ready.
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
 
   // Set up mock thread local cluster.
   auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -2411,7 +2400,8 @@ TEST_F(ReverseConnectionIOHandleTest, SkipNewConnectionIfAttemptInProgress) {
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
 
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).Times(0);
 
@@ -2435,72 +2425,35 @@ TEST_F(ReverseConnectionIOHandleTest, ReverseConnectionIoHandleBindMustBeNoOp) {
 
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
-  auto address = io_handle_->localAddress();
-  EXPECT_EQ(address.ok(), true);
+  auto address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0);
 
   // Set up the api mocks any call here fails the test.
   StrictMock<Api::MockOsSysCalls> mock_os_syscalls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
 
-  auto result = io_handle_->bind(address.value());
+  auto result = io_handle_->bind(address);
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(result.errno_, 0);
 }
 
-// Test ReverseConnectionIOHandle::close() method without trigger pipe.
-TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithoutTriggerPipe) {
+// Test ReverseConnectionIOHandle::close() method.
+TEST_F(ReverseConnectionIOHandleTest, CloseMethod) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Verify initial state - trigger pipe not ready.
-  EXPECT_FALSE(isTriggerPipeReady());
-
-  // Get initial file descriptor (this is the original socket FD)
-  int initial_fd = io_handle_->fdDoNotUse();
-  EXPECT_GE(initial_fd, 0);
-
-  // Call close() - should close only the original socket FD and delegate to base class.
-  auto result = io_handle_->close();
-
-  // After close(), the FD should be -1.
-  EXPECT_EQ(io_handle_->fdDoNotUse(), -1);
-}
-
-// Test ReverseConnectionIOHandle::close() method with trigger pipe.
-TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithTriggerPipe) {
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  EXPECT_NE(io_handle_, nullptr);
-
-  // Get the original socket FD before creating trigger pipe.
-  int original_socket_fd = io_handle_->fdDoNotUse();
-  EXPECT_GE(original_socket_fd, 0);
-
-  // Create trigger pipe and initialize file event to set up the scenario where fd_ points to.
-  // trigger pipe Mock file event callback
   Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
-
-  // Initialize file event to ensure the monitored FD is set to the trigger pipe.
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
-  EXPECT_TRUE(isTriggerPipeReady());
+  EXPECT_TRUE(listenerWantRead());
 
-  // Get the pipe monitor FD (this becomes the monitored fd_ after initializeFileEvent)
-  int pipe_monitor_fd = getTriggerPipeReadFd();
-  EXPECT_GE(pipe_monitor_fd, 0);
-  EXPECT_NE(original_socket_fd, pipe_monitor_fd); // Should be different FDs
-
-  // Verify that the active FD is now the pipe monitor FD.
-  EXPECT_EQ(io_handle_->fdDoNotUse(), pipe_monitor_fd);
-
-  // Call close() - should:
-  // 1. Close the original socket FD (original_socket_fd_)
-  // 2. Let base class close() handle fd_
+  int initial_fd = io_handle_->fdDoNotUse();
+  EXPECT_GE(initial_fd, 0);
 
   auto result = io_handle_->close();
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(io_handle_->fdDoNotUse(), -1);
+  EXPECT_FALSE(listenerWantRead());
 }
 
 // Test ReverseConnectionIOHandle::cleanup() method.
@@ -2509,36 +2462,24 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupMethod) {
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Set up initial state with trigger pipe.
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+  EXPECT_TRUE(listenerWantRead());
 
   // Add some host connection info.
   addHostConnectionInfo("192.168.1.1", "test-cluster", 2);
   addHostConnectionInfo("192.168.1.2", "test-cluster", 1);
 
-  // Verify initial state.
   EXPECT_EQ(getHostToConnInfoMap().size(), 2);
-  EXPECT_TRUE(isTriggerPipeReady());
 
-  // Call cleanup() - should reset all resources.
   cleanup();
 
-  // Verify that trigger pipe FDs are reset to -1.
-  EXPECT_FALSE(isTriggerPipeReady());
-  EXPECT_EQ(getTriggerPipeReadFd(), -1);
-  EXPECT_EQ(getTriggerPipeWriteFd(), -1);
-
-  // Verify that host connection info is cleared.
+  EXPECT_FALSE(listenerWantRead());
   EXPECT_EQ(getHostToConnInfoMap().size(), 0);
-
-  // Verify that connection wrappers are cleared.
   EXPECT_EQ(getConnectionWrappers().size(), 0);
   EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
-
-  // Verify that the base class fd_ is still valid (cleanup doesn't close the main socket)
+  // cleanup resets file events but does not close the main socket FD.
   EXPECT_GE(io_handle_->fdDoNotUse(), 0);
 }
 
@@ -2570,8 +2511,8 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupClosesEstablishedConnections) {
   EXPECT_EQ(getEstablishedConnectionsSize(), 0);
 }
 
-// Test that cleanup() resets file events before closing trigger pipe FDs to prevent busy loop.
-TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) {
+// Test that cleanup() resets file events so a pending activation cannot fire after teardown.
+TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEvents) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
@@ -2583,36 +2524,33 @@ TEST_F(ReverseConnectionIOHandleTest, CleanupResetsFileEventsBeforeClosingPipe) 
   };
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
-
-  EXPECT_TRUE(isTriggerPipeReady());
-  EXPECT_GE(getTriggerPipeReadFd(), 0);
-  EXPECT_GE(getTriggerPipeWriteFd(), 0);
-  EXPECT_EQ(io_handle_->fdDoNotUse(), getTriggerPipeReadFd());
+  EXPECT_TRUE(listenerWantRead());
 
   cleanup();
+  EXPECT_FALSE(listenerWantRead());
 
-  EXPECT_FALSE(isTriggerPipeReady());
-  EXPECT_EQ(getTriggerPipeReadFd(), -1);
-  EXPECT_EQ(getTriggerPipeWriteFd(), -1);
-
-  // Verify the file event callback is not triggered after cleanup (no busy loop).
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(callback_call_count, 0);
 }
 
-// Test initializeFileEvent early-return path when already started.
+// Test initializeFileEvent early-return path when already started (after reset).
 TEST_F(ReverseConnectionIOHandleTest, InitializeFileEventSkipWhenAlreadyStarted) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
   Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
-  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level, 0);
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+  EXPECT_TRUE(isReverseConnStarted());
 
-  // Call again; should skip without changing fd or creating a new pipe.
+  // Must reset before re-init (same contract as ~TcpListenerImpl).
+  io_handle_->resetFileEvents();
   const int fd_before = io_handle_->fdDoNotUse();
-  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level, 0);
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
   EXPECT_EQ(fd_before, io_handle_->fdDoNotUse());
+  EXPECT_TRUE(isReverseConnStarted());
 }
 
 // Test maintainReverseConnections early return when src_node_id is empty.
@@ -2625,6 +2563,62 @@ TEST_F(ReverseConnectionIOHandleTest, MaintainReverseConnectionsMissingSrcNodeId
   io_handle_ = createTestIOHandle(cfg);
   EXPECT_NE(io_handle_, nullptr);
   maintainReverseConnections();
+}
+
+// While the hot-restart parent is still accepting, maintainReverseConnections() must not dial and
+// should re-arm the retry timer for a short re-check instead.
+TEST_F(ReverseConnectionIOHandleTest, MaintainReverseConnectionsDefersWhileParentAccepting) {
+  setupThreadLocalSlot();
+
+  // Give the extension a server whose hot restart reports the parent still accepting.
+  NiceMock<Server::MockInstance> server;
+  EXPECT_CALL(server.hot_restart_, parentStopAcceptingRequested()).WillRepeatedly(Return(false));
+  extension_->onServerInitialized(server);
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  // Create the retry timer via initializeFileEvent; the initial maintenance pass must defer, so the
+  // timer is enabled with the short re-check interval and no cluster dial is attempted.
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(10), _));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+}
+
+// After the drain request is sent, maintainReverseConnections() arms a fixed propagation
+// grace timer before dialing so the parent can process the RPC and stop listeners.
+TEST_F(ReverseConnectionIOHandleTest, MaintainReverseConnectionsDefersForDrainPropagationGrace) {
+  setupThreadLocalSlot();
+
+  NiceMock<Server::MockInstance> server;
+  // First maintenance pass still sees the parent accepting; after the re-check the drain
+  // request has been sent.
+  EXPECT_CALL(server.hot_restart_, parentStopAcceptingRequested())
+      .WillOnce(Return(false))
+      .WillRepeatedly(Return(true));
+  extension_->onServerInitialized(server);
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(10), _));
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  // Re-check after the drain request: schedule the fixed grace period, still no dial.
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(50), _));
+  mock_timer->invokeCallback();
 }
 
 // Test maintainClusterConnections early return when cluster is not found.
@@ -2648,7 +2642,7 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionCreatesHostEntry) {
 
   EXPECT_TRUE(shouldAttemptConnectionToHost("10.0.0.5", "cluster-x"));
   const auto& map = getHostToConnInfoMap();
-  EXPECT_NE(map.find("10.0.0.5"), map.end());
+  EXPECT_THAT(map, Contains(Key("10.0.0.5")));
 }
 
 // Test maybeUpdateHostsMappingsAndConnections removes stale hosts.
@@ -2666,8 +2660,7 @@ TEST_F(ReverseConnectionIOHandleTest, MaybeUpdateHostsRemovesStaleHosts) {
   // Updated set: only a → b should be removed.
   maybeUpdateHostsMappingsAndConnections("c1", std::vector<std::string>{"a"});
   const auto& map = getHostToConnInfoMap();
-  EXPECT_NE(map.find("a"), map.end());
-  EXPECT_EQ(map.find("b"), map.end());
+  EXPECT_THAT(map, UnorderedElementsAre(Key("a")));
 }
 
 // Lightly exercise read/write/connect wrappers for coverage.
@@ -2711,8 +2704,9 @@ TEST_F(ReverseConnectionIOHandleTest, OnBelowWriteBufferLowWatermark) {
 TEST_F(ReverseConnectionIOHandleTest, UpdateStateGaugeWithNullExtension) {
   // Create a test IO handle with null extension BEFORE setting up thread local slot.
   auto config = createDefaultTestConfig();
-  int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-  EXPECT_GE(test_fd, 0);
+  const os_fd_t test_fd =
+      Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+  EXPECT_TRUE(SOCKET_VALID(test_fd));
 
   auto io_handle_null_extension = std::make_unique<ReverseConnectionIOHandle>(
       test_fd, config, cluster_manager_, nullptr, *stats_scope_);
@@ -2767,50 +2761,21 @@ TEST_F(ReverseConnectionIOHandleTest, UpdateStateGaugeWithUnknownState) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.unknown"], 1);
 }
 
-// Test ReverseConnectionIOHandle::accept() method - trigger pipe edge cases.
-TEST_F(ReverseConnectionIOHandleTest, AcceptMethodTriggerPipeEdgeCases) {
+// accept() with an empty queue returns nullptr.
+TEST_F(ReverseConnectionIOHandleTest, AcceptEmptyQueue) {
   setupThreadLocalSlot();
 
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  // Test Case 1: Trigger pipe not ready - should return nullptr.
-  auto result = io_handle_->accept(nullptr, nullptr);
-  EXPECT_EQ(result, nullptr);
-
-  // Create trigger pipe.
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
-
-  // Test Case 2: Trigger pipe ready but no data to read (EAGAIN/EWOULDBLOCK) - should return
-  // nullptr.
-  result = io_handle_->accept(nullptr, nullptr);
-  EXPECT_EQ(result, nullptr);
-
-  // Test Case 3: Trigger pipe closed (read returns 0) - should return nullptr.
-  ::close(getTriggerPipeWriteFd());
-  result = io_handle_->accept(nullptr, nullptr);
-  EXPECT_EQ(result, nullptr);
-  createTriggerPipe();
-
-  // Test Case 4: Trigger pipe read error (not EAGAIN/EWOULDBLOCK) - should return nullptr.
-  ::close(getTriggerPipeReadFd());
-  result = io_handle_->accept(nullptr, nullptr);
-  EXPECT_EQ(result, nullptr);
-  createTriggerPipe();
-
-  // Test Case 5: Trigger pipe ready, data read, but no established connections - should return
-  // nullptr.
-  char trigger_byte = 1;
-  ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-  EXPECT_EQ(bytes_written, 1);
-
-  result = io_handle_->accept(nullptr, nullptr);
+  struct sockaddr_in addr;
+  socklen_t addrlen = sizeof(addr);
+  auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
   EXPECT_EQ(result, nullptr);
 }
 
-// Test ReverseConnectionIOHandle::accept() method - successful accept with address parameters.
+// Successful accept with address parameters.
 TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulWithAddress) {
   setupThreadLocalSlot();
 
@@ -2818,13 +2783,8 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulWithAddress) {
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
-
-  // Create a mock connection with proper socket setup.
   auto mock_connection = setupMockConnection();
 
-  // Set up connection info provider with remote address.
   auto mock_remote_address =
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.100", 8080);
   auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
@@ -2837,18 +2797,10 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulWithAddress) {
             return *mock_provider;
           }));
 
-  // Set up socket expectations.
   EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
-  // Add connection to the established queue.
   addConnectionToEstablishedQueue(std::move(mock_connection));
 
-  // Write trigger byte.
-  char trigger_byte = 1;
-  ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-  EXPECT_EQ(bytes_written, 1);
-
-  // Test accept with address parameters.
   struct sockaddr_in addr;
   socklen_t addrlen = sizeof(addr);
   auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
@@ -2858,7 +2810,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulWithAddress) {
   EXPECT_EQ(addr.sin_family, AF_INET);
 }
 
-// Test ReverseConnectionIOHandle::accept() method - address handling edge cases.
+// Address handling edge cases in accept().
 TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
   setupThreadLocalSlot();
 
@@ -2866,10 +2818,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
-
-  // Test Case 1: Address buffer too small for remote address.
+  // Address buffer too small for remote address.
   {
     auto mock_connection = setupMockConnection();
 
@@ -2889,10 +2838,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
-    char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-    EXPECT_EQ(bytes_written, 1);
-
     struct sockaddr_in addr;
     socklen_t addrlen = 1; // Too small
     auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
@@ -2901,7 +2846,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
     EXPECT_GT(addrlen, 1);
   }
 
-  // Test Case 2: No remote address, fallback to synthetic address.
+  // No remote address, fallback to synthetic address.
   {
     auto mock_connection = setupMockConnection();
 
@@ -2918,10 +2863,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
-    char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-    EXPECT_EQ(bytes_written, 1);
-
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
     auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
@@ -2932,7 +2873,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
     EXPECT_EQ(addr.sin_addr.s_addr, htonl(INADDR_LOOPBACK));
   }
 
-  // Test Case 3: Synthetic address buffer too small.
+  // Synthetic address buffer too small.
   {
     auto mock_connection = setupMockConnection();
 
@@ -2949,10 +2890,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
-    char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-    EXPECT_EQ(bytes_written, 1);
-
     struct sockaddr_in addr;
     socklen_t addrlen = 1; // Too small
     auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
@@ -2962,47 +2899,7 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
   }
 }
 
-// Test ReverseConnectionIOHandle::accept() method - successful accept scenarios.
-TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulScenarios) {
-  setupThreadLocalSlot();
-
-  auto config = createDefaultTestConfig();
-  io_handle_ = createTestIOHandle(config);
-  EXPECT_NE(io_handle_, nullptr);
-
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
-
-  // Test Case 1: Accept without address parameters.
-  {
-    auto mock_connection = setupMockConnection();
-
-    auto mock_remote_address =
-        std::make_shared<Network::Address::Ipv4Instance>("192.168.1.102", 8080);
-    auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12349);
-
-    EXPECT_CALL(*mock_connection, connectionInfoProvider())
-        .WillRepeatedly(Invoke(
-            [mock_remote_address, mock_local_address]() -> const Network::ConnectionInfoProvider& {
-              static auto mock_provider = std::make_unique<Network::ConnectionInfoSetterImpl>(
-                  mock_local_address, mock_remote_address);
-              return *mock_provider;
-            }));
-
-    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
-
-    addConnectionToEstablishedQueue(std::move(mock_connection));
-
-    char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-    EXPECT_EQ(bytes_written, 1);
-
-    auto result = io_handle_->accept(nullptr, nullptr);
-    EXPECT_NE(result, nullptr);
-  }
-}
-
-// Test ReverseConnectionIOHandle::accept() method - socket and file descriptor failures.
+// Socket and file descriptor failures in accept().
 TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSocketAndFdFailures) {
   setupThreadLocalSlot();
 
@@ -3010,82 +2907,27 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSocketAndFdFailures) {
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
+  // Original socket isOpen() == false trips RELEASE_ASSERT in accept().
+  // Covered by death/assert path in production; here exercise dup failure instead.
 
-  // Test Case 1: Original socket not available or not open.
+  // Failed to duplicate file descriptor.
   {
     auto mock_connection = getDeletableConn();
 
-    // Create a mock socket that returns isOpen() = false.
     auto mock_socket_ptr = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
 
-    // Set up IO handle expectations.
-    EXPECT_CALL(*mock_io_handle, resetFileEvents()).WillRepeatedly(Return());
-    EXPECT_CALL(*mock_io_handle, isOpen()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*mock_io_handle, duplicate()).WillRepeatedly(Invoke([]() {
-      auto duplicated_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-      EXPECT_CALL(*duplicated_handle, isOpen()).WillRepeatedly(Return(true));
-      return duplicated_handle;
-    }));
-
-    // Set up socket expectations - but isOpen returns false to simulate failure.
-    EXPECT_CALL(*mock_socket_ptr, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
-    EXPECT_CALL(*mock_socket_ptr, isOpen()).WillRepeatedly(Return(false));
-
-    // Store the mock_io_handle in the socket before casting.
-    mock_socket_ptr->io_handle_ = std::move(mock_io_handle);
-
-    // Create the socket and set up connection expectations.
-    auto mock_socket = std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release());
-    EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(mock_socket));
-
-    auto mock_remote_address =
-        std::make_shared<Network::Address::Ipv4Instance>("192.168.1.103", 8080);
-    auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12350);
-
-    EXPECT_CALL(*mock_connection, connectionInfoProvider())
-        .WillRepeatedly(Invoke(
-            [mock_remote_address, mock_local_address]() -> const Network::ConnectionInfoProvider& {
-              static auto mock_provider = std::make_unique<Network::ConnectionInfoSetterImpl>(
-                  mock_local_address, mock_remote_address);
-              return *mock_provider;
-            }));
-
-    addConnectionToEstablishedQueue(std::move(mock_connection));
-
-    char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-    EXPECT_EQ(bytes_written, 1);
-
-    auto result = io_handle_->accept(nullptr, nullptr);
-    EXPECT_EQ(result, nullptr);
-  }
-
-  // Test Case 2: Failed to duplicate file descriptor.
-  {
-    auto mock_connection = getDeletableConn();
-
-    // Create a mock socket with IO handle that fails to duplicate.
-    auto mock_socket_ptr = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
-    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-
-    // Set up IO handle expectations - but duplicate returns nullptr to simulate failure.
     EXPECT_CALL(*mock_io_handle, resetFileEvents()).WillRepeatedly(Return());
     EXPECT_CALL(*mock_io_handle, isOpen()).WillRepeatedly(Return(true));
     EXPECT_CALL(*mock_io_handle, duplicate()).WillRepeatedly(Invoke([]() {
       return std::unique_ptr<Network::IoHandle>(nullptr);
     }));
 
-    // Set up socket expectations.
     EXPECT_CALL(*mock_socket_ptr, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
     EXPECT_CALL(*mock_socket_ptr, isOpen()).WillRepeatedly(Return(true));
 
-    // Store the mock_io_handle in the socket before casting.
     mock_socket_ptr->io_handle_ = std::move(mock_io_handle);
 
-    // Create the socket and set up connection expectations.
     auto mock_socket = std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release());
     EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(mock_socket));
 
@@ -3100,16 +2942,126 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSocketAndFdFailures) {
                   mock_local_address, mock_remote_address);
               return *mock_provider;
             }));
+    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
+
+    // Track the key so dropTunnelFromTracking on dup failure has something to erase.
+    addHostConnectionInfo("192.168.1.104", "test-cluster", 1);
+    getMutableHostConnectionInfo("192.168.1.104").connection_keys.insert("127.0.0.1:12351");
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
 
-    char trigger_byte = 1;
-    ssize_t bytes_written = ::write(getTriggerPipeWriteFd(), &trigger_byte, 1);
-    EXPECT_EQ(bytes_written, 1);
-
-    auto result = io_handle_->accept(nullptr, nullptr);
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
     EXPECT_EQ(result, nullptr);
+    EXPECT_TRUE(getHostConnectionInfo("192.168.1.104").connection_keys.empty());
   }
+
+  // duplicate() returned a handle, but the peer closed the fd underneath it: the accepted socket
+  // would be dead on arrival, so accept() must reject it exactly like a null duplicate.
+  {
+    auto mock_connection = getDeletableConn();
+
+    auto mock_socket_ptr = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+
+    EXPECT_CALL(*mock_io_handle, resetFileEvents()).WillRepeatedly(Return());
+    EXPECT_CALL(*mock_io_handle, isOpen()).WillRepeatedly(Return(true));
+    EXPECT_CALL(*mock_io_handle, duplicate()).WillRepeatedly(Invoke([]() {
+      auto closed_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+      EXPECT_CALL(*closed_handle, isOpen()).WillRepeatedly(Return(false));
+      return closed_handle;
+    }));
+
+    EXPECT_CALL(*mock_socket_ptr, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+    EXPECT_CALL(*mock_socket_ptr, isOpen()).WillRepeatedly(Return(true));
+
+    mock_socket_ptr->io_handle_ = std::move(mock_io_handle);
+
+    auto mock_socket = std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release());
+    EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(mock_socket));
+
+    auto mock_remote_address =
+        std::make_shared<Network::Address::Ipv4Instance>("192.168.1.105", 8080);
+    auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12352);
+
+    EXPECT_CALL(*mock_connection, connectionInfoProvider())
+        .WillRepeatedly(Invoke(
+            [mock_remote_address, mock_local_address]() -> const Network::ConnectionInfoProvider& {
+              static auto mock_provider = std::make_unique<Network::ConnectionInfoSetterImpl>(
+                  mock_local_address, mock_remote_address);
+              return *mock_provider;
+            }));
+    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
+
+    addHostConnectionInfo("192.168.1.105", "test-cluster", 1);
+    getMutableHostConnectionInfo("192.168.1.105").connection_keys.insert("127.0.0.1:12352");
+
+    addConnectionToEstablishedQueue(std::move(mock_connection));
+
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
+    EXPECT_EQ(result, nullptr);
+    EXPECT_TRUE(getHostConnectionInfo("192.168.1.105").connection_keys.empty());
+  }
+}
+
+// accept() requires a real address buffer: the listener always supplies one, so a null buffer is a
+// caller bug rather than a runtime condition to tolerate.
+TEST_F(ReverseConnectionIOHandleTest, AcceptRejectsNullAddressBuffer) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  EXPECT_DEATH(io_handle_->accept(nullptr, nullptr), "addr and addrlen must be valid");
+}
+
+// A queued connection found closed by accept() releases its tunnel key so the host is redialed
+// rather than counting a phantom tunnel toward the target forever.
+TEST_F(ReverseConnectionIOHandleTest, AcceptReleasesKeyWhenQueuedConnectionClosed) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // Register a host with the connection key the queued connection will report as its local address.
+  const std::string connection_key = "127.0.0.1:12360";
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+  getMutableHostConnectionInfo("192.168.1.1").connection_keys.insert(connection_key);
+  ASSERT_EQ(getHostConnectionInfo("192.168.1.1").connection_keys.size(), 1u);
+
+  // Queue a connection whose socket is not open, matching the registered key.
+  auto mock_connection = getDeletableConn();
+  auto mock_socket_ptr = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  EXPECT_CALL(*mock_io_handle, isOpen()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*mock_socket_ptr, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket_ptr, isOpen()).WillRepeatedly(Return(false));
+  mock_socket_ptr->io_handle_ = std::move(mock_io_handle);
+  auto mock_socket = std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release());
+  EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(mock_socket));
+
+  auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1", 8080);
+  auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12360);
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+        static auto provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+        return *provider;
+      }));
+
+  addConnectionToEstablishedQueue(std::move(mock_connection));
+
+  // accept() finds the connection closed, returns nullptr, and releases the key.
+  struct sockaddr_in addr;
+  socklen_t addrlen = sizeof(addr);
+  auto result = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
+  EXPECT_EQ(result, nullptr);
+  EXPECT_FALSE(getHostConnectionInfo("192.168.1.1").connection_keys.contains(connection_key));
 }
 
 // Tests the case where dynamic_cast succeeds and SSL_set_quiet_shutdown is called.
@@ -3119,9 +3071,6 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdown
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
-
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
 
   // Set up mock thread local cluster.
   auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
@@ -3135,7 +3084,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionQuietShutdown
   auto host_map = std::make_shared<Upstream::HostMap>();
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
@@ -3205,9 +3155,6 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionDynamicCastFa
   io_handle_ = createTestIOHandle(config);
   EXPECT_NE(io_handle_, nullptr);
 
-  createTriggerPipe();
-  EXPECT_TRUE(isTriggerPipeReady());
-
   // Set up mock thread local cluster.
   auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
@@ -3220,7 +3167,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionDynamicCastFa
   auto host_map = std::make_shared<Upstream::HostMap>();
   auto mock_host = createMockHost("192.168.1.1");
   (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
-  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap())
+      .WillRepeatedly(Return(std::make_shared<Upstream::FlatHostLookupMap>(host_map)));
 
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
@@ -3266,12 +3214,12 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneTlsConnectionDynamicCastFa
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.connected"], 1);
 }
 
-// Verify ReverseConnectionIOHandle::close() doesn't double-close original_socket_fd_ when it equals
-// fd_.
+// close() followed by destruction must close the socket exactly once.
 TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWhenOriginalEqualsFd) {
   auto config = createDefaultTestConfig();
-  int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-  ASSERT_GE(test_fd, 0);
+  const os_fd_t test_fd =
+      Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+  ASSERT_TRUE(SOCKET_VALID(test_fd));
 
   NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
@@ -3283,29 +3231,19 @@ TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWhenOriginalEqualsFd) {
   handle.reset();
 }
 
-// Verify that after initializeFileEvent (pipe created), close+destructor closes each FD exactly
-// once. After initializeFileEvent: fd_ = pipe_read_fd, original_socket_fd_ = original_fd,
-// pipe_write_fd separate. close() should close original_fd once (manual) and pipe_read_fd once (via
-// IoSocketHandleImpl::close). cleanup() closes pipe_write_fd once.
-TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleCloseWithPipeFds) {
+// Verify that after initializeFileEvent, close+destructor closes the socket FD exactly once.
+TEST_F(ReverseConnectionIOHandleTest, CloseNoDoubleClose) {
   auto config = createDefaultTestConfig();
   io_handle_ = createTestIOHandle(config);
 
   NiceMock<Api::MockOsSysCalls> mock_os_syscalls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
-  EXPECT_CALL(mock_os_syscalls, close(io_handle_->fdDoNotUse()))
-      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  const os_fd_t fd = io_handle_->fdDoNotUse();
+  EXPECT_CALL(mock_os_syscalls, close(fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
 
   Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
-
-  ASSERT_TRUE(isTriggerPipeReady());
-
-  os_fd_t pipe_read_fd = getTriggerPipeReadFd();
-  os_fd_t pipe_write_fd = getTriggerPipeWriteFd();
-  EXPECT_CALL(mock_os_syscalls, close(pipe_read_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
-  EXPECT_CALL(mock_os_syscalls, close(pipe_write_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
 
   io_handle_->close();
   io_handle_.reset();
@@ -3338,10 +3276,68 @@ TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingDropsKeyAndDialsReplacem
   // The replacement is dialed immediately (0ms) rather than waiting for the periodic tick.
   EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _));
 
-  io_handle_->markTunnelDrainingAndDialReplacement(connection_key);
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key, /*connection_id=*/42);
 
   // The draining tunnel is no longer tracked, leaving a deficit for the maintenance loop to fill.
-  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+  EXPECT_FALSE(getHostConnectionInfo(host).connection_keys.contains(connection_key));
+}
+
+// Unset maintain_interval uses the historical 10s re-check. initializeFileEvent immediately
+// runs maintainReverseConnections, which re-arms the retry timer with that interval plus
+// 15% upward jitter: 10000 + 3999 % 1500 = 10999.
+TEST_F(ReverseConnectionIOHandleTest, DefaultMaintainInterval) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  uint64_t retry_timeout =
+      ReverseConnectionUtility::addJitter(10000, 15, extension_->randomGenerator());
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(retry_timeout), _));
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+}
+
+// The interval is only visible when the handle re-arms its retry timer, so this goes through
+// createBootstrapExtension + socket() and checks the first enableTimer. 5s plus the fixture's
+// fixed jitter is 5000 + 3999 % 750 = 5249. The unique_ptr is kept so the initiator's cached
+// raw pointer stays valid.
+TEST_F(ReverseConnectionIOHandleTest, MaintainIntervalPassedOnFromExtension) {
+  auto socket_interface = std::make_unique<ReverseTunnelInitiator>(context_);
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface extension_config;
+  extension_config.mutable_maintain_interval()->set_seconds(5);
+  auto extension = socket_interface->createBootstrapExtension(extension_config, context_);
+  ASSERT_NE(extension, nullptr);
+
+  ReverseConnectionAddress::ReverseConnectionConfig config;
+  config.src_cluster_id = "test-cluster";
+  config.src_node_id = "test-node";
+  config.src_tenant_id = "test-tenant";
+  config.remote_cluster = "remote-cluster";
+  config.connection_count = 1;
+
+  auto reverse_address = std::make_shared<ReverseConnectionAddress>(config);
+  auto socket = socket_interface->socket(Network::Socket::Type::Stream, reverse_address,
+                                         Network::SocketCreationOptions{});
+  ASSERT_NE(socket, nullptr);
+  auto* reverse_handle = dynamic_cast<ReverseConnectionIOHandle*>(socket.get());
+  ASSERT_NE(reverse_handle, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  uint64_t retry_timeout =
+      ReverseConnectionUtility::addJitter(5000, 15, extension_->randomGenerator());
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(retry_timeout), _));
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  reverse_handle->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                      Event::FileReadyType::Read);
 }
 
 // Draining an unknown connection key is a benign no-op: nothing is dropped and no immediate
@@ -3363,11 +3359,11 @@ TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingUnknownKeyIsNoOp) {
   io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
                                   Event::FileReadyType::Read);
 
-  io_handle_->markTunnelDrainingAndDialReplacement("203.0.113.9:9999");
+  io_handle_->markTunnelDrainingAndDialReplacement("203.0.113.9:9999", /*connection_id=*/0);
 }
 
 // Closing a connection key that is no longer tracked (e.g. it was already dropped when the tunnel
-// began draining) is a benign no-op and must not crash.
+// began draining) does not crash; tracking cleanup is a no-op (access log may still emit).
 TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNoOp) {
   setupThreadLocalSlot();
 
@@ -3375,8 +3371,574 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedUnknownKeyIsNo
   io_handle_ = createTestIOHandle(config);
   ASSERT_NE(io_handle_, nullptr);
 
-  io_handle_->onDownstreamConnectionClosed("203.0.113.9:9999");
+  io_handle_->onDownstreamConnectionClosed("203.0.113.9:9999", /*connection_id=*/0);
   EXPECT_TRUE(getHostToConnInfoMap().empty());
+}
+
+TEST_F(ReverseConnectionIOHandleTest, MarkTunnelDrainingEmitsConnectionDrainingAccessLog) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_draining");
+        EXPECT_EQ(metadata.fields().at("host_address").string_value(), host);
+        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "remote-cluster");
+        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), connection_key);
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "42");
+        EXPECT_EQ(metadata.fields().at("node_id").string_value(), "test-node");
+        EXPECT_EQ(metadata.fields().at("cluster_id").string_value(), "test-cluster");
+      }));
+
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _));
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key, /*connection_id=*/42);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedAfterDrainStillEmitsClosed) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_draining");
+      }))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_closed");
+        EXPECT_EQ(metadata.fields().at("host_address").string_value(), "");
+        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "");
+        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), connection_key);
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "42");
+      }));
+
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _));
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key, /*connection_id=*/42);
+  io_handle_->onDownstreamConnectionClosed(connection_key, /*connection_id=*/42);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTrackedEmitsHostAndCluster) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_closed");
+        EXPECT_EQ(metadata.fields().at("host_address").string_value(), host);
+        EXPECT_EQ(metadata.fields().at("upstream_cluster").string_value(), "remote-cluster");
+        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), connection_key);
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "99");
+      }));
+
+  io_handle_->onDownstreamConnectionClosed(connection_key, /*connection_id=*/99);
+  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, ChildMarkTunnelDrainingForwardsKeyAndId) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  auto* mock_io_handle_raw = mock_io_handle.get();
+  EXPECT_CALL(*mock_io_handle_raw, fdDoNotUse()).WillRepeatedly(Return(42));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle_raw));
+  mock_socket->io_handle_ = std::move(mock_io_handle);
+  auto child = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::unique_ptr<Network::ConnectionSocket>(mock_socket.release()), io_handle_.get(),
+      connection_key, /*connection_id=*/77);
+
+  // The child's destructor emits a connection_closed event after the drain, so allow extra logs.
+  EXPECT_CALL(*access_log, log(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*access_log, log(_, _))
+      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata =
+            stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
+        EXPECT_EQ(metadata.fields().at("event").string_value(), "connection_draining");
+        EXPECT_EQ(metadata.fields().at("connection_key").string_value(), connection_key);
+        EXPECT_EQ(metadata.fields().at("connection_id").string_value(), "77");
+      }))
+      .RetiresOnSaturation();
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _));
+
+  child->markTunnelDrainingAndDialReplacement();
+  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+}
+
+TEST_F(ReverseConnectionIOHandleTest, ChildMarkTunnelDrainingAfterDetachIsNoOp) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto access_log = std::make_shared<NiceMock<AccessLog::MockInstance>>();
+  extension_->setTestOnlyAccessLogs({access_log});
+
+  const std::string connection_key = "192.168.1.1:12345";
+  auto mock_socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+  auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+  auto* mock_io_handle_raw = mock_io_handle.get();
+  EXPECT_CALL(*mock_io_handle_raw, fdDoNotUse()).WillRepeatedly(Return(42));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle_raw));
+  mock_socket->io_handle_ = std::move(mock_io_handle);
+  auto child = std::make_unique<DownstreamReverseConnectionIOHandle>(
+      std::unique_ptr<Network::ConnectionSocket>(mock_socket.release()), io_handle_.get(),
+      connection_key, /*connection_id=*/77);
+
+  EXPECT_CALL(*access_log, log(_, _)).Times(0);
+  io_handle_.reset();
+  child->markTunnelDrainingAndDialReplacement();
+}
+
+// Listener stop must destroy the retry timer and block replacement dials.
+TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsStopsReplacementDialOnListenerStop) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  // Set expectations before resetFileEvents() destroys the timer.
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+  EXPECT_CALL(*mock_timer, enableTimer(std::chrono::milliseconds(0), _)).Times(0);
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "remote-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+
+  // Simulate worker-thread listener teardown.
+  io_handle_->resetFileEvents();
+
+  // Drop tracking without dialing a replacement.
+  io_handle_->markTunnelDrainingAndDialReplacement(connection_key, 10);
+
+  EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
+}
+
+// Listener stop must shut down in-flight handshake wrappers on the worker. close() is expected
+// once, from RCConnectionWrapper::shutdown() (not a second time from resetFileEvents()).
+TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsShutsDownHandshakeWrappers) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  auto mock_connection = setupMockConnection();
+  EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                       mock_host, "test-cluster");
+  addWrapperToHostMap(wrapper.get(), "192.168.1.1");
+  pushConnectionWrapper(std::move(wrapper));
+  ASSERT_EQ(getConnectionWrappers().size(), 1);
+
+  const size_t deferred_before = dispatcher_.to_delete_.size();
+  io_handle_->resetFileEvents();
+
+  EXPECT_TRUE(getConnectionWrappers().empty());
+  EXPECT_TRUE(getConnWrapperToHostMap().empty());
+  // shutdown() deferred-deletes the connection; resetFileEvents() deferred-deletes the wrapper.
+  EXPECT_EQ(dispatcher_.to_delete_.size(), deferred_before + 2);
+}
+
+// Queued tunnels survive overload disable and are delivered when the listener re-enables.
+TEST_F(ReverseConnectionIOHandleTest, EnableFileEventsReArmsQueuedTunnels) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_file_event = new NiceMock<Event::MockFileEvent>();
+  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, 0)).WillOnce(Return(mock_file_event));
+  // initializeFileEvent -> enableFileEvents(Read) always calls setEnabled(0) (zero-mask).
+  EXPECT_CALL(*mock_file_event, setEnabled(0)).Times(testing::AtLeast(1));
+
+  Event::FileReadyCb listener_cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, listener_cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+  EXPECT_TRUE(listenerWantRead());
+
+  // Disable (overload manager): clear want-read, no activation while queue empty.
+  {
+    EXPECT_CALL(*mock_file_event, activate(_)).Times(0);
+    io_handle_->enableFileEvents(0);
+  }
+  EXPECT_FALSE(listenerWantRead());
+
+  // Handshake completes while disabled: queue grows, still no activation.
+  {
+    auto mock_connection = setupMockConnection();
+    auto remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.100", 8080);
+    auto local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+    auto provider = std::make_shared<Network::ConnectionInfoSetterImpl>(local, remote);
+    EXPECT_CALL(*mock_connection, connectionInfoProvider())
+        .WillRepeatedly(
+            Invoke([provider]() -> const Network::ConnectionInfoProvider& { return *provider; }));
+    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
+    EXPECT_CALL(*mock_file_event, activate(_)).Times(0);
+    addConnectionToEstablishedQueue(std::move(mock_connection));
+    maybePushConn();
+  }
+  EXPECT_EQ(getEstablishedConnectionsSize(), 1);
+
+  // Re-enable: must activate so the listener drains the queued tunnel.
+  {
+    EXPECT_CALL(*mock_file_event, activate(Event::FileReadyType::Read));
+    io_handle_->enableFileEvents(Event::FileReadyType::Read);
+  }
+  EXPECT_TRUE(listenerWantRead());
+
+  struct sockaddr_in addr;
+  socklen_t addrlen = sizeof(addr);
+  auto accepted = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
+  EXPECT_NE(accepted, nullptr);
+  EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+}
+
+// Post-callback re-arm drains the queue when the listener accepts only one connection per event.
+TEST_F(ReverseConnectionIOHandleTest, WrappedCallbackReArmsUntilQueueDrained) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_file_event = new NiceMock<Event::MockFileEvent>();
+  Event::FileReadyCb wrapped_cb;
+  EXPECT_CALL(dispatcher_, createFileEvent_(_, _, _, 0))
+      .WillOnce(Invoke([mock_file_event, &wrapped_cb](os_fd_t, Event::FileReadyCb cb,
+                                                      Event::FileTriggerType, uint32_t) {
+        wrapped_cb = std::move(cb);
+        return mock_file_event;
+      }));
+  EXPECT_CALL(*mock_file_event, setEnabled(0)).Times(testing::AtLeast(1));
+
+  // Listener accepts at most one connection per readiness event (cap = 1).
+  Event::FileReadyCb listener_cb = [this](uint32_t) -> absl::Status {
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+    auto accepted = io_handle_->accept(reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
+    EXPECT_NE(accepted, nullptr);
+    return absl::OkStatus();
+  };
+  io_handle_->initializeFileEvent(dispatcher_, listener_cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  auto enqueue = [this](uint16_t port) {
+    auto mock_connection = setupMockConnection();
+    auto remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.100", 8080);
+    auto local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", port);
+    auto provider = std::make_shared<Network::ConnectionInfoSetterImpl>(local, remote);
+    EXPECT_CALL(*mock_connection, connectionInfoProvider())
+        .WillRepeatedly(
+            Invoke([provider]() -> const Network::ConnectionInfoProvider& { return *provider; }));
+    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
+    addConnectionToEstablishedQueue(std::move(mock_connection));
+  };
+  enqueue(11111);
+  enqueue(22222);
+  EXPECT_EQ(getEstablishedConnectionsSize(), 2);
+
+  // First readiness: accept one, then wrapper re-arms because the queue is still non-empty.
+  {
+    EXPECT_CALL(*mock_file_event, activate(Event::FileReadyType::Read));
+    ASSERT_OK(wrapped_cb(Event::FileReadyType::Read));
+  }
+  EXPECT_EQ(getEstablishedConnectionsSize(), 1);
+
+  // Second readiness: accept the last one; wrapper does not re-arm on empty queue.
+  {
+    EXPECT_CALL(*mock_file_event, activate(_)).Times(0);
+    ASSERT_OK(wrapped_cb(Event::FileReadyType::Read));
+  }
+  EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+}
+
+// Access logging is optional: a handle built without an extension (no bootstrap extension
+// registered) must silently skip logging rather than dereference the null extension.
+TEST_F(ReverseConnectionIOHandleTest, EmitAccessLogWithoutExtensionIsNoOp) {
+  auto config = createDefaultTestConfig();
+  const int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  ASSERT_GE(test_fd, 0);
+  io_handle_ = std::make_unique<ReverseConnectionIOHandle>(test_fd, config, cluster_manager_,
+                                                           /*extension=*/nullptr, *stats_scope_);
+
+  emitAccessLog("handshake_success", "192.168.1.1", "test-cluster", "127.0.0.1:12345", "");
+}
+
+// The retry timer is the only thing that keeps dialing after the initial burst, so its callback
+// must run a full maintenance cycle each time it fires.
+TEST_F(ReverseConnectionIOHandleTest, RetryTimerCallbackRunsMaintenanceCycle) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // Capture the callback the handle registers so the timer can be fired deterministically.
+  Event::TimerCb retry_timer_cb;
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_))
+      .WillOnce(Invoke([&retry_timer_cb, mock_timer](Event::TimerCb cb) {
+        retry_timer_cb = std::move(cb);
+        return mock_timer;
+      }));
+
+  // One lookup from the maintenance cycle inside initializeFileEvent, one from the timer firing.
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("remote-cluster"))
+      .Times(2)
+      .WillRepeatedly(Return(nullptr));
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+  ASSERT_NE(retry_timer_cb, nullptr);
+
+  retry_timer_cb();
+}
+
+// The thread-local registry is only populated once the worker has run its TLS initialization, so
+// callers must be able to check availability before using the dispatcher.
+TEST_F(ReverseConnectionIOHandleTest, ThreadLocalDispatcherAvailabilityTracksRegistry) {
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  EXPECT_FALSE(isThreadLocalDispatcherAvailable());
+
+  setupThreadLocalSlot();
+  EXPECT_TRUE(isThreadLocalDispatcherAvailable());
+  EXPECT_EQ(&getThreadLocalDispatcher(), &dispatcher_);
+}
+
+// If the registry is missing but the handle has already been bound to a worker, fall back to the
+// worker dispatcher instead of failing: the fallback keeps a misconfigured worker limping rather
+// than taking the process down.
+TEST_F(ReverseConnectionIOHandleTest, ThreadLocalDispatcherFallsBackToWorkerDispatcher) {
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  EXPECT_ENVOY_BUG(EXPECT_EQ(&getThreadLocalDispatcher(), &dispatcher_),
+                   "Failed to get dispatcher from thread-local registry");
+}
+
+// With neither a registry nor a worker dispatcher there is no clock to attribute events to, which
+// means the handle was used before it was bound to a worker: fail loudly instead of inventing time.
+TEST_F(ReverseConnectionIOHandleTest, TimeSourceWithoutDispatcherIsFatal) {
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  EXPECT_DEATH(getTimeSource(), "[Nn]o (valid )?time source available");
+}
+
+// A wrapper can report completion after its connection was already released (for example a close
+// event racing the handshake teardown). The failure must still be recorded, using a synthetic key
+// since the real connection key is no longer reachable.
+TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneWithReleasedConnectionUsesFallbackKey) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto mock_connection = setupMockConnection();
+  auto mock_host_description = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto wrapper = std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection),
+                                                       mock_host_description, "test-cluster");
+  auto* wrapper_ptr = wrapper.get();
+  pushConnectionWrapper(std::move(wrapper));
+  addWrapperToHostMap(wrapper_ptr, "192.168.1.1");
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Drop the connection before reporting completion.
+  wrapper_ptr->releaseConnection();
+  ASSERT_EQ(wrapper_ptr->getConnection(), nullptr);
+
+  io_handle_->onConnectionDone("connection reset", wrapper_ptr, true);
+
+  EXPECT_EQ(getConnWrapperToHostMap().size(), 0);
+  auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.failed"], 1);
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.failed"], 1);
+}
+
+// duplicate() returns a fresh, unstarted reverse connection handle over its own fd rather than a
+// raw fd dup, so every worker and LDS update stands up its own dial loop.
+TEST_F(ReverseConnectionIOHandleTest, DuplicateReturnsFreshHandle) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto dup = io_handle_->duplicate();
+  ASSERT_NE(dup, nullptr);
+  auto* dup_handle = dynamic_cast<ReverseConnectionIOHandle*>(dup.get());
+  ASSERT_NE(dup_handle, nullptr);
+  EXPECT_TRUE(SOCKET_VALID(dup_handle->fdDoNotUse()));
+  EXPECT_NE(dup_handle->fdDoNotUse(), io_handle_->fdDoNotUse());
+}
+
+// resetFileEvents() closes tunnels still queued for accept() on the worker that owns them, so the
+// main-thread destructor does not close worker-owned connections off thread.
+TEST_F(ReverseConnectionIOHandleTest, ResetFileEventsDrainsEstablishedQueue) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  EXPECT_CALL(*mock_timer, enableTimer(_, _)).Times(testing::AnyNumber());
+  Event::FileReadyCb cb = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, cb, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  auto open_conn = getDeletableConn();
+  EXPECT_CALL(*open_conn, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*open_conn, close(Network::ConnectionCloseType::NoFlush));
+  addConnectionToEstablishedQueue(std::move(open_conn));
+  ASSERT_EQ(getEstablishedConnectionsSize(), 1);
+
+  io_handle_->resetFileEvents();
+
+  EXPECT_EQ(getEstablishedConnectionsSize(), 0);
+}
+
+// An EnvoyInternal remote cluster address is rejected before dialing, since the user-space I/O
+// handle cannot be duplicated for the accepted tunnel. The rejection happens before any cluster
+// lookup and moves the host into the CannotConnect state.
+TEST_F(ReverseConnectionIOHandleTest, InitiateRejectsEnvoyInternalHost) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  // The host is rejected before the cluster is ever resolved.
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto internal_address =
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_listener", "endpoint_id");
+  EXPECT_CALL(*mock_host, address()).WillRepeatedly(Return(internal_address));
+
+  EXPECT_FALSE(
+      initiateOneReverseConnection("test-cluster", "envoy://internal_listener", mock_host));
+
+  auto stat_map = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(
+      stat_map["test_scope.reverse_connections.host.envoy://internal_listener.cannot_connect"], 1);
 }
 
 } // namespace ReverseConnection

@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -62,14 +63,15 @@ public:
     const auto health_check_config = Upstream::parseHealthCheckFromV3Yaml(yaml);
 
     auto module = Extensions::DynamicModules::newDynamicModuleByName(module_name, true, false);
-    ASSERT_TRUE(module.ok());
+    ASSERT_OK(module);
     auto config_or_error =
         newDynamicModuleHealthCheckerConfig(checker_name, config, std::move(module.value()));
-    ASSERT_TRUE(config_or_error.ok());
+    ASSERT_OK(config_or_error);
 
     health_checker_ = std::make_shared<DynamicModuleHealthChecker>(
         *cluster_, health_check_config, std::move(config_or_error.value()), *dispatcher_, runtime_,
-        random_, Upstream::HealthCheckEventLoggerPtr(event_logger_));
+        random_, Upstream::HealthCheckEventLoggerPtr(event_logger_),
+        Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   // Builds the checker for the given Rust-module mode ("healthy"/"degraded"/"unhealthy"/"timeout"/

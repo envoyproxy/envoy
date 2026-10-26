@@ -6,6 +6,7 @@ import "envoy/config/accesslog/v3/accesslog.proto";
 import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/udp_socket_config.proto";
 
 import "google/protobuf/any.proto";
@@ -31,7 +32,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message UdpProxyConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig";
@@ -73,7 +74,7 @@ message UdpProxyConfig {
 
   // Configuration for tunneling UDP over other transports or application layers.
   // Tunneling is currently supported over HTTP/2.
-  // [#next-free-field: 12]
+  // [#next-free-field: 13]
   message UdpTunnelingConfig {
     // Configuration for UDP datagrams buffering.
     message BufferOptions {
@@ -178,6 +179,12 @@ message UdpProxyConfig {
     // Save the response trailers to the downstream info filter state for consumption
     // by the session filters. The filter state key is ``envoy.udp_proxy.propagate_response_trailers``.
     bool propagate_response_trailers = 11;
+
+    // Specifies a collection of Formatter plugins that can be used in substitution formatters
+    // in ``headers_to_add``.
+    // See the formatters extensions documentation for details.
+    // [#extension-category: envoy.formatter]
+    repeated config.core.v3.TypedExtensionConfig formatters = 12;
   }
 
   message UdpAccessLogOptions {
@@ -268,4 +275,12 @@ message UdpProxyConfig {
 
   // Additional access log options for UDP Proxy.
   UdpAccessLogOptions access_log_options = 13;
+
+  // Configuration for the upstream UDP packet writer. If unset, datagrams are sent individually.
+  // Independent of the downstream :ref:`udp_packet_packet_writer_config
+  // <envoy_v3_api_field_config.listener.v3.UdpListenerConfig.udp_packet_packet_writer_config>`
+  // and incompatible with
+  // :ref:`tunneling_config <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.tunneling_config>`.
+  // [#extension-category: envoy.udp_packet_writer]
+  config.core.v3.TypedExtensionConfig upstream_packet_writer_config = 14;
 }

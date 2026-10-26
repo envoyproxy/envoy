@@ -92,6 +92,13 @@ public:
                                     const StreamInfo::StreamInfo& stream_info) const override;
   Protobuf::Value formatValue(const ::Envoy::Formatter::Context& context,
                               const StreamInfo::StreamInfo& stream_info) const override;
+  bool formatTo(std::string& sink, const ::Envoy::Formatter::Context& context,
+                const StreamInfo::StreamInfo& stream_info) const override;
+  void formatValueTo(::Envoy::Formatter::ValueSink& sink,
+                     const ::Envoy::Formatter::Context& context,
+                     const StreamInfo::StreamInfo& stream_info) const override;
+  std::optional<absl::string_view> formatView(const ::Envoy::Formatter::Context& context,
+                                              const StreamInfo::StreamInfo& stream_info) const;
 
 private:
   const DynamicModuleFormatterConfigSharedPtr config_;

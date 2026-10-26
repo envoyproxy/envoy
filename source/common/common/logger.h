@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/logger.h"
 #include "envoy/thread/thread.h"
 
 #include "source/common/common/base_logger.h"
@@ -36,6 +37,7 @@ const static bool should_log = true;
 #define ALL_LOGGER_IDS(FUNCTION)                                                                   \
   FUNCTION(a2a)                                                                                    \
   FUNCTION(admin)                                                                                  \
+  FUNCTION(ai_protocol_manager)                                                                    \
   FUNCTION(alternate_protocols_cache)                                                              \
   FUNCTION(aws)                                                                                    \
   FUNCTION(assert)                                                                                 \
@@ -290,7 +292,9 @@ public:
   static bool useFineGrainLogger();
 
   // Change the log level for all loggers (fine grained or otherwise) to the level provided.
-  static void changeAllLogLevels(spdlog::level::level_enum level);
+  static void changeAllLogLevels(Levels level);
+  [[deprecated("Use changeAllLogLevels(Levels) instead")]] static void
+  changeAllLogLevels(spdlog::level::level_enum level);
 
   static void enableFineGrainLogger();
   static void disableFineGrainLogger();
@@ -336,7 +340,9 @@ public:
    * Sets the minimum log severity required to print messages.
    * Messages below this loglevel will be suppressed.
    */
-  static void setLogLevel(spdlog::level::level_enum log_level);
+  static void setLogLevel(Levels log_level);
+  [[deprecated("Use setLogLevel(Levels) instead")]] static void
+  setLogLevel(spdlog::level::level_enum log_level);
 
   /**
    * Sets the log format.
@@ -508,7 +514,7 @@ public:
  */
 
 #define ENVOY_SPDLOG_LEVEL(LEVEL)                                                                  \
-  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Logger::LEVEL))
+  (static_cast<spdlog::level::level_enum>(Envoy::Logger::Levels::LEVEL))
 
 #define ENVOY_LOG_COMP_LEVEL(LOGGER, LEVEL) (ENVOY_SPDLOG_LEVEL(LEVEL) >= (LOGGER).level())
 

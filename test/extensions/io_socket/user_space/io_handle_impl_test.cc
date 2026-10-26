@@ -8,12 +8,16 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 
 #include "absl/container/fixed_array.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::Contains;
 using testing::NiceMock;
+using testing::Pair;
 
 namespace Envoy {
 namespace Extensions {
@@ -1036,6 +1040,46 @@ TEST_F(IoHandleImplTest, ClosedPeerHandleAllowsWrite) {
   // We suddenly close the peer handle, even though there is data left to send to it.
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isWriteUnblocked());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
+  schedulable_cb->invokeCallback();
+}
+
+TEST_F(IoHandleImplTest, PeerCloseDoesNotActivateDisabledWrite) {
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  ASSERT_FALSE(schedulable_cb->enabled_);
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
+  schedulable_cb->invokeCallback();
+}
+
+TEST_F(IoHandleImplTest, PeerCloseCombinesReadAndBlockedWriteNotifications) {
+  io_handle_peer_->setWatermarks(128);
+  Buffer::OwnedImpl buf(std::string(256, 'a'));
+  ASSERT_TRUE(io_handle_->write(buf).ok());
+  ASSERT_FALSE(io_handle_peer_->canReceiveData());
+
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+  ASSERT_FALSE(schedulable_cb->enabled_);
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  schedulable_cb->invokeCallback();
 }
 
 TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {
@@ -1201,11 +1245,111 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   envoy::config::core::v3::Metadata dest_metadata;
   ASSERT_NE(nullptr, io_handle_peer_->passthroughState());
   io_handle_peer_->passthroughState()->mergeInto(dest_metadata, dest_filter_state);
-  ASSERT_EQ("val",
-            dest_metadata.filter_metadata().at("envoy.test").fields().at("key").string_value());
+  ASSERT_THAT(
+      dest_metadata.filter_metadata(),
+      Contains(Pair("envoy.test", HasStructFields(Contains(IsStructString("key", "val"))))));
   auto dest_object = dest_filter_state.getDataReadOnly<TestObject>("object_key");
   ASSERT_NE(nullptr, dest_object);
   ASSERT_EQ(object->value_, dest_object->value_);
+}
+
+// A full peer close() surfaces as ECONNRESET once pending data is drained, while a peer
+// shutdown(WR) stays a plain EOF. This is how half-close-enabled consumers distinguish a peer
+// that is fully gone from one that only stopped writing.
+TEST_F(IoHandleImplTest, PeerCloseEmitsConnectionResetAfterDrain) {
+  Buffer::OwnedImpl buf_to_write("hello");
+  io_handle_peer_->write(buf_to_write);
+  io_handle_peer_->close();
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(5, read_res.return_value_);
+  EXPECT_EQ("hello", read_buf.toString());
+
+  auto reset_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(reset_res.ok());
+  EXPECT_EQ(0, reset_res.return_value_);
+  ASSERT_NE(nullptr, reset_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+}
+
+TEST_F(IoHandleImplTest, PeerShutdownWriteStaysEof) {
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+  EXPECT_TRUE(io_handle_->hasReceivedEof());
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
+}
+
+TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+
+  Buffer::OwnedImpl read_buf;
+  auto eof_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(eof_res.ok());
+  EXPECT_EQ(0, eof_res.return_value_);
+
+  io_handle_peer_->close();
+  auto reset_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(reset_res.ok());
+  ASSERT_NE(nullptr, reset_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+}
+
+TEST_F(IoHandleImplTest, ShutdownWriteFollowedByPeerCloseEmitsEof) {
+  // This handle half-closes its write side.
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+  EXPECT_TRUE(io_handle_peer_->hasReceivedEof());
+
+  // Peer then closes its connection.
+  io_handle_peer_->close();
+
+  // Since this handle already sent EOF (shutdown(WR)), peer's close completes an orderly shutdown.
+  // The subsequent read on this handle must return clean EOF, not ECONNRESET.
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
+  EXPECT_EQ(nullptr, read_res.err_);
+}
+
+TEST_F(IoHandleImplTest, ShutdownWriteFollowedByPeerWriteAndCloseEmitsDataThenEof) {
+  // This handle half-closes its write side.
+  io_handle_->shutdown(ENVOY_SHUT_WR);
+
+  // Peer writes response data and then closes.
+  Buffer::OwnedImpl buf_to_write("response");
+  io_handle_peer_->write(buf_to_write);
+  io_handle_peer_->close();
+
+  // This handle should read the pending data first, then clean EOF.
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(8, read_res.return_value_);
+  EXPECT_EQ("response", read_buf.toString());
+
+  auto eof_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(eof_res.ok());
+  EXPECT_EQ(0, eof_res.return_value_);
+  EXPECT_EQ(nullptr, eof_res.err_);
+}
+
+TEST_F(IoHandleImplTest, PeerCloseEmitsEofGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
+
+  io_handle_peer_->close();
+  EXPECT_TRUE(io_handle_->hasReceivedEof());
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
 }
 
 class IoHandleImplNotImplementedTest : public testing::Test {
@@ -1293,6 +1437,54 @@ TEST(IoHandleFactoryTest, UseExistingPassthroughState) {
     EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle_peer->passthroughState()),
               nullptr);
   }
+}
+
+TEST_F(IoHandleImplTest, ResetCloseEmitsConnectionResetErrorOnReadGuardEnabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  EXPECT_TRUE(io_handle_->isOpen());
+  EXPECT_TRUE(io_handle_peer_->isOpen());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+  EXPECT_FALSE(io_handle_peer_->isOpen());
+  EXPECT_TRUE(io_handle_->isOpen());
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
+  ASSERT_NE(nullptr, read_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, read_res.err_->getErrorCode());
+
+  Buffer::Slice mutable_slice(1024, nullptr);
+  auto slice = mutable_slice.reserve(1024);
+  Buffer::RawSlice raw_slice{slice.mem_, slice.len_};
+  auto readv_res = io_handle_->readv(1024, &raw_slice, 1);
+  EXPECT_FALSE(readv_res.ok());
+  EXPECT_EQ(0, readv_res.return_value_);
+  ASSERT_NE(nullptr, readv_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, readv_res.err_->getErrorCode());
+}
+
+TEST_F(IoHandleImplTest, ResetCloseEmitsEofOnReadGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false"}});
+
+  EXPECT_TRUE(io_handle_->isOpen());
+  EXPECT_TRUE(io_handle_peer_->isOpen());
+  io_handle_peer_->setAbortiveClose();
+  io_handle_peer_->close();
+  EXPECT_FALSE(io_handle_peer_->isOpen());
+  EXPECT_TRUE(io_handle_->isOpen());
+
+  Buffer::OwnedImpl read_buf;
+  auto read_res = io_handle_->read(read_buf, 1024);
+  EXPECT_TRUE(read_res.ok());
+  EXPECT_EQ(0, read_res.return_value_);
+  EXPECT_EQ(nullptr, read_res.err_);
 }
 
 } // namespace

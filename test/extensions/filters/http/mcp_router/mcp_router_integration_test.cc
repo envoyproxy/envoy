@@ -5,8 +5,11 @@
 #include "envoy/extensions/filters/http/mcp_router/v3/mcp_router.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/extensions/filters/http/mcp_router/session_codec.h"
 
 #include "test/integration/http_integration.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -134,6 +137,108 @@ public:
     )EOF");
 
     // Remove the default router filter.
+    config_helper_.addConfigModifier(
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) {
+          auto* filters = hcm.mutable_http_filters();
+          for (auto it = filters->begin(); it != filters->end();) {
+            if (it->name() == "envoy.filters.http.router") {
+              it = filters->erase(it);
+            } else {
+              ++it;
+            }
+          }
+          if (configSource() == ConfigSource::Cluster) {
+            hcm.mutable_route_config()
+                ->mutable_virtual_hosts(0)
+                ->mutable_routes(0)
+                ->mutable_route()
+                ->set_cluster("multicluster");
+          }
+        });
+
+    initialize();
+  }
+
+  // Sets up a single backend ("time" -> fake_upstreams_[0]) with the given header_forwarding
+  // policy, applied via both of the two independent, field-for-field-parallel
+  // HeaderForwarding proto messages depending on configSource() -- the mcp_router filter's own
+  // McpRouter.HeaderForwarding (YAML, embedded as a sibling of mcp_cluster: at the given
+  // indentation, referenced from McpRouter.McpBackend.header_forwarding) and
+  // mcp_multicluster's ClusterConfig.HeaderForwarding (C++ proto builder, referenced from
+  // ClusterConfig.McpBackend.header_forwarding). header_forwarding_yaml must already be
+  // indented to align as a sibling of "mcp_cluster:" under a servers list item (14 spaces),
+  // or be empty to leave header_forwarding unset.
+  using HeaderForwardingProto =
+      envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig_HeaderForwarding;
+  void initializeSingleBackendWithHeaderForwarding(
+      absl::string_view header_forwarding_yaml,
+      std::function<void(HeaderForwardingProto&)> configure_cluster_header_forwarding) {
+    config_helper_.skipPortUsageValidation();
+
+    config_helper_.addConfigModifier([this, configure_cluster_header_forwarding](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* time_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      time_cluster->set_name("mcp_time_backend");
+      time_cluster->mutable_connect_timeout()->set_seconds(5);
+      time_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+      time_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+      auto* time_endpoint = time_cluster->mutable_load_assignment();
+      time_endpoint->set_cluster_name("mcp_time_backend");
+      auto* time_locality = time_endpoint->add_endpoints();
+      auto* time_lb = time_locality->add_lb_endpoints();
+      time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+          Network::Test::getLoopbackAddressString(ipVersion()));
+      time_lb->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
+          fake_upstreams_[0]->localAddress()->ip()->port());
+
+      if (configSource() == ConfigSource::Cluster) {
+        auto* multicluster = bootstrap.mutable_static_resources()->add_clusters();
+        multicluster->set_name("multicluster");
+        multicluster->mutable_connect_timeout()->set_seconds(5);
+        multicluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+        multicluster->mutable_cluster_type()->set_name("envoy.clusters.mcp_multicluster");
+
+        envoy::extensions::clusters::mcp_multicluster::v3::ClusterConfig multicluster_config;
+        auto* server = multicluster_config.add_servers();
+        server->set_name("time");
+        server->mutable_mcp_cluster()->set_cluster("mcp_time_backend");
+        if (configure_cluster_header_forwarding) {
+          configure_cluster_header_forwarding(*server->mutable_header_forwarding());
+        }
+        std::ignore = multicluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
+            multicluster_config);
+      }
+    });
+
+    if (configSource() == ConfigSource::Cluster) {
+      config_helper_.prependFilter(R"EOF(
+        name: envoy.filters.http.mcp_router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+      )EOF");
+    } else {
+      config_helper_.prependFilter(absl::StrCat(R"EOF(
+        name: envoy.filters.http.mcp_router
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_router.v3.McpRouter
+          servers:
+            - name: time
+              mcp_cluster:
+                cluster: mcp_time_backend
+                path: /mcp
+)EOF",
+                                                header_forwarding_yaml));
+    }
+
+    config_helper_.prependFilter(R"EOF(
+      name: envoy.filters.http.mcp
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+        traffic_mode: PASS_THROUGH
+    )EOF");
+
     config_helper_.addConfigModifier(
         [this](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -493,6 +598,265 @@ TEST_P(McpRouterIntegrationTest, ToolCallRoutesToCorrectBackend) {
   // Verify stats: tool call with body rewrite
   test_server_->waitForCounter("http.config_test.mcp_router.rq_total", Eq(1));
   test_server_->waitForCounter("http.config_test.mcp_router.rq_body_rewrite", Eq(1));
+}
+
+// Test that with no header_forwarding configured on a backend, the client's authorization
+// header (and any other non-router-owned header) is NOT forwarded to that backend. This is
+// the core behavioral requirement of issue #46525: MCP prohibits implicit token passthrough,
+// so a mixed-trust deployment must not leak a client's bearer token to every backend by
+// default. Exercises both ConfigSource::Filter and ConfigSource::Cluster (see
+// INSTANTIATE_TEST_SUITE_P above) -- i.e. both of the two independent, field-for-field-
+// parallel McpBackend.HeaderForwarding proto messages documented in issue #46525's
+// FINDINGS.md.
+TEST_P(McpRouterIntegrationTest, HeaderForwardingDefaultsToSecure) {
+  initializeFilter();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "id": 1,
+    "params": {
+      "name": "time__get_current_time",
+      "arguments": {}
+    }
+  })";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"authorization", "Bearer client-token-should-not-leak"},
+                                     {"x-custom-header", "should-not-forward-either"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_TRUE(time_backend_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  EXPECT_TRUE(
+      time_backend_request_->headers().get(Http::LowerCaseString("x-custom-header")).empty());
+
+  const std::string backend_response = R"({
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "content": [{"type": "text", "text": "2023-10-27T10:00:00Z"}]
+    }
+  })";
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(backend_response);
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that forward_all: true restores the legacy forward-everything behavior (minus the
+// unconditional router-owned skip-list), as an explicit opt-in.
+TEST_P(McpRouterIntegrationTest, HeaderForwardingForwardAllForwardsEverything) {
+  initializeSingleBackendWithHeaderForwarding(
+      R"EOF(
+              header_forwarding:
+                forward_all: true
+)EOF",
+      [](HeaderForwardingProto& header_forwarding) { header_forwarding.set_forward_all(true); });
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"authorization", "Bearer legacy-behavior-token"},
+                                     {"x-custom-header", "also-forwarded"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  auto auth_header = time_backend_request_->headers().get(Http::LowerCaseString("authorization"));
+  ASSERT_FALSE(auth_header.empty());
+  EXPECT_EQ("Bearer legacy-behavior-token", auth_header[0]->value().getStringView());
+  auto custom_header =
+      time_backend_request_->headers().get(Http::LowerCaseString("x-custom-header"));
+  ASSERT_FALSE(custom_header.empty());
+  EXPECT_EQ("also-forwarded", custom_header[0]->value().getStringView());
+
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(R"({"jsonrpc":"2.0","id":1,"result":{"tools":[]}})");
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that hop-by-hop headers are never forwarded even under forward_all: true.
+// connection/upgrade/te/keep-alive/transfer-encoding are stripped by the HTTP connection
+// manager before any filter runs, so they can't reach mcp_router at all in this test --
+// proxy-authorization is the one hop-by-hop header Envoy's core HTTP stack never strips, so
+// it's the meaningful case: this test would fail without the explicit kSkipHeaders entry.
+TEST_P(McpRouterIntegrationTest, HeaderForwardingHopByHopNeverForwardedEvenWithForwardAll) {
+  initializeSingleBackendWithHeaderForwarding(
+      R"EOF(
+              header_forwarding:
+                forward_all: true
+)EOF",
+      [](HeaderForwardingProto& header_forwarding) { header_forwarding.set_forward_all(true); });
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"proxy-authorization", "Basic should-not-leak"},
+                                     {"x-custom-header", "should-still-forward"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_TRUE(
+      time_backend_request_->headers().get(Http::LowerCaseString("proxy-authorization")).empty());
+  auto custom_header =
+      time_backend_request_->headers().get(Http::LowerCaseString("x-custom-header"));
+  ASSERT_FALSE(custom_header.empty());
+  EXPECT_EQ("should-still-forward", custom_header[0]->value().getStringView());
+
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(R"({"jsonrpc":"2.0","id":1,"result":{"tools":[]}})");
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that allowed_headers forwards only the matched header(s), leaving everything else
+// (including authorization) blocked, when forward_all is not set.
+TEST_P(McpRouterIntegrationTest, HeaderForwardingAllowedHeadersOnly) {
+  initializeSingleBackendWithHeaderForwarding(
+      R"EOF(
+              header_forwarding:
+                allowed_headers:
+                  patterns:
+                  - exact: x-trace-id
+)EOF",
+      [](HeaderForwardingProto& header_forwarding) {
+        header_forwarding.mutable_allowed_headers()->add_patterns()->set_exact("x-trace-id");
+      });
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"authorization", "Bearer should-not-leak"},
+                                     {"x-trace-id", "trace-12345"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_TRUE(time_backend_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  auto trace_header = time_backend_request_->headers().get(Http::LowerCaseString("x-trace-id"));
+  ASSERT_FALSE(trace_header.empty());
+  EXPECT_EQ("trace-12345", trace_header[0]->value().getStringView());
+
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(R"({"jsonrpc":"2.0","id":1,"result":{"tools":[]}})");
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that disallowed_headers overrides forward_all -- deny always wins, even under the
+// legacy-behavior opt-in.
+TEST_P(McpRouterIntegrationTest, HeaderForwardingDisallowedWinsOverForwardAll) {
+  initializeSingleBackendWithHeaderForwarding(
+      R"EOF(
+              header_forwarding:
+                forward_all: true
+                disallowed_headers:
+                  patterns:
+                  - exact: authorization
+)EOF",
+      [](HeaderForwardingProto& header_forwarding) {
+        header_forwarding.set_forward_all(true);
+        header_forwarding.mutable_disallowed_headers()->add_patterns()->set_exact("authorization");
+      });
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body = R"({"jsonrpc": "2.0", "method": "tools/list", "id": 1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"authorization", "Bearer should-still-not-leak"},
+                                     {"x-custom-header", "still-forwarded"}},
+      request_body);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, time_backend_connection_));
+  ASSERT_TRUE(time_backend_connection_->waitForNewStream(*dispatcher_, time_backend_request_));
+  ASSERT_TRUE(time_backend_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_TRUE(time_backend_request_->headers().get(Http::LowerCaseString("authorization")).empty());
+  auto custom_header =
+      time_backend_request_->headers().get(Http::LowerCaseString("x-custom-header"));
+  ASSERT_FALSE(custom_header.empty());
+  EXPECT_EQ("still-forwarded", custom_header[0]->value().getStringView());
+
+  time_backend_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  Buffer::OwnedImpl response_body(R"({"jsonrpc":"2.0","id":1,"result":{"tools":[]}})");
+  time_backend_request_->encodeData(response_body, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Test tools/call routes to the second backend (tools) based on prefix
@@ -2234,6 +2598,8 @@ public:
                 name: x-user-id
             validation:
               mode: ENFORCE
+          session_signing_key:
+            inline_string: test-signing-key
       )EOF");
     } else {
       config_helper_.prependFilter(R"EOF(
@@ -2252,6 +2618,8 @@ public:
                 name: x-user-id
             validation:
               mode: ENFORCE
+          session_signing_key:
+            inline_string: test-signing-key
       )EOF");
     }
 
@@ -2286,11 +2654,15 @@ public:
     HttpIntegrationTest::initialize();
   }
 
+  // Builds a session ID exactly the way the filter mints it: the subject is Base64 encoded inside
+  // the composite, the composite is Base64 encoded, and the blob is HMAC-signed with the configured
+  // signing key. (The previous version of this helper inserted the subject raw, so the parsed
+  // subject decoded to the empty string and the ENFORCE accept path was never exercised.)
   std::string encodeSessionId(const std::string& route, const std::string& subject,
                               const std::string& backend_session) {
-    std::string backend_encoded = Base64::encode(backend_session.data(), backend_session.size());
-    std::string composite = route + "@" + subject + "@time:" + backend_encoded;
-    return Base64::encode(composite.data(), composite.size());
+    const std::string composite =
+        SessionCodec::buildCompositeSessionId(route, subject, {{"time", backend_session}});
+    return SessionCodec::encodeWithIntegrity(composite, "test-signing-key");
   }
 };
 
@@ -2351,6 +2723,69 @@ TEST_P(McpRouterSubjectValidationIntegrationTest, MissingAuthHeaderReturns403) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("403", response->headers().getStatusValue());
+}
+
+// Positive ENFORCE path: a session minted for "alice" presented by "alice" passes subject
+// validation and the request proceeds.
+TEST_P(McpRouterSubjectValidationIntegrationTest, SubjectMatchProceeds) {
+  initializeFilterWithSubjectValidation();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  std::string session_id = encodeSessionId("test_route", "alice", "backend-session-123");
+
+  const std::string request_body = R"({"jsonrpc":"2.0","method":"ping","id":1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-session-id", session_id},
+                                     {"x-user-id", "alice"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Tamper regression: an attacker holding another principal's session ID can Base64 decode the
+// blob and rewrite the bound subject to their own identity, but without the server-held signing
+// key the MAC no longer verifies, so the session is rejected before the subject check runs.
+TEST_P(McpRouterSubjectValidationIntegrationTest, ForgedSessionSubjectRejected) {
+  initializeFilterWithSubjectValidation();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // A valid session minted for "alice".
+  const std::string valid = encodeSessionId("test_route", "alice", "backend-session-123");
+
+  // The attacker rebinds the subject to "bob" and must reuse the MAC, which they cannot
+  // recompute without the key.
+  const std::string stale_mac = valid.substr(valid.rfind('.') + 1);
+  const std::string forged_composite =
+      SessionCodec::buildCompositeSessionId("test_route", "bob", {{"time", "backend-session-123"}});
+  const std::string forged = SessionCodec::encode(forged_composite) + "." + stale_mac;
+
+  const std::string request_body = R"({"jsonrpc":"2.0","method":"tools/list","id":1})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/mcp"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-session-id", forged},
+                                     {"x-user-id", "bob"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("400", response->headers().getStatusValue());
+
+  test_server_->waitForCounter("http.config_test.mcp_router.rq_session_invalid", Eq(1));
 }
 
 // Test tools/list with SSE responses containing intermediate events (notifications, server

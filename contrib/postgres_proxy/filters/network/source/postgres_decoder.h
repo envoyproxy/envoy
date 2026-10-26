@@ -65,9 +65,8 @@ public:
   enum class Result {
     ReadyForNext, // Decoder processed previous message and is ready for the next message.
     NeedMoreData, // Decoder needs more data to reconstruct the message.
-    Stopped // Received and processed message disrupts the current flow. Decoder stopped accepting
-            // data. This happens when decoder wants filter to perform some action, for example to
-            // call starttls transport socket to enable TLS.
+    Stopped       // Don't forward data to the next filter. Used when the filter must perform
+                  // an action (e.g., start TLS) or when accumulating a partial initial message.
   };
   virtual Result onData(Buffer::Instance& data, bool frontend) PURE;
   virtual PostgresSession& getSession() PURE;

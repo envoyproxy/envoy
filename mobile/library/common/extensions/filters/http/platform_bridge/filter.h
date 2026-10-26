@@ -45,7 +45,7 @@ class PlatformBridgeFilter;
 class PlatformBridgeFilterConfig {
 public:
   PlatformBridgeFilterConfig(
-      Server::Configuration::FactoryContext& context,
+      Stats::Scope& scope,
       const envoymobile::extensions::filters::http::platform_bridge::PlatformBridge& proto_config);
 
   PlatformBridgeFilterStats& stats() const { return stats_; }

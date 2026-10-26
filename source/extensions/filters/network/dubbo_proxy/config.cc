@@ -119,14 +119,14 @@ ConfigImpl::ConfigImpl(const DubboProxyConfig& config,
       throw EnvoyException("both mutiple_route_config and route_config is present in DubboProxy");
     }
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        config.multiple_route_config(), context_.serverFactoryContext());
+        config.multiple_route_config(), context_.serverFactoryContext(), context_.initManager());
   } else {
     envoy::extensions::filters::network::dubbo_proxy::v3::MultipleRouteConfiguration
         multiple_route_config;
 
     *multiple_route_config.mutable_route_config() = config.route_config();
     route_config_provider_ = route_config_provider_manager.createStaticRouteConfigProvider(
-        multiple_route_config, context_.serverFactoryContext());
+        multiple_route_config, context_.serverFactoryContext(), context_.initManager());
   }
 
   if (config.dubbo_filters().empty()) {

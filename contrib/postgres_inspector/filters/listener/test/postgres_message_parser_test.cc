@@ -206,6 +206,53 @@ TEST_F(PostgresMessageParserTest, HasCompleteMessageWithOffset) {
   EXPECT_TRUE(PostgresMessageParser::hasCompleteMessage(buffer, 6, message_length));
 }
 
+TEST_F(PostgresMessageParserTest, HasCompleteMessageWithOffsetExactBoundary) {
+  auto startup = PostgresTestUtils::createStartupMessage({{"user", "test"}});
+  const uint64_t offset = 6;
+  const uint32_t expected_message_length = startup.length();
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("prefix", offset);
+  buffer.move(startup);
+
+  uint32_t message_length = 0;
+  EXPECT_TRUE(PostgresMessageParser::hasCompleteMessage(buffer, offset, message_length));
+  EXPECT_EQ(expected_message_length, message_length);
+  EXPECT_EQ(buffer.length(), offset + message_length);
+}
+
+TEST_F(PostgresMessageParserTest, HasCompleteMessageWithOffsetIncompleteBoundary) {
+  auto startup = PostgresTestUtils::createStartupMessage({{"user", "test"}});
+  const uint64_t offset = 6;
+  const uint32_t expected_message_length = startup.length();
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("prefix", offset);
+  // Add all but the last byte so the length header is intact but the message is truncated.
+  buffer.add(startup.linearize(startup.length()), startup.length() - 1);
+
+  uint32_t message_length = 0;
+  EXPECT_FALSE(PostgresMessageParser::hasCompleteMessage(buffer, offset, message_length));
+  EXPECT_EQ(expected_message_length, message_length);
+  EXPECT_LT(buffer.length(), offset + message_length);
+}
+
+TEST_F(PostgresMessageParserTest, HasCompleteMessageWithOffsetLargerBuffer) {
+  auto startup = PostgresTestUtils::createStartupMessage({{"user", "test"}});
+  const uint64_t offset = 6;
+  const uint32_t expected_message_length = startup.length();
+
+  Buffer::OwnedImpl buffer;
+  buffer.add("prefix", offset);
+  buffer.move(startup);
+  buffer.add("x", 1);
+
+  uint32_t message_length = 0;
+  EXPECT_TRUE(PostgresMessageParser::hasCompleteMessage(buffer, offset, message_length));
+  EXPECT_EQ(expected_message_length, message_length);
+  EXPECT_GT(buffer.length(), offset + message_length);
+}
+
 } // namespace
 } // namespace PostgresInspector
 } // namespace ListenerFilters

@@ -38,7 +38,7 @@ UpstreamKafkaConfigurationImpl::UpstreamKafkaConfigurationImpl(const KafkaMeshPr
     const std::string& cluster_name = upstream_cluster_definition.cluster_name();
 
     // No duplicates are allowed.
-    if (cluster_name_to_cluster_config.find(cluster_name) != cluster_name_to_cluster_config.end()) {
+    if (cluster_name_to_cluster_config.contains(cluster_name)) {
       throw EnvoyException(
           absl::StrCat("kafka-mesh filter has multiple Kafka clusters referenced by the same name",
                        cluster_name));

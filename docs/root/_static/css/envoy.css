@@ -1,64 +1,176 @@
 @import url("theme.css");
 
-/* Splits a long line descriptions in tables in to multiple lines */
-.wy-table-responsive table td, .wy-table-responsive table th {
-  white-space: normal !important;
+/* ==========================================================================
+   Envoy documentation — design tokens
+
+   Two palettes with a hard line between them:
+
+   * The grey ramp carries the whole page: grounds, rules, body text, metadata.
+   * Six inks sit on top of it, each with one meaning that holds everywhere it
+     appears. Nothing is ever marked by hue alone — every coloured thing also
+     carries a weight, a rail or a label, so greyscale and colour-blind readers
+     lose nothing.
+
+       accent   interaction, and only interaction — links, active nav, current
+                TOC entry, focus ring, proto type links
+       info     structure you scan for — YAML/JSON keys, note, seealso
+       affirm   literal values — strings, tip, hint, important, versionadded
+       caution  numbers and constants, attention, deprecated, enum rail
+       critical only where something breaks — warning, danger, error, required
+       message  the proto message rail, the most common thing on the site
+
+   The accent derives from the logo's #492365, so the mark reads as the source
+   of the palette rather than an exception to it.
+
+   This file is loaded first (html_style). The component modules that follow
+   are listed in html_css_files; see docs/root/_static/css/envoy/.
+   ========================================================================== */
+
+:root {
+  /* layout */
+  --envoy-topbar-height: 56px;
+  /* the API tree is five levels deep and its leaf titles are prose, so the
+     column is sized for those rather than for the nine top-level areas */
+  --envoy-sidebar-width: 320px;
+  --envoy-toc-width: 240px;
+  --envoy-measure: 72ch;
+  --envoy-gutter: 56px;
+
+  /* grey ramp — carries the page */
+  --envoy-ground: #ffffff;
+  --envoy-surface: #fafafa;
+  --envoy-surface-2: #f1f1f1;
+  --envoy-rule: #e4e4e4;
+  --envoy-rule-strong: #c9c9c9;
+  --envoy-ink-muted: #6e6e6e;
+  --envoy-ink-body: #3d3d3d;
+  --envoy-ink: #0a0a0a;
+  --envoy-shadow: 0 18px 48px rgba(10, 10, 10, 0.16);
+  --envoy-scrim: rgba(10, 10, 10, 0.34);
+
+  /* six inks — one meaning each */
+  --envoy-accent: #5b2e8c;
+  --envoy-info: #14539e;
+  --envoy-affirm: #186b49;
+  --envoy-caution: #8a5a00;
+  --envoy-critical: #a62828;
+
+  /* admonition grounds — 4% of the ink, enough to read as a block without
+     turning a page of six notes into stripes */
+  --envoy-info-tint: #f1f6fc;
+  --envoy-affirm-tint: #f0f8f4;
+  --envoy-caution-tint: #fcf7ed;
+  --envoy-critical-tint: #fcf4f4;
+
+  /* proto kinds — the rail down each symbol */
+  --envoy-kind-message: #0f6e6e;
+  --envoy-kind-enum: #8a5a00;
+  --envoy-kind-service: #14539e;
+
+  /* code — four roles carry a config file; everything else stays in ink */
+  --envoy-code-bg: #fafafa;
+  --envoy-code-text: #3d3d3d;
+  --envoy-code-ink: #0a0a0a;
+  --envoy-code-key: #14539e;
+  --envoy-code-string: #186b49;
+  --envoy-code-number: #8a5a00;
+  --envoy-code-comment: #6e6e6e;
+  --envoy-code-punct: #6e6e6e;
+  --envoy-code-output: #3d3d3d;
+  --envoy-code-error: #a62828;
+  --envoy-code-added: #186b49;
+  --envoy-code-mark: #f2efe4;
+
+  --envoy-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --envoy-font-mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono",
+    "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
-/* align multi line csv table columns */
-table.docutils div.line-block {
-    margin-left: 0;
-}
-/* Breaking long words */
-.wy-nav-content {
-  overflow-wrap: break-word;
-  max-width: 1000px;
+/* The dark values are declared once and applied through two selectors: the
+   media query covers readers who never touch the toggle, the attribute covers
+   readers who did. Keep the two blocks identical. */
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-envoy-theme="light"]) {
+    --envoy-ground: #0a0a0a;
+    --envoy-surface: #141414;
+    --envoy-surface-2: #1c1c1c;
+    --envoy-rule: #262626;
+    --envoy-rule-strong: #3c3c3c;
+    --envoy-ink-muted: #8a8a8a;
+    --envoy-ink-body: #c6c6c6;
+    --envoy-ink: #fafafa;
+    --envoy-shadow: 0 18px 48px rgba(0, 0, 0, 0.7);
+    --envoy-scrim: rgba(0, 0, 0, 0.66);
+
+    --envoy-accent: #c4a0e8;
+    --envoy-info: #7fb2f0;
+    --envoy-affirm: #68cfa0;
+    --envoy-caution: #dfb25a;
+    --envoy-critical: #f08c86;
+
+    --envoy-info-tint: #0d151f;
+    --envoy-affirm-tint: #0c1712;
+    --envoy-caution-tint: #191308;
+    --envoy-critical-tint: #1a1010;
+
+    --envoy-kind-message: #5fcfc7;
+    --envoy-kind-enum: #dfb25a;
+    --envoy-kind-service: #7fb2f0;
+
+    --envoy-code-bg: #111111;
+    --envoy-code-text: #c6c6c6;
+    --envoy-code-ink: #fafafa;
+    --envoy-code-key: #7fb2f0;
+    --envoy-code-string: #68cfa0;
+    --envoy-code-number: #dfb25a;
+    --envoy-code-comment: #8a8a8a;
+    --envoy-code-punct: #8a8a8a;
+    --envoy-code-output: #c6c6c6;
+    --envoy-code-error: #f08c86;
+    --envoy-code-added: #68cfa0;
+    --envoy-code-mark: #2a2416;
+  }
 }
 
-/* To style the API version label of a search result item */
-.api-v3-version-label {
-  border-radius: 20%;
-  background-color: #c0c0c0;
-  color: #ffffff;
-  margin-left: 4px;
-  padding: 4px;
-}
+html[data-envoy-theme="dark"] {
+  --envoy-ground: #0a0a0a;
+  --envoy-surface: #141414;
+  --envoy-surface-2: #1c1c1c;
+  --envoy-rule: #262626;
+  --envoy-rule-strong: #3c3c3c;
+  --envoy-ink-muted: #8a8a8a;
+  --envoy-ink-body: #c6c6c6;
+  --envoy-ink: #fafafa;
+  --envoy-shadow: 0 18px 48px rgba(0, 0, 0, 0.7);
+  --envoy-scrim: rgba(0, 0, 0, 0.66);
 
-/* To style the API version label of a search result item */
-.xds-version-label {
-  border-radius: 20%;
-  background-color: #aaa;
-  color: #ffffff;
-  margin-left: 4px;
-  padding: 4px;
-}
+  --envoy-accent: #c4a0e8;
+  --envoy-info: #7fb2f0;
+  --envoy-affirm: #68cfa0;
+  --envoy-caution: #dfb25a;
+  --envoy-critical: #f08c86;
 
-/* make inline sidebars flow down the right of page */
-.rst-content .sidebar {
-  clear: right;
-}
+  --envoy-info-tint: #0d151f;
+  --envoy-affirm-tint: #0c1712;
+  --envoy-caution-tint: #191308;
+  --envoy-critical-tint: #1a1010;
 
-/* make code.literals more muted - dont use red! */
-.rst-content code.literal {
-    color: #555;
-    background-color: rgba(27, 31, 35, 0.05);
-    padding: 2px 2px;
-    border: solid #eee 1px;
-}
+  --envoy-kind-message: #5fcfc7;
+  --envoy-kind-enum: #dfb25a;
+  --envoy-kind-service: #7fb2f0;
 
-/* restore margin bottom on aligned images */
-.rst-content img.align-center {
-    margin-bottom: 24px
-}
-
-/* suppress errs on pseudo-json code highlights */
-.highlight-json .highlight .err {
-    border: inherit;
-    box-sizing: inherit;
-}
-
-/* tame the search highlight colours */
-.rst-content .highlighted {
-    background: #f6f5db;
-    box-shadow: 0 0 0 2px #e7e6b6;
+  --envoy-code-bg: #111111;
+  --envoy-code-text: #c6c6c6;
+  --envoy-code-ink: #fafafa;
+  --envoy-code-key: #7fb2f0;
+  --envoy-code-string: #68cfa0;
+  --envoy-code-number: #dfb25a;
+  --envoy-code-comment: #8a8a8a;
+  --envoy-code-punct: #8a8a8a;
+  --envoy-code-output: #c6c6c6;
+  --envoy-code-error: #f08c86;
+  --envoy-code-added: #68cfa0;
+  --envoy-code-mark: #2a2416;
 }

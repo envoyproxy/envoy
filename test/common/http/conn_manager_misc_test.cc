@@ -39,6 +39,7 @@ public:
     // codec stream error
     EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
         .WillOnce(Return(stream_error_on_invalid_http_message));
+    EXPECT_CALL(*filter, onLocalReply(_));
     EXPECT_CALL(*filter, encodeComplete());
     EXPECT_CALL(*filter, encodeHeaders(_, true));
     if (!stream_error_on_invalid_http_message) {

@@ -37,7 +37,8 @@ void FixedHeapMonitor::updateResourceUsage(Server::ResourceUpdateCallbacks& call
       },
       max_heap_source_);
   if (max_heap == 0) {
-    callbacks.onFailure(EnvoyException("fixed_heap: max heap size must be greater than 0"));
+    callbacks.onFailure(
+        absl::InvalidArgumentError("fixed_heap: max heap size must be greater than 0"));
     return;
   }
 

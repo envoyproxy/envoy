@@ -40,6 +40,40 @@ TEST_P(AccessLogIntegrationTest, CoalesceFormatterFirstValueAvailable) {
   EXPECT_THAT(log, HasSubstr("host=sni.lyft.com"));
 }
 
+// The LISTENER_NAME formatter logs the name of the listener that accepted the connection.
+TEST_P(AccessLogIntegrationTest, ListenerName) {
+  useAccessLog("LISTENER_NAME=%LISTENER_NAME%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // The default HttpIntegrationTest listener is named "http".
+  EXPECT_THAT(log, HasSubstr("LISTENER_NAME=http"));
+}
+
+// The route resolution formatters report the per stream route resolution count and time.
+TEST_P(AccessLogIntegrationTest, RouteResolutionFormatters) {
+  useAccessLog("RESOLUTIONS=%ROUTE_RESOLUTION_COUNT%;TIME=%ROUTE_RESOLUTION_TIME_US%");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  std::string log = waitForAccessLog(access_log_name_);
+  // The request resolves its route once, so the count is 1 and the time is a numeric microsecond
+  // value rather than the unset "-".
+  EXPECT_THAT(log, HasSubstr("RESOLUTIONS=1"));
+  EXPECT_THAT(log, ContainsRegex("TIME=[0-9]+"));
+}
+
 // Test COALESCE formatter with fallback when first operator returns null.
 TEST_P(AccessLogIntegrationTest, CoalesceFormatterFallback) {
   // Use a header that won't be present as first operator, fallback to :authority.

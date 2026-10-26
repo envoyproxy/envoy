@@ -41,7 +41,7 @@ AccessLog::AccessLog(
     : Common::ImplBase(std::move(filter)), tls_slot_(tls.allocateSlot()),
       access_logger_cache_(std::move(access_logger_cache)),
       filter_state_objects_to_log_(getFilterStateObjectsToLog(config)),
-      custom_tags_(getCustomTags(config)) {
+      custom_tags_(getCustomTags(config, commands)) {
 
   THROW_IF_NOT_OK(Envoy::Config::Utility::checkTransportVersion(config.common_config()));
   tls_slot_->set([this, config](Event::Dispatcher&) {

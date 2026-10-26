@@ -178,6 +178,9 @@ struct ResponseCodeDetailValues {
   const std::string InvalidPath = "invalid_path";
   // The request was rejected due to using an absolute path on a route not supporting them.
   const std::string AbsolutePath = "absolute_path_rejected";
+  // The QUERY request was rejected because it had no Content-Type field. RFC 10008 Section 2
+  // requires servers to fail such requests.
+  const std::string QueryMissingContentType = "query_missing_content_type";
   // The request was rejected because path normalization was configured on and failed, probably due
   // to an invalid path.
   const std::string PathNormalizationFailed = "path_normalization_failed";
@@ -275,6 +278,7 @@ enum class DetectedCloseType {
 struct LocalCloseReasonValues {
   const std::string DeferredCloseOnDrainedConnection = "deferred_close_on_drained_connection";
   const std::string IdleTimeoutOnConnection = "on_idle_timeout";
+  const std::string DrainDeadlineOnConnection = "on_drain_deadline";
   const std::string CloseForConnectRequestOrTcpTunneling =
       "close_for_connect_request_or_tcp_tunneling";
   const std::string Http2PingTimeout = "http2_ping_timeout";
@@ -294,6 +298,7 @@ struct LocalCloseReasonValues {
   const std::string NonPooledTcpConnectionHostHealthFailure =
       "non_pooled_tcp_connection_host_health_failure";
   const std::string BufferHighWatermarkTimeout = "buffer_high_watermark_timeout_reached";
+  const std::string OverloadManagerClose = "overload_manager_close";
 };
 
 using LocalCloseReasons = ConstSingleton<LocalCloseReasonValues>;
@@ -402,6 +407,9 @@ struct DownstreamTiming {
   std::optional<MonotonicTime> lastDownstreamTxByteSent() const {
     return last_downstream_tx_byte_sent_;
   }
+  std::optional<MonotonicTime> downstreamHandshakeStart() const {
+    return downstream_handshake_start_;
+  }
   std::optional<MonotonicTime> downstreamHandshakeComplete() const {
     return downstream_handshake_complete_;
   }
@@ -430,6 +438,14 @@ struct DownstreamTiming {
     ASSERT(!last_downstream_tx_byte_sent_);
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
+  void onDownstreamHandshakeStart(TimeSource& time_source) {
+    // Records the time the TLS handshake started, i.e. when the ClientHello was received.
+    // Only the first value is kept so the handshake duration is not skewed by renegotiation
+    // or resumption.
+    if (!downstream_handshake_start_) {
+      downstream_handshake_start_ = time_source.monotonicTime();
+    }
+  }
   void onDownstreamHandshakeComplete(TimeSource& time_source) {
     // An existing value can be overwritten, e.g. in resumption case.
     downstream_handshake_complete_ = time_source.monotonicTime();
@@ -446,6 +462,10 @@ struct DownstreamTiming {
     ASSERT(!downstream_connection_begin_);
     downstream_connection_begin_ = time;
   }
+  // Sets the downstream handshake start/complete time points to specific values. Used to copy the
+  // connection-level time points onto a request-level stream info for access logging.
+  void setDownstreamHandshakeStart(MonotonicTime time) { downstream_handshake_start_ = time; }
+  void setDownstreamHandshakeComplete(MonotonicTime time) { downstream_handshake_complete_ = time; }
   void onDownstreamConnectionEnd(TimeSource& time_source) {
     // Record only the first close so the connection duration is not inflated.
     if (!downstream_connection_end_) {
@@ -460,6 +480,9 @@ struct DownstreamTiming {
   std::optional<MonotonicTime> first_downstream_tx_byte_sent_;
   // The time when the last byte of the response was sent downstream.
   std::optional<MonotonicTime> last_downstream_tx_byte_sent_;
+  // The time the TLS handshake started, i.e. when the ClientHello was received. Set at
+  // connection level.
+  std::optional<MonotonicTime> downstream_handshake_start_;
   // The time the TLS handshake completed. Set at connection level.
   std::optional<MonotonicTime> downstream_handshake_complete_;
   // The time the final ack was received from the client.
@@ -964,6 +987,22 @@ public:
    * extended to allow a caller to extend or transfer ownership.
    */
   virtual Router::VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
+
+  /**
+   * Records the wall time of one route resolution, adding to the total time and the count.
+   * @param duration the wall time the resolution took.
+   */
+  virtual void addRouteResolutionTime(std::chrono::nanoseconds duration) PURE;
+
+  /**
+   * @return the total wall time spent resolving the route of this stream.
+   */
+  virtual std::chrono::nanoseconds routeResolutionTime() const PURE;
+
+  /**
+   * @return how many times the route of this stream was resolved.
+   */
+  virtual uint32_t routeResolutionCount() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this

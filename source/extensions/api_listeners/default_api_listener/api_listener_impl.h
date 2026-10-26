@@ -70,6 +70,7 @@ protected:
     void injectReadDataToFilterChain(Buffer::Instance&, bool) override {
       IS_ENVOY_BUG("Unexpected call to injectReadDataToFilterChain");
     }
+    OptRef<Buffer::Instance> readBuffer() override { return {}; }
     void disableClose(bool) override { IS_ENVOY_BUG("Unexpected call to disableClose"); }
     bool startUpstreamSecureTransport() override {
       IS_ENVOY_BUG("Unexpected call to startUpstreamSecureTransport");
@@ -134,7 +135,7 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
-      void onDrain() override {}
+      void onDrain(Network::ConnectionDrainEvent) override {}
       void close(Network::ConnectionCloseType) override {}
       void close(Network::ConnectionCloseType, absl::string_view) override {}
       StreamInfo::DetectedCloseType detectedCloseType() const override {

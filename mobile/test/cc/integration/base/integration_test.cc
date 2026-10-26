@@ -47,7 +47,7 @@ protected:
       engine_builder.addHcmHttpFilter(std::move(assertion_filter));
     }
 
-    engine_builder.enableLogger(false).setLogLevel(Logger::Logger::debug).setOnEngineRunning([&]() {
+    engine_builder.enableLogger(false).setLogLevel(Logger::Levels::debug).setOnEngineRunning([&]() {
       engine_running.Notify();
     });
     client_engine_with_test_server_ = std::make_unique<TestEngineAndServer>(

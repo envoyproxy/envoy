@@ -9,9 +9,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CacheV2 {
 
-absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactory(
     const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
-    const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context) {
   std::shared_ptr<CacheSessions> cache;
   if (!config.disabled().value()) {
     if (!config.has_typed_config()) {
@@ -28,16 +28,24 @@ absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createFilterFactoryFro
     absl::StatusOr<std::shared_ptr<CacheSessions>> status_or_cache =
         http_cache_factory->getCache(config, context);
     if (!status_or_cache.ok()) {
-      return absl::InvalidArgumentError(
-          fmt::format("Couldn't initialize cache: {}", status_or_cache.status()));
+      const absl::Status& status = status_or_cache.status();
+      return absl::InvalidArgumentError(fmt::format("Couldn't initialize cache: {}: {}",
+                                                    absl::StatusCodeToString(status.code()),
+                                                    status.message()));
     }
     cache = *std::move(status_or_cache);
   }
-  return
-      [config = std::make_shared<CacheFilterConfig>(config, cache, context.serverFactoryContext())](
-          Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
-      };
+  return [config = std::make_shared<CacheFilterConfig>(config, cache, context)](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
+  };
+}
+
+absl::StatusOr<Http::FilterFactoryCb> CacheFilterFactory::createHttpFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config& config,
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
+  return createFilterFactory(config, context);
 }
 
 REGISTER_FACTORY(CacheFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);

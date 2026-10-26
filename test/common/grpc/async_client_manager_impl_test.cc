@@ -13,6 +13,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/cluster_priority_set.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -235,7 +236,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
   EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Return(absl::OkStatus()));
-  ASSERT_TRUE(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).ok());
+  ASSERT_OK(async_client_manager_->factoryForGrpcService(grpc_service, scope_, false));
 }
 
 TEST_F(AsyncClientManagerImplTest, GrpcServiceConfigWithHashKeyTest) {
@@ -363,7 +364,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -379,7 +380,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -400,7 +401,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInKey) {
 
 TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -420,7 +421,7 @@ TEST_F(AsyncClientManagerImplTest, LegalGoogleGrpcChar) {
 
 TEST_F(AsyncClientManagerImplTest, GoogleGrpcIllegalCharsInValue) {
   initialize();
-  EXPECT_CALL(scope_, createScope_("grpc.foo."));
+  EXPECT_CALL(scope_, createScope_("grpc", "grpc.foo."));
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
@@ -445,8 +446,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownSkipClusterCheck) {
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   EXPECT_CALL(cm_, checkActiveStaticCluster(_)).Times(0);
-  ASSERT_TRUE(
-      async_client_manager_->factoryForGrpcService(grpc_service, scope_, true).status().ok());
+  ASSERT_OK(async_client_manager_->factoryForGrpcService(grpc_service, scope_, true).status());
 }
 
 } // namespace

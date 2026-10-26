@@ -77,7 +77,7 @@ public:
   MOCK_METHOD(std::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));
   MOCK_METHOD(uint16_t, ciphersuiteId, (), (const));
-  MOCK_METHOD(std::string, ciphersuiteString, (), (const));
+  MOCK_METHOD(absl::string_view, ciphersuiteString, (), (const));
   MOCK_METHOD(uint16_t, tlsGroupId, (), (const));
   MOCK_METHOD(absl::string_view, tlsGroupString, (), (const));
   MOCK_METHOD(const std::string&, tlsVersion, (), (const));
@@ -92,8 +92,13 @@ public:
 
   MOCK_METHOD(std::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(std::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
-  MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
+  MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCaCertInformation, (), (const));
   MOCK_METHOD(std::vector<CertificateDetailsPtr>, getCertChainInformation, (), (const));
+  MOCK_METHOD(const TlsContext&, getTlsContext, (), (const));
+
+private:
+  // Default return value for getTlsContext(): an empty context with no certificate.
+  std::unique_ptr<TlsContext> default_tls_context_;
 };
 
 class MockClientContextConfig : public ClientContextConfig {
@@ -108,6 +113,7 @@ public:
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
+  MOCK_METHOD(bool, validationContextConfigured, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
@@ -135,6 +141,7 @@ public:
   Ssl::HandshakerCapabilities capabilities_;
   std::string sni_{"default_sni.example.com"};
   std::string ciphers_{"RSA"};
+  std::string curves_{""};
   std::string alpn_{""};
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
@@ -154,6 +161,7 @@ public:
   MOCK_METHOD(std::vector<std::reference_wrapper<const TlsCertificateConfig>>, tlsCertificates, (),
               (const));
   MOCK_METHOD(const CertificateValidationContextConfig*, certificateValidationContext, (), (const));
+  MOCK_METHOD(bool, validationContextConfigured, (), (const));
   MOCK_METHOD(unsigned, minProtocolVersion, (), (const));
   MOCK_METHOD(unsigned, maxProtocolVersion, (), (const));
   MOCK_METHOD(bool, isReady, (), (const));
@@ -183,6 +191,7 @@ public:
 
   Ssl::HandshakerCapabilities capabilities_;
   std::string ciphers_{"RSA"};
+  std::string curves_{""};
   std::string alpn_{""};
   std::string sigalgs_{""};
   Network::Address::IpList iplist_;
@@ -208,6 +217,7 @@ public:
   MOCK_METHOD(const std::string&, password, (), (const));
   MOCK_METHOD(const std::string&, passwordPath, (), (const));
   MOCK_METHOD(Envoy::Ssl::PrivateKeyMethodProviderSharedPtr, privateKeyMethod, (), (const));
+  MOCK_METHOD(const Envoy::Ssl::TlsParams*, tlsParams, (), (const));
 };
 
 class MockCertificateValidationContextConfig : public CertificateValidationContextConfig {

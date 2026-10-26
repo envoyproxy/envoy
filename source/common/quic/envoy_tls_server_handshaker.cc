@@ -1,7 +1,12 @@
 #include "source/common/quic/envoy_tls_server_handshaker.h"
 
 #include "source/common/common/macros.h"
+#include "source/common/quic/envoy_quic_downstream_cert_verifier.h"
+#include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_server_session.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Quic {
@@ -11,7 +16,24 @@ EnvoyTlsServerHandshaker::EnvoyTlsServerHandshaker(
     Ssl::ServerContextSharedPtr pinned_ssl_ctx, bool disable_resumption)
     : TlsServerHandshaker(session, crypto_config), pinned_ssl_ctx_(std::move(pinned_ssl_ctx)) {
   SSL_set_ex_data(ssl(), handshakerExDataIndex(), this);
-  if (disable_resumption) {
+  bool refuse_resumption = disable_resumption;
+  // The pinned server context is null until the downstream secrets are loaded, and its session
+  // context id is empty for a dynamic certificate selector. Resumption cannot be scoped in either
+  // case, so refuse it and force a full handshake that re-validates the client certificate.
+  auto* context = pinnedServerContext();
+  const absl::Span<const uint8_t> session_context_id =
+      context != nullptr ? context->sessionContextId() : absl::Span<const uint8_t>();
+  if (session_context_id.empty()) {
+    refuse_resumption = true;
+  } else {
+    // Bind resumption to the matched configuration so a resumed session cannot reuse the client
+    // certificate verdict from a different configuration. This mirrors the TCP TLS session id
+    // context, set per connection because QUIC shares one `SSL_CTX` per listener.
+    const int rc =
+        SSL_set_session_id_context(ssl(), session_context_id.data(), session_context_id.size());
+    RELEASE_ASSERT(rc == 1, "Failed to set the QUIC session id context.");
+  }
+  if (refuse_resumption) {
     DisableResumption();
   }
 }
@@ -52,6 +74,34 @@ void EnvoyTlsServerHandshaker::keylogCallback(const SSL* ssl, const char* line) 
       static_cast<EnvoyQuicServerSession*>(handshaker->session())->connectionInfoProvider();
   handshaker->pinnedServerContext()->maybeWriteKeyLog(line, info.localAddress().get(),
                                                       info.remoteAddress().get());
+}
+
+quic::QuicAsyncStatus EnvoyTlsServerHandshaker::VerifyCertChain(
+    const std::vector<absl::string_view>& certs, std::string* error_details,
+    std::unique_ptr<quic::ProofVerifyDetails>* details, uint8_t* out_alert,
+    std::unique_ptr<quic::ProofVerifierCallback> /*callback*/) {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_mtls_server_enabled")) {
+    *error_details = "QUIC mTLS server validation is disabled by runtime guard "
+                     "envoy.reloadable_features.quic_mtls_server_enabled";
+    *details = std::make_unique<CertVerifyResult>(false);
+    return quic::QUIC_FAILURE;
+  }
+  auto* context = pinnedServerContext();
+  if (context == nullptr) {
+    *error_details = "server SSL context not available because secrets are not loaded";
+    *details = std::make_unique<CertVerifyResult>(false);
+    return quic::QUIC_FAILURE;
+  }
+  bool cert_validated = false;
+  const quic::QuicAsyncStatus status = verifyQuicClientCertChain(
+      certs, *context, error_details, details, out_alert, &cert_validated);
+  if (cert_validated) {
+    ASSERT(dynamic_cast<EnvoyQuicServerSession*>(session()) != nullptr);
+    ASSERT(dynamic_cast<const CertVerifyResult*>(details->get()) != nullptr);
+    static_cast<EnvoyQuicServerSession*>(session())->setClientCertificateValidated(
+        static_cast<const CertVerifyResult&>(**details).validatedChain());
+  }
+  return status;
 }
 
 } // namespace Quic

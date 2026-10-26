@@ -129,9 +129,7 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
 // received, but that would result in a latency penalty instead.
 void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
   if (settings.maxConcurrentStreams().has_value()) {
-    int64_t old_unused_capacity = currentUnusedCapacity();
-    // Given config limits old_unused_capacity should never exceed int32_t.
-    ASSERT(std::numeric_limits<int32_t>::max() >= old_unused_capacity);
+    uint32_t old_pool_contribution = currentUnusedCapacity();
     if (parent().cache() && parent().origin().has_value()) {
       parent().cache()->setConcurrentStreams(*parent().origin(),
                                              settings.maxConcurrentStreams().value());
@@ -139,19 +137,27 @@ void MultiplexedActiveClientBase::onSettings(ReceivedSettings& settings) {
     concurrent_stream_limit_ =
         std::min(settings.maxConcurrentStreams().value(), configured_stream_limit_);
 
-    int64_t delta = old_unused_capacity - currentUnusedCapacity();
-    if (state() == ActiveClient::State::Ready && currentUnusedCapacity() <= 0) {
+    // Compute raw signed capacity to determine debt (the negative portion not tracked in pool).
+    int64_t new_raw_capacity = static_cast<int64_t>(concurrent_stream_limit_) - numActiveStreams();
+    new_raw_capacity = std::min<int64_t>(remaining_streams_, new_raw_capacity);
+    uint32_t new_pool_contribution = static_cast<uint32_t>(std::max<int64_t>(0, new_raw_capacity));
+
+    if (state() == ActiveClient::State::Ready && new_raw_capacity <= 0) {
       parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
-    } else if (state() == ActiveClient::State::Busy && currentUnusedCapacity() > 0) {
+    } else if (state() == ActiveClient::State::Busy && new_raw_capacity > 0) {
       parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
     }
 
-    if (delta > 0) {
-      parent_.decrClusterStreamCapacity(delta);
-      ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, delta);
-    } else if (delta < 0) {
-      parent_.incrClusterStreamCapacity(-delta);
-      ENVOY_CONN_LOG(trace, "Increasing stream capacity by {}", *codec_client_, -delta);
+    capacity_debt_ = static_cast<uint32_t>(std::max<int64_t>(0, -new_raw_capacity));
+
+    if (old_pool_contribution > new_pool_contribution) {
+      uint32_t pool_delta = old_pool_contribution - new_pool_contribution;
+      parent_.decrClusterStreamCapacity(pool_delta);
+      ENVOY_CONN_LOG(trace, "Decreasing stream capacity by {}", *codec_client_, pool_delta);
+    } else if (new_pool_contribution > old_pool_contribution) {
+      uint32_t pool_delta = new_pool_contribution - old_pool_contribution;
+      parent_.incrClusterStreamCapacity(pool_delta);
+      ENVOY_CONN_LOG(trace, "Increasing stream capacity by {}", *codec_client_, pool_delta);
     }
   }
 }

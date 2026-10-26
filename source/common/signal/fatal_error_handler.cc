@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <list>
+#include <utility>
 
 #include "envoy/event/dispatcher.h"
 
@@ -153,9 +154,14 @@ void registerFatalActions(FatalAction::FatalActionPtrList safe_actions,
                           FatalAction::FatalActionPtrList unsafe_actions,
                           Thread::ThreadFactory& thread_factory) {
   // Create a FatalActionManager and store it.
-  if (!fatal_action_manager) {
-    fatal_action_manager.exchange(new FatalAction::FatalActionManager(
-        std::move(safe_actions), std::move(unsafe_actions), thread_factory));
+  if (!fatal_action_manager.load(std::memory_order_acquire)) {
+    auto* new_manager = new FatalAction::FatalActionManager(
+        std::move(safe_actions), std::move(unsafe_actions), thread_factory);
+    FatalAction::FatalActionManager* expected = nullptr;
+    if (!fatal_action_manager.compare_exchange_strong(expected, new_manager,
+                                                      std::memory_order_acq_rel)) {
+      delete new_manager;
+    }
   }
 }
 

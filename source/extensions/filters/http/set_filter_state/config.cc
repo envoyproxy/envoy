@@ -16,6 +16,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace SetFilterState {
 
+using envoy::extensions::filters::http::set_filter_state::v3::Config;
+
 SetFilterState::SetFilterState(const Filters::Common::SetFilterState::ConfigSharedPtr config)
     : config_(config) {}
 
@@ -35,17 +37,19 @@ Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& 
   return Http::FilterHeadersStatus::Continue;
 }
 
-Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
-
-  const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain, context,
-      proto_config.clear_route_cache());
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(
-        Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});
-  };
+absl::StatusOr<StreamInfo::FilterState::LifeSpan>
+SetFilterStateConfig::toFilterStateLifeSpan(Config::LifeSpan life_span) {
+  switch (life_span) {
+  case Config::DEFAULT:
+  case Config::FILTER_CHAIN:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  case Config::REQUEST:
+    return StreamInfo::FilterState::LifeSpan::Request;
+  case Config::CONNECTION:
+    return StreamInfo::FilterState::LifeSpan::Connection;
+  default:
+    return absl::InvalidArgumentError("Invalid LifeSpan");
+  }
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
@@ -54,24 +58,27 @@ SetFilterStateConfig::createRouteSpecificFilterConfigTyped(
     Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
 
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  auto life_span_or_error = toFilterStateLifeSpan(proto_config.life_span());
+  RETURN_IF_NOT_OK_REF(life_span_or_error.status());
 
   return std::make_shared<const Filters::Common::SetFilterState::Config>(
-      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-      generic_context, proto_config.clear_route_cache());
+      proto_config.on_request_headers(), *life_span_or_error, generic_context,
+      proto_config.clear_route_cache());
 }
 
 absl::StatusOr<Http::FilterFactoryCb> SetFilterStateConfig::createHttpFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
-    const std::string&, Server::Configuration::ServerFactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext& extra_context) {
 
-  // TODO(wbpcode): these is a potential bug of message validation. The validation visitor
-  // of server context should not be used here directly. But this is bug of
-  // 'createHttpFilterFactoryFromProto' and will be fixed in the future.
-  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+  Server::GenericFactoryContextImpl generic_context(
+      context, extra_context.scope, extra_context.visitor, extra_context.init_manager);
+  auto life_span_or_error = toFilterStateLifeSpan(proto_config.life_span());
+  RETURN_IF_NOT_OK_REF(life_span_or_error.status());
 
   const auto filter_config = std::make_shared<Filters::Common::SetFilterState::Config>(
-      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
-      generic_context, proto_config.clear_route_cache());
+      proto_config.on_request_headers(), *life_span_or_error, generic_context,
+      proto_config.clear_route_cache());
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});

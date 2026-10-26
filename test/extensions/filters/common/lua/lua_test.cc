@@ -5,6 +5,8 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
@@ -40,19 +42,98 @@ int TestObject::luaTestCall(lua_State* state) { return doTestCall(state); }
 
 class LuaTest : public testing::Test {
 public:
-  LuaTest() : yield_callback_([this]() { on_yield_.ready(); }) {}
+  LuaTest()
+      : yield_callback_([this]() {
+          on_yield_.ready();
+          return absl::OkStatus();
+        }) {}
 
-  void setup(const std::string& code) {
-    state_ = std::make_unique<ThreadLocalState>(code, tls_);
+  void setup(const std::string& code, const PackagePaths& package_paths = {}) {
+    absl::Status creation_status = absl::OkStatus();
+    state_ = std::make_unique<ThreadLocalState>(code, package_paths, tls_, creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     state_->registerType<TestObject>();
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   ThreadLocalStatePtr state_;
-  std::function<void()> yield_callback_;
+  YieldCallback yield_callback_;
   ReadyWatcher on_yield_;
   InitializerList initializers_;
 };
+
+// Writes a module for a script to require, and returns the search pattern that finds it.
+std::string writeTestModule() {
+  TestEnvironment::writeStringToFileForTest("lua_test_module.lua", R"EOF(
+    local m = {}
+    function m.greeting()
+      return "hello from the module"
+    end
+    return m
+  )EOF");
+  return TestEnvironment::temporaryPath("?.lua");
+}
+
+// A configured package path is in place before the code runs, so a top-level require() of a module
+// found there resolves. The script errors rather than returning a value, so a failure surfaces as
+// a load error out of the constructor.
+TEST_F(LuaTest, PackagePathResolvesRequire) {
+  const std::string SCRIPT{R"EOF(
+    local m = require("lua_test_module")
+    if m.greeting() ~= "hello from the module" then
+      error("unexpected module contents")
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{writeTestModule(), ""});
+}
+
+// Without the package path the same require() fails, and it fails at construction rather than per
+// request, because the code is run once to validate it.
+TEST_F(LuaTest, PackagePathAbsentFailsToLoad) {
+  writeTestModule();
+  const std::string SCRIPT{R"EOF(
+    local m = require("lua_test_module")
+  )EOF"};
+
+  absl::Status creation_status = absl::OkStatus();
+  ThreadLocalState state(SCRIPT, PackagePaths{}, tls_, creation_status);
+  EXPECT_THAT(creation_status, StatusHelpers::HasStatusMessage(testing::AllOf(
+                                   testing::HasSubstr("script load error"),
+                                   testing::HasSubstr("module 'lua_test_module' not found"))));
+}
+
+// Configured patterns keep the order they were given in, come ahead of the interpreter's own
+// search path, and do not replace it.
+TEST_F(LuaTest, PackagePathIsPrependedInOrder) {
+  const std::string SCRIPT{R"EOF(
+    local expected = "/first/?.lua;/second/?.lua;/second/?/init.lua"
+    if package.path:sub(1, #expected) ~= expected then
+      error("configured patterns are not first: " .. package.path)
+    end
+    if package.path:sub(#expected + 1, #expected + 1) ~= ";" then
+      error("built-in package.path was not kept: " .. package.path)
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{"/first/?.lua;/second/?.lua;/second/?/init.lua", ""});
+}
+
+// `cpath` is prepended the same way. Loading a real C module is out of scope here, so the script
+// checks the search path itself.
+TEST_F(LuaTest, PackageCpathIsPrepended) {
+  const std::string SCRIPT{R"EOF(
+    local expected = "/does/not/exist/?.so"
+    if package.cpath:sub(1, #expected) ~= expected then
+      error("configured pattern is not first: " .. package.cpath)
+    end
+    if package.cpath:sub(#expected + 1, #expected + 1) ~= ";" then
+      error("built-in package.cpath was not kept: " .. package.cpath)
+    end
+  )EOF"};
+
+  setup(SCRIPT, PackagePaths{"", "/does/not/exist/?.so"});
+}
 
 // Basic ref counting between coroutines.
 TEST_F(LuaTest, CoroutineRefCounting) {
@@ -69,7 +150,7 @@ TEST_F(LuaTest, CoroutineRefCounting) {
   // Start a coroutine but do not hold a reference to the object we pass.
   CoroutinePtr cr1(state_->createCoroutine());
   TestObject* object1 = TestObject::create(cr1->luaState()).first;
-  cr1->start(state_->getGlobalRef(1), 1, yield_callback_);
+  EXPECT_TRUE(cr1->start(state_->getGlobalRef(1), 1, yield_callback_).ok());
   EXPECT_EQ(cr1->state(), Coroutine::State::Finished);
   EXPECT_CALL(*object1, onDestroy());
   lua_gc(cr1->luaState(), LUA_GCCOLLECT, 0);
@@ -79,7 +160,7 @@ TEST_F(LuaTest, CoroutineRefCounting) {
   // collect it. Then unref and collect and it should be gone.
   CoroutinePtr cr2(state_->createCoroutine());
   LuaRef<TestObject> ref2(TestObject::create(cr2->luaState()), true);
-  cr2->start(state_->getGlobalRef(1), 1, yield_callback_);
+  EXPECT_TRUE(cr2->start(state_->getGlobalRef(1), 1, yield_callback_).ok());
   EXPECT_EQ(cr2->state(), Coroutine::State::Finished);
   lua_gc(cr2->luaState(), LUA_GCCOLLECT, 0);
   EXPECT_CALL(*ref2.get(), onDestroy());
@@ -101,8 +182,8 @@ TEST_F(LuaTest, EmptyError) {
   const int callMeRef = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
   EXPECT_NE(LUA_REFNIL, callMeRef);
   CoroutinePtr cr1(state_->createCoroutine());
-  EXPECT_THROW_WITH_REGEX(cr1->start(callMeRef, 0, yield_callback_), EnvoyException,
-                          "unspecified lua error");
+  EXPECT_THAT(cr1->start(callMeRef, 0, yield_callback_),
+              StatusHelpers::HasStatusMessage("unspecified lua error"));
 }
 
 // Basic yield/resume functionality.
@@ -121,11 +202,11 @@ TEST_F(LuaTest, YieldAndResume) {
   CoroutinePtr cr(state_->createCoroutine());
   LuaRef<TestObject> ref(TestObject::create(cr->luaState()), true);
   EXPECT_CALL(on_yield_, ready());
-  cr->start(state_->getGlobalRef(0), 1, yield_callback_);
+  EXPECT_TRUE(cr->start(state_->getGlobalRef(0), 1, yield_callback_).ok());
   EXPECT_EQ(cr->state(), Coroutine::State::Yielded);
 
   EXPECT_CALL(*ref.get(), doTestCall(_));
-  cr->resume(0, yield_callback_);
+  EXPECT_TRUE(cr->resume(0, yield_callback_).ok());
   EXPECT_EQ(cr->state(), Coroutine::State::Finished);
 
   lua_gc(cr->luaState(), LUA_GCCOLLECT, 0);
@@ -159,18 +240,19 @@ TEST_F(LuaTest, MarkDead) {
   LuaDeathRef<TestObject> ref(TestObject::create(cr1->luaState()), true);
   EXPECT_CALL(*ref.get(), doTestCall(_));
   EXPECT_CALL(on_yield_, ready());
-  cr1->start(state_->getGlobalRef(0), 1, yield_callback_);
+  EXPECT_TRUE(cr1->start(state_->getGlobalRef(0), 1, yield_callback_).ok());
   EXPECT_EQ(cr1->state(), Coroutine::State::Yielded);
 
   ref.markDead();
   CoroutinePtr cr2(state_->createCoroutine());
-  EXPECT_THROW_WITH_MESSAGE(cr2->start(state_->getGlobalRef(1), 0, yield_callback_), LuaException,
-                            "[string \"...\"]:10: object used outside of proper scope");
+  EXPECT_THAT(
+      cr2->start(state_->getGlobalRef(1), 0, yield_callback_),
+      StatusHelpers::HasStatusMessage("[string \"...\"]:10: object used outside of proper scope"));
   EXPECT_EQ(cr2->state(), Coroutine::State::Finished);
 
   ref.markLive();
   EXPECT_CALL(*ref.get(), doTestCall(_));
-  cr1->resume(0, yield_callback_);
+  EXPECT_TRUE(cr1->resume(0, yield_callback_).ok());
   EXPECT_EQ(cr1->state(), Coroutine::State::Finished);
 
   lua_gc(cr1->luaState(), LUA_GCCOLLECT, 0);
@@ -208,7 +290,9 @@ TEST_F(ThreadSafeTest, StateDestructedBeforeWorkerRun) {
 
   // Some callback functions waiting to be executed will be added to the dispatcher of the Worker
   // thread. The callback functions in the main thread will be executed directly.
-  state_ = std::make_unique<ThreadLocalState>(SCRIPT, tls_);
+  absl::Status creation_status = absl::OkStatus();
+  state_ = std::make_unique<ThreadLocalState>(SCRIPT, PackagePaths{}, tls_, creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
   state_->registerType<TestObject>();
 
   main_dispatcher_->run(Event::Dispatcher::RunType::Block);

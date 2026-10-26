@@ -13,6 +13,7 @@
 #pragma once
 
 #include <array>
+#include <format>
 #include <functional>
 
 #include "envoy/stats/scope.h"
@@ -69,7 +70,7 @@ using RichRequestMetricsSharedPtr = std::shared_ptr<RichRequestMetrics>;
 class RichRequestMetricsImpl: public RichRequestMetrics {
 public:
   RichRequestMetricsImpl(Stats::Scope& scope, std::string stat_prefix): metrics_({
-    KAFKA_REQUEST_METRICS(POOL_COUNTER_PREFIX(scope, fmt::format("kafka.{}.request.",
+    KAFKA_REQUEST_METRICS(POOL_COUNTER_PREFIX(scope, std::format("kafka.{}.request.",
       stat_prefix)))}) {};
 
   void onRequest(const int16_t api_key) override {

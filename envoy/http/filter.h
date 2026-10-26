@@ -260,6 +260,12 @@ public:
   virtual bool pausedForWebsocketUpgrade() const PURE;
   virtual void setPausedForWebsocketUpgrade(bool value) PURE;
 
+  // Setters and getters to determine if sending body payload is paused on
+  // confirmation of a generic (non-WebSocket) HTTP upgrade. These should only be used by the
+  // upstream codec filter.
+  virtual bool pausedForGenericUpgrade() const PURE;
+  virtual void setPausedForGenericUpgrade(bool value) PURE;
+
   // Disable the route timeout after websocket upgrade completes successfully.
   // This should only be used by the upstream codec filter.
   virtual void disableRouteTimeoutForWebsocketUpgrade() PURE;
@@ -391,6 +397,14 @@ public:
    * the headers in a way that would affect routing.
    */
   virtual void clearRouteCache() PURE;
+
+  /**
+   * Re-snaps the route configuration snapshot held by the stream from the route config provider.
+   * This is intended for on-demand xDS filters (VHDS) that need the stream to observe a route
+   * config update that landed after the original request-start snapshot. Most filters should use
+   * clearRouteCache() instead, which re-evaluates routing against the existing snapshot.
+   */
+  virtual void refreshRouteConfigSnapshot() PURE;
 
   /**
    * Refresh the target cluster but not the route cache. This is used when we want to change the
@@ -709,6 +723,18 @@ public:
   virtual void injectDecodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
+   * Decode headers directly to subsequent filters in the filter chain. This method is used in
+   * cases in which a filter needs to inject or continue decoded headers to subsequent filters
+   * asynchronously, indicating end_stream at an appropriate time.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's decodeHeaders() call.
+   *
+   * @param end_stream boolean supplies whether this is a header-only request.
+   */
+  virtual void injectDecodedHeadersToFilterChain(bool end_stream) PURE;
+
+  /**
    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
    * If called in any other context, an assertion will be triggered.
    *
@@ -979,6 +1005,9 @@ public:
     // True if a reset will occur rather than the local reply (some prior filter
     // has returned ContinueAndResetStream)
     bool reset_imminent_;
+    // The body supplied to sendLocalReply(). This view is valid only for the duration of the
+    // onLocalReply() callback.
+    absl::string_view body_;
   };
 
   /**
@@ -1148,6 +1177,18 @@ public:
    * @param end_stream boolean supplies whether this is the last data frame, and no trailers behind.
    */
   virtual void injectEncodedDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Encode headers directly to subsequent filters in the filter chain. This method is used in
+   * cases in which a filter needs to inject or continue encoded headers to subsequent filters
+   * asynchronously, indicating end_stream at an appropriate time.
+   *
+   * This method should only be called outside of callback context. I.e., do not call this method
+   * from within a filter's encodeHeaders() call.
+   *
+   * @param end_stream boolean supplies whether this is a header-only response.
+   */
+  virtual void injectEncodedHeadersToFilterChain(bool end_stream) PURE;
 
   /**
    * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.

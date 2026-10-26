@@ -48,7 +48,7 @@ envoy_cc_test(
     data = [
         "//contrib/qat/private_key_providers/test/test_data:certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":test_fake_factory",
         "//source/common/common:random_generator_lib",
@@ -71,7 +71,7 @@ envoy_cc_test(
     data = [
         "//contrib/qat/private_key_providers/test/test_data:certs",
     ],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":test_fake_factory",
         "//source/common/tls/private_key:private_key_manager_lib",

@@ -119,6 +119,76 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions)
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
+// Validates that the HTTP stream keeps the async client default buffer limit when
+// per_stream_buffer_limit_bytes is not configured.
+TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitNotSetByDefault) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+            EXPECT_FALSE(opts.buffer_limit_.has_value());
+            return nullptr;
+          }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that per_stream_buffer_limit_bytes is used as the buffer limit of streams and unary
+// requests.
+TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitFromConfig) {
+  config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(1024 * 1024);
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke([](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+            EXPECT_TRUE(opts.buffer_body_for_retry);
+            EXPECT_NE(opts.parsed_retry_policy, nullptr);
+            EXPECT_TRUE(opts.buffer_limit_.has_value());
+            EXPECT_EQ(opts.buffer_limit_.value_or(0), 1024U * 1024U);
+            return nullptr;
+          }));
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> stream_callbacks;
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, stream_callbacks,
+                          Http::AsyncClient::StreamOptions().setBufferBodyForRetry(true));
+  EXPECT_EQ(grpc_stream, nullptr);
+
+  NiceMock<MockAsyncRequestCallbacks<helloworld::HelloReply>> request_callbacks;
+  NiceMock<Tracing::MockSpan> active_span;
+  EXPECT_CALL(active_span, spawnChild_(_, _, _))
+      .WillOnce(Return(new NiceMock<Tracing::MockSpan>()));
+  helloworld::HelloRequest request_msg;
+  auto* grpc_request = grpc_client_->send(*method_descriptor_, request_msg, request_callbacks,
+                                          active_span, Http::AsyncClient::RequestOptions());
+  EXPECT_EQ(grpc_request, nullptr);
+}
+
+// Validates that a per-stream buffer limit set by the caller takes precedence over
+// per_stream_buffer_limit_bytes.
+TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitOverriddenByCallerOptions) {
+  config.mutable_envoy_grpc()->mutable_per_stream_buffer_limit_bytes()->set_value(1024 * 1024);
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
+
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+            EXPECT_TRUE(opts.buffer_limit_.has_value());
+            EXPECT_EQ(opts.buffer_limit_.value_or(0), 2048U);
+            return nullptr;
+          }));
+  auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                         Http::AsyncClient::StreamOptions().setBufferLimit(2048));
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validates that the host header is the cluster name in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
@@ -673,6 +743,97 @@ TEST_F(EnvoyAsyncClientImplTest, MultipleFramesWithResetInBetween) {
       .WillOnce(Invoke([&](const helloworld::HelloReply&) { grpc_stream->resetStream(); }));
 
   http_callbacks->onData(data, false);
+}
+
+// Helper that starts a stream successfully and hands back the HTTP-level callbacks so the test can
+// drive server-side events after the fact.
+class WaitForRemoteCloseTest : public EnvoyAsyncClientImplTest {
+protected:
+  Http::AsyncClient::Stream*
+  startStream(AsyncStreamCallbacks<helloworld::HelloReply>& grpc_callbacks,
+              Http::AsyncClient::StreamCallbacks*& http_callbacks,
+              AsyncStream<helloworld::HelloRequest>& grpc_stream) {
+    ON_CALL(Const(http_stream_), streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    ON_CALL(http_stream_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+    EXPECT_CALL(http_client_, start(_, _))
+        .WillOnce(Invoke([&http_callbacks, this](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+          http_callbacks = &callbacks;
+          return &http_stream_;
+        }));
+    // sendHeaders succeeds (does not reset), so the stream stays open.
+    EXPECT_CALL(http_stream_, sendHeaders(_, _));
+    grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                                      Http::AsyncClient::StreamOptions());
+    return &http_stream_;
+  }
+
+  // Deliver a full sequence of server-side events (initial metadata, a data frame, and a stream
+  // reset) that would each dispatch a callback on a live stream.
+  void deliverServerEvents(Http::AsyncClient::StreamCallbacks* http_callbacks) {
+    // Server initial metadata.
+    http_callbacks->onHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+                                  Http::TestResponseHeaderMapImpl{{":status", "200"}}),
+                              false);
+    // A single (empty) gRPC data frame: 1 byte of flags followed by a 4 byte length.
+    Buffer::OwnedImpl data;
+    uint8_t flags = 0;
+    uint32_t len = 0;
+    data.add(&flags, 1);
+    data.add(&len, 4);
+    http_callbacks->onData(data, false);
+    // Server (remote) close.
+    http_callbacks->onReset();
+  }
+
+  StreamInfo::StreamInfoImpl stream_info_{context_.time_system_, nullptr,
+                                          StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream_;
+};
+
+// After the owner detaches via waitForRemoteCloseAndDelete(), the underlying gRPC stream must not
+// deliver any further callbacks. This is the guard that makes the ext_proc "graceful gRPC close"
+// mode (envoy.reloadable_features.ext_proc_graceful_grpc_close) safe: the ext_proc
+// ProcessorStreamImpl half-closes, calls waitForRemoteCloseAndDelete(), and is then destroyed while
+// this AsyncStreamImpl lives on awaiting the server's close.
+TEST_F(WaitForRemoteCloseTest, NoStreamCallbacksAfterWaitForRemoteCloseAndDelete) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks = nullptr;
+  AsyncStream<helloworld::HelloRequest> grpc_stream;
+  startStream(grpc_callbacks, http_callbacks, grpc_stream);
+  ASSERT_NE(grpc_stream, nullptr);
+  ASSERT_NE(http_callbacks, nullptr);
+
+  // The owner detaches. From here, no callbacks may be delivered.
+  grpc_stream.waitForRemoteCloseAndDelete();
+
+  EXPECT_CALL(grpc_callbacks, onReceiveInitialMetadata_(_)).Times(0);
+  EXPECT_CALL(grpc_callbacks, onReceiveMessage_(_)).Times(0);
+  EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_)).Times(0);
+  EXPECT_CALL(grpc_callbacks, onRemoteClose(_, _)).Times(0);
+
+  deliverServerEvents(http_callbacks);
+}
+
+// Same scenario as above, but the callbacks object is actually destroyed after detaching (as the
+// ext_proc ProcessorStreamImpl is). Delivering server events must not touch the freed object; this
+// would be caught as a use-after-free under ASAN if the reference were not reset.
+TEST_F(WaitForRemoteCloseTest, StreamSurvivesCallbacksDestroyedAfterWaitForRemoteCloseAndDelete) {
+  auto grpc_callbacks =
+      std::make_unique<NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>>>();
+  Http::AsyncClient::StreamCallbacks* http_callbacks = nullptr;
+  AsyncStream<helloworld::HelloRequest> grpc_stream;
+  startStream(*grpc_callbacks, http_callbacks, grpc_stream);
+  ASSERT_NE(grpc_stream, nullptr);
+  ASSERT_NE(http_callbacks, nullptr);
+
+  grpc_stream.waitForRemoteCloseAndDelete();
+
+  // The owner destroys the callbacks object while the underlying stream lives on.
+  grpc_callbacks.reset();
+
+  // Must be a no-op rather than a use-after-free.
+  deliverServerEvents(http_callbacks);
 }
 
 } // namespace

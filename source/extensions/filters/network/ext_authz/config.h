@@ -14,13 +14,13 @@ namespace ExtAuthz {
 /**
  * Config registration for the external authorization filter. @see NamedNetworkFilterConfigFactory.
  */
-class ExtAuthzConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::network::ext_authz::v3::ExtAuthz> {
+class ExtAuthzConfigFactory : public Common::ExceptionFreeFactoryBase<
+                                  envoy::extensions::filters::network::ext_authz::v3::ExtAuthz> {
 public:
-  ExtAuthzConfigFactory() : FactoryBase(NetworkFilterNames::get().ExtAuthorization) {}
+  ExtAuthzConfigFactory() : ExceptionFreeFactoryBase(NetworkFilterNames::get().ExtAuthorization) {}
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };

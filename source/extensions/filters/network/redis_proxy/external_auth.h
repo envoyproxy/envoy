@@ -121,7 +121,7 @@ public:
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
   void onSuccess(
-      std::unique_ptr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
+      Grpc::ResponsePtr<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>&& response,
       Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;

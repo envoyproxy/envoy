@@ -2,6 +2,7 @@
 
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
@@ -40,22 +41,57 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
 
 // Initialize QuicGsoBatchWriter, set io_handle_ and stats_
 UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope)
-    : quic::QuicGsoBatchWriter(io_handle.fdDoNotUse()), stats_(generateStats(scope)) {}
+    : quic::QuicGsoBatchWriter(io_handle.fdDoNotUse()), stats_(generateStats(scope)),
+      default_writer_(io_handle) {}
+
+UdpGsoBatchWriter::~UdpGsoBatchWriter() { stats_.internal_buffer_size_.sub(buffered_bytes_); }
 
 Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
                                const Network::Address::Instance& peer_address) {
+  const size_t payload_len = static_cast<size_t>(buffer.length());
+
+  if (payload_len == 0 &&
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_send_zero_length_datagrams")) {
+    return Api::ioCallUint64ResultNoError();
+  }
+
+  if (isWriteBlocked()) {
+    return {0, Network::IoSocketError::getIoSocketEagainError()};
+  }
+
+  // GSO requires contiguous payloads within its packet size limit. Empty datagrams must also be
+  // sent separately. Flush older packets first to preserve datagram ordering in both cases.
+  const bool use_default_writer =
+      payload_len > getMaxPacketSize(peer_address) || buffer.getRawSlices(2).size() > 1;
+  if ((payload_len == 0 || use_default_writer) && !buffered_writes().empty()) {
+    quic::WriteResult flush_result = Flush();
+    updateUdpGsoBatchWriterStats(flush_result);
+    if (flush_result.status != quic::WRITE_STATUS_OK) {
+      return convertQuicWriteResult(flush_result, /*payload_len=*/0);
+    }
+  }
+
+  if (use_default_writer) {
+    auto result = default_writer_.writePacket(buffer, local_ip, peer_address);
+    if (result.ok()) {
+      stats_.total_bytes_sent_.add(result.return_value_);
+    }
+    return result;
+  }
+
   // Convert received parameters to relevant forms
   quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
-  ASSERT(buffer.getRawSlices().size() == 1);
-  size_t payload_len = static_cast<size_t>(buffer.frontSlice().len_);
+  ASSERT(payload_len == 0 || buffer.getRawSlices().size() == 1);
+  char empty_payload = 0;
+  const char* payload =
+      payload_len == 0 ? &empty_payload : static_cast<char*>(buffer.frontSlice().mem_);
 
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
   // specify this parameter here at a later stage.
   quic::QuicPacketWriterParams params;
-  quic::WriteResult quic_result = WritePacket(static_cast<char*>(buffer.frontSlice().mem_),
-                                              payload_len, self_addr.host(), peer_addr,
+  quic::WriteResult quic_result = WritePacket(payload, payload_len, self_addr.host(), peer_addr,
                                               /*quic::PerPacketOptions=*/nullptr, params);
   updateUdpGsoBatchWriterStats(quic_result);
 
@@ -93,7 +129,13 @@ void UdpGsoBatchWriter::updateUdpGsoBatchWriterStats(quic::WriteResult quic_resu
     }
     stats_.total_bytes_sent_.add(quic_result.bytes_written);
   }
-  stats_.internal_buffer_size_.set(batch_buffer().SizeInUse());
+  const uint64_t buffered_bytes = batch_buffer().SizeInUse();
+  if (buffered_bytes >= buffered_bytes_) {
+    stats_.internal_buffer_size_.add(buffered_bytes - buffered_bytes_);
+  } else {
+    stats_.internal_buffer_size_.sub(buffered_bytes_ - buffered_bytes);
+  }
+  buffered_bytes_ = buffered_bytes;
   gso_size_ = buffered_writes().empty() ? 0u : buffered_writes().front().buf_len;
 }
 

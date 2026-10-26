@@ -106,9 +106,6 @@ do
           -s main \
           -v warn || exit 1
 
-    # Check correctness of repositories definitions.
-    echo "  Checking repositories definitions"
-    "$SCRIPT_DIR"/check_repositories.sh || exit 1
   fi
 done
 

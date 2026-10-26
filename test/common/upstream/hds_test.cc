@@ -24,6 +24,8 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/struct_matchers.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -32,6 +34,7 @@
 
 using testing::_;
 using testing::AtLeast;
+using testing::Contains;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -48,7 +51,7 @@ public:
   void processPrivateMessage(
       HdsDelegate& hd,
       std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
-    ASSERT_TRUE(hd.processMessage(std::move(message)).ok());
+    ASSERT_OK(hd.processMessage(std::move(message)));
   };
   HdsDelegateStats getStats(HdsDelegate& hd) { return hd.stats_; };
   static void swapFactory(HdsDelegate& hd, std::unique_ptr<ClusterInfoFactory>&& factory) {
@@ -583,6 +586,43 @@ TEST_F(HdsTest, TestSendResponseMultipleEndpoints) {
     }
   }
   EXPECT_EQ(response.endpoints_health_size(), NumClusters * NumLocalities * NumEndpoints);
+}
+
+TEST_F(HdsTest, TestSendResponseSkipsEmptyLocality) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message = createComplexSpecifier(1, 2, 1);
+  // HDS retains locality groups with no endpoints as empty host buckets.
+  message->mutable_cluster_health_checks(0)->add_locality_endpoints()->mutable_locality()->set_zone(
+      "empty");
+  expectCreateClientConnection();
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_))
+      .WillRepeatedly(Invoke([](const ClusterInfoFactory::CreateClusterInfoParams& params) {
+        std::shared_ptr<Upstream::MockClusterInfo> cluster_info{
+            new NiceMock<Upstream::MockClusterInfo>()};
+        cluster_info->name_ = params.cluster_.name();
+        return cluster_info;
+      }));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_)).Times(2);
+  hds_delegate_->onReceiveMessage(std::move(message));
+
+  const auto& host_set = *hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0];
+  const auto& localities = host_set.hostsPerLocality().get();
+  ASSERT_EQ(localities.size(), 3);
+  EXPECT_TRUE(localities[2].empty());
+
+  const auto response = hds_delegate_->sendResponse().endpoint_health_response();
+  ASSERT_EQ(response.cluster_endpoints_health_size(), 1);
+  const auto& cluster_response = response.cluster_endpoints_health(0);
+  ASSERT_EQ(cluster_response.locality_endpoints_health_size(), 2);
+  EXPECT_EQ(cluster_response.locality_endpoints_health(0).locality().zone(), "zone0");
+  EXPECT_EQ(cluster_response.locality_endpoints_health(1).locality().zone(), "zone1");
+  EXPECT_EQ(response.endpoints_health_size(), 2);
 }
 
 // Tests OnReceiveMessage given a minimal HealthCheckSpecifier message
@@ -1261,7 +1301,8 @@ TEST_F(HdsTest, TestCustomHealthCheckPortWhenUpdate) {
 
   // Process message
   EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
-  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
+  auto message_copy = std::make_unique<envoy::service::health::v3::HealthCheckSpecifier>(*message);
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message_copy));
 
   for (int i = 0; i < 3; i++) {
     auto& host =
@@ -1333,8 +1374,8 @@ TEST_F(HdsTest, TestSendResponseWithHealthMetadata) {
       msg.endpoint_health_response().cluster_endpoints_health(0).locality_endpoints_health(0);
   const auto& structured_endpoint = cluster_endpoint.endpoints_health(0);
   ASSERT_TRUE(structured_endpoint.has_health_metadata());
-  EXPECT_EQ(structured_endpoint.health_metadata().fields().at("http_status_code").number_value(),
-            200.0);
+  EXPECT_THAT(structured_endpoint.health_metadata().fields(),
+              Contains(IsStructNumber("http_status_code", 200.0)));
 }
 
 // Test that sendResponse does not include health_metadata when no metadata

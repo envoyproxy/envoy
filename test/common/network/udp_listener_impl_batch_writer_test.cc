@@ -22,6 +22,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
 #include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/network/udp_listener_impl.h"
@@ -29,9 +30,11 @@
 #include "source/common/quic/udp_gso_batch_writer.h"
 
 #include "test/common/network/udp_listener_impl_test_base.h"
+#include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -164,6 +167,176 @@ TEST_P(UdpListenerImplBatchWriterTest, SendData) {
             total_bytes_sent);
 }
 
+TEST_P(UdpListenerImplBatchWriterTest, SharedBufferGaugeTracksEachWriter) {
+  auto& scope = listener_config_.listenerScope();
+  auto& gauge =
+      scope.gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport);
+  auto second_writer = std::make_unique<Quic::UdpGsoBatchWriter>(server_socket_->ioHandle(), scope);
+  Buffer::OwnedImpl payload("hello");
+  const auto source = getNonDefaultSourceAddress();
+  ASSERT_TRUE(udp_packet_writer_->writePacket(payload, source->ip(), *client_.localAddress()).ok());
+  ASSERT_TRUE(second_writer->writePacket(payload, source->ip(), *client_.localAddress()).ok());
+  EXPECT_EQ(10, gauge.value());
+  second_writer.reset();
+  EXPECT_EQ(5, gauge.value());
+  ASSERT_TRUE(udp_packet_writer_->flush().ok());
+  EXPECT_EQ(0, gauge.value());
+}
+
+TEST_P(UdpListenerImplBatchWriterTest, NonBatchablePacketsFlushInOrder) {
+  testing::StrictMock<quic::test::MockQuicSyscallWrapper> os_sys_calls;
+  quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
+  const auto source = getNonDefaultSourceAddress();
+  auto& scope = listener_config_.listenerScope();
+  uint64_t total_bytes = 0;
+  for (bool connected : {false, true}) {
+    testing::StrictMock<MockIoHandle> io_handle;
+    EXPECT_CALL(io_handle, fdDoNotUse())
+        .WillOnce(testing::Return(server_socket_->ioHandle().fdDoNotUse()));
+    EXPECT_CALL(io_handle, wasConnected()).WillRepeatedly(testing::Return(connected));
+    Quic::UdpGsoBatchWriter writer(io_handle, scope);
+    for (bool fragmented : {false, true}) {
+      Buffer::BufferFragmentImpl first("one", 3, nullptr), second("two", 3, nullptr);
+      Buffer::OwnedImpl packet;
+      if (fragmented) {
+        packet.addBufferFragment(first);
+        packet.addBufferFragment(second);
+        ASSERT_EQ(2, packet.getRawSlices().size());
+      } else {
+        packet.add(std::string(2000, 'x'));
+      }
+      for (int error : {SOCKET_ERROR_AGAIN, SOCKET_ERROR_INVAL, 0}) {
+        SCOPED_TRACE(testing::Message() << "connected=" << connected << " fragmented=" << fragmented
+                                        << " error=" << error);
+        Buffer::OwnedImpl older("hello");
+        ASSERT_TRUE(writer.writePacket(older, source->ip(), *client_.localAddress()).ok());
+        testing::InSequence sequence;
+        EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
+            .WillOnce(Invoke([](int, const msghdr* msg, int) {
+              EXPECT_EQ(5, getPacketLength(msg));
+              return 5;
+            }));
+        const auto send = [&packet, error](const Buffer::RawSlice* slices, uint64_t count) {
+          EXPECT_TRUE(TestUtility::rawSlicesEqual(slices, packet.getRawSlices().data(), count));
+          if (error != 0) {
+            return Api::IoCallUint64Result{0, error == SOCKET_ERROR_AGAIN
+                                                  ? IoSocketError::getIoSocketEagainError()
+                                                  : IoSocketError::create(error)};
+          }
+          return Api::IoCallUint64Result{packet.length(), Api::IoError::none()};
+        };
+        if (connected) {
+          EXPECT_CALL(io_handle, writev(_, fragmented ? 2 : 1)).WillOnce(Invoke(send));
+        } else {
+          EXPECT_CALL(io_handle, sendmsg(_, fragmented ? 2 : 1, 0, source->ip(),
+                                         testing::Ref(*client_.localAddress())))
+              .WillOnce(testing::WithArgs<0, 1>(Invoke(send)));
+        }
+        auto result = writer.writePacket(packet, source->ip(), *client_.localAddress());
+        EXPECT_EQ(error == 0, result.ok());
+        EXPECT_EQ(error == 0 ? packet.length() : 0, result.return_value_);
+        EXPECT_EQ(error == SOCKET_ERROR_AGAIN, writer.isWriteBlocked());
+        if (writer.isWriteBlocked()) {
+          EXPECT_FALSE(writer.writePacket(packet, source->ip(), *client_.localAddress()).ok());
+          writer.setWritable();
+          EXPECT_FALSE(writer.isWriteBlocked());
+        }
+        total_bytes += older.length() + result.return_value_;
+        EXPECT_EQ(total_bytes, scope.counterFromString("total_bytes_sent").value());
+        EXPECT_EQ(
+            0, scope.gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+      }
+    }
+  }
+}
+
+TEST_P(UdpListenerImplBatchWriterTest, SendEmptyDatagramsInOrder) {
+  quic::test::MockQuicSyscallWrapper os_sys_calls;
+  quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
+  testing::InSequence sequence;
+
+  const std::string payload("payload");
+  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce(Invoke([&](int, const msghdr* message, int) {
+    EXPECT_EQ(payload.length(), getPacketLength(message));
+    return payload.length();
+  }));
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
+        .WillOnce(Invoke([](int, const msghdr* message, int) {
+          EXPECT_EQ(1, message->msg_iovlen);
+          EXPECT_NE(nullptr, message->msg_iov);
+          if (message->msg_iov != nullptr && message->msg_iovlen == 1) {
+            EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
+            EXPECT_EQ(0, message->msg_iov[0].iov_len);
+          }
+          return 0;
+        }));
+  }
+
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
+  Buffer::OwnedImpl payload_buffer(payload);
+  UdpSendData payload_data{send_from_addr->ip(), *client_.localAddress(), payload_buffer};
+  Api::IoCallUint64Result send_result = listener_->send(payload_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(payload.length(), send_result.return_value_);
+
+  Buffer::OwnedImpl first_empty_buffer;
+  UdpSendData first_empty_data{send_from_addr->ip(), *client_.localAddress(), first_empty_buffer};
+  send_result = listener_->send(first_empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  Buffer::OwnedImpl second_empty_buffer;
+  UdpSendData second_empty_data{send_from_addr->ip(), *client_.localAddress(), second_empty_buffer};
+  send_result = listener_->send(second_empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+
+  const Api::IoCallUint64Result flush_result = udp_packet_writer_->flush();
+  ASSERT_TRUE(flush_result.ok()) << flush_result.err_->getErrorDetails();
+  EXPECT_EQ(0, flush_result.return_value_);
+  EXPECT_FALSE(udp_packet_writer_->isWriteBlocked());
+}
+
+TEST_P(UdpListenerImplBatchWriterTest, DropEmptyDatagramWhenRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.udp_send_zero_length_datagrams", "false"}});
+
+  quic::test::MockQuicSyscallWrapper os_sys_calls;
+  quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
+
+  const std::string payload("payload");
+  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce(Invoke([&](int, const msghdr* message, int) {
+    EXPECT_EQ(payload.length(), getPacketLength(message));
+    return payload.length();
+  }));
+
+  Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
+  Buffer::OwnedImpl payload_buffer(payload);
+  UdpSendData payload_data{send_from_addr->ip(), *client_.localAddress(), payload_buffer};
+  Api::IoCallUint64Result send_result = listener_->send(payload_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(payload.length(), send_result.return_value_);
+
+  Buffer::OwnedImpl empty_buffer;
+  UdpSendData empty_data{send_from_addr->ip(), *client_.localAddress(), empty_buffer};
+  send_result = listener_->send(empty_data);
+  ASSERT_TRUE(send_result.ok()) << send_result.err_->getErrorDetails();
+  EXPECT_EQ(0, send_result.return_value_);
+  EXPECT_EQ(payload.length(),
+            listener_config_.listenerScope()
+                .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
+                .value());
+
+  const Api::IoCallUint64Result flush_result = udp_packet_writer_->flush();
+  ASSERT_TRUE(flush_result.ok()) << flush_result.err_->getErrorDetails();
+  EXPECT_EQ(0, listener_config_.listenerScope()
+                   .gaugeFromString("internal_buffer_size", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+}
+
 /**
  * Tests UDP Packet writer behavior when socket is write-blocked.
  * 1. Setup the udp_listener and have a payload buffered in the internal buffer.
@@ -187,7 +360,7 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
       listener_config_.listenerScope().counterFromString("total_bytes_sent").value();
 
   // Possible following payloads to be sent after the initial payload
-  absl::FixedArray<std::string> following_payloads{"length<7", "len<7"};
+  absl::FixedArray<std::string> following_payloads{"length<7", "len<7", "", std::string(2000, 'x')};
 
   for (const auto& following_payload : following_payloads) {
     std::string internal_buffer("");
@@ -225,9 +398,8 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
                                     *following_buffer};
     send_result = listener_->send(following_send_data);
 
-    if (following_payload.length() < initial_payload.length()) {
-      // The following payload should get buffered if it is
-      // shorter than initial payload
+    if (!following_payload.empty() && following_payload.length() < initial_payload.length()) {
+      // A shorter nonempty payload can join the batch. Empty datagrams must wait for it to flush.
       EXPECT_TRUE(send_result.ok());
       EXPECT_EQ(send_result.return_value_, following_payload.length());
       EXPECT_TRUE(udp_packet_writer_->isWriteBlocked());

@@ -18,7 +18,7 @@ namespace ZooKeeperProxy {
 /**
  * Config registration for the ZooKeeper proxy filter. @see NamedNetworkFilterConfigFactory.
  */
-Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Network::FilterFactoryCb> ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
@@ -44,16 +44,21 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
   for (const auto& threshold_override : latency_threshold_overrides) {
     auto insertion = opcodes.insert(threshold_override.opcode());
     if (!insertion.second) {
-      throw EnvoyException(fmt::format("Duplicated opcode find in config: {}",
-                                       static_cast<uint32_t>(threshold_override.opcode())));
+      return absl::InvalidArgumentError(
+          fmt::format("Duplicated opcode find in config: {}",
+                      static_cast<uint32_t>(threshold_override.opcode())));
     }
   }
+
+  absl::StatusOr<LatencyThresholdOverrideMap> latency_threshold_override_map =
+      ZooKeeperFilterConfig::parseLatencyThresholdOverrides(latency_threshold_overrides);
+  RETURN_IF_NOT_OK_REF(latency_threshold_override_map.status());
 
   ZooKeeperFilterConfigSharedPtr filter_config(std::make_shared<ZooKeeperFilterConfig>(
       stat_prefix, max_packet_bytes, enable_per_opcode_request_bytes_metrics,
       enable_per_opcode_response_bytes_metrics, enable_per_opcode_decoder_error_metrics,
-      enable_latency_threshold_metrics, default_latency_threshold, latency_threshold_overrides,
-      context.scope()));
+      enable_latency_threshold_metrics, default_latency_threshold,
+      latency_threshold_override_map.value(), context.scope()));
   auto& time_source = context.serverFactoryContext().mainThreadDispatcher().timeSource();
 
   return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {

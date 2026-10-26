@@ -35,6 +35,25 @@ Unlike classic round robin, endpoint weights are derived from load reports sent 
 upstreams via ORCA (Open Request Cost Aggregation), incorporating queries-per-second (QPS),
 errors-per-second (EPS) and utilization to adaptively balance load.
 
+Endpoint weights are recomputed periodically from each endpoint's most recent ORCA
+report as ``qps / (utilization + eps/qps * error_utilization_penalty)``, where
+``qps`` is the report's ``rps_fractional`` field. Both ``qps`` and the final
+``utilization`` (resolved utilization plus any error penalty) must be greater than 0;
+a report that fails either requirement is ignored. Utilization is resolved in the
+following order, taking the first source whose value is greater than 0 (precedence
+may be flipped by the ``envoy.reloadable_features.orca_weight_manager_use_named_metrics_first``
+runtime feature). By default:
+
+1. Named metrics via ``metric_names_for_computing_utilization`` -- max of present
+   values.
+2. ``application_utilization``.
+3. ``cpu_utilization`` -- final fallback.
+
+While an endpoint has no valid weight -- because its reports are being ignored, or
+during the initial ``blackout_period``, or after ``weight_expiration_period`` has
+elapsed -- it is assigned the median weight of the endpoints that currently have a
+valid weight (or 1 if none are valid).
+
 This policy supports:
 
 - :ref:`Slow start <arch_overview_load_balancing_slow_start>` via

@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -17,13 +17,14 @@ envoy_extension_cc_test(
     name = "local_ratelimit_test",
     srcs = ["local_ratelimit_test.cc"],
     extension_names = ["envoy.filters.network.local_ratelimit"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/singleton:manager_impl_lib",
         "//source/extensions/filters/network/local_ratelimit:local_ratelimit_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg_cc_proto",
     ],
 )
@@ -33,14 +34,18 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["local_ratelimit_integration_test.cc"],
     extension_names = ["envoy.filters.network.local_ratelimit"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
     deps = [
+        "//source/common/config:well_known_names",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/filters/network/local_ratelimit:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/integration:integration_lib",
+        "//test/test_common:simulated_time_system_lib",
     ],
 )
 
@@ -52,11 +57,12 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "local_ratelimit_fuzz_test",
     srcs = ["local_ratelimit_fuzz_test.cc"],
     corpus = "local_ratelimit_corpus",
-    rbe_pool = "6gig",
+    extension_names = ["envoy.filters.network.local_ratelimit"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":local_ratelimit_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",

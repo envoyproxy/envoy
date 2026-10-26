@@ -256,8 +256,13 @@ public:
                         const bool enable_per_opcode_decoder_error_metrics,
                         const bool enable_latency_threshold_metrics,
                         const std::chrono::milliseconds default_latency_threshold,
-                        const LatencyThresholdOverrideList& latency_threshold_overrides,
+                        const LatencyThresholdOverrideMap& latency_threshold_override_map,
                         Stats::Scope& scope);
+
+  // Parses the latency threshold overrides from the config into a map keyed by the opcode enum
+  // value defined in decoder.h. Returns an error status if an unknown opcode is present.
+  static absl::StatusOr<LatencyThresholdOverrideMap>
+  parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
 
   const ZooKeeperProxyStats& stats() { return stats_; }
   uint32_t maxPacketBytes() const { return max_packet_bytes_; }
@@ -338,9 +343,7 @@ private:
                                        {LatencyThresholdOverride::AddWatch, 106}});
   }
 
-  int32_t getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
-  LatencyThresholdOverrideMap
-  parseLatencyThresholdOverrides(const LatencyThresholdOverrideList& latency_threshold_overrides);
+  static absl::StatusOr<int32_t> getOpCodeIndex(LatencyThresholdOverride_Opcode opcode);
 
   const bool enable_latency_threshold_metrics_;
   const std::chrono::milliseconds default_latency_threshold_;

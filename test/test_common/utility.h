@@ -687,7 +687,8 @@ public:
                   const std::string& name_field = "name") {
     Config::DecodedResourcesWrapper decoded_resources;
     for (const auto& resource : resources) {
-      auto owned_resource = std::make_unique<MessageType>(resource);
+      auto owned_resource =
+          Protobuf::Arena::MakeUnique<MessageType>(decoded_resources.arena_.get(), resource);
       decoded_resources.owned_resources_.emplace_back(new Config::DecodedResourceImpl(
           std::move(owned_resource), MessageUtil::getStringField(resource, name_field), {}, ""));
       decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
@@ -700,7 +701,8 @@ public:
                                                          const std::string& name_field = "name") {
     Config::DecodedResourcesWrapper decoded_resources;
     for (const auto& resource : resources) {
-      auto owned_resource = std::make_unique<MessageType>(resource);
+      auto owned_resource =
+          Protobuf::Arena::MakeUnique<MessageType>(decoded_resources.arena_.get(), resource);
       decoded_resources.owned_resources_.emplace_back(new Config::DecodedResourceImpl(
           std::move(owned_resource), MessageUtil::getStringField(resource, name_field), {}, ""));
       decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
@@ -713,7 +715,8 @@ public:
   decodeResources(absl::flat_hash_map<std::string, MessageType> resources) {
     Config::DecodedResourcesWrapper decoded_resources;
     for (const auto& [name, resource] : resources) {
-      auto owned_resource = std::make_unique<MessageType>(resource);
+      auto owned_resource =
+          Protobuf::Arena::MakeUnique<MessageType>(decoded_resources.arena_.get(), resource);
       decoded_resources.owned_resources_.emplace_back(
           new Config::DecodedResourceImpl(std::move(owned_resource), name, {}, ""));
       decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
@@ -728,10 +731,7 @@ public:
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
     std::unique_ptr<Config::DecodedResourcesWrapper> tmp_wrapper =
         *Config::DecodedResourcesWrapper::create(resource_decoder, resources, version);
-    Config::DecodedResourcesWrapper ret;
-    ret.owned_resources_ = std::move(tmp_wrapper->owned_resources_);
-    ret.refvec_ = std::move(tmp_wrapper->refvec_);
-    return ret;
+    return std::move(*tmp_wrapper);
   }
 
   template <class MessageType>
@@ -746,11 +746,11 @@ public:
   static Config::DecodedResourcesWrapper decodeResources(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
       const std::string& name_field = "name") {
-    Config::DecodedResourcesWrapper decoded_resources;
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
+    Config::DecodedResourcesWrapper decoded_resources(resource_decoder.arenaOptions());
     for (const auto& resource : resources) {
       decoded_resources.owned_resources_.emplace_back(
-          new Config::DecodedResourceImpl(resource_decoder, resource));
+          new Config::DecodedResourceImpl(resource_decoder, resource, *decoded_resources.arena_));
       decoded_resources.refvec_.emplace_back(*decoded_resources.owned_resources_.back());
     }
     return decoded_resources;

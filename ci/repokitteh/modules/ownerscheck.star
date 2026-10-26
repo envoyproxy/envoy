@@ -225,9 +225,21 @@ def _assign_from_team(team_name, assignees, exclude_users):
 
 def _assign_from(command, assignees):
     lines = []
+    team_names_without_at = []
+    used_team_mention = False
     for team_name in command.args:
         assigned = _assign_from_team(team_name, assignees, [])
         lines.append("%s assignee is @%s" % (team_name, assigned))
+        if team_name.startswith("@"):
+            used_team_mention = True
+            team_name = team_name[1:]
+        team_names_without_at.append(team_name)
+    if used_team_mention:
+        lines.append(
+            "In future, please do this without the `@`, like `/assign-from " +
+            " ".join(team_names_without_at) +
+            "`, unless you wish to subscribe the group to the PR",
+        )
     if lines:
         github.issue_create_comment("\n".join(lines))
 

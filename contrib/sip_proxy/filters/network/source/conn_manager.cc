@@ -1,5 +1,6 @@
 #include "contrib/sip_proxy/filters/network/source/conn_manager.h"
 
+#include <format>
 #include <optional>
 
 #include "envoy/common/exception.h"
@@ -219,7 +220,7 @@ void ConnectionManager::continueHandling(const std::string& key, bool try_next_a
             // When onPoolFailure, continueHandling with try_next_affinity, but there is no next
             // affinity, need throw exception and response with 503.
             auto ex = AppException(AppExceptionType::InternalError,
-                                   fmt::format("envoy can't establish connection to {}", key));
+                                   std::format("envoy can't establish connection to {}", key));
             sendLocalReply(*(metadata), ex, false);
             setLocalResponseSent(metadata->transactionId().value());
 
@@ -307,7 +308,7 @@ void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectRe
 }
 
 void ConnectionManager::setLocalResponseSent(absl::string_view transaction_id) {
-  if (transactions_.find(transaction_id) != transactions_.end()) {
+  if (transactions_.contains(transaction_id)) {
     transactions_[transaction_id]->setLocalResponseSent(true);
   }
 }
@@ -357,7 +358,7 @@ DecoderEventHandler& ConnectionManager::newDecoderEventHandler(MessageMetadataSh
 
   std::string&& k = std::string(metadata->transactionId().value());
   // if (metadata->methodType() == MethodType::Ack) {
-  if (transactions_.find(k) != transactions_.end()) {
+  if (transactions_.contains(k)) {
     // ACK_4XX metadata will updated later.
     return *transactions_.at(k);
   }

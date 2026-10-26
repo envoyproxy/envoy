@@ -10,4 +10,4 @@ Security
   rbac_filter
   threat_model
   external_deps
-  google_vrp
+  google_prp

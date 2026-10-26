@@ -1,3 +1,5 @@
+#include <format>
+
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
@@ -31,7 +33,7 @@ envoy::config::core::v3::TypedExtensionConfig kvStoreDelegateConfig() {
   const std::string filename = TestEnvironment::temporaryPath("xds_kv_store.txt");
   Api::OsSysCallsSingleton().get().unlink(filename.c_str());
 
-  const std::string config_str = fmt::format(R"EOF(
+  const std::string config_str = std::format(R"EOF(
     name: envoy.config.config.KeyValueStoreXdsDelegate
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.config.v3alpha.KeyValueStoreXdsDelegateConfig

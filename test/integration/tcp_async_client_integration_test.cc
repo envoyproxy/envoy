@@ -193,6 +193,27 @@ TEST_P(TcpAsyncClientIntegrationTest, ClientTearDown) {
   tcp_client->close();
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/43233. With half close
+// enabled, the downstream payload and FIN can be delivered to the filter in two separate
+// read dispatches. The first dispatch destroys the async client (kill_after_on_data), and
+// the second dispatch used to dereference the destroyed client and segfault.
+TEST_P(TcpAsyncClientIntegrationTest, ClientTearDownSplitFin) {
+  init(true);
+
+  std::string request("request");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(request, false));
+  // Once the counter is visible the first onData() call has run and the async client is
+  // being destroyed within the same dispatch; any later read event sees a null client.
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_data", Ge(1));
+  // Deliver the FIN as a separate read event.
+  ASSERT_TRUE(tcp_client->write("", true));
+  test_server_->waitForCounter("test_network_async_tcp_filter.on_data", Ge(2));
+
+  tcp_client->close();
+}
+
 #if ENVOY_PLATFORM_ENABLE_SEND_RST
 // Test if RST close can be detected from downstream and upstream is closed by RST.
 TEST_P(TcpAsyncClientIntegrationTest, TestClientCloseRST) {

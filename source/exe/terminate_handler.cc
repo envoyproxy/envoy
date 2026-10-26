@@ -6,6 +6,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
+#include "source/common/coroutine/backtrace.h"
 #include "source/server/backtrace.h"
 
 #include "absl/strings/str_format.h"
@@ -17,9 +18,11 @@ std::terminate_handler TerminateHandler::logOnTerminate() const {
   // actions during stack trace.
   BackwardsTrace::addrMapping(/*setup=*/true);
   return std::set_terminate([]() {
-    logException(std::current_exception());
-    BACKTRACE_LOG();
-    std::abort();
+    logException(std::current_exception()); // LCOV_EXCL_LINE
+    BACKTRACE_LOG();                        // LCOV_EXCL_LINE
+    Coroutine::Backtrace co_backtrace;      // LCOV_EXCL_LINE
+    co_backtrace.logTrace();                // LCOV_EXCL_LINE
+    std::abort();                           // LCOV_EXCL_LINE
   });
 }
 

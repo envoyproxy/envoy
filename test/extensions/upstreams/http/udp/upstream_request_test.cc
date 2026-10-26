@@ -17,6 +17,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -29,9 +30,11 @@ namespace Upstreams {
 namespace Http {
 namespace Udp {
 
+using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Eq;
 using ::testing::Invoke;
 using ::testing::NiceMock;
+using ::testing::Not;
 using ::testing::NotNull;
 using ::testing::Return;
 
@@ -73,7 +76,7 @@ TEST_F(UdpUpstreamTest, ExchangeCapsules) {
         EXPECT_EQ(headers->getStatusValue(), "200");
         EXPECT_FALSE(end_stream);
       });
-  EXPECT_TRUE(udp_upstream_->encodeHeaders(connect_udp_headers_, false).ok());
+  EXPECT_OK(udp_upstream_->encodeHeaders(connect_udp_headers_, false));
 
   // Swallow read disable.
   udp_upstream_->readDisable(false);
@@ -117,7 +120,7 @@ TEST_F(UdpUpstreamTest, HeaderOnlyRequest) {
         EXPECT_EQ(headers->getStatusValue(), "400");
         EXPECT_TRUE(end_stream);
       });
-  EXPECT_TRUE(udp_upstream_->encodeHeaders(connect_udp_headers_, true).ok());
+  EXPECT_OK(udp_upstream_->encodeHeaders(connect_udp_headers_, true));
 }
 
 TEST_F(UdpUpstreamTest, SwallowMetadata) {
@@ -140,7 +143,7 @@ TEST_F(UdpUpstreamTest, DatagramsDropped) {
 }
 
 TEST_F(UdpUpstreamTest, InvalidCapsule) {
-  EXPECT_TRUE(udp_upstream_->encodeHeaders(connect_udp_headers_, false).ok());
+  EXPECT_OK(udp_upstream_->encodeHeaders(connect_udp_headers_, false));
   // Sends an invalid capsule.
   const std::string invalid_capsule_fragment =
       absl::HexStringToBytes("0x1eca6a00" // DATAGRAM Capsule Type
@@ -153,7 +156,7 @@ TEST_F(UdpUpstreamTest, InvalidCapsule) {
 }
 
 TEST_F(UdpUpstreamTest, MalformedContextIdDatagram) {
-  EXPECT_TRUE(udp_upstream_->encodeHeaders(connect_udp_headers_, false).ok());
+  EXPECT_OK(udp_upstream_->encodeHeaders(connect_udp_headers_, false));
   // Sends a capsule with an invalid variable length integer.
   const std::string invalid_context_id_fragment =
       absl::HexStringToBytes("00" // DATAGRAM Capsule Type
@@ -171,7 +174,7 @@ TEST_F(UdpUpstreamTest, RemainingDataWhenStreamEnded) {
         EXPECT_EQ(headers->getStatusValue(), "200");
         EXPECT_FALSE(end_stream);
       });
-  EXPECT_TRUE(udp_upstream_->encodeHeaders(connect_udp_headers_, false).ok());
+  EXPECT_OK(udp_upstream_->encodeHeaders(connect_udp_headers_, false));
 
   // Sends a capsule to upstream with a large length value.
   const std::string sent_capsule_fragment =
@@ -188,7 +191,7 @@ TEST_F(UdpUpstreamTest, RemainingDataWhenStreamEnded) {
 TEST_F(UdpUpstreamTest, SocketConnectError) {
   EXPECT_CALL(mock_upstream_to_downstream_, decodeHeaders).Times(0);
   EXPECT_CALL(*mock_socket_, connect(_)).WillOnce(Return(Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_FALSE(udp_upstream_->encodeHeaders(connect_udp_headers_, false).ok());
+  EXPECT_THAT(udp_upstream_->encodeHeaders(connect_udp_headers_, false), Not(IsOk()));
 }
 
 class UdpConnPoolTest : public ::testing::Test {

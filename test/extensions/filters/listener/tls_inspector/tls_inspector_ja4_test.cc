@@ -5,8 +5,11 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/extensions/filters/listener/tls_inspector/tls_utility.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "gtest/gtest.h"
@@ -252,8 +255,32 @@ const std::vector<std::tuple<std::string, std::string, std::string>> JA4_TEST_VE
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
      "00000000000",
-     SSL_SELECT("t13d1516baad_8daaf6152771_e5627efa2ab1",
-                "t13d1515baad_8daaf6152771_de4a06bb82e3")},
+     SSL_SELECT("t13d1516bd_8daaf6152771_e5627efa2ab1", "t13d1515bd_8daaf6152771_de4a06bb82e3")},
+
+    // Regression coverage for the GREASE-in-signature_algorithms bug (see
+    // https://github.com/FoxIO-LLC/ja4/blob/main/technical_details/JA4.md). This is
+    // Browser-1's captured ClientHello with a single GREASE codepoint (0x0a0a)
+    // injected at the head of the signature_algorithms list. The trailing padding
+    // extension is shrunk by 2 bytes to keep outer record/handshake lengths intact.
+    //
+    // Since the ``JA4`` spec requires GREASE codepoints to be excluded everywhere they
+    // appear, the resulting fingerprint (including ``JA4_c``) must exactly match the
+    // baseline Browser-1 fingerprint above -- the GREASE sig-alg must not affect
+    // the hash. Without the fix, ``JA4_c`` would drift to a different value.
+    {"Browser-1-Grease-SigAlg",
+     "1603010200010001fc0303528b4e00213672e534980dfed836dd5b375ab164dcc65ba6a3c87e7e2a1f9d61201bf29"
+     "c9dffaa31ed2df524d3a113edb4e6fd3b7fb3d6d57d5d9aafb213e83c420020aaaa130113021303c02bc02fc02cc0"
+     "30cca9cca8c013c014009c009d002f0035010001936a6a0000000d001400120a0a040308040401050308050501080"
+     "60601000000170015000012656467652e6d6963726f736f66742e636f6d000a000a00084a4a001d00170018000500"
+     "050100000000000b00020100002b0007069a9a03040303001b0003020002ff010001000033002b00294a4a0001000"
+     "01d0020c4ce4268d58f0c703855163f4754b883742487a5ce87a6016a30208c18e07f69446900050003026832002d"
+     "000201010023000000170000001200000010000e000c02683208687474702f312e310a0a000100001500c30000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+     "00000000000",
+     SSL_SELECT("t13d1516h2_8daaf6152771_e5627efa2ab1", "t13d1515h2_8daaf6152771_de4a06bb82e3")},
 };
 
 class TlsInspectorJA4Test
@@ -263,8 +290,10 @@ public:
       : cfg_(std::make_shared<Config>(
             *store_.rootScope(),
             envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector())),
-        io_handle_(Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt,
-                                                                            {})) {}
+        io_handle_(
+            Network::SocketInterfaceImpl::makePlatformSpecificSocket(42, false, std::nullopt, {})) {
+    ON_CALL(os_sys_calls_, close(_)).WillByDefault(testing::Return(Api::SysCallIntResult{0, 0}));
+  }
 
   void init() {
     filter_ = std::make_unique<Filter>(cfg_);
@@ -347,13 +376,61 @@ TEST_P(TlsInspectorJA4Test, JA4FingerprintFromCapturedClientHello) {
   EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
 
   // Trigger the event to copy the client hello message into buffer
-  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
   auto state = filter_->onData(*buffer_);
 
   // This is only checked for tests that pass processing
   if (state == Network::FilterStatus::Continue) {
     EXPECT_EQ(1, cfg_->stats().tls_found_.value());
   }
+}
+
+TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericOldBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ja4_alpn_hex_conversion_fix", "false"}});
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  init();
+
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}6032_.*")));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
+      .Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::_)).Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  filter_->onData(*buffer_);
+}
+
+TEST_F(TlsInspectorJA4Test, AlpnNonAlphanumericNewBehavior) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.ja4_alpn_hex_conversion_fix", "true"}});
+
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.mutable_enable_ja4_fingerprinting()->set_value(true);
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  init();
+
+  std::vector<uint8_t> client_hello =
+      Tls::Test::generateClientHello(0x0303, 0x0303, "", "\x02\x60\x32");
+  mockSysCallForPeek(client_hello);
+
+  EXPECT_CALL(socket_, setJA4Hash(testing::MatchesRegex("^t[0-9]{2}[di][0-9]{4}62_.*")));
+  EXPECT_CALL(socket_, setDetectedTransportProtocol(absl::string_view("tls")))
+      .Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(testing::_)).Times(testing::AtMost(1));
+  EXPECT_CALL(socket_, setRequestedServerName(testing::_)).Times(testing::AtMost(1));
+
+  EXPECT_OK(file_event_callback_(Event::FileReadyType::Read));
+  filter_->onData(*buffer_);
 }
 
 } // namespace

@@ -61,7 +61,6 @@ envoy_cc_library(
     srcs = ["new_grpc_mux_impl.cc"],
     hdrs = ["new_grpc_mux_impl.h"],
     deps = [
-        ":delta_subscription_state_lib",
         ":eds_resources_cache_lib",
         ":grpc_mux_context_lib",
         ":grpc_mux_failover_lib",
@@ -75,6 +74,7 @@ envoy_cc_library(
         "//source/common/config:xds_context_params_lib",
         "//source/common/config:xds_resource_lib",
         "//source/common/memory:utils_lib",
+        "//source/extensions/config_subscription/grpc/xds_mux:delta_subscription_state_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -151,32 +151,6 @@ envoy_cc_extension(
 )
 
 envoy_cc_library(
-    name = "delta_subscription_state_lib",
-    srcs = [
-        "delta_subscription_state.cc",
-    ],
-    hdrs = [
-        "delta_subscription_state.h",
-    ],
-    deps = [
-        ":pausable_ack_queue_lib",
-        ":watch_map_lib",
-        "//envoy/config:subscription_interface",
-        "//envoy/event:dispatcher_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:backoff_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/common:token_bucket_impl_lib",
-        "//source/common/config:api_version_lib",
-        "//source/common/config:ttl_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/grpc:common_lib",
-        "//source/common/protobuf",
-        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "grpc_stream_interface",
     hdrs = ["grpc_stream_interface.h"],
     deps = [
@@ -232,7 +206,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "update_ack_lib",
     hdrs = ["update_ack.h"],
-    deps = ["@com_google_googleapis//google/rpc:status_cc_proto"],
+    deps = ["@googleapis//google/rpc:status_cc_proto"],
 )
 
 envoy_cc_library(

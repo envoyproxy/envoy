@@ -195,6 +195,10 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
                      data.length());
   }
 
+  // Forward any bytes the MessageConverter buffered past the last complete
+  // message (the head of a pipelined message that shared the final chunk).
+  request_msg_converter_->drainLeftoverData(data);
+
   // Reject the request if  extraction is required but could not
   // buffer up any messages.
   if (!extraction_done_) {
@@ -213,12 +217,12 @@ void Filter::handleExtractionResult(const ExtractionResult& result) {
 
   Protobuf::Struct dest_metadata;
   for (const auto& req_field : result) {
-    RELEASE_ASSERT(!req_field.path.empty(), "`req_field.path` shouldn't be empty");
+    RELEASE_ASSERT(!req_field.metadata_key.empty(), "`req_field.metadata_key` shouldn't be empty");
     if (req_field.value.kind_case() == ::google::protobuf::Value::KindCase::KIND_NOT_SET) {
       // Initialize an empty ListValue for any unset field.
-      (*dest_metadata.mutable_fields())[req_field.path].mutable_list_value();
+      (*dest_metadata.mutable_fields())[req_field.metadata_key].mutable_list_value();
     } else {
-      (*dest_metadata.mutable_fields())[req_field.path] = req_field.value;
+      (*dest_metadata.mutable_fields())[req_field.metadata_key] = req_field.value;
     }
   }
   if (dest_metadata.fields_size() > 0) {

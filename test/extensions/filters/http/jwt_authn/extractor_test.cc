@@ -309,6 +309,17 @@ TEST_F(ExtractorTest, TestPrefixHeaderFlexibleMatch3) {
   EXPECT_EQ(tokens[1]->token(), "and0X3Rva2Vu\"}");
 }
 
+// Test that when the value_prefix is present but is followed by no Base64Url-legal
+// characters, extractJWT returns the whole value as-is.
+TEST_F(ExtractorTest, TestPrefixHeaderNoTokenAfterPrefix) {
+  auto headers = TestRequestHeaderMapImpl{{"prefix-header", "AAA "}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer5"));
+  EXPECT_EQ(tokens[0]->token(), "AAA ");
+}
+
 // Test extracting token from the custom query parameter: "token_param"
 TEST_F(ExtractorTest, TestCustomParamToken) {
   auto headers = TestRequestHeaderMapImpl{{":path", "/path?token_param=jwt_token"}};
@@ -452,6 +463,23 @@ providers:
   // Token2 only allows "issuer2"
   EXPECT_TRUE(tokens[1]->isIssuerAllowed("issuer2"));
   EXPECT_FALSE(tokens[1]->isIssuerAllowed("abc"));
+}
+
+// A param-location token is only produced from a :path query string, but the :path header may be
+// absent by the time removeJwt runs (e.g. a filter removed it). removeJwt must not crash and must
+// leave the path absent.
+TEST_F(ExtractorTest, TestCustomParamTokenRemoveWithoutPath) {
+  auto headers = TestRequestHeaderMapImpl{{":path", "/path?token_param=jwt_token"}};
+  auto tokens = extractor_->extract(headers);
+  EXPECT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens[0]->token(), "jwt_token");
+
+  // Drop the :path header before removing the JWT.
+  headers.removePath();
+  EXPECT_EQ(headers.Path(), nullptr);
+
+  tokens[0]->removeJwt(headers);
+  EXPECT_EQ(headers.Path(), nullptr);
 }
 
 } // namespace

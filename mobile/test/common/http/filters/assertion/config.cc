@@ -7,12 +7,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Assertion {
 
-Http::FilterFactoryCb AssertionFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> AssertionFilterFactory::createHttpFilterFactoryFromProtoTyped(
     const envoymobile::extensions::filters::http::assertion::Assertion& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context,
+    Server::Configuration::ExtraFactoryContext&) {
 
   AssertionFilterConfigSharedPtr filter_config =
-      std::make_shared<AssertionFilterConfig>(proto_config, context.serverFactoryContext());
+      std::make_shared<AssertionFilterConfig>(proto_config, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AssertionFilter>(filter_config));
   };

@@ -95,14 +95,14 @@ matcher_tree:
 
   Stats::IsolatedStoreImpl store;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
+  EXPECT_THROW(std::ignore = std::make_shared<RoleBasedAccessControlFilterConfig>(
                    config, "test", *store.rootScope(), context,
                    ProtobufMessage::getStrictValidationVisitor()),
                Envoy::EnvoyException);
 
   config.clear_matcher();
   *config.mutable_shadow_matcher() = matcher_proto;
-  EXPECT_THROW(std::make_shared<RoleBasedAccessControlFilterConfig>(
+  EXPECT_THROW(std::ignore = std::make_shared<RoleBasedAccessControlFilterConfig>(
                    config, "test", *store.rootScope(), context,
                    ProtobufMessage::getStrictValidationVisitor()),
                Envoy::EnvoyException);
@@ -132,8 +132,10 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProtoWithServerContext)
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   RoleBasedAccessControlFilterConfigFactory factory;
+  Server::Configuration::ExtraFactoryContext extra_context{context.messageValidationVisitor(),
+                                                           "stats"};
   Http::FilterFactoryCb cb =
-      factory.createHttpFilterFactoryFromProto(config, "stats", context).value();
+      factory.createHttpFilterFactoryFromProto(config, context, extra_context).value();
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
   cb(filter_callbacks);

@@ -102,10 +102,12 @@ private:
 // once and shared among filters for better performance.
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
-  // Creates and returns an instance of ProtoApiScrubberConfig.
+  // Creates and returns an instance of ProtoApiScrubberConfig. Accepts a `ServerFactoryContext&`
+  // plus the stats scope so it can be used from both the downstream (FactoryContext) and
+  // route/vhost-level (ServerFactoryContext) factory paths; stats are scoped to the given scope.
   static absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
   create(const ProtoApiScrubberConfig& proto_config,
-         Server::Configuration::FactoryContext& context);
+         Server::Configuration::ServerFactoryContext& context, Stats::Scope& scope);
 
   virtual ~ProtoApiScrubberFilterConfig() = default;
 
@@ -237,7 +239,7 @@ private:
   // This is critical for efficient caching in FieldChecker.
   MatchTreeHttpMatchingDataSharedPtr
   getOrCreateMatcher(const xds::type::matcher::v3::Matcher& matcher,
-                     Server::Configuration::FactoryContext& context);
+                     Server::Configuration::ServerFactoryContext& context);
 
   // Validates the filtering mode. Currently, only FilteringMode::OVERRIDE is supported.
   // For any unsupported FilteringMode, it returns absl::InvalidArgument.
@@ -260,7 +262,7 @@ private:
 
   // Initializes the request and response field mask maps using the proto_config.
   absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
-                          Envoy::Server::Configuration::FactoryContext& context);
+                          Envoy::Server::Configuration::ServerFactoryContext& context);
 
   // Loads and parses the descriptor set from the data source.
   // Returns the parsed FileDescriptorSet and populates the internal descriptor_pool_.
@@ -311,18 +313,18 @@ private:
   initializeMethodFieldRestrictions(absl::string_view method_name,
                                     StringPairToMatchTreeMap& field_restrictions,
                                     const Map<std::string, RestrictionConfig>& restrictions,
-                                    Envoy::Server::Configuration::FactoryContext& context);
+                                    Envoy::Server::Configuration::ServerFactoryContext& context);
 
   // Initializes the method-level restrictions.
   absl::Status
   initializeMethodLevelRestrictions(absl::string_view method_name,
                                     const MethodRestrictions& method_config,
-                                    Envoy::Server::Configuration::FactoryContext& context);
+                                    Envoy::Server::Configuration::ServerFactoryContext& context);
 
   // Initializes the message-level restrictions.
   absl::Status
   initializeMessageRestrictions(const Map<std::string, MessageRestrictions>& message_configs,
-                                Envoy::Server::Configuration::FactoryContext& context);
+                                Envoy::Server::Configuration::ServerFactoryContext& context);
 
   FilteringMode filtering_mode_;
 

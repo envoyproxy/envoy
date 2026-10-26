@@ -8,6 +8,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/status_utility.h"
 
 #include "gtest/gtest.h"
 
@@ -86,7 +87,7 @@ protected:
         proto_config.has_manager_config() ? mock_async_file_manager_
                                           : std::shared_ptr<AsyncFileManager>(),
         proto_config, creation_status);
-    EXPECT_TRUE(creation_status.ok());
+    EXPECT_OK(creation_status);
     return config;
   }
 

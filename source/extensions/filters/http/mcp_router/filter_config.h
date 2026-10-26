@@ -11,6 +11,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/extensions/filters/http/mcp_router/header_forwarding_utils.h"
+
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -27,6 +29,7 @@ struct McpBackendConfig {
   std::string path;
   std::chrono::milliseconds timeout{5000};
   std::string host_rewrite_literal;
+  HeaderForwardingPolicy header_forwarding;
 };
 
 // Subject extraction from request header.
@@ -88,7 +91,7 @@ public:
   virtual const std::vector<McpBackendConfig>& backends() const = 0;
   virtual bool isMultiplexing() const = 0;
   virtual const std::string& defaultBackendName() const = 0;
-  virtual Server::Configuration::FactoryContext& factoryContext() const = 0;
+  virtual Server::Configuration::ServerFactoryContext& factoryContext() const = 0;
   virtual const McpBackendConfig* findBackend(const std::string& name) const = 0;
 
   virtual bool lazyInitialization() const = 0;
@@ -98,6 +101,7 @@ public:
   virtual ValidationMode validationMode() const = 0;
   virtual bool shouldEnforceValidation() const = 0;
   virtual const std::string& metadataNamespace() const = 0;
+  virtual const std::string& sessionSigningKey() const = 0;
 
   virtual McpRouterStats& stats() = 0;
 };
@@ -109,12 +113,12 @@ public:
   McpRouterConfigImpl(
       const envoy::extensions::filters::http::mcp_router::v3::McpRouter& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::ServerFactoryContext& context, std::string session_signing_key = {});
 
   const std::vector<McpBackendConfig>& backends() const override { return backends_; }
   bool isMultiplexing() const override { return backends_.size() > 1; }
   const std::string& defaultBackendName() const override { return default_backend_name_; }
-  Server::Configuration::FactoryContext& factoryContext() const override {
+  Server::Configuration::ServerFactoryContext& factoryContext() const override {
     return factory_context_;
   }
   const McpBackendConfig* findBackend(const std::string& name) const override;
@@ -130,16 +134,18 @@ public:
     return session_identity_.validation_mode == ValidationMode::Enforce;
   }
   const std::string& metadataNamespace() const override { return metadata_namespace_; }
+  const std::string& sessionSigningKey() const override { return session_signing_key_; }
 
   McpRouterStats& stats() override { return stats_; }
 
 private:
   std::vector<McpBackendConfig> backends_;
   std::string default_backend_name_;
-  Server::Configuration::FactoryContext& factory_context_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
   bool lazy_initialization_;
   SessionIdentityConfig session_identity_;
   std::string metadata_namespace_;
+  std::string session_signing_key_;
   McpRouterStats stats_;
 };
 
@@ -156,7 +162,7 @@ public:
   const std::vector<McpBackendConfig>& backends() const override { return backends_; }
   bool isMultiplexing() const override { return backends_.size() > 1; }
   const std::string& defaultBackendName() const override { return default_backend_name_; }
-  Server::Configuration::FactoryContext& factoryContext() const override {
+  Server::Configuration::ServerFactoryContext& factoryContext() const override {
     return base_config_->factoryContext();
   }
   const McpBackendConfig* findBackend(const std::string& name) const override;
@@ -169,6 +175,9 @@ public:
   bool shouldEnforceValidation() const override { return base_config_->shouldEnforceValidation(); }
   const std::string& metadataNamespace() const override {
     return base_config_->metadataNamespace();
+  }
+  const std::string& sessionSigningKey() const override {
+    return base_config_->sessionSigningKey();
   }
 
   McpRouterStats& stats() override { return base_config_->stats(); }

@@ -235,8 +235,9 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
       return;
     }
 
-    std::vector<DecodedResourcePtr> decoded_resources;
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
+    Protobuf::Arena batch_arena(resource_decoder.arenaOptions());
+    std::vector<DecodedResourcePtr> decoded_resources;
     std::string version_info;
     for (const auto& resource : resources) {
       if (version_info.empty()) {
@@ -247,7 +248,7 @@ void GrpcMuxImpl::loadConfigFromDelegate(const std::string& type_url,
 
       TRY_ASSERT_MAIN_THREAD {
         decoded_resources.emplace_back(
-            std::make_unique<DecodedResourceImpl>(resource_decoder, resource));
+            std::make_unique<DecodedResourceImpl>(resource_decoder, resource, batch_arena));
       }
       END_TRY
       CATCH(const EnvoyException& e,
@@ -323,6 +324,10 @@ absl::Status GrpcMuxImpl::updateMuxSource(
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
 
   load_stats_reporter_factory_ = std::move(load_stats_reporter_factory);
+  if (lrs_server_ != nullptr) {
+    lrs_server_.reset();
+    maybeCreateLoadStatsReporter();
+  }
 
   // No need to update the config_validators_ as they may contain some state
   // that needs to be kept across different GrpcMux objects.
@@ -361,12 +366,12 @@ ScopedResume GrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
 }
 
 void GrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
+    ResponseProtoPtr<envoy::service::discovery::v3::DiscoveryResponse>&& message,
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
 
-  if (api_state_.count(type_url) == 0) {
+  if (!api_state_.contains(type_url)) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
     // protocol violation
     ENVOY_LOG(warn, "Ignoring the message for type URL {} as it has no current subscribers.",
@@ -411,8 +416,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
   // see https://github.com/envoyproxy/envoy/issues/11477.
   same_type_resume = pause(type_url);
   TRY_ASSERT_MAIN_THREAD {
-    std::vector<DecodedResourcePtr> resources;
     OpaqueResourceDecoder& resource_decoder = *api_state.watches_.front()->resource_decoder_;
+    Protobuf::Arena batch_arena(resource_decoder.arenaOptions());
+    std::vector<DecodedResourcePtr> resources;
 
     for (const auto& resource : message->resources()) {
       // TODO(snowp): Check the underlying type when the resource is a Resource.
@@ -424,7 +430,8 @@ void GrpcMuxImpl::onDiscoveryResponse(
       }
 
       auto decoded_resource = THROW_OR_RETURN_VALUE(
-          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info()),
+          DecodedResourceImpl::fromResource(resource_decoder, resource, message->version_info(),
+                                            batch_arena),
           DecodedResourceImplPtr);
 
       if (!isHeartbeatResource(type_url, *decoded_resource)) {
@@ -597,6 +604,9 @@ void GrpcMuxImpl::onEstablishmentFailure(bool) {
 }
 
 void GrpcMuxImpl::queueDiscoveryRequest(absl::string_view queue_item) {
+  if (shutdown_) {
+    return;
+  }
   if (!grpc_stream_->grpcStreamAvailable()) {
     ENVOY_LOG(debug, "No stream available to queueDiscoveryRequest for {}", queue_item);
     return; // Drop this request; the reconnect will enqueue a new one.
@@ -628,7 +638,7 @@ void GrpcMuxImpl::expiryCallback(absl::string_view type_url,
     Protobuf::RepeatedPtrField<std::string> found_resources_for_watch;
 
     for (const auto& resource : expired) {
-      if (all_expired.find(resource) != all_expired.end()) {
+      if (all_expired.contains(resource)) {
         found_resources_for_watch.Add(std::string(resource));
       }
     }

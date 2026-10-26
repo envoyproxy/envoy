@@ -101,6 +101,9 @@ envoy::service::health::v3::HealthCheckRequestOrEndpointHealthResponse HdsDelega
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       // Get a grouping of hosts by locality.
       for (const auto& locality_hosts : hosts->hostsPerLocality().get()) {
+        if (locality_hosts.empty()) {
+          continue;
+        }
         // For this locality, add the response grouping.
         envoy::service::health::v3::LocalityEndpointsHealth* locality_health =
             cluster_health->add_locality_endpoints_health();
@@ -232,7 +235,7 @@ HdsDelegate::createHdsCluster(const envoy::config::cluster::v3::Cluster& cluster
 }
 
 absl::Status HdsDelegate::processMessage(
-    std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
+    Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
   std::vector<HdsClusterPtr> hds_clusters;
@@ -292,7 +295,7 @@ absl::Status HdsDelegate::processMessage(
 }
 
 void HdsDelegate::onReceiveMessage(
-    std::unique_ptr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
+    Grpc::ResponsePtr<envoy::service::health::v3::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 

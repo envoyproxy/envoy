@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "compressor_test",
     srcs = ["zstd_compressor_impl_test.cc"],
     extension_names = ["envoy.compression.zstd.compressor"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/compression/zstd/decompressor:decompressor_lib",

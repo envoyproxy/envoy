@@ -24,16 +24,17 @@ namespace ProtoMessageExtraction {
 // performance.
 class FilterConfig : public Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  explicit FilterConfig(const envoy::extensions::filters::http::proto_message_extraction::v3::
-                            ProtoMessageExtractionConfig& proto_config,
-                        std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api);
+  FilterConfig(const envoy::extensions::filters::http::proto_message_extraction::v3::
+                   ProtoMessageExtractionConfig& proto_config,
+               std::unique_ptr<ExtractorFactory> extractor_factory, Api::Api& api,
+               absl::Status& creation_status);
 
   const Extractor* findExtractor(absl::string_view proto_path) const;
 
 private:
-  void initDescriptorPool(Api::Api& api);
+  absl::Status initDescriptorPool(Api::Api& api);
 
-  void initExtractors(ExtractorFactory& extractor_factory);
+  absl::Status initExtractors(ExtractorFactory& extractor_factory);
 
   const envoy::extensions::filters::http::proto_message_extraction::v3::
       ProtoMessageExtractionConfig& proto_config_;

@@ -1,6 +1,7 @@
 #include "source/common/http/http_service_headers.h"
 
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -9,6 +10,7 @@ namespace Envoy {
 namespace Http {
 namespace {
 
+using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::NiceMock;
 
 class HttpServiceHeadersApplicatorTest : public testing::Test {
@@ -18,7 +20,7 @@ protected:
     TestUtility::loadFromYaml(yaml, http_service);
     absl::Status creation_status = absl::OkStatus();
     HttpServiceHeadersApplicator applicator(http_service, server_context_, creation_status);
-    EXPECT_TRUE(creation_status.ok());
+    EXPECT_OK(creation_status);
     return applicator;
   }
 
@@ -131,8 +133,8 @@ request_headers_to_add:
 
   absl::Status creation_status = absl::OkStatus();
   HttpServiceHeadersApplicator applicator(http_service, server_context_, creation_status);
-  EXPECT_FALSE(creation_status.ok());
-  EXPECT_EQ(creation_status.message(), "Not supported field in StreamInfo: NOSUCHCOMMAND");
+  EXPECT_THAT(creation_status,
+              HasStatusMessage("Not supported field in StreamInfo: NOSUCHCOMMAND"));
 }
 
 TEST_F(HttpServiceHeadersApplicatorTest, MultipleValueFieldsReportsError) {
@@ -155,7 +157,7 @@ request_headers_to_add:
   // Both value and raw_value set; raw_value takes precedence (non-empty raw_value is used as
   // static header). The value field is ignored since raw_value is checked first.
   // This matches proto3 behavior where both fields can be set independently.
-  EXPECT_TRUE(creation_status.ok());
+  EXPECT_OK(creation_status);
 }
 
 } // namespace

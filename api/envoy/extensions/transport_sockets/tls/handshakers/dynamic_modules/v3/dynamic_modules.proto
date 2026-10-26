@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.handshakers.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.handshakers.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/handshakers/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Module TLS Handshaker]
+// [#extension: envoy.tls.handshakers.dynamic_modules]
+
+// Configuration for the dynamic module TLS handshaker.
+//
+// Example:
+//
+// .. validated-code-block:: yaml
+//   :type-name: envoy.extensions.transport_sockets.tls.v3.CommonTlsContext
+//
+//   custom_handshaker:
+//     name: envoy.tls.handshakers.dynamic_modules
+//     typed_config:
+//       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.handshakers.dynamic_modules.v3.DynamicModuleTlsHandshaker
+//       dynamic_module_config:
+//         name: my_module
+//       handshaker_name: my_handshaker
+//
+message DynamicModuleTlsHandshaker {
+  // Dynamic module configuration. See :ref:`dynamic module configuration
+  // <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>` for details.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name of the handshaker implementation in the dynamic module.
+  // This is passed to the module's ``envoy_dynamic_module_on_tls_handshaker_config_new`` function.
+  string handshaker_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Optional configuration for the handshaker. This is passed as bytes to the dynamic module.
+  // If not specified, no configuration bytes are passed to the module.
+  google.protobuf.Any handshaker_config = 3;
+}

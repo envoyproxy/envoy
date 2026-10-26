@@ -41,7 +41,8 @@ message MetadataKey {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.metadata.v2.MetadataKey";
 
   // Specifies a segment in a path for retrieving values from Metadata.
-  // Currently, only key-based segments (field names) are supported.
+  // Supports both key-based segments (field names in a Struct) and index-based
+  // segments (element access in a ListValue).
   message PathSegment {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.type.metadata.v2.MetadataKey.PathSegment";
@@ -51,6 +52,9 @@ message MetadataKey {
 
       // If specified, use this key to retrieve the value in a Struct.
       string key = 1 [(validate.rules).string = {min_len: 1}];
+
+      // If specified, use this index to retrieve a value from a ListValue.
+      uint32 index = 2;
     }
   }
 
@@ -60,12 +64,12 @@ message MetadataKey {
 
   // The path used to retrieve a specific Value from the Struct.
   // This can be either a prefix or a full path, depending on the use case.
-  // For example, ``[prop, xyz]`` would retrieve a struct or ``[prop, foo]`` would retrieve a string
-  // in the example above.
+  // For example, ``[{key: prop}, {key: xyz}]`` would retrieve a struct or ``[{key: prop}, {key: foo}]``
+  // would retrieve a string in the example above.
   //
-  // .. note::
-  //   Since only key-type segments are supported, a path cannot specify a list
-  //   unless the list is the last segment.
+  // Path segments support both struct field access (via ``key``) and list element access (via ``index``).
+  // For example, to access the first element of a list at ``envoy.filters.http.grpc_field_extraction.tenant_id``,
+  // use ``path: [{key: tenant_id}, {index: 0}]``.
   repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 

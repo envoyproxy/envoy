@@ -1,14 +1,17 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
     data = [
@@ -20,8 +23,10 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_no_op",
         "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_stop_and_buffer",
+        "//test/extensions/dynamic_modules/test_data/c:upstream_bridge_terminal_response",
     ],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.upstreams.http.dynamic_modules"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:address_lib",
@@ -34,18 +39,20 @@ envoy_cc_test(
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/rust:upstream_http_tcp_bridge",
     ],
-    rbe_pool = "2core",
+    extension_names = ["envoy.upstreams.http.dynamic_modules"],
+    rbe_pool = "linux_x64_medium",
     shard_count = 4,
     tags = [
         "cpu:3",
@@ -55,6 +62,7 @@ envoy_cc_test(
         "//test/integration:http_integration_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:environment_lib",
+        "//test/test_common:logging_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/dynamic_modules/v3:pkg_cc_proto",
     ],

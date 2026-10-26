@@ -17,6 +17,7 @@ public:
   StaticRouteConfigProviderImpl(const Protobuf::Message& route_config_proto,
                                 ConfigTraits& config_traits,
                                 Server::Configuration::ServerFactoryContext& factory_context,
+                                Init::Manager& init_manager,
                                 RouteConfigProviderManager& route_config_provider_manager);
 
   ~StaticRouteConfigProviderImpl() override;
@@ -28,7 +29,8 @@ public:
   absl::Status onConfigUpdate() override { return absl::OkStatus(); }
 
 private:
-  ProtobufTypes::MessagePtr route_config_proto_;
+  Protobuf::Any route_config_any_;
+  std::string route_config_name_;
   ConfigConstSharedPtr config_;
   SystemTime last_updated_;
   std::optional<ConfigInfo> config_info_;

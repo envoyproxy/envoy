@@ -23,11 +23,14 @@
 #include "source/common/event/scaled_range_timer_manager_impl.h"
 #include "source/common/event/signal_impl.h"
 #include "source/common/event/timer_impl.h"
+#include "source/common/event/worker_id.h"
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
+#include "source/common/stats/utility.h"
 
 #include "event2/event.h"
 
@@ -68,8 +71,9 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
                                Event::TimeSystem& time_system,
                                const ScaledRangeTimerManagerFactory& scaled_timer_factory,
                                const Buffer::WatermarkFactorySharedPtr& watermark_factory)
-    : name_(name), thread_factory_(thread_factory), time_source_(time_source),
-      file_system_(file_system), buffer_factory_(watermark_factory),
+    : name_(name), worker_id_(workerIdFromThreadName(name)), thread_factory_(thread_factory),
+      time_source_(time_source), file_system_(file_system), buffer_factory_(watermark_factory),
+      base_scheduler_(time_source),
       scheduler_(time_system.createScheduler(base_scheduler_, base_scheduler_)),
       thread_local_delete_cb_(
           base_scheduler_.createSchedulableCallback([this]() -> void { runThreadLocalDelete(); })),
@@ -98,16 +102,30 @@ void DispatcherImpl::registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
       std::make_unique<WatchdogRegistration>(watchdog, *scheduler_, min_touch_interval, *this);
 }
 
+void DispatcherImpl::registerEvwatchObserver(Evwatch::Observer& observer) {
+  ASSERT(isThreadSafe());
+  base_scheduler_.registerEvwatchObserver(observer);
+}
+
+void DispatcherImpl::unregisterEvwatchObserver(Evwatch::Observer& observer) {
+  ASSERT(isThreadSafe());
+  base_scheduler_.unregisterEvwatchObserver(observer);
+}
+
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const std::optional<std::string>& prefix) {
-  const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
-  post([this, &scope, effective_prefix] {
-    stats_prefix_ = effective_prefix + "dispatcher";
+  post([this, &scope, prefix] {
+    // An explicit prefix is already '.' suffixed and replaces the dispatcher's name entirely.
+    const Stats::TaggedStatName stats_prefix = Stats::workerStatPrefix(
+        scope.symbolTable(), prefix.value_or(""), prefix.has_value() ? "" : name_, "dispatcher.");
+    Stats::LiteScopeHelper helper(scope, stats_prefix.baseName(), stats_prefix.tags(),
+                                  stats_prefix.name());
     stats_ = std::make_unique<DispatcherStats>(
-        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
+        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM(helper))});
     base_scheduler_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_.debugString());
+    ENVOY_LOG(debug, "running {} on thread {}", scope.symbolTable().toString(stats_prefix.name()),
+              run_tid_.debugString());
   });
 }
 

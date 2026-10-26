@@ -1,6 +1,7 @@
 #include "source/common/config/context_provider_impl.h"
 
 #include "test/common/config/xds_test_utility.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -56,26 +57,26 @@ TEST(ContextProviderTest, DynamicContextParameters) {
   EXPECT_EQ(0, update_count);
 
   // Setting a DCP.
-  ASSERT_TRUE(context_provider.setDynamicContextParam("some_type", "foo", "bar").ok());
+  ASSERT_OK(context_provider.setDynamicContextParam("some_type", "foo", "bar"));
   EXPECT_EQ(1, update_count);
   EXPECT_EQ("some_type", last_updated_resource);
   EXPECT_EQ("bar", context_provider.dynamicContext("some_type").params().at("foo"));
 
   // Updating a DCP.
-  ASSERT_TRUE(context_provider.setDynamicContextParam("some_type", "foo", "baz").ok());
+  ASSERT_OK(context_provider.setDynamicContextParam("some_type", "foo", "baz"));
   EXPECT_EQ(2, update_count);
   EXPECT_EQ("some_type", last_updated_resource);
   EXPECT_EQ("baz", context_provider.dynamicContext("some_type").params().at("foo"));
 
   // Setting a DCP on an unrelated resource.
-  ASSERT_TRUE(context_provider.setDynamicContextParam("other_type", "foo", "bar").ok());
+  ASSERT_OK(context_provider.setDynamicContextParam("other_type", "foo", "bar"));
   EXPECT_EQ(3, update_count);
   EXPECT_EQ("other_type", last_updated_resource);
   EXPECT_EQ("baz", context_provider.dynamicContext("some_type").params().at("foo"));
   EXPECT_EQ("bar", context_provider.dynamicContext("other_type").params().at("foo"));
 
   // Unsetting a DCP
-  ASSERT_TRUE(context_provider.unsetDynamicContextParam("some_type", "foo").ok());
+  ASSERT_OK(context_provider.unsetDynamicContextParam("some_type", "foo"));
   EXPECT_EQ(4, update_count);
   EXPECT_EQ("some_type", last_updated_resource);
   EXPECT_EQ(0, context_provider.dynamicContext("some_type").params().count("foo"));

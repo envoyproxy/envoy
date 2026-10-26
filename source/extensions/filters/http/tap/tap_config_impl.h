@@ -21,7 +21,7 @@ class HttpTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
 public:
   HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& proto_config,
                     Extensions::Common::Tap::Sink* admin_streamer,
-                    Server::Configuration::FactoryContext& context);
+                    Server::Configuration::GenericFactoryContext& context);
 
   // TapFilter::HttpTapConfig
   HttpPerRequestTapperPtr

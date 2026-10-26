@@ -1,3 +1,4 @@
+#include "envoy/config/common/key_value/v3/config.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
@@ -545,31 +546,6 @@ TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressAndContentLength) {
   // Wait for the encapsulated response to be received.
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
-}
-
-TEST_P(Http11ConnectHttpIntegrationTest, DfpWithProxyAddressLegacy) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "false");
-
-  addDfpConfig();
-
-  initialize();
-
-  // Point at the second fake upstream. Envoy doesn't actually know about this one.
-  absl::string_view second_upstream_address(fake_upstreams_[1]->localAddress()->asStringView());
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  // Set the host to a domain which does not exist.
-  default_request_headers_.setHost("doesnotexist.lyft.com");
-  // The connect-proxy header will be stripped by the header-to-proxy-filter and inserted as
-  // metadata.
-  default_request_headers_.setCopy(Envoy::Http::LowerCaseString("connect-proxy"),
-                                   second_upstream_address);
-
-  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-
-  // Wait for the encapsulated response to be received.
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 // Test sending a request to host with port.

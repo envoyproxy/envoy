@@ -114,6 +114,7 @@ public:
   MOCK_METHOD(const std::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (), (const));
   MOCK_METHOD(float, perUpstreamPreconnectRatio, (), (const));
   MOCK_METHOD(float, peekaheadRatio, (), (const));
+  MOCK_METHOD(bool, shouldPreconnect, (const Host& host), (const));
   MOCK_METHOD(uint32_t, perConnectionBufferLimitBytes, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, perConnectionBufferHighWatermarkTimeout, (), (const));
   MOCK_METHOD(uint64_t, features, (), (const));
@@ -154,9 +155,11 @@ public:
               (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(OptRef<const ClusterInfo::PendingRqQueuePolicy>, pendingRqQueuePolicy, (), (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, connectionPoolPerDownstreamConnection, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
+  MOCK_METHOD(bool, waitForWarmOnInit, (), (const));
   MOCK_METHOD(bool, setLocalInterfaceNameOnUpstreamConnections, (), (const));
   MOCK_METHOD(const std::string&, edsServiceName, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
@@ -266,6 +269,7 @@ public:
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;
   envoy::config::core::v3::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
+  std::unique_ptr<ClusterInfo::PendingRqQueuePolicy> pending_rq_queue_policy_;
   std::optional<std::chrono::milliseconds> max_stream_duration_;
   Stats::ScopeSharedPtr stats_scope_;
   mutable Http::Http1::CodecStats::AtomicPtr http1_codec_stats_;

@@ -76,7 +76,7 @@ graph TD;
     KC["RichKafkaConsumer"]
     FRH -.-> |registers itself with| SCM
     SCM -.-> |provides records| FRH
-    SCM --> |stores mutliple| KC
+    SCM --> |stores multiple| KC
 
     LibrdKafkaConsumer["<< librdkafka >> \n KafkaConsumer"]
     ConsumerPoller["<< thread >> \n consumer poller"]

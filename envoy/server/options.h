@@ -9,6 +9,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/network/address.h"
+#include "envoy/server/drain_strategy.h"
 #include "envoy/stats/tag.h"
 
 #include "spdlog/spdlog.h"
@@ -41,24 +42,6 @@ enum class Mode {
   // Perform no validation of files referenced in the config, such as runtime configs, SSL certs,
   // etc. Validation will pass even if those files are malformed or don't exist, allowing the config
   // to be validated in a non-prod environment.
-};
-
-/**
- * During the drain sequence, different components ask the DrainManager
- * whether to drain via drainClose(). This enum dictates the behaviour of
- * drainClose() calls.
- */
-enum class DrainStrategy {
-  /**
-   * The probability of drainClose() returning true increases from 0 to 100%
-   * over the duration of the drain period.
-   */
-  Gradual,
-
-  /**
-   * drainClose() will return true as soon as the drain sequence is initiated.
-   */
-  Immediate,
 };
 
 using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v3::CommandLineOptions>;

@@ -381,6 +381,10 @@ void ConnectionManagerUtility::cleanInternalHeaders(
   request_headers.removeEnvoyIpTags();
   request_headers.removeEnvoyOriginalUrl();
   request_headers.removeEnvoyHedgeOnPerTryTimeout();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.sanitize_upstream_stream_duration_header")) {
+    request_headers.removeEnvoyUpstreamStreamDurationMs();
+  }
 
   for (const LowerCaseString& header : internal_only_headers) {
     request_headers.remove(header);
@@ -523,6 +527,14 @@ void appendXfccJsonObject(
         }
         break;
       }
+      case ClientCertDetailsType::Issuer: {
+        const std::string& issuer = connection.ssl()->issuerPeerCertificate();
+        if (!issuer.empty()) {
+          root->addKey("issuer");
+          root->addString(issuer);
+        }
+        break;
+      }
       }
     }
   }
@@ -641,6 +653,11 @@ void applyForwardClientCertConfig(
           }
           break;
         }
+        case ClientCertDetailsType::Issuer:
+          // The "Issuer" key still exists even if the issuer is empty.
+          client_cert_details.push_back(
+              absl::StrCat("Issuer=\"", connection.ssl()->issuerPeerCertificate(), "\""));
+          break;
         }
       }
       client_cert_details_str = absl::StrJoin(client_cert_details, ";");

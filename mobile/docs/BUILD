@@ -63,7 +63,7 @@ genrule(
     cmd = """
     . $(location @envoy//bazel:volatile_env) \
     && VERSION_NUMBER="$$(cat $(location //:VERSION))" \
-    && export ENVOY_BLOB_SHA=$${BUILD_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${{BUILD_SCM_REVISION}}} \
+    && export ENVOY_BLOB_SHA=$${BUILD_SHA:-$${ENVOY_BUILD_SCM_REVISION:-$${BUILD_SCM_REVISION}}} \
     && export ENVOY_DOCS_VERSION_STRING="$${VERSION_NUMBER}"-"$${ENVOY_BLOB_SHA:0:6}" \
     && export ENVOY_DOCS_RELEASE_LEVEL=pre-release \
     && mkdir -p build \

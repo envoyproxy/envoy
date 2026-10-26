@@ -27,12 +27,11 @@ private:
       const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfig& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr> createHttpFilterRouteConfigTyped(
       const envoy::extensions::filters::http::filter_chain::v3::FilterChainConfigPerRoute&
           proto_config,
       Server::Configuration::ServerFactoryContext& context,
-      ProtobufMessage::ValidationVisitor&) override;
+      Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
 DECLARE_FACTORY(FilterChainFilterFactory);

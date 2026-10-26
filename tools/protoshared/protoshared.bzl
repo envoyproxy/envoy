@@ -1,5 +1,5 @@
-load("@com_google_protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 load("@envoy_api//bazel:api_build_system.bzl", "EnvoyProtoDepsInfo")
+load("@protobuf//bazel/common:proto_info.bzl", "ProtoInfo")
 
 MNEMONIC = "ProtoShared"
 

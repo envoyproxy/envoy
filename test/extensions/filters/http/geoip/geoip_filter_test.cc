@@ -8,12 +8,14 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::DoAll;
+using testing::Return;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -271,6 +273,88 @@ TEST_F(GeoipFilterTest, GeoHeaderNotAppendedOnEmptyLookup) {
   filter_->onDestroy();
 }
 
+// A geolocation header a client sent is removed before the lookup, so it does not survive a
+// lookup that has no value for it. Only the header the lookup populated reaches the upstream.
+TEST_F(GeoipFilterTest, ClientSuppliedGeoHeadersRemovedBeforeLookup) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  const std::vector<Http::LowerCaseString> geo_header_names = {
+      Http::LowerCaseString("x-geo-country"), Http::LowerCaseString("x-geo-city"),
+      Http::LowerCaseString("x-geo-anon-vpn")};
+  EXPECT_CALL(*dummy_driver_, geoHeaderNames())
+      .WillRepeatedly(Return(absl::MakeConstSpan(geo_header_names)));
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.addCopy("x-geo-country", "US");
+  request_headers.addCopy("x-geo-city", "client_city");
+  request_headers.addCopy("x-geo-anon-vpn", "false");
+  request_headers.addCopy("x-unrelated", "kept");
+  expectStats();
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                              captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+                            })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, request_headers.size());
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-geo-city", "dummy-city"));
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-unrelated", "kept"));
+  EXPECT_FALSE(request_headers.has("x-geo-country"));
+  EXPECT_FALSE(request_headers.has("x-geo-anon-vpn"));
+  ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  filter_->onDestroy();
+}
+
+// The removal is guarded by a runtime flag so that a deployment which relied on client-supplied
+// geolocation headers passing through can keep the previous behavior while it migrates.
+TEST_F(GeoipFilterTest, ClientSuppliedGeoHeadersKeptWhenSanitizationDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.geoip_sanitize_geo_headers", "false"}});
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  const std::vector<Http::LowerCaseString> geo_header_names = {
+      Http::LowerCaseString("x-geo-country"), Http::LowerCaseString("x-geo-city")};
+  EXPECT_CALL(*dummy_driver_, geoHeaderNames())
+      .WillRepeatedly(Return(absl::MakeConstSpan(geo_header_names)));
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.addCopy("x-geo-country", "US");
+  expectStats();
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_), Invoke([this]() {
+                              captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+                            })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(2, request_headers.size());
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-geo-country", "US"));
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-geo-city", "dummy-city"));
+  ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  filter_->onDestroy();
+}
+
 TEST_F(GeoipFilterTest, NoCrashIfFilterDestroyedBeforeCallbackCalled) {
   initializeProviderFactory();
   const std::string external_request_yaml = R"EOF(
@@ -430,6 +514,110 @@ TEST_F(GeoipFilterTest, UseIpAddressHeaderFallbackOnInvalidIp) {
   // Should fall back to downstream address when IP is invalid.
   EXPECT_EQ("1.2.3.4:0", captured_rq_.remoteAddress()->asString());
   ::testing::Mock::VerifyAndClearExpectations(&filter_callbacks_);
+  filter_->onDestroy();
+}
+
+TEST_F(GeoipFilterTest, NoContinueDecodingWhenStreamDestroyedBeforeLookupCompletes) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  Http::TestRequestHeaderMapImpl request_headers;
+  // The stream is gone by the time the lookup completes, so nothing should be recorded either.
+  expectStats(0);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      remote_address);
+  EXPECT_CALL(*dummy_driver_, lookup(_, _))
+      .WillRepeatedly(DoAll(SaveArg<0>(&captured_rq_), SaveArg<1>(&captured_cb_)));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+  // Keep the filter alive through the posted callback so the destroyed_ guard is exercised.
+  // In production, the callback captures a weak_ptr and does nothing if the filter is already gone;
+  // the decoder callbacks and request headers it refers to are invalid after stream destruction.
+  filter_->onDestroy();
+  captured_cb_(Geolocation::LookupResult{{"x-geo-city", "dummy-city"}});
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(0, request_headers.size());
+}
+
+// A geolocation lookup needs an IP address, and the downstream connection address is not
+// necessarily one. The filter must skip the lookup rather than pass a non-IP address to the
+// provider, which asserts on one.
+class GeoipFilterNonIpAddressTest : public GeoipFilterTest {
+public:
+  void expectLookupSkipped(Network::Address::InstanceConstSharedPtr remote_address) {
+    initializeProviderFactory();
+    const std::string external_request_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+)EOF";
+    initializeFilter(external_request_yaml);
+    Http::TestRequestHeaderMapImpl request_headers;
+    filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        remote_address);
+    // No lookup is attempted, but the request is still counted in the total alongside skipped.
+    expectStats();
+    EXPECT_CALL(stats_, counter("prefix.geoip.skipped"));
+    EXPECT_CALL(*dummy_driver_, lookup(_, _)).Times(0);
+    // The request must continue down the chain untouched rather than stall waiting on a lookup
+    // that will never run.
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+    EXPECT_EQ(0, request_headers.size());
+    filter_->onDestroy();
+  }
+};
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNonIpDownstreamAddress) {
+  expectLookupSkipped(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_address_for_test"));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForPipeDownstreamAddress) {
+  auto pipe_or_error = Network::Address::PipeInstance::create("/tmp/envoy_geoip_test.sock");
+  ASSERT_TRUE(pipe_or_error.ok());
+  expectLookupSkipped(std::move(*pipe_or_error));
+}
+
+TEST_F(GeoipFilterNonIpAddressTest, SkipLookupForNullDownstreamAddress) {
+  expectLookupSkipped(nullptr);
+}
+
+// A skipped lookup sets no header, so the client-supplied geolocation headers are removed on that
+// path as well; the upstream must not read them as the filter's own.
+TEST_F(GeoipFilterNonIpAddressTest, ClientSuppliedGeoHeadersRemovedWhenLookupSkipped) {
+  initializeProviderFactory();
+  const std::string external_request_yaml = R"EOF(
+    provider:
+        name: "envoy.geoip_providers.dummy"
+        typed_config:
+          "@type": type.googleapis.com/test.mocks.geoip.DummyProvider
+)EOF";
+  initializeFilter(external_request_yaml);
+  const std::vector<Http::LowerCaseString> geo_header_names = {
+      Http::LowerCaseString("x-geo-country")};
+  EXPECT_CALL(*dummy_driver_, geoHeaderNames())
+      .WillRepeatedly(Return(absl::MakeConstSpan(geo_header_names)));
+  Http::TestRequestHeaderMapImpl request_headers;
+  request_headers.addCopy("x-geo-country", "US");
+  request_headers.addCopy("x-unrelated", "kept");
+  filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::EnvoyInternalInstance>("internal_address_for_test"));
+  expectStats();
+  EXPECT_CALL(stats_, counter("prefix.geoip.skipped"));
+  EXPECT_CALL(*dummy_driver_, lookup(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(1, request_headers.size());
+  EXPECT_FALSE(request_headers.has("x-geo-country"));
+  EXPECT_THAT(request_headers, HasExpectedHeader("x-unrelated", "kept"));
   filter_->onDestroy();
 }
 

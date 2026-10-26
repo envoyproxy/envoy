@@ -15,6 +15,7 @@
 #include "test/mocks/upstream/cluster_update_callbacks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 
 using testing::Return;
 
@@ -46,7 +47,7 @@ public:
     ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
     THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
-    ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
+    ASSERT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     EXPECT_EQ(cluster_manager_->activeClusters().size(), 1);
     cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   }
@@ -269,7 +270,7 @@ TEST_P(AggregateClusterUpdateTest, InitializeAggregateClusterAfterOtherClusters)
   ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
   THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
-  ASSERT_TRUE(cluster_manager_->initializeSecondaryClusters(bootstrap).ok());
+  ASSERT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
   EXPECT_EQ(cluster_manager_->activeClusters().size(), 2);
   cluster_ = cluster_manager_->getThreadLocalCluster("aggregate_cluster");
   auto primary = cluster_manager_->getThreadLocalCluster("primary");

@@ -4,6 +4,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "envoy/api/api.h"
@@ -57,8 +58,11 @@ public:
 
   // Event::Dispatcher
   const std::string& name() override { return name_; }
+  std::optional<uint32_t> workerId() const override { return worker_id_; }
   void registerWatchdog(const Server::WatchDogSharedPtr& watchdog,
                         std::chrono::milliseconds min_touch_interval) override;
+  void registerEvwatchObserver(Evwatch::Observer& observer) override;
+  void unregisterEvwatchObserver(Evwatch::Observer& observer) override;
   TimeSource& timeSource() override { return time_source_; }
   void initializeStats(Stats::Scope& scope, const std::optional<std::string>& prefix) override;
   void clearDeferredDeleteList() override;
@@ -141,10 +145,10 @@ private:
   }
 
   const std::string name_;
+  const std::optional<uint32_t> worker_id_;
   Thread::ThreadFactory& thread_factory_;
   TimeSource& time_source_;
   Filesystem::Instance& file_system_;
-  std::string stats_prefix_;
   DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;
   Buffer::WatermarkFactorySharedPtr buffer_factory_;

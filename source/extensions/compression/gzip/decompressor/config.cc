@@ -35,7 +35,7 @@ GzipDecompressorFactory::createDecompressor(const std::string& stats_prefix) {
 Envoy::Compression::Decompressor::DecompressorFactoryPtr
 GzipDecompressorLibraryFactory::createDecompressorFactoryFromProtoTyped(
     const envoy::extensions::compression::gzip::decompressor::v3::Gzip& proto_config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   return std::make_unique<GzipDecompressorFactory>(proto_config, context.scope());
 }
 

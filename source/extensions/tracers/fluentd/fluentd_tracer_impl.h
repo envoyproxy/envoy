@@ -149,7 +149,7 @@ private:
   };
 
 private:
-  ThreadLocal::SlotPtr tls_slot_;
+  ThreadLocal::SlotSharedPtr tls_slot_;
   const FluentdConfigSharedPtr fluentd_config_;
   FluentdTracerCacheSharedPtr tracer_cache_;
 };

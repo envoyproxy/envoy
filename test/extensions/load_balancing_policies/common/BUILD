@@ -44,7 +44,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:thread_aware_lb_lib",
@@ -58,7 +58,7 @@ envoy_cc_test_library(
     name = "load_balancer_fuzz_lib",
     srcs = ["load_balancer_fuzz_base.cc"],
     hdrs = ["load_balancer_fuzz_base.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":load_balancer_fuzz_proto_cc_proto",
         "//source/common/upstream:load_balancer_context_base_lib",
@@ -117,6 +117,7 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@xds//xds/data/orca/v3:pkg_cc_proto",
     ],
@@ -176,7 +177,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "load_balancer_base_test",
     srcs = ["load_balancer_impl_base_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":load_balancer_base_test_lib",
     ],

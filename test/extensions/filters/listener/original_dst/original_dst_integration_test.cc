@@ -86,6 +86,35 @@ TEST_P(OriginalDstIntegrationTest, OriginalDstHttpManyConnections) {
   }
 }
 
+TEST_P(OriginalDstIntegrationTest, ScopedIpv6OriginalDstCrash) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.clear_load_balancing_policy();
+
+    cluster.set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
+    cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+    cluster.mutable_original_dst_lb_config()->set_use_http_header(true);
+    cluster.clear_load_assignment();
+  });
+
+  initialize();
+
+  // Send a raw HTTP/1.1 request with a scoped link-local IPv6 in the override header.
+  auto tcp = makeTcpConnection(lookupPort("http"));
+  ASSERT_TRUE(tcp->write("GET / HTTP/1.1\r\n"
+                         "Host: h\r\n"
+                         "x-envoy-original-dst-host: [fe80::1%1]:80\r\n"
+                         "\r\n",
+                         false));
+
+  // Since chooseHost() now successfully handles the scoped IPv6 address without throwing/aborting,
+  // Envoy should gracefully handle the request and return a 503 response because the target is
+  // unreachable.
+  tcp->waitForData("HTTP/1.1 503");
+  EXPECT_TRUE(absl::StartsWith(tcp->data(), "HTTP/1.1 503"));
+}
+
 class OriginalDstTcpProxyIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public BaseIntegrationTest {

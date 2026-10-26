@@ -90,6 +90,8 @@ public:
   const std::string AdmissionControl = "envoy.filters.http.admission_control";
   // Original Src Filter
   const std::string OriginalSrc = "envoy.filters.http.original_src";
+  // Priority load shed filter
+  const std::string PriorityLoadShed = "envoy.filters.http.priority_load_shed";
   // Dynamic forward proxy filter
   const std::string DynamicForwardProxy = "envoy.filters.http.dynamic_forward_proxy";
   // Alternate Protocols Cache filter
@@ -108,6 +110,10 @@ public:
   const std::string ExternalProcessing = "envoy.filters.http.ext_proc";
   // Set metadata filter
   const std::string SetMetadata = "envoy.filters.http.set_metadata";
+  // Body Size Limit filter
+  const std::string BodySizeLimit = "envoy.filters.http.body_size_limit";
+  // MCP JSON REST bridge filter
+  const std::string McpJsonRestBridge = "envoy.filters.http.mcp_json_rest_bridge";
 };
 
 using HttpFilterNames = ConstSingleton<HttpFilterNameValues>;

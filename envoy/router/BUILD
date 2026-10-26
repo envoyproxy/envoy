@@ -34,6 +34,7 @@ envoy_cc_library(
         ":rds_interface",
         "//envoy/config:config_provider_manager_interface",
         "//envoy/event:dispatcher_interface",
+        "//envoy/init:manager_interface",
         "//envoy/json:json_object_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/runtime:runtime_interface",
@@ -78,6 +79,7 @@ envoy_cc_library(
         ":internal_redirect_interface",
         ":path_matcher_interface",
         ":path_rewriter_interface",
+        ":retry_interface",
         "//envoy/access_log:access_log_interface",
         "//envoy/common:conn_pool_interface",
         "//envoy/common:matchers_interface",
@@ -100,6 +102,23 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "retry_interface",
+    hdrs = ["retry.h"],
+    deps = [
+        "//envoy/common:optref_lib",
+        "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/http:codec_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/upstream:resource_manager_interface",
+        "//envoy/upstream:retry_interface",
+        "//envoy/upstream:upstream_interface",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
@@ -155,6 +174,17 @@ envoy_cc_library(
     hdrs = ["cluster_specifier_plugin.h"],
     deps = [
         ":router_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "route_specifier_interface",
+    hdrs = ["route_specifier.h"],
+    deps = [
+        ":router_interface",
+        "//envoy/common:optref_lib",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
     ],

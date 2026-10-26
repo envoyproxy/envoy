@@ -4,7 +4,7 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
+    "envoy_extension_cc_dyn_module_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -28,20 +28,23 @@ HICKORY_ABI_IMPL_DEPS = [
     "//source/extensions/upstreams/http/dynamic_modules:abi_impl",
 ]
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "hickory_dns_impl_test",
     srcs = ["hickory_dns_impl_test.cc"],
     data = [
         # Failure-path stubs loaded via ENVOY_DYNAMIC_MODULES_SEARCH_PATH:
         #   - ``dns_resolver_config_new_fail``: exports all 7 DNS resolver ABI symbols, returns null
         #     from ``on_dns_resolver_config_new`` to exercise the Rust-rejection path.
+        #   - ``dns_resolver_new_fail``: loads its configuration but returns null from
+        #     ``on_dns_resolver_new`` to exercise the resolver-creation failure path.
         #   - ``matcher_no_op``: exports ``program_init`` but no DNS resolver symbols, exercising the
         #     ABI-symbol-resolution failure path.
         "//test/extensions/dynamic_modules/test_data/c:dns_resolver_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:dns_resolver_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op",
     ],
     extension_names = ["envoy.network.dns_resolver.hickory"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         # It is a known issue that TSAN detects a false positive in uninstrumented Rust code:
         # https://github.com/rust-lang/rust/issues/39608
@@ -57,16 +60,17 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/hickory:config",
         "//test/common/stats:stat_test_utility_lib",
         "//test/extensions/dynamic_modules:util",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/network/dns_resolver/hickory/v3:pkg_cc_proto",
     ] + HICKORY_ABI_IMPL_DEPS,
 )
 
-envoy_extension_cc_test(
+envoy_extension_cc_dyn_module_test(
     name = "hickory_dns_integration_test",
     srcs = ["hickory_dns_integration_test.cc"],
     extension_names = ["envoy.network.dns_resolver.hickory"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     tags = [
         # See comment on hickory_dns_impl_test above.
         "no_tsan",

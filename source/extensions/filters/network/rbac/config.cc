@@ -16,73 +16,76 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
-static void validateFail(const std::string& header) {
-  throw EnvoyException(fmt::format("Found header({}) rule,"
-                                   "not supported by RBAC network filter",
-                                   header));
+static absl::Status validateFail(const std::string& header) {
+  return absl::InvalidArgumentError(fmt::format("Found header({}) rule,"
+                                                "not supported by RBAC network filter",
+                                                header));
 }
 
-static void validatePermission(const envoy::config::rbac::v3::Permission& permission) {
+static absl::Status validatePermission(const envoy::config::rbac::v3::Permission& permission) {
   if (permission.has_header()) {
-    validateFail(permission.header().DebugString());
+    return validateFail(permission.header().DebugString());
   }
   if (permission.has_and_rules()) {
     for (const auto& r : permission.and_rules().rules()) {
-      validatePermission(r);
+      RETURN_IF_NOT_OK(validatePermission(r));
     }
   }
   if (permission.has_or_rules()) {
     for (const auto& r : permission.or_rules().rules()) {
-      validatePermission(r);
+      RETURN_IF_NOT_OK(validatePermission(r));
     }
   }
   if (permission.has_not_rule()) {
-    validatePermission(permission.not_rule());
+    RETURN_IF_NOT_OK(validatePermission(permission.not_rule()));
   }
+  return absl::OkStatus();
 }
 
-static void validatePrincipal(const envoy::config::rbac::v3::Principal& principal) {
+static absl::Status validatePrincipal(const envoy::config::rbac::v3::Principal& principal) {
   if (principal.has_header()) {
-    validateFail(principal.header().DebugString());
+    return validateFail(principal.header().DebugString());
   }
   if (principal.has_and_ids()) {
     for (const auto& r : principal.and_ids().ids()) {
-      validatePrincipal(r);
+      RETURN_IF_NOT_OK(validatePrincipal(r));
     }
   }
   if (principal.has_or_ids()) {
     for (const auto& r : principal.or_ids().ids()) {
-      validatePrincipal(r);
+      RETURN_IF_NOT_OK(validatePrincipal(r));
     }
   }
   if (principal.has_not_id()) {
-    validatePrincipal(principal.not_id());
+    RETURN_IF_NOT_OK(validatePrincipal(principal.not_id()));
   }
+  return absl::OkStatus();
 }
 
 /**
  * Validate the RBAC rules doesn't include any header or metadata rule.
  */
-static void validateRbacRules(const envoy::config::rbac::v3::RBAC& rules) {
+static absl::Status validateRbacRules(const envoy::config::rbac::v3::RBAC& rules) {
   for (const auto& policy : rules.policies()) {
     for (const auto& permission : policy.second.permissions()) {
-      validatePermission(permission);
+      RETURN_IF_NOT_OK(validatePermission(permission));
     }
     for (const auto& principal : policy.second.principals()) {
-      validatePrincipal(principal);
+      RETURN_IF_NOT_OK(validatePrincipal(principal));
     }
   }
+  return absl::OkStatus();
 }
 
-Network::FilterFactoryCb
+absl::StatusOr<Network::FilterFactoryCb>
 RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::rbac::v3::RBAC& proto_config,
     Server::Configuration::FactoryContext& context) {
   if (proto_config.has_rules()) {
-    validateRbacRules(proto_config.rules());
+    RETURN_IF_NOT_OK(validateRbacRules(proto_config.rules()));
   }
   if (proto_config.has_shadow_rules()) {
-    validateRbacRules(proto_config.shadow_rules());
+    RETURN_IF_NOT_OK(validateRbacRules(proto_config.shadow_rules()));
   }
   RoleBasedAccessControlFilterConfigSharedPtr config(
       std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope(),

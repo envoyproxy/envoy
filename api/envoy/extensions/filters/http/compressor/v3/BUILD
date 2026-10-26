@@ -8,6 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/config/core/v3:pkg",
+        "//envoy/type/matcher/v3:pkg",
         "@xds//udpa/annotations:pkg",
     ],
 )

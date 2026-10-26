@@ -20,6 +20,12 @@ Api::IoCallUint64Result SockmapIoSocketHandle::writev(const Buffer::RawSlice* sl
   return result;
 }
 
+Api::IoCallUint64Result SockmapIoSocketHandle::send(const void* buffer, size_t length) {
+  Api::IoCallUint64Result result = IoSocketHandleImpl::send(buffer, length);
+  maybeRegister(result);
+  return result;
+}
+
 IoHandlePtr SockmapIoSocketHandle::accept(struct sockaddr* addr, socklen_t* addrlen) {
   Api::SysCallSocketResult result = Api::OsSysCallsSingleton::get().accept(fd_, addr, addrlen);
   if (SOCKET_INVALID(result.return_value_)) {

@@ -1,5 +1,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
+#include <algorithm>
+#include <cstring>
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -27,6 +30,18 @@ bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
     return false;
   }
   return ::memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.size()) == 0;
+}
+
+ReverseConnectionUtility::RpingPrefixMatch
+ReverseConnectionUtility::classifyRpingPrefix(absl::string_view data) {
+  const size_t len = std::min(data.size(), PING_MESSAGE.size());
+  const absl::string_view peek = data.substr(0, len);
+  if (len == PING_MESSAGE.size()) {
+    return isPingMessage(peek) ? RpingPrefixMatch::Complete : RpingPrefixMatch::NotRping;
+  }
+  // Fewer than a full keepalive: a viable prefix if it matches RPING so far.
+  return peek == PING_MESSAGE.substr(0, len) ? RpingPrefixMatch::PartialPrefix
+                                             : RpingPrefixMatch::NotRping;
 }
 
 Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {
@@ -149,6 +164,13 @@ void ReverseConnectionUtility::applySslQuietClose(Network::Connection& connectio
       ENVOY_LOG(warn, "reverse_tunnel: Failed to cast to SslHandshakerImpl or ssl() returned null");
     }
   }
+}
+
+uint64_t ReverseConnectionUtility::diffMs(const Envoy::MonotonicTime& start,
+                                          const Envoy::MonotonicTime& end) {
+  ASSERT(start <= end, "Invalid the start of the period must be before the end");
+  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  return ms.count();
 }
 
 } // namespace ReverseConnection

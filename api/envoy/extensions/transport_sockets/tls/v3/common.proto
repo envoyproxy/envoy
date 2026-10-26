@@ -77,6 +77,24 @@ message TlsParameters {
     //   Please refer to the `BoringSSL CNSA2_202603 compliance policy <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260413.0/include/openssl/ssl.h#6293>`_
     //   for details.
     CNSA2_202603 = 1;
+
+    // CNSA1_202603 configures a TLS connection to use:
+    //   * TLS 1.2 or TLS 1.3.
+    //   * For TLS 1.2, only TLS_ECDHE_[ECDSA|RSA]_WITH_AES_256_GCM_SHA384.
+    //   * For TLS 1.3, only AES-256-GCM.
+    //   * ML-KEM-1024 or P-384 for key agreement, preferring ML-KEM-1024 if the
+    //     client supports it.
+    //   * For handshake signatures, only ECDSA with P-384 and SHA-384, or RSA
+    //     with SHA-384.
+    //
+    // Note: this setting aids with compliance with CNSA requirements but does not
+    // guarantee it. Careful reading of RFC 9151 is recommended.
+    //
+    // .. attention::
+    //
+    //   Please refer to the `BoringSSL CNSA1_202603 compliance policy <https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20260413.0/include/openssl/ssl.h#6280>`_
+    //   for details.
+    CNSA1_202603 = 2;
   }
 
   // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.
@@ -224,7 +242,7 @@ message PrivateKeyProvider {
   bool fallback = 4;
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
@@ -291,6 +309,26 @@ message TlsCertificate {
 
   // [#not-implemented-hide:]
   repeated config.core.v3.DataSource signed_certificate_timestamp = 5;
+
+  // Optional per-certificate TLS parameters. When set on a server certificate, any specified
+  // fields override the corresponding context-level
+  // :ref:`tls_params <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CommonTlsContext.tls_params>`
+  // for that certificate during the TLS handshake; unset fields continue to use the context-level
+  // values. This allows different cipher suites, ECDH curves, protocol versions, signature
+  // algorithms, or compliance policies per certificate.
+  //
+  // These parameters do not affect certificate selection, which continues to be based only on SNI,
+  // the client's ECDSA capability, and OCSP capability. They are applied after a certificate has
+  // been selected. For a multi-certificate configuration this means each certificate's parameters
+  // must be compatible with the clients that select it: if the selected certificate's parameters
+  // leave nothing in common with the client, the handshake fails and no other certificate is tried.
+  //
+  // Note: because these are overrides rather than constraints, a certificate-level
+  // ``tls_minimum_protocol_version`` can lower the floor set by the context-level
+  // ``tls_params``, weakening the listener's overall TLS security policy.
+  // Setting this on a client certificate is not supported and is ignored.
+  // This field has no effect on QUIC/HTTP3 downstream connections.
+  TlsParameters tls_params = 9;
 }
 
 message TlsSessionTicketKeys {

@@ -1204,6 +1204,21 @@ TEST_F(TcpConnPoolImplTest, TestPreconnect) {
 }
 
 /**
+ * Test that a failure to create the underlying connection (e.g. a network namespace binding
+ * failure) surfaces as a pool failure instead of crashing.
+ */
+TEST_F(TcpConnPoolImplDestructorTest, ConnectionCreationFailure) {
+  connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(nullptr));
+
+  callbacks_ = std::make_unique<ConnPoolCallbacks>();
+  EXPECT_CALL(callbacks_->mock_pool_failure_cb_, Call);
+  ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*callbacks_);
+  EXPECT_EQ(nullptr, handle);
+  EXPECT_EQ(ConnectionPool::PoolFailureReason::LocalConnectionFailure, callbacks_->reason_);
+}
+
+/**
  * Test that pending connections are closed when the connection pool is destroyed.
  */
 TEST_F(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {

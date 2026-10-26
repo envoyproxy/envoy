@@ -53,5 +53,11 @@ actions {
   read: 2789
 }
 actions {
+  extract_immutable_front_slice {}
+}
+actions {
+  extract_mutable_front_slice {}
+}
+actions {
   write: {}
 }

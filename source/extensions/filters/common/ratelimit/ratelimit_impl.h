@@ -63,7 +63,7 @@ public:
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
+  void onSuccess(Grpc::ResponsePtr<envoy::service::ratelimit::v3::RateLimitResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
@@ -82,7 +82,7 @@ private:
  * Builds the rate limit client.
  * @param timeout the timeout for the gRPC request. If nullopt, no timeout is applied (infinite).
  */
-ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+ClientPtr rateLimitClient(Server::Configuration::ServerFactoryContext& context,
                           const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                           const std::optional<std::chrono::milliseconds>& timeout);
 

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.ext_authz;
+
+// Authorization decision recorded in FilterState when shadow mode is enabled. A subsequent filter
+// reads this object and decides whether to enforce the decision.
+message ExtAuthzDecision {
+  // Possible authorization decisions.
+  enum CheckResult {
+    UNSPECIFIED = 0;
+    OK = 1;
+    DENIED = 2;
+    ERROR = 3;
+  }
+
+  // The decision the authorization service returned.
+  CheckResult check_result = 1;
+
+  // Status code returned by the authorization service on a denial. Unset for OK and when the
+  // service returned none.
+  uint32 status_code = 2;
+}

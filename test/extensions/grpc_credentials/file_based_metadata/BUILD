@@ -1,20 +1,24 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
     "envoy_select_google_grpc",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
     data = ["//test/config/integration/certs"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.grpc_credentials.file_based_metadata"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/grpc_credentials/file_based_metadata:config",
         "//test/common/grpc:grpc_client_integration_test_harness_lib",

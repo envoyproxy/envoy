@@ -15,7 +15,7 @@ envoy_extension_cc_test(
     name = "gradient_controller_test",
     srcs = ["gradient_controller_test.cc"],
     extension_names = ["envoy.filters.http.adaptive_concurrency"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/adaptive_concurrency:adaptive_concurrency_filter_lib",
@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg_cc_proto",
     ],

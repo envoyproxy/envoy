@@ -1,6 +1,8 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"

@@ -112,4 +112,11 @@ bool envoy_dynamic_module_callback_matcher_get_header_value(
   return getHeaderValueImpl(map, key, result, index, total_count_out);
 }
 
+void envoy_dynamic_module_callback_matcher_set_error(
+    envoy_dynamic_module_type_matcher_input_envoy_ptr matcher_input_envoy_ptr) {
+  using namespace Envoy::Extensions::Matching::InputMatchers::DynamicModules;
+  auto* context = static_cast<MatchContext*>(matcher_input_envoy_ptr);
+  context->module_error = true;
+}
+
 } // extern "C"

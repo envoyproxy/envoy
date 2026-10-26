@@ -1,8 +1,11 @@
 #pragma once
 
 #include <functional>
+#include <vector>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/evwatch.h"
+#include "envoy/event/evwatch_observer_manager.h"
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 
@@ -59,7 +62,12 @@ public:
   using OnPrepareCallback = std::function<void()>;
   using OnCheckCallback = std::function<void()>;
 
-  LibeventScheduler();
+  explicit LibeventScheduler(TimeSource& time_source);
+  LibeventScheduler(TimeSource& time_source, EvwatchObserverManagerPtr evwatch_manager);
+  ~LibeventScheduler() override;
+
+  void registerEvwatchObserver(Evwatch::Observer& observer);
+  void unregisterEvwatchObserver(Evwatch::Observer& observer);
 
   // Scheduler
   TimerPtr createTimer(const TimerCb& cb, Dispatcher& dispatcher) override;
@@ -114,6 +122,8 @@ private:
   static void onCheckForCallback(evwatch*, const evwatch_check_cb_info* info, void* arg);
   static void onPrepareForStats(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
   static void onCheckForStats(evwatch*, const evwatch_check_cb_info*, void* arg);
+  static void onPrepareForObserver(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
+  static void onCheckForObserver(evwatch*, const evwatch_check_cb_info* info, void* arg);
 
   static constexpr int flagsBasedOnEventType() {
     if constexpr (Event::PlatformDefaultTriggerType == FileTriggerType::Level) {
@@ -125,6 +135,7 @@ private:
     return EVLOOP_NONBLOCK;
   }
 
+  TimeSource& time_source_;
   Libevent::BasePtr libevent_;
   DispatcherStats* stats_{}; // stats owned by the containing DispatcherImpl
   bool timeout_set_{};       // whether there is a poll timeout in the current event loop iteration
@@ -133,6 +144,7 @@ private:
   timeval check_time_{};     // timestamp immediately after polling
   OnPrepareCallback prepare_callback_; // callback to be called from onPrepareForCallback()
   OnCheckCallback check_callback_;     // callback to be called from onCheckForCallback()
+  EvwatchObserverManagerPtr evwatch_manager_;
 };
 
 } // namespace Event

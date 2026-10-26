@@ -326,7 +326,7 @@ typed_config:
   stat_prefix: http_local_rate_limiter
   max_dynamic_descriptors: {}
   token_bucket:
-    max_tokens: 2
+    max_tokens: 20
     tokens_per_fill: 1
     fill_interval: 1000s
   filter_enabled:

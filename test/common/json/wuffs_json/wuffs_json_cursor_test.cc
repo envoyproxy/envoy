@@ -3,6 +3,8 @@
 
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
 
+#include "test/test_common/status_utility.h"
+
 #include "absl/strings/numbers.h"
 #include "gtest/gtest.h"
 
@@ -10,6 +12,9 @@ namespace Envoy {
 namespace Json {
 namespace Wuffs {
 namespace {
+
+using ::Envoy::StatusHelpers::IsOk;
+using ::testing::Not;
 
 // Capturing handler
 // Records depth-1 fields from a JSON object. Deeper content is discarded.
@@ -150,85 +155,17 @@ public:
   void onContainerClose(int, size_t token_end) override { container_close_end = token_end; }
 };
 
-// Path-tracking handler
-// Records buildIndexedPath() at each leaf callback (scalar or string value).
-// Captures all string values at every depth so path tests aren't depth-gated.
-
-class PathCapturingHandler : public WuffsJsonCursor::Handler {
-public:
-  WuffsJsonCursor* cursor = nullptr;
-  std::vector<std::string> paths;
-  std::string str_buf_;
-
-  bool openStringCapture(absl::string_view, int, size_t) override {
-    str_buf_.clear();
-    return true;
-  }
-  bool onStringChunk(absl::string_view, int, absl::string_view chunk) override {
-    str_buf_.append(chunk);
-    return true;
-  }
-  void closeStringCapture(absl::string_view, int depth, size_t) override {
-    if (cursor) {
-      paths.push_back(cursor->buildIndexedPath(depth));
-    }
-  }
-  absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
-  absl::Status onNumber(absl::string_view, absl::string_view, int depth, size_t, size_t) override {
-    if (cursor) {
-      paths.push_back(cursor->buildIndexedPath(depth));
-    }
-    return absl::OkStatus();
-  }
-  absl::Status onBoolean(absl::string_view, bool, int depth, size_t, size_t) override {
-    if (cursor) {
-      paths.push_back(cursor->buildIndexedPath(depth));
-    }
-    return absl::OkStatus();
-  }
-  void onNull(absl::string_view, int depth, size_t, size_t) override {
-    if (cursor) {
-      paths.push_back(cursor->buildIndexedPath(depth));
-    }
-  }
-  void onContainerOpen(absl::string_view, bool, int, size_t) override {}
-  void onContainerClose(int, size_t) override {}
-};
-
-absl::Status parsePaths(absl::string_view json, PathCapturingHandler& h, bool pattern = false) {
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
-  h.cursor = &cursor;
-  (void)pattern; // buildPatternPath tests call cursor directly from the handler
-  return cursor.feed(json, /*closed=*/true);
-}
-
-// Same handler but records buildPatternPath instead of buildIndexedPath.
-class PatternCapturingHandler : public PathCapturingHandler {
-public:
-  void closeStringCapture(absl::string_view, int depth, size_t) override {
-    if (cursor) {
-      paths.push_back(cursor->buildPatternPath(depth));
-    }
-  }
-  absl::Status onNumber(absl::string_view, absl::string_view, int depth, size_t, size_t) override {
-    if (cursor) {
-      paths.push_back(cursor->buildPatternPath(depth));
-    }
-    return absl::OkStatus();
-  }
-};
-
 // Tests
 
 TEST(WuffsJsonCursorTest, EmptyObject) {
   CapturingHandler h;
-  EXPECT_TRUE(parse("{}", h).ok());
+  EXPECT_OK(parse("{}", h));
   EXPECT_TRUE(h.fields.empty());
 }
 
 TEST(WuffsJsonCursorTest, FlatStringFields) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"model":"gpt-4","role":"user"})", h).ok());
+  EXPECT_OK(parse(R"({"model":"gpt-4","role":"user"})", h));
   ASSERT_EQ(h.fields.size(), 2u);
   EXPECT_EQ(h.fields[0].key, "model");
   EXPECT_EQ(h.fields[0].str_val, "gpt-4");
@@ -238,7 +175,7 @@ TEST(WuffsJsonCursorTest, FlatStringFields) {
 
 TEST(WuffsJsonCursorTest, ScalarFields) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"count":42,"ratio":1.5,"ok":true,"x":null})", h).ok());
+  EXPECT_OK(parse(R"({"count":42,"ratio":1.5,"ok":true,"x":null})", h));
   ASSERT_EQ(h.fields.size(), 4u);
   EXPECT_EQ(h.fields[0].raw_val, "42");
   EXPECT_EQ(h.fields[1].raw_val, "1.5");
@@ -250,7 +187,7 @@ TEST(WuffsJsonCursorTest, ScalarFields) {
 // not STRING tokens. This test verifies the cursor handles them correctly.
 TEST(WuffsJsonCursorTest, StringEscapes) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"nl":"hello\nworld","tab":"a\tb","uni":"A"})", h).ok());
+  EXPECT_OK(parse(R"({"nl":"hello\nworld","tab":"a\tb","uni":"A"})", h));
   ASSERT_EQ(h.fields.size(), 3u);
   EXPECT_EQ(h.fields[0].str_val, "hello\nworld");
   EXPECT_EQ(h.fields[1].str_val, "a\tb");
@@ -263,7 +200,7 @@ TEST(WuffsJsonCursorTest, StringEscapes) {
 // 中 (U+4E2D) -> 3 UTF-8 bytes E4 B8 AD.
 TEST(WuffsJsonCursorTest, UnicodeEscapeMultiByteUtf8) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"a":"\u00C9","b":"\u4E2D"})", h).ok());
+  EXPECT_OK(parse(R"({"a":"\u00C9","b":"\u4E2D"})", h));
   ASSERT_EQ(h.fields.size(), 2u);
   EXPECT_EQ(h.fields[0].str_val, "\xC3\x89");     // U+00C9
   EXPECT_EQ(h.fields[1].str_val, "\xE4\xB8\xAD"); // U+4E2D
@@ -275,7 +212,7 @@ TEST(WuffsJsonCursorTest, UnicodeEscapeMultiByteUtf8) {
 // 😀 -> U+1F600 -> F0 9F 98 80.
 TEST(WuffsJsonCursorTest, UnicodeSurrogatePairDecodedToUtf8) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"a":"\uD83D\uDE00"})", h).ok());
+  EXPECT_OK(parse(R"({"a":"\uD83D\uDE00"})", h));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].str_val, "\xF0\x9F\x98\x80"); // U+1F600
 }
@@ -283,7 +220,7 @@ TEST(WuffsJsonCursorTest, UnicodeSurrogatePairDecodedToUtf8) {
 // Deeper-than-1 content is discarded (openStringCapture returns false).
 TEST(WuffsJsonCursorTest, NestedObjectDiscarded) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"top":"v","nested":{"a":"b"}})", h).ok());
+  EXPECT_OK(parse(R"({"top":"v","nested":{"a":"b"}})", h));
   // "top" is a depth-1 string -> captured.
   // Inner "a"/"b" at depth 2 have openStringCapture return false -> discarded.
   ASSERT_EQ(h.fields.size(), 1u);
@@ -296,8 +233,8 @@ TEST(WuffsJsonCursorTest, StreamingAcrossChunks) {
   WuffsJsonCursor cursor(h);
 
   // The string value "gpt-4" straddles the chunk boundary.
-  EXPECT_TRUE(cursor.feed(R"({"model":"gpt)", /*closed=*/false).ok());
-  EXPECT_TRUE(cursor.feed(R"(-4","n":7})", /*closed=*/true).ok());
+  EXPECT_OK(cursor.feed(R"({"model":"gpt)", /*closed=*/false));
+  EXPECT_OK(cursor.feed(R"(-4","n":7})", /*closed=*/true));
 
   ASSERT_EQ(h.fields.size(), 2u);
   EXPECT_EQ(h.fields[0].str_val, "gpt-4");
@@ -306,49 +243,49 @@ TEST(WuffsJsonCursorTest, StreamingAcrossChunks) {
 
 TEST(WuffsJsonCursorTest, InvalidJsonReturnsError) {
   CapturingHandler h;
-  EXPECT_FALSE(parse("not json", h).ok());
+  EXPECT_THAT(parse("not json", h), Not(IsOk()));
 }
 
 TEST(WuffsJsonCursorTest, FeedAfterCompleteReturnsError) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed("{}", /*closed=*/true).ok());
-  EXPECT_FALSE(cursor.feed("{}", /*closed=*/true).ok());
+  EXPECT_OK(cursor.feed("{}", /*closed=*/true));
+  EXPECT_THAT(cursor.feed("{}", /*closed=*/true), Not(IsOk()));
 }
 
 TEST(WuffsJsonCursorTest, TrailingGarbageInSameChunkRejected) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_FALSE(cursor.feed(R"({"key":"val"}random_garbage)", /*closed=*/true).ok());
+  EXPECT_THAT(cursor.feed(R"({"key":"val"}random_garbage)", /*closed=*/true), Not(IsOk()));
 }
 
 TEST(WuffsJsonCursorTest, TrailingGarbageInDifferentDataChunk) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed(R"({"key":"val"})", /*closed=*/true).ok());
-  EXPECT_FALSE(cursor.feed("random_garbage)", /*closed=*/true).ok());
+  EXPECT_OK(cursor.feed(R"({"key":"val"})", /*closed=*/true));
+  EXPECT_THAT(cursor.feed("random_garbage)", /*closed=*/true), Not(IsOk()));
 }
 
 TEST(WuffsJsonCursorTest, DuplicateKeyRejected) {
   CapturingHandler h;
-  EXPECT_FALSE(parse(R"({"model":"gpt-4","model":"gpt-4o"})", h).ok());
+  EXPECT_THAT(parse(R"({"model":"gpt-4","model":"gpt-4o"})", h), Not(IsOk()));
 }
 
 TEST(WuffsJsonCursorTest, DuplicateKeyInNestedObjectRejected) {
   CapturingHandler h;
-  EXPECT_FALSE(parse(R"({"x":{"a":1,"a":2}})", h).ok());
+  EXPECT_THAT(parse(R"({"x":{"a":1,"a":2}})", h), Not(IsOk()));
 }
 
 // Same key name at different nesting depths must not trigger a false positive.
 TEST(WuffsJsonCursorTest, SameKeyNameAtDifferentDepthsAllowed) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"({"a":{"a":1}})", h).ok());
+  EXPECT_OK(parse(R"({"a":{"a":1}})", h));
 }
 
 // Same key name in sibling objects must not trigger a false positive.
 TEST(WuffsJsonCursorTest, SameKeyNameInSiblingObjectsAllowed) {
   CapturingHandler h;
-  EXPECT_TRUE(parse(R"([{"a":1},{"a":2}])", h).ok());
+  EXPECT_OK(parse(R"([{"a":1},{"a":2}])", h));
 }
 
 // Key-length enforcement tests
@@ -357,14 +294,14 @@ TEST(WuffsJsonCursorTest, SameKeyNameInSiblingObjectsAllowed) {
 TEST(WuffsJsonCursorTest, KeyAtMaxBytesAccepted) {
   CapturingHandler h;
   const std::string key(256, 'k');
-  EXPECT_TRUE(parse("{\"" + key + "\":1}", h).ok());
+  EXPECT_OK(parse("{\"" + key + "\":1}", h));
 }
 
 // Key one byte over kMaxKeyBytes must be rejected mid-accumulation.
 TEST(WuffsJsonCursorTest, KeyExceedsMaxBytesRejected) {
   CapturingHandler h;
   const std::string key(257, 'k');
-  EXPECT_FALSE(parse("{\"" + key + "\":1}", h).ok());
+  EXPECT_THAT(parse("{\"" + key + "\":1}", h), Not(IsOk()));
 }
 
 // Same boundary delivered across two chunks: chunk1 ends inside the key (no
@@ -374,8 +311,8 @@ TEST(WuffsJsonCursorTest, KeyExceedsMaxBytesRejected) {
 TEST(WuffsJsonCursorTest, KeyAtMaxBytesAcceptedSplitAcrossChunks) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed("{\"" + std::string(256, 'k'), /*closed=*/false).ok());
-  EXPECT_TRUE(cursor.feed("\":1}", /*closed=*/true).ok());
+  EXPECT_OK(cursor.feed("{\"" + std::string(256, 'k'), /*closed=*/false));
+  EXPECT_OK(cursor.feed("\":1}", /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].key.size(), 256u);
 }
@@ -386,7 +323,7 @@ TEST(WuffsJsonCursorTest, KeyAtMaxBytesAcceptedSplitAcrossChunks) {
 TEST(WuffsJsonCursorTest, KeyAtMaxBytesWithEscapeAccepted) {
   CapturingHandler h;
   // 255 plain bytes + \n (1 decoded byte) = 256 bytes total.
-  EXPECT_TRUE(parse("{\"" + std::string(255, 'k') + R"(\n":1})", h).ok());
+  EXPECT_OK(parse("{\"" + std::string(255, 'k') + R"(\n":1})", h));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].key.size(), 256u);
 }
@@ -394,7 +331,7 @@ TEST(WuffsJsonCursorTest, KeyAtMaxBytesWithEscapeAccepted) {
 // 256 plain bytes + \n (1 decoded byte) = 257 bytes -- must be rejected.
 TEST(WuffsJsonCursorTest, KeyExceedsMaxBytesWithEscapeRejected) {
   CapturingHandler h;
-  EXPECT_FALSE(parse("{\"" + std::string(256, 'k') + R"(\n":1})", h).ok());
+  EXPECT_THAT(parse("{\"" + std::string(256, 'k') + R"(\n":1})", h), Not(IsOk()));
 }
 
 // Handler abort propagation
@@ -402,7 +339,7 @@ TEST(WuffsJsonCursorTest, KeyExceedsMaxBytesWithEscapeRejected) {
 // A non-OK status returned from onNumber must cause feed() to return that error.
 TEST(WuffsJsonCursorTest, HandlerAbortPropagated) {
   AbortOnNumberHandler h;
-  EXPECT_FALSE(parse(R"({"n":1})", h).ok());
+  EXPECT_THAT(parse(R"({"n":1})", h), Not(IsOk()));
 }
 
 // A non-OK status returned from onBoolean must cause feed() to return that error.
@@ -413,7 +350,7 @@ TEST(WuffsJsonCursorTest, BooleanHandlerAbortPropagated) {
       return absl::InternalError("bool abort");
     }
   } h;
-  EXPECT_FALSE(parse(R"({"ok":true})", h).ok());
+  EXPECT_THAT(parse(R"({"ok":true})", h), Not(IsOk()));
 }
 
 // A non-OK status returned from onKey must cause feed() to return that error.
@@ -424,7 +361,7 @@ TEST(WuffsJsonCursorTest, KeyHandlerAbortPropagated) {
       return absl::InternalError("key abort");
     }
   } h;
-  EXPECT_FALSE(parse(R"({"a":1})", h).ok());
+  EXPECT_THAT(parse(R"({"a":1})", h), Not(IsOk()));
 }
 
 // onStringChunk early-abort tests
@@ -455,7 +392,7 @@ public:
 // but closeStringCapture still fires.
 TEST(WuffsJsonCursorTest, OnStringChunkFalseStopsDeliveryOnCopy) {
   AbortStringChunkHandler h;
-  EXPECT_TRUE(parse(R"({"a":"hello"})", h).ok());
+  EXPECT_OK(parse(R"({"a":"hello"})", h));
   EXPECT_TRUE(h.close_fired);
 }
 
@@ -463,7 +400,7 @@ TEST(WuffsJsonCursorTest, OnStringChunkFalseStopsDeliveryOnCopy) {
 // stops further chunk delivery but closeStringCapture still fires.
 TEST(WuffsJsonCursorTest, OnStringChunkFalseStopsDeliveryOnEscape) {
   AbortStringChunkHandler h;
-  EXPECT_TRUE(parse(R"({"a":"\nhello"})", h).ok());
+  EXPECT_OK(parse(R"({"a":"\nhello"})", h));
   EXPECT_TRUE(h.close_fired);
 }
 
@@ -474,8 +411,8 @@ TEST(WuffsJsonCursorTest, OnStringChunkFalseStopsDeliveryOnEscape) {
 TEST(WuffsJsonCursorTest, FeedAfterCompletion) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed("{}", true).ok());
-  EXPECT_FALSE(cursor.feed("extra", true).ok());
+  EXPECT_OK(cursor.feed("{}", true));
+  EXPECT_THAT(cursor.feed("extra", true), Not(IsOk()));
   EXPECT_TRUE(h.fields.empty());
 }
 
@@ -484,13 +421,13 @@ TEST(WuffsJsonCursorTest, FeedAfterCompletion) {
 TEST(WuffsJsonCursorTest, TrailingNewlineAccepted) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed("{}\n", true).ok());
+  EXPECT_OK(cursor.feed("{}\n", true));
 }
 
 TEST(WuffsJsonCursorTest, TrailingSpacesAccepted) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed("[]  \n", true).ok());
+  EXPECT_OK(cursor.feed("[]  \n", true));
 }
 
 // nextSourcePosition test
@@ -498,7 +435,7 @@ TEST(WuffsJsonCursorTest, NextSourcePositionAfterParse) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
   constexpr absl::string_view json = R"({"a":1})";
-  EXPECT_TRUE(cursor.feed(json, true).ok());
+  EXPECT_OK(cursor.feed(json, true));
   EXPECT_EQ(cursor.nextSourcePosition(), json.size());
 }
 
@@ -516,7 +453,7 @@ TEST(WuffsJsonCursorTest, LargeInputTriggersTokenBufferReset) {
     json += "\"k" + std::to_string(i) + "\":" + std::to_string(i);
   }
   json += "}";
-  EXPECT_TRUE(parse(json, h).ok());
+  EXPECT_OK(parse(json, h));
   EXPECT_EQ(h.fields.size(), 50u);
 }
 
@@ -527,7 +464,7 @@ TEST(WuffsJsonCursorTest, ByteRangeContainerCoversWholeInput) {
   constexpr absl::string_view json = R"({"a":1})";
   ByteRangeHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_OK(cursor.feed(json, /*closed=*/true));
   EXPECT_EQ(h.container_open_start, 0u);
   EXPECT_EQ(h.container_close_end, json.size());
 }
@@ -538,7 +475,7 @@ TEST(WuffsJsonCursorTest, ByteRangeKeyValueField) {
   constexpr absl::string_view json = R"({"a":1})";
   ByteRangeHandler h;
   WuffsJsonCursor cursor(h);
-  EXPECT_TRUE(cursor.feed(json, /*closed=*/true).ok());
+  EXPECT_OK(cursor.feed(json, /*closed=*/true));
   ASSERT_NE(h.first_key_start, ByteRangeHandler::kNotSet);
   ASSERT_NE(h.first_value_end, ByteRangeHandler::kNotSet);
   EXPECT_EQ(json.substr(h.first_key_start, h.first_value_end - h.first_key_start), R"("a":1)");
@@ -572,7 +509,7 @@ TEST(WuffsJsonCursorTest, CloseStringCaptureFiresWhenOpenReturnedFalse) {
   } h;
 
   constexpr absl::string_view json = R"({"a":"hello"})";
-  EXPECT_TRUE(parse(json, h).ok());
+  EXPECT_OK(parse(json, h));
   ASSERT_NE(h.open_start, size_t(-1));
   ASSERT_NE(h.close_end, size_t(-1));
   // [open_start, close_end) must cover the verbatim string token "hello".
@@ -584,7 +521,7 @@ TEST(WuffsJsonCursorTest, CloseStringCaptureFiresWhenOpenReturnedFalse) {
 TEST(WuffsJsonCursorTest, ByteRangeKeyValueFieldString) {
   constexpr absl::string_view json = R"({"a":"hello"})";
   ByteRangeHandler h;
-  EXPECT_TRUE(parse(json, h).ok());
+  EXPECT_OK(parse(json, h));
   ASSERT_NE(h.first_key_start, ByteRangeHandler::kNotSet);
   ASSERT_NE(h.first_value_end, ByteRangeHandler::kNotSet);
   EXPECT_EQ(json.substr(h.first_key_start, h.first_value_end - h.first_key_start),
@@ -593,27 +530,130 @@ TEST(WuffsJsonCursorTest, ByteRangeKeyValueFieldString) {
 
 // Depth limit tests
 
-// 8 levels of nesting must be accepted (boundary value for default max_depth=8).
+// 16 levels of nesting must be accepted (boundary value for the tracked
+// depth limit; Gemini streamed root arrays reach depth 9+ through
+// candidates[].content.parts[].functionCall.args).
 TEST(WuffsJsonCursorTest, MaxDepthAccepted) {
   CapturingHandler h;
-  // 8 nested objects, scalar at the innermost level.
-  EXPECT_TRUE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}})", h).ok());
+  // 16 nested objects, scalar at the innermost level.
+  EXPECT_OK(parse(
+      R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}}}}}}}})",
+      h));
 }
 
-// 9 levels of nesting must be rejected (fail-closed).
+// 17 levels of nesting must be rejected (fail-closed).
 TEST(WuffsJsonCursorTest, ExceedMaxDepthRejected) {
   CapturingHandler h;
-  EXPECT_FALSE(parse(R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}})", h).ok());
+  EXPECT_THAT(
+      parse(
+          R"({"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":{"a":1}}}}}}}}}}}}}}}}})",
+          h),
+      Not(IsOk()));
 }
 
 // Path-tracking tests
+
+// Helper: feed a complete JSON string with no path tracking (PathCapturingHandler
+// builds paths entirely from its own per-depth state).
+absl::Status parsePaths(absl::string_view json, WuffsJsonCursor::Handler& h) {
+  WuffsJsonCursor cursor(h);
+  return cursor.feed(json, /*closed=*/true);
+}
+
+// Handler that records the fully-qualified path (with numeric array indices) for
+// every leaf value (string, number, boolean, null).
+//
+// Maintains per-depth container state in its own callbacks so it can build paths
+// like "messages[0].role" without any additional cursor API.
+class PathCapturingHandler : public WuffsJsonCursor::Handler {
+public:
+  std::vector<std::string> paths;
+
+  bool openStringCapture(absl::string_view, int, size_t) override { return false; }
+  bool onStringChunk(absl::string_view, int, absl::string_view) override { return true; }
+  void closeStringCapture(absl::string_view key, int depth, size_t) override { record(key, depth); }
+  absl::Status onKey(absl::string_view, int, size_t) override { return absl::OkStatus(); }
+  absl::Status onNumber(absl::string_view key, absl::string_view, int d, size_t, size_t) override {
+    record(key, d);
+    return absl::OkStatus();
+  }
+  absl::Status onBoolean(absl::string_view key, bool, int d, size_t, size_t) override {
+    record(key, d);
+    return absl::OkStatus();
+  }
+  void onNull(absl::string_view key, int d, size_t, size_t) override { record(key, d); }
+
+  void onContainerOpen(absl::string_view key, bool is_dict, int depth, size_t) override {
+    if (depth <= kMaxDepth) {
+      is_array_[depth] = !is_dict;
+      array_index_[depth] = 0;
+      push_key_[depth] = std::string(key);
+    }
+  }
+
+  void onContainerClose(int depth, size_t) override {
+    // Advance the parent array's element counter when a child container closes.
+    if (depth > 1 && depth - 1 <= kMaxDepth && is_array_[depth - 1]) {
+      ++array_index_[depth - 1];
+    }
+  }
+
+protected:
+  static constexpr int kMaxDepth = WuffsJsonCursor::kMaxTrackedDepth;
+  bool is_array_[kMaxDepth + 1]{};
+  int array_index_[kMaxDepth + 1]{};
+  std::string push_key_[kMaxDepth + 1];
+
+  // Returns the array-index segment for depth d, e.g. "[0]".
+  // Overridden by PatternCapturingHandler to produce "[]".
+  virtual std::string arraySegment(int depth) const {
+    return '[' + std::to_string(array_index_[depth]) + ']';
+  }
+
+  void record(absl::string_view key, int depth) {
+    std::string path;
+    for (int d = 1; d <= depth; ++d) {
+      if (!is_array_[d]) {
+        continue;
+      }
+      if (!push_key_[d].empty()) {
+        if (!path.empty()) {
+          path += '.';
+        }
+        path += push_key_[d];
+      }
+      path += arraySegment(d);
+    }
+    if (!key.empty()) {
+      if (!path.empty()) {
+        path += '.';
+      }
+      path += std::string(key);
+    }
+    paths.push_back(std::move(path));
+    // Advance this depth's array index after recording a scalar element.
+    if (depth <= kMaxDepth && is_array_[depth]) {
+      ++array_index_[depth];
+    }
+  }
+};
+
+// Like PathCapturingHandler but uses "[]" instead of "[n]" — a structural pattern
+// path that is identical for every element in the same array position.
+class PatternCapturingHandler : public PathCapturingHandler {
+public:
+  const WuffsJsonCursor* cursor{nullptr};
+
+protected:
+  std::string arraySegment(int /*depth*/) const override { return "[]"; }
+};
 
 // Scalar elements in an array must each get a distinct 0-based index.
 // Before the fix, array_index_ was only incremented on container close, so
 // [1,2,3] would report [0] for every element.
 TEST(WuffsJsonCursorTest, BuildIndexedPathScalarsInArray) {
   PathCapturingHandler h;
-  EXPECT_TRUE(parsePaths("[1, 2, 3]", h).ok());
+  EXPECT_OK(parsePaths("[1, 2, 3]", h));
   ASSERT_EQ(h.paths.size(), 3u);
   EXPECT_EQ(h.paths[0], "[0]");
   EXPECT_EQ(h.paths[1], "[1]");
@@ -623,7 +663,7 @@ TEST(WuffsJsonCursorTest, BuildIndexedPathScalarsInArray) {
 // String elements in an array must also advance the index counter.
 TEST(WuffsJsonCursorTest, BuildIndexedPathStringsInArray) {
   PathCapturingHandler h;
-  EXPECT_TRUE(parsePaths(R"(["a","b","c"])", h).ok());
+  EXPECT_OK(parsePaths(R"(["a","b","c"])", h));
   ASSERT_EQ(h.paths.size(), 3u);
   EXPECT_EQ(h.paths[0], "[0]");
   EXPECT_EQ(h.paths[1], "[1]");
@@ -635,7 +675,7 @@ TEST(WuffsJsonCursorTest, BuildIndexedPathStringsInArray) {
 TEST(WuffsJsonCursorTest, BuildIndexedPathMixedScalarThenObject) {
   PathCapturingHandler h;
   // "2" is a number inside {"a":2} at depth 2; path should be "[1].a".
-  EXPECT_TRUE(parsePaths(R"([1, {"a": 2}])", h).ok());
+  EXPECT_OK(parsePaths(R"([1, {"a": 2}])", h));
   ASSERT_EQ(h.paths.size(), 2u);
   EXPECT_EQ(h.paths[0], "[0]");   // scalar 1 at depth 1
   EXPECT_EQ(h.paths[1], "[1].a"); // number 2 at depth 2, inside second element
@@ -645,7 +685,7 @@ TEST(WuffsJsonCursorTest, BuildIndexedPathMixedScalarThenObject) {
 // Each object's string value must be reported under the correct array index.
 TEST(WuffsJsonCursorTest, BuildIndexedPathNestedMessages) {
   PathCapturingHandler h;
-  EXPECT_TRUE(parsePaths(R"({"messages":[{"role":"user"},{"role":"assistant"}]})", h).ok());
+  EXPECT_OK(parsePaths(R"({"messages":[{"role":"user"},{"role":"assistant"}]})", h));
   ASSERT_EQ(h.paths.size(), 2u);
   EXPECT_EQ(h.paths[0], "messages[0].role");
   EXPECT_EQ(h.paths[1], "messages[1].role");
@@ -654,12 +694,10 @@ TEST(WuffsJsonCursorTest, BuildIndexedPathNestedMessages) {
 // buildPatternPath must use [] instead of [n] and be identical for each element.
 TEST(WuffsJsonCursorTest, BuildPatternPathNestedMessages) {
   PatternCapturingHandler h;
-  WuffsJsonCursor cursor(h, /*track_paths=*/true);
+  WuffsJsonCursor cursor(h);
   h.cursor = &cursor;
-  EXPECT_TRUE(cursor
-                  .feed(R"({"messages":[{"role":"user"},{"role":"assistant"}]})",
-                        /*closed=*/true)
-                  .ok());
+  EXPECT_OK(cursor.feed(R"({"messages":[{"role":"user"},{"role":"assistant"}]})",
+                        /*closed=*/true));
   ASSERT_EQ(h.paths.size(), 2u);
   EXPECT_EQ(h.paths[0], "messages[].role");
   EXPECT_EQ(h.paths[1], "messages[].role");
@@ -669,8 +707,8 @@ TEST(WuffsJsonCursorTest, BuildPatternPathNestedMessages) {
 TEST(WuffsJsonCursorTest, NumberSplitChunkCorrectValue) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_TRUE(cursor.feed(R"({"n":12)", /*closed=*/false).ok());
-  ASSERT_TRUE(cursor.feed(R"(34})", /*closed=*/true).ok());
+  ASSERT_OK(cursor.feed(R"({"n":12)", /*closed=*/false));
+  ASSERT_OK(cursor.feed(R"(34})", /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].raw_val, "1234");
 }
@@ -679,8 +717,8 @@ TEST(WuffsJsonCursorTest, NumberSplitChunkCorrectValue) {
 TEST(WuffsJsonCursorTest, LiteralSplitChunkAccepted) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_TRUE(cursor.feed(R"({"x":tr)", /*closed=*/false).ok());
-  EXPECT_TRUE(cursor.feed(R"(ue})", /*closed=*/true).ok());
+  ASSERT_OK(cursor.feed(R"({"x":tr)", /*closed=*/false));
+  EXPECT_OK(cursor.feed(R"(ue})", /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].raw_val, "true");
 }
@@ -691,8 +729,8 @@ TEST(WuffsJsonCursorTest, LiteralSplitChunkAccepted) {
 TEST(WuffsJsonCursorTest, StringValueSplitChunkCorrectValue) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_TRUE(cursor.feed(R"({"s":"hel)", /*closed=*/false).ok());
-  ASSERT_TRUE(cursor.feed(R"(lo"})", /*closed=*/true).ok());
+  ASSERT_OK(cursor.feed(R"({"s":"hel)", /*closed=*/false));
+  ASSERT_OK(cursor.feed(R"(lo"})", /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].str_val, "hello");
 }
@@ -704,9 +742,9 @@ TEST(WuffsJsonCursorTest, StringValueSplitChunkCorrectValue) {
 TEST(WuffsJsonCursorTest, NumberSplitThreeChunksCorrectValue) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_TRUE(cursor.feed(R"({"n":12)", /*closed=*/false).ok());
-  ASSERT_TRUE(cursor.feed(R"(34)", /*closed=*/false).ok());
-  ASSERT_TRUE(cursor.feed(R"(56})", /*closed=*/true).ok());
+  ASSERT_OK(cursor.feed(R"({"n":12)", /*closed=*/false));
+  ASSERT_OK(cursor.feed(R"(34)", /*closed=*/false));
+  ASSERT_OK(cursor.feed(R"(56})", /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].raw_val, "123456");
 }
@@ -719,8 +757,8 @@ TEST(WuffsJsonCursorTest, NumberSplitThreeChunksCorrectValue) {
 TEST(WuffsJsonCursorTest, UnicodeEscapeSplitChunkCorrectValue) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_TRUE(cursor.feed(R"({"s":"a\u)", /*closed=*/false).ok());
-  ASSERT_TRUE(cursor.feed(R"(0041b"})", /*closed=*/true).ok());
+  ASSERT_OK(cursor.feed(R"({"s":"a\u)", /*closed=*/false));
+  ASSERT_OK(cursor.feed(R"(0041b"})", /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].str_val, "aAb"); // U+0041 = 'A'
 }
@@ -735,11 +773,11 @@ TEST(WuffsJsonCursorTest, NumberAtPendingCapAccepted) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
   // Feed structure first; no number in flight yet.
-  ASSERT_TRUE(cursor.feed("{\"n\":", /*closed=*/false).ok());
+  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
   // Feed exactly 64 digit bytes with no terminator — pending_bytes_ = 64, not over cap.
-  ASSERT_TRUE(cursor.feed(std::string(64, '1'), /*closed=*/false).ok());
+  ASSERT_OK(cursor.feed(std::string(64, '1'), /*closed=*/false));
   // Close with '}': Wuffs now sees terminator and completes the NUMBER token.
-  ASSERT_TRUE(cursor.feed("}", /*closed=*/true).ok());
+  ASSERT_OK(cursor.feed("}", /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].raw_val, std::string(64, '1'));
 }
@@ -748,9 +786,9 @@ TEST(WuffsJsonCursorTest, NumberAtPendingCapAccepted) {
 TEST(WuffsJsonCursorTest, NumberOverPendingCapRejected) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_TRUE(cursor.feed("{\"n\":", /*closed=*/false).ok());
+  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
   // 65 digit bytes with no terminator — leftover = 65 > 64 → error.
-  EXPECT_FALSE(cursor.feed(std::string(65, '1'), /*closed=*/false).ok());
+  EXPECT_THAT(cursor.feed(std::string(65, '1'), /*closed=*/false), Not(IsOk()));
 }
 
 } // namespace

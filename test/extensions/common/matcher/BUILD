@@ -3,6 +3,10 @@ load(
     "envoy_cc_test",
     "envoy_package",
 )
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
+)
 
 licenses(["notice"])  # Apache 2
 
@@ -11,7 +15,7 @@ envoy_package()
 envoy_cc_test(
     name = "matcher_test",
     srcs = ["matcher_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/common/matcher:matcher_lib",
         "//test/mocks/server:server_factory_context_mocks",
@@ -20,10 +24,11 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "ip_range_matcher_test",
     srcs = ["ip_range_matcher_test.cc"],
-    rbe_pool = "6gig",
+    extension_names = ["envoy.matching.custom_matchers.ip_range_matcher"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/common/network:address_lib",
@@ -42,9 +47,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "domain_matcher_test",
     srcs = ["domain_matcher_test.cc"],
+    extension_names = ["envoy.matching.custom_matchers.domain_matcher"],
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/common/network:address_lib",

@@ -11,7 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "subscription_factory_impl_test",
     srcs = ["subscription_factory_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/config:xds_config_tracker_interface",
         "//envoy/config:xds_resources_delegate_interface",
@@ -23,6 +23,7 @@ envoy_cc_test(
         "//source/extensions/config_subscription/rest:http_subscription_lib",
         "//test/config:v2_link_hacks",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/local_info:local_info_mocks",
@@ -44,7 +45,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "subscription_impl_test",
     srcs = ["subscription_impl_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//test/common/config:grpc_subscription_test_harness",
         "//test/common/config:subscription_test_harness",

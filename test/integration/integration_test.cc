@@ -8,6 +8,9 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/registry/registry.h"
 
+#if defined(__linux__)
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#endif
 #include "source/common/common/cpu_affinity.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -24,6 +27,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -126,6 +130,51 @@ TEST_P(IntegrationTest, BadPostListenSocketOption) {
   initialize();
   test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
 }
+
+#if defined(__linux__)
+// Entering a network namespace requires CAP_SYS_ADMIN, so setns() is faked and only counted.
+class FakeSetns : public Api::LinuxOsSysCallsImpl {
+public:
+  Api::SysCallIntResult setns(int, int) const override {
+    calls_++;
+    return {0, 0};
+  }
+
+  uint32_t calls() const { return calls_; }
+
+private:
+  mutable std::atomic<uint32_t> calls_{0};
+};
+
+// Verify that the main thread leaves the network namespace of a listener that fails to bind there.
+TEST_P(IntegrationTest, BindFailureInNetworkNamespace) {
+  FakeSetns fake_setns;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls{&fake_setns};
+  // The namespace file only has to exist since setns() is faked.
+  const std::string netns_path = TestEnvironment::writeStringToFileForTest("netns", "");
+  // Reserve a port without reuse_port so that the listener fails to bind it.
+  auto addr_socket =
+      Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, false);
+  // Do not wait for listeners to start as the listener will fail.
+  defer_listener_finalization_ = true;
+
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* socket_address = bootstrap.mutable_static_resources()
+                               ->mutable_listeners(0)
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_port_value(
+        addr_socket.second->connectionInfoProvider().localAddress()->ip()->port());
+    socket_address->set_network_namespace_filepath(netns_path);
+  });
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Ge(1));
+  // One call enters the network namespace and one leaves it.
+  EXPECT_EQ(2, fake_setns.calls());
+  // Shut down the server before linux_os_calls and fake_setns go out of scope.
+  test_server_.reset();
+}
+#endif
 
 // Make sure we have correctly specified per-worker performance stats.
 TEST_P(IntegrationTest, PerWorkerStatsAndBalancing) {
@@ -511,6 +560,28 @@ TEST_P(IntegrationTest, RouterRequestAndResponseLargeHeaderNoBuffer) {
 
 TEST_P(IntegrationTest, RouterHeaderOnlyRequestAndResponseNoBuffer) {
   testRouterHeaderOnlyRequestAndResponse();
+}
+
+TEST_P(IntegrationTest, CleanupWithIncompleteUpstreamRequest) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"content-length", "10"}});
+  Http::RequestEncoder& encoder = encoder_decoder.first;
+
+  Buffer::OwnedImpl partial_body("a");
+  codec_client_->sendData(encoder, partial_body, false);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 1));
+
+  // Cleanup must not interpret the resulting EOF as part of the incomplete HTTP/1 request.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeRequestcomplete) {
@@ -2516,6 +2587,98 @@ TEST_P(IntegrationTest, Preconnect) {
     ASSERT_TRUE(connection->waitForDisconnect());
     connection.reset();
   }
+}
+
+// Configures cluster 0 with per-upstream preconnect and a matcher that only accepts hosts with
+// test.preconnect.eligible == true.
+static void addPreconnectEligibilityMatcher(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+  auto* preconnect =
+      bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_preconnect_policy();
+  preconnect->mutable_per_upstream_preconnect_ratio()->set_value(2.0);
+  auto* matcher = preconnect->mutable_preconnect_enabled_metadata();
+  matcher->set_filter("test.preconnect");
+  matcher->add_path()->set_key("eligible");
+  matcher->mutable_value()->set_bool_match(true);
+}
+
+// An ineligible host (no matching metadata) is served on demand only; the preconnect is skipped.
+TEST_P(IntegrationTest, PreconnectSkipsIneligibleHost) {
+  config_helper_.addConfigModifier(&addPreconnectEligibilityMatcher);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_preconnect_skipped", testing::Ge(1));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+
+  codec_client_->close();
+}
+
+// A host stamped with matching metadata is eligible; the preconnect proceeds and nothing is
+// skipped.
+TEST_P(IntegrationTest, PreconnectAllowsEligibleHost) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    addPreconnectEligibilityMatcher(bootstrap);
+    auto* lb_endpoint = bootstrap.mutable_static_resources()
+                            ->mutable_clusters(0)
+                            ->mutable_load_assignment()
+                            ->mutable_endpoints(0)
+                            ->mutable_lb_endpoints(0);
+    Protobuf::Struct metadata;
+    (*metadata.mutable_fields())["eligible"].set_bool_value(true);
+    (*lb_endpoint->mutable_metadata()->mutable_filter_metadata())["test.preconnect"] = metadata;
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  FakeHttpConnectionPtr preconnect_connection;
+  waitForNextUpstreamConnection(std::vector<uint64_t>({0}), TestUtility::DefaultTimeout,
+                                preconnect_connection);
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_preconnect_skipped")->value());
+  // One on-demand connection plus one preconnect.
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", testing::Eq(2));
+
+  ASSERT_TRUE(preconnect_connection->close());
+  ASSERT_TRUE(preconnect_connection->waitForDisconnect());
+  codec_client_->close();
+}
+
+// Without a preconnect ratio no connection is ever anticipated, so no skips are recorded.
+TEST_P(IntegrationTest, PreconnectSkipNotCountedWithoutRatio) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* matcher = bootstrap.mutable_static_resources()
+                        ->mutable_clusters(0)
+                        ->mutable_preconnect_policy()
+                        ->mutable_preconnect_enabled_metadata();
+    matcher->set_filter("test.preconnect");
+    matcher->add_path()->set_key("eligible");
+    matcher->mutable_value()->set_bool_match(true);
+  });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_preconnect_skipped")->value());
+
+  codec_client_->close();
 }
 
 TEST_P(IntegrationTest, RandomPreconnect) {

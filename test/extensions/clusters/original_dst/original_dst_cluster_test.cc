@@ -23,6 +23,7 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -656,6 +657,144 @@ TEST_F(OriginalDstClusterTest, Membership2) {
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()); // hosts vector changes
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
+// Verifies that ORIGINAL_DST clusters expose all retained hosts as healthy hosts,
+// both upon initial addition and during partial cleanup rounds when some hosts become stale.
+TEST_F(OriginalDstClusterTest, AllRetainedHostsExposedAsHealthy) {
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(handle_, cluster_->prioritySet());
+  Event::PostCb post_cb;
+
+  // Set up downstream connection 1 and trigger chooseHost to asynchronously add host1
+  NiceMock<Network::MockConnection> connection1;
+  TestLoadBalancerContext lb_context1(&connection1);
+  connection1.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1).host;
+  post_cb();
+
+  // Explicitly set health flags on host1 that would normally mark it unhealthy/degraded under
+  // partitionHosts()
+  std::const_pointer_cast<Host>(host1)->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  std::const_pointer_cast<Host>(host1)->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+
+  // Set up downstream connection 2 and trigger chooseHost to asynchronously add host2
+  NiceMock<Network::MockConnection> connection2;
+  TestLoadBalancerContext lb_context2(&connection2);
+  connection2.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12"));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host2 = lb.chooseHost(&lb_context2).host;
+  post_cb();
+
+  // Explicitly set health flag on host2 as well
+  std::const_pointer_cast<Host>(host2)->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+
+  // Verify that both added hosts are present and exposed as healthy, despite health flags
+  const auto& host_set = *cluster_->prioritySet().hostSetsPerPriority()[0];
+  EXPECT_EQ(2UL, host_set.hosts().size());
+  EXPECT_EQ(2UL, host_set.healthyHosts().size());
+  EXPECT_EQ(0UL, host_set.degradedHosts().size());
+  EXPECT_EQ(0UL, host_set.excludedHosts().size());
+
+  // Mark both hosts as used_ = false by firing the cleanup timer
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  cleanup_timer_->invokeCallback();
+  EXPECT_EQ(2UL, host_set.hosts().size());
+  EXPECT_EQ(2UL, host_set.healthyHosts().size());
+
+  // Re-select host1 to simulate active traffic
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  EXPECT_EQ(lb.chooseHost(&lb_context1).host, host1);
+
+  // Cleanup timeout: host2 is removed as stale, host1 is retained
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  EXPECT_CALL(membership_updated_, ready());
+  cleanup_timer_->invokeCallback();
+
+  // Verify host1 is retained in both hosts() and healthyHosts() regardless of its health flags
+  EXPECT_EQ(1UL, host_set.hosts().size());
+  EXPECT_EQ(1UL, host_set.healthyHosts().size());
+  EXPECT_EQ(host_set.hosts()[0], host1);
+  EXPECT_EQ(host_set.healthyHosts()[0], host1);
+}
+
+// Verifies behavior when envoy.reloadable_features.skip_partition_original_dst_hosts runtime guard
+// is disabled. With the runtime flag disabled, partitionHosts() is used, so hosts marked with
+// FAILED_ACTIVE_HC are partitioned out of healthyHosts().
+TEST_F(OriginalDstClusterTest, AllRetainedHostsDisabledRuntimeGuard) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.skip_partition_original_dst_hosts", "false"}});
+
+  std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: ORIGINAL_DST
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
+
+  OriginalDstCluster::LoadBalancer lb(handle_, cluster_->prioritySet());
+  Event::PostCb post_cb;
+
+  NiceMock<Network::MockConnection> connection1;
+  TestLoadBalancerContext lb_context1(&connection1);
+  connection1.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11"));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host1 = lb.chooseHost(&lb_context1).host;
+  post_cb();
+
+  // Explicitly mark host1 as failing active health check
+  std::const_pointer_cast<Host>(host1)->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+
+  // Add host2 to trigger updateHosts using partitionHosts() path
+  NiceMock<Network::MockConnection> connection2;
+  TestLoadBalancerContext lb_context2(&connection2);
+  connection2.stream_info_.downstream_connection_info_provider_->restoreLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.10.11.12"));
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
+  HostConstSharedPtr host2 = lb.chooseHost(&lb_context2).host;
+  post_cb();
+
+  const auto& host_set = *cluster_->prioritySet().hostSetsPerPriority()[0];
+  EXPECT_EQ(2UL, host_set.hosts().size());
+  // When runtime flag is disabled, partitionHosts() filters out host1 (which has FAILED_ACTIVE_HC),
+  // so healthyHosts() only contains host2.
+  EXPECT_EQ(1UL, host_set.healthyHosts().size());
+  EXPECT_EQ(host_set.healthyHosts()[0], host2);
 }
 
 TEST_F(OriginalDstClusterTest, Connection) {

@@ -8,6 +8,7 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/status_utility.h"
 
 using testing::Return;
 
@@ -56,7 +57,7 @@ public:
   void init() {
     factory_ = std::make_shared<RedisClusterLoadBalancerFactory>(random_);
     lb_ = std::make_unique<RedisClusterThreadAwareLoadBalancer>(factory_);
-    EXPECT_TRUE(lb_->initialize().ok());
+    EXPECT_OK(lb_->initialize());
     factory_->onHostHealthUpdate();
   }
 

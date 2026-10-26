@@ -1,3 +1,6 @@
+# Changing the default behavior of ext_authz is generally not allowed. While you may add tests,
+# you generally should not change or remove existing tests.
+
 # Regression test for https://github.com/envoyproxy/envoy/issues/17344
 static_resources:
   listeners:

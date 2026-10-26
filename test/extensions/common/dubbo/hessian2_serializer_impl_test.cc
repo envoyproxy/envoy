@@ -61,9 +61,23 @@ TEST(Hessian2ProtocolTest, deserializeRpcRequest) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        0x05, '2', '.', '0', '.', '2', // Dubbo version
-        0x04, 't', 'e', 's', 't',      // Service name
-        0x05, '0', '.', '0', '.', '0', // Service version
+        0x05,
+        '2',
+        '.',
+        '0',
+        '.',
+        '2', // Dubbo version
+        0x04,
+        't',
+        'e',
+        's',
+        't', // Service name
+        0x05,
+        '0',
+        '.',
+        '0',
+        '.',
+        '0', // Service version
     }));
     auto context = std::make_unique<Context>();
     context->setBodySize(buffer.length());
@@ -289,8 +303,12 @@ TEST(Hessian2ProtocolTest, deserializeRpcResponse) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x94',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x94', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
 
     auto context = std::make_unique<Context>();
@@ -309,8 +327,12 @@ TEST(Hessian2ProtocolTest, deserializeRpcResponse) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x93',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x93', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
 
     auto context = std::make_unique<Context>();
@@ -331,8 +353,12 @@ TEST(Hessian2ProtocolTest, deserializeRpcResponse) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x90',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x90', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
 
     auto context = std::make_unique<Context>();
@@ -351,8 +377,12 @@ TEST(Hessian2ProtocolTest, deserializeRpcResponse) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x91',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x91', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
 
     auto context = std::make_unique<Context>();
@@ -401,8 +431,12 @@ TEST(Hessian2ProtocolTest, deserializeRpcResponse) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x94',                   // return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x94', // return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
 
     auto context = std::make_unique<Context>();
@@ -418,8 +452,12 @@ TEST(Hessian2ProtocolTest, deserializeRpcResponse) {
   {
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({
-        '\x96',                   // incorrect return type
-        0x04, 't', 'e', 's', 't', // return body
+        '\x96', // incorrect return type
+        0x04,
+        't',
+        'e',
+        's',
+        't', // return body
     }));
 
     auto context = std::make_unique<Context>();

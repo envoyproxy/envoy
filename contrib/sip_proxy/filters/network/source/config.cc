@@ -1,5 +1,7 @@
 #include "contrib/sip_proxy/filters/network/source/config.h"
 
+#include <format>
+
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.validate.h"
@@ -52,7 +54,7 @@ Network::FilterFactoryCb SipProxyFilterConfigFactory::createFilterFactoryFromPro
   auto transaction_infos = std::make_shared<Router::TransactionInfos>();
   for (auto& cluster : unique_clusters) {
     Stats::ScopeSharedPtr stats_scope =
-        context.scope().createScope(fmt::format("cluster.{}.sip_cluster", cluster));
+        context.scope().createScope(std::format("cluster.{}.sip_cluster", cluster));
     auto transaction_info_ptr = std::make_shared<Router::TransactionInfo>(
         cluster, context.serverFactoryContext().threadLocal(),
         static_cast<std::chrono::milliseconds>(
@@ -79,7 +81,7 @@ REGISTER_FACTORY(SipProxyFilterConfigFactory,
 ConfigImpl::ConfigImpl(
     const envoy::extensions::filters::network::sip_proxy::v3alpha::SipProxy& config,
     Server::Configuration::FactoryContext& context)
-    : context_(context), stats_prefix_(fmt::format("sip.{}.", config.stat_prefix())),
+    : context_(context), stats_prefix_(std::format("sip.{}.", config.stat_prefix())),
       stats_(SipFilterStats::generateStats(stats_prefix_, context_.scope())),
       route_matcher_(new Router::RouteMatcher(config.route_config())),
       settings_(std::make_shared<SipSettings>(

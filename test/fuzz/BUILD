@@ -54,6 +54,7 @@ envoy_cc_test_library(
     hdrs = ["fuzz_runner.h"],
     deps = [
         ":fuzzed_data_provider",
+        "//bazel/deps:libprotobuf-mutator",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
@@ -61,7 +62,6 @@ envoy_cc_test_library(
         "//source/common/http/http2:codec_lib",
         "//source/exe:process_wide_lib",
         "//test/test_common:environment_lib",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
     ],
 )
 
@@ -69,7 +69,7 @@ envoy_cc_test_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         ":common_proto_cc_proto",
         "//source/common/common:empty_string",
@@ -105,10 +105,10 @@ envoy_cc_test_library(
     srcs = ["validated_input_generator.cc"],
     hdrs = ["validated_input_generator.h"],
     deps = [
+        "//bazel/deps:libprotobuf-mutator",
         "//test/fuzz:mutable_visitor_lib",
         "//test/fuzz:random_lib",
-        "@com_envoyproxy_protoc_gen_validate//validate:cc_validate",
-        "@libprotobuf-mutator//:libprotobuf_mutator",
+        "@protoc-gen-validate//validate:cc_validate",
         "@xds//udpa/type/v1:pkg_cc_proto",
         "@xds//xds/type/v3:pkg_cc_proto",
     ],
@@ -127,7 +127,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "random_test",
     srcs = ["random_test.cc"],
-    rbe_pool = "6gig",
+    rbe_pool = "linux_x64_small",
     deps = [
         "//test/fuzz:random_lib",
     ],

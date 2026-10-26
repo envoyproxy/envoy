@@ -70,7 +70,7 @@ public:
                                 unsigned hash_length) override;
   std::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_name_; }
-  Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  std::vector<Envoy::Ssl::CertificateDetailsPtr> getCaCertInformation() const override;
 
   // Utility functions
   X509_STORE* getTrustBundleStore(X509* leaf_cert, absl::string_view workload_trust_domain);
@@ -88,6 +88,7 @@ private:
   bool verifyCertChainUsingTrustBundleStore(X509& leaf_cert, STACK_OF(X509)* cert_chain,
                                             X509_VERIFY_PARAM* verify_param,
                                             absl::string_view workload_trust_domain,
+                                            absl::Span<const std::string> verify_san_list,
                                             std::string& error_details,
                                             std::vector<bssl::UniquePtr<X509>>& validated_chain);
 

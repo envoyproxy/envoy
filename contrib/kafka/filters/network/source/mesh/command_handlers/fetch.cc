@@ -1,5 +1,6 @@
 #include "contrib/kafka/filters/network/source/mesh/command_handlers/fetch.h"
 
+#include <format>
 #include <thread>
 
 #include "source/common/common/fmt.h"
@@ -131,7 +132,7 @@ CallbackReply FetchRequestHolder::receive(InboundRecordSharedPtr message) {
 }
 
 std::string FetchRequestHolder::toString() const {
-  return fmt::format("[Fetch id={}]", request_->request_header_.correlation_id_);
+  return std::format("[Fetch id={}]", request_->request_header_.correlation_id_);
 }
 
 void FetchRequestHolder::cleanup(bool unregister) {
@@ -144,9 +145,14 @@ void FetchRequestHolder::cleanup(bool unregister) {
   // Our request is ready and can be sent downstream.
   // However, the caller here could be a Kafka-consumer worker thread (not an Envoy worker one),
   // so we need to use dispatcher to notify the filter that we are finished.
-  auto notifyCallback = [this]() -> void {
-    timer_ = nullptr;
-    filter_.onRequestReadyForAnswer();
+  // By the time the callback runs, the downstream connection might have been closed: then the
+  // filter has abandoned this request (and might have been destroyed together with it), so we
+  // must not keep this request alive, nor reach the filter other than through notifyFilter().
+  auto notifyCallback = [weak_self = weak_from_this()]() -> void {
+    if (const auto self = weak_self.lock()) {
+      self->timer_ = nullptr;
+      self->notifyFilter();
+    }
   };
   // Impl note: usually this will be invoked by non-Envoy thread,
   // so let's not optimize that this might be invoked by dispatcher callback.
