@@ -289,13 +289,15 @@ TEST_P(HboneIntegrationTest, PermanentConnectRejectionsDoNotRetryOrEject) {
   outlier_detection_ = true;
   initialize();
   for (const auto status : {"400", "401", "403", "404", "429", "302", "204", "600", "999"}) {
+    SCOPED_TRACE(status);
     codec_client_ = makeHttpConnection(lookupPort("http"));
     auto response = codec_client_->makeRequestWithBody(request_headers_, "payload");
     FakeStreamPtr rejected;
     waitForConnect(rejected);
     rejected->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", status}}, true);
     ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_EQ(status[0] == '4' ? status : "502", response->headers().getStatusValue());
+    const auto expected = absl::string_view(status) == "401" ? "403" : status;
+    EXPECT_EQ(status[0] == '4' ? expected : "502", response->headers().getStatusValue());
     EXPECT_EQ(0, rejected->bodyLength());
     codec_client_->close();
     completed_streams_.push_back(std::move(rejected));
@@ -360,6 +362,25 @@ TEST_P(HboneIntegrationTest, ApplicationForbiddenRetainsApplicationRetryPolicy) 
   waitForConnect(upstream_request_);
   acceptAndRespond(*upstream_request_, *response);
   EXPECT_EQ(1, test_server_->counter("cluster.service.upstream_rq_retry")->value());
+}
+
+TEST_P(HboneIntegrationTest, ApplicationUnauthorizedRemainsCredentialChallenge) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(request_headers_, "payload");
+  waitForConnect(upstream_request_);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, [](const std::string& data) {
+    return absl::StrContains(data, "\r\n\r\npayload");
+  }));
+  upstream_request_->encodeData("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n"
+                                "WWW-Authenticate: Bearer\r\n\r\n",
+                                false);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("401", response->headers().getStatusValue());
+  const auto challenge = response->headers().get(Http::LowerCaseString("www-authenticate"));
+  ASSERT_EQ(1, challenge.size());
+  EXPECT_EQ("Bearer", challenge[0]->value().getStringView());
 }
 
 TEST_P(HboneIntegrationTest, PermanentRejectionDoesNotAffectConcurrentAcceptedStream) {
@@ -484,7 +505,7 @@ TEST_P(HboneIntegrationTest, CancelPendingConnectThenRejectAnotherRequest) {
   EXPECT_EQ(0, test_server_->counter("cluster.service.upstream_rq_retry")->value());
 }
 
-TEST_P(HboneIntegrationTest, OuterConnectRejectionPreservesStatusThroughInnerTlsPool) {
+TEST_P(HboneIntegrationTest, OuterConnectUnauthorizedMapsToForbiddenThroughInnerTlsPool) {
   nested_ = true;
   outlier_detection_ = true;
   tunnel_attempts_ = 3;
@@ -493,7 +514,7 @@ TEST_P(HboneIntegrationTest, OuterConnectRejectionPreservesStatusThroughInnerTls
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(request_headers_, "payload");
   waitForConnect(upstream_request_);
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "403"}}, true);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "401"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("403", response->headers().getStatusValue());
   // Even inner TLS bytes are held until the outer CONNECT succeeds.

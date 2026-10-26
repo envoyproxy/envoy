@@ -52,9 +52,11 @@ message UpstreamConfig {
 
 // Required cluster upstream_config for application clusters using CONNECT wait. Handles
 // permanent CONNECT rejections before router retry and outlier accounting.
-// HTTP callers receive the rejected 4xx status (502 for other non-5xx statuses);
-// TCP callers are closed. Successful connections and transient failures retain
-// the standard pool behavior. Must be deployed together with the adapter sockets.
+// HTTP callers receive 403 for CONNECT 401, the original status for other 4xx,
+// and 502 for other non-5xx statuses. The original CONNECT status is retained in
+// failure diagnostics with the UF response flag. TCP callers are closed.
+// Successful connections and transient failures retain the standard pool behavior.
+// Must be deployed together with the adapter sockets.
 // [#extension: envoy.upstreams.istio_hbone]
 message ConnectionPoolConfig {
 }

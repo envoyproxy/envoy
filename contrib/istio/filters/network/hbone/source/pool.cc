@@ -69,8 +69,13 @@ public:
         const auto status = *permanentConnectRejection(reason);
         // Other invalid CONNECT responses (e.g. 302) are gateway protocol
         // failures, not redirects or successful application responses.
-        const auto code = status >= 400 && status < 500 ? static_cast<Http::Code>(status)
-                                                        : Http::Code::BadGateway;
+        auto code = status >= 400 && status < 500 ? static_cast<Http::Code>(status)
+                                                  : Http::Code::BadGateway;
+        // A tunnel authorization denial is not an application credential challenge.
+        // Preserve the original CONNECT status in the failure reason.
+        if (code == Http::Code::Unauthorized) {
+          code = Http::Code::Forbidden;
+        }
         downstream_.sendLocalReply(code, "HBONE CONNECT rejected", nullptr, std::nullopt, reason);
       });
     }

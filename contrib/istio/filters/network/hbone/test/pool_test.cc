@@ -170,6 +170,20 @@ TEST_F(HboneHttpPoolTest, CancellationRemovesAlreadyScheduledRejection) {
   run();
 }
 
+TEST_F(HboneHttpPoolTest, UnauthorizedConnectReturnsForbiddenPreservingDiagnostics) {
+  initialize();
+  const std::string reason = "istio_hbone_connect_rejected:401";
+  adapter_callbacks_->onPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                    reason, host_);
+  EXPECT_CALL(downstream_, sendLocalReply(Http::Code::Forbidden, _, _, _, reason))
+      .WillOnce(Return());
+  run();
+  EXPECT_TRUE(info_.hasResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure));
+  EXPECT_EQ(reason, info_.responseCodeDetails());
+  EXPECT_EQ(reason, info_.upstreamInfo()->upstreamTransportFailureReason());
+  EXPECT_EQ(host_, info_.upstreamInfo()->upstreamHost());
+}
+
 TEST_F(HboneHttpPoolTest, DestructionRemovesAlreadyScheduledRejection) {
   initialize();
   reject();

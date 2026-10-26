@@ -96,7 +96,9 @@ When CONNECT fails:
 * CONNECT 500--599 remains eligible for connection-failure retries, within the
   configured attempt and time budgets.
 * CONNECT 4xx, including 400, 401, 403 and 429, is permanent. An HTTP caller receives
-  a local reply with that status. A raw TCP caller is closed without forwarding data.
+  a local 403 for CONNECT 401 and the original status for other 4xx. The tunnel's
+  authorization denial does not challenge the application's credentials.
+  A raw TCP caller is closed without forwarding data.
 * Other rejected non-5xx statuses are permanent and produce a local 502 for HTTP
   callers. A CONNECT 200 that prematurely ends the stream is an establishment
   failure and retains the existing transient-failure behavior.
@@ -110,6 +112,9 @@ retain normal HTTP retry and outlier semantics.
 Access logs identify a rejection with ``UF`` and
 ``istio_hbone_connect_rejected:<status>`` in the response code details and upstream
 transport failure reason. The selected service endpoint remains in upstream info.
+For CONNECT 401, the application response is 403 with ``UF``, while both diagnostic
+fields retain ``istio_hbone_connect_rejected:401``. Application-generated 401
+responses inside accepted tunnels are unchanged.
 Connection-attempt failure counters can still increase; this does not imply an
 outlier health failure. The local response is not charged as an application response
 in the service cluster's upstream HTTP status counters.
