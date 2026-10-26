@@ -2449,6 +2449,10 @@ WEAK_STUB(HealthCheckerGetHostMetadataBool,
                                                                               nullptr))
 WEAK_STUB(HealthCheckerGetHostHealth,
           envoy_dynamic_module_callback_health_checker_get_host_health(nullptr))
+WEAK_STUB(RouteSpecifierSetPrefixRewriteRule,
+          envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+              nullptr, envoy_dynamic_module_type_route_specifier_rewrite_span_Literal, {nullptr, 0},
+              {nullptr, 0}))
 
 } // namespace
 } // namespace DynamicModules

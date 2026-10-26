@@ -98,6 +98,18 @@ bool knownAppendAction(envoy_dynamic_module_type_route_specifier_header_append_a
   return false;
 }
 
+bool knownRewriteSpan(envoy_dynamic_module_type_route_specifier_rewrite_span span) {
+  switch (span) {
+  case envoy_dynamic_module_type_route_specifier_rewrite_span_Literal:
+  case envoy_dynamic_module_type_route_specifier_rewrite_span_WholePath:
+    return true;
+  case envoy_dynamic_module_type_route_specifier_rewrite_span_Sentinel:
+    // Not a span a module passes, handled like any other value this build does not know.
+    break;
+  }
+  return false;
+}
+
 bool recordHeaderMutation(envoy_dynamic_module_type_module_buffer key,
                           envoy_dynamic_module_type_module_buffer value,
                           envoy_dynamic_module_type_route_specifier_header_append_action action,
@@ -867,9 +879,8 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
                    toStringView(override_id));
     return false;
   }
-  // Only the selection is recorded here. The path rewrite and the metadata the override carries
-  // are applied when the decision resolves, so unset_route_override can revert the selection
-  // cleanly and the values the module records itself win whatever the call order.
+  // Only the selection is recorded here, so unset_route_override can revert it cleanly and the
+  // values the module records itself win whatever the call order.
   context->overrides.route_override = entry;
   return true;
 }
@@ -900,6 +911,39 @@ bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
     return false;
   }
   context->overrides.path = std::move(*rewritten);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_rewrite_span span,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const absl::string_view matched_view = toStringView(matched);
+  const absl::string_view replacement_view = toStringView(replacement);
+  const bool whole_path = span == envoy_dynamic_module_type_route_specifier_rewrite_span_WholePath;
+  if (!knownRewriteSpan(span) || (whole_path && !matched_view.empty())) {
+    return false;
+  }
+  // The replacement starts the path the rule produces, so it must start with a slash like the path
+  // set_path takes, be a valid header value and carry no query string or fragment of its own.
+  if (!absl::StartsWith(replacement_view, "/") ||
+      replacement_view.find_first_of("?#") != absl::string_view::npos ||
+      !Http::HeaderUtility::headerValueIsValid(replacement_view)) {
+    return false;
+  }
+  PrefixRewriteRule rule;
+  if (!whole_path) {
+    rule.matched.emplace(matched_view);
+  }
+  rule.replacement = std::string(replacement_view);
+  // The module learns now that the rule does not fit the request, which finalization only counts.
+  if (!rule.apply(context->headers.getPathValue(), context->config.maxRewrittenPathBytes())
+           .has_value()) {
+    return false;
+  }
+  context->overrides.prefix_rewrite_rule = std::move(rule);
   return true;
 }
 
