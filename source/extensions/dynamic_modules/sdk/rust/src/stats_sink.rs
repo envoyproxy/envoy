@@ -440,7 +440,7 @@ impl<'a> MetricSnapshot<'a> {
   pub fn to_owned(&self) -> OwnedMetricSnapshot {
     let mut name = Vec::new();
     let mut value = Vec::new();
-    let counters = (0..self.counter_count())
+    let counters = (0 .. self.counter_count())
       .filter_map(|index| {
         self.counter(index, &mut name).map(|counter| OwnedCounter {
           name: String::from_utf8_lossy(&name).into_owned(),
@@ -449,7 +449,7 @@ impl<'a> MetricSnapshot<'a> {
         })
       })
       .collect();
-    let gauges = (0..self.gauge_count())
+    let gauges = (0 .. self.gauge_count())
       .filter_map(|index| {
         self.gauge(index, &mut name).map(|gauge_value| OwnedGauge {
           name: String::from_utf8_lossy(&name).into_owned(),
@@ -457,7 +457,7 @@ impl<'a> MetricSnapshot<'a> {
         })
       })
       .collect();
-    let text_readouts = (0..self.text_readout_count())
+    let text_readouts = (0 .. self.text_readout_count())
       .filter_map(|index| {
         if self.text_readout(index, &mut name, &mut value) {
           Some(OwnedTextReadout {
@@ -469,10 +469,10 @@ impl<'a> MetricSnapshot<'a> {
         }
       })
       .collect();
-    let histograms = (0..self.histogram_count())
+    let histograms = (0 .. self.histogram_count())
       .filter_map(|index| {
         self.histogram(index, &mut name).map(|histogram| {
-          let buckets = (0..self.histogram_bucket_count(index))
+          let buckets = (0 .. self.histogram_bucket_count(index))
             .filter_map(|bucket_index| self.histogram_bucket(index, bucket_index))
             .collect();
           OwnedHistogram {
@@ -722,7 +722,8 @@ impl EnvoyStatSinkConfig {
 /// Envoy-side resource when dropped.
 #[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyStatSinkConfigScheduler: Send + Sync {
-  /// Schedules [`StatSink::on_config_scheduled`] to run on the main thread with the given `event_id`.
+  /// Schedules [`StatSink::on_config_scheduled`] to run on the main thread with the given
+  /// `event_id`.
   ///
   /// This can be called multiple times to schedule multiple events. The configuration is guaranteed
   /// to be alive when the event runs.

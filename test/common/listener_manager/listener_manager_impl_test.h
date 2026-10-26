@@ -91,10 +91,11 @@ protected:
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(*api_));
     // Retires so that a fixture running at concurrency > 1 can supply the remaining workers.
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_)).RetiresOnSaturation();
-    // Drain notifications are scheduled whenever a listener or its filter chains begin draining.
-    // They are not the focus of these tests, so allow them in any number.
+    // Drain notifications are scheduled whenever a listener, its filter chains or its addresses
+    // begin draining. They are not the focus of these tests, so allow them in any number.
     EXPECT_CALL(*worker_, onListenerDrain(_, _)).Times(::testing::AnyNumber());
     EXPECT_CALL(*worker_, onFilterChainDrain(_, _, _)).Times(::testing::AnyNumber());
+    EXPECT_CALL(*worker_, onListenerAddressesDrain(_, _)).Times(::testing::AnyNumber());
     ON_CALL(server_.validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor));
     ON_CALL(server_.validation_context_, dynamicValidationVisitor())

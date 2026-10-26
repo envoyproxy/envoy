@@ -3177,6 +3177,109 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
   EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
 }
 
+// A health change re-partitions only the host's priority, or every priority with the guard off.
+TEST_F(StaticClusterImplTest, HealthChangeRepartitionsOnlyHostPriority) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - priority: 0
+        lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+      - priority: 1
+        lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.2
+                port_value: 443
+  )EOF";
+
+  for (const bool guard : {true, false}) {
+    SCOPED_TRACE(guard);
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.incremental_health_transition", guard ? "true" : "false"}});
+
+    envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+
+    Outlier::MockDetector* detector = new Outlier::MockDetector();
+    EXPECT_CALL(*detector, addChangedStateCb(_));
+    cluster->setOutlierDetector(Outlier::DetectorSharedPtr{detector});
+    cluster->initialize([] { return absl::OkStatus(); });
+
+    const auto& host_sets = cluster->prioritySet().hostSetsPerPriority();
+    ASSERT_EQ(2UL, host_sets.size());
+    const auto p0_healthy = host_sets[0]->healthyHostsPtr();
+    const HostSharedPtr p1_host = host_sets[1]->hosts()[0];
+
+    std::vector<uint32_t> updated_priorities;
+    MockPriorityUpdateCallback priority_update_cb;
+    EXPECT_CALL(priority_update_cb, Call)
+        .WillRepeatedly([&](uint32_t priority, const HostVector&, const HostVector&) {
+          updated_priorities.push_back(priority);
+          return absl::OkStatus();
+        });
+    auto priority_update_handle =
+        cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
+
+    p1_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+    detector->runCallbacks(p1_host);
+
+    EXPECT_TRUE(host_sets[1]->healthyHosts().empty());
+    if (guard) {
+      EXPECT_EQ(std::vector<uint32_t>{1}, updated_priorities);
+      EXPECT_EQ(p0_healthy, host_sets[0]->healthyHostsPtr());
+    } else {
+      EXPECT_EQ((std::vector<uint32_t>{0, 1}), updated_priorities);
+      EXPECT_NE(p0_healthy, host_sets[0]->healthyHostsPtr());
+    }
+  }
+}
+
+// A health change for a host whose priority has no host set re-partitions every priority.
+TEST_F(StaticClusterImplTest, HealthChangeForUnknownPriorityRepartitionsAll) {
+  const std::string yaml = R"EOF(
+    name: staticcluster
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 10.0.0.1
+                port_value: 443
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+
+  Outlier::MockDetector* detector = new Outlier::MockDetector();
+  EXPECT_CALL(*detector, addChangedStateCb(_));
+  cluster->setOutlierDetector(Outlier::DetectorSharedPtr{detector});
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  const HostSharedPtr host = cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  host->priority(5);
+  EXPECT_ENVOY_BUG(detector->runCallbacks(host), "health change for host at priority 5");
+}
+
 TEST_F(StaticClusterImplTest, HealthyStat) {
   const std::string yaml = R"EOF(
     name: addressportconfig

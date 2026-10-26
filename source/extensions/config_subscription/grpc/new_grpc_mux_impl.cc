@@ -52,7 +52,8 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
               })),
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
-      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)) {
+      eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
+      load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_) {
   AllMuxes::get().insert(this);
 }
 
@@ -178,12 +179,6 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   }
 
   auto ack = sub->second->sub_state_.handleResponse(*message);
-
-  // Processing point to record error if there is any failure after the response is processed.
-  if (xds_config_tracker_.has_value() &&
-      ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
-    xds_config_tracker_->onConfigRejected(*message, ack.error_detail_.message());
-  }
   kickOffAck(ack);
   Memory::Utils::tryShrinkHeap();
 }
@@ -204,8 +199,8 @@ void NewGrpcMuxImpl::onEstablishmentFailure(bool next_attempt_may_send_initial_r
   // crash, the iteration needs to dance around a little: collect pointers to all
   // SubscriptionStates, call on all those pointers we haven't yet called on, repeat if there are
   // now more SubscriptionStates.
-  absl::flat_hash_map<std::string, DeltaSubscriptionState*> all_subscribed;
-  absl::flat_hash_map<std::string, DeltaSubscriptionState*> already_called;
+  absl::flat_hash_map<std::string, XdsMux::DeltaSubscriptionState*> all_subscribed;
+  absl::flat_hash_map<std::string, XdsMux::DeltaSubscriptionState*> already_called;
   do {
     for (auto& [type_url, subscription] : subscriptions_) {
       all_subscribed[type_url] = &subscription->sub_state_;
@@ -253,12 +248,12 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
   return std::make_unique<WatchImpl>(type_url, watch, *this, options);
 }
 
-absl::Status
-NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
-                                Grpc::RawAsyncClientSharedPtr&& failover_async_client,
-                                Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
-                                const envoy::config::core::v3::ApiConfigSource& ads_config_source,
-                                std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>) {
+absl::Status NewGrpcMuxImpl::updateMuxSource(
+    Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+    Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+    BackOffStrategyPtr&& backoff_strategy,
+    const envoy::config::core::v3::ApiConfigSource& ads_config_source,
+    std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory) {
   // Process the rate limit settings.
   absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
       Utility::parseRateLimitSettings(ads_config_source);
@@ -274,6 +269,13 @@ NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_cl
   grpc_stream_ = createGrpcStreamObject(std::move(primary_async_client),
                                         std::move(failover_async_client), service_method, scope,
                                         std::move(backoff_strategy), *rate_limit_settings_or_error);
+
+  load_stats_reporter_factory_ = std::move(load_stats_reporter_factory);
+  if (lrs_server_ != nullptr) {
+    lrs_server_.reset();
+    maybeCreateLoadStatsReporter();
+  }
+
   // No need to update the config_validators_ as they may contain some state
   // that needs to be kept across different GrpcMux objects.
 
@@ -422,7 +424,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
     }
-    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
+    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryRequest> request;
     // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
@@ -435,10 +437,10 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
                           !skip_subsequent_node_ || first_request_on_stream_;
     if (set_node) {
       first_request_on_stream_ = false;
-      *request.mutable_node() = local_info_.node();
+      *request->mutable_node() = local_info_.node();
     }
     sub->second->sub_state_.clearDynamicContextChanged();
-    grpc_stream_->sendMessage(request);
+    grpc_stream_->sendMessage(*request);
   }
   grpc_stream_->maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
 }
@@ -485,6 +487,23 @@ std::optional<std::string> NewGrpcMuxImpl::whoWantsToSendDiscoveryRequest() {
   }
   return std::nullopt;
 }
+
+Upstream::LoadStatsReporter* NewGrpcMuxImpl::maybeCreateLoadStatsReporter() {
+  if (!lrs_server_ && load_stats_reporter_factory_ &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_lrs_server_self_ads")) {
+    ENVOY_LOG(info, "Creating self-hosted LRS reporter for xDS-gRPC-Mux");
+    lrs_server_ = load_stats_reporter_factory_();
+    if (!lrs_server_) {
+      ENVOY_LOG(warn,
+                "Failed to create self-hosted LRS reporter, not using an xDS-based LRS server");
+      return nullptr;
+    }
+    ENVOY_LOG(debug, "Successfully created self-hosted LRS reporter for xDS-gRPC-Mux");
+  }
+  return lrs_server_.get();
+}
+
+Upstream::LoadStatsReporter* NewGrpcMuxImpl::loadStatsReporter() const { return lrs_server_.get(); }
 
 // A factory class for creating NewGrpcMuxImpl so it does not have to be
 // hard-compiled into cluster_manager_impl.cc

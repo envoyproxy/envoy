@@ -2790,12 +2790,8 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ResponseEncoder* response_encoder = response_encoder_;
 
-  Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
-  const auto& buffered_request_data = filter_manager_.bufferedRequestData();
-  const bool proxy_body = buffered_request_data != nullptr && buffered_request_data->length() > 0;
-  if (proxy_body) {
-    request_data->move(*buffered_request_data);
-  }
+  Buffer::InstancePtr request_data = filter_manager_.takeBufferedRequestData();
+  const bool proxy_body = request_data != nullptr && request_data->length() > 0;
 
   // Null after move(): draining the WatermarkBuffer may synchronously fire
   // onDecoderFilterBelowWriteBufferLowWatermark which needs a valid encoder.

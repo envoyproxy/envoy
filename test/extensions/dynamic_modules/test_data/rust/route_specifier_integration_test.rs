@@ -462,8 +462,9 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
       ctx.set_route_user_data(user_data);
     }
     if let Some(name) = ctx.get_request_header("x-override") {
-      // The declaration getter is queried, then the override is applied. Applying validates the name
-      // too, so a name that is not declared exercises the rejection path. Tests pass both kinds.
+      // The declaration getter is queried, then the override is applied. Applying validates the
+      // name too, so a name that is not declared exercises the rejection path. Tests pass
+      // both kinds.
       let name = buffer_to_string(name);
       let _ = self.envoy_config.has_route_override(&name);
       let _ = ctx.set_route_override(&name);

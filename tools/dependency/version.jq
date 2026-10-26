@@ -4,10 +4,10 @@ def cmp_pre(a; b):
     elif (a == []) then 1    # empty pre-release > any pre-release
     elif (b == []) then -1
     else
-      reduce range(0; max([a|length, b|length])) as $i (0;
+      reduce range(0; ([(a|length), (b|length)] | max)) as $i (0;
         if . != 0 then . else
-          (a[$i]? // 0) as $ai
-          | (b[$i]? // 0) as $bi
+          (a[$i]? // "") as $ai
+          | (b[$i]? // "") as $bi
           | if ($ai | test("^[0-9]+$")) and ($bi | test("^[0-9]+$")) then
               ($ai | tonumber) - ($bi | tonumber)
             else
@@ -27,6 +27,7 @@ def cmp(v1; v2):
          reduce range(0;3) as $i (0;
            if . != 0 then . else $a.main[$i] - $b.main[$i] end
          )
+         | if . != 0 then . else cmp_pre($a.pre; $b.pre) end
        else
          # fallback: opaque comparison → string equality or lexicographic
          if $a.string == $b.string then 0
@@ -58,8 +59,8 @@ def parse(v):
             else
               $m
               | .main |= (split(".") | map(tonumber) + [0,0,0])[0:3]
-              | .pre |= (if .pre == null then [] else split(".") end)
-              | .build |= (if .build == null then [] else split(".") end)
+              | .pre |= (if . == null then [] else split(".") end)
+              | .build |= (if . == null then [] else split(".") end)
               | .string = $v
             end
         end

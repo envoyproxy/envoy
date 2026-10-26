@@ -149,7 +149,6 @@ private:
   Thread::ThreadFactory& thread_factory_;
   TimeSource& time_source_;
   Filesystem::Instance& file_system_;
-  std::string stats_prefix_;
   DispatcherStatsPtr stats_;
   Thread::ThreadId run_tid_;
   Buffer::WatermarkFactorySharedPtr buffer_factory_;

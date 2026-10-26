@@ -1676,6 +1676,7 @@ vanishingly
 varchar
 variadic
 varint
+Vcluster
 vec
 vectorize
 VBC
@@ -1843,3 +1844,4 @@ X25519MLKEM768
 cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
+vendored
