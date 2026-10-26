@@ -445,22 +445,7 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   response->waitForHeaders();
   EXPECT_EQ("200", response->headers().getStatusValue());
 
-  // The unknown host triggered an on-demand route discovery that found the virtual host.
-  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_requested", Ge(1));
-  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_found", Ge(1));
-  EXPECT_EQ(0,
-            test_server_->counter("http.config_test.on_demand.route_discovery_not_found")->value());
-  EXPECT_EQ(0, test_server_->gauge("http.config_test.on_demand.route_discovery_pending")->value());
-
   cleanupUpstreamAndDownstream();
-
-  // The two requests to known hosts waited for nothing, so they log "-" for every field. The third
-  // one waited for the virtual host, and the log shows what was discovered and how long it took.
-  const std::vector<std::string> entries = waitForAccessLogEntries(access_log_name_, nullptr, 3);
-  EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[0]);
-  EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[1]);
-  EXPECT_THAT(entries[2], ContainsRegex("^route=found host=vhost_1 vhost=my_route/vhost_1 "
-                                        "cluster=- route_us=[0-9]+$"));
 }
 
 // tests a scenario when:
@@ -572,7 +557,22 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   response->waitForHeaders();
   EXPECT_EQ("200", response->headers().getStatusValue());
 
+  // The unknown host triggered an on-demand route discovery that found the virtual host.
+  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_requested", Ge(1));
+  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_found", Ge(1));
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.on_demand.route_discovery_not_found")->value());
+  EXPECT_EQ(0, test_server_->gauge("http.config_test.on_demand.route_discovery_pending")->value());
+
   cleanupUpstreamAndDownstream();
+
+  // The two requests to known hosts waited for nothing, so they log "-" for every field. The third
+  // one waited for the virtual host, and the log shows what was discovered and how long it took.
+  const std::vector<std::string> entries = waitForAccessLogEntries(access_log_name_, nullptr, 3);
+  EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[0]);
+  EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[1]);
+  EXPECT_THAT(entries[2], ContainsRegex("^route=found host=vhost_1 vhost=my_route/vhost_1 "
+                                        "cluster=- route_us=[0-9]+$"));
 }
 
 // tests a scenario when:
