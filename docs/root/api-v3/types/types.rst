@@ -7,6 +7,7 @@ Types
 
   ../type/ai/v3/llm_binding.proto
   ../type/ai/v3/llm_protocol.proto
+  ../type/ai/v3/routes.proto
   ../type/matcher/v3/http_inputs.proto
   ../type/tracing/v3/custom_tag.proto
   ../type/v3/hash_policy.proto
