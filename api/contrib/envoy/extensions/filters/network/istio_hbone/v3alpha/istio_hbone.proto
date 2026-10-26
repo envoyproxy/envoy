@@ -29,8 +29,7 @@ message Config {
   // TCP proxy settings. HTTP CONNECT tunneling and immediate upstream connection
   // establishment are required. Application TLS and PROXY protocol wrapping of
   // the internal connection are not supported by this adapter.
-  envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy tcp_proxy = 1
-      [(validate.rules).message = {required: true}];
+  tcp_proxy.v3.TcpProxy tcp_proxy = 1 [(validate.rules).message = {required: true}];
 }
 
 // Transport socket for clusters whose endpoints are HBONE origination internal
@@ -41,20 +40,20 @@ message Config {
 message UpstreamConfig {
   // Metadata to pass to the internal listener, including original destination
   // metadata when required by the listener's original destination filter.
-  repeated envoy.extensions.transport_sockets.internal_upstream.v3.InternalUpstreamTransport
-      .MetadataValueSource passthrough_metadata = 1;
+  repeated transport_sockets.internal_upstream.v3.InternalUpstreamTransport.MetadataValueSource
+      passthrough_metadata = 1;
 
   // Optional wrapped transport, started only after CONNECT acceptance. Defaults
   // to raw buffer. Use TLS here on the inner HTTP/2 cluster of double HBONE, with
   // a paired adapter filter on the outer origination listener.
-  envoy.config.core.v3.TransportSocket transport_socket = 2;
+  config.core.v3.TransportSocket transport_socket = 2;
 }
 
 // Required cluster upstream_config for application clusters using CONNECT wait. Handles
 // permanent CONNECT rejections before router retry and outlier accounting.
 // HTTP callers receive 403 for CONNECT 401, the original status for other 4xx,
 // and 502 for other non-5xx statuses. The original CONNECT status is retained in
-// failure diagnostics with the UF response flag. TCP callers are closed.
+// failure diagnostics with the ``UF`` response flag. TCP callers are closed.
 // Successful connections and transient failures retain the standard pool behavior.
 // Must be deployed together with the adapter sockets.
 // [#extension: envoy.upstreams.istio_hbone]
