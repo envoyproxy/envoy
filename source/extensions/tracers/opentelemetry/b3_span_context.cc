@@ -16,6 +16,9 @@ namespace {
 constexpr size_t kTraceId64HexSize = 16;
 constexpr size_t kTraceId128HexSize = 32;
 constexpr size_t kSpanIdHexSize = 16;
+// {TraceId128}-{SpanId}-{SamplingState}-{ParentSpanId}
+constexpr size_t kMaxSingleHeaderSize =
+    kTraceId128HexSize + 1 + kSpanIdHexSize + 2 + 1 + kSpanIdHexSize;
 
 bool isValidHex(absl::string_view input) {
   return std::all_of(input.begin(), input.end(),
@@ -45,14 +48,18 @@ std::string toTraceId128(absl::string_view trace_id) {
 // A single header of one character carries only a sampling decision, e.g. "b3: 0".
 bool isSamplingOnly(absl::string_view b3) { return b3.size() == 1; }
 
+// Both ids are required; a lone x-b3-traceid or x-b3-spanid is not treated as trace context.
 bool multipleHeadersPresent(const Tracing::TraceContext& trace_context) {
-  return B3Constants::get().X_B3_TRACE_ID.get(trace_context).has_value() ||
+  return B3Constants::get().X_B3_TRACE_ID.get(trace_context).has_value() &&
          B3Constants::get().X_B3_SPAN_ID.get(trace_context).has_value();
 }
 
 // b3: {TraceId}-{SpanId}-{SamplingState}-{ParentSpanId}, where the last two fields are optional.
 absl::StatusOr<B3SpanContext> extractFromSingleHeader(absl::string_view b3) {
-  const std::vector<absl::string_view> fields = absl::StrSplit(b3, '-');
+  if (b3.size() > kMaxSingleHeaderSize) {
+    return absl::InvalidArgumentError("Invalid b3 header length");
+  }
+  const std::vector<absl::string_view> fields = absl::StrSplit(b3, absl::MaxSplits('-', 4));
   if (fields.size() < 2 || fields.size() > 4) {
     return absl::InvalidArgumentError("Invalid b3 header field count");
   }

@@ -830,6 +830,18 @@ TEST_F(OpenTelemetryDriverTest, B3SamplingOnlyStartsNewTrace) {
   EXPECT_TRUE(span->useLocalDecision());
 }
 
+// Verifies only one of x-b3-traceid and x-b3-spanid is not trace context and starts a new trace.
+TEST_F(OpenTelemetryDriverTest, B3PartialMultipleHeadersStartsNewTrace) {
+  setupValidDriverWithTraceContext("B3_MULTI", "");
+  ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(5));
+  Tracing::TestTraceContextImpl request_headers{{"x-b3-spanid", b3_span_id}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_EQ(span->getTraceId(), "00000000000000050000000000000005");
+  EXPECT_TRUE(span->useLocalDecision());
+}
+
 // Verifies B3 context without a sampling decision uses the Envoy tracing decision.
 TEST_F(OpenTelemetryDriverTest, B3DeferredSamplingUsesTracingDecision) {
   setupValidDriverWithTraceContext("B3_MULTI", "");

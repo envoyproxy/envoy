@@ -23,8 +23,11 @@ TEST(B3SpanContextTest, HeadersPresent) {
   EXPECT_FALSE(b3HeadersPresent(Tracing::TestTraceContextImpl{{"other", "value"}}));
   EXPECT_TRUE(b3HeadersPresent(
       Tracing::TestTraceContextImpl{{"b3", absl::StrCat(trace_id_128, "-", span_id)}}));
-  EXPECT_TRUE(b3HeadersPresent(Tracing::TestTraceContextImpl{{"x-b3-traceid", trace_id_128}}));
-  EXPECT_TRUE(b3HeadersPresent(Tracing::TestTraceContextImpl{{"x-b3-spanid", span_id}}));
+  EXPECT_TRUE(b3HeadersPresent(
+      Tracing::TestTraceContextImpl{{"x-b3-traceid", trace_id_128}, {"x-b3-spanid", span_id}}));
+  // Only one of the multiple header ids is not trace context.
+  EXPECT_FALSE(b3HeadersPresent(Tracing::TestTraceContextImpl{{"x-b3-traceid", trace_id_128}}));
+  EXPECT_FALSE(b3HeadersPresent(Tracing::TestTraceContextImpl{{"x-b3-spanid", span_id}}));
   // A single header that only carries a sampling decision has no trace context.
   EXPECT_FALSE(b3HeadersPresent(Tracing::TestTraceContextImpl{{"b3", "0"}}));
   EXPECT_FALSE(b3HeadersPresent(Tracing::TestTraceContextImpl{{"x-b3-sampled", "1"}}));
@@ -64,8 +67,10 @@ TEST(B3SpanContextTest, ExtractInvalidSingleHeader) {
   const std::vector<TestCase> test_cases = {
       {"", "Invalid b3 header field count"},
       {std::string(trace_id_128), "Invalid b3 header field count"},
-      {absl::StrCat(trace_id_128, "-", span_id, "-1-", parent_span_id, "-extra"),
-       "Invalid b3 header field count"},
+      {"1-2-3-4-5", "Invalid b3 header field count"},
+      {absl::StrCat(trace_id_128, "-", span_id, "-1-", parent_span_id, "-"),
+       "Invalid b3 header length"},
+      {std::string(1024, '-'), "Invalid b3 header length"},
       {absl::StrCat("463ac35c9f6413a", "-", span_id), "Invalid b3 trace id"},
       {absl::StrCat("463ac35c9f6413ad48485a3953bb612", "-", span_id), "Invalid b3 trace id"},
       {absl::StrCat("x63ac35c9f6413ad48485a3953bb6124", "-", span_id), "Invalid b3 trace id"},

@@ -43,8 +43,8 @@ struct B3SpanContext {
 
 /**
  * @return true if the trace context carries B3 trace and span ids in either the single header or
- * the multiple header encoding. A single header that only carries a sampling decision is not
- * considered to be present.
+ * the multiple header encoding. A single header that only carries a sampling decision, or only one
+ * of x-b3-traceid and x-b3-spanid, is not considered to be present.
  */
 bool b3HeadersPresent(const Tracing::TraceContext& trace_context);
 
