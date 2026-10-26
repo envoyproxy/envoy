@@ -86,26 +86,26 @@ public:
   }
   bool hasFieldSupport() const override { return true; }
   FieldType getField(absl::string_view field_name) const override {
-    if (field_name == "host") {
-      return stringField(host_);
-    }
-    if (field_name == "vhost") {
-      return stringField(vhost_);
-    }
-    if (field_name == "cluster") {
-      return stringField(cluster_);
-    }
-    if (field_name == "route_status") {
-      return stringField(route_status_);
-    }
-    if (field_name == "cluster_status") {
-      return stringField(cluster_status_);
-    }
-    if (field_name == "route_discovery_duration_us") {
-      return durationField(route_duration_us_);
-    }
-    if (field_name == "cluster_discovery_duration_us") {
-      return durationField(cluster_duration_us_);
+    // All the fields in one place: adding one is a single line.
+    struct Field {
+      absl::string_view name;
+      FieldType (*get)(const DiscoveryState&);
+    };
+    static constexpr Field Fields[] = {
+        {"host", [](const DiscoveryState& s) { return stringField(s.host_); }},
+        {"vhost", [](const DiscoveryState& s) { return stringField(s.vhost_); }},
+        {"cluster", [](const DiscoveryState& s) { return stringField(s.cluster_); }},
+        {"route_status", [](const DiscoveryState& s) { return stringField(s.route_status_); }},
+        {"cluster_status", [](const DiscoveryState& s) { return stringField(s.cluster_status_); }},
+        {"route_discovery_duration_us",
+         [](const DiscoveryState& s) { return durationField(s.route_duration_us_); }},
+        {"cluster_discovery_duration_us",
+         [](const DiscoveryState& s) { return durationField(s.cluster_duration_us_); }},
+    };
+    for (const Field& field : Fields) {
+      if (field.name == field_name) {
+        return field.get(*this);
+      }
     }
     return absl::monostate{};
   }
