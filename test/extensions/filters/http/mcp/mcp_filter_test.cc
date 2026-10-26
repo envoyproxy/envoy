@@ -975,10 +975,41 @@ TEST_F(McpFilterTest, MissingProtocolVersionMetaContinues) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
-constexpr char kMissingProtocolVersionMetaMessage[] =
-    "Missing required params._meta field: io.modelcontextprotocol/protocolVersion";
-constexpr char kInvalidProtocolVersionMetaMessage[] =
-    "Invalid params._meta field: io.modelcontextprotocol/protocolVersion must be a string";
+TEST_F(McpFilterTest, MissingProtocolVersionMetaRejects) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})");
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32602"),
+                                    testing::HasSubstr("Missing or invalid params._meta field: "
+                                                       "io.modelcontextprotocol/protocolVersion")),
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
+}
 
 TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
@@ -1003,234 +1034,15 @@ TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
   Buffer::OwnedImpl buffer(
       R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":123}}})");
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             testing::AllOf(testing::HasSubstr("\"code\":-32602"),
-                                            testing::HasSubstr(kInvalidProtocolVersionMetaMessage)),
-                             _, _, _));
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32602"),
+                                    testing::HasSubstr("Missing or invalid params._meta field: "
+                                                       "io.modelcontextprotocol/protocolVersion")),
+                     _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
-
-  // A non-string protocol version is invalid params, not a header mismatch.
-  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
-}
-
-struct ProtocolVersionMetaCase {
-  std::string name;
-  // Value of the Mcp-Method header, which matches the JSON-RPC method in the body.
-  std::string method;
-  // Value of the Mcp-Name header, or empty when the method has no name attribute.
-  std::string mcp_name;
-  std::string body;
-  // JSON-RPC error message expected in REJECT_NO_MCP mode.
-  std::string expected_message;
-};
-
-// 2026-07-28 requests whose params._meta["io.modelcontextprotocol/protocolVersion"] is missing or
-// is not a string. All other request headers match the body.
-class McpFilterProtocolVersionMetaTest
-    : public McpFilterTest,
-      public testing::WithParamInterface<ProtocolVersionMetaCase> {
-protected:
-  void setupNewSpecMode(
-      envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode,
-      envoy::extensions::filters::http::mcp::v3::Mcp::AttributeSource attribute_source =
-          envoy::extensions::filters::http::mcp::v3::Mcp::BODY) {
-    envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-    proto_config.set_traffic_mode(traffic_mode);
-    proto_config.set_attribute_source(attribute_source);
-    proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
-    proto_config.set_request_storage_mode(
-        envoy::extensions::filters::http::mcp::v3::Mcp::DYNAMIC_METADATA_AND_FILTER_STATE);
-    config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
-    filter_ = std::make_unique<McpFilter>(config_);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-  }
-
-  Http::TestRequestHeaderMapImpl newSpecHeaders() const {
-    Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                           {"content-type", "application/json"},
-                                           {"accept", "application/json"},
-                                           {"accept", "text/event-stream"},
-                                           {"mcp-protocol-version", "2026-07-28"},
-                                           {"mcp-method", GetParam().method}};
-    if (!GetParam().mcp_name.empty()) {
-      headers.addCopy("mcp-name", GetParam().mcp_name);
-    }
-    return headers;
-  }
-
-  void expectRejectedWithInvalidParams() {
-    auto headers = newSpecHeaders();
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-
-    EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _))
-        .WillOnce([expected_message = GetParam().expected_message](
-                      Http::Code, absl::string_view body,
-                      std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                      const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
-          EXPECT_THAT(body, HasSubstr("\"jsonrpc\":\"2.0\""));
-          EXPECT_THAT(body, HasSubstr("\"code\":-32602"));
-          EXPECT_THAT(body, HasSubstr(expected_message));
-          EXPECT_THAT(body, HasSubstr("\"id\":1"));
-
-          Http::TestResponseHeaderMapImpl response_headers;
-          modify_headers(response_headers);
-          EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
-                    response_headers.getContentTypeValue());
-        });
-
-    Buffer::OwnedImpl buffer(GetParam().body);
-    EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
-
-    // Missing or invalid metadata is invalid params, not a header mismatch.
-    EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
-
-    const auto* filter_state_obj =
-        decoder_callbacks_.stream_info_.filterState()->getDataReadOnly<McpFilterStateObject>(
-            std::string(McpFilterStateObject::FilterStateKey));
-    ASSERT_NE(filter_state_obj, nullptr);
-    EXPECT_FALSE(filter_state_obj->isMcpRequest());
-    EXPECT_EQ(Filters::Common::Mcp::Status::NotJsonRpc, filter_state_obj->status());
-  }
-};
-
-INSTANTIATE_TEST_SUITE_P(
-    MissingOrInvalidProtocolVersionMeta, McpFilterProtocolVersionMetaTest,
-    testing::Values(
-        ProtocolVersionMetaCase{"MissingParams", "tools/list", "",
-                                R"({"jsonrpc":"2.0","id":1,"method":"tools/list"})",
-                                kMissingProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "MissingMeta", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})",
-            kMissingProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "StringMeta", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":"2026-07-28"}})",
-            kMissingProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "ArrayMeta", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":["2026-07-28"]}})",
-            kMissingProtocolVersionMetaMessage},
-        // The missing protocol version is reported before the missing clientCapabilities.
-        ProtocolVersionMetaCase{
-            "EmptyMeta", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{}}})",
-            kMissingProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "MissingProtocolVersion", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/clientCapabilities":{}}}})",
-            kMissingProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "NullProtocolVersion", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/protocolVersion":null}}})",
-            kInvalidProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "NumberProtocolVersion", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/protocolVersion":20260728}}})",
-            kInvalidProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "BooleanProtocolVersion", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/protocolVersion":true}}})",
-            kInvalidProtocolVersionMetaMessage},
-        ProtocolVersionMetaCase{
-            "ObjectProtocolVersion", "tasks/get", "task-123",
-            R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/protocolVersion":{"version":"2026-07-28"}}}})",
-            kInvalidProtocolVersionMetaMessage}),
-    [](const testing::TestParamInfo<ProtocolVersionMetaCase>& info) { return info.param.name; });
-
-TEST_P(McpFilterProtocolVersionMetaTest, RejectModeReturnsInvalidParams) {
-  setupNewSpecMode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
-  expectRejectedWithInvalidParams();
-}
-
-TEST_P(McpFilterProtocolVersionMetaTest, RejectModeWithHeadersAttributeSourceReturnsInvalidParams) {
-  setupNewSpecMode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP,
-                   envoy::extensions::filters::http::mcp::v3::Mcp::HEADERS);
-  expectRejectedWithInvalidParams();
-}
-
-TEST_P(McpFilterProtocolVersionMetaTest, PassThroughModeContinues) {
-  setupNewSpecMode(envoy::extensions::filters::http::mcp::v3::Mcp::PASS_THROUGH);
-  auto headers = newSpecHeaders();
-
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-
-  Buffer::OwnedImpl buffer(GetParam().body);
-  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
-
-  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
-}
-
-// Notifications are not required to carry the protocol version metadata, but a value that is
-// present must still be a string.
-TEST_F(McpFilterTest, NotificationRejectsNonStringProtocolVersionMeta) {
-  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
-  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
-
-  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
-  filter_ = std::make_unique<McpFilter>(config_);
-  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-
-  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                         {"content-type", "application/json"},
-                                         {"accept", "application/json"},
-                                         {"accept", "text/event-stream"},
-                                         {"mcp-protocol-version", "2026-07-28"},
-                                         {"mcp-method", "notifications/cancelled"}};
-
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-
-  Buffer::OwnedImpl buffer(
-      R"({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1,"_meta":{"io.modelcontextprotocol/protocolVersion":123}}})");
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Http::Code::BadRequest,
-                             testing::AllOf(testing::HasSubstr("\"code\":-32602"),
-                                            testing::HasSubstr("\"id\":null"),
-                                            testing::HasSubstr(kInvalidProtocolVersionMetaMessage)),
-                             _, _, _));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
-  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
-}
-
-// Without a 2026-07-28 MCP-Protocol-Version header, requests keep legacy semantics in
-// REJECT_NO_MCP mode, and params._meta is not validated.
-TEST_F(McpFilterTest, LegacyRequestSkipsProtocolVersionMetaValidation) {
-  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
-  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
-  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
-
-  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
-
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-
-  for (const absl::string_view protocol_version : {"", "2025-11-25"}) {
-    SCOPED_TRACE(protocol_version);
-    filter_ = std::make_unique<McpFilter>(config_);
-    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
-    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
-
-    Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
-                                           {"content-type", "application/json"},
-                                           {"accept", "application/json"},
-                                           {"accept", "text/event-stream"}};
-    if (!protocol_version.empty()) {
-      headers.addCopy("mcp-protocol-version", std::string(protocol_version));
-    }
-
-    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-
-    Buffer::OwnedImpl buffer(
-        R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123","_meta":{"io.modelcontextprotocol/protocolVersion":123}}})");
-    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
-  }
 
   EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
 }

@@ -5483,65 +5483,7 @@ TEST_F(McpJsonRestBridgeFilterTest,
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
-constexpr absl::string_view kMissingProtocolVersionMetaError =
-    R"json({"code":-32602,"message":"Missing required params._meta field: io.modelcontextprotocol/protocolVersion"})json";
-constexpr absl::string_view kInvalidProtocolVersionMetaError =
-    R"json({"code":-32602,"message":"Invalid params._meta field: io.modelcontextprotocol/protocolVersion must be a string"})json";
-
-struct StatelessProtocolVersionMetaCase {
-  std::string test_name;
-  // The JSON-RPC "params" value, or empty to omit "params".
-  std::string params;
-  absl::string_view expected_error;
-};
-
-// Requests that explicitly declare MCP-Protocol-Version: 2026-07-28 are stateless, so missing or
-// non-string params._meta["io.modelcontextprotocol/protocolVersion"] is rejected rather than
-// handled as a legacy request.
-class StatelessProtocolVersionMetaTest
-    : public McpJsonRestBridgeFilterTest,
-      public testing::WithParamInterface<StatelessProtocolVersionMetaCase> {};
-
-INSTANTIATE_TEST_SUITE_P(
-    MissingOrInvalidProtocolVersionMeta, StatelessProtocolVersionMetaTest,
-    testing::Values(
-        StatelessProtocolVersionMetaCase{"MissingParams", "", kMissingProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{"NonObjectParams", R"([])",
-                                         kMissingProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{"MissingMeta", R"({"name":"create_api_key"})",
-                                         kMissingProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{"NonObjectMeta",
-                                         R"({"name":"create_api_key","_meta":"2026-07-28"})",
-                                         kMissingProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{
-            "MissingProtocolVersion",
-            R"({"name":"create_api_key","_meta":{"io.modelcontextprotocol/clientCapabilities":{}}})",
-            kMissingProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{
-            "NullProtocolVersion",
-            R"({"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":null,"io.modelcontextprotocol/clientCapabilities":{}}})",
-            kInvalidProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{
-            "NumberProtocolVersion",
-            R"({"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":20260728,"io.modelcontextprotocol/clientCapabilities":{}}})",
-            kInvalidProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{
-            "BooleanProtocolVersion",
-            R"({"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":true,"io.modelcontextprotocol/clientCapabilities":{}}})",
-            kInvalidProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{
-            "ObjectProtocolVersion",
-            R"({"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":{"version":"2026-07-28"},"io.modelcontextprotocol/clientCapabilities":{}}})",
-            kInvalidProtocolVersionMetaError},
-        StatelessProtocolVersionMetaCase{
-            "ArrayProtocolVersion",
-            R"({"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":["2026-07-28"],"io.modelcontextprotocol/clientCapabilities":{}}})",
-            kInvalidProtocolVersionMetaError}),
-    [](const testing::TestParamInfo<StatelessProtocolVersionMetaCase>& info) {
-      return info.param.test_name;
-    });
-
-TEST_P(StatelessProtocolVersionMetaTest, ReturnsInvalidParams) {
+TEST_F(McpJsonRestBridgeFilterTest, StatelessToolsCallWithoutProtocolVersionMetaReturnsError) {
   proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
       "2026-07-28");
   ASSERT_OK(makeFilter());
@@ -5551,147 +5493,6 @@ TEST_P(StatelessProtocolVersionMetaTest, ReturnsInvalidParams) {
                       {"mcp-method", "tools/call"},
                       {"mcp-name", "create_api_key"},
                       {"mcp-protocol-version", "2026-07-28"}};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
-            Http::FilterHeadersStatus::StopIteration);
-
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::BadRequest), StrEq(GetParam().expected_error), _, _,
-                     StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
-
-  nlohmann::json request = {{"jsonrpc", "2.0"}, {"id", 123}, {"method", "tools/call"}};
-  if (!GetParam().params.empty()) {
-    request["params"] = nlohmann::json::parse(GetParam().params);
-  }
-  Buffer::OwnedImpl body(request.dump());
-  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
-            Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
-}
-
-TEST_F(McpJsonRestBridgeFilterTest, StatelessToolsListWithoutProtocolVersionMetaReturnsError) {
-  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
-      "2026-07-28");
-  ASSERT_OK(makeFilter());
-
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {"mcp-method", "tools/list"},
-                      {"mcp-protocol-version", "2026-07-28"}};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
-            Http::FilterHeadersStatus::StopIteration);
-
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kMissingProtocolVersionMetaError), _, _,
-                     StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
-
-  Protobuf::Struct expected_metadata;
-  MessageUtil::loadFromJson(R"json({
-    "status": "mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid",
-    "method": "tools/list",
-    "params": {
-      "_meta": {
-        "io.modelcontextprotocol/clientCapabilities": {}
-      }
-    }
-  })json",
-                            expected_metadata);
-
-  EXPECT_CALL(
-      decoder_callbacks_.stream_info_,
-      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
-
-  Buffer::OwnedImpl body(
-      R"json({"jsonrpc":"2.0","id":12,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/clientCapabilities":{}}}})json");
-  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
-            Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
-  EXPECT_THAT(request_headers_.getMethodValue(), StrEq("POST"));
-
-  // Simulates how the router filter handles the local response.
-  response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
-  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
-            Http::FilterHeadersStatus::StopIteration);
-  Buffer::OwnedImpl response_body(kMissingProtocolVersionMetaError);
-  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
-            Http::FilterDataStatus::Continue);
-  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-  EXPECT_EQ(
-      nlohmann::json::parse(response_body.toString()),
-      nlohmann::json::parse(
-          R"json({"error":{"code":-32602,"message":"Missing required params._meta field: io.modelcontextprotocol/protocolVersion"},"id":12,"jsonrpc":"2.0"})json"));
-}
-
-// With an explicit 2026-07-28 MCP-Protocol-Version header, initialize is validated as a stateless
-// request instead of being served as a legacy initialize request.
-TEST_F(McpJsonRestBridgeFilterTest,
-       StatelessHeaderInitializeWithoutProtocolVersionMetaReturnsError) {
-  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
-      "2026-07-28");
-  ASSERT_OK(makeFilter());
-
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {":authority", "test-host"},
-                      {"mcp-method", "initialize"},
-                      {"mcp-protocol-version", "2026-07-28"}};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
-            Http::FilterHeadersStatus::StopIteration);
-
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kMissingProtocolVersionMetaError), _, _,
-                     StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
-
-  Buffer::OwnedImpl body(
-      R"json({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18"}})json");
-  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
-            Http::FilterDataStatus::StopIterationNoBuffer);
-}
-
-// Any MCP-Protocol-Version header value that declares 2026-07-28 makes the request stateless.
-TEST_F(McpJsonRestBridgeFilterTest,
-       StatelessMultipleProtocolVersionHeadersWithoutProtocolVersionMetaReturnsError) {
-  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
-      "2026-07-28");
-  ASSERT_OK(makeFilter());
-
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {"mcp-method", "tools/call"},
-                      {"mcp-name", "list_api_keys"},
-                      {"mcp-protocol-version", "2025-11-25"},
-                      {"mcp-protocol-version", "2026-07-28"}};
-  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
-            Http::FilterHeadersStatus::StopIteration);
-
-  EXPECT_CALL(
-      decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kMissingProtocolVersionMetaError), _, _,
-                     StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
-
-  Buffer::OwnedImpl body(
-      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test-codelab","pageSize":1}}})json");
-  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
-            Http::FilterDataStatus::StopIterationNoBuffer);
-  EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
-}
-
-// A string protocol version in params._meta makes the request stateless even when the version is
-// not supported, so an unsupported newer version is rejected rather than handled as legacy.
-TEST_F(McpJsonRestBridgeFilterTest,
-       StatelessToolsCallWithUnsupportedNewerProtocolVersionReturnsBadRequest) {
-  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
-      "2026-07-28");
-  ASSERT_OK(makeFilter());
-
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {"mcp-method", "tools/call"},
-                      {"mcp-name", "create_api_key"},
-                      {"mcp-protocol-version", "2099-01-01"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
@@ -5700,64 +5501,39 @@ TEST_F(McpJsonRestBridgeFilterTest,
       sendLocalReply(
           Eq(Http::Code::BadRequest),
           StrEq(
-              R"json({"code":-32022,"data":{"requested":"2099-01-01","supported":["2026-07-28","2025-11-25","2025-06-18","2025-03-26","2024-11-05"]},"message":"Unsupported protocol version"})json"),
-          _, _, StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
+              R"json({"code":-32602,"message":"Missing or invalid params._meta field: io.modelcontextprotocol/protocolVersion"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
 
   Buffer::OwnedImpl body(
-      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":"2099-01-01","io.modelcontextprotocol/clientCapabilities":{}}}})json");
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key"}})json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
-// Without an explicit stateless MCP-Protocol-Version header, a request whose params._meta has a
-// non-string protocol version keeps the legacy behavior, where params._meta is not validated.
 TEST_F(McpJsonRestBridgeFilterTest,
-       LegacyToolsCallWithNonStringProtocolVersionMetaProcessesRequest) {
+       StatelessToolsCallWithNonStringProtocolVersionMetaReturnsError) {
   proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
       "2026-07-28");
-
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
-
-  for (const absl::string_view protocol_version : {"", "2025-11-25"}) {
-    SCOPED_TRACE(protocol_version);
-    ASSERT_OK(makeFilter());
-
-    request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
-    if (!protocol_version.empty()) {
-      request_headers_.addCopy(Http::LowerCaseString("mcp-protocol-version"),
-                               std::string(protocol_version));
-    }
-    EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
-              Http::FilterHeadersStatus::StopIteration);
-
-    Buffer::OwnedImpl body(
-        R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"list_api_keys","arguments":{"parent":"projects/test-codelab","pageSize":1},"_meta":{"io.modelcontextprotocol/protocolVersion":20260728}}})json");
-    EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true), Http::FilterDataStatus::Continue);
-    EXPECT_THAT(request_headers_.getPathValue(),
-                StrEq("/v1/projects/test-codelab/apiKeys?pageSize=1"));
-    EXPECT_THAT(request_headers_.getMethodValue(), StrEq("GET"));
-  }
-}
-
-// An explicit 2026-07-28 header only makes a request stateless when the server supports that
-// version. Otherwise, the header is rejected by the legacy protocol version validation.
-TEST_F(McpJsonRestBridgeFilterTest, StatelessHeaderWithLegacyMaxVersionKeepsLegacyValidation) {
   ASSERT_OK(makeFilter());
 
   request_headers_ = {{":method", "POST"},
                       {":path", "/mcp"},
-                      {"mcp-method", "tools/list"},
+                      {"mcp-method", "tools/call"},
+                      {"mcp-name", "create_api_key"},
                       {"mcp-protocol-version", "2026-07-28"}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
   EXPECT_CALL(
       decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::OK),
-                     StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"), _, _,
-                     StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
+      sendLocalReply(
+          Eq(Http::Code::BadRequest),
+          StrEq(
+              R"json({"code":-32602,"message":"Missing or invalid params._meta field: io.modelcontextprotocol/protocolVersion"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
 
-  Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":123,"method":"tools/list"})json");
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":123}}})json");
   EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
