@@ -4,6 +4,7 @@
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
@@ -45,7 +46,8 @@ public:
       if (tcp_downstream_) {
         auto* listener = resources->add_listeners();
         listener->set_name("tcp");
-        listener->mutable_address()->mutable_socket_address()->set_address("127.0.0.1");
+        listener->mutable_address()->mutable_socket_address()->set_address(
+            Network::Test::getLoopbackAddressString(version_));
         listener->mutable_address()->mutable_socket_address()->set_port_value(0);
         auto* filter = listener->add_filter_chains()->add_filters();
         filter->set_name("envoy.filters.network.tcp_proxy");
@@ -448,7 +450,7 @@ TEST_P(HboneIntegrationTest, RawTcpCancelPendingConnectThenRejectAnotherConnecti
   ASSERT_TRUE(cancelled->write("cancelled"));
   waitForConnect(upstream_request_);
   cancelled->close(Network::ConnectionCloseType::AbortReset);
-  test_server_->waitForCounter("listener.127.0.0.1_0.downstream_cx_destroy", Eq(1));
+  test_server_->waitForCounter(listenerStatPrefix("downstream_cx_destroy"), Eq(1));
   // A late CONNECT rejection must not call the destroyed downstream connection.
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "403"}}, true);
   ASSERT_TRUE(upstream_request_->waitForReset());
