@@ -13,7 +13,7 @@ build-image:
   sha-worker: 58abaea3f29aae5340f32dc99fc66c97a6c2fec0902345d03cf6d47684606a1d
   # TODO: remove this dupe (currently used by ci request handler)
   mobile-sha: b4351554fbf60ecf5b69ae17434a1503802473118388361543a3c695040f8859
-  tag: 7e0344e0ddd6ee5e56105172f7dd17346049c0df
+  tag: v0.2.5
 
 config:
   envoy:
