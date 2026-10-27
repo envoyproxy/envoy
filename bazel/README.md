@@ -234,6 +234,23 @@ The `llvm_toolchain_alias_extension.host(path = ...)` tag detects the installed 
 major version. This mechanism supports host LLVM versions other than 22; the separate
 `toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
 
+### Migrating from `envoy_llvm_extension`
+
+Replace `@envoy//bazel:extensions.bzl%envoy_llvm_extension` with toolshed's
+`llvm_toolchain_alias_extension` in your root `MODULE.bazel`:
+
+```
+llvm_toolchain_alias_ext = use_extension(
+    "@envoy_toolshed//compile:extensions.bzl",
+    "llvm_toolchain_alias_extension",
+)
+llvm_toolchain_alias_ext.host(path = "/usr/lib/llvm-22")  # Optional
+use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+```
+
+The deprecated `envoy_llvm_extension` shim still supports existing no-tag usage, but setting its
+`.host()` tag now fails with migration instructions.
+
 **Note:** Building with host-provided toolchains is **not supported** by the Envoy project. The
 hermetic toolchain remains the supported default. Other host tools may fail depending on the build
 environment. Upstream Envoy builds are unaffected when no host toolchain is registered.
