@@ -30,6 +30,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   mutations:
 //   - { body_field: model }
 //   - { body_field: anthropic_version, value: vertex-2023-10-16, keep_existing: true }
+//   - { header: anthropic-version }
 //
 // The Anthropic API itself, which Envoy defines as the binding of ``ANTHROPIC_MESSAGES``:
 //
@@ -39,7 +40,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //   mutations:
 //   - { header: anthropic-version, value: "2023-06-01", keep_existing: true }
 //
-// On the way out, the path is rendered from the request and the mutations are applied in order.
+// A binding's mutations apply on top of the API's, so the Vertex binding removes the API's
+// version header, which Vertex does not take, by naming it. On the way out, the path is rendered
+// from the request and the mutations are applied in order.
 // On the way in, the model and streaming mode the path names are written into the body and the
 // body fields and headers the mutations write are removed, so the API's own document is
 // transcoded.
@@ -82,6 +85,9 @@ message LLMBinding {
   // API's own path is used.
   string uri_pattern = 1;
 
-  // Ordered edits to the request body and headers. When empty, the API's default edits apply.
+  // Ordered edits to the request body and headers, applied after the API's own edits. One that
+  // names a field or header the API's edits also name replaces that edit; the API's other edits
+  // still apply. So a binding that only adds a header keeps, say, Gemini's removal of ``model``
+  // and ``stream`` from the body, and overrides one of the API's edits by naming its target.
   repeated Mutation mutations = 2;
 }

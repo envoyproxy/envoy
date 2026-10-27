@@ -1165,14 +1165,16 @@ DialectTranscodePack createAnthropicTranscodePack() {
       .binding = builtInBinding("/v1/messages", {{.header = "anthropic-version",
                                                   .value = nlohmann::json("2023-06-01"),
                                                   .keep_existing = true}}),
-      // Claude on Vertex AI: the model in the path alone, and the Vertex API version in the body.
+      // Claude on Vertex AI: the model in the path alone, and the Vertex API version in the body
+      // rather than in the API's header, which is removed so it does not leak to Vertex.
       .client_bindings = {builtInBinding(
           "/{version}/projects/{project}/locations/{location}/publishers/anthropic/models/"
           "{model}:{rawPredict|streamRawPredict}",
           {{.body_field = "model"},
            {.body_field = "anthropic_version",
             .value = nlohmann::json("vertex-2023-10-16"),
-            .keep_existing = true}})},
+            .keep_existing = true},
+           {.header = "anthropic-version"}})},
   };
 }
 

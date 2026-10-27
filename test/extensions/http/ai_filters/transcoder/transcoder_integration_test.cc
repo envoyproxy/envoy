@@ -131,7 +131,7 @@ public:
         R"({"uri_pattern": "/{version}/projects/{project}/locations/{location}/publishers/)"
         R"(anthropic/models/{model}:{rawPredict|streamRawPredict}", "mutations": [)"
         R"({"body_field": "model"}, {"body_field": "anthropic_version", )"
-        R"("value": "vertex-2023-10-16", "keep_existing": true}]})",
+        R"("value": "vertex-2023-10-16", "keep_existing": true}, {"header": "anthropic-version"}]})",
         ClaudeModel, /*binding_on_route=*/false);
   }
 

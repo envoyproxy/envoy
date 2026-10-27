@@ -517,7 +517,7 @@ The example pins a route to Claude on an illustrative gateway, statically, with
               inline_string: "claude-sonnet-4-5"
 
 A binding in JSON also edits the body and the request headers. Claude on Vertex AI takes the
-model in the path alone and the Vertex AI API version in the body:
+model in the path alone and the Vertex AI API version in the body, not in the API's header:
 
 .. code-block:: json
 
@@ -525,7 +525,8 @@ model in the path alone and the Vertex AI API version in the body:
     "uri_pattern": "/v1/projects/my-project/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
     "mutations": [
       {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true},
+      {"header": "anthropic-version"}
     ]
   }
 
@@ -540,6 +541,10 @@ automatically, so requests to Anthropic need no extra path or header configurati
       {"header": "anthropic-version", "value": "2023-06-01", "keep_existing": true}
     ]
   }
+
+A binding's mutations apply on top of the API's own, so a binding that only adds a header keeps
+the API's body edits. A mutation naming a field or header the API's also name replaces that one
+edit, which is how the Vertex binding above removes the API's version header.
 
 Use header mutations only for non-secret API headers; pass credentials via
 ``request_headers_to_add`` or :ref:`credential_injector <config_http_filters_credential_injector>`.

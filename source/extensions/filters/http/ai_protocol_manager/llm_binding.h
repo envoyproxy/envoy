@@ -57,7 +57,8 @@ public:
   // around it is ignored.
   static absl::StatusOr<LlmBindingConstSharedPtr> parse(absl::string_view text);
 
-  // `pattern` nullopt: the API's own path. `mutations` empty: the API's own edits.
+  // `pattern` nullopt: the API's own path. `mutations` apply after the API's own edits, each
+  // replacing the API's edit to the same field or header, if any.
   LlmBinding(std::optional<UriPattern>&& pattern, std::vector<Mutation>&& mutations);
 
   const std::optional<UriPattern>& pattern() const { return pattern_; }

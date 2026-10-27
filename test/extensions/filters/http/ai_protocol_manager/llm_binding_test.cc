@@ -28,7 +28,8 @@ constexpr absl::string_view VertexClaude = R"({
   "uri_pattern": "/{version}/projects/{project}/locations/{location}/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
   "mutations": [
     {"body_field": "model"},
-    {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true},
+    {"header": "anthropic-version"}
   ]
 })";
 constexpr absl::string_view VertexGemini =
@@ -135,6 +136,11 @@ TEST(LlmBindingParseTest, RejectsWhatCannotBeApplied) {
            R"({"mutations": [{"header": "transfer-encoding"}]})",
            // Header names are matched lower-case.
            R"({"mutations": [{"header": "Anthropic-Version", "value": "v"}]})",
+           // And are RFC 7230 tokens: the filter-state path is not PGV-checked.
+           R"({"mutations": [{"header": "x@a", "value": "v"}]})",
+           R"({"mutations": [{"header": "x a", "value": "v"}]})",
+           R"({"mutations": [{"header": "x:a", "value": "v"}]})",
+           R"({"mutations": [{"header": "x/a", "value": "v"}]})",
            // A header's value is text.
            R"({"mutations": [{"header": "x-a", "value": 1}]})",
            R"({"mutations": [{"header": "x-a", "value": {"k": "v"}}]})",
@@ -181,8 +187,7 @@ TEST(LlmBindingParseTest, KnowsWhatItRemoves) {
   EXPECT_TRUE(binding->removesStream());
 }
 
-// A binding's empty part is the API's: a pattern-only binding takes the API's mutations, and a
-// mutations-only one its pattern.
+// A binding's empty pattern is the API's, and its mutations apply on top of the API's own.
 TEST(LlmBindingTest, EmptyPartsFallBackToTheApis) {
   const LlmBindingConstSharedPtr api = parseOk(GeminiApi);
   const LlmBindingConstSharedPtr pattern_only = parseOk("/gw/{model}");
@@ -197,11 +202,52 @@ TEST(LlmBindingTest, EmptyPartsFallBackToTheApis) {
               IsOkAndHolds(std::make_optional<std::string>("/gw/m")));
   EXPECT_EQ(body, nlohmann::json::object());
 
+  // The API's removals of `model` and `stream` still apply beside the binding's own edit.
   body = nlohmann::json::parse(R"({"model": "m", "stream": true})");
   EXPECT_THAT(
       write(*edits_only, nullptr, body, api.get()),
       IsOkAndHolds(std::make_optional<std::string>("/v1beta/models/m:streamGenerateContent")));
-  EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m", "stream": true, "x": 1})"));
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"x": 1})"));
+}
+
+// A binding's mutations add to the API's rather than replace them: a header on top of Gemini's
+// binding does not undo its body edits, on the way out or on the way in.
+TEST(LlmBindingTest, MutationsAddToTheApis) {
+  const LlmBindingConstSharedPtr api = parseOk(GeminiApi);
+  const LlmBindingConstSharedPtr header_only =
+      parseOk(R"({"mutations": [{"header": "x-goog-user-project", "value": "{project}"}]})");
+  const LlmBindingRead arrived{nullptr, "", {{"project", "acme"}}, {}, {}};
+
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "m", "stream": false})");
+  std::vector<HeaderMutation> headers;
+  EXPECT_THAT(write(*header_only, &arrived, body, api.get(), &headers),
+              IsOkAndHolds(std::make_optional<std::string>("/v1beta/models/m:generateContent")));
+  EXPECT_EQ(body, nlohmann::json::object());
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("x-goog-user-project: acme"));
+
+  // Coming in, the API's removals still put the path's model and streaming mode into the body,
+  // and the binding's header is recorded as the API's would be.
+  body = nlohmann::json::parse(R"({"model": "from-body"})");
+  const std::optional<LlmBindingRead> read_back = read(
+      header_only, "/v1beta/models/m:generateContent", body, api, {{"x-goog-user-project", "p"}});
+  ASSERT_TRUE(read_back.has_value());
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m", "stream": false})"));
+  EXPECT_THAT(read_back->written_headers,
+              ::testing::ElementsAre(::testing::Pair("x-goog-user-project", "p")));
+}
+
+// A binding overrides one of the API's edits by naming the same field or header; the API's
+// other edits still apply.
+TEST(LlmBindingTest, ABindingOverridesAnApiEditByNamingItsTarget) {
+  const LlmBindingConstSharedPtr api = parseOk(GeminiApi);
+  // Keeps `model` in the body (the API would remove it); `stream` is still removed.
+  const LlmBindingConstSharedPtr keeps_model = parseOk(
+      R"({"mutations": [{"body_field": "model", "value": "{model}", "keep_existing": true}]})");
+  nlohmann::json body = nlohmann::json::parse(R"({"model": "m", "stream": true})");
+  EXPECT_THAT(
+      write(*keeps_model, nullptr, body, api.get()),
+      IsOkAndHolds(std::make_optional<std::string>("/v1beta/models/m:streamGenerateContent")));
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"model": "m"})"));
 }
 
 TEST(LlmBindingReadTest, ThePathWinsForAFieldTheBindingRemoves) {
@@ -509,6 +555,47 @@ TEST(LlmBindingHeaderTest, KeepsAHeaderTheRequestHas) {
   EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: 2023-06-01"));
 }
 
+// `keep_existing` on a header sees the edits before it, as it does on a body field: a header an
+// earlier edit set is present, one an earlier edit removed is absent, whatever the request had.
+TEST(LlmBindingHeaderTest, KeepExistingSeesEarlierHeaderEdits) {
+  // Absent in the request; set a, then set b only if absent: a stands.
+  const LlmBindingConstSharedPtr set_then_keep = parseOk(R"({"mutations": [
+    {"header": "x-a", "value": "a"}, {"header": "x-a", "value": "b", "keep_existing": true}
+  ]})");
+  nlohmann::json body = nlohmann::json::object();
+  std::vector<HeaderMutation> headers;
+  ASSERT_THAT(write(*set_then_keep, nullptr, body, nullptr, &headers), IsOk());
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("x-a: a"));
+
+  // Present in the request; remove, then set b only if absent: b is written.
+  const LlmBindingConstSharedPtr remove_then_keep = parseOk(R"({"mutations": [
+    {"header": "x-a"}, {"header": "x-a", "value": "b", "keep_existing": true}
+  ]})");
+  headers.clear();
+  ASSERT_THAT(write(*remove_then_keep, nullptr, body, nullptr, &headers, {{"x-a", "original"}}),
+              IsOk());
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("x-a", "x-a: b"));
+
+  // The same two edits on a body field, for comparison.
+  const LlmBindingConstSharedPtr body_edits = parseOk(R"({"mutations": [
+    {"body_field": "f", "value": "a"}, {"body_field": "f", "value": "b", "keep_existing": true}
+  ]})");
+  ASSERT_THAT(write(*body_edits, nullptr, body), IsOk());
+  EXPECT_EQ(body, nlohmann::json::parse(R"({"f": "a"})"));
+}
+
+// A binding's header edit stands in for the API's edit to the same header.
+TEST(LlmBindingHeaderTest, ABindingOverridesAnApiHeaderEditByNamingIt) {
+  const LlmBindingConstSharedPtr anthropic = parseOk(AnthropicApi);
+  const LlmBindingConstSharedPtr newer =
+      parseOk(R"({"mutations": [{"header": "anthropic-version", "value": "2024-01-01"}]})");
+  nlohmann::json body = nlohmann::json::object();
+  std::vector<HeaderMutation> headers;
+  ASSERT_THAT(write(*newer, nullptr, body, anthropic.get(), &headers),
+              IsOkAndHolds("/v1/messages"));
+  EXPECT_THAT(describe(headers), ::testing::ElementsAre("anthropic-version: 2024-01-01"));
+}
+
 // A header the arrived binding writes is the provider's: recorded on the way in for the caller to
 // take out, and given back only when the request leaves in the same binding.
 TEST(LlmBindingHeaderTest, TheSameBindingRestoresTheClientsHeader) {
@@ -559,6 +646,31 @@ TEST(LlmBindingHeaderTest, HeadersDoNotDependOnTheBody) {
   EXPECT_THAT(write(*needs_project, nullptr, body, nullptr, &headers),
               HasStatusCode(absl::StatusCode::kFailedPrecondition));
   EXPECT_TRUE(headers.empty());
+}
+
+// A value is checked once its placeholders are filled, since a placeholder takes what the client
+// sent: a CR, LF or NUL in the result would end the header and start another.
+TEST(LlmBindingHeaderTest, RejectsAValueThatWouldSplitTheHeader) {
+  const LlmBindingConstSharedPtr binding = parseOk(R"({"mutations": [
+    {"header": "x-a", "value": "a"}, {"header": "x-model", "value": "{model}"}
+  ]})");
+  std::vector<HeaderMutation> headers;
+  for (absl::string_view model : {absl::string_view("m\r\nx-admin: true"), absl::string_view("m\n"),
+                                  absl::string_view("m\0", 2)}) {
+    nlohmann::json body;
+    body["model"] = std::string(model);
+    headers.clear();
+    EXPECT_THAT(write(*binding, nullptr, body, nullptr, &headers),
+                HasStatusCode(absl::StatusCode::kInvalidArgument));
+    EXPECT_TRUE(headers.empty());
+  }
+
+  // Set in the binding itself, from filter state, the value is caught the same way.
+  const LlmBindingConstSharedPtr injected =
+      parseOk(R"({"mutations": [{"header": "x-a", "value": "a\r\nx-admin: true"}]})");
+  nlohmann::json body = nlohmann::json::object();
+  EXPECT_THAT(write(*injected, nullptr, body, nullptr, &headers),
+              HasStatusCode(absl::StatusCode::kInvalidArgument));
 }
 
 } // namespace
