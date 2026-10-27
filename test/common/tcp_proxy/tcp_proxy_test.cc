@@ -534,8 +534,8 @@ TEST_P(TcpProxyTest, UpstreamRemoteDisconnect) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
-// Test that upstream RemoteClose propagates AbortReset (default behavior)
-// when upstream detected close type is RemoteReset.
+// Test that upstream RemoteClose propagates AbortReset when upstream detected close type is
+// RemoteReset.
 TEST_P(TcpProxyTest, UpstreamRemoteCloseWithRstPropagation) {
   setup(1);
   raiseEventUpstreamConnected(0);
@@ -563,18 +563,6 @@ TEST_P(TcpProxyTest, UpstreamLocalCloseStillUsesFin) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
-}
-
-// Test that upstream RemoteClose uses FlushWrite (FIN) when runtime guard is disabled.
-TEST_P(TcpProxyTest, UpstreamRemoteCloseUsesFinWhenRstGuardDisabled) {
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.propagate_upstream_rst_through_tunneled_tcp_proxy", "false"}});
-
-  setup(1);
-  raiseEventUpstreamConnected(0);
-
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 // Test that upstream RemoteClose with Normal close type uses FlushWrite.

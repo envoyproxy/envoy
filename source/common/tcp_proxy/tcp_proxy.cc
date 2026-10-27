@@ -1409,9 +1409,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     } else {
       if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
         // Propagate upstream RST to downstream.
-        if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset &&
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features."
-                                           "propagate_upstream_rst_through_tunneled_tcp_proxy")) {
+        if (upstream_detected_close_type == StreamInfo::DetectedCloseType::RemoteReset) {
           ENVOY_CONN_LOG(trace, "TCP:onUpstreamEvent(): propagating upstream RST to downstream",
                          read_callbacks_->connection());
           getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRemoteReset);
