@@ -1,6 +1,8 @@
 #include <cstddef>
 #include <string>
 
+#include "envoy/http/header_validator_errors.h"
+
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/http/headers.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
@@ -11,6 +13,7 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/server/active_listener_base.h"
 
+#include "test/common/http/test_header_validator_factory.h"
 #include "test/common/quic/test_utils.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -1231,6 +1234,146 @@ TEST_F(EnvoyQuicServerStreamTest, OnCloseDoesNotUnderflowBytesToSendWithUnreport
   EXPECT_GT(quic_session_.bytesToSend(), 0u);
   EXPECT_LT(quic_session_.bytesToSend(), 1000u);
 }
+
+#ifdef ENVOY_ENABLE_UHV
+// Tests for the UHV code path in the server stream: when a header validator factory is supplied the
+// stream validates/transforms request headers and trailers and reports rejections to the request
+// decoder through rejectRequest() (the HCM then sends the response and resets the stream).
+class EnvoyQuicServerStreamUhvTest : public EnvoyQuicServerStreamTest {
+protected:
+  // Creates and activates a stream that runs the default UHV configured by
+  // header_validator_config_. Must be called after header_validator_config_ is set up since the
+  // validator copies the config.
+  EnvoyQuicServerStream& createStreamWithUhv() {
+    // The fixture's default stream is left open; TearDown closes the connection, which resets it.
+    EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
+    auto* stream = new EnvoyQuicServerStream(
+        uhv_stream_id_, &quic_session_, quic::BIDIRECTIONAL, stats_, http3_options_,
+        envoy::config::core::v3::HttpProtocolOptions::ALLOW, header_validator_factory_);
+    setupRequestDecoderMock(uhv_decoder_);
+    stream->setRequestDecoder(uhv_decoder_);
+    stream->addCallbacks(uhv_stream_callbacks_);
+    stream->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
+    quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(stream));
+    return *stream;
+  }
+
+  // Mirrors what the HCM does after a rejection, so that the session can be closed cleanly in
+  // TearDown().
+  void resetUhvStream(EnvoyQuicServerStream& stream) {
+    EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _)).Times(testing::AtMost(1u));
+    EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _)).Times(testing::AtMost(1u));
+    EXPECT_CALL(uhv_stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
+    stream.resetStream(Http::StreamResetReason::LocalReset);
+  }
+
+  quic::QuicHeaderList makeRequestHeaderList() {
+    quic::QuicHeaderList header_list;
+    header_list.OnHeader(":authority", host_);
+    header_list.OnHeader(":method", "GET");
+    header_list.OnHeader(":scheme", "https");
+    header_list.OnHeader(":path", "/");
+    return header_list;
+  }
+
+  quic::QuicStreamId uhv_stream_id_{kStreamId + 4};
+  testing::NiceMock<Http::MockRequestDecoder> uhv_decoder_;
+  testing::NiceMock<Http::MockStreamCallbacks> uhv_stream_callbacks_;
+  envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      header_validator_config_;
+  Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
+      header_validator_config_overrides_;
+  Http::TestHeaderValidatorFactory header_validator_factory_{header_validator_config_,
+                                                             header_validator_config_overrides_};
+};
+
+// A valid request is transformed by UHV (path normalization) and delivered to the decoder.
+TEST_F(EnvoyQuicServerStreamUhvTest, AcceptAndTransformRequestHeaders) {
+  header_validator_config_.mutable_uri_path_normalization_options()->set_skip_path_normalization(
+      false);
+  EnvoyQuicServerStream& stream = createStreamWithUhv();
+
+  quic::QuicHeaderList header_list;
+  header_list.OnHeader(":authority", host_);
+  header_list.OnHeader(":method", "GET");
+  header_list.OnHeader(":scheme", "https");
+  header_list.OnHeader(":path", "/a/../b");
+  header_list.OnHeaderBlockEnd(0, 0);
+
+  EXPECT_CALL(uhv_decoder_, rejectRequest_(_)).Times(0);
+  EXPECT_CALL(uhv_decoder_, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([](const Http::RequestHeaderMapSharedPtr& headers, bool) {
+        EXPECT_EQ("/b", headers->getPathValue());
+      }));
+  stream.OnStreamHeaderList(/*fin=*/true, 0, header_list);
+  EXPECT_TRUE(stream.FinishedReadingHeaders());
+  // Finish the stream so that the session can be closed cleanly in TearDown().
+  stream.encodeHeaders(response_headers_, /*end_stream=*/true);
+}
+
+// Request headers rejected by UHV are reported through rejectRequest() instead of decodeHeaders().
+TEST_F(EnvoyQuicServerStreamUhvTest, RejectRequestHeaders) {
+  header_validator_config_.set_headers_with_underscores_action(
+      envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+          REJECT_REQUEST);
+  EnvoyQuicServerStream& stream = createStreamWithUhv();
+
+  quic::QuicHeaderList header_list = makeRequestHeaderList();
+  header_list.OnHeader("foo_bar", "baz");
+  header_list.OnHeaderBlockEnd(0, 0);
+
+  EXPECT_CALL(uhv_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(uhv_decoder_, rejectRequest_(_))
+      .WillOnce(Invoke([&](Http::RequestRejection& rejection) {
+        EXPECT_EQ(Http::RequestRejection::Phase::Headers, rejection.phase);
+        EXPECT_EQ(Http::RequestRejection::Action::LocalReply, rejection.action);
+        EXPECT_EQ(Http::Code::BadRequest, rejection.response_code);
+        EXPECT_EQ(Http::UhvResponseCodeDetail::get().InvalidUnderscore, rejection.details);
+        // stream_error_on_invalid_http_message defaults to false for H/3.
+        EXPECT_TRUE(rejection.close_connection);
+        EXPECT_TRUE(rejection.end_stream);
+        ASSERT_NE(nullptr, rejection.headers);
+        EXPECT_EQ(host_, rejection.headers->getHostValue());
+      }));
+  stream.OnStreamHeaderList(/*fin=*/true, 0, header_list);
+  EXPECT_TRUE(stream.FinishedReadingHeaders());
+  EXPECT_EQ(1u, stats_.requests_rejected_with_underscores_in_headers_.value());
+
+  resetUhvStream(stream);
+}
+
+// Request trailers rejected by UHV are reported through rejectRequest() instead of
+// decodeTrailers(). H/3 asks for the stream to be reset (no local reply) for trailer failures.
+TEST_F(EnvoyQuicServerStreamUhvTest, RejectRequestTrailers) {
+  header_validator_config_.set_headers_with_underscores_action(
+      envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig::
+          REJECT_REQUEST);
+  EnvoyQuicServerStream& stream = createStreamWithUhv();
+
+  quic::QuicHeaderList header_list = makeRequestHeaderList();
+  header_list.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(uhv_decoder_, decodeHeaders_(_, /*end_stream=*/false));
+  stream.OnStreamHeaderList(/*fin=*/false, 0, header_list);
+  EXPECT_TRUE(stream.FinishedReadingHeaders());
+
+  quic::QuicHeaderList trailer_list;
+  trailer_list.OnHeader("foo_bar", "baz");
+  trailer_list.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(uhv_decoder_, decodeTrailers_(_)).Times(0);
+  EXPECT_CALL(uhv_decoder_, rejectRequest_(_))
+      .WillOnce(Invoke([](Http::RequestRejection& rejection) {
+        EXPECT_EQ(Http::RequestRejection::Phase::Trailers, rejection.phase);
+        EXPECT_EQ(Http::RequestRejection::Action::ResetStream, rejection.action);
+        EXPECT_EQ(Http::UhvResponseCodeDetail::get().InvalidUnderscore, rejection.details);
+        EXPECT_TRUE(rejection.close_connection);
+        EXPECT_EQ(nullptr, rejection.headers);
+        ASSERT_NE(nullptr, rejection.trailers);
+      }));
+  stream.OnStreamHeaderList(/*fin=*/true, 0, trailer_list);
+
+  resetUhvStream(stream);
+}
+#endif // ENVOY_ENABLE_UHV
 
 } // namespace Quic
 } // namespace Envoy

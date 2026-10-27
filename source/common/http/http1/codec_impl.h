@@ -460,7 +460,8 @@ public:
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action,
-                       Server::OverloadManager& overload_manager);
+                       Server::OverloadManager& overload_manager,
+                       OptRef<HeaderValidatorFactory> header_validator_factory = std::nullopt);
   bool supportsHttp10() override { return codec_settings_.accept_http_10_; }
 
 protected:
@@ -477,6 +478,9 @@ protected:
     HeaderString request_url_;
     RequestDecoderHandlePtr request_decoder_handle_;
     ResponseEncoderImpl response_encoder_;
+    // Per-request header validator (Universal Header Validator). Only created when the codec was
+    // built with ENVOY_ENABLE_UHV and a factory was supplied; otherwise nullptr.
+    ServerHeaderValidatorPtr header_validator_;
     bool remote_complete_{};
   };
   // ConnectionImpl
@@ -552,6 +556,13 @@ private:
   Status doFloodProtectionChecks() const;
   Status checkHeaderNameForUnderscores() override;
   Status checkProtocolVersion(RequestHeaderMap& headers);
+  /**
+   * Hands fully parsed request headers to the request decoder. When the request has a header
+   * validator, the headers are validated and transformed first and the decoder is told to reject
+   * the request instead if they fail.
+   */
+  void deliverRequestHeaders(RequestDecoder& decoder, RequestHeaderMapPtr&& headers,
+                             bool end_stream);
 
   ServerConnectionCallbacks& callbacks_;
   std::unique_ptr<ActiveRequest> active_request_;
@@ -570,6 +581,8 @@ private:
   const envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   Server::LoadShedPoint* abort_dispatch_{nullptr};
+  // Factory for per-request header validators; unset when header validation is not configured.
+  const OptRef<HeaderValidatorFactory> header_validator_factory_;
 };
 
 /**

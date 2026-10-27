@@ -2436,18 +2436,50 @@ TEST_F(HttpConnectionManagerImplTest, DirectLocalReplyCausesDisconnect) {
   EXPECT_EQ(1U, stats_.named_.rs_too_large_.value());
 }
 
-// Header validator rejects header map for HTTP/1.x protocols
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
+namespace {
+
+// Builds a RequestRejection the way a server codec does when the header validator rejects
+// request headers.
+RequestRejection makeHeadersRejection(RequestHeaderMapPtr&& headers, bool end_stream,
+                                      RequestRejection::Action action, absl::string_view details,
+                                      bool close_connection) {
+  RequestRejection rejection;
+  rejection.phase = RequestRejection::Phase::Headers;
+  rejection.action = action;
+  rejection.details = std::string(details);
+  rejection.close_connection = close_connection;
+  rejection.headers = std::move(headers);
+  rejection.end_stream = end_stream;
+  return rejection;
+}
+
+// Builds a RequestRejection the way a server codec does when the header validator rejects
+// request trailers.
+RequestRejection makeTrailersRejection(RequestTrailerMapPtr&& trailers,
+                                       RequestRejection::Action action, absl::string_view details,
+                                       bool close_connection) {
+  RequestRejection rejection;
+  rejection.phase = RequestRejection::Phase::Trailers;
+  rejection.action = action;
+  rejection.details = std::string(details);
+  rejection.close_connection = close_connection;
+  rejection.trailers = std::move(trailers);
+  return rejection;
+}
+
+} // namespace
+
+// Codec rejects request headers for HTTP/1.x protocols and asks for the connection to be closed.
+TEST_F(HttpConnectionManagerImplTest, RejectRequestHttp1) {
   setup();
-  expectUhvHeaderCheck(HeaderValidator::ValidationResult(
-                           HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
-                       ServerHeaderValidator::RequestHeadersTransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    decoder_->rejectRequest(makeHeadersRejection(std::move(headers), true,
+                                                 RequestRejection::Action::LocalReply,
+                                                 "bad_header_map", /*close_connection=*/true));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -2475,31 +2507,38 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp1) {
         EXPECT_EQ("close", headers.getConnectionValue());
         EXPECT_EQ("bad_header_map",
                   filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
+        EXPECT_TRUE(filter->decoder_callbacks_->streamInfo().hasResponseFlag(
+            StreamInfo::CoreResponseFlag::DownstreamProtocolError));
       }));
   EXPECT_CALL(*filter, onStreamComplete());
   EXPECT_CALL(*filter, onDestroy());
+  // close_connection requests the connection to be closed after the local reply (the connection
+  // is also closed by the drain logic since the local reply carries "connection: close").
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _))
+      .Times(AtLeast(1));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 }
 
-// Header validator rejects header map for HTTP/2 protocols
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
+// Codec rejects request headers for HTTP/2 protocols without closing the connection.
+TEST_F(HttpConnectionManagerImplTest, RejectRequestHttp2) {
   codec_->protocol_ = Protocol::Http2;
   setup();
-  expectUhvHeaderCheck(HeaderValidator::ValidationResult(
-                           HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
-                       ServerHeaderValidator::RequestHeadersTransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    decoder_->rejectRequest(makeHeadersRejection(std::move(headers), true,
+                                                 RequestRejection::Action::LocalReply,
+                                                 "bad_header_map", /*close_connection=*/false));
     data.drain(4);
     return Http::okStatus();
   }));
 
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
@@ -2512,13 +2551,38 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectHttp2) {
   conn_manager_->onData(fake_input, false);
 }
 
-// Header validator rejects gRPC request
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
+// The response code requested by the codec is honored.
+TEST_F(HttpConnectionManagerImplTest, RejectRequestWithCustomResponseCode) {
   codec_->protocol_ = Protocol::Http2;
   setup();
-  expectUhvHeaderCheck(HeaderValidator::ValidationResult(
-                           HeaderValidator::ValidationResult::Action::Reject, "bad_header_map"),
-                       ServerHeaderValidator::RequestHeadersTransformationResult::success());
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    auto rejection =
+        makeHeadersRejection(std::move(headers), true, RequestRejection::Action::LocalReply,
+                             "bad_transfer_encoding", /*close_connection=*/false);
+    rejection.response_code = Code::NotImplemented;
+    decoder_->rejectRequest(std::move(rejection));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("501", headers.getStatusValue());
+        EXPECT_EQ("bad_transfer_encoding", decoder_->streamInfo().responseCodeDetails().value());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Codec rejects gRPC request headers: the local reply is converted into a gRPC response.
+TEST_F(HttpConnectionManagerImplTest, RejectGrpcRequest) {
+  codec_->protocol_ = Protocol::Http2;
+  setup();
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -2527,7 +2591,9 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
         {":authority", "host"},
         {":path", "/something"},
         {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    decoder_->rejectRequest(makeHeadersRejection(std::move(headers), true,
+                                                 RequestRejection::Action::LocalReply,
+                                                 "bad_header_map", /*close_connection=*/false));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -2543,20 +2609,20 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectGrpcRequest) {
   conn_manager_->onData(fake_input, false);
 }
 
-// Header validator redirects
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
+// Codec asks for a redirect to the normalized path.
+TEST_F(HttpConnectionManagerImplTest, RejectRequestRedirect) {
   setup();
-  expectUhvHeaderCheck(
-      HeaderValidator::ValidationResult::success(),
-      ServerHeaderValidator::RequestHeadersTransformationResult(
-          ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect,
-          "bad_header_map"));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
+    // The codec has already transformed the path when it requests a redirect.
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+        {":authority", "host"}, {":path", "/some/new/path"}, {":method", "GET"}}};
+    auto rejection = makeHeadersRejection(std::move(headers), true,
+                                          RequestRejection::Action::Redirect, "bad_header_map",
+                                          /*close_connection=*/false);
+    rejection.transformation_failed = true;
+    decoder_->rejectRequest(std::move(rejection));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -2570,26 +2636,27 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirect) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_redirected_with_normalized_path_.value());
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_failed_path_normalization_.value());
 }
 
-// Header validator redirects gRPC request
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
+// Redirect requested for a gRPC request is converted into a gRPC error response.
+TEST_F(HttpConnectionManagerImplTest, RejectGrpcRequestRedirect) {
   codec_->protocol_ = Protocol::Http2;
   setup();
-  expectUhvHeaderCheck(
-      HeaderValidator::ValidationResult::success(),
-      ServerHeaderValidator::RequestHeadersTransformationResult(
-          ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect,
-          "bad_header_map"));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {"content-type", "application/grpc"}, // Make Envoy interpret this request as gRPC call
         {":authority", "host"},
-        {":path", "/something"},
+        {":path", "/some/new/path"},
         {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    auto rejection = makeHeadersRejection(std::move(headers), true,
+                                          RequestRejection::Action::Redirect, "bad_header_map",
+                                          /*close_connection=*/false);
+    rejection.transformation_failed = true;
+    decoder_->rejectRequest(std::move(rejection));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -2598,29 +2665,29 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRedirectGrpcRequest) {
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("200", headers.getStatusValue());
         EXPECT_EQ("13", headers.getGrpcStatusValue());
+        EXPECT_TRUE(headers.Location() == nullptr);
         EXPECT_EQ("bad_header_map", decoder_->streamInfo().responseCodeDetails().value());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_redirected_with_normalized_path_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
 }
 
-// Header validator rejects trailer map before response has started
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp1) {
-  codec_->protocol_ = Protocol::Http11;
+// Failed path transformation is counted even when a plain local reply is requested.
+TEST_F(HttpConnectionManagerImplTest, RejectRequestFailedPathNormalization) {
   setup();
-  expectUhvTrailerCheck(HeaderValidator::ValidationResult(
-                            HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TransformationResult::success());
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), false);
-    RequestTrailerMapPtr trailers{
-        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
-    decoder_->decodeTrailers(std::move(trailers));
+    auto rejection = makeHeadersRejection(std::move(headers), true,
+                                          RequestRejection::Action::LocalReply, "bad_path",
+                                          /*close_connection=*/false);
+    rejection.transformation_failed = true;
+    decoder_->rejectRequest(std::move(rejection));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -2628,45 +2695,41 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeRespons
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ("400", headers.getStatusValue());
-        EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
       }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_failed_path_normalization_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersBeforeResponseHttp2) {
+// Codec asks for the stream to be reset without a response (e.g. H/2 underscore handling).
+TEST_F(HttpConnectionManagerImplTest, RejectRequestResetStream) {
   codec_->protocol_ = Protocol::Http2;
   setup();
-  expectUhvTrailerCheck(HeaderValidator::ValidationResult(
-                            HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TransformationResult::success(), false);
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), false);
-    RequestTrailerMapPtr trailers{
-        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
-    decoder_->decodeTrailers(std::move(trailers));
+    decoder_->rejectRequest(makeHeadersRejection(std::move(headers), true,
+                                                 RequestRejection::Action::ResetStream,
+                                                 "bad_header_map", /*close_connection=*/false));
     data.drain(4);
     return Http::okStatus();
   }));
 
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, _)).Times(0);
   EXPECT_CALL(response_encoder_.stream_, resetStream(_));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+  EXPECT_EQ("bad_header_map", decoder_->streamInfo().responseCodeDetails().value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationBeforeResponse) {
+// Codec rejects trailers before response has started (HTTP/1: local reply).
+TEST_F(HttpConnectionManagerImplTest, RejectTrailersBeforeResponseHttp1) {
   codec_->protocol_ = Protocol::Http11;
   setup();
-  expectUhvTrailerCheck(
-      HeaderValidator::ValidationResult::success(),
-      HeaderValidator::TransformationResult(HeaderValidator::TransformationResult::Action::Reject,
-                                            "bad_trailer_map"));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
@@ -2675,7 +2738,9 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationB
     decoder_->decodeHeaders(std::move(headers), false);
     RequestTrailerMapPtr trailers{
         new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
-    decoder_->decodeTrailers(std::move(trailers));
+    decoder_->rejectRequest(makeTrailersRejection(std::move(trailers),
+                                                  RequestRejection::Action::LocalReply,
+                                                  "bad_trailer_map", /*close_connection=*/false));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -2690,14 +2755,101 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorFailTrailersTransformationB
   conn_manager_->onData(fake_input, false);
 }
 
-// Header validator rejects trailer map after response has started
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse) {
+// Codec rejects trailers before response has started (HTTP/2: stream reset).
+TEST_F(HttpConnectionManagerImplTest, RejectTrailersBeforeResponseHttp2) {
+  codec_->protocol_ = Protocol::Http2;
+  setup();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{
+        new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
+    decoder_->rejectRequest(makeTrailersRejection(std::move(trailers),
+                                                  RequestRejection::Action::ResetStream,
+                                                  "bad_trailer_map", /*close_connection=*/false));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, _)).Times(0);
+  EXPECT_CALL(response_encoder_.stream_, resetStream(_));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+  EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+}
+
+// Trailer rejection of a gRPC request with a local reply produces a gRPC error response.
+TEST_F(HttpConnectionManagerImplTest, RejectTrailersGrpcRequest) {
+  codec_->protocol_ = Protocol::Http11;
+  setup();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{"content-type", "application/grpc"},
+                                                             {":authority", "host"},
+                                                             {":path", "/something"},
+                                                             {":method", "POST"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"trailer1", "value1"}}};
+    decoder_->rejectRequest(makeTrailersRejection(std::move(trailers),
+                                                  RequestRejection::Action::LocalReply,
+                                                  "bad_trailer_map", /*close_connection=*/false));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("200", headers.getStatusValue());
+        EXPECT_EQ("13", headers.getGrpcStatusValue());
+        EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Trailer rejection with close_connection closes the connection after the reply.
+TEST_F(HttpConnectionManagerImplTest, RejectTrailersCloseConnection) {
+  codec_->protocol_ = Protocol::Http11;
+  setup();
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/something"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"trailer1", "value1"}}};
+    decoder_->rejectRequest(makeTrailersRejection(std::move(trailers),
+                                                  RequestRejection::Action::LocalReply,
+                                                  "bad_trailer_map", /*close_connection=*/true));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+      }));
+  // The connection is closed by the drain logic (the local reply carries "connection: close")
+  // and by the codec error handling requested through close_connection.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _))
+      .Times(AtLeast(1));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Codec rejects trailers after response has started.
+TEST_F(HttpConnectionManagerImplTest, RejectTrailersAfterResponse) {
   codec_->protocol_ = Protocol::Http2;
   setup();
   setupFilterChain(1, 0, 1);
-  expectUhvTrailerCheck(HeaderValidator::ValidationResult(
-                            HeaderValidator::ValidationResult::Action::Reject, "bad_trailer_map"),
-                        HeaderValidator::TransformationResult::success());
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
         return FilterHeadersStatus::StopIteration;
@@ -2714,7 +2866,9 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse
 
     RequestTrailerMapPtr trailers{
         new TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer2", "value2"}}};
-    decoder_->decodeTrailers(std::move(trailers));
+    decoder_->rejectRequest(makeTrailersRejection(std::move(trailers),
+                                                  RequestRejection::Action::ResetStream,
+                                                  "bad_trailer_map", /*close_connection=*/false));
     data.drain(4);
     return Http::okStatus();
   }));
@@ -2729,60 +2883,6 @@ TEST_F(HttpConnectionManagerImplTest, HeaderValidatorRejectTrailersAfterResponse
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
   EXPECT_EQ("bad_trailer_map", decoder_->streamInfo().responseCodeDetails().value());
-}
-
-// Request completes normally if header validator accepts it
-TEST_F(HttpConnectionManagerImplTest, HeaderValidatorAccept) {
-  setup();
-  expectUhvHeaderCheck(HeaderValidator::ValidationResult::success(),
-                       ServerHeaderValidator::RequestHeadersTransformationResult::success());
-
-  // Store the basic request encoder during filter chain setup.
-  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
-
-  EXPECT_CALL(*filter, decodeHeaders(_, true))
-      .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
-        return FilterHeadersStatus::StopIteration;
-      }));
-
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-
-  EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillRepeatedly(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
-        auto factory = createDecoderFilterFactoryCb(filter);
-        callbacks.setFilterConfigName("");
-        factory(callbacks);
-        return true;
-      }));
-
-  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
-
-  // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
-  // only request into it. Then we respond into the filter.
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-        decoder_ = &conn_manager_->newStream(response_encoder_);
-
-        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
-        decoder_->decodeHeaders(std::move(headers), true);
-
-        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-        filter->callbacks_->streamInfo().setResponseCodeDetails("");
-        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-
-        data.drain(4);
-        return Http::okStatus();
-      }));
-
-  // Kick off the incoming data.
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
-  EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
-  EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
-  EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, NoProxyProtocolAdded) {
@@ -3977,6 +4077,165 @@ TEST_F(HttpConnectionManagerImplTest, NoProactiveDrainForConnectionAcceptedLate)
           std::chrono::seconds(500),
       Server::DrainStrategy::Gradual});
 }
+
+// Requests decoded by the codec are validated by the codec; the HCM must not validate them a
+// second time. "/foo bar" is rejected by UHV but accepted by the HCM's own sanity checks.
+TEST_F(HttpConnectionManagerImplTest, CodecDecodedRequestIsNotValidatedByHcm) {
+  setup();
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/foo bar"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("/foo bar", headers.getPathValue());
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+#ifdef ENVOY_ENABLE_UHV
+// Streams created directly through newStream() (API listener) are not decoded by the codec, so the
+// HCM validates their headers itself.
+TEST_F(HttpConnectionManagerImplTest, CodecBypassedRequestIsValidatedByHcm) {
+  setup();
+  conn_manager_->setStreamsBypassCodec(true);
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/foo bar"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        EXPECT_EQ("uhv.invalid_url", decoder_->streamInfo().responseCodeDetails().value());
+        EXPECT_TRUE(decoder_->streamInfo().hasResponseFlag(
+            StreamInfo::CoreResponseFlag::DownstreamProtocolError));
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// Valid requests on codec bypassing streams are transformed by the HCM's validator (here: path
+// normalization) and delivered to the filter chain.
+TEST_F(HttpConnectionManagerImplTest, CodecBypassedRequestIsTransformedByHcm) {
+  normalize_path_ = true;
+  setup();
+  conn_manager_->setStreamsBypassCodec(true);
+  setupFilterChain(1, 0);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/foo/../bar"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
+        EXPECT_EQ("/bar", headers.getPathValue());
+        return FilterHeadersStatus::StopIteration;
+      }));
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Trailers of codec bypassing streams are validated by the HCM too.
+TEST_F(HttpConnectionManagerImplTest, CodecBypassedTrailersAreValidatedByHcm) {
+  setup();
+  conn_manager_->setStreamsBypassCodec(true);
+  setupFilterChain(1, 0);
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "POST"}}};
+    decoder_->decodeHeaders(std::move(headers), false);
+    RequestTrailerMapPtr trailers{new TestRequestTrailerMapImpl{{"bad trailer", "value"}}};
+    decoder_->decodeTrailers(std::move(trailers));
+    data.drain(4);
+    return Http::okStatus();
+  }));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_)).Times(0);
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        EXPECT_EQ("uhv.invalid_name_characters",
+                  decoder_->streamInfo().responseCodeDetails().value());
+      }));
+  expectOnDestroy();
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+// A stream recreated for an internal redirect re-enters the HCM through decodeHeaders() without
+// going through the codec, so the HCM validates the (filter mutated) headers itself.
+TEST_F(HttpConnectionManagerImplTest, InternalRedirectRequestIsValidatedByHcm) {
+  setup();
+  EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
+  decoder_filters_.push_back(new NiceMock<MockStreamDecoderFilter>());
+
+  // The first filter chain (original stream) runs the filter that triggers the internal redirect.
+  // The recreated stream is rejected by the HCM's validator; the second createFilterChain() call
+  // is the one made for the local reply.
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.setFilterConfigName("");
+        auto factory =
+            createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{decoder_filters_[0]});
+        factory(callbacks);
+        return true;
+      }))
+      .WillOnce(Return(false));
+  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
+        headers.setPath("/redirected path");
+        decoder_filters_[0]->callbacks_->recreateStream(nullptr);
+        return FilterHeadersStatus::StopIteration;
+      }));
+  // recreateStream() hands the recreated stream to the encoder.
+  RequestDecoder* recreated_decoder = nullptr;
+  EXPECT_CALL(response_encoder_, setRequestDecoder(_))
+      .WillOnce(Invoke([&](RequestDecoder& decoder) { recreated_decoder = &decoder; }));
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("400", headers.getStatusValue());
+        ASSERT_NE(nullptr, recreated_decoder);
+        EXPECT_EQ("uhv.invalid_url", recreated_decoder->streamInfo().responseCodeDetails().value());
+      }));
+
+  startRequest(true);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+#endif // ENVOY_ENABLE_UHV
 
 } // namespace Http
 } // namespace Envoy

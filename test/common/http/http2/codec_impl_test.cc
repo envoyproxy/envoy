@@ -18,6 +18,7 @@
 
 #include "test/common/http/common.h"
 #include "test/common/http/http2/http2_frame.h"
+#include "test/common/http/test_header_validator_factory.h"
 #include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
@@ -60,55 +61,35 @@ namespace {
 // Tests in this suite observe request headers produced by the codec
 // by returning a MockRequestDecoder object in the newStream callback.
 // For tests runs with Universal Header Validator (UHV) enabled, some checks and transformations
-// have moved from the codec to UHV, and for tests that verify behaviors that were moved to UHV this
-// shim class is required instead of plain MockRequestDecoder.
-// The shim is transparent when UHV is disabled (header_validator_ == nullptr) and simply defers to
-// the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
-// validateRequestHeaderMap() method. This will validate and apply transformations expected by the
-// test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
-// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error. This
-// class also handles behavior specific to the H/2 codec, where it resets requests with headers
-// containing underscores (when configured), instead of sending 400. See
-// https://github.com/envoyproxy/envoy/issues/24466
+// have moved from the codec to UHV, which the codec runs before calling the request decoder.
+// When UHV rejects a request the codec calls RequestDecoder::rejectRequest() instead of
+// decodeHeaders(). This shim approximates what the HCM does in that case: it calls sendLocalReply()
+// (so that tests can keep their sendLocalReply expectations) and resets the stream. The H/2 codec
+// asks for a plain stream reset (no 400) for requests with headers containing underscores (when
+// configured to reject them), see https://github.com/envoyproxy/envoy/issues/24466.
+// These tests assume that the connection is not closed on protocol errors.
+// The shim is transparent when UHV is disabled since the codec never rejects requests.
 class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
-  MockRequestDecoderShimWithUhv() = default;
+  MockRequestDecoderShimWithUhv() {
+    // Rejections are an expected part of the UHV tests; tests that care about the rejection
+    // details set their own expectations.
+    EXPECT_CALL(*this, rejectRequest_(_)).Times(testing::AnyNumber());
+  }
 
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
   }
-  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
-    header_validator_ = header_validator;
-  }
-  void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
-    if (header_validator_) {
-      // Header validation is done by the HCM when header map is fully parsed.
-      // This part approximates calling header validation and handling errors, in which case HCM
-      // calls sendLocalReply and closes network connection (based on the
-      // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
-      auto result = header_validator_->validateRequestHeaders(*headers);
-      std::string failure_details(result.details());
-      if (result.ok()) {
-        auto transformation_result = header_validator_->transformRequestHeaders(*headers);
-        if (transformation_result.ok()) {
-          MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
-          return;
-        }
-        failure_details = transformation_result.details();
-      }
-      if (failure_details != UhvResponseCodeDetail::get().InvalidUnderscore) {
-        sendLocalReply(Http::Code::BadRequest, Http::CodeUtility::toString(Http::Code::BadRequest),
-                       nullptr, std::nullopt, failure_details);
-      }
-      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
-      // These tests assume that connection is not closed on protocol errors
-    } else {
-      MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
+  void rejectRequest(Http::RequestRejection&& rejection) override {
+    MockRequestDecoder::rejectRequest(std::move(rejection));
+    if (rejection.action != Http::RequestRejection::Action::ResetStream) {
+      sendLocalReply(rejection.response_code, Http::CodeUtility::toString(rejection.response_code),
+                     nullptr, std::nullopt, rejection.details);
     }
+    response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
 
 private:
-  Http::ServerHeaderValidator* header_validator_{nullptr};
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
 } // namespace
@@ -254,7 +235,7 @@ public:
     server_ = std::make_unique<TestServerConnectionImpl>(
         server_connection_, server_callbacks_, *server_stats_store_.rootScope(),
         server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
-        headers_with_underscores_action_, runtime_);
+        headers_with_underscores_action_, runtime_, header_validator_factory_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -422,6 +403,9 @@ public:
         .sources_size();
   }
 
+  // Configures the header validator used by the server codec (header_validator_factory_ creates
+  // validators from header_validator_config_ lazily, per stream) and creates a standalone
+  // validator for tests that need to validate headers directly.
   void createHeaderValidator() {
 #ifdef ENVOY_ENABLE_UHV
     header_validator_config_.set_headers_with_underscores_action(
@@ -432,7 +416,6 @@ public:
         Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp2HeaderValidator>(
         header_validator_config_, Protocol::Http2, server_->http2CodecStats(),
         header_validator_config_overrides_);
-    request_decoder_.setHeaderValidator(header_validator_.get());
 #endif
   }
 
@@ -485,6 +468,9 @@ public:
   ServerHeaderValidatorPtr header_validator_;
   Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
       header_validator_config_overrides_;
+  // Handed to the server codec; only used by the codec when built with ENVOY_ENABLE_UHV.
+  TestHeaderValidatorFactory header_validator_factory_{header_validator_config_,
+                                                       header_validator_config_overrides_};
 };
 
 class Http2CodecImplTest : public ::testing::TestWithParam<Http2SettingsTestParam>,

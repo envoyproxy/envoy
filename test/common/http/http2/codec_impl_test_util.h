@@ -97,11 +97,13 @@ public:
       uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
-      OptRef<Runtime::Loader> runtime = std::nullopt)
+      OptRef<Runtime::Loader> runtime = std::nullopt,
+      OptRef<HeaderValidatorFactory> header_validator_factory = std::nullopt)
       : TestCodecStatsProvider(scope),
         ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
                              max_request_headers_kb, max_request_headers_count,
-                             headers_with_underscores_action, overload_manager_, runtime) {}
+                             headers_with_underscores_action, overload_manager_, runtime,
+                             header_validator_factory) {}
 
   http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   using ServerConnectionImpl::getStream;

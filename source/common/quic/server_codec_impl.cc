@@ -22,9 +22,11 @@ QuicHttpServerConnectionImpl::QuicHttpServerConnectionImpl(
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager)
+    Server::OverloadManager& overload_manager,
+    OptRef<Http::HeaderValidatorFactory> header_validator_factory)
     : QuicHttpConnectionImplBase(quic_session, stats), quic_server_session_(quic_session) {
   quic_session.setCodecStats(stats);
+  quic_session.setHeaderValidatorFactory(header_validator_factory);
   quic_session.setHttp3Options(http3_options);
   quic_session.setHeadersWithUnderscoreAction(headers_with_underscores_action);
   quic_session.setHttpConnectionCallbacks(callbacks);

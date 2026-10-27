@@ -315,6 +315,18 @@ envoy_cc_fuzz_test(
 )
 
 envoy_cc_test_library(
+    name = "test_header_validator_factory_lib",
+    hdrs = ["test_header_validator_factory.h"],
+    deps = [
+        "//envoy/http:header_validator_interface",
+        "//envoy/http:protocol_interface",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
+        "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
     name = "conn_manager_impl_test_base_lib",
     srcs = ["conn_manager_impl_test_base.cc"],
     hdrs = ["conn_manager_impl_test_base.h"],
@@ -324,6 +336,7 @@ envoy_cc_test_library(
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
+        "//source/common/http:header_validation_utility_lib",
         "//source/common/http:rds_lib",
         "//source/common/tracing:custom_tag_lib",
         "//source/extensions/access_loggers/common:file_access_log_lib",
@@ -484,6 +497,17 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "header_validation_utility_test",
+    srcs = ["header_validation_utility_test.cc"],
+    deps = [
+        "//envoy/http:header_validator_errors",
+        "//source/common/http:header_validation_utility_lib",
+        "//test/mocks/http:header_validator_mocks",
+        "//test/test_common:utility_lib",
     ],
 )
 

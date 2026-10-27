@@ -20,6 +20,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
@@ -430,6 +431,17 @@ void ConnectionImpl::ServerStreamImpl::encodeHeaders(const ResponseHeaderMap& he
     encodeHeadersBase(headers, end_stream);
   }
 #else
+  if (header_validator_ != nullptr) {
+    auto result = header_validator_->transformResponseHeaders(headers);
+    if (!result.status.ok()) {
+      // It is possible that the header map is invalid if an encoder filter makes invalid
+      // modifications
+      // TODO(yanavlasov): add handling for this case.
+    } else if (result.new_headers != nullptr) {
+      encodeHeadersBase(*result.new_headers, end_stream);
+      return;
+    }
+  }
   encodeHeadersBase(headers, end_stream);
 #endif
 }
@@ -702,6 +714,19 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
   RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
   ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
   if (request_decoder) {
+#ifdef ENVOY_ENABLE_UHV
+    if (header_validator_ != nullptr) {
+      if (auto rejection = HeaderValidationUtility::checkRequestHeaders(
+              *header_validator_, *headers, Protocol::Http2,
+              parent_.stream_error_on_invalid_http_messaging_);
+          rejection.has_value()) {
+        rejection->headers = std::move(headers);
+        rejection->end_stream = sendEndStream();
+        request_decoder->rejectRequest(std::move(*rejection));
+        return;
+      }
+    }
+#endif
     request_decoder->decodeHeaders(std::move(headers), sendEndStream());
   }
 }
@@ -717,8 +742,21 @@ void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
   RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
   ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
   if (request_decoder) {
-    request_decoder->decodeTrailers(
-        std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+    RequestTrailerMapPtr trailers =
+        std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
+#ifdef ENVOY_ENABLE_UHV
+    if (header_validator_ != nullptr) {
+      if (auto rejection = HeaderValidationUtility::checkRequestTrailers(
+              *header_validator_, *trailers, Protocol::Http2,
+              parent_.stream_error_on_invalid_http_messaging_);
+          rejection.has_value()) {
+        rejection->trailers = std::move(trailers);
+        request_decoder->rejectRequest(std::move(*rejection));
+        return;
+      }
+    }
+#endif
+    request_decoder->decodeTrailers(std::move(trailers));
   }
 }
 
@@ -2525,7 +2563,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager, OptRef<Runtime::Loader> runtime)
+    Server::OverloadManager& overload_manager, OptRef<Runtime::Loader> runtime,
+    OptRef<HeaderValidatorFactory> header_validator_factory)
     : ConnectionImpl(connection, stats, random_generator, http2_options, max_request_headers_kb,
                      max_request_headers_count, runtime),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
@@ -2536,7 +2575,8 @@ ServerConnectionImpl::ServerConnectionImpl(
       should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)),
       should_reset_stream_on_begin_headers_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H2ServerResetStreamOnBeginHeaders)) {
+          Server::LoadShedPointName::get().H2ServerResetStreamOnBeginHeaders)),
+      header_validator_factory_(header_validator_factory) {
   ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
                     "found. Is it configured?");
@@ -2595,6 +2635,12 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
     stream->runHighWatermarkCallbacks();
   }
   stream->setRequestDecoder(callbacks_.newStream(*stream));
+#ifdef ENVOY_ENABLE_UHV
+  if (header_validator_factory_.has_value()) {
+    stream->header_validator_ =
+        header_validator_factory_->createServerHeaderValidator(Protocol::Http2, stats_);
+  }
+#endif
   stream->stream_id_ = stream_id;
   LinkedList::moveIntoList(std::move(stream), active_streams_);
   adapter_->SetStreamUserData(stream_id, active_streams_.front().get());

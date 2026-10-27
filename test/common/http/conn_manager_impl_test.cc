@@ -640,13 +640,10 @@ TEST_F(HttpConnectionManagerImplTest, PathFailedtoSanitize) {
         {":authority", "host"},
         {":path", "/ab%00c"}, // "%00" is not valid in path according to RFC
         {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    deliverRequestHeaders(std::move(headers), true);
     data.drain(4);
     return Http::okStatus();
   }));
-#ifdef ENVOY_ENABLE_UHV
-  expectCheckWithDefaultUhv();
-#endif
   EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage()).WillRepeatedly(Return(true));
 
   // This test also verifies that decoder/encoder filters have onDestroy() called only once.
@@ -685,9 +682,6 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
   normalize_path_ = true;
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
-#ifdef ENVOY_ENABLE_UHV
-  expectCheckWithDefaultUhv();
-#endif
 
   auto* filter = new MockStreamFilter();
 
@@ -712,7 +706,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterShouldUseSantizedPath) {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    deliverRequestHeaders(std::move(headers), true);
     return Http::okStatus();
   }));
 
@@ -733,15 +727,12 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
   normalize_path_ = true;
   const std::string original_path = "/x/%2E%2e/z";
   const std::string normalized_path = "/z";
-#ifdef ENVOY_ENABLE_UHV
-  expectCheckWithDefaultUhv();
-#endif
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    deliverRequestHeaders(std::move(headers), true);
     return Http::okStatus();
   }));
 
@@ -833,10 +824,6 @@ TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForward
   const std::string original_path = "/x/%2E%2e/z%2f%2Fabc%5C../def";
   const std::string normalized_path = "/z/def";
 
-#ifdef ENVOY_ENABLE_UHV
-  expectCheckWithDefaultUhv();
-#endif
-
   auto* filter = new MockStreamFilter();
 
   EXPECT_CALL(filter_factory_, createFilterChain(_))
@@ -860,7 +847,7 @@ TEST_F(HttpConnectionManagerImplTest, AllNormalizationsWithEscapedSlashesForward
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
         {":authority", "host"}, {":path", original_path}, {":method", "GET"}}};
-    decoder_->decodeHeaders(std::move(headers), true);
+    deliverRequestHeaders(std::move(headers), true);
     return Http::okStatus();
   }));
 
@@ -3933,9 +3920,7 @@ TEST_F(HttpConnectionManagerImplTest, BufferLimitAndRefresh) {
 
   // The initial route buffer limit is not valid value and the limit from underlying stream
   // will be used.
-  {
-    EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->bufferLimit());
-  }
+  { EXPECT_EQ(122U, decoder_filters_[0]->callbacks_->bufferLimit()); }
 
   // Less buffer limit from route entry will not be applied.
   {

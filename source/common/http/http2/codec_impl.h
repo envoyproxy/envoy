@@ -653,6 +653,9 @@ protected:
     void dumpState(std::ostream& os, int indent_level) const override;
 
     absl::variant<RequestHeaderMapSharedPtr, RequestTrailerMapPtr> headers_or_trailers_;
+    // Per-stream header validator (Universal Header Validator). Only created when the codec was
+    // built with ENVOY_ENABLE_UHV and a factory was supplied; otherwise nullptr.
+    ServerHeaderValidatorPtr header_validator_;
 
     bool streamErrorOnInvalidHttpMessage() const override {
       return parent_.stream_error_on_invalid_http_messaging_;
@@ -902,7 +905,8 @@ public:
                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                            headers_with_underscores_action,
                        Server::OverloadManager& overload_manager,
-                       OptRef<Runtime::Loader> runtime = std::nullopt);
+                       OptRef<Runtime::Loader> runtime = std::nullopt,
+                       OptRef<HeaderValidatorFactory> header_validator_factory = std::nullopt);
 
 private:
   // ConnectionImpl
@@ -935,6 +939,8 @@ private:
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_reset_stream_on_begin_headers_{nullptr};
+  // Factory for per-stream header validators; unset when header validation is not configured.
+  const OptRef<HeaderValidatorFactory> header_validator_factory_;
   bool sent_go_away_on_dispatch_{false};
 };
 

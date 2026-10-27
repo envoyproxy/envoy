@@ -266,6 +266,51 @@ public:
 };
 
 /**
+ * Describes why a codec rejected a request after fully parsing its headers or trailers (for
+ * example because header validation failed). Produced by server codecs and consumed by
+ * RequestDecoder::rejectRequest(). The decoder owns the response mechanics (local reply, stream
+ * reset, connection close, stats); the codec only decides.
+ */
+struct RequestRejection {
+  // Which part of the request was rejected.
+  enum class Phase { Headers, Trailers };
+  // What the decoder should do about it.
+  enum class Action {
+    // Send a local reply with `response_code` (decoders convert this into a gRPC response for
+    // gRPC requests).
+    LocalReply,
+    // Send a redirect to the (already transformed) :path in `headers`. Only valid for
+    // Phase::Headers. Decoders fall back to a local reply for gRPC requests.
+    Redirect,
+    // Reset the stream without sending a response.
+    ResetStream,
+  };
+
+  Phase phase{Phase::Headers};
+  Action action{Action::LocalReply};
+  // Response code for Action::LocalReply. Only used for Phase::Headers; trailer rejections
+  // always use 400.
+  Code response_code{Code::BadRequest};
+  // Response code details, e.g. "uhv.invalid_url".
+  std::string details;
+  // Phase::Headers only: true when the failure came from the request header transformation
+  // (e.g. path normalization) as opposed to validation.
+  bool transformation_failed{false};
+  // Whether the decoder should close the connection after acting on the rejection (i.e. the
+  // codec's stream_error_on_invalid_http_message does not apply to this failure).
+  bool close_connection{false};
+
+  // Phase::Headers: the fully parsed (and possibly partially transformed) request headers. The
+  // decoder adopts them as the request headers for access logging, stream info and local reply
+  // formatting. Null for Phase::Trailers.
+  RequestHeaderMapSharedPtr headers;
+  // Phase::Headers: whether the request consisted of headers only.
+  bool end_stream{false};
+  // Phase::Trailers: the rejected trailers (for logging purposes). Null for Phase::Headers.
+  RequestTrailerMapPtr trailers;
+};
+
+/**
  * Stream decoder used for receiving a request (client to server). Virtual inheritance is required
  * due to a parallel implementation split between the shared base class and the derived class.
  */
@@ -283,6 +328,16 @@ public:
    * @param trailers supplies the decoded trailers.
    */
   virtual void decodeTrailers(RequestTrailerMapPtr&& trailers) PURE;
+
+  /**
+   * Called INSTEAD of decodeHeaders() (RequestRejection::Phase::Headers) or decodeTrailers()
+   * (RequestRejection::Phase::Trailers) when the codec rejects the request after it was fully
+   * parsed, e.g. because header validation failed. The decoder must treat the rejected phase as
+   * complete and act on the rejection: send a local reply or redirect, or reset the stream, and
+   * close the connection if requested.
+   * @param rejection supplies the rejection decision and the rejected headers or trailers.
+   */
+  virtual void rejectRequest(RequestRejection&& rejection) PURE;
 
   /**
    * Called if the codec needs to send a protocol error.

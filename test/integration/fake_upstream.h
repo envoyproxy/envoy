@@ -254,6 +254,9 @@ public:
   // Http::RequestDecoder
   void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
   void decodeTrailers(Http::RequestTrailerMapPtr&& trailers) override;
+  // The fake upstream never hands a header validator factory to its codecs, so this should not be
+  // reached; it exists to satisfy the interface and behaves like a plain local reply / reset.
+  void rejectRequest(Http::RequestRejection&& rejection) override;
   StreamInfo::StreamInfo& streamInfo() override {
     RELEASE_ASSERT(false, "initialize if this is needed");
     return *stream_info_;

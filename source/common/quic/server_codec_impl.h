@@ -23,7 +23,8 @@ public:
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
-      Server::OverloadManager& overload_manager);
+      Server::OverloadManager& overload_manager,
+      OptRef<Http::HeaderValidatorFactory> header_validator_factory = std::nullopt);
 
   // Http::Connection
   void goAway() override;
@@ -46,11 +47,12 @@ public:
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
-      Server::OverloadManager& overload_manager) override {
+      Server::OverloadManager& overload_manager,
+      OptRef<Http::HeaderValidatorFactory> header_validator_factory) override {
     return std::make_unique<QuicHttpServerConnectionImpl>(
         dynamic_cast<Quic::EnvoyQuicServerSession&>(connection), callbacks, stats, http3_options,
         max_request_headers_kb, max_request_headers_count, headers_with_underscores_action,
-        overload_manager);
+        overload_manager, header_validator_factory);
   }
   std::string name() const override { return "quic.http_server_connection.default"; }
 };

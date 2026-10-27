@@ -10,6 +10,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/quic/envoy_quic_server_session.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -29,7 +30,8 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
     Http::Http3::CodecStats& stats,
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-        headers_with_underscores_action)
+        headers_with_underscores_action,
+    OptRef<Http::HeaderValidatorFactory> header_validator_factory)
     : quic::QuicSpdyServerStreamBase(id, session, type),
       EnvoyQuicStream(
           *this, *session,
@@ -48,6 +50,14 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   if (session->allow_extended_connect()) {
     header_validator().SetAllowExtendedConnect();
   }
+#ifdef ENVOY_ENABLE_UHV
+  if (header_validator_factory.has_value()) {
+    header_validator_ =
+        header_validator_factory->createServerHeaderValidator(Http::Protocol::Http3, stats);
+  }
+#else
+  UNREFERENCED_PARAMETER(header_validator_factory);
+#endif
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -75,6 +85,19 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
     modified_headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers);
     Http::Utility::transformUpgradeResponseFromH1toH3(*modified_headers);
     header_map = modified_headers.get();
+  }
+#else
+  Http::ResponseHeaderMapPtr transformed_headers;
+  if (header_validator_ != nullptr) {
+    auto result = header_validator_->transformResponseHeaders(headers);
+    if (!result.status.ok()) {
+      // It is possible that the header map is invalid if an encoder filter makes invalid
+      // modifications
+      // TODO(yanavlasov): add handling for this case.
+    } else if (result.new_headers != nullptr) {
+      transformed_headers = std::move(result.new_headers);
+      header_map = transformed_headers.get();
+    }
   }
 #endif
   // This is counting not serialized bytes in the send buffer.
@@ -246,6 +269,20 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
     }
   }
   if (decoder != nullptr) {
+#ifdef ENVOY_ENABLE_UHV
+    if (header_validator_ != nullptr) {
+      if (auto rejection = Http::HeaderValidationUtility::checkRequestHeaders(
+              *header_validator_, *headers, Http::Protocol::Http3,
+              streamErrorOnInvalidHttpMessage());
+          rejection.has_value()) {
+        rejection->headers = std::move(headers);
+        rejection->end_stream = end_stream;
+        decoder->rejectRequest(std::move(*rejection));
+        ConsumeHeaderList();
+        return;
+      }
+    }
+#endif
     decoder->decodeHeaders(std::move(headers), /*end_stream=*/end_stream);
   }
   ConsumeHeaderList();
@@ -370,6 +407,19 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
     }
     Http::RequestDecoder* decoder = requestDecoderOrNull();
     if (decoder != nullptr) {
+#ifdef ENVOY_ENABLE_UHV
+      if (header_validator_ != nullptr) {
+        if (auto rejection = Http::HeaderValidationUtility::checkRequestTrailers(
+                *header_validator_, *trailers, Http::Protocol::Http3,
+                streamErrorOnInvalidHttpMessage());
+            rejection.has_value()) {
+          rejection->trailers = std::move(trailers);
+          decoder->rejectRequest(std::move(*rejection));
+          MarkTrailersConsumed();
+          return;
+        }
+      }
+#endif
       decoder->decodeTrailers(std::move(trailers));
     }
     MarkTrailersConsumed();

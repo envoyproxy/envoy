@@ -39,6 +39,9 @@ MATCHER_P(HasEventStrategy, m, "") {
   return testing::ExplainMatchResult(m, arg.strategy, result_listener);
 }
 
+// Defined after AdminTestingPeer below.
+bool adminHasHeaderValidatorFactory(AdminImpl& admin);
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, AdminInstanceTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -154,11 +157,11 @@ TEST_P(AdminInstanceTest, Getters) {
                 HttpConnectionManager::KEEP_UNCHANGED);
   EXPECT_NE(nullptr, admin_.scopedRouteConfigProvider());
 #ifdef ENVOY_ENABLE_UHV
-  // In UHV mode there is always UHV factory
-  EXPECT_NE(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+  // In UHV mode there is always UHV factory, which is handed to the codecs.
+  EXPECT_TRUE(adminHasHeaderValidatorFactory(admin_));
 #else
-  // In non UHV mode, header validator can not be created
-  EXPECT_EQ(nullptr, admin_.makeHeaderValidator(Http::Protocol::Http11));
+  // In non UHV mode, header validator factory is not created.
+  EXPECT_FALSE(adminHasHeaderValidatorFactory(admin_));
 #endif
 }
 
@@ -411,6 +414,9 @@ public:
   NullOverloadManager::OverloadState& overloadState() { return overload_state_; }
   AdminImpl::AdminListenSocketFactory& socketFactory() { return socket_factory_; }
   AdminImpl::AdminListener& listener() { return listener_; }
+  const Http::HeaderValidatorFactoryPtr& headerValidatorFactory() {
+    return admin_.header_validator_factory_;
+  }
 
 private:
   AdminImpl& admin_;
@@ -422,6 +428,10 @@ private:
   Stats::ScopeSharedPtr listener_scope_;
   AdminImpl::AdminListener listener_{admin_, *listener_scope_};
 };
+
+bool adminHasHeaderValidatorFactory(AdminImpl& admin) {
+  return AdminTestingPeer(admin).headerValidatorFactory() != nullptr;
+}
 
 // Covers override methods for admin-specific implementations of classes in
 // admin.h, reducing a major source of reduced coverage-percent expectations in
