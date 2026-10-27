@@ -135,8 +135,11 @@ void MockStreamDecoderFilterCallbacks::sendLocalReply_(
   Utility::sendLocalReply(
       stream_destroyed_,
       Utility::EncodeFunctions{
-          modify_headers, nullptr,
-          [this, details](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+          nullptr, nullptr,
+          [this, modify_headers, details](ResponseHeaderMapPtr&& headers, bool end_stream) -> void {
+            if (modify_headers != nullptr) {
+              modify_headers(*headers);
+            }
             encodeHeaders(std::move(headers), end_stream, details);
           },
           [this](Buffer::Instance& data, bool end_stream) -> void {

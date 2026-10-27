@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//source/common/common:empty_string",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
+        "//source/common/http:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/fault:fault_filter_lib",
         "//test/common/http:common_lib",

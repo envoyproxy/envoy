@@ -13,6 +13,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/extensions/filters/http/fault/fault_filter.h"
 
 #include "test/common/http/common.h"
@@ -470,6 +471,28 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   custom_header->mutable_header()->set_key("x-fault-abort");
   custom_header->mutable_header()->set_value("injected");
   setUpTest(fault);
+
+  EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(testing::Invoke(
+          [this](Http::Code code, absl::string_view body,
+                 std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
+                 const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                 absl::string_view details) {
+            Http::Utility::sendLocalReply(
+                decoder_filter_callbacks_.stream_destroyed_,
+                Http::Utility::EncodeFunctions{
+                    modify_headers, nullptr,
+                    [this, details](Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
+                      decoder_filter_callbacks_.encodeHeaders(std::move(headers), end_stream,
+                                                              details);
+                    },
+                    [this](Buffer::Instance& data, bool end_stream) {
+                      decoder_filter_callbacks_.encodeData(data, end_stream);
+                    }},
+                Http::Utility::LocalReplyData{decoder_filter_callbacks_.is_grpc_request_, code, body,
+                                              grpc_status,
+                                              decoder_filter_callbacks_.is_head_request_});
+          }));
 
   EXPECT_CALL(runtime_.snapshot_,
               getInteger("fault.http.max_active_faults", std::numeric_limits<uint64_t>::max()))
