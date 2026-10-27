@@ -27,6 +27,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 #include "source/common/tls/cert_validator/factory.h"
+#include "source/common/tls/ssl_handshaker.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
@@ -105,6 +106,14 @@ ServerContextImpl::ServerContextImpl(
       ocsp_staple_policy_(config.ocspStaplePolicy()) {
   if (!creation_status.ok()) {
     return;
+  }
+  if (!config.disableStatelessSessionResumption() &&
+      !config.capabilities().handles_session_resumption &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.preserve_verified_peer_chain_in_session_ticket")) {
+    auto codec = SessionTicketCodec::create(session_ticket_keys_);
+    SET_AND_RETURN_IF_NOT_OK(codec.status(), creation_status);
+    session_ticket_codec_ = std::move(codec).value();
   }
 
   // Validate certificate-level tls_params so bad values are rejected at config load rather than
@@ -198,7 +207,28 @@ ServerContextImpl::ServerContextImpl(
     // `SSL_CTX_set_tlsext_ticket_key_cb`.
     if (config.disableStatelessSessionResumption()) {
       SSL_CTX_set_options(ctx.ssl_ctx_.get(), SSL_OP_NO_TICKET);
-    } else if (!session_ticket_keys_.empty() && !config.capabilities().handles_session_resumption) {
+    }
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+    else if (session_ticket_codec_) {
+      static const SSL_TICKET_AEAD_METHOD ticket_method{
+          [](SSL* ssl) -> size_t {
+            return static_cast<ServerContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
+                ->session_ticket_codec_->maxOverhead();
+          },
+          [](SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out_len, const uint8_t* in,
+             size_t in_len) -> int {
+            return static_cast<ServerContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
+                ->session_ticket_codec_->seal(ssl, out, out_len, max_out_len, in, in_len);
+          },
+          [](SSL* ssl, uint8_t* out, size_t* out_len, size_t max_out_len, const uint8_t* in,
+             size_t in_len) -> ssl_ticket_aead_result_t {
+            return static_cast<ServerContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)))
+                ->session_ticket_codec_->open(ssl, out, out_len, max_out_len, in, in_len);
+          }};
+      SSL_CTX_set_ticket_aead_method(ctx.ssl_ctx_.get(), &ticket_method);
+    }
+#endif
+    else if (!session_ticket_keys_.empty() && !config.capabilities().handles_session_resumption) {
       SSL_CTX_set_tlsext_ticket_key_cb(
           ctx.ssl_ctx_.get(),
           [](SSL* ssl, uint8_t* key_name, uint8_t* iv, EVP_CIPHER_CTX* ctx, HMAC_CTX* hmac_ctx,
@@ -214,6 +244,40 @@ ServerContextImpl::ServerContextImpl(
 
     if (config.disableStatefulSessionResumption()) {
       SSL_CTX_set_session_cache_mode(ctx.ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
+    } else if (!config.capabilities().handles_session_resumption &&
+               Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.preserve_verified_peer_chain_in_session_cache")) {
+#if !defined(OPENSSL_IS_AWSLC) && !defined(ENVOY_SSL_OPENSSL)
+      // Publish only after attaching immutable metadata. BoringSSL's default automatic store
+      // runs before new_session_cb, which would otherwise expose a metadata-free cached session.
+      SSL_CTX_set_session_cache_mode(ctx.ssl_ctx_.get(),
+                                     SSL_CTX_get_session_cache_mode(ctx.ssl_ctx_.get()) |
+                                         SSL_SESS_CACHE_NO_INTERNAL_STORE);
+      SSL_CTX_sess_set_new_cb(ctx.ssl_ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
+        unsigned int id_length;
+        SSL_SESSION_get_id(session, &id_length);
+        if (SSL_version(ssl) > TLS1_2_VERSION || id_length == 0 ||
+            !SslHandshakerImpl::saveValidatedCertChainToSession(ssl, session)) {
+          return 0;
+        }
+        auto* context = static_cast<ServerContextImpl*>(SSL_CTX_get_app_data(SSL_get_SSL_CTX(ssl)));
+        // newSsl() starts on context 0. SSL_set_SSL_CTX() may subsequently select another
+        // certificate context, but BoringSSL's session cache remains on the original context.
+        SSL_CTX* cache = context->tls_contexts_[0].ssl_ctx_.get();
+        SSL_CTX_add_session(cache, session);
+        if (!(SSL_CTX_get_session_cache_mode(cache) & SSL_SESS_CACHE_NO_AUTO_CLEAR) &&
+            (context->stateful_sessions_since_flush_.fetch_add(1, std::memory_order_relaxed) + 1) %
+                    255 ==
+                0) {
+          SSL_CTX_flush_sessions(cache, SSL_SESSION_get_time(session));
+        }
+        return 0; // The internal cache takes its own reference; retain no callback reference.
+      });
+#else
+      creation_status =
+          absl::UnimplementedError("Verified-chain stateful sessions require BoringSSL");
+      return;
+#endif
     }
 
     if (config.sessionTimeout() && !config.capabilities().handles_session_resumption) {
