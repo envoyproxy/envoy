@@ -200,10 +200,7 @@ const char YamlSingleDstPortBottom[] = R"EOF(
             - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
-// The benchmark library creates one fixture per registered benchmark during static initialization
-// and destroys them at exit in an unspecified order, so the fixture must not hold a
-// Logger::Context: each context restores the one created before it. test/benchmark/main.cc already
-// installs the logging context.
+// Fixtures are destroyed at exit in an unspecified order, so they must not hold a Logger::Context.
 class FilterChainBenchmarkFixture : public ::benchmark::Fixture {
 public:
   void initialize(::benchmark::State& state) {
