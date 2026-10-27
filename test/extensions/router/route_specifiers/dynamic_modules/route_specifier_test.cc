@@ -1011,6 +1011,20 @@ TEST_P(RejectedPrefixRewriteRuleTest, RecordsNothing) {
   EXPECT_EQ(nullptr, dynamic_cast<const DynamicModuleRouteEntry*>(route.route->routeEntry()));
 }
 
+// A literal span ends before the query string and fragment, so a matched that reaches into them is
+// rejected even though it is a prefix of the path the request carries.
+TEST_F(DynamicModuleRouteSpecifierTest, LiteralSpanEndsBeforeTheQueryAndFragment) {
+  for (const auto& [mode, path] : std::vector<std::pair<std::string, std::string>>{
+           {"query-in-matched", "/api?x=1"}, {"fragment-in-matched", "/api#x"}}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadRaw(rewriteRuleConfigYaml(mode, "{cluster: matched_cluster}"));
+    ASSERT_TRUE(config.ok());
+    const auto route = config.value()->route(requestHeaders(path), stream_info_, 0);
+    ASSERT_NE(nullptr, route.route);
+    EXPECT_EQ("false", ruleAccepted(*route.route));
+  }
+}
+
 // A recorded path takes precedence over a rule, which is then neither applied nor counted.
 TEST_F(DynamicModuleRouteSpecifierTest, RecordedPathTakesPrecedenceOverPrefixRewriteRule) {
   const auto config = loadRaw(rewriteRuleConfigYaml("path-wins"));

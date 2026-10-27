@@ -18264,10 +18264,10 @@ bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
  * when the request headers are finalized, the way it applies the prefix_rewrite of a configured
  * route, so the produced route is not specific to the current request.
  *
- * With the Literal span, matched must be a case insensitive prefix of the current path and is
- * replaced by replacement. With the WholePath span, matched must be empty and replacement replaces
- * the whole path, keeping its query string and fragment. The replacement starts with a slash and
- * carries no query string or fragment of its own.
+ * With the Literal span, matched must be a case insensitive prefix of the current path without its
+ * query string and fragment, and is replaced by replacement. With the WholePath span, matched must
+ * be empty and replacement replaces the whole path, keeping its query string and fragment. The
+ * replacement starts with a slash and carries no query string or fragment of its own.
  *
  * A path recorded with set_path or set_prefix_rewrite takes precedence over the rule, and the rule
  * takes precedence over the regex rewrite of a selected route override and the rewrites of the

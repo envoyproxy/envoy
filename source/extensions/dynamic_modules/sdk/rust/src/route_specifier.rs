@@ -862,8 +862,9 @@ impl RouteSpecifierContext {
   /// Envoy applies the rule to the path the request carries when the request headers are
   /// finalized, the way it applies the `prefix_rewrite` of a configured route, so the produced
   /// route is not specific to the current request. With [`RewriteSpan::Literal`], `matched` must
-  /// be a case insensitive prefix of the current path. With [`RewriteSpan::WholePath`], `matched`
-  /// must be empty and the query string and fragment are kept. The replacement starts with a slash
+  /// be a case insensitive prefix of the current path without its query string and fragment. With
+  /// [`RewriteSpan::WholePath`], `matched` must be empty and the query string and fragment are
+  /// kept. The replacement starts with a slash
   /// and carries no query string or fragment of its own.
   ///
   /// A path recorded with [`RouteSpecifierContext::set_path`] or

@@ -923,7 +923,9 @@ bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
   const absl::string_view matched_view = toStringView(matched);
   const absl::string_view replacement_view = toStringView(replacement);
   const bool whole_path = span == envoy_dynamic_module_type_route_specifier_rewrite_span_WholePath;
-  if (!knownRewriteSpan(span) || (whole_path && !matched_view.empty())) {
+  // A literal span ends before the query string and fragment, which the rule keeps.
+  if (!knownRewriteSpan(span) || (whole_path && !matched_view.empty()) ||
+      matched_view.find_first_of("?#") != absl::string_view::npos) {
     return false;
   }
   // The replacement starts the path the rule produces, so it must start with a slash like the path

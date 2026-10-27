@@ -135,8 +135,9 @@ route it produces is specific to that request. ``set_prefix_rewrite_rule`` recor
 rule instead, which Envoy applies to the path the request carries when the request headers are
 finalized, the way a configured route applies its
 :ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`. A rule
-replaces a literal prefix of the path or the whole path without its query string with a replacement
-that starts with a slash, and it is checked against the request the decision is taken for.
+replaces a literal prefix of the path without its query string, or all of that path, with a
+replacement that starts with a slash, and it is checked against the request the decision is taken
+for.
 
 Envoy takes the path sent upstream from the first of these that yields one, whatever the call
 order.

@@ -30,6 +30,8 @@ enum mode {
   FRAGMENT_IN_REPLACEMENT,
   RESULT_TOO_LONG,
   PATH_OVER_OVERRIDE,
+  QUERY_IN_MATCHED,
+  FRAGMENT_IN_MATCHED,
   MODE_COUNT,
 };
 
@@ -53,6 +55,8 @@ static const char* const mode_names[MODE_COUNT] = {
     "fragment-in-replacement",
     "result-too-long",
     "path-over-override",
+    "query-in-matched",
+    "fragment-in-matched",
 };
 
 // Distinct addresses used as the config handle that selects the mode.
@@ -164,6 +168,12 @@ envoy_dynamic_module_on_route_specifier_on_route(
     envoy_dynamic_module_callback_route_specifier_set_path(context_envoy_ptr, buffer("/literal"));
     accepted = envoy_dynamic_module_callback_route_specifier_set_route_override(context_envoy_ptr,
                                                                                 buffer("rewrite"));
+    break;
+  case QUERY_IN_MATCHED:
+    accepted = rule(context_envoy_ptr, literal, "/api?", "/internal");
+    break;
+  case FRAGMENT_IN_MATCHED:
+    accepted = rule(context_envoy_ptr, literal, "/api#", "/internal");
     break;
   case MODE_COUNT:
     break;

@@ -237,7 +237,8 @@ void appendHeaderTransforms(Http::HeaderTransforms& transforms,
 
 std::optional<std::string> PrefixRewriteRule::apply(absl::string_view path,
                                                     size_t max_bytes) const {
-  // The whole path excludes the query string and the fragment, like the part a regex route matches.
+  // A literal span carries no '?' or '#', so it ends before the query string and fragment, and the
+  // whole path excludes them like the part a regex route matches.
   const absl::string_view span = matched.has_value() ? absl::string_view(*matched)
                                                      : Http::PathUtil::removeQueryAndFragment(path);
   return Envoy::Router::rewritePathByPrefixOrRegex(path, span, replacement, nullptr, "", max_bytes);
