@@ -6,6 +6,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/config/route/v3/route.pb.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/http/filter.h"
 #include "envoy/rds/route_config_update_receiver.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -50,6 +52,22 @@ public:
    * @param alias supplies the alias of the virtual host to fetch.
    */
   virtual void updateOnDemand(const std::string& alias) PURE;
+
+  /**
+   * Callback used to request an update to the route configuration from the management server.
+   * @param for_domain supplies the domain name that virtual hosts must match on
+   * @param thread_local_dispatcher thread-local dispatcher
+   * @param route_config_updated_cb callback to be called when the configuration update has been
+   * propagated to worker threads
+   */
+  virtual void requestVirtualHostsUpdate(
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) PURE;
+
+  /**
+   * Notifies queued VHDS callbacks that the route configuration has been published.
+   */
+  virtual void onVhdsConfigPublished() PURE;
 
   /**
    * @return the union of all resource names and aliases (if any) received with the last VHDS
