@@ -1,0 +1,5 @@
+data: {"id":"chatcmpl-oa","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","content":"Hello Claude"},"finish_reason":"stop"}],"usage":{"prompt_tokens":22,"prompt_tokens_details":{"cached_tokens":5},"completion_tokens":9,"completion_tokens_details":{"reasoning_tokens":2},"total_tokens":31}}
+
+data: [DONE]
+
+yV4¾ºþÊÿ
