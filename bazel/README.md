@@ -643,6 +643,12 @@ Invalid values are rejected at parse time. Note: the former `--define wasm=<engi
 `--define engine=<engine>` mechanisms are no longer supported; passing them is now a **build
 error**. Use `--@proxy-wasm-cpp-host//bazel:engine=<engine>` instead.
 
+By default the `v8` engine links a prebuilt wee8 (V8) static library from `envoy_toolshed` on
+supported platforms. To build all dependencies that have prebuilt alternatives (currently only
+wee8) from source instead, e.g. in environments that disallow prebuilt artifacts, pass
+`--@envoy//bazel:use_prebuilt_libs=False`. This does not affect toolchain components such as the
+compiler, sysroot or C++ runtime libraries.
+
 You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`.
 
 Contrib extensions can be enabled and disabled similarly to above when building the contrib
