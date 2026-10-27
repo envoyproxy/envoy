@@ -433,7 +433,7 @@ public:
   uint64_t errors() { return counterValue("bench.lua.errors"); }
   uint64_t executions() { return counterValue("bench.lua.executions"); }
   bool executionTimeRecorded() const {
-    return stats_store_.histogramRecordedValues("bench.lua.stream_execution_time_us");
+    return stats_store_.histogramRecordedValues("bench.lua.stream_execution_time");
   }
 
 private:

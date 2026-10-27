@@ -5453,7 +5453,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithNamespaceInResponse) {
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
 
-static constexpr absl::string_view kExecutionTimeHistogram = "test.lua.stream_execution_time_us";
+static constexpr absl::string_view kExecutionTimeHistogram = "test.lua.stream_execution_time";
 
 // Off by default: no histogram is created and the clock is never read.
 TEST_F(LuaHttpFilterTest, ExecutionTimeNotTrackedByDefault) {
@@ -5753,7 +5753,7 @@ TEST_F(LuaHttpFilterTest, ExecutionTimeHistogramNameAndUnit) {
   filter_ = std::make_unique<Filter>(config_, mock_time_);
 
   Stats::HistogramOptConstRef histogram =
-      stats_store_.findHistogramByString("test.lua.my_script.stream_execution_time_us");
+      stats_store_.findHistogramByString("test.lua.my_script.stream_execution_time");
   ASSERT_TRUE(histogram);
   EXPECT_EQ(Stats::Histogram::Unit::Microseconds, histogram->unit());
   EXPECT_FALSE(stats_store_.findHistogramByString(std::string(kExecutionTimeHistogram)));

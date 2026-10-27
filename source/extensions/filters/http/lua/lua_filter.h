@@ -33,7 +33,7 @@ struct LuaFilterStats {
 /**
  * Lua stats created only when `track_execution_time` is set. @see stats_macros.h
  */
-#define ALL_LUA_EXECUTION_TIME_STATS(HISTOGRAM) HISTOGRAM(stream_execution_time_us, Microseconds)
+#define ALL_LUA_EXECUTION_TIME_STATS(HISTOGRAM) HISTOGRAM(stream_execution_time, Microseconds)
 
 struct LuaExecutionTimeStats {
   ALL_LUA_EXECUTION_TIME_STATS(GENERATE_HISTOGRAM_STRUCT)
@@ -574,7 +574,7 @@ public:
   const LuaFilterStats& stats() const { return stats_; }
   // Null unless the configuration sets `track_execution_time`.
   Stats::Histogram* executionTimeHistogram() const {
-    return execution_time_stats_.has_value() ? &execution_time_stats_->stream_execution_time_us_
+    return execution_time_stats_.has_value() ? &execution_time_stats_->stream_execution_time_
                                              : nullptr;
   }
   Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
