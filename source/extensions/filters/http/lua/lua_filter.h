@@ -31,6 +31,15 @@ struct LuaFilterStats {
 };
 
 /**
+ * Lua stats created only when `track_execution_time` is set. @see stats_macros.h
+ */
+#define ALL_LUA_EXECUTION_TIME_STATS(HISTOGRAM) HISTOGRAM(stream_execution_time_us, Microseconds)
+
+struct LuaExecutionTimeStats {
+  ALL_LUA_EXECUTION_TIME_STATS(GENERATE_HISTOGRAM_STRUCT)
+};
+
+/**
  * One PerLuaCodeSetup owns one ThreadLocalState, i.e. one Lua VM (lua_State) per worker thread
  * plus the main thread, so it accounts for exactly `concurrency + 1` VMs in the shared
  * `lua.lua_vm_count` gauge. The gauge is updated once here, not per-thread/per-VM.
@@ -564,17 +573,25 @@ public:
 
   const LuaFilterStats& stats() const { return stats_; }
   // Null unless the configuration sets `track_execution_time`.
-  Stats::Histogram* executionTimeHistogram() const { return execution_time_histogram_; }
+  Stats::Histogram* executionTimeHistogram() const {
+    return execution_time_stats_.has_value() ? &execution_time_stats_->stream_execution_time_us_
+                                             : nullptr;
+  }
   Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
 private:
-  static std::string statsPrefix(const std::string& prefix, const std::string& filter_stats_prefix) {
+  static std::string statsPrefix(const std::string& prefix,
+                                 const std::string& filter_stats_prefix) {
     return absl::StrCat(prefix, "lua.", filter_stats_prefix);
   }
   LuaFilterStats generateStats(const std::string& final_prefix, Stats::Scope& scope) {
     return {ALL_LUA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  }
+  static LuaExecutionTimeStats generateExecutionTimeStats(const std::string& final_prefix,
+                                                          Stats::Scope& scope) {
+    return {ALL_LUA_EXECUTION_TIME_STATS(POOL_HISTOGRAM_PREFIX(scope, final_prefix))};
   }
 
   const bool clear_route_cache_{};
@@ -585,7 +602,7 @@ private:
   PerLuaCodeSetupSharedPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupSharedPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
-  Stats::Histogram* const execution_time_histogram_;
+  const std::optional<LuaExecutionTimeStats> execution_time_stats_;
   // Sub-scope pre-configured with the lua stat prefix.
   Stats::ScopeSharedPtr lua_stats_scope_;
 };

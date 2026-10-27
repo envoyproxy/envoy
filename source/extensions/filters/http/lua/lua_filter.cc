@@ -1035,13 +1035,10 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
       filter_context_(proto_config.filter_context()),
       stats_(generateStats(statsPrefix(stats_prefix, proto_config.stat_prefix()), scope)),
-      execution_time_histogram_(
-          proto_config.track_execution_time()
-              ? &scope.histogramFromString(
-                    statPrefixJoin(statsPrefix(stats_prefix, proto_config.stat_prefix()),
-                                   "stream_execution_time_us"),
-                    Stats::Histogram::Unit::Microseconds)
-              : nullptr),
+      execution_time_stats_(proto_config.track_execution_time()
+                                ? std::make_optional(generateExecutionTimeStats(
+                                      statsPrefix(stats_prefix, proto_config.stat_prefix()), scope))
+                                : std::nullopt),
       lua_stats_scope_(
           scope.createScope(proto_config.stat_prefix().empty()
                                 ? absl::StrCat(stats_prefix, "lua")

@@ -522,7 +522,7 @@ LUA_SCRIPT_BENCHMARK_CFG(HeadersMetadataNoRouteClear, kHeadersMetadata, false)
 // arms send headers only, so the delta between an arm and its Tracked twin is the histogram's cost
 // for a stream with no body or local reply.
 #define LUA_SCRIPT_BENCHMARK_TRACKED(Name, Code)                                                   \
-  void BM_##Name##Tracked(benchmark::State& state) { runScript(state, Code, true, true); }        \
+  void BM_##Name##Tracked(benchmark::State& state) { runScript(state, Code, true, true); }         \
   BENCHMARK(BM_##Name##Tracked);
 
 LUA_SCRIPT_BENCHMARK_TRACKED(NoopBoth, kNoopBoth)
