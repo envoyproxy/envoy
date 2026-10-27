@@ -61,8 +61,7 @@ absl::Status RdsRouteConfigSubscription::afterProviderUpdate() {
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::ServerFactoryContext& factory_context)
-    : base_(subscription, factory_context),
-      config_update_info_(subscription->routeConfigUpdate()) {
+    : base_(subscription, factory_context), config_update_info_(subscription->routeConfigUpdate()) {
   // The subscription referenced by the 'base_' and by 'this' is the same.
   // In it the provider is already set by the 'base_' so it points to that.
   // Need to set again to point to 'this'.

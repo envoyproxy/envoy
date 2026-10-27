@@ -80,11 +80,9 @@ StaticRouteConfigProviderImpl::VhdsContext::VhdsContext(
     : config_update_info_(std::make_unique<RouteConfigUpdateReceiverImpl>(proto_traits,
                                                                           factory_context, "",
                                                                           /*from_rds=*/false)),
-      factory_context_(factory_context), route_config_name_(config.name()),
       tls_(factory_context.threadLocal()),
       local_init_target_(
-          fmt::format("StaticRouteConfigProvider local-init-target {}", route_config_name_),
-          []() {}) {
+          fmt::format("StaticRouteConfigProvider local-init-target {}", config.name()), []() {}) {
   init_manager.add(local_init_target_);
   config_update_info_->setObserver(*this);
 

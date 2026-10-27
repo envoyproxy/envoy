@@ -84,10 +84,6 @@ private:
 
     RouteConfigUpdatePtr config_update_info_;
     bool initialized_{false};
-    Server::Configuration::ServerFactoryContext& factory_context_;
-    // Name of the inline route configuration. Captured here because until the initial VHDS fetch
-    // has landed the receiver hasn't published anything to read it back off.
-    const std::string route_config_name_;
     ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
     // Only ready once a route configuration has been warmed up and published, so that whatever
     // warms up with this provider waits for the initial VHDS fetch.
