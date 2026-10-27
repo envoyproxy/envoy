@@ -309,6 +309,28 @@ TEST_F(JsonWithExtBufParserTest, CallbacksNoOpOnceAnErrorIsRecorded) {
   EXPECT_TRUE(parser.takeDocument().json().is_null());
 }
 
+// onKey/onNumber/onBoolean must also stop once an error is recorded: the stack
+// may be out of step, and returning OK would let the cursor carry on.
+TEST_F(JsonWithExtBufParserTest, ValueCallbacksDoNotAttachOnceAnErrorIsRecorded) {
+  JsonWithExtBufParser parser(config_);
+  // Open a real root so stack_.back() is a live container.
+  ASSERT_OK(parser.feed(R"({"keep":1,)", /*end_stream=*/false));
+  // Record an error via a void callback: closing past the root is internal.
+  parser.onContainerClose(/*depth=*/1, /*token_end=*/0);
+  parser.onContainerClose(/*depth=*/1, /*token_end=*/0);
+
+  // Each returns the recorded error and attaches nothing.
+  EXPECT_THAT(parser.onKey("k", /*depth=*/1, /*token_start=*/0),
+              HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_THAT(parser.onNumber("k", "7", /*depth=*/1, /*token_start=*/0, /*token_end=*/1),
+              HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_THAT(parser.onBoolean("k", true, /*depth=*/1, /*token_start=*/0, /*token_end=*/4),
+              HasStatusCode(absl::StatusCode::kInternal));
+
+  EXPECT_THAT(parser.feed("}", /*end_stream=*/true), HasStatusCode(absl::StatusCode::kInternal));
+  EXPECT_TRUE(parser.takeDocument().json().is_null());
+}
+
 // Trailing bytes are rejected by the cursor, so a value can only follow the
 // root if the callback sequence is broken; the first root is not overwritten.
 TEST_F(JsonWithExtBufParserTest, SecondRootValueIsRejected) {
