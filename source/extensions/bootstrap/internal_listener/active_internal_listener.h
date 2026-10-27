@@ -44,6 +44,9 @@ public:
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
 
+  // Records why this side closed the connection in the passthrough state, if any.
+  void recordCloseDetails();
+
 private:
   const IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state_;
 };

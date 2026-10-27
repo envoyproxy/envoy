@@ -236,6 +236,37 @@ TEST_F(ClientConnectionFactoryTest, ReportsListenerCloseDetailsAsTransportFailur
   EXPECT_EQ(client_conn->transportFailureReason(),
             client_conn->streamInfo().downstreamTransportFailureReason());
 }
+
+// If the internal listener side closes the connection while accepting it, the client side fails to
+// connect. The close details take precedence over the connection's own failure reason.
+TEST_F(ClientConnectionFactoryTest, ListenerCloseDetailsTakePrecedenceOverConnectFailure) {
+  setupTlsSlot();
+  registry_->setInternalListenerManager(internal_listener_manager_);
+  MockInternalListener internal_listener;
+  Network::InternalListenerOptRef internal_listener_opt{internal_listener};
+
+  EXPECT_CALL(internal_listener_manager_, findByAddress(_))
+      .WillOnce(testing::Return(internal_listener_opt));
+  EXPECT_CALL(internal_listener, onAccept(_)).WillOnce([&](Network::ConnectionSocketPtr&& socket) {
+    auto* io_handle = dynamic_cast<IoSocket::UserSpace::IoHandle*>(&socket->ioHandle());
+    ASSERT_NE(nullptr, io_handle);
+    io_handle->passthroughState()->setCloseDetails("local_close_reason", "");
+    socket->close();
+  });
+
+  auto client_conn = dispatcher_->createClientConnection(
+      std::make_shared<Network::Address::EnvoyInternalInstance>(listener_addr),
+      Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
+      nullptr);
+  NiceMock<Network::MockConnectionCallbacks> callbacks;
+  client_conn->addConnectionCallbacks(callbacks);
+  EXPECT_CALL(callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
+  client_conn->connect();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ("internal_listener_close:local_close_reason", client_conn->transportFailureReason());
+  EXPECT_EQ(client_conn->transportFailureReason(),
+            client_conn->streamInfo().downstreamTransportFailureReason());
+}
 } // namespace
 } // namespace InternalListener
 } // namespace Bootstrap

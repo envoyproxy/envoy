@@ -22,10 +22,10 @@ uint32_t InternalClientConnectionFactory::buffer_size_ =
 namespace {
 
 /**
- * Client connection to an internal listener. If the connection has no failure reason of its own,
- * it reports the close details that the internal listener side recorded in the shared
- * PassthroughState, e.g. that tcp_proxy closed the connection because it failed to connect to its
- * upstream. This lets the client side tell such a failure apart from a bare connection termination.
+ * Client connection to an internal listener. If the internal listener side recorded why it closed
+ * the connection in the shared PassthroughState, e.g. that tcp_proxy failed to connect to its
+ * upstream, the connection reports that as its transport failure reason. This lets the client side
+ * tell such a failure apart from a bare connection termination.
  */
 class InternalClientConnectionImpl : public Network::ClientConnectionImpl {
 public:
@@ -42,11 +42,14 @@ public:
 
   // Network::Connection
   absl::string_view transportFailureReason() const override {
-    absl::string_view reason = Network::ClientConnectionImpl::transportFailureReason();
-    if (reason.empty() && passthrough_state_ != nullptr) {
+    // The listener side records close details only when it closed the connection, which then
+    // causes whatever failure the client side observes. E.g. if the listener side closes the
+    // connection while accepting it, before the client side connects, the client side fails to
+    // connect with an uninformative error. So the close details take precedence.
+    if (passthrough_state_ != nullptr && !passthrough_state_->closeDetails().empty()) {
       return passthrough_state_->closeDetails();
     }
-    return reason;
+    return Network::ClientConnectionImpl::transportFailureReason();
   }
 
 private:

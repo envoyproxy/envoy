@@ -39,18 +39,25 @@ ActiveInternalConnection::ActiveInternalConnection(
                                   std::move(stream_info)),
       passthrough_state_(std::move(passthrough_state)) {}
 
+void ActiveInternalConnection::recordCloseDetails() {
+  if (passthrough_state_ == nullptr) {
+    return;
+  }
+  const StreamInfo::StreamInfo& stream_info = connection_->streamInfo();
+  absl::string_view upstream_transport_failure_reason;
+  if (stream_info.upstreamInfo().has_value()) {
+    upstream_transport_failure_reason =
+        stream_info.upstreamInfo()->upstreamTransportFailureReason();
+  }
+  passthrough_state_->setCloseDetails(connection_->localCloseReason(),
+                                      upstream_transport_failure_reason);
+}
+
 void ActiveInternalConnection::onEvent(Network::ConnectionEvent event) {
   // Record why this side closed the connection. A close initiated by the client side is not
   // recorded, as the client side already knows why it closed.
-  if (event == Network::ConnectionEvent::LocalClose && passthrough_state_ != nullptr) {
-    const StreamInfo::StreamInfo& stream_info = connection_->streamInfo();
-    absl::string_view upstream_transport_failure_reason;
-    if (stream_info.upstreamInfo().has_value()) {
-      upstream_transport_failure_reason =
-          stream_info.upstreamInfo()->upstreamTransportFailureReason();
-    }
-    passthrough_state_->setCloseDetails(connection_->localCloseReason(),
-                                        upstream_transport_failure_reason);
+  if (event == Network::ConnectionEvent::LocalClose) {
+    recordCloseDetails();
   }
   Server::ActiveTcpConnection::onEvent(event);
 }
@@ -117,7 +124,7 @@ void ActiveInternalListener::newActiveConnection(
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
   IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state =
       closeDetailsPassthroughState(*server_conn_ptr);
-  Server::ActiveConnectionPtr active_connection = std::make_unique<ActiveInternalConnection>(
+  auto active_connection = std::make_unique<ActiveInternalConnection>(
       active_connections, std::move(server_conn_ptr), dispatcher().timeSource(),
       std::move(stream_info), std::move(passthrough_state));
   // If the connection is already closed, we can just let this connection immediately die.
@@ -126,7 +133,12 @@ void ActiveInternalListener::newActiveConnection(
         debug, "new connection from {}", *active_connection->connection_,
         active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
-    LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
+    LinkedList::moveIntoList(Server::ActiveConnectionPtr{std::move(active_connection)},
+                             active_connections.connections_);
+  } else {
+    // This side closed the connection while setting it up, e.g. a network filter closed it when it
+    // was created, before the connection callbacks were added.
+    active_connection->recordCloseDetails();
   }
 }
 } // namespace InternalListener
