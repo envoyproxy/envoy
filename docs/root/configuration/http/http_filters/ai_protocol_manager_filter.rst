@@ -388,8 +388,12 @@ The client-boundary instance converts from and to the API the route declares for
 :ref:`request <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`,
 and the backend-boundary instance to and from the one it declares for the
 :ref:`response <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.response>`.
-A leg whose API the route does not declare cannot be transcoded, which is counted by
-``transcoder.unresolved``.
+A leg whose client API nobody declares cannot be transcoded, which is counted by
+``transcoder.unresolved``. A backend API nobody declares -- neither the route nor
+``envoy.ai.llm_protocol.response`` -- is taken to be the client's, so a route with no backend,
+such as one answered locally, leaves the request as it came; this is counted by
+``transcoder.backend_defaulted``, and a route that forwards to a backend of another API shows up
+there when its ``response`` declaration is missing.
 
 The rewritten request is validated against the target's schema before it is
 replayed, so a document the upstream would reject fails locally rather than over the
@@ -833,5 +837,6 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.
   transcoder.transcoded, Counter, "The transcoder AI filter converted a payload (a request, a unary response or an SSE event) into or out of the canonical IR."
-  transcoder.unresolved, Counter, "A payload could not be transcoded because the route declared no wire API for its leg. A request is rejected; a response is forwarded untranslated and counted once, however many SSE events it has."
+  transcoder.backend_defaulted, Counter, "Neither the route nor filter state named the backend's wire API, so the transcoder took it to be the client's and left the request as it came."
+  transcoder.unresolved, Counter, "A payload could not be transcoded because nothing declared the client's wire API, or an instruction in filter state could not be followed. A request is rejected; a response is forwarded untranslated and counted once, however many SSE events it has."
   transcoder.failed, Counter, "A payload could not be converted: its rules failed, or a converted request failed the target schema. A request is rejected; a response or SSE event is forwarded untranslated."

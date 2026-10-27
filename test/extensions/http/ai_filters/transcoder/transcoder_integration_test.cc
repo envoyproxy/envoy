@@ -482,5 +482,79 @@ TEST_P(TranscoderIntegrationTest, VertexGeminiStreamGenerateContentReachesClaude
   EXPECT_EQ(test_server_->counter("ai_protocol_manager.transcoder.failed")->value(), 0);
 }
 
+// Two AI Protocol Managers on one downstream chain, as a gateway that reads the model before it
+// picks the route has: `read_model` declared on the route, `transcode` with no entry of its own.
+// The route answers locally, so there is no backend. `read_model` names the client's API in filter
+// state, which makes `transcode` an endpoint there too; with no backend API named, the transcoder
+// takes the backend to speak the client's API and leaves the request alone.
+class TwoInstanceChainIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                        public HttpIntegrationTest {
+public:
+  TwoInstanceChainIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void initializeChain() {
+    config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
+      auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+      route->clear_route();
+      route->mutable_direct_response()->set_status(404);
+      route->mutable_direct_response()->mutable_body()->set_inline_string(
+          R"({"error": {"code": "model_not_found"}})");
+      envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
+          per_route;
+      per_route.mutable_request()->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+      std::ignore = (*route->mutable_typed_per_filter_config())["read_model"].PackFrom(per_route);
+    });
+    // Prepended in reverse so `read_model` runs first.
+    config_helper_.prependFilter(R"EOF(
+name: transcode
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  request_handling: {}
+  filters:
+  - name: envoy.http.ai_filters.transcoder
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
+      request_handling: TO_IR
+      response_handling: FROM_IR
+  - name: envoy.http.ai_filters.transcoder
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.ai_filters.transcoder.v3.Transcoder
+      request_handling: FROM_IR
+      response_handling: TO_IR
+)EOF");
+    config_helper_.prependFilter(R"EOF(
+name: read_model
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  request_handling:
+    reserialize_body: DISABLE
+)EOF");
+    initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, TwoInstanceChainIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(TwoInstanceChainIntegrationTest, LocalReplyRouteWithNoBackendApiIsLeftAlone) {
+  initializeChain();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/v1/chat/completions"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"model": "llama-3.1-8b", "messages": [{"role": "user", "content": "hi"}]})");
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "404") << response->body();
+  EXPECT_EQ(nlohmann::json::parse(response->body())["error"]["code"], "model_not_found");
+  test_server_->waitForCounter("ai_protocol_manager.transcoder.backend_defaulted", testing::Ge(1));
+  EXPECT_EQ(test_server_->counter("ai_protocol_manager.transcoder.unresolved")->value(), 0);
+  EXPECT_EQ(test_server_->counter("ai_protocol_manager.transcoder.failed")->value(), 0);
+}
+
 } // namespace
 } // namespace Envoy
