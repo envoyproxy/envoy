@@ -74,11 +74,13 @@ envoy_cc_library(
     deps = [
         ":character_tables",
         ":config_overrides",
+        "//envoy/http:header_map_interface",
         "//envoy/http:header_validator_errors",
         "//envoy/http:header_validator_interface",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/runtime:runtime_features_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
     ],
 )
