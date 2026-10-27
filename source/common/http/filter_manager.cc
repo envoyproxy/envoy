@@ -70,6 +70,7 @@ public:
       : Buffer::WatermarkBuffer([] {}, [] {}, [] {}), tracker_(tracker) {}
   ~PerFilterBuffer() override { tracker_.release(reported_length_); }
 
+  using Buffer::WatermarkBuffer::prepend;
   void prepend(Instance& data) override {
     tracker_.deferChecks();
     Buffer::WatermarkBuffer::prepend(data);
