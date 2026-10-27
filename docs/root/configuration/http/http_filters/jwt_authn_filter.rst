@@ -54,7 +54,12 @@ If :ref:`from_headers <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.J
 
   Authorization: Bearer <token>
 
-and query parameter key ``access_token`` as::
+The ``Bearer`` authentication scheme is case-insensitive, so ``bearer`` and ``BEARER`` are also accepted.
+The token itself remains case-sensitive.
+Set the runtime guard ``envoy.reloadable_features.jwt_authn_case_insensitive_bearer`` to ``false``
+to restore case-sensitive matching, including for explicitly configured ``Bearer `` prefixes.
+
+JWTs are also extracted from the query parameter key ``access_token`` as::
 
   /path?access_token=<JWT>
 
@@ -99,7 +104,8 @@ This means all of the following will return a JWT of ``eyJFbnZveSI6ICJyb2NrcyJ9.
 
 The header :ref:`name <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.name>` may be ``Authorization``.
 
-The :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` must match exactly, i.e., case-sensitively.
+The :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` must match exactly, i.e., case-sensitively,
+except for ``Bearer `` (including its trailing space) in the ``Authorization`` header, which matches case-insensitively.
 If the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>` is not found, the header is skipped, not considered as a source for a JWT.
 
 If there are no JWT-legal characters after the :ref:`value_prefix <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtHeader.value_prefix>`, the entire string after it
