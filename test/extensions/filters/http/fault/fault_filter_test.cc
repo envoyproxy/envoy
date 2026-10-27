@@ -471,7 +471,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(testing::Invoke(
           [this](Http::Code code, absl::string_view body,
-                std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                 std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
                  const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view details) {
             Http::Utility::sendLocalReply(
