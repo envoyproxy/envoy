@@ -8,6 +8,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/quic/load_balancer/load_balancer_config.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
@@ -440,6 +441,124 @@ TEST(QuicLbTest, WorkerSelector) {
   buf[1 + 8 + 1] = non_default_host; // Worker ID suffix.
   EXPECT_EQ(non_default_host, selector(buffer, default_host));
   BPF_EXPECT_EQ(non_default_host, bpf_tester->sendAndGetRecipient(buffer));
+}
+
+class QuicLbSecretUpdateTest : public testing::TestWithParam<bool> {
+public:
+  void initialize(bool has_secret) {
+    has_secret_ = has_secret;
+    secret_ = encryptionParamaters().generic_secret();
+    auto manager = std::make_unique<testing::StrictMock<Secret::MockSecretManager>>();
+    auto& manager_ref = *manager;
+    factory_context_.server_factory_context_.secret_manager_ = std::move(manager);
+    EXPECT_CALL(manager_ref, findOrCreateGenericSecretProvider(_, _, _, _, _))
+        .WillOnce(testing::Return(secret_provider_));
+    EXPECT_CALL(*secret_provider_, addValidationCallback(_))
+        .WillOnce([this](std::function<absl::Status(const SecretType&)> callback) {
+          validation_callback_ = std::move(callback);
+          return nullptr;
+        });
+    EXPECT_CALL(*secret_provider_, addUpdateCallback(_))
+        .WillOnce([this](std::function<absl::Status()> callback) {
+          update_callback_ = std::move(callback);
+          return nullptr;
+        });
+    EXPECT_CALL(*secret_provider_, secret()).WillRepeatedly([this]() -> SecretType* {
+      return has_secret_ ? &secret_ : nullptr;
+    });
+
+    envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config config;
+    config.mutable_server_id()->set_inline_string("server");
+    config.set_nonce_length_bytes(10);
+    config.set_unencrypted_mode(GetParam());
+    config.mutable_encryption_parameters()->set_name(kSecretName);
+    config.mutable_encryption_parameters()->mutable_sds_config();
+    auto result = Factory::create(config, factory_context_);
+    ASSERT_OK(result.status());
+    factory_ = std::move(result.value());
+  }
+
+  absl::Status applySecret(uint8_t version, const std::string& key = "0123456789abcdef") {
+    auto candidate = encryptionParamaters(version, key);
+    RETURN_IF_NOT_OK(validation_callback_(candidate.generic_secret()));
+    secret_ = candidate.generic_secret();
+    has_secret_ = true;
+    return update_callback_();
+  }
+
+  void expectConnectionId(uint8_t version, absl::string_view key = "0123456789abcdef") {
+    auto generator = createTypedIdGenerator(*factory_);
+    auto connection_id = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
+    ASSERT_TRUE(connection_id.has_value());
+    EXPECT_EQ(static_cast<uint8_t>(connection_id->data()[0]) >> quic::kConnectionIdLengthBits,
+              version);
+    ASSERT_EQ(connection_id->length(), 18);
+    if (GetParam()) {
+      EXPECT_EQ(absl::string_view(connection_id->data() + 1, 6), "server");
+    } else {
+      auto config = quic::LoadBalancerConfig::Create(version, 6, 10, key);
+      ASSERT_TRUE(config.has_value());
+      uint8_t plaintext[quic::kLoadBalancerBlockSize];
+      ASSERT_TRUE(config->BlockDecrypt(reinterpret_cast<const uint8_t*>(connection_id->data() + 1),
+                                       plaintext));
+      EXPECT_EQ(absl::string_view(reinterpret_cast<const char*>(plaintext), 6), "server");
+    }
+  }
+
+  using SecretType = envoy::extensions::transport_sockets::tls::v3::GenericSecret;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::shared_ptr<testing::StrictMock<Secret::MockGenericSecretConfigProvider>> secret_provider_ =
+      std::make_shared<testing::StrictMock<Secret::MockGenericSecretConfigProvider>>();
+  SecretType secret_;
+  bool has_secret_{false};
+  std::function<absl::Status(const SecretType&)> validation_callback_;
+  std::function<absl::Status()> update_callback_;
+  std::unique_ptr<Factory> factory_;
+};
+
+INSTANTIATE_TEST_SUITE_P(EncryptionModes, QuicLbSecretUpdateTest, testing::Bool());
+
+TEST_P(QuicLbSecretUpdateTest, IdenticalUpdateIsANoop) {
+  initialize(true);
+  expectConnectionId(0);
+  EXPECT_OK(applySecret(0));
+  EXPECT_OK(applySecret(0));
+  expectConnectionId(0);
+}
+
+TEST_P(QuicLbSecretUpdateTest, SameVersionWithDifferentKeyIsRejected) {
+  initialize(true);
+  auto status = applySecret(0, "fedcba9876543210");
+  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(status.message(),
+            "'encryption_key' cannot change without changing 'configuration_version'");
+  EXPECT_EQ(secret_.secrets().at("encryption_key").inline_string(), "0123456789abcdef");
+  expectConnectionId(0);
+
+  EXPECT_OK(applySecret(1, "fedcba9876543210"));
+  expectConnectionId(1, "fedcba9876543210");
+  EXPECT_OK(applySecret(1, "fedcba9876543210"));
+  expectConnectionId(1, "fedcba9876543210");
+
+  // A previous version can be reused after rotating away from it.
+  EXPECT_OK(applySecret(0, "fedcba9876543210"));
+  expectConnectionId(0, "fedcba9876543210");
+}
+
+TEST_P(QuicLbSecretUpdateTest, DeferredSecretInitialization) {
+  initialize(false);
+  EXPECT_EQ(applySecret(0, "bad").code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_OK(applySecret(0));
+  expectConnectionId(0);
+  EXPECT_EQ(applySecret(0, "fedcba9876543210").code(), absl::StatusCode::kInvalidArgument);
+  expectConnectionId(0);
+}
+
+TEST_P(QuicLbSecretUpdateTest, UpdateCallbackAlsoValidatesVersion) {
+  initialize(true);
+  secret_ = encryptionParamaters(0, "fedcba9876543210").generic_secret();
+  EXPECT_EQ(update_callback_().code(), absl::StatusCode::kInvalidArgument);
+  expectConnectionId(0);
 }
 
 TEST(QuicLbTest, EmptySecretCallback) {
