@@ -258,6 +258,22 @@ MATCHER_P4(IsUdpWith, local_addr, peer_addr, buffer, timestamp, "") {
   return local_matched && peer_matched && buffer_matched && timestamp_matched;
 }
 
+TEST_F(HotRestartingChildTest, ShutdownReleasesUdpListenerConfigs) {
+  auto listener_config = std::make_shared<testing::StrictMock<Network::MockUdpListenerConfig>>();
+  std::weak_ptr<Network::UdpListenerConfig> weak_config = listener_config;
+  auto listener_addr = *Network::Utility::resolveUrl("udp://127.0.0.1:1234");
+  HotRestartUdpForwardingTestHelper helper(*hot_restarting_child_);
+  helper.registerUdpForwardingListener(listener_addr, listener_config);
+  listener_config.reset();
+  EXPECT_FALSE(weak_config.expired());
+
+  hot_restarting_child_->shutdown();
+
+  EXPECT_TRUE(weak_config.expired());
+  EXPECT_FALSE(helper.getListenerForDestination(*listener_addr).has_value());
+  hot_restarting_child_->shutdown();
+}
+
 TEST_F(HotRestartingChildTest, ForwardsPacketToRegisteredListenerOnMatch) {
   uint32_t worker_index = 12;
   uint64_t packet_timestamp = 987654321;

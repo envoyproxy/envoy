@@ -107,7 +107,12 @@ void HotRestartingChild::initialize(Event::Dispatcher& dispatcher) {
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 }
 
-void HotRestartingChild::shutdown() { socket_event_udp_forwarding_.reset(); }
+void HotRestartingChild::shutdown() {
+  socket_event_udp_forwarding_.reset();
+  // Listener configs can own SDS providers and other server-dependent resources. Release them
+  // while the server is still alive, rather than when the hot restart implementation is destroyed.
+  udp_forwarding_context_.clear();
+}
 
 void HotRestartingChild::onForwardedUdpPacket(uint32_t worker_index,
                                               const Network::Address::Instance& listener_address,
