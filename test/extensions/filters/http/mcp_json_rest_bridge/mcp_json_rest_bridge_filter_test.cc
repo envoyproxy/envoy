@@ -4880,7 +4880,7 @@ TEST_F(TraceContextExtractionTest, TraceContextNotExtractedForInitialize) {
               StrEq("old-baggage"));
 }
 
-class McpHttpMethodFilterTest : public testing::TestWithParam<std::string> {
+class McpHttpMethodFilterTestBase : public testing::Test {
 public:
   void SetUp() override {
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config;
@@ -4906,6 +4906,9 @@ public:
   Http::TestResponseHeaderMapImpl response_headers_;
 };
 
+class McpHttpMethodFilterTest : public McpHttpMethodFilterTestBase,
+                                public testing::WithParamInterface<std::string> {};
+
 INSTANTIATE_TEST_SUITE_P(NonPostMethods, McpHttpMethodFilterTest,
                          testing::Values("GET", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT",
                                          "TRACE"),
@@ -4928,27 +4931,66 @@ TEST_P(McpHttpMethodFilterTest, NonPostMethodsReturnMethodNotAllowed) {
   EXPECT_CALL(
       decoder_callbacks_.stream_info_,
       setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
-  Http::TestResponseHeaderMapImpl additional_response_headers;
-  EXPECT_CALL(decoder_callbacks_, encodeHeaders_)
-      .WillOnce(testing::SaveArg<0>(&additional_response_headers));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, /*end_stream=*/false))
+      .WillOnce(testing::SaveArg<0>(&response_headers_));
   request_headers_ = {{":path", "/mcp"}, {":method", GetParam()}};
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::StopIteration);
 
-  ASSERT_THAT(additional_response_headers.get(Http::LowerCaseString("allow")), SizeIs(1));
-  EXPECT_THAT(
-      additional_response_headers.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
-      StrEq("POST"));
+  ASSERT_THAT(response_headers_.get(Http::LowerCaseString("allow")), SizeIs(1));
+  EXPECT_THAT(response_headers_.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
+              StrEq("POST"));
 
   // Simulate how the filter manager passes the local response through the encoder filter chain.
-  EXPECT_EQ(filter_->encodeHeaders(additional_response_headers, /*end_stream=*/false),
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
             Http::FilterHeadersStatus::Continue);
   Buffer::OwnedImpl response_body("HTTP Method Not Allowed");
   EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
             Http::FilterDataStatus::Continue);
-  EXPECT_THAT(additional_response_headers.getStatusValue(), StrEq("405"));
-  EXPECT_THAT(additional_response_headers.getContentLengthValue(), StrEq("23"));
+  EXPECT_THAT(response_headers_.getStatusValue(), StrEq("405"));
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("text/plain"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq("23"));
+  ASSERT_THAT(response_headers_.get(Http::LowerCaseString("allow")), SizeIs(1));
+  EXPECT_THAT(response_headers_.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
+              StrEq("POST"));
   EXPECT_THAT(response_body.toString(), StrEq("HTTP Method Not Allowed"));
+}
+
+TEST_F(McpHttpMethodFilterTestBase, HeadMethodReturnsHeadersOnlyMethodNotAllowed) {
+  decoder_callbacks_.is_head_request_ = true;
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::MethodNotAllowed), StrEq("HTTP Method Not Allowed"), _,
+                             Eq(Grpc::Status::WellKnownGrpcStatus::InvalidArgument),
+                             StrEq("mcp_json_rest_bridge_http_request_method_not_post")));
+
+  Protobuf::Struct expected_metadata;
+  MessageUtil::loadFromJson(R"json({
+    "status": "mcp_json_rest_bridge_http_request_method_not_post"
+  })json",
+                            expected_metadata);
+
+  EXPECT_CALL(
+      decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(testing::SaveArg<0>(&response_headers_));
+  EXPECT_CALL(decoder_callbacks_, encodeData(_, _)).Times(0);
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _)).Times(0);
+
+  request_headers_ = {{":path", "/mcp"}, {":method", "HEAD"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // Simulate how the filter manager passes the headers-only HEAD local response through the
+  // encoder filter chain.
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getStatusValue(), StrEq("405"));
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("text/plain"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq("23"));
+  ASSERT_THAT(response_headers_.get(Http::LowerCaseString("allow")), SizeIs(1));
+  EXPECT_THAT(response_headers_.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
+              StrEq("POST"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
