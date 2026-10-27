@@ -13,24 +13,19 @@ class SnapshotHostSet : public HostSetImpl {
 public:
   using HostSetImpl::HostSetImpl;
 
-  static HostSetFactory factory() {
-    return [](uint32_t priority, std::optional<bool> weighted_priority_health,
-              std::optional<uint32_t> overprovisioning_factor) -> HostSetImplPtr {
-      return std::make_unique<SnapshotHostSet>(priority, weighted_priority_health,
-                                               overprovisioning_factor);
-    };
+  static HostSetImplPtr create(uint32_t priority, std::optional<bool> weighted_priority_health,
+                               std::optional<uint32_t> overprovisioning_factor) {
+    return std::make_unique<SnapshotHostSet>(priority, weighted_priority_health,
+                                             overprovisioning_factor);
   }
 
   // Wraps `params` in a snapshot that SnapshotHostSet adopts.
-  static PersistentHostPartitionsSnapshotConstSharedPtr
-  makeSnapshot(PrioritySet::UpdateHostsParams params) {
+  static HostSetSnapshotConstSharedPtr makeSnapshot(PrioritySet::UpdateHostsParams params) {
     return std::make_shared<const Snapshot>(std::move(params));
   }
 
   // HostSet
-  PersistentHostPartitionsSnapshotConstSharedPtr persistentPartitions() const override {
-    return snapshot_;
-  }
+  HostSetSnapshotConstSharedPtr snapshot() const override { return snapshot_; }
 
   // HostSetImpl
   void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
@@ -38,10 +33,9 @@ public:
                    const HostVector& hosts_removed,
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt) override {
-    if (update_hosts_params.persistent_partitions != nullptr) {
-      snapshot_ = std::static_pointer_cast<const Snapshot>(
-          std::move(update_hosts_params.persistent_partitions));
-      update_hosts_params = snapshot_->flatUpdateHostsParams();
+    if (update_hosts_params.snapshot != nullptr) {
+      snapshot_ = std::static_pointer_cast<const Snapshot>(std::move(update_hosts_params.snapshot));
+      update_hosts_params = snapshot_->params_;
     } else {
       snapshot_ = std::make_shared<const Snapshot>(update_hosts_params);
     }
@@ -51,14 +45,9 @@ public:
   }
 
 private:
-  class Snapshot : public HostSetSnapshotBase {
-  public:
+  struct Snapshot : public HostSetSnapshot {
     explicit Snapshot(PrioritySet::UpdateHostsParams params) : params_(std::move(params)) {}
 
-    HostSetFactory hostSetFactory() const override { return factory(); }
-    PrioritySet::UpdateHostsParams flatUpdateHostsParams() const override { return params_; }
-
-  private:
     const PrioritySet::UpdateHostsParams params_;
   };
 

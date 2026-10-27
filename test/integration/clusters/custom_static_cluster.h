@@ -15,6 +15,7 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
+#include "test/common/upstream/snapshot_host_set.h"
 #include "test/common/upstream/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
 #include "test/integration/clusters/cluster_factory_config.pb.validate.h"
@@ -29,8 +30,9 @@ public:
                       Upstream::ClusterFactoryContext& context, uint32_t priority,
                       std::string address, uint32_t port, bool use_snapshot_host_set,
                       absl::Status& creation_status)
-      : ClusterImplBase(cluster, context, creation_status), priority_(priority),
-        address_(std::move(address)), port_(port), use_snapshot_host_set_(use_snapshot_host_set) {
+      : ClusterImplBase(cluster, context, creation_status,
+                        use_snapshot_host_set ? &Upstream::SnapshotHostSet::create : nullptr),
+        priority_(priority), address_(std::move(address)), port_(port) {
     THROW_IF_NOT_OK_REF(creation_status);
     host_ = makeHost();
   }
@@ -48,7 +50,6 @@ private:
   const uint32_t priority_;
   const std::string address_;
   const uint32_t port_;
-  const bool use_snapshot_host_set_;
   Upstream::HostSharedPtr host_;
 
   friend class CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1>;

@@ -715,10 +715,7 @@ public:
 
   // Returns update params that carry only `snapshot`, for a host set to adopt.
   static PrioritySet::UpdateHostsParams
-  snapshotUpdateHostsParams(PersistentHostPartitionsSnapshotConstSharedPtr snapshot);
-
-  // Empty views, shared so that dropped flat vectors are released.
-  static const PrioritySet::UpdateHostsParams& emptyHostsParams();
+  snapshotUpdateHostsParams(HostSetSnapshotConstSharedPtr snapshot);
 
   // Whether `host`'s health flags place it in the excluded view, as partitionHosts() decides.
   static bool excludedByHealthFlags(const Host& host);
@@ -748,20 +745,19 @@ private:
 };
 
 using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
-using HostSetFactory =
-    std::function<HostSetImplPtr(uint32_t priority, std::optional<bool> weighted_priority_health,
-                                 std::optional<uint32_t> overprovisioning_factor)>;
+// Creates a host set of a cluster-specific type.
+using HostSetFactory = HostSetImplPtr (*)(uint32_t priority,
+                                          std::optional<bool> weighted_priority_health,
+                                          std::optional<uint32_t> overprovisioning_factor);
 
 /**
- * Base of every PersistentHostPartitionsSnapshot. A worker priority set uses it to create the host
- * set type that published the snapshot, or to read its flat views when it keeps flat vectors.
+ * A host set's hosts in a form other than flat vectors, produced by a host set created through a
+ * HostSetFactory and adopted by the host sets the same factory creates on workers. It is published
+ * once on the main thread and read concurrently on every worker, so it must be immutable.
  */
-class HostSetSnapshotBase : public PersistentHostPartitionsSnapshot {
+class HostSetSnapshot {
 public:
-  // Creates host sets that can adopt this snapshot.
-  virtual HostSetFactory hostSetFactory() const PURE;
-  // The flat views this snapshot describes.
-  virtual PrioritySet::UpdateHostsParams flatUpdateHostsParams() const PURE;
+  virtual ~HostSetSnapshot() = default;
 };
 
 /**
@@ -802,9 +798,10 @@ public:
     return cross_priority_host_map_;
   }
 
-  // Creates every host set with `factory`, replacing the existing ones. Call before the first host
-  // update, while every host set is empty.
+  // Creates every host set with `factory`. Must be called before any host set exists, since other
+  // components may hold references to host sets.
   void setHostSetFactory(HostSetFactory factory);
+  HostSetFactory hostSetFactory() const { return host_set_factory_; }
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
@@ -837,7 +834,7 @@ private:
       member_update_cb_helper_;
   mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
-  HostSetFactory host_set_factory_;
+  HostSetFactory host_set_factory_{};
   bool batch_update_ : 1 = false;
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
@@ -1333,8 +1330,10 @@ public:
   void setDropCategory(absl::string_view drop_category) override { drop_category_ = drop_category; }
 
 protected:
+  // `host_set_factory`, if set, creates every host set of this cluster and of its worker copies.
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context, absl::Status& creation_status);
+                  ClusterFactoryContext& cluster_context, absl::Status& creation_status,
+                  HostSetFactory host_set_factory = nullptr);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed.

@@ -1,5 +1,8 @@
+#include <atomic>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/network/address_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
@@ -11,6 +14,7 @@
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/integration/http_integration.h"
 
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 using testing::Contains;
 using testing::Key;
@@ -56,8 +60,6 @@ public:
       }
 
       cluster_0->mutable_cluster_type()->CopyFrom(cluster_type);
-      bootstrap.mutable_cluster_manager()->set_enable_deferred_cluster_creation(
-          deferred_cluster_creation_);
     });
     HttpIntegrationTest::initialize();
     test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(1));
@@ -65,16 +67,41 @@ public:
 
   Network::Address::IpVersion ipVersion() const { return version_; }
 
-  // The main-thread host set at the cluster's configured priority.
-  const Upstream::HostSet& clusterHostSet() {
-    const auto& cluster_maps = test_server_->server().clusterManager().clusters();
-    const auto& cluster_ref = cluster_maps.active_clusters_.find("cluster_0")->second;
-    return *cluster_ref.get().prioritySet().hostSetsPerPriority()[10];
+  // Whether every thread's copy of cluster_0, workers included, holds a SnapshotHostSet with a
+  // snapshot of one host at the configured priority.
+  bool everyThreadHoldsSnapshot() {
+    std::atomic<bool> all_hold{true};
+    absl::Notification done;
+    ThreadLocal::TypedSlotPtr<> slot;
+    test_server_->server().dispatcher().post([&] {
+      slot = ThreadLocal::TypedSlot<>::makeUnique(test_server_->server().threadLocal());
+      slot->set([](Event::Dispatcher&) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
+        return nullptr;
+      });
+      slot->runOnAllThreads(
+          [&](OptRef<ThreadLocal::ThreadLocalObject>) {
+            auto* cluster =
+                test_server_->server().clusterManager().getThreadLocalCluster("cluster_0");
+            const auto& host_sets = cluster->prioritySet().hostSetsPerPriority();
+            const bool holds =
+                host_sets.size() > 10 &&
+                dynamic_cast<const Upstream::SnapshotHostSet*>(host_sets[10].get()) != nullptr &&
+                host_sets[10]->snapshot() != nullptr && host_sets[10]->hostCounts().hosts == 1;
+            if (!holds) {
+              all_hold = false;
+            }
+          },
+          [&] {
+            slot.reset(nullptr);
+            done.Notify();
+          });
+    });
+    done.WaitForNotification();
+    return all_hold;
   }
 
   bool cluster_provided_lb_{};
   bool use_snapshot_host_set_{};
-  bool deferred_cluster_creation_{};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, CustomClusterIntegrationTest,
@@ -107,32 +134,15 @@ TEST_P(CustomClusterIntegrationTest, TestCustomConfig) {
   EXPECT_EQ(10, host_set->priority());
 }
 
-// A cluster whose host sets hand workers snapshots serves traffic with the same membership
-// accounting as the flat path.
+// A cluster whose host sets hand workers snapshots serves traffic, every worker copy holds the
+// same host set type and its snapshot, and the membership accounting matches the flat path.
 TEST_P(CustomClusterIntegrationTest, SnapshotHostSetServesTraffic) {
   use_snapshot_host_set_ = true;
   testRouterHeaderOnlyRequestAndResponse(nullptr, UpstreamIndex);
 
-  const Upstream::HostSet& host_set = clusterHostSet();
-  EXPECT_NE(nullptr, dynamic_cast<const Upstream::SnapshotHostSet*>(&host_set));
-  EXPECT_NE(nullptr, host_set.persistentPartitions());
-  EXPECT_EQ(1, host_set.hostCount());
-  EXPECT_EQ(1, host_set.healthyHostCount());
+  EXPECT_TRUE(everyThreadHoldsSnapshot());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-}
-
-// With deferred cluster creation, workers build the cluster from the initialization object on first
-// use. That object carries the snapshot, so the host must still serve traffic.
-TEST_P(CustomClusterIntegrationTest, SnapshotHostSetWithDeferredClusterCreation) {
-  use_snapshot_host_set_ = true;
-  deferred_cluster_creation_ = true;
-  testTwoRequests(false);
-
-  const Upstream::HostSet& host_set = clusterHostSet();
-  EXPECT_NE(nullptr, dynamic_cast<const Upstream::SnapshotHostSet*>(&host_set));
-  EXPECT_NE(nullptr, host_set.persistentPartitions());
-  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_total")->value());
 }
 
 } // namespace

@@ -474,18 +474,19 @@ using LocalityWeights = std::vector<uint32_t>;
 using LocalityWeightsSharedPtr = std::shared_ptr<LocalityWeights>;
 using LocalityWeightsConstSharedPtr = std::shared_ptr<const LocalityWeights>;
 
-/**
- * Immutable snapshot of a host set that keeps its hosts in another form than flat vectors. The
- * main-thread host set publishes one per update, so worker host sets adopt the update without the
- * flat vectors being built. Implementations derive Upstream::HostSetSnapshotBase.
- */
-class PersistentHostPartitionsSnapshot {
-public:
-  virtual ~PersistentHostPartitionsSnapshot() = default;
-};
+// A host set's hosts in a form other than flat vectors. Defined in upstream_impl.h.
+class HostSetSnapshot;
+using HostSetSnapshotConstSharedPtr = std::shared_ptr<const HostSetSnapshot>;
 
-using PersistentHostPartitionsSnapshotConstSharedPtr =
-    std::shared_ptr<const PersistentHostPartitionsSnapshot>;
+/**
+ * Sizes of a host set's hosts(), healthyHosts(), degradedHosts() and excludedHosts().
+ */
+struct HostCounts {
+  size_t hosts{};
+  size_t healthy{};
+  size_t degraded{};
+  size_t excluded{};
+};
 
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
@@ -520,22 +521,18 @@ public:
   virtual HealthyHostVectorConstSharedPtr healthyHostsPtr() const PURE;
 
   /**
-   * @return the sizes of hosts(), healthyHosts(), degradedHosts() and excludedHosts(). An
-   *         implementation that keeps its hosts in another form can answer these without building
-   *         those vectors.
+   * @return the host counts. An implementation that keeps its hosts in another form can answer
+   *         without building the vectors.
    */
-  virtual size_t hostCount() const { return hosts().size(); }
-  virtual size_t healthyHostCount() const { return healthyHosts().size(); }
-  virtual size_t degradedHostCount() const { return degradedHosts().size(); }
-  virtual size_t excludedHostCount() const { return excludedHosts().size(); }
+  virtual HostCounts hostCounts() const {
+    return {hosts().size(), healthyHosts().size(), degradedHosts().size(), excludedHosts().size()};
+  }
 
   /**
    * @return a snapshot of this set's hosts for workers to adopt, or nullptr when the flat vectors
    *         are the current representation.
    */
-  virtual PersistentHostPartitionsSnapshotConstSharedPtr persistentPartitions() const {
-    return nullptr;
-  }
+  virtual HostSetSnapshotConstSharedPtr snapshot() const { return nullptr; }
 
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
@@ -689,8 +686,8 @@ public:
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality;
     // When set, a snapshot for the host set to adopt in place of the flat views above, which are
-    // then empty.
-    PersistentHostPartitionsSnapshotConstSharedPtr persistent_partitions;
+    // then null.
+    HostSetSnapshotConstSharedPtr snapshot;
   };
 
   /**
