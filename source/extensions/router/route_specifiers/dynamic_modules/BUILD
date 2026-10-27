@@ -38,6 +38,7 @@ envoy_cc_library(
         "//source/common/http:hash_policy_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/http:path_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",

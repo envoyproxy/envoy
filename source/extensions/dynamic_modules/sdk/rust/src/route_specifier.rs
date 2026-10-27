@@ -144,6 +144,27 @@ impl HeaderAppendAction {
   }
 }
 
+/// The part of the request path a rule recorded with
+/// [`RouteSpecifierContext::set_prefix_rewrite_rule`] replaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RewriteSpan {
+  /// A literal prefix of the path, which is what a prefix or a path route replaces with its
+  /// `prefix_rewrite`.
+  Literal,
+  /// The whole path without its query string and fragment, which is what a regex route replaces
+  /// with its `prefix_rewrite`.
+  WholePath,
+}
+
+impl RewriteSpan {
+  fn to_abi(self) -> abi::envoy_dynamic_module_type_route_specifier_rewrite_span {
+    match self {
+      Self::Literal => abi::envoy_dynamic_module_type_route_specifier_rewrite_span::Literal,
+      Self::WholePath => abi::envoy_dynamic_module_type_route_specifier_rewrite_span::WholePath,
+    }
+  }
+}
+
 /// Convert a duration to the millisecond count the ABI takes, saturating instead of wrapping.
 fn duration_to_millis(duration: Duration) -> u64 {
   u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
@@ -822,12 +843,51 @@ impl RouteSpecifierContext {
   /// Record a prefix rewrite of the request path sent upstream.
   ///
   /// `matched` must be a case insensitive prefix of the current path without its query string,
-  /// which is replaced by `replacement` while the query string is preserved. Returns `false` when
-  /// `matched` is not such a prefix or the rewritten path exceeds the configured maximum.
+  /// which is replaced by `replacement` while the query string is preserved. A module that
+  /// rewrites the path the request carries when its headers are finalized records
+  /// [`RouteSpecifierContext::set_prefix_rewrite_rule`] instead. Returns `false` when `matched` is
+  /// not such a prefix or the rewritten path exceeds the configured maximum.
   pub fn set_prefix_rewrite(&mut self, matched: &str, replacement: &str) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
         self.envoy_ptr,
+        crate::str_to_module_buffer(matched),
+        crate::str_to_module_buffer(replacement),
+      )
+    }
+  }
+
+  /// Record a prefix rewrite of the request path sent upstream as a rule.
+  ///
+  /// Envoy applies the rule to the path the request carries when the request headers are
+  /// finalized, the way it applies the `prefix_rewrite` of a configured route, so the produced
+  /// route is not specific to the current request. With [`RewriteSpan::Literal`], `matched` must
+  /// be a case insensitive prefix of the current path without its query string and fragment. With
+  /// [`RewriteSpan::WholePath`], `matched` must be empty and the query string and fragment are
+  /// kept. The replacement starts with a slash
+  /// and carries no query string or fragment of its own.
+  ///
+  /// A path recorded with [`RouteSpecifierContext::set_path`] or
+  /// [`RouteSpecifierContext::set_prefix_rewrite`] takes precedence over the rule, and the rule
+  /// takes precedence over the regex rewrite of a selected route override and the rewrites of the
+  /// route, whatever the call order. With a rule recorded, the regex rewrite applies when the
+  /// request headers are finalized rather than when the decision resolves. A rule that does not
+  /// apply to the path when the request headers are finalized leaves the next of these in effect.
+  /// A later call replaces the rule of an earlier one.
+  ///
+  /// Returns `false`, recording nothing, when `matched` does not fit the span, the replacement does
+  /// not start with a slash, carries a query string or fragment or is not a valid header value, or
+  /// the rule does not apply to the current path within the configured maximum.
+  pub fn set_prefix_rewrite_rule(
+    &mut self,
+    span: RewriteSpan,
+    matched: &str,
+    replacement: &str,
+  ) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+        self.envoy_ptr,
+        span.to_abi(),
         crate::str_to_module_buffer(matched),
         crate::str_to_module_buffer(replacement),
       )
