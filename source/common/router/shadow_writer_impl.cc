@@ -3,6 +3,8 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/router/router.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_utility.h"

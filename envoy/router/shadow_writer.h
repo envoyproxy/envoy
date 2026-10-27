@@ -6,10 +6,12 @@
 
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
-#include "envoy/router/router.h"
 
 namespace Envoy {
 namespace Router {
+
+struct ShadowPolicyStats;
+using ShadowPolicyStatsSharedPtr = std::shared_ptr<const ShadowPolicyStats>;
 
 /**
  * Interface used to shadow complete requests to an alternate upstream cluster in a "fire and

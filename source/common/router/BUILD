@@ -538,6 +538,7 @@ envoy_cc_library(
     deps = [
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
+        "//envoy/router:router_interface",
         "//envoy/router:shadow_writer_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
