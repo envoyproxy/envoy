@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/filters/http/body_size_limit:body_size_limit_filter_lib",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "@envoy_api//envoy/extensions/filters/http/body_size_limit/v3:pkg_cc_proto",
     ],
