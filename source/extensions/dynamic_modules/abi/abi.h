@@ -17420,8 +17420,8 @@ typedef enum envoy_dynamic_module_type_route_specifier_built_route_lookup_result
   envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Hit = 2,
   // A route cached for the key serves the request, and the module records the route exactly as on
   // a miss. When the decision is left Unspecified, Envoy uses the route the recording builds, and
-  // evicts the cached route when the recording differs from the one the cached route was built
-  // from.
+  // evicts the cached route when the decision fails or its recording depends on the path of the
+  // current request through Envoy or differs from the one the cached route was built from.
   envoy_dynamic_module_type_route_specifier_built_route_lookup_result_HitVerify = 3,
 } envoy_dynamic_module_type_route_specifier_built_route_lookup_result;
 

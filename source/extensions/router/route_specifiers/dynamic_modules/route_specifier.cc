@@ -1051,8 +1051,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
         // A verified hit serves the route the module recorded, which keeps every user data the
         // module records on a route of its own.
         verifyCachedRoute(context, wrapped, *lookup);
-      } else if (lookup != nullptr && wrapped.failure == Failure::None &&
-                 !context.depends_on_request_path) {
+      } else if (lookup != nullptr && recordsACacheableRoute(context, wrapped)) {
         // Even the template cached as it is spares the module its recording on a hit.
         lookup->cache->insert(lookup->key, context.selected_route.get(),
                               {wrapped.route, wrapped.recorded, context.user_data});
@@ -1142,11 +1141,18 @@ DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
   return decision;
 }
 
+bool DynamicModuleRouteSpecifier::recordsACacheableRoute(const RouteSpecifierContext& context,
+                                                         const Decision& decision) {
+  return decision.failure == Failure::None && !context.depends_on_request_path;
+}
+
 void DynamicModuleRouteSpecifier::verifyCachedRoute(const RouteSpecifierContext& context,
                                                     const Decision& decision,
                                                     const BuiltRouteLookup& lookup) const {
   config_->stats().built_route_cache_verify_.inc();
-  if (decision.failure == Failure::None &&
+  // A recording the cache could not hold, such as one that depends on the request path, cannot
+  // confirm the cached route even when it records the same route for this request.
+  if (recordsACacheableRoute(context, decision) &&
       recordsTheCachedRoute(*lookup.hit, decision.recorded, context.user_data)) {
     return;
   }
@@ -1154,7 +1160,7 @@ void DynamicModuleRouteSpecifier::verifyCachedRoute(const RouteSpecifierContext&
   lookup.cache->erase(lookup.key, context.selected_route.get());
   ENVOY_LOG_EVERY_POW_2(
       warn,
-      "dynamic module route specifier evicted a cached route the module now records differently");
+      "dynamic module route specifier evicted a cached route its verification did not confirm");
 }
 
 } // namespace DynamicModules

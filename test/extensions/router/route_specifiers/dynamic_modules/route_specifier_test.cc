@@ -1366,6 +1366,27 @@ TEST_F(DynamicModuleBuiltRouteCacheTest, VerifiedHitWhoseRecordingFailsEvictsThe
   EXPECT_EQ(0, entries());
 }
 
+// A verified recording that depends on the request path could not be cached itself, so it evicts
+// the cached route even when it records the same path for this request, and a later request for
+// another path does not reuse that path.
+TEST_F(DynamicModuleBuiltRouteCacheTest,
+       VerifiedHitWhoseRecordingDependsOnTheRequestPathEvictsTheRoute) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml(
+      "prefix-rewrite-when-verified", builtRouteCacheYaml(16, "        verify_one_in: 2\n")));
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), 1);
+  EXPECT_EQ(1, entries());
+  verificationRandom(2);
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+  EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
+  EXPECT_EQ(0, entries());
+
+  verificationRandom(1);
+  resolve(*config.value(), 1, 1, "/api/v2");
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+}
+
 // A template cached as it is differs from a verified recording that carries only route overrides.
 TEST_F(DynamicModuleBuiltRouteCacheTest, VerifiedHitFindsRouteOverridesMissingFromACachedTemplate) {
   const auto config = loadConfig(builtRouteCacheModuleYaml(

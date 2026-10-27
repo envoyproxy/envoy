@@ -612,7 +612,12 @@ private:
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
                 Envoy::Router::OnRouteStatus status) const;
-  // Evicts the cached route of a verified hit when the decision recorded it differently.
+  // Whether the decision recorded a route the cache can hold, which serves every later request that
+  // looks the key up.
+  static bool recordsACacheableRoute(const RouteSpecifierContext& context,
+                                     const Decision& decision);
+  // Evicts the cached route of a verified hit unless the decision recorded it again, as a route the
+  // cache can hold.
   void verifyCachedRoute(const RouteSpecifierContext& context, const Decision& decision,
                          const BuiltRouteLookup& lookup) const;
 

@@ -55,6 +55,9 @@ enum mode {
   PREFIX_REWRITE,
   // Records a path with set_prefix_rewrite and then replaces it with set_path.
   PREFIX_REWRITE_THEN_PATH,
+  // Records the path /internal/v1 with set_path on a miss, and the same path for /api/v1 with
+  // set_prefix_rewrite on a verified hit, which depends on the request path.
+  PREFIX_REWRITE_WHEN_VERIFIED,
   // Records a prefix rewrite rule of /api and rule_cluster, or fallback_cluster when the rule is
   // rejected for a path it does not apply to.
   RULE,
@@ -92,6 +95,7 @@ static const char* const mode_names[MODE_COUNT] = {
     "replaced-rule",
     "prefix-rewrite",
     "prefix-rewrite-then-path",
+    "prefix-rewrite-when-verified",
     "rule",
     "rule-for-api",
     "override-regex",
@@ -381,6 +385,14 @@ envoy_dynamic_module_on_route_specifier_on_route(
     envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(ctx, buffer("/api"),
                                                                      buffer("/rewritten"));
     envoy_dynamic_module_callback_route_specifier_set_path(ctx, buffer("/literal"));
+    break;
+  case PREFIX_REWRITE_WHEN_VERIFIED:
+    if (verified) {
+      envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(ctx, buffer("/api"),
+                                                                       buffer("/internal"));
+    } else {
+      envoy_dynamic_module_callback_route_specifier_set_path(ctx, buffer("/internal/v1"));
+    }
     break;
   case RULE:
     envoy_dynamic_module_callback_route_specifier_set_cluster_name(

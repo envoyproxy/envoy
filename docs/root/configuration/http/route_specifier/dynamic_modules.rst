@@ -183,11 +183,11 @@ plugin, is not cached.
 A worker evicts a route it has not used recently when it is full, and a route idle for longer than
 ``max_idle_time``. A hit is verified with a chance of one in ``verify_one_in``, for which
 ``lookup_built_route`` returns ``HitVerify``. The module then records the route exactly as on a
-miss and Envoy uses the route the recording builds. When the recording differs from the one the
-cached route was built from, Envoy counts ``built_route_cache_verify_mismatch`` and evicts the
-cached route. A hit ignores the overrides and user data the module records, and a route that
-carries user data fires ``on_route_specifier_route_destroy`` once neither the cache nor a stream
-holds it.
+miss and Envoy uses the route the recording builds. When the decision fails or its recording
+depends on the path of the request through Envoy or differs from the one the cached route was built
+from, Envoy counts ``built_route_cache_verify_mismatch`` and evicts the cached route. A hit ignores
+the overrides and user data the module records, and a route that carries user data fires
+``on_route_specifier_route_destroy`` once neither the cache nor a stream holds it.
 
 Notes
 -----
@@ -235,7 +235,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   built_route_cache_hit, Counter, Built route cache lookups that found a route.
   built_route_cache_miss, Counter, Built route cache lookups that found no route for the request.
   built_route_cache_verify, Counter, Built route cache hits verified against what the module recorded.
-  built_route_cache_verify_mismatch, Counter, Verified hits whose recording differed from the one the cached route was built from.
+  built_route_cache_verify_mismatch, Counter, Verified hits that evicted the cached route.
   built_route_cache_evict, Counter, Cached routes evicted because a worker was full or the route was idle for longer than ``max_idle_time``.
   built_route_cache_entries, Gauge, Routes cached by the workers of the specifiers that share the stat prefix.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.

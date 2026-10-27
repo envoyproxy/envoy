@@ -162,9 +162,10 @@ message BuiltRouteCache {
 
   // A cache hit is verified with a chance of one in this many, for which ``lookup_built_route``
   // returns ``HitVerify``. The module then records the route exactly as on a miss and Envoy uses
-  // the route the recording builds. When the recording differs from the one the cached route was
-  // built from, Envoy counts ``built_route_cache_verify_mismatch`` and evicts the cached route.
-  // Zero disables verification. If not specified, defaults to 1024.
+  // the route the recording builds. When the decision fails or its recording depends on the path of
+  // the request through Envoy or differs from the one the cached route was built from, Envoy counts
+  // ``built_route_cache_verify_mismatch`` and evicts the cached route. Zero disables verification.
+  // If not specified, defaults to 1024.
   google.protobuf.UInt32Value verify_one_in = 3;
 }
 
