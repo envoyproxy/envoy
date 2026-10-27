@@ -968,6 +968,12 @@ message RouteAction {
     // selected for mirroring, how many mirrors were started, and how each mirror ended. See
     // :ref:`mirror policy statistics <config_http_filters_router_mirror_stats>`.
     //
+    // The statistics are emitted in the server's root scope, so policies that use the same
+    // ``stat_prefix`` share the same counters, wherever they are configured. This includes
+    // cluster-level :ref:`request_mirror_policies
+    // <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`,
+    // which take precedence over route-level policies.
+    //
     // If empty, no per policy statistics are emitted.
     string stat_prefix = 9;
   }

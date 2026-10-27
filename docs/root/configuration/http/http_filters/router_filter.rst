@@ -499,6 +499,13 @@ statistics in the ``mirror.<stat_prefix>.`` namespace:
   rq_failure, Counter, Total mirror requests that received a non-2xx response or failed without a response
   rq_cancelled, Counter, Total mirror requests cancelled because the primary request was destroyed before the request was fully sent
 
+The statistics are emitted in the server's root scope and tagged with the policy ``stat_prefix``.
+Policies that use the same ``stat_prefix`` share the same counters, including policies of different
+routes, virtual hosts or route configurations. Cluster-level :ref:`request_mirror_policies
+<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
+emit the same statistics. When a cluster has mirror policies, they replace the route-level
+policies, so only the statistics of the cluster-level policies are updated.
+
 ``rq_sampled`` minus ``rq_no_cluster`` minus ``rq_started`` counts the selected requests that were
 not mirrored because the primary request was answered locally before reaching an upstream.
 ``rq_started`` minus ``rq_success``, ``rq_failure`` and ``rq_cancelled`` counts the mirror requests

@@ -281,6 +281,31 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorPolicyStatsNoCluster) {
   EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_started")->value());
 }
 
+// Cluster-level mirror policies emit the same stats and replace the route-level policies.
+TEST_P(ShadowPolicyIntegrationTest, ClusterMirrorPolicyStats) {
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("route_mirror");
+  };
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* policy = protocol_options.add_request_mirror_policies();
+    policy->set_cluster("cluster_1");
+    policy->set_stat_prefix("cluster_mirror");
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  initialize();
+
+  sendRequestAndValidateResponse(1);
+
+  test_server_->waitForCounter("mirror.cluster_mirror.rq_success", Eq(1));
+  EXPECT_EQ(1, test_server_->counter("mirror.cluster_mirror.rq_sampled")->value());
+  EXPECT_EQ(1, test_server_->counter("mirror.cluster_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.route_mirror.rq_sampled")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.route_mirror.rq_started")->value());
+}
+
 TEST_P(ShadowPolicyIntegrationTest, BasicWithLimits) {
   initialConfigSetup("cluster_1", "");
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
