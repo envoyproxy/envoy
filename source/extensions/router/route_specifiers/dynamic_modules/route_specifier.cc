@@ -245,8 +245,8 @@ void appendHeaderTransforms(Http::HeaderTransforms& transforms,
   }
 }
 
-// The part of the path a rule replaces. The whole path excludes the query string and the fragment,
-// like the part a regex route matches.
+// The part of the path a rule replaces. A literal span carries no '?' or '#', so it ends before the
+// query string and fragment, and the whole path excludes them like the part a regex route matches.
 absl::string_view replacedSpan(const PrefixRewriteRule& rule, absl::string_view path) {
   return rule.matched.has_value() ? absl::string_view(*rule.matched)
                                   : Http::PathUtil::removeQueryAndFragment(path);
