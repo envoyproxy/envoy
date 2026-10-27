@@ -28,6 +28,7 @@ envoy_extension_cc_test(
         "//source/common/singleton:manager_impl_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
+        "//test/mocks:common_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",

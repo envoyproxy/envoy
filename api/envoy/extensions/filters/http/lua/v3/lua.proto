@@ -22,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message Lua {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.lua.v2.Lua";
@@ -157,6 +157,17 @@ message Lua {
   // one is drained the VM is torn down, and the next configuration asking for that id and script
   // builds a fresh one.
   string shared_vm_id = 9;
+
+  // If set to true, the filter records ``stream_execution_time_us``, a histogram of how long its
+  // scripts ran on the worker thread for each stream, in microseconds. That time is summed over
+  // ``envoy_on_request`` and ``envoy_on_response`` and over every resume of their coroutines, and
+  // includes creating each coroutine and its stream handle. It excludes the time a script spends
+  // yielded, waiting on an ``httpCall()`` response, a body or trailers, since the worker is free to
+  // run other streams meanwhile. A stream on which no handler ran records nothing.
+  //
+  // Defaults to false, which creates no histogram and reads no clock. See :ref:`statistics
+  // <config_http_filters_lua_stats>`.
+  bool track_execution_time = 10;
 }
 
 // [#next-free-field: 8]

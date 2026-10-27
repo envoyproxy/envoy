@@ -12,6 +12,7 @@
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
@@ -116,6 +117,21 @@ public:
     THROW_IF_NOT_OK_REF(creation_status);
   }
 
+  // Builds the filter on a clock the test scripts, with `track_execution_time` set as given.
+  void setupExecutionTimeFilter(const std::string& lua_code, bool track_execution_time) {
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.mutable_default_source_code()->set_inline_string(lua_code);
+    proto_config.set_track_execution_time(track_execution_time);
+    setupConfig(proto_config, envoy::extensions::filters::http::lua::v3::LuaPerRoute());
+    filter_ = std::make_unique<Filter>(config_, mock_time_);
+    filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+    filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+  }
+
+  static MonotonicTime atMicros(int64_t micros) {
+    return MonotonicTime(std::chrono::microseconds(micros));
+  }
+
   void setupFilter() {
     Event::SimulatedTimeSystem test_time;
     test_time.setSystemTime(std::chrono::microseconds(1583879145572237));
@@ -176,6 +192,7 @@ public:
   // stats_store_ must be declared before config_ so that the sub-scope held by
   // FilterConfig (lua_stats_scope_) is destroyed before the store itself.
   Stats::TestUtil::TestStore stats_store_;
+  NiceMock<MockTimeSystem> mock_time_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -5434,6 +5451,156 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithNamespaceInResponse) {
   });
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+static constexpr absl::string_view kExecutionTimeHistogram = "test.lua.stream_execution_time_us";
+
+// Off by default: no histogram is created and the clock is never read.
+TEST_F(LuaHttpFilterTest, ExecutionTimeNotTrackedByDefault) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("foo", "bar")
+    end
+  )EOF",
+                           false);
+  EXPECT_CALL(mock_time_, monotonicTime()).Times(0);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  filter_->onDestroy();
+
+  EXPECT_FALSE(stats_store_.findHistogramByString(std::string(kExecutionTimeHistogram)));
+}
+
+// Both handlers' running time is summed into one sample per stream.
+TEST_F(LuaHttpFilterTest, ExecutionTimeSumsBothHandlers) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("foo", "bar")
+    end
+    function envoy_on_response(response_handle)
+      response_handle:headers():add("foo", "bar")
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime())
+      .WillOnce(Return(atMicros(100)))
+      .WillOnce(Return(atMicros(103)))
+      .WillOnce(Return(atMicros(900)))
+      .WillOnce(Return(atMicros(904)));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  EXPECT_FALSE(stats_store_.histogramRecordedValues(std::string(kExecutionTimeHistogram)));
+  filter_->onDestroy();
+
+  EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
+              testing::ElementsAre(7));
+}
+
+// The time a script spends yielded on an httpCall() is not counted; the resume is.
+TEST_F(LuaHttpFilterTest, ExecutionTimeExcludesYieldedTime) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "GET",
+          [":path"] = "/",
+          [":authority"] = "foo"
+        },
+        nil,
+        5000)
+      request_handle:headers():add("status", headers[":status"])
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime())
+      .WillOnce(Return(atMicros(100)))
+      .WillOnce(Return(atMicros(103)))
+      .WillOnce(Return(atMicros(5000100)))
+      .WillOnce(Return(atMicros(5000102)));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+  ASSERT_NE(callbacks, nullptr);
+
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  callbacks->onSuccess(request, std::move(response_message));
+  filter_->onDestroy();
+
+  EXPECT_EQ("200", request_headers.get_("status"));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
+              testing::ElementsAre(5));
+}
+
+// A local reply sent from a script runs the response handler from inside the request handler.
+// Only the outer handler reads the clock, so the nested one is not counted twice.
+TEST_F(LuaHttpFilterTest, ExecutionTimeCountsNestedHandlersOnce) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:respond({[":status"] = "403"}, "nope")
+    end
+    function envoy_on_response(response_handle)
+      response_handle:headers():add("foo", "bar")
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime())
+      .WillOnce(Return(atMicros(100)))
+      .WillOnce(Return(atMicros(109)));
+
+  Http::TestResponseHeaderMapImpl local_reply_headers;
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
+      .WillOnce(Invoke([&](Http::Code, absl::string_view,
+                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                           const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+        modify_headers(local_reply_headers);
+        filter_->encodeHeaders(local_reply_headers, true);
+      }));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+  filter_->onDestroy();
+
+  EXPECT_EQ("bar", local_reply_headers.get_("foo"));
+  EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
+  EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
+              testing::ElementsAre(9));
+}
+
+// A stream on which no handler ran records nothing.
+TEST_F(LuaHttpFilterTest, ExecutionTimeSkipsStreamsWithNoHandler) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:headers():add("foo", "bar")
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime()).Times(0);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  filter_->onDestroy();
+
+  EXPECT_TRUE(stats_store_.findHistogramByString(std::string(kExecutionTimeHistogram)));
+  EXPECT_FALSE(stats_store_.histogramRecordedValues(std::string(kExecutionTimeHistogram)));
 }
 
 } // namespace

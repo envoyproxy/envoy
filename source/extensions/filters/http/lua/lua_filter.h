@@ -556,14 +556,17 @@ public:
   const Protobuf::Struct& filterContext() const { return filter_context_; }
 
   const LuaFilterStats& stats() const { return stats_; }
+  // Null unless the configuration sets `track_execution_time`.
+  Stats::Histogram* executionTimeHistogram() const { return execution_time_histogram_; }
   Stats::Scope& luaStatsScope() const { return *lua_stats_scope_; }
 
   Upstream::ClusterManager& cluster_manager_;
 
 private:
-  LuaFilterStats generateStats(const std::string& prefix, const std::string& filter_stats_prefix,
-                               Stats::Scope& scope) {
-    const std::string final_prefix = absl::StrCat(prefix, "lua.", filter_stats_prefix);
+  static std::string statsPrefix(const std::string& prefix, const std::string& filter_stats_prefix) {
+    return absl::StrCat(prefix, "lua.", filter_stats_prefix);
+  }
+  LuaFilterStats generateStats(const std::string& final_prefix, Stats::Scope& scope) {
     return {ALL_LUA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
   }
 
@@ -575,6 +578,7 @@ private:
   PerLuaCodeSetupSharedPtr default_lua_code_setup_;
   absl::flat_hash_map<std::string, PerLuaCodeSetupSharedPtr> per_lua_code_setups_map_;
   LuaFilterStats stats_;
+  Stats::Histogram* const execution_time_histogram_;
   // Sub-scope pre-configured with the lua stat prefix.
   Stats::ScopeSharedPtr lua_stats_scope_;
 };
@@ -612,10 +616,23 @@ private:
 class Filter : public Http::StreamFilter, private Filters::Common::Lua::LuaLoggable {
 public:
   Filter(FilterConfigConstSharedPtr config, TimeSource& time_source)
-      : config_(config), time_source_(time_source), stats_(config->stats()) {}
+      : config_(config), time_source_(time_source), stats_(config->stats()),
+        execution_time_histogram_(config->executionTimeHistogram()) {}
 
   Upstream::ClusterManager& clusterManager() { return config_->cluster_manager_; }
   void scriptError(const absl::Status& status);
+
+  // Counts the enclosing scope as script execution when the configuration tracks execution time.
+  // Only the outermost of nested scopes reads the clock, so a callback that re-enters the filter,
+  // such as the encoder path of a local reply sent from a script, is not counted twice.
+  class ExecutionTimer {
+  public:
+    explicit ExecutionTimer(Filter& filter);
+    ~ExecutionTimer();
+
+  private:
+    Filter& filter_;
+  };
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -790,6 +807,11 @@ private:
 
   TimeSource& time_source_;
   LuaFilterStats stats_;
+  Stats::Histogram* const execution_time_histogram_;
+  std::chrono::nanoseconds execution_time_{};
+  MonotonicTime execution_start_;
+  uint32_t execution_depth_{};
+  bool executed_{};
 
   // These coroutines used to be owned by the stream handles. After investigating #3570, it
   // became clear that there is a circular memory reference when a coroutine yields. Basically,

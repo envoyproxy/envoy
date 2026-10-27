@@ -559,6 +559,9 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
   ASSERT(state_ == State::HttpCall || state_ == State::Running);
   ENVOY_LOG(debug, "async HTTP response complete");
   http_request_ = nullptr;
+  // Ends before continueIteration(), which runs the rest of the filter chain.
+  std::optional<Filter::ExecutionTimer> timer;
+  timer.emplace(filter_);
 
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_.luaState());
@@ -629,6 +632,7 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
       filter_.scriptError(status);
     }
 
+    timer.reset();
     if (state_ == State::Running) {
       headers_continued_ = true;
       callbacks_.continueIteration();
@@ -1028,7 +1032,14 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
       clear_route_cache_(
           proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
       filter_context_(proto_config.filter_context()),
-      stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
+      stats_(generateStats(statsPrefix(stats_prefix, proto_config.stat_prefix()), scope)),
+      execution_time_histogram_(
+          proto_config.track_execution_time()
+              ? &scope.histogramFromString(
+                    statPrefixJoin(statsPrefix(stats_prefix, proto_config.stat_prefix()),
+                                   "stream_execution_time_us"),
+                    Stats::Histogram::Unit::Microseconds)
+              : nullptr),
       lua_stats_scope_(
           scope.createScope(proto_config.stat_prefix().empty()
                                 ? absl::StrCat(stats_prefix, "lua")
@@ -1097,7 +1108,23 @@ FilterConfigPerRoute::FilterConfigPerRoute(
   }
 }
 
+Filter::ExecutionTimer::ExecutionTimer(Filter& filter) : filter_(filter) {
+  if (filter_.execution_time_histogram_ != nullptr && filter_.execution_depth_++ == 0) {
+    filter_.execution_start_ = filter_.time_source_.monotonicTime();
+  }
+}
+
+Filter::ExecutionTimer::~ExecutionTimer() {
+  if (filter_.execution_time_histogram_ != nullptr && --filter_.execution_depth_ == 0) {
+    filter_.execution_time_ += filter_.time_source_.monotonicTime() - filter_.execution_start_;
+  }
+}
+
 void Filter::onDestroy() {
+  if (execution_time_histogram_ != nullptr && executed_) {
+    execution_time_histogram_->recordValue(
+        std::chrono::duration_cast<std::chrono::microseconds>(execution_time_).count());
+  }
   destroyed_ = true;
   if (request_stream_wrapper_.get()) {
     request_stream_wrapper_.get()->onReset();
@@ -1115,6 +1142,8 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
     return Http::FilterHeadersStatus::Continue;
   }
   ASSERT(setup);
+  ExecutionTimer timer(*this);
+  executed_ = true;
   coroutine = setup->createCoroutine();
 
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
@@ -1141,6 +1170,7 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
+    ExecutionTimer timer(*this);
     handle.markLive();
     status = handle.get()->onData(data, end_stream);
     // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
@@ -1158,6 +1188,7 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
+    ExecutionTimer timer(*this);
     handle.markLive();
     status = handle.get()->onTrailers(trailers);
     // Copy the status out before scriptError(), which may reset (destroy) the wrapper.

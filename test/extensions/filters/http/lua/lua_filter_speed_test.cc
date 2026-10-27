@@ -359,7 +359,8 @@ public:
   // Worker count the filter config is told about; it only feeds the lua.lua_vm_count gauge.
   static constexpr uint32_t kConcurrency = 1;
 
-  Harness(absl::string_view code, bool clear_route_cache = true) {
+  Harness(absl::string_view code, bool clear_route_cache = true,
+          bool track_execution_time = false) {
     ON_CALL(api_, rootScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
     ON_CALL(decoder_callbacks_, streamInfo())
         .WillByDefault(Invoke([this]() -> StreamInfo::StreamInfo& { return *stream_info_; }));
@@ -374,6 +375,7 @@ public:
     envoy::extensions::filters::http::lua::v3::Lua proto_config;
     proto_config.mutable_default_source_code()->set_inline_string(std::string(code));
     proto_config.mutable_clear_route_cache()->set_value(clear_route_cache);
+    proto_config.set_track_execution_time(track_execution_time);
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, tls_, cluster_manager_, api_,
                                              *stats_store_.rootScope(), "bench.", kConcurrency,
@@ -457,8 +459,9 @@ private:
 
 // One request/response pair for a given script. The error count has to stay zero, because the
 // filter fails open: a script that raises on every request looks exactly like a very fast script.
-void runScript(benchmark::State& state, absl::string_view code, bool clear_route_cache) {
-  Harness harness(code, clear_route_cache);
+void runScript(benchmark::State& state, absl::string_view code, bool clear_route_cache,
+               bool track_execution_time = false) {
+  Harness harness(code, clear_route_cache, track_execution_time);
   // Warm the VM and prove the script actually runs before anything is timed.
   harness.oneRequest();
   RELEASE_ASSERT(harness.executions() > 0, "script never ran");
@@ -509,6 +512,16 @@ LUA_SCRIPT_BENCHMARK(RepeatHeaderReplace, kRepeatHeaderReplace)
 LUA_SCRIPT_BENCHMARK_CFG(RepeatHeaderAddNoRouteClear, kRepeatHeaderAdd, false)
 LUA_SCRIPT_BENCHMARK_CFG(RepeatHeaderReplaceNoRouteClear, kRepeatHeaderReplace, false)
 LUA_SCRIPT_BENCHMARK_CFG(HeadersMetadataNoRouteClear, kHeadersMetadata, false)
+
+// `track_execution_time` reads the clock twice per handler and records one sample per stream. The
+// delta between an arm and its Tracked twin is what the histogram costs.
+#define LUA_SCRIPT_BENCHMARK_TRACKED(Name, Code)                                                   \
+  void BM_##Name##Tracked(benchmark::State& state) { runScript(state, Code, true, true); }        \
+  BENCHMARK(BM_##Name##Tracked);
+
+LUA_SCRIPT_BENCHMARK_TRACKED(NoopBoth, kNoopBoth)
+LUA_SCRIPT_BENCHMARK_TRACKED(HeaderMetadata, kHeaderMetadata)
+LUA_SCRIPT_BENCHMARK_TRACKED(CookieMetadata, kCookieMetadata)
 LUA_SCRIPT_BENCHMARK(RepeatMetadataSet, kRepeatMetadataSet)
 LUA_SCRIPT_BENCHMARK(RepeatFilterStateSet, kRepeatFilterStateSet)
 LUA_SCRIPT_BENCHMARK(MetadataSet1Get0, kMetadataSet1Get0)

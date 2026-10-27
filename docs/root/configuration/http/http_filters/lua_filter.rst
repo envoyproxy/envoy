@@ -236,6 +236,7 @@ individual filter instance/script can be tracked by providing a per-filter
 
   errors, Counter, Total script execution errors.
   executions, Counter, Total number of times ``envoy_on_request`` and ``envoy_on_response`` was executed.
+  stream_execution_time_us, Histogram, "Time the scripts ran on the worker thread for one stream, excluding time yielded. Only with :ref:`track_execution_time <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.track_execution_time>`."
 
 In addition, a single process-wide ``lua.lua_vm_count`` gauge (not affected by ``stat_prefix``) tracks
 the total number of active Lua VMs across every filter-config-level and route-level Lua script
