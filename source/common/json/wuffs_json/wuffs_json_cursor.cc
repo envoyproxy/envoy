@@ -193,7 +193,11 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
 
     if (status.repr == nullptr || wuffs_base__status__is_note(&status)) {
       wuffs_done_ = true;
-      if (closed && source_buf.meta.ri < effective_chunk.size()) {
+      // Wuffs reports completion only at the end of a closed source or at the
+      // first non-whitespace byte after the root value, so any unread byte
+      // here is extra data. Reject it even when !closed: the raw body is
+      // forwarded upstream, so skipping it would let unparsed JSON through.
+      if (source_buf.meta.ri < effective_chunk.size()) {
         return absl::InvalidArgumentError("wuffs json: trailing bytes after root value");
       }
       break;
