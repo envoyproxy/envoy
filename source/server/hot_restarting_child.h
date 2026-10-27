@@ -40,6 +40,8 @@ public:
     void registerListener(Network::Address::InstanceConstSharedPtr address,
                           std::shared_ptr<Network::UdpListenerConfig> listener_config);
 
+    void clear() { listener_map_.clear(); }
+
   private:
     // Builds the map key for an address string within a network namespace.
     static std::string key(absl::string_view network_namespace, absl::string_view address);
