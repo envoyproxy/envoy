@@ -72,6 +72,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.ai_protocol_manager"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_parser_lib",
         "//source/extensions/filters/http/ai_protocol_manager:schema_lib",
         "//test/test_common:status_utility_lib",
     ],
