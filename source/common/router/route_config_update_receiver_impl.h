@@ -110,6 +110,10 @@ public:
   void onVhdsConfigPublished() override;
 
 private:
+  static void notifyCallback(const ConfigImpl& config, const std::string& alias,
+                             Event::Dispatcher& thread_local_dispatcher,
+                             std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
+
   const Protobuf::Any& latestRouteConfigurationAny() const {
     return base_.warming_state_.route_config_any_.has_value()
                ? *base_.warming_state_.route_config_any_
