@@ -13278,6 +13278,20 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_path(
   true
 }
 
+// Maps each key onto a result, so a test can observe every arm of the SDK conversion.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  key: u64,
+) -> abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result {
+  match key {
+    1 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Miss,
+    2 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Hit,
+    3 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::HitVerify,
+    _ => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Disabled,
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
@@ -13883,6 +13897,14 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_filter_disabled("", true));
   assert!(ctx.set_path("/rewritten"));
   assert!(!ctx.set_path("rewritten"));
+  for (key, result) in [
+    (0, route_specifier::BuiltRouteLookupResult::Disabled),
+    (1, route_specifier::BuiltRouteLookupResult::Miss),
+    (2, route_specifier::BuiltRouteLookupResult::Hit),
+    (3, route_specifier::BuiltRouteLookupResult::HitVerify),
+  ] {
+    assert_eq!(result, ctx.lookup_built_route(key));
+  }
   assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::WholePath, "", "/fixed"));
   assert_eq!(
     Some((

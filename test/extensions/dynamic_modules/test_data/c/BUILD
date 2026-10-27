@@ -241,6 +241,8 @@ test_program(name = "route_specifier_override")
 
 test_program(name = "route_specifier_rewrite_rule")
 
+test_program(name = "route_specifier_built_route_cache")
+
 test_program(name = "cluster_async_host_selection")
 
 test_program(name = "cluster_no_op")

@@ -30,6 +30,8 @@ enum mode {
   FRAGMENT_IN_REPLACEMENT,
   RESULT_TOO_LONG,
   PATH_OVER_OVERRIDE,
+  RULE_THEN_PATH,
+  RULE_THEN_OVERRIDE,
   QUERY_IN_MATCHED,
   FRAGMENT_IN_MATCHED,
   MODE_COUNT,
@@ -55,6 +57,8 @@ static const char* const mode_names[MODE_COUNT] = {
     "fragment-in-replacement",
     "result-too-long",
     "path-over-override",
+    "rule-then-path",
+    "rule-then-override",
     "query-in-matched",
     "fragment-in-matched",
 };
@@ -160,6 +164,12 @@ envoy_dynamic_module_on_route_specifier_on_route(
   case FRAGMENT_IN_REPLACEMENT:
     accepted = rule(context_envoy_ptr, literal, "/api", "/internal#x");
     break;
+  case QUERY_IN_MATCHED:
+    accepted = rule(context_envoy_ptr, literal, "/api?", "/internal");
+    break;
+  case FRAGMENT_IN_MATCHED:
+    accepted = rule(context_envoy_ptr, literal, "/api#", "/internal");
+    break;
   case RESULT_TOO_LONG:
     // The replacement fits the bound, but not the path it produces for the current request.
     accepted = rule(context_envoy_ptr, literal, "/api", "/0123456789abcd");
@@ -169,11 +179,14 @@ envoy_dynamic_module_on_route_specifier_on_route(
     accepted = envoy_dynamic_module_callback_route_specifier_set_route_override(context_envoy_ptr,
                                                                                 buffer("rewrite"));
     break;
-  case QUERY_IN_MATCHED:
-    accepted = rule(context_envoy_ptr, literal, "/api?", "/internal");
+  case RULE_THEN_PATH:
+    accepted = rule(context_envoy_ptr, literal, "/api", "/internal");
+    envoy_dynamic_module_callback_route_specifier_set_path(context_envoy_ptr, buffer("/literal"));
     break;
-  case FRAGMENT_IN_MATCHED:
-    accepted = rule(context_envoy_ptr, literal, "/api#", "/internal");
+  case RULE_THEN_OVERRIDE:
+    accepted = rule(context_envoy_ptr, literal, "/api", "/internal");
+    envoy_dynamic_module_callback_route_specifier_set_route_override(context_envoy_ptr,
+                                                                     buffer("rewrite"));
     break;
   case MODE_COUNT:
     break;

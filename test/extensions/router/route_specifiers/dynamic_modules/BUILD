@@ -15,6 +15,7 @@ envoy_extension_cc_dyn_module_test(
     name = "route_specifier_test",
     srcs = ["route_specifier_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:route_specifier_built_route_cache",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_continue_matching",
         "//test/extensions/dynamic_modules/test_data/c:route_specifier_missing_config_destroy",
@@ -35,6 +36,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/router/route_specifiers/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
