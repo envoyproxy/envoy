@@ -143,11 +143,11 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
     vhds_subscription_ = std::move(new_vhds_subscription);
     // The new subscription holds none of the aliases the old one requested, so nothing
     // guarantees pushes for them any more.
-    requested_vhds_resource_ids_.clear();
+    on_demand_aliases_.clear();
   } else if (!has_vhds) {
     // This route configuration doesn't use VHDS, so the subscription of a previous one goes away.
     vhds_subscription_.reset();
-    requested_vhds_resource_ids_.clear();
+    on_demand_aliases_.clear();
   }
   last_vhds_config_hash_ = new_vhds_config_hash;
   rds_virtual_hosts_ = std::move(rds_virtual_hosts);
@@ -180,10 +180,7 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   const bool vhosts_changed = removed || updated || !added_resource_ids.empty();
   if (!vhosts_changed) {
     // Nothing to rebuild, so the currently published route configuration stays in place. An update
-    // that is still warming up is deliberately left alone. This update still carried no resource
-    // ids, so record that, otherwise the ids of the previous update would be resolved against a
-    // later publish.
-    resource_ids_in_last_update_ = std::move(added_resource_ids);
+    // that is still warming up is deliberately left alone.
     return false;
   }
 
@@ -200,8 +197,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 
   base_.updateConfig(*route_config_after_this_update, std::nullopt, version_info);
   // No exception, the new route configuration is valid, can update the state. This has to happen
-  // before the update is published, because publishing runs the on-demand VHDS callbacks against
-  // resourceIdsInLastVhdsUpdate().
+  // before the update is published, because publishing transitions Warming aliases in
+  // on_demand_aliases_ to Published and runs the queued on-demand VHDS callbacks.
   vhds_virtual_hosts_ = std::move(vhosts_after_this_update);
   // Only ids that were explicitly requested on demand enter the answered cache. The server may
   // name a resource or attach aliases Envoy never asked for; Envoy holds no subscription
@@ -210,12 +207,10 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
   // TODO(wbpcode): also take the removed_resources into account for marking requested VHDS resource
   // IDs as answered.
   for (absl::string_view resource_id : added_resource_ids) {
-    if (auto it = requested_vhds_resource_ids_.find(resource_id);
-        it != requested_vhds_resource_ids_.end()) {
-      it->second = true;
+    if (auto it = on_demand_aliases_.find(resource_id); it != on_demand_aliases_.end()) {
+      it->second = OnDemandAliasState::Warming;
     }
   }
-  resource_ids_in_last_update_ = std::move(added_resource_ids);
   base_.startWarming();
   return true;
 }
@@ -277,13 +272,10 @@ void RouteConfigUpdateReceiverImpl::requestVirtualHostsUpdate(
         if (!maybe_still_alive.lock()) {
           return;
         }
-        const std::string& route_config_name = !base_.warming_state_.route_config_name_.empty()
-                                                   ? base_.warming_state_.route_config_name_
-                                                   : base_.route_config_name_;
         const std::string alias =
-            VhdsSubscription::domainNameToAlias(route_config_name, for_domain);
+            VhdsSubscription::domainNameToAlias(routeConfigName(), for_domain);
         if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
-            vhdsResourceIdAnswered(alias)) {
+            !configWarming() && isAliasPublished(alias)) {
           // The server has already answered for this alias and the published route configuration
           // reflects that answer, so the request can be answered locally. The delta subscription
           // to the alias is persistent: if the virtual host appears or changes later, the server
@@ -292,23 +284,34 @@ void RouteConfigUpdateReceiverImpl::requestVirtualHostsUpdate(
           notifyCallback(*config, alias, thread_local_dispatcher, route_config_updated_cb);
           return;
         }
-        updateOnDemand(alias);
-        config_update_callbacks_.push_back(
+        if (vhds_subscription_ != nullptr) {
+          on_demand_aliases_.try_emplace(alias, OnDemandAliasState::WaitingForResponse);
+          vhds_subscription_->updateOnDemand(alias);
+        }
+        pending_on_demand_callbacks_.push_back(
             {alias, thread_local_dispatcher, route_config_updated_cb});
       });
 }
 
 void RouteConfigUpdateReceiverImpl::onVhdsConfigPublished() {
-  if (config_update_callbacks_.empty()) {
+  absl::flat_hash_set<std::string> published_in_this_update;
+  for (auto& [alias, state] : on_demand_aliases_) {
+    if (state == OnDemandAliasState::Warming) {
+      state = OnDemandAliasState::Published;
+      published_in_this_update.insert(alias);
+    }
+  }
+
+  if (pending_on_demand_callbacks_.empty()) {
     return;
   }
 
   const bool check_answered_ids =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache");
-  const auto& aliases = resourceIdsInLastVhdsUpdate();
+
   // Regular (non-VHDS) updates don't populate aliases fields in resources, but any publish can
   // resolve a queued callback whose alias an earlier update already answered.
-  if (aliases.empty() && !check_answered_ids) {
+  if (published_in_this_update.empty() && !check_answered_ids) {
     return;
   }
 
@@ -316,16 +319,16 @@ void RouteConfigUpdateReceiverImpl::onVhdsConfigPublished() {
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
-  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
-    // A callback is answered by this update if the update carries its alias, or by any earlier
-    // published update that did: the callback was then queued while that update was still
-    // warming, or the update that carried the alias was superseded before it was published and
-    // this update is the one delivering its merged result.
-    const bool answered =
-        aliases.contains(it->alias_) || (check_answered_ids && vhdsResourceIdAnswered(it->alias_));
+  for (auto it = pending_on_demand_callbacks_.begin(); it != pending_on_demand_callbacks_.end();) {
+    // A callback is answered by this update if the update transitions its alias to Published,
+    // or by any earlier published update that did: the callback was then queued while that
+    // update was still warming, or the update that carried the alias was superseded before it was
+    // published and this update is the one delivering its merged result.
+    const bool answered = published_in_this_update.contains(it->alias_) ||
+                          (check_answered_ids && isAliasPublished(it->alias_));
     if (answered) {
       notifyCallback(*config, it->alias_, it->thread_local_dispatcher_, it->cb_);
-      it = config_update_callbacks_.erase(it);
+      it = pending_on_demand_callbacks_.erase(it);
     } else {
       it++;
     }

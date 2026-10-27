@@ -19,6 +19,7 @@
 #include "source/common/router/vhds.h"
 
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
 namespace Router {
@@ -79,37 +80,32 @@ public:
   const std::optional<Rds::RouteConfigProvider::ConfigInfo>& configInfo() const override {
     return base_.configInfo();
   }
-  void updateOnDemand(const std::string& alias) override {
-    if (vhds_subscription_ != nullptr) {
-      // try_emplace keeps the answered state of an id that is requested again.
-      requested_vhds_resource_ids_.try_emplace(alias, false);
-      vhds_subscription_->updateOnDemand(alias);
-    }
-  }
   Rds::ConfigConstSharedPtr parsedConfiguration() const override {
     return base_.parsedConfiguration();
   }
   SystemTime lastUpdated() const override { return base_.lastUpdated(); }
-  const std::set<std::string>& resourceIdsInLastVhdsUpdate() const override {
-    return resource_ids_in_last_update_;
-  }
-  bool vhdsResourceIdAnswered(const std::string& resource_id) const override {
-    if (configWarming()) {
-      // While an update is warming, the published configuration may predate the answer for the
-      // id, so return false. The caller then queues the request, and the publish of the warming
-      // update resolves it.
-      // TODO(wbpcode): consider tracking the ids answered by the warming update separately.
-      return false;
-    }
-    const auto it = requested_vhds_resource_ids_.find(resource_id);
-    return it != requested_vhds_resource_ids_.end() ? it->second : false;
-  }
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
   void onVhdsConfigPublished() override;
 
 private:
+  enum class OnDemandAliasState {
+    WaitingForResponse,
+    Warming,
+    Published,
+  };
+
+  const std::string& routeConfigName() const {
+    return !base_.warming_state_.route_config_name_.empty()
+               ? base_.warming_state_.route_config_name_
+               : base_.route_config_name_;
+  }
+  bool isAliasPublished(const std::string& alias) const {
+    const auto it = on_demand_aliases_.find(alias);
+    return it != on_demand_aliases_.end() && it->second == OnDemandAliasState::Published;
+  }
+
   static void notifyCallback(const ConfigImpl& config, const std::string& alias,
                              Event::Dispatcher& thread_local_dispatcher,
                              std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
@@ -143,11 +139,10 @@ private:
   std::unique_ptr<VirtualHostMap> rds_virtual_hosts_;
   // vhosts supplied by VHDS, to be merged with RDS vhosts in onRdsUpdate.
   std::unique_ptr<VirtualHostMap> vhds_virtual_hosts_;
-  std::set<std::string> resource_ids_in_last_update_;
-  // The resource IDs explicitly requested on demand from the current subscription, and whether
-  // the server has answered each of them in a published update.
-  absl::flat_hash_map<std::string, bool> requested_vhds_resource_ids_;
-  std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  // The resource IDs explicitly requested on demand from the current subscription, and their
+  // state in the on-demand lifecycle.
+  absl::flat_hash_map<std::string, OnDemandAliasState> on_demand_aliases_;
+  std::list<UpdateOnDemandCallback> pending_on_demand_callbacks_;
   // A flag used to determine if this instance of RouteConfigUpdateReceiverImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};

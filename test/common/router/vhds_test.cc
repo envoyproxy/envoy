@@ -68,7 +68,8 @@ vhds:
   }
 
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
-  buildAddedResources(const std::vector<envoy::config::route::v3::VirtualHost>& added_or_updated) {
+  buildAddedResources(const std::vector<envoy::config::route::v3::VirtualHost>& added_or_updated,
+                      const std::vector<std::string>& aliases = {}) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> to_ret;
 
     for (const auto& vhost : added_or_updated) {
@@ -76,10 +77,30 @@ vhds:
       resource->set_name(vhost.name());
       resource->set_version("1");
       std::ignore = resource->mutable_resource()->PackFrom(vhost);
+      for (const auto& alias : aliases) {
+        resource->add_aliases(alias);
+      }
     }
 
     return to_ret;
   }
+
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+  emptyVhdsResource(const std::string& name) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> to_ret;
+    to_ret.Add()->set_name(name);
+    return to_ret;
+  }
+
+  struct CallbackTracker {
+    bool called_{false};
+    bool exists_{false};
+    std::shared_ptr<Http::RouteConfigUpdatedCallback> cb_{
+        std::make_shared<Http::RouteConfigUpdatedCallback>([this](bool exists) {
+          called_ = true;
+          exists_ = exists;
+        })};
+  };
 
   Protobuf::RepeatedPtrField<std::string>
   buildRemovedResources(const std::vector<std::string>& removed) {
@@ -371,22 +392,39 @@ TEST_F(VhdsTest, VhdsUpdateWithoutChangesClearsTheResourceIdsOfTheLastUpdate) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  // An update that actually adds a virtual host records its resource id.
-  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  CallbackTracker tracker1;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker1.cb_);
+  EXPECT_FALSE(tracker1.called_);
+
+  // An update that actually adds a virtual host records its resource id and resolves the pending
+  // request.
+  const auto added_resources =
+      buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")}, {"my_route/vhost1.com"});
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, {}, "2"));
-  EXPECT_THAT(config_update_info->resourceIdsInLastVhdsUpdate(),
-              ::testing::UnorderedElementsAre("vhost1"));
+  EXPECT_FALSE(tracker1.called_);
+  config_update_info->onVhdsConfigPublished();
+  EXPECT_TRUE(tracker1.called_);
+  EXPECT_TRUE(tracker1.exists_);
 
-  // A following no-op update carried no resource ids, so none are left over from the one above.
+  // A new request is made for an unadded host.
+  CallbackTracker tracker2;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost2.com", factory_context_.mainThreadDispatcher(), tracker2.cb_);
+  EXPECT_FALSE(tracker2.called_);
+
+  // A following no-op update carried no resource ids, so none are left over from the one above and
+  // the pending request remains unresolved.
   const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> no_added_resources;
   const auto no_decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(no_added_resources);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       no_decoded_resources.refvec_, buildRemovedResources({"never_added_vhost"}), "3"));
-  EXPECT_TRUE(config_update_info->resourceIdsInLastVhdsUpdate().empty());
+  config_update_info->onVhdsConfigPublished();
+  EXPECT_FALSE(tracker2.called_);
 }
 
 // verify that the resource ids of published VHDS updates accumulate, so that a repeated on-demand
@@ -395,29 +433,61 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsAccumulateAcrossUpdates) {
   const auto route_config =
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
-  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+
+  CallbackTracker tracker1;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker1.cb_);
+  EXPECT_FALSE(tracker1.called_);
 
   // The first update answers a requested id with a virtual host delivered under its name.
-  config_update_info->updateOnDemand("vhost1");
-  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto added_resources =
+      buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")}, {"my_route/vhost1.com"});
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, {}, "2"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
-  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("my_route/unknown.com"));
+  EXPECT_FALSE(tracker1.called_);
+  config_update_info->onVhdsConfigPublished();
+  EXPECT_TRUE(tracker1.called_);
+  EXPECT_TRUE(tracker1.exists_);
+
+  // A repeated request for the answered alias is answered locally.
+  CallbackTracker tracker1_repeat;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker1_repeat.cb_);
+  EXPECT_TRUE(tracker1_repeat.called_);
+  EXPECT_TRUE(tracker1_repeat.exists_);
+
+  // A request for an unknown alias is queued.
+  CallbackTracker tracker2;
+  config_update_info->requestVirtualHostsUpdate(
+      "unknown.com", factory_context_.mainThreadDispatcher(), tracker2.cb_);
+  EXPECT_FALSE(tracker2.called_);
 
   // The second update is an empty resource, the way the server answers for an alias it couldn't
   // resolve. Its id accumulates next to the one of the first update instead of replacing it.
-  config_update_info->updateOnDemand("my_route/unknown.com");
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> empty_resource;
-  empty_resource.Add()->set_name("my_route/unknown.com");
   const auto decoded_empty_resource =
-      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(empty_resource);
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(
+          emptyVhdsResource("my_route/unknown.com"));
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_empty_resource.refvec_, {}, "3"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("my_route/unknown.com"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  EXPECT_FALSE(tracker2.called_);
+  config_update_info->onVhdsConfigPublished();
+  EXPECT_TRUE(tracker2.called_);
+  EXPECT_FALSE(tracker2.exists_);
+
+  // Both aliases are now answered locally.
+  CallbackTracker tracker2_repeat;
+  config_update_info->requestVirtualHostsUpdate(
+      "unknown.com", factory_context_.mainThreadDispatcher(), tracker2_repeat.cb_);
+  EXPECT_TRUE(tracker2_repeat.called_);
+  EXPECT_FALSE(tracker2_repeat.exists_);
+
+  CallbackTracker tracker1_repeat2;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker1_repeat2.cb_);
+  EXPECT_TRUE(tracker1_repeat2.called_);
+  EXPECT_TRUE(tracker1_repeat2.exists_);
 
   // Removing the virtual host doesn't withdraw the answer: the published configuration now
   // answers that the virtual host doesn't exist, and the subscription to the id stays, so the
@@ -427,7 +497,13 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsAccumulateAcrossUpdates) {
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(nothing_added);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_nothing_added.refvec_, buildRemovedResources({"vhost1"}), "4"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  config_update_info->onVhdsConfigPublished();
+
+  CallbackTracker tracker1_after_removal;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker1_after_removal.cb_);
+  EXPECT_TRUE(tracker1_after_removal.called_);
+  EXPECT_FALSE(tracker1_after_removal.exists_);
 }
 
 // verify that accumulated answers don't survive the VHDS subscription they came from: a changed
@@ -438,13 +514,18 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsAreDroppedWithTheSubscription) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  config_update_info->updateOnDemand("vhost1");
-  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  CallbackTracker tracker;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker.cb_);
+  const auto added_resources =
+      buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")}, {"my_route/vhost1.com"});
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, {}, "2"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  config_update_info->onVhdsConfigPublished();
+  EXPECT_TRUE(tracker.called_);
+  EXPECT_TRUE(tracker.exists_);
 
   // An RDS update with a different VHDS config source replaces the subscription.
   const auto updated_route_config =
@@ -459,14 +540,18 @@ vhds:
           cluster_name: another_xds_cluster
   )EOF");
   EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
-  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
 
   // The request made on the old subscription is forgotten too: the same update pushed again on
   // the new subscription doesn't mark the id answered, because the new subscription holds no
   // interest in it until it is requested again.
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, {}, "3"));
-  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  config_update_info->onVhdsConfigPublished();
+
+  CallbackTracker tracker_after_reconnect;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker_after_reconnect.cb_);
+  EXPECT_FALSE(tracker_after_reconnect.called_);
 }
 
 // verify that names and aliases the server volunteered without a request never enter the
@@ -478,22 +563,34 @@ TEST_F(VhdsTest, VhdsUnrequestedResourceIdsAreNotAnswered) {
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
   // The server pushes a virtual host unsolicited, with an alias attached on its own.
-  auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
-  added_resources.Mutable(0)->add_aliases("my_route/vhost1.com");
+  const auto added_resources =
+      buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")}, {"my_route/vhost1.com"});
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, {}, "2"));
-  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
-  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("my_route/vhost1.com"));
+  config_update_info->onVhdsConfigPublished();
 
-  // Once the alias is requested and the server answers it, it is cached. The name the server
-  // chose on its own still isn't.
-  config_update_info->updateOnDemand("my_route/vhost1.com");
+  // The unrequested alias is not answered locally.
+  CallbackTracker tracker;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker.cb_);
+  EXPECT_FALSE(tracker.called_);
+
+  // Once the alias is requested and the server answers it, it is cached.
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, {}, "3"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("my_route/vhost1.com"));
-  EXPECT_FALSE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  EXPECT_FALSE(tracker.called_);
+  config_update_info->onVhdsConfigPublished();
+  EXPECT_TRUE(tracker.called_);
+  EXPECT_TRUE(tracker.exists_);
+
+  // Repeated request is now answered locally.
+  CallbackTracker tracker_repeat;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker_repeat.cb_);
+  EXPECT_TRUE(tracker_repeat.called_);
+  EXPECT_TRUE(tracker_repeat.exists_);
 }
 
 // verify that accumulated answers survive an RDS update that changes only the virtual hosts: the
@@ -504,13 +601,18 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsSurviveRdsUpdateThatKeepsTheSubscription
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  config_update_info->updateOnDemand("vhost1");
-  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  CallbackTracker tracker;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker.cb_);
+  const auto added_resources =
+      buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")}, {"my_route/vhost1.com"});
   const auto decoded_resources =
       TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, {}, "2"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+  config_update_info->onVhdsConfigPublished();
+  EXPECT_TRUE(tracker.called_);
+  EXPECT_TRUE(tracker.exists_);
 
   // An RDS update with the same VHDS config source but different virtual hosts keeps the
   // subscription.
@@ -519,7 +621,13 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsSurviveRdsUpdateThatKeepsTheSubscription
   rds_vhost->set_name("vhost_rds1");
   rds_vhost->add_domains("vhost.rds.first");
   EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
-  EXPECT_TRUE(config_update_info->vhdsResourceIdAnswered("vhost1"));
+
+  // The answered alias is still answered locally.
+  CallbackTracker tracker_repeat;
+  config_update_info->requestVirtualHostsUpdate(
+      "vhost1.com", factory_context_.mainThreadDispatcher(), tracker_repeat.cb_);
+  EXPECT_TRUE(tracker_repeat.called_);
+  EXPECT_TRUE(tracker_repeat.exists_);
 
   // The published configuration still carries the answered virtual host, merged with the new RDS
   // virtual host, so the locally served answer stays correct.
