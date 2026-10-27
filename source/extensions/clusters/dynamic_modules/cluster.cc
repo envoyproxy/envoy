@@ -13,6 +13,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/clusters/dynamic_modules/persistent_host_set.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -207,7 +208,10 @@ DynamicModuleCluster::DynamicModuleCluster(const envoy::config::cluster::v3::Clu
                                            DynamicModuleClusterConfigSharedPtr config,
                                            Upstream::ClusterFactoryContext& context,
                                            absl::Status& creation_status)
-    : ClusterImplBase(cluster, context, creation_status), config_(std::move(config)),
+    : ClusterImplBase(cluster, context, creation_status,
+                      config->use_persistent_host_partitions_ ? &PersistentHostSet::create
+                                                              : nullptr),
+      config_(std::move(config)),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       server_context_(context.serverFactoryContext()) {
   // If the base cluster construction failed, do not run the module hook on an invalid cluster.
@@ -284,6 +288,53 @@ void DynamicModuleCluster::registerLifecycleCallbacks() {
           }
         });
   }
+}
+
+void DynamicModuleCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) {
+  if (!config_->use_persistent_host_partitions_) {
+    ClusterImplBase::reloadHealthyHostsHelper(host);
+    return;
+  }
+  // Re-partition inside the persistent host sets so they keep handing workers snapshots. A null
+  // host comes from finishInitialization() with a health checker; a host the cluster no longer
+  // holds needs no update.
+  if (host != nullptr) {
+    applyPersistentHealthChange(host);
+    return;
+  }
+  for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
+    updateHostsFromSnapshot(priority, persistentHostSet(priority).refreshHealth(), {}, {});
+  }
+}
+
+PersistentHostSet& DynamicModuleCluster::persistentHostSet(uint32_t priority) {
+  ASSERT(config_->use_persistent_host_partitions_);
+  priority_set_.getOrCreateHostSet(priority);
+  return static_cast<PersistentHostSet&>(*priority_set_.hostSetsPerPriority()[priority]);
+}
+
+void DynamicModuleCluster::updateHostsFromSnapshot(uint32_t priority,
+                                                   Upstream::HostSetSnapshotConstSharedPtr snapshot,
+                                                   const Upstream::HostVector& hosts_added,
+                                                   const Upstream::HostVector& hosts_removed) {
+  priority_set_.updateHosts(priority,
+                            Upstream::HostSetImpl::snapshotUpdateHostsParams(std::move(snapshot)),
+                            priority_set_.hostSetsPerPriority()[priority]->localityWeights(),
+                            hosts_added, hosts_removed, std::nullopt, std::nullopt);
+}
+
+bool DynamicModuleCluster::applyPersistentHealthChange(const Upstream::HostSharedPtr& host) {
+  // Hosts keep the priority they were added at.
+  if (!config_->use_persistent_host_partitions_ ||
+      host->priority() >= priority_set_.hostSetsPerPriority().size()) {
+    return false;
+  }
+  auto snapshot = persistentHostSet(host->priority()).applyHostHealthChange(host);
+  if (snapshot == nullptr) {
+    return false;
+  }
+  updateHostsFromSnapshot(host->priority(), std::move(snapshot), {}, {});
+  return true;
 }
 
 void DynamicModuleCluster::startPreInit() {
@@ -495,19 +546,25 @@ bool DynamicModuleCluster::addHosts(
     }
   }
 
-  const auto& host_set = priority_set_.getOrCreateHostSet(priority);
-  Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector(host_set.hosts()));
-  Upstream::HostVector added_hosts;
-  for (const auto& host : result_hosts) {
-    all_hosts->emplace_back(host);
-    added_hosts.emplace_back(host);
+  if (config_->use_persistent_host_partitions_) {
+    updateHostsFromSnapshot(priority,
+                            persistentHostSet(priority).applyMembershipDelta(result_hosts, {}),
+                            result_hosts, {});
+  } else {
+    const auto& host_set = priority_set_.getOrCreateHostSet(priority);
+    Upstream::HostVectorSharedPtr all_hosts(new Upstream::HostVector(host_set.hosts()));
+    Upstream::HostVector added_hosts;
+    for (const auto& host : result_hosts) {
+      all_hosts->emplace_back(host);
+      added_hosts.emplace_back(host);
+    }
+
+    auto hosts_per_locality = buildHostsPerLocality(*all_hosts);
+
+    priority_set_.updateHosts(
+        priority, Upstream::HostSetImpl::partitionHosts(all_hosts, std::move(hosts_per_locality)),
+        {}, added_hosts, {}, std::nullopt, std::nullopt);
   }
-
-  auto hosts_per_locality = buildHostsPerLocality(*all_hosts);
-
-  priority_set_.updateHosts(
-      priority, Upstream::HostSetImpl::partitionHosts(all_hosts, std::move(hosts_per_locality)), {},
-      added_hosts, {}, std::nullopt, std::nullopt);
 
   ENVOY_LOG(debug, "Added {} hosts to dynamic module cluster at priority {}.", result_hosts.size(),
             priority);
@@ -533,6 +590,13 @@ bool DynamicModuleCluster::updateHostHealth(Upstream::HostSharedPtr host,
     break;
   case envoy_dynamic_module_type_host_health_Healthy:
     break;
+  }
+
+  // A persistent host set re-partitions just this host.
+  if (applyPersistentHealthChange(host)) {
+    ENVOY_LOG(debug, "Updated health status for host to {} at priority {}.",
+              static_cast<int>(health_status), host->priority());
+    return true;
   }
 
   // Find the priority level that contains this host and trigger a priority set update to
@@ -596,6 +660,26 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
 
   if (removed_hosts.empty()) {
     return 0;
+  }
+
+  if (config_->use_persistent_host_partitions_) {
+    // Hosts keep the priority they were added at, so grouping by it finds each host's set without
+    // scanning the priorities.
+    std::vector<Upstream::HostVector> removed_by_priority(
+        priority_set_.hostSetsPerPriority().size());
+    for (const auto& h : removed_hosts) {
+      ASSERT(h->priority() < removed_by_priority.size());
+      removed_by_priority[h->priority()].emplace_back(h);
+    }
+    for (uint32_t priority = 0; priority < removed_by_priority.size(); ++priority) {
+      if (!removed_by_priority[priority].empty()) {
+        const auto& removed = removed_by_priority[priority];
+        updateHostsFromSnapshot(
+            priority, persistentHostSet(priority).applyMembershipDelta({}, removed), {}, removed);
+      }
+    }
+    ENVOY_LOG(debug, "Removed {} hosts from dynamic module cluster.", removed_hosts.size());
+    return removed_hosts.size();
   }
 
   // Build a set of removed host pointers for O(1) lookup.
@@ -788,6 +872,10 @@ DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
   // list is only mutated on this worker thread.
   if (in_module_lb_ != nullptr &&
       handle_->cluster_->config()->on_cluster_lb_on_host_membership_update_ != nullptr) {
+    priority_update_cb_ = priority_set_.addPriorityUpdateCb(
+        [this](uint32_t priority, const Upstream::HostVector&, const Upstream::HostVector&) {
+          updated_priorities_.push_back(priority);
+        });
     member_update_cb_ = priority_set_.addMemberUpdateCb(
         [this](const Upstream::HostVector& hosts_added, const Upstream::HostVector& hosts_removed) {
           hosts_added_ = &hosts_added;
@@ -796,8 +884,34 @@ DynamicModuleLoadBalancer::DynamicModuleLoadBalancer(
               this, in_module_lb_, hosts_added.size(), hosts_removed.size());
           hosts_added_ = nullptr;
           hosts_removed_ = nullptr;
+          updated_priorities_.clear();
+          health_changed_hosts_.reset();
+          health_changed_hosts_known_ = false;
         });
   }
+}
+
+const Upstream::HostVector* DynamicModuleLoadBalancer::healthChangedHosts() {
+  if (hosts_added_ == nullptr) {
+    return nullptr;
+  }
+  if (!health_changed_hosts_known_) {
+    health_changed_hosts_known_ = true;
+    Upstream::HostVector hosts;
+    const auto& host_sets = priority_set_.hostSetsPerPriority();
+    for (const uint32_t priority : updated_priorities_) {
+      const auto* host_set = priority < host_sets.size()
+                                 ? dynamic_cast<const PersistentHostSet*>(host_sets[priority].get())
+                                 : nullptr;
+      if (host_set == nullptr || !host_set->healthChangedHosts().has_value()) {
+        return nullptr;
+      }
+      const auto& changed = *host_set->healthChangedHosts();
+      hosts.insert(hosts.end(), changed.begin(), changed.end());
+    }
+    health_changed_hosts_ = std::move(hosts);
+  }
+  return health_changed_hosts_.has_value() ? &*health_changed_hosts_ : nullptr;
 }
 
 DynamicModuleLoadBalancer::~DynamicModuleLoadBalancer() {
@@ -982,6 +1096,8 @@ DynamicModuleClusterFactory::createClusterWithConfig(
         Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return config_or_error.status();
   }
+  config_or_error.value()->use_persistent_host_partitions_ =
+      proto_config.use_persistent_host_partitions();
 
   // Create the cluster.
   absl::Status creation_status = absl::OkStatus();
