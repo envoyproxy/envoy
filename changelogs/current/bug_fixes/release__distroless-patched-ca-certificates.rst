@@ -1,4 +1,0 @@
-Updated the ``distroless`` docker image to use the patched ``ca-certificates`` package
-(``20250419~deb12u2``) from Debian bookworm, so it no longer trusts the roots of the compromised
-``eMudhra`` intermediate CAs. The distroless image released in 1.38.8 still shipped the unpatched
-bundle.
