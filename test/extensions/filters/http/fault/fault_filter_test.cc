@@ -109,9 +109,6 @@ public:
     - header:
         key: x-fault-abort
         value: injected
-    - header:
-        key: x-response-status
-        value: '%RESP(:status)%'
   )EOF";
 
   const std::string fixed_delay_and_abort_yaml = R"EOF(
@@ -380,8 +377,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatusAndResponseHeaders) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "429"},
                                                    {"content-length", "30"},
                                                    {"content-type", "application/json"},
-                                                   {"x-fault-abort", "injected"},
-                                                   {"x-response-status", "429"}};
+                                                   {"x-fault-abort", "injected"}};
   EXPECT_CALL(decoder_filter_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(decoder_filter_callbacks_, encodeData(_, true));
@@ -475,7 +471,7 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
       .WillOnce(testing::Invoke(
           [this](Http::Code code, absl::string_view body,
-                 std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
+                std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
                  const std::optional<Grpc::Status::GrpcStatus> grpc_status,
                  absl::string_view details) {
             Http::Utility::sendLocalReply(
@@ -489,8 +485,8 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
                     [this](Buffer::Instance& data, bool end_stream) {
                       decoder_filter_callbacks_.encodeData(data, end_stream);
                     }},
-                Http::Utility::LocalReplyData{decoder_filter_callbacks_.is_grpc_request_, code, body,
-                                              grpc_status,
+                Http::Utility::LocalReplyData{decoder_filter_callbacks_.is_grpc_request_, code,
+                                              body, grpc_status,
                                               decoder_filter_callbacks_.is_head_request_});
           }));
 
@@ -515,9 +511,9 @@ TEST_F(FaultFilterTest, AbortWithGrpcStatus) {
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"content-type", "application/grpc"},
+                                                   {"x-fault-abort", "injected"},
                                                    {"grpc-status", "5"},
-                                                   {"grpc-message", "fault filter abort"},
-                                                   {"x-fault-abort", "injected"}};
+                                                   {"grpc-message", "fault filter abort"}};
   EXPECT_CALL(decoder_filter_callbacks_,
               encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
