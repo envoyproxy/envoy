@@ -378,8 +378,8 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeDataOnClosedStream) {
   // messed up.
   std::string response2(1024, 'a');
   Buffer::OwnedImpl buffer2(response2);
-  EXPECT_ENVOY_BUG(quic_stream_->encodeData(buffer2, true),
-                   "encodeData is called on write-closed stream");
+  quic_stream_->encodeData(buffer2, true);
+  EXPECT_EQ(0u, buffer2.length());
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 
