@@ -2,7 +2,6 @@
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "source/common/http/header_map_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
 #include "source/common/router/vhds.h"
 #include "source/common/runtime/runtime_features.h"
@@ -140,9 +139,8 @@ void StaticRouteConfigProviderImpl::VhdsContext::onConfigWarmed() {
         aliases.contains(it->alias_) ||
         (check_answered_ids && config_update_info_->vhdsResourceIdAnswered(it->alias_));
     if (answered) {
-      auto host_header = Http::RequestHeaderMapImpl::create();
-      host_header->setHost(VhdsSubscription::aliasToDomainName(it->alias_));
-      const bool host_exists = config->virtualHostExists(*host_header);
+      const bool host_exists =
+          config->virtualHostExists(VhdsSubscription::aliasToDomainName(it->alias_));
       std::weak_ptr<Http::RouteConfigUpdatedCallback> current_cb(it->cb_);
       it->thread_local_dispatcher_.post([current_cb, host_exists] {
         if (auto cb = current_cb.lock()) {
@@ -180,9 +178,8 @@ void StaticRouteConfigProviderImpl::VhdsContext::requestVirtualHostsUpdate(
           // pushes an update on its own.
           const auto config = std::static_pointer_cast<const ConfigImpl>(
               config_update_info_->parsedConfiguration());
-          auto host_header = Http::RequestHeaderMapImpl::create();
-          host_header->setHost(VhdsSubscription::aliasToDomainName(alias));
-          const bool host_exists = config->virtualHostExists(*host_header);
+          const bool host_exists =
+              config->virtualHostExists(VhdsSubscription::aliasToDomainName(alias));
           thread_local_dispatcher.post([route_config_updated_cb, host_exists] {
             if (auto cb = route_config_updated_cb.lock()) {
               (*cb)(host_exists);
