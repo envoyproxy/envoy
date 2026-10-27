@@ -1,3 +1,0 @@
-Updated the ``distroless`` docker image base to pick up the patched ``ca-certificates`` package
-(``20250419+deb13u1``), so it no longer trusts the roots of the compromised ``eMudhra``
-intermediate CAs. The distroless image released in 1.40.1 still shipped the unpatched bundle.
