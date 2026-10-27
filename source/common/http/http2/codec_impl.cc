@@ -807,6 +807,8 @@ void ConnectionImpl::StreamImpl::onPendingFlushTimer() {
   MultiplexedStreamImplBase::onPendingFlushTimer();
   parent_.stats_.tx_flush_timeout_.inc();
   ASSERT(local_end_stream_ && !local_end_stream_sent_);
+  // The timeout replaces a deferred reset that is still waiting for flow control window.
+  parent_.pending_deferred_reset_streams_.erase(stream_id_);
   // This will emit a reset frame for this stream and close the stream locally.
   // Only the stream adapter's reset callback should run as other higher layers
   // think the stream is already finished.
@@ -980,6 +982,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
           "envoy.reloadable_features.http2_include_cookies_in_limits")),
       reject_frames_after_end_stream_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.http2_reject_frames_after_end_stream")),
+      deferred_reset_waits_for_end_stream_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_deferred_reset_waits_for_end_stream")),
       protocol_constraints_(stats, http2_options,
                             Runtime::runtimeFeatureEnabled(
                                 "envoy.reloadable_features.http2_flood_protection_active_streams")),
@@ -1777,24 +1781,33 @@ Status ConnectionImpl::sendPendingFrames() {
   // deal. Furthermore, queueing a reset frame does not actually invoke the close stream callback.
   // This is only done when the reset frame is sent. Thus, it's safe to work directly with the
   // stream map.
-  // NOTE: The way we handle deferred reset is essentially best effort. If we intend to do a
-  //       deferred reset, we try to finish the stream, including writing any pending data frames.
-  //       If we cannot do this (potentially due to not enough window), we just reset the stream.
-  //       In general this behavior occurs only when we are trying to send immediate error messages
-  //       to short circuit requests. In the best effort case, we complete the stream before
-  //       resetting. In other cases, we just do the reset now which will blow away pending data
-  //       frames and release any memory associated with the stream.
+  // NOTE: A stream whose remaining data frames are blocked by flow control stays pending until the
+  //       frame carrying END_STREAM has been sent, so the reset does not discard the end of the
+  //       response. A peer that never opens its window is bounded by the stream flush timeout.
+  //       Without the `http2_deferred_reset_waits_for_end_stream` runtime feature, the deferred
+  //       reset is best effort and pending data frames are dropped if they could not be sent.
   if (!pending_deferred_reset_streams_.empty()) {
-    while (!pending_deferred_reset_streams_.empty()) {
-      auto it = pending_deferred_reset_streams_.begin();
+    bool reset_any = false;
+    auto it = pending_deferred_reset_streams_.begin();
+    while (it != pending_deferred_reset_streams_.end()) {
       auto* stream = it->second;
       // Sanity check: the stream's id matches the map key.
       ASSERT(it->first == stream->stream_id_);
+      if (deferred_reset_waits_for_end_stream_ && !stream->local_end_stream_sent_) {
+        ++it;
+        continue;
+      }
+      const int32_t stream_id = it->first;
       pending_deferred_reset_streams_.erase(it);
       ASSERT(stream->deferred_reset_);
       stream->resetStreamWorker(stream->deferred_reset_.value());
+      reset_any = true;
+      // Resetting may close other streams, so look up the next one again.
+      it = pending_deferred_reset_streams_.upper_bound(stream_id);
     }
-    RETURN_IF_ERROR(sendPendingFrames());
+    if (reset_any) {
+      RETURN_IF_ERROR(sendPendingFrames());
+    }
   }
 
   // After all pending frames have been written into the outbound buffer check if any of

@@ -2010,7 +2010,12 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
   EXPECT_OK(client_wrapper_->status_);
 }
 
-TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndStreamBeforeReset) {
+// With `http2_deferred_reset_waits_for_end_stream` disabled, the deferred reset is sent as soon as
+// the window is exhausted and the remaining data frames are dropped.
+TEST_P(Http2CodecImplDeferredResetTest,
+       LargeDataDeferredResetServerIfLocalEndStreamBeforeResetRuntimeDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http2_deferred_reset_waits_for_end_stream", "false"}});
   initialize();
 
   InSequence s;
@@ -2053,6 +2058,101 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   driveToCompletion();
   EXPECT_OK(client_wrapper_->status_);
+}
+
+// The deferred reset waits until the data frames blocked by flow control have been sent, so the
+// whole body reaches the client before the stream is reset with NO_ERROR.
+TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndStreamBeforeReset) {
+  initialize();
+
+  const uint64_t body_size = 1024 * 1024;
+  Event::MockTimer* flush_timer = nullptr;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl body(std::string(body_size, 'a'));
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
+    flush_timer = new Event::MockTimer();
+    EXPECT_CALL(server_connection_.dispatcher_,
+                createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+          flush_timer->callback_ = cb;
+          return flush_timer;
+        }));
+    EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+    response_encoder_->encodeData(body, true);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  driveClient();
+  driveServer();
+  // The window is exhausted, so the reset is still pending.
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  uint64_t received = 0;
+  auto count_data = [&received](Buffer::Instance& data, bool) { received += data.length(); };
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder_, decodeData(_, false))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(count_data));
+  EXPECT_CALL(response_decoder_, decodeData(_, true)).WillOnce(Invoke(count_data));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(*flush_timer, disableTimer());
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  driveToCompletion();
+  EXPECT_OK(client_wrapper_->status_);
+  EXPECT_EQ(body_size, received);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
+}
+
+// A deferred reset that waits for window is still bounded by the stream flush timeout, which
+// sends a single reset.
+TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerFlushTimeout) {
+  initialize();
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  auto flush_timer = new NiceMock<Event::MockTimer>();
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    EXPECT_CALL(server_connection_.dispatcher_,
+                createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+          flush_timer->callback_ = cb;
+          return flush_timer;
+        }));
+    response_encoder_->encodeData(body, true);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  // Drive the client only once after the server, so no WINDOW_UPDATE reaches the server.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AnyNumber());
+  driveClient();
+  driveServer();
+  driveClient();
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  flush_timer->invokeCallback();
+  driveToCompletion();
+  EXPECT_OK(client_wrapper_->status_);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
 }
 
 TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalEndStream) {
