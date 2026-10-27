@@ -233,6 +233,9 @@ public:
   static constexpr int kMaxTrackedDepth = 17;
 
 private:
+  // feed() without the sticky-error check.
+  absl::Status feedChunk(absl::string_view chunk, bool closed);
+
   Handler& handler_;
 
   wuffs_json__decoder::unique_ptr decoder_;
@@ -242,6 +245,8 @@ private:
 
   size_t body_src_pos_{0};
   bool wuffs_done_{false};
+  // First error returned by feed(); every later call returns it again.
+  absl::Status status_;
   // Cap key length at 256 bytes: well above any legitimate schema field name
   // (longest observed ~25B, e.g. "input_audio_transcription") while bounding
   // per-key allocation and guarding against DoS via unbounded key lengths.
