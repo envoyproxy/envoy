@@ -200,6 +200,10 @@ const char YamlSingleDstPortBottom[] = R"EOF(
             - filename: "{{ test_rundir }}/test/common/tls/test_data/ticket_key_a")EOF";
 } // namespace
 
+// The benchmark library creates one fixture per registered benchmark during static initialization
+// and destroys them at exit in an unspecified order, so the fixture must not hold a
+// Logger::Context: each context restores the one created before it. test/benchmark/main.cc already
+// installs the logging context.
 class FilterChainBenchmarkFixture : public ::benchmark::Fixture {
 public:
   void initialize(::benchmark::State& state) {
@@ -216,9 +220,6 @@ public:
     filter_chains_ = listener_config_.filter_chains();
   }
 
-  Envoy::Thread::MutexBasicLockable lock_;
-  Logger::Context logging_state_{spdlog::level::warn, Logger::Logger::DEFAULT_LOG_FORMAT, lock_,
-                                 false};
   std::string listener_yaml_config_;
   envoy::config::listener::v3::Listener listener_config_;
   absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
