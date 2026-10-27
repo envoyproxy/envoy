@@ -2510,8 +2510,10 @@ envoy.config_mux.sotw_grpc_mux_factory:
 envoy.filters.http.set_filter_state:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.set_filter_state.v3.Config
 envoy.filters.network.set_filter_state:
