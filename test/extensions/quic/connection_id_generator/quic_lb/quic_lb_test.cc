@@ -528,6 +528,9 @@ TEST_P(QuicLbSecretUpdateTest, IdenticalUpdateIsANoop) {
 
 TEST_P(QuicLbSecretUpdateTest, SameVersionWithDifferentKeyIsRejected) {
   initialize(true);
+  const auto candidate = encryptionParamaters(0, "fedcba9876543210");
+  ASSERT_EQ(validation_callback_(candidate.generic_secret()).code(),
+            absl::StatusCode::kInvalidArgument);
   auto status = applySecret(0, "fedcba9876543210");
   EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
   EXPECT_EQ(status.message(),
