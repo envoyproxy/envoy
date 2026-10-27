@@ -63,33 +63,21 @@ This extension emits the following statistics:
 Close details
 -------------
 
-When an internal listener closes a connection, it records why: the local close reason and the upstream transport failure
-reason of its side of the connection. These are set by the network filters of the internal listener, e.g. by
-:ref:`tcp_proxy <config_network_filters_tcp_proxy>` when it cannot connect to its upstream or when its session times
-out. The client side connection reports them as its transport failure reason, in the form
-``internal_listener_close:<local close reason>|internal_listener_upstream_failure:<upstream transport failure
-reason>``. Empty fields are omitted. If the internal listener records neither, or if the client side closes the
-connection, nothing is reported.
+When an internal listener closes a connection, the client side reports the local close reason and upstream transport
+failure reason set by the internal listener's network filters as its transport failure reason:
+``internal_listener_close:<local close reason>|internal_listener_upstream_failure:<upstream transport failure reason>``,
+omitting empty fields. Nothing is reported for closes initiated by the client side.
 
-An HTTP router that uses the internal listener as its upstream includes this reason in its response code details, e.g.
-``upstream_reset_before_response_started{connection_termination|<reason>}``, and in
-``%UPSTREAM_TRANSPORT_FAILURE_REASON%``. If the internal listener closes the connection while accepting it, the
-router's connection fails to connect and the details are
-``upstream_reset_before_response_started{remote_connection_failure|<reason>}`` instead. For example, with a
-``tcp_proxy`` in the internal listener:
+An HTTP router using the internal listener as its upstream reports this reason in ``%UPSTREAM_TRANSPORT_FAILURE_REASON%``
+and its response code details, e.g. ``upstream_reset_before_response_started{connection_termination|<reason>}``, or
+``{remote_connection_failure|<reason>}`` if the connection was closed while being accepted.
 
-* If the upstream rejects its HTTP CONNECT request, the reason is
-  ``internal_listener_close:tcp_initializion_failure:0|internal_listener_upstream_failure:tunnel_response:<status>``.
-* If it fails to connect to the upstream, e.g. because the connection is refused or times out, the upstream transport
-  failure reason is that of the connection pool instead.
-* If its cluster has no healthy host, the reason is ``internal_listener_close:tcp_initializion_failure:1``. ``tcp_proxy``
-  closes the connection while accepting it in this case.
-* If its session times out, the reason includes ``internal_listener_close:tcp_session_idle_timeout``.
-
-``tcp_proxy`` closes a connection with its initialization failure close reason (``tcp_initializion_failure:<upstream
-failure reason>``) only if it never established its upstream connection. Such a close reason therefore means that no
-data from the client side reached the upstream. The upstream transport failure reason alone does not mean that: it may
-have been recorded by an earlier connection attempt before a later attempt succeeded.
+For example, :ref:`tcp_proxy <config_network_filters_tcp_proxy>` reports
+``internal_listener_close:tcp_initializion_failure:0|internal_listener_upstream_failure:tunnel_response:<status>``
+when the upstream rejects its CONNECT request, and ``internal_listener_close:tcp_initializion_failure:1`` when its
+cluster has no healthy host. It uses the ``tcp_initializion_failure:`` close reason only if it never established its
+upstream connection, so no client data reached the upstream. The upstream transport failure reason alone does not imply
+this, as it may remain from an earlier failed connection attempt.
 
 
 Endpoint disambiguation
