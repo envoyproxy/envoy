@@ -134,6 +134,13 @@ public:
   void setClearHopByHopResponseHeaders(bool value) { clear_hop_by_hop_response_headers_ = value; }
   bool clearHopByHopResponseHeaders() const { return clear_hop_by_hop_response_headers_; }
 
+  // Marks this connection manager as one whose streams are created directly through newStream()
+  // (e.g. by the API listener) rather than decoded by its codec. The codec validates request
+  // headers for the streams it decodes; for streams that bypass the codec the connection manager
+  // validates them itself (only when built with ENVOY_ENABLE_UHV).
+  void setStreamsBypassCodec(bool value) { streams_bypass_codec_ = value; }
+  bool streamsBypassCodec() const { return streams_bypass_codec_; }
+
   // This runtime key configures the number of streams which must be closed on a connection before
   // envoy will potentially drain a connection due to excessive prematurely reset streams.
   static const absl::string_view PrematureResetTotalStreamCountKey;
@@ -197,6 +204,7 @@ private:
     // Http::RequestDecoder
     void decodeHeaders(RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
     void decodeTrailers(RequestTrailerMapPtr&& trailers) override;
+    void rejectRequest(RequestRejection&& rejection) override;
     StreamInfo::StreamInfo& streamInfo() override { return filter_manager_.streamInfo(); }
     void sendLocalReply(Code code, absl::string_view body,
                         const std::function<void(ResponseHeaderMap& headers)>& modify_headers,
@@ -444,20 +452,27 @@ private:
       return os;
     }
 
-    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
-    // Call header validator extension to validate request header map after it was deserialized.
-    // If header map failed validation, it sends an error response and returns false.
-    bool validateHeaders();
+    // Adopts fully parsed request headers as the request headers of this stream and performs the
+    // bookkeeping that must happen as soon as they are known (timing, request header timer,
+    // connection drain decision, protocol, HEAD/gRPC detection). Shared by decodeHeaders() and
+    // rejectRequest().
+    void onRequestHeadersReceived(RequestHeaderMapSharedPtr&& headers, bool end_stream);
 
-    // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
-    // Call header validator extension to validate the request trailer map after it was
-    // deserialized. If the trailer map failed validation, this method does the following:
-    // 1. For H/1 it sends 400 response and returns false.
-    // 2. For H/2 and H/3 it resets the stream (without error response). Issue #24735 is filed to
-    //    harmonize this behavior with H/1.
-    // 3. If the `stream_error_on_invalid_http_message` is set to `false` (it is by default) in the
-    // HTTP connection manager configuration, then the entire connection is closed.
-    bool validateTrailers(RequestTrailerMap& trailers);
+#ifdef ENVOY_ENABLE_UHV
+    // Returns true when this stream's request is not decoded by the connection's codec and
+    // therefore has not been header-validated by it: streams created through the API listener and
+    // streams recreated for internal redirects.
+    bool bypassesCodec() const {
+      return state_.is_internally_created_ || connection_manager_.streams_bypass_codec_;
+    }
+    // Header validation for streams that bypass the codec (see bypassesCodec()). Codec-decoded
+    // requests are validated by the codec, which calls rejectRequest() on failure. These helpers
+    // apply the exact same decision logic. They return false (after rejecting the request, which
+    // may destroy the stream) when the headers / trailers were rejected.
+    bool validateCodecBypassedHeaders(RequestHeaderMapSharedPtr& headers, bool end_stream);
+    bool validateCodecBypassedTrailers(RequestTrailerMapPtr& trailers);
+    ServerHeaderValidatorPtr header_validator_;
+#endif
 
     std::weak_ptr<bool> stillAlive() { return {still_alive_}; }
 
@@ -548,7 +563,6 @@ private:
 
     std::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     std::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
-    Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
 
@@ -719,6 +733,7 @@ private:
   // Hop by hop headers should always be cleared for Envoy-as-a-proxy but will
   // not be for Envoy-mobile.
   bool clear_hop_by_hop_response_headers_{true};
+  bool streams_bypass_codec_{false};
   // The number of requests accumulated on the current connection.
   uint64_t accumulated_requests_{};
   // The number of requests closed on the current connection which were

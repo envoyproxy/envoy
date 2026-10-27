@@ -847,14 +847,14 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
     return std::make_unique<Http::Http1::ServerConnectionImpl>(
         connection, Http::Http1::CodecStats::atomicGet(http1_codec_stats_, context_.scope()),
         callbacks, http1_settings_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-        headersWithUnderscoresAction(), overload_manager);
+        headersWithUnderscoresAction(), overload_manager, headerValidatorFactory());
   case CodecType::HTTP2:
     return std::make_unique<Http::Http2::ServerConnectionImpl>(
         connection, callbacks,
         Http::Http2::CodecStats::atomicGet(http2_codec_stats_, context_.scope()),
         context_.serverFactoryContext().api().randomGenerator(), http2_options_,
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
-        overload_manager, context_.serverFactoryContext().runtime());
+        overload_manager, context_.serverFactoryContext().runtime(), headerValidatorFactory());
   case CodecType::HTTP3:
 #ifdef ENVOY_ENABLE_QUIC
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
@@ -863,7 +863,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
             connection, callbacks,
             Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
             http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
-            headersWithUnderscoresAction(), overload_manager);
+            headersWithUnderscoresAction(), overload_manager, headerValidatorFactory());
 #else
     // Should be blocked by configuration checking at an earlier point.
     PANIC("unexpected");
@@ -875,7 +875,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         context_.serverFactoryContext().api().randomGenerator(), http1_codec_stats_,
         http2_codec_stats_, http1_settings_, http2_options_, maxRequestHeadersKb(),
         maxRequestHeadersCount(), headersWithUnderscoresAction(), overload_manager,
-        context_.serverFactoryContext().runtime());
+        context_.serverFactoryContext().runtime(), headerValidatorFactory());
   }
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
@@ -1003,6 +1003,11 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     // creates a codec. Here we force create a codec as onData will not be called.
     Buffer::OwnedImpl dummy;
     conn_manager->createCodec(dummy);
+
+    // Requests reach this ConnectionManager directly through Http::ApiListener::newStreamHandle()
+    // and are never decoded (nor header-validated) by the codec created above, so the
+    // ConnectionManager has to validate them itself.
+    conn_manager->setStreamsBypassCodec(true);
 
     return conn_manager;
   };

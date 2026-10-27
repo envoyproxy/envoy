@@ -22,11 +22,13 @@ class EnvoyQuicServerStream : public quic::QuicSpdyServerStreamBase,
                               public quic::QuicSpdyStream::MetadataVisitor,
                               public Http::WebTransportSession {
 public:
-  EnvoyQuicServerStream(quic::QuicStreamId id, quic::QuicSpdySession* session,
-                        quic::StreamType type, Http::Http3::CodecStats& stats,
-                        const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
-                        envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
-                            headers_with_underscores_action);
+  EnvoyQuicServerStream(
+      quic::QuicStreamId id, quic::QuicSpdySession* session, quic::StreamType type,
+      Http::Http3::CodecStats& stats,
+      const envoy::config::core::v3::Http3ProtocolOptions& http3_options,
+      envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
+          headers_with_underscores_action,
+      OptRef<Http::HeaderValidatorFactory> header_validator_factory = std::nullopt);
 
   void setRequestDecoder(Http::RequestDecoder& decoder) override {
     request_decoder_ = decoder.getRequestDecoderHandle();
@@ -162,6 +164,10 @@ private:
   Http::RequestDecoderHandlePtr request_decoder_;
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  // Per-stream header validator (Universal Header Validator). Only created when built with
+  // ENVOY_ENABLE_UHV and a factory was supplied; otherwise nullptr. Distinct from QUICHE's own
+  // QuicSpdyStream::header_validator().
+  Http::ServerHeaderValidatorPtr header_validator_;
 
   // True if a :path header has been seen before.
   bool saw_path_{false};

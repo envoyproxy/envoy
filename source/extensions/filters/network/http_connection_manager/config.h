@@ -264,6 +264,12 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
+  /**
+   * @return the header validator factory handed to the codecs, if header validation is configured.
+   */
+  OptRef<Http::HeaderValidatorFactory> headerValidatorFactory() {
+    return makeOptRefFromPtr(header_validator_factory_.get());
+  }
   Http::ServerHeaderValidatorPtr
   makeHeaderValidator([[maybe_unused]] Http::Protocol protocol) override {
 #ifdef ENVOY_ENABLE_UHV

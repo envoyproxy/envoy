@@ -1,5 +1,6 @@
 #include "test/common/http/conn_manager_impl_test_base.h"
 
+#include "source/common/http/header_validation_utility.h"
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/common/http/xff_extension.h"
@@ -454,14 +455,10 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{std::make_unique<TestRequestHeaderMapImpl>(request_headers)};
-    decoder_->decodeHeaders(std::move(headers), true);
+    deliverRequestHeaders(std::move(headers), true);
     data.drain(4);
     return Http::okStatus();
   }));
-
-#ifdef ENVOY_ENABLE_UHV
-  expectCheckWithDefaultUhv();
-#endif
 
   EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
@@ -475,7 +472,12 @@ void HttpConnectionManagerImplMixin::testPathNormalization(
   conn_manager_->onData(fake_input, false);
 }
 
-void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
+ServerHeaderValidatorPtr
+HttpConnectionManagerImplMixin::makeHeaderValidator([[maybe_unused]] Protocol protocol) {
+#ifdef ENVOY_ENABLE_UHV
+  // Real default UHV configured from normalize_path_, merge_slashes_ and
+  // path_with_escaped_slashes_action_. Used by deliverRequestHeaders() to emulate a codec and by
+  // the HCM for streams that bypass the codec.
   header_validator_config_.mutable_uri_path_normalization_options()->set_skip_path_normalization(
       !normalize_path_);
   header_validator_config_.mutable_uri_path_normalization_options()->set_skip_merging_slashes(
@@ -486,75 +488,32 @@ void HttpConnectionManagerImplMixin::expectCheckWithDefaultUhv() {
               ::envoy::extensions::http::header_validators::envoy_default::v3::
                   HeaderValidatorConfig::UriPathNormalizationOptions::PathWithEscapedSlashesAction>(
               path_with_escaped_slashes_action_));
-  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
-      .WillOnce(InvokeWithoutArgs([this]() {
-        auto header_validator = std::make_unique<
-            Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
-            header_validator_config_, Protocol::Http11, header_validator_stats_,
-            header_validator_config_overrides_);
-
-        return header_validator;
-      }));
+  return std::make_unique<
+      Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
+      header_validator_config_, Protocol::Http11, header_validator_stats_,
+      header_validator_config_overrides_);
+#else
+  return nullptr;
+#endif
 }
 
-void HttpConnectionManagerImplMixin::expectUhvHeaderCheck(
-    HeaderValidator::ValidationResult validation_result,
-    ServerHeaderValidator::RequestHeadersTransformationResult transformation_result) {
-  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
-      .WillOnce(InvokeWithoutArgs([validation_result, transformation_result]() {
-        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
-        EXPECT_CALL(*header_validator, validateRequestHeaders(_))
-            .WillOnce(InvokeWithoutArgs([validation_result]() { return validation_result; }));
-
-        if (validation_result.ok()) {
-          EXPECT_CALL(*header_validator, transformRequestHeaders(_))
-              .WillOnce(Invoke([transformation_result](RequestHeaderMap& headers) {
-                if (transformation_result.action() ==
-                    ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect) {
-                  headers.setPath("/some/new/path");
-                }
-                return transformation_result;
-              }));
-        }
-
-        EXPECT_CALL(*header_validator, transformResponseHeaders(_))
-            .WillOnce(InvokeWithoutArgs([]() {
-              return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
-            }));
-
-        return header_validator;
-      }));
-}
-
-void HttpConnectionManagerImplMixin::expectUhvTrailerCheck(
-    HeaderValidator::ValidationResult validation_result,
-    HeaderValidator::TransformationResult transformation_result, bool expect_response) {
-  EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(codec_->protocol_, _))
-      .WillOnce(InvokeWithoutArgs([validation_result, transformation_result, expect_response]() {
-        auto header_validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
-        EXPECT_CALL(*header_validator, validateRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
-          return HeaderValidator::ValidationResult::success();
-        }));
-
-        EXPECT_CALL(*header_validator, transformRequestHeaders(_)).WillOnce(InvokeWithoutArgs([]() {
-          return ServerHeaderValidator::RequestHeadersTransformationResult::success();
-        }));
-
-        EXPECT_CALL(*header_validator, validateRequestTrailers(_))
-            .WillOnce(InvokeWithoutArgs([validation_result]() { return validation_result; }));
-        if (validation_result.ok()) {
-          EXPECT_CALL(*header_validator, transformRequestTrailers(_))
-              .WillOnce(
-                  InvokeWithoutArgs([transformation_result]() { return transformation_result; }));
-        }
-        if (expect_response) {
-          EXPECT_CALL(*header_validator, transformResponseHeaders(_))
-              .WillOnce(InvokeWithoutArgs([]() {
-                return ServerHeaderValidator::ResponseHeadersTransformationResult::success();
-              }));
-        }
-        return header_validator;
-      }));
+void HttpConnectionManagerImplMixin::deliverRequestHeaders(RequestHeaderMapPtr&& headers,
+                                                           bool end_stream) {
+#ifdef ENVOY_ENABLE_UHV
+  // Emulate a server codec with UHV enabled: run the default UHV over the headers and either
+  // deliver them or report the rejection to the stream, exactly like the codecs do.
+  ServerHeaderValidatorPtr header_validator = makeHeaderValidator(codec_->protocol_);
+  auto rejection = HeaderValidationUtility::checkRequestHeaders(
+      *header_validator, *headers, codec_->protocol_,
+      response_encoder_.streamErrorOnInvalidHttpMessage());
+  if (rejection.has_value()) {
+    rejection->headers = std::move(headers);
+    rejection->end_stream = end_stream;
+    decoder_->rejectRequest(std::move(*rejection));
+    return;
+  }
+#endif
+  decoder_->decodeHeaders(std::move(headers), end_stream);
 }
 
 Event::MockSchedulableCallback*

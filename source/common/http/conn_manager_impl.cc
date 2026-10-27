@@ -17,7 +17,6 @@
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
-#include "envoy/http/header_validator_errors.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
@@ -41,6 +40,7 @@
 #include "source/common/http/exception.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
 #include "source/common/http/http2/codec_impl.h"
@@ -1128,9 +1128,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       has_explicit_global_flush_timeout_(
-          connection_manager.config_->streamFlushTimeout().has_value()),
-      header_validator_(
-          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())) {
+          connection_manager.config_->streamFlushTimeout().has_value()) {
   ASSERT(!connection_manager.config_->isRoutable() ||
              ((connection_manager.config_->routeConfigProvider() == nullptr &&
                connection_manager.config_->scopedRouteConfigProvider() != nullptr &&
@@ -1382,17 +1380,6 @@ uint32_t ConnectionManagerImpl::ActiveStream::localPort() {
   return ip->port();
 }
 
-namespace {
-bool streamErrorOnlyErrors(absl::string_view error_details) {
-  // Pre UHV HCM did not respect stream_error_on_invalid_http_message
-  // and only sent 400 for specific errors.
-  // TODO(#28555): make these errors respect the stream_error_on_invalid_http_message
-  return error_details == UhvResponseCodeDetail::get().FragmentInUrlPath ||
-         error_details == UhvResponseCodeDetail::get().EscapedSlashesInPath ||
-         error_details == UhvResponseCodeDetail::get().Percent00InPath;
-}
-} // namespace
-
 void ConnectionManagerImpl::ActiveStream::setRequestDecorator(RequestHeaderMap& headers) {
   ASSERT(active_span_ != nullptr);
   const Router::Decorator* decorater = route_decorator_;
@@ -1461,110 +1448,110 @@ void ConnectionManagerImpl::ActiveStream::setResponseDecorator(ResponseHeaderMap
   }
 }
 
-bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
-  if (header_validator_) {
-    auto validation_result = header_validator_->validateRequestHeaders(*request_headers_);
-    bool failure = !validation_result.ok();
-    bool redirect = false;
-    bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
-    std::string failure_details(validation_result.details());
-    if (!failure) {
-      auto transformation_result = header_validator_->transformRequestHeaders(*request_headers_);
-      failure = !transformation_result.ok();
-      redirect = transformation_result.action() ==
-                 Http::ServerHeaderValidator::RequestHeadersTransformationResult::Action::Redirect;
-      failure_details = std::string(transformation_result.details());
-      if (redirect && !is_grpc) {
-        connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
-      } else if (failure) {
-        connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
-      }
-    }
-    if (failure) {
-      std::function<void(ResponseHeaderMap & headers)> modify_headers;
-      Code response_code = failure_details == Http1ResponseCodeDetail::get().InvalidTransferEncoding
-                               ? Code::NotImplemented
-                               : Code::BadRequest;
-      std::optional<Grpc::Status::GrpcStatus> grpc_status;
-      if (redirect && !is_grpc) {
-        response_code = Code::TemporaryRedirect;
-        modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
-                             Http::ResponseHeaderMap& response_headers) -> void {
-          response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
-        };
-      } else if (is_grpc) {
-        grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
-      }
-
-      filter_manager_.streamInfo().setResponseFlag(
-          StreamInfo::CoreResponseFlag::DownstreamProtocolError);
-
-      // H/2 codec was resetting requests that were rejected due to headers with underscores,
-      // instead of sending 400. Preserving this behavior for now.
-      // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-      if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
-          connection_manager_.codec_->protocol() == Protocol::Http2) {
-        filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
-        resetStream();
-      } else {
-        sendLocalReply(response_code, "", modify_headers, grpc_status, failure_details);
-        if (!response_encoder_->streamErrorOnInvalidHttpMessage() &&
-            !streamErrorOnlyErrors(failure_details)) {
-          connection_manager_.handleCodecError(failure_details);
-        }
-      }
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& trailers) {
-  if (!header_validator_) {
-    return true;
-  }
-
-  auto validation_result = header_validator_->validateRequestTrailers(trailers);
-  std::string failure_details(validation_result.details());
-  if (validation_result.ok()) {
-    auto transformation_result = header_validator_->transformRequestTrailers(trailers);
-    if (transformation_result.ok()) {
-      return true;
-    }
-    failure_details = std::string(transformation_result.details());
-  }
-
-  Code response_code = Code::BadRequest;
-  std::optional<Grpc::Status::GrpcStatus> grpc_status;
-  if (Grpc::Common::hasGrpcContentType(*request_headers_)) {
-    grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
-  }
-
+void ConnectionManagerImpl::ActiveStream::rejectRequest(RequestRejection&& rejection) {
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
   filter_manager_.streamInfo().setResponseFlag(
       StreamInfo::CoreResponseFlag::DownstreamProtocolError);
 
-  // H/2 codec was resetting requests that were rejected due to headers with underscores,
-  // instead of sending 400. Preserving this behavior for now.
-  // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
-  if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
-      connection_manager_.codec_->protocol() == Protocol::Http2) {
-    filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
-    resetStream();
-  } else {
-    // TODO(#24735): Harmonize H/2 and H/3 behavior with H/1
-    if (connection_manager_.codec_->protocol() < Protocol::Http2) {
-      sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
-    } else {
-      filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
+  switch (rejection.phase) {
+  case RequestRejection::Phase::Headers: {
+    ASSERT(rejection.headers != nullptr);
+    onRequestHeadersReceived(std::move(rejection.headers), rejection.end_stream);
+    ENVOY_STREAM_LOG(debug, "request headers validation failed ({}):\n{}", *this, rejection.details,
+                     *request_headers_);
+
+    const bool is_grpc = Grpc::Common::hasGrpcContentType(*request_headers_);
+    const bool redirect = rejection.action == RequestRejection::Action::Redirect;
+    if (redirect && !is_grpc) {
+      connection_manager_.stats_.named_.downstream_rq_redirected_with_normalized_path_.inc();
+    } else if (rejection.transformation_failed) {
+      connection_manager_.stats_.named_.downstream_rq_failed_path_normalization_.inc();
+    }
+
+    std::function<void(ResponseHeaderMap & headers)> modify_headers;
+    Code response_code = rejection.response_code;
+    std::optional<Grpc::Status::GrpcStatus> grpc_status;
+    if (redirect && !is_grpc) {
+      response_code = Code::TemporaryRedirect;
+      modify_headers = [new_path = request_headers_->Path()->value().getStringView()](
+                           Http::ResponseHeaderMap& response_headers) -> void {
+        response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+      };
+    } else if (is_grpc) {
+      grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+    }
+
+    if (rejection.action == RequestRejection::Action::ResetStream) {
+      filter_manager_.streamInfo().setResponseCodeDetails(rejection.details);
       resetStream();
+    } else {
+      sendLocalReply(response_code, "", modify_headers, grpc_status, rejection.details);
     }
-    if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {
-      connection_manager_.handleCodecError(failure_details);
-    }
+    break;
   }
+  case RequestRejection::Phase::Trailers: {
+    resetIdleTimer();
+    if (rejection.trailers != nullptr) {
+      ENVOY_STREAM_LOG(debug, "request trailers validation failed ({}):\n{}", *this,
+                       rejection.details, *rejection.trailers);
+    }
+    std::optional<Grpc::Status::GrpcStatus> grpc_status;
+    if (request_headers_ != nullptr && Grpc::Common::hasGrpcContentType(*request_headers_)) {
+      grpc_status = Grpc::Status::WellKnownGrpcStatus::Internal;
+    }
+    if (rejection.action == RequestRejection::Action::ResetStream) {
+      filter_manager_.streamInfo().setResponseCodeDetails(rejection.details);
+      resetStream();
+    } else {
+      sendLocalReply(Code::BadRequest, "", nullptr, grpc_status, rejection.details);
+    }
+    break;
+  }
+  }
+
+  if (rejection.close_connection) {
+    connection_manager_.handleCodecError(rejection.details);
+  }
+}
+
+#ifdef ENVOY_ENABLE_UHV
+bool ConnectionManagerImpl::ActiveStream::validateCodecBypassedHeaders(
+    RequestHeaderMapSharedPtr& headers, bool end_stream) {
+  const Protocol protocol = connection_manager_.codec_->protocol();
+  if (header_validator_ == nullptr) {
+    header_validator_ = connection_manager_.config_->makeHeaderValidator(protocol);
+  }
+  if (header_validator_ == nullptr) {
+    return true;
+  }
+  auto rejection = HeaderValidationUtility::checkRequestHeaders(
+      *header_validator_, *headers, protocol, response_encoder_->streamErrorOnInvalidHttpMessage());
+  if (!rejection.has_value()) {
+    return true;
+  }
+  rejection->headers = std::move(headers);
+  rejection->end_stream = end_stream;
+  rejectRequest(std::move(*rejection));
   return false;
 }
+
+bool ConnectionManagerImpl::ActiveStream::validateCodecBypassedTrailers(
+    RequestTrailerMapPtr& trailers) {
+  if (header_validator_ == nullptr) {
+    return true;
+  }
+  auto rejection = HeaderValidationUtility::checkRequestTrailers(
+      *header_validator_, *trailers, connection_manager_.codec_->protocol(),
+      response_encoder_->streamErrorOnInvalidHttpMessage());
+  if (!rejection.has_value()) {
+    return true;
+  }
+  rejection->trailers = std::move(trailers);
+  rejectRequest(std::move(*rejection));
+  return false;
+}
+#endif
 
 void ConnectionManagerImpl::ActiveStream::maybeRecordLastByteReceived(bool end_stream) {
   // If recreateStream is called, the HCM rewinds state and may send more encodeData calls.
@@ -1585,8 +1572,8 @@ void ConnectionManagerImpl::ActiveStream::maybeRecordLastByteReceived(bool end_s
 // can't route select properly without full headers), checking state required to
 // serve error responses (connection close, head requests, etc), and
 // modifications which may themselves affect route selection.
-void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
-                                                        bool end_stream) {
+void ConnectionManagerImpl::ActiveStream::onRequestHeadersReceived(
+    RequestHeaderMapSharedPtr&& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *headers);
   // We only want to record this when reading the headers the first time, not when recreating
@@ -1595,8 +1582,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
     filter_manager_.streamInfo().downstreamTiming().onLastDownstreamHeaderRxByteReceived(
         connection_manager_.dispatcher_->timeSource());
   }
-  ScopeTrackerScopeState scope(this,
-                               connection_manager_.read_callbacks_->connection().dispatcher());
   request_headers_ = std::move(headers);
   filter_manager_.requestHeadersInitialized();
   if (request_header_timer_ != nullptr) {
@@ -1618,11 +1603,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 
   // We end the decode here to mark that the downstream stream is complete.
   maybeRecordLastByteReceived(end_stream);
+}
 
-  if (!validateHeaders()) {
-    ENVOY_STREAM_LOG(debug, "request headers validation failed\n{}", *this, *request_headers_);
+void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPtr&& headers,
+                                                        bool end_stream) {
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
+#ifdef ENVOY_ENABLE_UHV
+  if (bypassesCodec() && !validateCodecBypassedHeaders(headers, end_stream)) {
     return;
   }
+#endif
+  onRequestHeadersReceived(std::move(headers), end_stream);
 
   // We need to snap snapped_route_config_ here as it's used in mutateRequestHeaders later.
   if (connection_manager_.config_->isRoutable()) {
@@ -1899,11 +1891,13 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   resetIdleTimer();
 
-  ASSERT(!request_trailers_);
-  if (!validateTrailers(*trailers)) {
-    ENVOY_STREAM_LOG(debug, "request trailers validation failed:\n{}", *this, *trailers);
+#ifdef ENVOY_ENABLE_UHV
+  if (bypassesCodec() && !validateCodecBypassedTrailers(trailers)) {
     return;
   }
+#endif
+
+  ASSERT(!request_trailers_);
   maybeRecordLastByteReceived(true);
   if (!state_.deferred_to_next_io_iteration_) {
     request_trailers_ = std::move(trailers);
@@ -2285,18 +2279,6 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
 
   filter_manager_.streamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
       connection_manager_.time_source_);
-
-  if (header_validator_) {
-    auto result = header_validator_->transformResponseHeaders(headers);
-    if (!result.status.ok()) {
-      // It is possible that the header map is invalid if an encoder filter makes invalid
-      // modifications
-      // TODO(yanavlasov): add handling for this case.
-    } else if (result.new_headers) {
-      response_encoder_->encodeHeaders(*result.new_headers, end_stream);
-      return;
-    }
-  }
 
   // Now actually encode via the codec.
   response_encoder_->encodeHeaders(headers, end_stream);

@@ -19,6 +19,7 @@ envoy_cc_test(
     shard_count = 5,
     deps = [
         ":codec_impl_test_util",
+        ":http2_frame",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
@@ -29,7 +30,7 @@ envoy_cc_test(
         "//source/extensions/http/header_validators/envoy_default:header_validator_factory",
         "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//test/common/http:common_lib",
-        "//test/common/http/http2:http2_frame",
+        "//test/common/http:test_header_validator_factory_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",

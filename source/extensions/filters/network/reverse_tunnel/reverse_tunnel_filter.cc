@@ -406,6 +406,16 @@ void ReverseTunnelFilter::RequestDecoderImpl::decodeTrailers(Http::RequestTraile
   processIfComplete(true);
 }
 
+void ReverseTunnelFilter::RequestDecoderImpl::rejectRequest(Http::RequestRejection&& rejection) {
+  if (rejection.action == Http::RequestRejection::Action::ResetStream) {
+    encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    return;
+  }
+  sendLocalReply(rejection.phase == Http::RequestRejection::Phase::Headers ? rejection.response_code
+                                                                           : Http::Code::BadRequest,
+                 "", nullptr, std::nullopt, rejection.details);
+}
+
 void ReverseTunnelFilter::RequestDecoderImpl::decodeMetadata(Http::MetadataMapPtr&&) {}
 
 void ReverseTunnelFilter::RequestDecoderImpl::sendLocalReply(

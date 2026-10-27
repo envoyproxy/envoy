@@ -100,6 +100,19 @@ void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
   trailers_ = std::move(trailers);
 }
 
+void FakeStream::rejectRequest(Http::RequestRejection&& rejection) {
+  if (rejection.phase == Http::RequestRejection::Phase::Headers) {
+    decodeHeaders(std::move(rejection.headers), rejection.end_stream);
+  }
+  if (rejection.action == Http::RequestRejection::Action::ResetStream) {
+    encoder_.getStream().resetStream(Http::StreamResetReason::LocalReset);
+    return;
+  }
+  sendLocalReply(rejection.phase == Http::RequestRejection::Phase::Headers ? rejection.response_code
+                                                                           : Http::Code::BadRequest,
+                 "", nullptr, std::nullopt, rejection.details);
+}
+
 void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   for (const auto& metadata : *metadata_map_ptr) {
     duplicated_metadata_key_count_[metadata.first]++;

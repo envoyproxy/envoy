@@ -34,6 +34,7 @@ envoy_cc_test(
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http1:legacy_parser_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//test/common/http:test_header_validator_factory_lib",
         "//test/common/memory:memory_test_utility_lib",
         "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/buffer:buffer_mocks",

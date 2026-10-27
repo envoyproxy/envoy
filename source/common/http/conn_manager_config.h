@@ -567,8 +567,11 @@ public:
   virtual const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const PURE;
 
   /**
-   * Creates new header validator. This method always returns nullptr unless the `ENVOY_ENABLE_UHV`
-   * pre-processor variable is defined.
+   * Creates a new header validator for a stream whose request was NOT decoded by the connection's
+   * codec and therefore was not validated by it: streams created through the API listener and
+   * streams recreated for internal redirects. Codec-decoded requests are validated by the codec
+   * itself. This method always returns nullptr unless the `ENVOY_ENABLE_UHV` pre-processor
+   * variable is defined.
    * @param protocol HTTP protocol version that is to be validated.
    * @return pointer to the header validator.
    *         If nullptr, header validation will not be done.

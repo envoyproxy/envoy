@@ -241,9 +241,8 @@ public:
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
-  ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) override {
-    return header_validator_factory_.createServerHeaderValidator(protocol, header_validator_stats_);
-  }
+  // In UHV builds returns the real default UHV (see deliverRequestHeaders()); nullptr otherwise.
+  ServerHeaderValidatorPtr makeHeaderValidator(Protocol protocol) override;
   bool appendLocalOverload() const override { return false; }
   bool appendXForwardedPort() const override { return false; }
   bool addProxyProtocolConnectionState() const override {
@@ -275,15 +274,12 @@ public:
       callbacks.addAccessLogHandler(handler);
     };
   }
-  void expectUhvHeaderCheck(
-      HeaderValidator::ValidationResult validation_result,
-      ServerHeaderValidator::RequestHeadersTransformationResult transformation_result);
-  void expectUhvTrailerCheck(HeaderValidator::ValidationResult validation_result,
-                             HeaderValidator::TransformationResult transformation_result,
-                             bool expect_response = true);
-  // This method sets-up expectation that UHV will be called and provides real default UHV to
-  // validate headers.
-  void expectCheckWithDefaultUhv();
+  // Delivers request headers to decoder_ the way a server codec would. In UHV builds the codec
+  // runs the header validator before calling the decoder, so this helper validates/transforms
+  // the headers with the default UHV (configured from normalize_path_, merge_slashes_ and
+  // path_with_escaped_slashes_action_) and calls either decodeHeaders() or rejectRequest().
+  // In legacy builds it simply calls decodeHeaders().
+  void deliverRequestHeaders(RequestHeaderMapPtr&& headers, bool end_stream);
 
   Event::MockSchedulableCallback* enableStreamsPerIoLimit(uint32_t limit);
 
@@ -389,7 +385,6 @@ public:
   bool strip_trailing_host_dot_ = false;
   bool record_route_resolution_stats_ = false;
   std::unique_ptr<HttpConnectionManagerProto::ProxyStatusConfig> proxy_status_config_;
-  NiceMock<MockHeaderValidatorFactory> header_validator_factory_;
   NiceMock<MockHeaderValidatorStats> header_validator_stats_;
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;

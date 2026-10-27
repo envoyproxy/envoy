@@ -3851,7 +3851,11 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfig) {
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      *filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+  ASSERT_TRUE(config.headerValidatorFactory().has_value());
+  // The factory is handed to the codecs, which create the validators.
+  NiceMock<Http::MockHeaderValidatorStats> header_validator_stats;
+  EXPECT_NE(nullptr, config.headerValidatorFactory()->createServerHeaderValidator(
+                         Http::Protocol::Http2, header_validator_stats));
 #else
   // If UHV is disabled, providing config should result in rejection
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -3892,7 +3896,7 @@ TEST_F(HttpConnectionManagerConfigTest, HeaderValidatorConfigWithRuntimeDisabled
   ASSERT_OK(creation_status_);
   // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
   // disabled
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+  EXPECT_FALSE(config.headerValidatorFactory().has_value());
 #else
   // If UHV is disabled, providing config should result in rejection
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
@@ -3934,7 +3938,11 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfigWithRuntimeE
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      *filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+  ASSERT_TRUE(config.headerValidatorFactory().has_value());
+  // The factory is handed to the codecs, which create the validators.
+  NiceMock<Http::MockHeaderValidatorStats> header_validator_stats;
+  EXPECT_NE(nullptr, config.headerValidatorFactory()->createServerHeaderValidator(
+                         Http::Protocol::Http2, header_validator_stats));
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_FALSE(proto_config.strip_fragment_from_path());
   EXPECT_TRUE(proto_config.uri_path_normalization_options().skip_path_normalization());
@@ -3983,7 +3991,7 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultHeaderValidatorConfig) {
 
   // Without envoy.reloadable_features.enable_universal_header_validator runtime set, UHV is always
   // disabled
-  EXPECT_EQ(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+  EXPECT_FALSE(config.headerValidatorFactory().has_value());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderValidatorConfig) {
@@ -4024,7 +4032,11 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                                      &scoped_routes_config_provider_manager_, tracer_manager_,
                                      *filter_config_provider_manager_, creation_status_);
   ASSERT_OK(creation_status_);
-  EXPECT_NE(nullptr, config.makeHeaderValidator(Http::Protocol::Http2));
+  ASSERT_TRUE(config.headerValidatorFactory().has_value());
+  // The factory is handed to the codecs, which create the validators.
+  NiceMock<Http::MockHeaderValidatorStats> header_validator_stats;
+  EXPECT_NE(nullptr, config.headerValidatorFactory()->createServerHeaderValidator(
+                         Http::Protocol::Http2, header_validator_stats));
   EXPECT_TRUE(proto_config.strip_fragment_from_path());
   EXPECT_FALSE(proto_config.restrict_http_methods());
   EXPECT_FALSE(proto_config.uri_path_normalization_options().skip_path_normalization());

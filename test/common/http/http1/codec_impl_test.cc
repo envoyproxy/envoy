@@ -7,7 +7,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/http/header_validators/envoy_default/v3/header_validator.pb.h"
 #include "envoy/http/codec.h"
-#include "envoy/http/header_validator_errors.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/utility.h"
@@ -18,6 +17,7 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
+#include "test/common/http/test_header_validator_factory.h"
 #include "test/common/memory/memory_test_utility.h"
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/buffer/mocks.h"
@@ -102,59 +102,40 @@ struct HTTPStringTestCase {
 // Tests in this suite observe request headers produced by the codec
 // by returning a MockRequestDecoder object in the newStream callback.
 // For tests runs with Universal Header Validator (UHV) enabled, some checks and transformations
-// have moved from the codec to UHV, and for tests that verify behaviors that were moved to UHV this
-// shim class is used instead of plain MockRequestDecoder.
-// The shim is transparent when UHV is disabled (header_validator_ == nullptr) and simply defers to
-// the MockRequestDecoder::decodeHeaders() method. With UHV enabled it invokes UHV's
-// validateRequestHeaderMap() method. This will validate and apply transformations expected by the
-// test, before passing it to the base class MockRequestDecoder::decodeHeaders() method. If UHV
-// validation fails it calls the `sendLocalReply` on the decoder, indicating validation error.
+// have moved from the codec to UHV, which the codec runs before calling the request decoder.
+// When UHV rejects a request the codec calls RequestDecoder::rejectRequest() instead of
+// decodeHeaders(). This shim approximates what the HCM does in that case: it calls sendLocalReply()
+// (so that tests can keep their sendLocalReply expectations), resets the stream and closes the
+// connection when the codec asked for it (stream_error_on_invalid_http_message is false in these
+// tests). The shim is transparent when UHV is disabled since the codec never rejects requests.
 class MockRequestDecoderShimWithUhv : public Http::MockRequestDecoder {
 public:
-  MockRequestDecoderShimWithUhv(Http::ServerHeaderValidator* header_validator,
-                                Network::MockConnection& connection)
-      : header_validator_(header_validator), connection_(connection) {
+  explicit MockRequestDecoderShimWithUhv(Network::MockConnection& connection)
+      : connection_(connection) {
     setupRequestDecoderMock(*this);
+    // Rejections are an expected part of the tests that opt into a header validator; tests that
+    // care about the rejection details set their own expectations.
+    EXPECT_CALL(*this, rejectRequest_(_)).Times(testing::AnyNumber());
   }
 
   void setResponseEncoder(Http::ResponseEncoder* response_encoder) {
     response_encoder_ = response_encoder;
   }
-  void setHeaderValidator(Http::ServerHeaderValidator* header_validator) {
-    header_validator_ = header_validator;
-  }
-  void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override {
-    if (header_validator_) {
-      // Header validation is done by the HCM when header map is fully parsed.
-      // This part approximates calling header validation and handling errors, in which case HCM
-      // calls sendLocalReply and closes network connection (based on the
-      // stream_error_on_invalid_http_message flag, which in this test is assumed to equal false).
-      auto result = header_validator_->validateRequestHeaders(*headers);
-      std::string failure_details(result.details());
-      if (result.ok()) {
-        auto transformation_result = header_validator_->transformRequestHeaders(*headers);
-        if (transformation_result.ok()) {
-          MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
-          return;
-        }
-        failure_details = transformation_result.details();
-      }
-      Code response_code = failure_details == Http1ResponseCodeDetail::get().InvalidTransferEncoding
-                               ? Code::NotImplemented
-                               : Code::BadRequest;
-      sendLocalReply(response_code, Http::CodeUtility::toString(response_code), nullptr,
-                     std::nullopt, failure_details);
-      if (response_encoder_) {
-        response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
-      }
+  void rejectRequest(Http::RequestRejection&& rejection) override {
+    MockRequestDecoder::rejectRequest(std::move(rejection));
+    if (rejection.action != Http::RequestRejection::Action::ResetStream) {
+      sendLocalReply(rejection.response_code, Http::CodeUtility::toString(rejection.response_code),
+                     nullptr, std::nullopt, rejection.details);
+    }
+    if (response_encoder_) {
+      response_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
+    }
+    if (rejection.close_connection) {
       connection_.state_ = Network::Connection::State::Closing;
-    } else {
-      MockRequestDecoder::decodeHeaders(std::move(headers), end_stream);
     }
   }
 
 private:
-  Http::ServerHeaderValidator* header_validator_;
   Network::MockConnection& connection_;
   Http::ResponseEncoder* response_encoder_{nullptr};
 };
@@ -185,11 +166,20 @@ public:
 
 class Http1ServerConnectionImplTest : public Http1CodecTestBase {
 public:
-  void initialize() {
+  // Creates the codec without a header validator (requests are delivered to the decoder as
+  // parsed, in both UHV and legacy builds).
+  void initialize() { initialize(/*with_header_validator=*/false); }
+
+  // Creates the codec with the default header validator. Used by tests that verify behaviors which
+  // moved from the codec to UHV. The validator is only used by the codec in UHV builds.
+  void initializeWithHeaderValidator() { initialize(/*with_header_validator=*/true); }
+
+  void initialize(bool with_header_validator) {
     createHeaderValidator();
     codec_ = std::make_unique<Http1::ServerConnectionImpl>(
         connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
-        max_request_headers_count_, headers_with_underscores_action_, overload_manager_);
+        max_request_headers_count_, headers_with_underscores_action_, overload_manager_,
+        with_header_validator ? headerValidatorFactory() : OptRef<HeaderValidatorFactory>());
   }
 
   ~Http1ServerConnectionImplTest() override {
@@ -264,10 +254,14 @@ public:
         static_cast<::envoy::extensions::http::header_validators::envoy_default::v3::
                         HeaderValidatorConfig::HeadersWithUnderscoresAction>(
             headers_with_underscores_action_));
-    header_validator_ = std::make_unique<
-        Extensions::Http::HeaderValidators::EnvoyDefault::ServerHttp1HeaderValidator>(
-        header_validator_config_, Protocol::Http11, http1CodecStats(),
-        header_validator_config_overrides_);
+    header_validator_factory_ = std::make_unique<TestHeaderValidatorFactory>(
+        header_validator_config_, header_validator_config_overrides_);
+  }
+
+  // Header validator factory handed to the codec. The codec only uses it when built with
+  // ENVOY_ENABLE_UHV.
+  OptRef<HeaderValidatorFactory> headerValidatorFactory() {
+    return makeOptRefFromPtr<HeaderValidatorFactory>(header_validator_factory_.get());
   }
 
 protected:
@@ -277,7 +271,7 @@ protected:
       headers_with_underscores_action_{envoy::config::core::v3::HttpProtocolOptions::ALLOW};
   envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
       header_validator_config_;
-  ServerHeaderValidatorPtr header_validator_;
+  std::unique_ptr<TestHeaderValidatorFactory> header_validator_factory_;
   Extensions::Http::HeaderValidators::EnvoyDefault::ConfigOverrides
       header_validator_config_overrides_;
 };
@@ -461,9 +455,9 @@ void Http1ServerConnectionImplTest::testServerAllowChunkedContentLength(uint32_t
   codec_ = std::make_unique<Http1::ServerConnectionImpl>(
       connection_, http1CodecStats(), callbacks_, codec_settings_, max_request_headers_kb_,
       max_request_headers_count_, envoy::config::core::v3::HttpProtocolOptions::ALLOW,
-      overload_manager_);
+      overload_manager_, headerValidatorFactory());
 
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
 
   EXPECT_CALL(callbacks_, newStream(_, _))
@@ -544,9 +538,9 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
 // We support the identity encoding, but because it does not end in chunked encoding we reject it
 // per RFC 7230 Section 3.3.3
 TEST_F(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
-  initialize();
+  initializeWithHeaderValidator();
 
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(connection_);
   InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
@@ -563,9 +557,9 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncodingNoChunked) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, UnsupportedEncoding) {
-  initialize();
+  initializeWithHeaderValidator();
 
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(connection_);
   InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
@@ -1518,9 +1512,9 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
 // when the option is set to allow.
 TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::ALLOW;
-  initialize();
+  initializeWithHeaderValidator();
 
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(connection_);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1542,9 +1536,9 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAllowed) {
 // when the option is set to drop headers.
 TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::DROP_HEADER;
-  initialize();
+  initializeWithHeaderValidator();
 
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(connection_);
   EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
 
   TestRequestHeaderMapImpl expected_headers{
@@ -1565,9 +1559,9 @@ TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreAreDropped) {
 // when the option is set to reject request.
 TEST_F(Http1ServerConnectionImplTest, HeaderNameWithUnderscoreCauseRequestRejected) {
   headers_with_underscores_action_ = envoy::config::core::v3::HttpProtocolOptions::REJECT_REQUEST;
-  initialize();
+  initializeWithHeaderValidator();
 
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(connection_);
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
@@ -2468,9 +2462,9 @@ TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithEarlyData) {
 }
 
 TEST_F(Http1ServerConnectionImplTest, ConnectRequestWithTEChunked) {
-  initialize();
+  initializeWithHeaderValidator();
 
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  MockRequestDecoderShimWithUhv decoder(connection_);
   InSequence sequence;
   EXPECT_CALL(callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
@@ -4668,8 +4662,8 @@ TEST_F(Http1ServerConnectionImplTest, EmptyFieldName) {
 
 // Multiple Transfer-Encoding request headers are not allowed, regardless of their value.
 TEST_F(Http1ServerConnectionImplTest, MultipleTransferEncoding) {
-  initialize();
-  MockRequestDecoderShimWithUhv decoder(header_validator_.get(), connection_);
+  initializeWithHeaderValidator();
+  MockRequestDecoderShimWithUhv decoder(connection_);
   InSequence s;
   Http::ResponseEncoder* response_encoder = nullptr;
   EXPECT_CALL(callbacks_, newStream(_, _))

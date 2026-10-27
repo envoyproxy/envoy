@@ -333,6 +333,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/http:header_validation_utility_lib",
         "//source/common/http:session_idle_list_lib",
         "//source/common/runtime:runtime_features_lib",
         "@quiche//:quic_server_http_spdy_session_lib",

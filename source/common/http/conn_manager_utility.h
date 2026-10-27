@@ -47,7 +47,8 @@ public:
                   uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
                   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
                       headers_with_underscores_action,
-                  Server::OverloadManager& overload_manager, Runtime::Loader& runtime);
+                  Server::OverloadManager& overload_manager, Runtime::Loader& runtime,
+                  OptRef<HeaderValidatorFactory> header_validator_factory = std::nullopt);
 
   /* The result after calling mutateRequestHeaders(), containing the final remote address. Note that
    * an extension used for detecting the original IP of the request might decide it should be

@@ -278,6 +278,7 @@ private:
     void decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(Http::RequestTrailerMapPtr&&) override;
+    void rejectRequest(Http::RequestRejection&& rejection) override;
     void decodeMetadata(Http::MetadataMapPtr&&) override;
     void sendLocalReply(Http::Code code, absl::string_view body,
                         const std::function<void(Http::ResponseHeaderMap& headers)>&,

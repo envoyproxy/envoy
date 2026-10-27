@@ -381,6 +381,7 @@ envoy_cc_library(
         ":forward_client_cert_lib",
         ":header_map_lib",
         ":header_utility_lib",
+        ":header_validation_utility_lib",
         ":headers_lib",
         ":path_utility_lib",
         ":status_lib",
@@ -605,6 +606,19 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@quiche//:http2_adapter_http2_protocol",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_validation_utility_lib",
+    srcs = ["header_validation_utility.cc"],
+    hdrs = ["header_validation_utility.h"],
+    deps = [
+        "//envoy/http:codec_interface",
+        "//envoy/http:header_validator_errors",
+        "//envoy/http:header_validator_interface",
+        "//envoy/http:protocol_interface",
+        "@abseil-cpp//absl/strings:string_view",
     ],
 )
 

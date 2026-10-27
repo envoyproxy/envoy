@@ -37,10 +37,12 @@ public:
     decodeHeaders_(headers, end_stream);
   }
   void decodeTrailers(RequestTrailerMapPtr&& trailers) override { decodeTrailers_(trailers); }
+  void rejectRequest(RequestRejection&& rejection) override { rejectRequest_(rejection); }
 
   // Http::RequestDecoder
   MOCK_METHOD(void, decodeHeaders_, (RequestHeaderMapSharedPtr & headers, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (RequestTrailerMapPtr & trailers));
+  MOCK_METHOD(void, rejectRequest_, (RequestRejection & rejection));
   MOCK_METHOD(AccessLog::InstanceSharedPtrVector, accessLogHandlers, ());
   MOCK_METHOD(RequestDecoderHandlePtr, getRequestDecoderHandle, ());
 };

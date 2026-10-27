@@ -1,7 +1,9 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/header_validator.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/http/http3/codec_stats.h"
@@ -16,7 +18,8 @@ public:
       const uint32_t max_request_headers_kb, const uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action,
-      Server::OverloadManager& overload_manager) PURE;
+      Server::OverloadManager& overload_manager,
+      OptRef<Http::HeaderValidatorFactory> header_validator_factory) PURE;
 
   std::string category() const override { return "quic.http_server_connection"; }
 };

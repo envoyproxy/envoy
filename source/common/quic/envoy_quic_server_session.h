@@ -111,6 +111,12 @@ public:
     headers_with_underscores_action_ = headers_with_underscores_action;
   }
 
+  // Sets the factory used to create a header validator for each incoming request stream. Unset
+  // when header validation is not configured.
+  void setHeaderValidatorFactory(OptRef<Http::HeaderValidatorFactory> header_validator_factory) {
+    header_validator_factory_ = header_validator_factory;
+  }
+
   void storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
@@ -183,6 +189,7 @@ private:
 
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
+  OptRef<Http::HeaderValidatorFactory> header_validator_factory_;
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   std::optional<ConnectionMapPosition> position_;

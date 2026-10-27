@@ -19,6 +19,7 @@
 #include "source/common/grpc/common.h"
 #include "source/common/http/exception.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/header_validation_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/balsa_parser.h"
 #include "source/common/http/http1/header_formatter.h"
@@ -1059,7 +1060,8 @@ ServerConnectionImpl::ServerConnectionImpl(
     const uint32_t max_request_headers_count,
     envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
         headers_with_underscores_action,
-    Server::OverloadManager& overload_manager)
+    Server::OverloadManager& overload_manager,
+    OptRef<HeaderValidatorFactory> header_validator_factory)
     : ConnectionImpl(connection, stats, settings, MessageType::Request, max_request_headers_kb,
                      max_request_headers_count),
       callbacks_(callbacks),
@@ -1072,7 +1074,8 @@ ServerConnectionImpl::ServerConnectionImpl(
           []() -> void { /* TODO(adisuissa): handle overflow watermark */ })),
       headers_with_underscores_action_(headers_with_underscores_action),
       abort_dispatch_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H1ServerAbortDispatch)) {
+          Server::LoadShedPointName::get().H1ServerAbortDispatch)),
+      header_validator_factory_(header_validator_factory) {
   ENVOY_LOG_ONCE_IF(trace, abort_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http1_server_abort_dispatch is not "
                     "found. Is it configured?");
@@ -1238,7 +1241,7 @@ Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
       RequestDecoder* decoder = active_request_->request_decoder_handle_->get().ptr();
       ENVOY_BUG(decoder != nullptr, "RequestDecoder is null in onHeadersCompleteBase");
       if (decoder) {
-        decoder->decodeHeaders(std::move(headers), false);
+        deliverRequestHeaders(*decoder, std::move(headers), false);
       }
 
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
@@ -1254,12 +1257,36 @@ Envoy::StatusOr<CallbackResult> ServerConnectionImpl::onHeadersCompleteBase() {
   return CallbackResult::Success;
 }
 
+void ServerConnectionImpl::deliverRequestHeaders(RequestDecoder& decoder,
+                                                 RequestHeaderMapPtr&& headers, bool end_stream) {
+#ifdef ENVOY_ENABLE_UHV
+  if (active_request_->header_validator_ != nullptr) {
+    if (auto rejection = HeaderValidationUtility::checkRequestHeaders(
+            *active_request_->header_validator_, *headers, protocol(),
+            codec_settings_.stream_error_on_invalid_http_message_);
+        rejection.has_value()) {
+      rejection->headers = std::move(headers);
+      rejection->end_stream = end_stream;
+      decoder.rejectRequest(std::move(*rejection));
+      return;
+    }
+  }
+#endif
+  decoder.decodeHeaders(std::move(headers), end_stream);
+}
+
 Status ServerConnectionImpl::onMessageBeginBase() {
   if (!resetStreamCalled()) {
     ASSERT(active_request_ == nullptr);
     active_request_ = std::make_unique<ActiveRequest>(*this, std::move(bytes_meter_before_stream_));
     active_request_->request_decoder_handle_ =
         callbacks_.newStream(active_request_->response_encoder_).getRequestDecoderHandle();
+#ifdef ENVOY_ENABLE_UHV
+    if (header_validator_factory_.has_value()) {
+      active_request_->header_validator_ =
+          header_validator_factory_->createServerHeaderValidator(protocol(), stats_);
+    }
+#endif
 
     // Check for pipelined request flood as we prepare to accept a new request.
     // Parse errors that happen prior to onMessageBegin result in stream termination, it is not
@@ -1329,13 +1356,31 @@ CallbackResult ServerConnectionImpl::onMessageCompleteBase() {
 
     if (deferred_end_stream_headers_) {
       if (decoder) {
-        decoder->decodeHeaders(std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)),
-                               true);
+        deliverRequestHeaders(
+            *decoder, std::move(absl::get<RequestHeaderMapPtr>(headers_or_trailers_)), true);
       }
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
       if (decoder) {
-        decoder->decodeTrailers(std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+        RequestTrailerMapPtr trailers =
+            std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_));
+#ifdef ENVOY_ENABLE_UHV
+        if (active_request_->header_validator_ != nullptr) {
+          if (auto rejection = HeaderValidationUtility::checkRequestTrailers(
+                  *active_request_->header_validator_, *trailers, protocol(),
+                  codec_settings_.stream_error_on_invalid_http_message_);
+              rejection.has_value()) {
+            rejection->trailers = std::move(trailers);
+            decoder->rejectRequest(std::move(*rejection));
+            trailers = nullptr;
+          }
+        }
+        if (trailers != nullptr) {
+          decoder->decodeTrailers(std::move(trailers));
+        }
+#else
+        decoder->decodeTrailers(std::move(trailers));
+#endif
       }
     } else {
       Buffer::OwnedImpl buffer;
