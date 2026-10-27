@@ -40,13 +40,13 @@ unflattenFields(absl::Span<const HttpFilters::AiProtocolManager::FlattenJsonFiel
 std::vector<HttpFilters::AiProtocolManager::FlattenJsonField>
 flattenJson(const nlohmann::json& json);
 
-// `transcoded` counts payloads rewritten and accepted by the target schema. `backend_defaulted`
-// counts requests whose backend API nobody named, so the client's was assumed; a route that
-// forwards to a backend of another API shows up here when it is misconfigured. The two failure
-// counters are kept apart because they mean different things operationally: `unresolved` is a
-// configuration or client problem (the source protocol is unset/unknown, or an instruction left
-// in filter state cannot be followed), while `failed` is a transcoding problem (the rules ran but
-// produced something the target schema rejected).
+// `transcoded`: a payload was converted and passed the target schema.
+// `backend_defaulted`: the backend schema is not configured but the client schema is, so the
+// backend schema defaulted to the client's.
+// `unresolved`: the request could not be transcoded at all, because nothing said which API the
+// client speaks, or a filter-state instruction could not be followed. A config or client problem.
+// `failed`: transcoding ran but the result was rejected by the target schema. A transcoding
+// problem.
 #define ALL_TRANSCODER_FILTER_STATS(COUNTER)                                                       \
   COUNTER(transcoded)                                                                              \
   COUNTER(backend_defaulted)                                                                       \
