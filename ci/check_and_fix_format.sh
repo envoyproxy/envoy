@@ -15,7 +15,7 @@ function fix {
   set +e
   "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" fix
   echo "Format check failed, try apply following patch to fix:"
-  git add api
+  git add api .github/instructions
   git diff HEAD | tee "${DIFF_OUTPUT}"
 
   exit 1

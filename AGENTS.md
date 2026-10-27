@@ -33,6 +33,8 @@ Read `CONTRIBUTING.md` for the full contribution process. Key points:
 
 ### 2. Writing code
 
+For changes to the xDS API protos under `api/`, read `api/AGENTS.md` first.
+
 Read `STYLE.md` for the C++ coding style. After writing C++ code, run `clang-format` to fix
 formatting automatically rather than trying to hand-format:
 
@@ -220,6 +222,7 @@ See `bazel/EXTERNAL_DEPS.md` and `DEPENDENCY_POLICY.md`. When updating a version
 | File | Purpose |
 |------|---------|
 | `STYLE.md` | C++ coding style and error handling |
+| `api/AGENTS.md` | Guide for changing the xDS API, with links to the API style guide and review checklist |
 | `CONTRIBUTING.md` | Contribution guidelines, deprecation, breaking changes |
 | `PULL_REQUESTS.md` | PR field descriptions |
 | `EXTENSION_POLICY.md` | Extension lifecycle and requirements |
