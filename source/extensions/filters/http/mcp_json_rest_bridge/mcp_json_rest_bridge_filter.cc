@@ -1107,29 +1107,6 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   }
 
   const int response_code = getResponseCode(response_headers);
-  // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
-  // (final size is unknown), and let the headers flow through immediately so
-  // the client can start receiving data without waiting for the full body.
-  if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
-    is_sse_response_ = isSseContentType(response_headers.getContentTypeValue());
-    // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
-    // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
-    // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
-    // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
-    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
-    // certain authorization errors, we assume authorization checks (e.g., OAuth token
-    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
-    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
-    if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
-        response_code != static_cast<int>(Http::Code::Forbidden)) {
-      response_headers.setStatus(enumToInt(Http::Code::OK));
-    }
-    buildStreamingPrefixAndSuffix(response_code >= static_cast<int>(Http::Code::BadRequest));
-    response_headers.removeContentLength();
-    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
-    return Http::FilterHeadersStatus::Continue;
-  }
-
   if (end_stream) {
     // Backend returned a headers-only response (e.g., 204 No Content). Synthesize a JSON-RPC
     // response body so MCP clients don't hang waiting for a body that will never arrive.
@@ -1167,6 +1144,30 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
     encoder_callbacks_->addEncodedData(body_buffer, false);
     return Http::FilterHeadersStatus::Continue;
   }
+
+  // Streaming mode: pre-build the JSON-RPC prefix/suffix, strip Content-Length
+  // (final size is unknown), and let the headers flow through immediately so
+  // the client can start receiving data without waiting for the full body.
+  if (mcp_operation_ == McpOperation::ToolsCall && text_content_streaming_enabled_) {
+    is_sse_response_ = isSseContentType(response_headers.getContentTypeValue());
+    // Overwrite response code to 200 OK unless it is 401 or 403. Non-200 responses
+    // cause MCP clients to fail at the transport layer. 401 and 403 are preserved
+    // as required by the MCP auth spec to drive OAuth handshake and step-up scope flows:
+    // https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization#error-handling
+    // Note on 400 Bad Request: While the MCP authorization spec also includes HTTP 400 for
+    // certain authorization errors, we assume authorization checks (e.g., OAuth token
+    // validation) occur in filters before MCP transcoding, so any 400 error from the REST
+    // backend is assumed to be an API error and is transformed into a standard JSON-RPC error.
+    if (response_code != static_cast<int>(Http::Code::Unauthorized) &&
+        response_code != static_cast<int>(Http::Code::Forbidden)) {
+      response_headers.setStatus(enumToInt(Http::Code::OK));
+    }
+    buildStreamingPrefixAndSuffix(response_code >= static_cast<int>(Http::Code::BadRequest));
+    response_headers.removeContentLength();
+    response_headers.setContentType(Http::Headers::get().ContentTypeValues.Json);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   return Http::FilterHeadersStatus::StopIteration;
 }
 
