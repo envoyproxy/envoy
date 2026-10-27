@@ -144,6 +144,10 @@ filter_chain_matcher:
   }
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+  listener_proto.mutable_udp_listener_config()
+      ->mutable_downstream_socket_config()
+      ->mutable_prefer_gro()
+      ->set_value(true);
   ON_CALL(udp_gso_syscall_, supportsUdpGso())
       .WillByDefault(Return(os_sys_calls_actual_.supportsUdpGso()));
   EXPECT_CALL(server_.api_.random_, uuid());
@@ -265,7 +269,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
@@ -337,7 +341,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicPacketWriterFactoryFromConfig) {
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
@@ -438,7 +442,7 @@ udp_listener_config:
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
@@ -500,7 +504,7 @@ listener_filters:
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
