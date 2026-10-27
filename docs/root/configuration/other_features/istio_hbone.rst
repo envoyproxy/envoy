@@ -10,21 +10,20 @@ sending the application request. Routes can retry it using ``connect-failure``,
 including for POST requests.
 
 This experimental extension pairs the ``envoy.transport_sockets.istio_hbone`` upstream
-transport with the terminal ``envoy.filters.network.istio_hbone`` network filter on an
-:ref:`internal listener <config_internal_listener>`, plus the
-``envoy.upstreams.istio_hbone`` application connection pool adapter. All three extensions
-must be compiled into the binary and configured together. The filter reuses TCP proxy's
-CONNECT implementation, HTTP/2 pooling, flow control and half-close handling. CONNECT
-streams continue to share outer HTTP/2 connections according to the existing pool keys.
+transport with the ``envoy.upstreams.istio_hbone`` connection pool adapter on both the
+application and HBONE clusters. The receiving :ref:`internal listener <config_internal_listener>`
+uses the standard TCP proxy filter. The pool adapter signals transport readiness when
+TCP proxy's tunneling pool accepts CONNECT, retaining its HTTP/2 pooling, flow control
+and half-close handling. CONNECT streams continue to share outer HTTP/2 connections
+according to the existing pool keys.
 
 Configuration
 -------------
 
 Retain the internal listener bootstrap extension and the existing HBONE upstream
 cluster. That cluster must use HTTP/2 and the appropriate upstream mutual TLS settings,
-including peer identity validation and the ``h2`` ALPN protocol. Use the default TCP
-proxy connection pool implementation. Configure the application service cluster's
-transport socket and pool adapter as follows:
+including peer identity validation and the ``h2`` ALPN protocol. Configure the
+application service cluster's transport socket and pool adapter as follows:
 
 .. code-block:: yaml
 
@@ -40,9 +39,14 @@ transport socket and pool adapter as follows:
      typed_config:
        "@type": type.googleapis.com/envoy.extensions.filters.network.istio_hbone.v3alpha.ConnectionPoolConfig
 
+Configure the same ``upstream_config`` pool adapter on the HBONE cluster selected by
+TCP proxy. The adapter on that cluster observes CONNECT acceptance and rejection;
+the application cluster's adapter handles the resulting application connection attempt.
+Tunneling callers without the adapter transport's readiness state retain the stock
+pool behavior, allowing the HBONE cluster to serve both kinds of callers.
+
 Point the service cluster's internal endpoints at ``connect_originate_hbone_adapter``,
-preserving endpoint identifiers and metadata. On that listener, replace the TCP proxy
-with the paired filter, nesting its existing TCP proxy settings under ``tcp_proxy``:
+preserving endpoint identifiers and metadata. Keep the standard TCP proxy on that listener:
 
 .. code-block:: yaml
 
@@ -50,14 +54,18 @@ with the paired filter, nesting its existing TCP proxy settings under ``tcp_prox
    internal_listener: {}
    filter_chains:
    - filters:
-     - name: envoy.filters.network.istio_hbone
+     - name: envoy.filters.network.tcp_proxy
        typed_config:
-         "@type": type.googleapis.com/envoy.extensions.filters.network.istio_hbone.v3alpha.Config
-         tcp_proxy:
-           stat_prefix: connect_originate
-           cluster: connect_originate
-           tunneling_config:
-             hostname: "%DOWNSTREAM_LOCAL_ADDRESS%"
+         "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+         stat_prefix: connect_originate
+         cluster: connect_originate
+         tunneling_config:
+           hostname: "%DOWNSTREAM_LOCAL_ADDRESS%"
+
+The ``envoy.filters.network.istio_hbone`` configuration factory also creates a standard
+TCP proxy, validating CONNECT and immediate connection establishment at configuration
+time. Its existing ``Config.tcp_proxy`` configuration remains available, but the
+HBONE cluster must now select the pool adapter as well.
 
 Istio's upstream peer-metadata filter recognizes ``connect_originate_hbone_adapter``
 and ``inner_connect_originate_hbone_adapter``. It consumes their metadata preamble
@@ -65,9 +73,10 @@ before forwarding the application response.
 
 Keep any existing original destination listener filter and address restoration needed
 to produce the CONNECT authority. A fixed ``hostname: "app:8080"`` can be used when
-testing one destination. CONNECT establishment must be immediate: POST tunneling,
-waiting for downstream application data, and the filter-state override that disables
-tunneling are rejected.
+testing one destination. CONNECT establishment must be immediate; waiting for
+downstream application data cannot work while the transport is holding that data.
+The pool adapter rejects POST tunneling and the filter-state override that disables
+tunneling before creating an upstream stream.
 
 Retry behavior
 --------------
@@ -128,7 +137,8 @@ Double HBONE
 ------------
 
 Gate application readiness at the inner CONNECT by pointing the application transport
-at ``inner_connect_originate_hbone_adapter``. Pair an adapter filter on the
+at ``inner_connect_originate_hbone_adapter``. Use TCP proxy on both origination
+listeners and configure the pool adapter on both selected HBONE clusters. Pair the
 ``outer_connect_originate_hbone_adapter`` listener with an adapter transport on the
 ``inner_connect_originate`` HTTP/2 cluster. Set that transport's ``transport_socket``
 field to the existing inner TLS transport, retaining all identity validation,

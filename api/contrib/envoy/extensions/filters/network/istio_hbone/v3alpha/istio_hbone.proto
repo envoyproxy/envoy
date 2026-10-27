@@ -20,9 +20,10 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 
 // [#protodoc-title: Istio HBONE CONNECT wait]
 
-// Terminal filter for an HBONE origination internal listener. Use together with
-// UpstreamConfig on the cluster connecting to this listener and ConnectionPoolConfig
-// on the application cluster.
+// Validating configuration factory for the standard TCP proxy filter on an HBONE
+// origination internal listener. Use together with UpstreamConfig on the cluster
+// connecting to this listener and ConnectionPoolConfig on both the application
+// and HBONE clusters. A standard TCP proxy configuration may also be used directly.
 // The upstream cluster must use HTTP/2 and configure the required HBONE mutual TLS context.
 // [#extension: envoy.filters.network.istio_hbone]
 message Config {
@@ -33,9 +34,9 @@ message Config {
 }
 
 // Transport socket for clusters whose endpoints are HBONE origination internal
-// listeners using Config. Holds connection readiness and all application bytes
-// until the peer filter receives a successful CONNECT response. Use together with
-// ConnectionPoolConfig on application clusters.
+// listeners using TCP proxy. Holds connection readiness and all application bytes
+// until the tunneling pool receives a successful CONNECT response. Use together with
+// ConnectionPoolConfig on both application and HBONE clusters.
 // [#extension: envoy.transport_sockets.istio_hbone]
 message UpstreamConfig {
   // Metadata to pass to the internal listener, including original destination
@@ -45,12 +46,13 @@ message UpstreamConfig {
 
   // Optional wrapped transport, started only after CONNECT acceptance. Defaults
   // to raw buffer. Use TLS here on the inner HTTP/2 cluster of double HBONE, with
-  // a paired adapter filter on the outer origination listener.
+  // the pool adapter on the outer HBONE cluster.
   config.core.v3.TransportSocket transport_socket = 2;
 }
 
-// Required cluster upstream_config for application clusters using CONNECT wait. Handles
-// permanent CONNECT rejections before router retry and outlier accounting.
+// Required cluster upstream_config for both application and HBONE clusters using
+// CONNECT wait. On HBONE clusters, signals connection readiness after CONNECT
+// acceptance. Handles permanent CONNECT rejections before retry and outlier accounting.
 // HTTP callers receive 403 for CONNECT 401, the original status for other 4xx,
 // and 502 for other non-5xx statuses. The original CONNECT status is retained in
 // failure diagnostics with the ``UF`` response flag. TCP callers are closed.

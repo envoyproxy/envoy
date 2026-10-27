@@ -1,9 +1,11 @@
 #include "contrib/istio/filters/network/hbone/source/pool.h"
 
 #include "envoy/router/router_filter_interface.h"
+#include "envoy/stream_info/bool_accessor.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
+#include "source/common/tcp_proxy/upstream.h"
 
 #include "contrib/istio/filters/network/hbone/source/hbone.h"
 
@@ -94,11 +96,120 @@ private:
   std::string failure_reason_;
 };
 
+// Owned by the pending pool, then by the accepted upstream. The underlying
+// tunneling implementation retains a reference to these callbacks after readiness.
+class TunnelCallbacks : public Tcp::ConnectionPool::UpstreamCallbacks {
+public:
+  TunnelCallbacks(Tcp::ConnectionPool::UpstreamCallbacks& inner, Network::Connection& downstream,
+                  StreamInfo::StreamInfo& info, ConnectStateSharedPtr state)
+      : inner_(inner), downstream_(downstream), info_(info), state_(std::move(state)) {}
+  ~TunnelCallbacks() override {
+    if (reject_) {
+      reject_->cancel();
+    }
+  }
+
+  const ConnectStateSharedPtr& state() const { return state_; }
+  void accepted() { accepted_ = true; }
+
+  void reject(absl::string_view reason, Upstream::HostDescriptionConstSharedPtr host) {
+    failure_reason_ = std::string(reason);
+    state_->fail(failure_reason_);
+    recordRejection(info_, failure_reason_, host);
+    if (!reject_) {
+      reject_ = downstream_.dispatcher().createSchedulableCallback([this]() {
+        const std::string reason = failure_reason_;
+        downstream_.close(Network::ConnectionCloseType::NoFlush, reason);
+      });
+    }
+    // Leave the decoder stack before closing and destroying its pending pool.
+    reject_->scheduleCallbackNextIteration();
+  }
+
+  void onEvent(Network::ConnectionEvent event) override {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      if (state_->phase() == ConnectState::Phase::Failed &&
+          permanentConnectRejection(state_->failureReason())) {
+        return;
+      }
+      // The upstream-filter tunneling implementation reports transport failures
+      // here, including rejections propagated through an outer HBONE transport.
+      if (state_->phase() == ConnectState::Phase::Pending && info_.upstreamInfo() &&
+          permanentConnectRejection(info_.upstreamInfo()->upstreamTransportFailureReason())) {
+        reject(info_.upstreamInfo()->upstreamTransportFailureReason(),
+               info_.upstreamInfo()->upstreamHost());
+        return;
+      }
+      if (info_.upstreamInfo()) {
+        state_->recordAttemptFailure(info_.upstreamInfo()->upstreamTransportFailureReason());
+      }
+      if (accepted_) {
+        state_->fail("hbone upstream closed before CONNECT readiness");
+      }
+    }
+    inner_.onEvent(event);
+  }
+  void onUpstreamData(Buffer::Instance& data, bool end_stream) override {
+    inner_.onUpstreamData(data, end_stream);
+  }
+  void onAboveWriteBufferHighWatermark() override { inner_.onAboveWriteBufferHighWatermark(); }
+  void onBelowWriteBufferLowWatermark() override { inner_.onBelowWriteBufferLowWatermark(); }
+
+private:
+  Tcp::ConnectionPool::UpstreamCallbacks& inner_;
+  Network::Connection& downstream_;
+  StreamInfo::StreamInfo& info_;
+  const ConnectStateSharedPtr state_;
+  Event::SchedulableCallbackPtr reject_;
+  std::string failure_reason_;
+  bool accepted_{false};
+};
+
+class TunnelUpstream : public TcpProxy::GenericUpstream {
+public:
+  TunnelUpstream(std::unique_ptr<TcpProxy::GenericUpstream> inner,
+                 std::shared_ptr<TunnelCallbacks> callbacks)
+      : callbacks_(std::move(callbacks)), inner_(std::move(inner)) {}
+  ~TunnelUpstream() override {
+    callbacks_->state()->fail("hbone upstream destroyed before CONNECT readiness");
+  }
+  bool readDisable(bool disable) override { return inner_->readDisable(disable); }
+  void encodeData(Buffer::Instance& data, bool end_stream) override {
+    inner_->encodeData(data, end_stream);
+  }
+  void addBytesSentCallback(Network::Connection::BytesSentCb callback) override {
+    inner_->addBytesSentCallback(std::move(callback));
+  }
+  Tcp::ConnectionPool::ConnectionData* onDownstreamEvent(Network::ConnectionEvent event,
+                                                         absl::string_view details) override {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      callbacks_->state()->fail("hbone internal peer closed before CONNECT readiness");
+    }
+    return inner_->onDownstreamEvent(event, details);
+  }
+  bool startUpstreamSecureTransport() override { return inner_->startUpstreamSecureTransport(); }
+  Ssl::ConnectionInfoConstSharedPtr getUpstreamConnectionSslInfo() override {
+    return inner_->getUpstreamConnectionSslInfo();
+  }
+  StreamInfo::DetectedCloseType detectedCloseType() const override {
+    return inner_->detectedCloseType();
+  }
+  absl::string_view localCloseReason() const override { return inner_->localCloseReason(); }
+
+private:
+  // Keep callbacks alive while destroying the upstream that references them.
+  const std::shared_ptr<TunnelCallbacks> callbacks_;
+  std::unique_ptr<TcpProxy::GenericUpstream> inner_;
+};
+
 class TcpPool : public TcpProxy::GenericConnPool, public TcpProxy::GenericConnectionPoolCallbacks {
 public:
   TcpPool(TcpProxy::GenericConnPoolPtr inner, Network::Connection& downstream,
-          StreamInfo::StreamInfo& info)
-      : inner_(std::move(inner)), downstream_(downstream), info_(info) {}
+          StreamInfo::StreamInfo& info, std::shared_ptr<TunnelCallbacks> tunnel = nullptr)
+      : tunnel_(std::move(tunnel)), inner_(std::move(inner)), downstream_(downstream), info_(info) {
+  }
   ~TcpPool() override {
     if (reject_) {
       reject_->cancel();
@@ -113,11 +224,29 @@ public:
                           Upstream::HostDescriptionConstSharedPtr& host,
                           const Network::ConnectionInfoProvider& address_provider,
                           Ssl::ConnectionInfoConstSharedPtr ssl_info) override {
+    if (tunnel_) {
+      const auto state = tunnel_->state();
+      tunnel_->accepted();
+      auto wrapped = std::make_unique<TunnelUpstream>(std::move(upstream), tunnel_);
+      // TCP proxy destroys this pool inside the callback. The upstream now owns
+      // the callback guard; a close during the handoff must win over acceptance.
+      callbacks_->onGenericPoolReady(info, std::move(wrapped), host, address_provider, ssl_info);
+      state->accept();
+      return;
+    }
     callbacks_->onGenericPoolReady(info, std::move(upstream), host, address_provider, ssl_info);
   }
   void onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
                             absl::string_view failure_reason,
                             Upstream::HostDescriptionConstSharedPtr host) override {
+    if (tunnel_) {
+      const auto detail = tunnelFailureReason(failure_reason);
+      if (permanentConnectRejection(detail)) {
+        tunnel_->reject(detail, host);
+        return;
+      }
+      tunnel_->state()->recordAttemptFailure(detail);
+    }
     if (!permanentConnectRejection(failure_reason)) {
       callbacks_->onGenericPoolFailure(reason, failure_reason, host);
       return;
@@ -136,6 +265,7 @@ public:
   }
 
 private:
+  const std::shared_ptr<TunnelCallbacks> tunnel_;
   TcpProxy::GenericConnPoolPtr inner_;
   Network::Connection& downstream_;
   StreamInfo::StreamInfo& info_;
@@ -176,6 +306,37 @@ TcpProxy::GenericConnPoolPtr TcpPoolFactory::createGenericConnPool(
   const auto* factory = Envoy::Config::Utility::getFactoryByName<TcpProxy::GenericConnPoolFactory>(
       "envoy.filters.connection_pools.tcp.generic");
   ASSERT(factory != nullptr);
+  auto state = std::dynamic_pointer_cast<ConnectState>(
+      downstream_info.filterState()->getDataSharedMutableGeneric(ConnectState::Key));
+  if (config.has_value() && !state) {
+    // HBONE clusters can also serve callers that do not enable CONNECT wait.
+    return factory->createGenericConnPool(host, cluster, config, context, upstream_callbacks,
+                                          decoder_callbacks, downstream_info);
+  }
+  if (state) {
+    const auto* downstream = context == nullptr ? nullptr : context->downstreamConnection();
+    if (!downstream) {
+      return nullptr;
+    }
+    const auto* disable_tunneling =
+        downstream_info.filterState()->getDataReadOnly<StreamInfo::BoolAccessor>(
+            TcpProxy::DisableTunnelingFilterStateKey);
+    if (!config.has_value() || config->usePost() ||
+        (disable_tunneling != nullptr && disable_tunneling->value())) {
+      state->fail("hbone adapter requires HTTP CONNECT tunneling");
+      return nullptr;
+    }
+    auto& connection = const_cast<Network::Connection&>(*downstream);
+    auto tunnel = std::make_shared<TunnelCallbacks>(upstream_callbacks, connection, downstream_info,
+                                                    std::move(state));
+    auto inner = factory->createGenericConnPool(host, cluster, config, context, *tunnel,
+                                                decoder_callbacks, downstream_info);
+    if (!inner) {
+      return nullptr;
+    }
+    return std::make_unique<TcpPool>(std::move(inner), connection, downstream_info,
+                                     std::move(tunnel));
+  }
   auto inner = factory->createGenericConnPool(host, cluster, config, context, upstream_callbacks,
                                               decoder_callbacks, downstream_info);
   if (!inner) {

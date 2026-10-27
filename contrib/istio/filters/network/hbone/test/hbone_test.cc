@@ -191,6 +191,30 @@ TEST_F(HboneSocketTest, PeerCloseWithoutForwardingFilter) {
   EXPECT_EQ(Network::Connection::State::Closed, connection_->state());
 }
 
+TEST_F(HboneSocketTest, PeerCloseAfterRetriesPreservesLastTunnelFailure) {
+  connect();
+  Buffer::OwnedImpl request("payload");
+  connection_->write(request, false);
+  state_->recordAttemptFailure("tunnel_response:503");
+  state_->recordAttemptFailure("tunnel_response:504");
+  EXPECT_EQ(ConnectState::Phase::Pending, state_->phase());
+  EXPECT_CALL(callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  peer_->close();
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(Network::Connection::State::Closed, connection_->state());
+  EXPECT_EQ("tunnel_response:504", connection_->transportFailureReason());
+  EXPECT_EQ(0, peer_->getReceiveBuffer()->length());
+}
+
+TEST_F(HboneSocketTest, SuccessfulRetryClearsEarlierTunnelFailure) {
+  connect();
+  state_->recordAttemptFailure("tunnel_response:503");
+  accept();
+  EXPECT_TRUE(connection_->transportFailureReason().empty());
+  state_->recordAttemptFailure("late failure");
+  EXPECT_TRUE(connection_->transportFailureReason().empty());
+}
+
 TEST_F(HboneSocketTest, StateStaysLocalToInternalPair) {
   envoy::config::core::v3::Metadata metadata;
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::Connection);

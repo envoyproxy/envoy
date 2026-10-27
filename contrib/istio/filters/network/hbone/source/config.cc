@@ -4,6 +4,7 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 
 #include "contrib/istio/filters/network/hbone/source/hbone.h"
 
@@ -35,8 +36,8 @@ absl::StatusOr<Network::FilterFactoryCb> FilterConfigFactory::createFilterFactor
   }
   auto shared_config = std::make_shared<TcpProxy::Config>(tcp, context);
   return Network::FilterFactoryCb([shared_config, &context](Network::FilterManager& manager) {
-    manager.addReadFilter(
-        std::make_shared<Filter>(shared_config, context.serverFactoryContext().clusterManager()));
+    manager.addReadFilter(std::make_shared<TcpProxy::Filter>(
+        shared_config, context.serverFactoryContext().clusterManager()));
   });
 }
 

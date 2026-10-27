@@ -44,6 +44,9 @@ public:
       ASSERT_TRUE(extension->mutable_typed_config()->PackFrom(internal_listener));
 
       auto* resources = bootstrap.mutable_static_resources();
+      auto* tunnel_pool = resources->mutable_clusters(0)->mutable_upstream_config();
+      tunnel_pool->set_name("envoy.upstreams.istio_hbone");
+      ASSERT_TRUE(tunnel_pool->mutable_typed_config()->PackFrom(PoolConfig{}));
       if (tcp_downstream_) {
         auto* listener = resources->add_listeners();
         listener->set_name("tcp");
@@ -125,9 +128,9 @@ value:
                                     *metadata->mutable_typed_config());
         }
         auto* filter = chain->add_filters();
-        filter->set_name("envoy.filters.network.istio_hbone");
-        FilterConfig config;
-        auto* tcp = config.mutable_tcp_proxy();
+        filter->set_name("envoy.filters.network.tcp_proxy");
+        envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+        auto* tcp = &config;
         tcp->set_stat_prefix(name);
         tcp->mutable_max_connect_attempts()->set_value(tunnel_attempts_);
         tcp->set_cluster("cluster_0");
@@ -141,7 +144,7 @@ value:
           outer_listener->set_name(outer_name);
           outer_listener->mutable_internal_listener();
           auto* outer_filter = outer_listener->add_filter_chains()->add_filters();
-          outer_filter->set_name("envoy.filters.network.istio_hbone");
+          outer_filter->set_name("envoy.filters.network.tcp_proxy");
           ASSERT_TRUE(outer_filter->mutable_typed_config()->PackFrom(config));
           tcp->set_cluster(inner_name);
 
@@ -316,6 +319,9 @@ TEST_P(HboneIntegrationTest, InnerHboneEmptyPeerMetadataIsRemovedBeforeHttpRespo
 }
 
 TEST_P(HboneIntegrationTest, ConnectRejectionIsConnectionFailureWithoutPayload) {
+  // Expose transport diagnostics in this test; the default local reply hides them.
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.hide_transport_failure_reason_in_response_body", "false");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(request_headers_, "payload");
@@ -323,6 +329,7 @@ TEST_P(HboneIntegrationTest, ConnectRejectionIsConnectionFailureWithoutPayload) 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("503", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), HasSubstr("tunnel_response:503"));
   EXPECT_EQ(0, upstream_request_->bodyLength());
   test_server_->waitForCounter("cluster.service.upstream_cx_connect_fail", Eq(1));
 }

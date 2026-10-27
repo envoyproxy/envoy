@@ -2,18 +2,23 @@
 
 HBONE CONNECT wait holds transport readiness and application I/O until CONNECT
 acceptance, allowing connection-failure retries before application bytes are sent.
-The HBONE CONNECT adapter uses an internal upstream transport, a terminal TCP proxy
-filter, and an application connection pool adapter. Configure all three together.
+The HBONE CONNECT adapter uses an internal upstream transport, the standard TCP proxy
+filter, and a connection pool adapter on both application and HBONE clusters.
 
 The implementation uses Envoy's existing internal listener, user-space socket pair,
 TCP proxy and HTTP/2 connection pool. No core Envoy changes are required. Each CONNECT
 is a separate stream; the existing pool continues multiplexing those streams over
 outer HTTP/2 connections.
 
-For double HBONE, the inner HTTP/2 cluster's adapter transport wraps its TLS socket and
-connects to an outer adapter listener. Inner TLS starts after the outer CONNECT succeeds.
+For double HBONE, both HBONE clusters select the pool adapter. The inner HTTP/2 cluster's
+adapter transport wraps its TLS socket and connects to the outer origination listener.
+Inner TLS starts after the outer CONNECT succeeds.
 Each hop keeps separate readiness state; accepted streams retain normal TLS and
 forwarding behavior.
+
+The network configuration factory remains available as a validating alias for stock
+TCP proxy. CONNECT signaling lives in the pool adapter; there is no TCP proxy subclass.
+Pilot must configure the pool adapter on the HBONE clusters before using this version.
 
 See [configuration and retry semantics](../../../../../docs/root/configuration/other_features/istio_hbone.rst).
 

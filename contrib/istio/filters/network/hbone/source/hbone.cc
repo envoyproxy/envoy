@@ -1,7 +1,6 @@
 #include "contrib/istio/filters/network/hbone/source/hbone.h"
 
 #include "envoy/event/file_event.h"
-#include "envoy/stream_info/bool_accessor.h"
 
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
@@ -44,6 +43,13 @@ std::optional<uint32_t> permanentConnectRejection(absl::string_view reason) {
   return rejectedStatus(reason, RejectionPrefix);
 }
 
+std::string tunnelFailureReason(absl::string_view reason) {
+  if (const auto status = rejectedStatus(reason, "tunnel_response:")) {
+    return absl::StrCat(RejectionPrefix, *status);
+  }
+  return std::string(reason);
+}
+
 void ConnectState::notify() {
   if (callback_) {
     callback_();
@@ -52,8 +58,15 @@ void ConnectState::notify() {
 
 void ConnectState::accept() {
   if (phase_ == Phase::Pending) {
+    failure_reason_.clear();
     phase_ = Phase::Accepted;
     notify();
+  }
+}
+
+void ConnectState::recordAttemptFailure(absl::string_view reason) {
+  if (phase_ == Phase::Pending) {
+    failure_reason_ = std::string(reason);
   }
 }
 
@@ -147,7 +160,9 @@ Network::IoResult UpstreamSocket::doRead(Buffer::Instance& buffer) {
     // Detect a peer close even if the accepting filter was never instantiated.
     auto* io = dynamic_cast<IoSocket::UserSpace::IoHandle*>(&callbacks_->ioHandle());
     if (state_->phase() == ConnectState::Phase::Pending && io != nullptr && io->hasReceivedEof()) {
-      state_->fail("hbone internal peer closed before CONNECT readiness");
+      state_->fail(state_->failureReason().empty()
+                       ? "hbone internal peer closed before CONNECT readiness"
+                       : state_->failureReason());
       return {Network::PostIoAction::Close, 0, false};
     }
     return {Network::PostIoAction::KeepOpen, 0, false};
@@ -180,130 +195,6 @@ void UpstreamSocket::cancel() {
 void UpstreamSocket::closeSocket(Network::ConnectionEvent event, bool abort_reset) {
   cancel();
   InternalSocket::closeSocket(event, abort_reset);
-}
-
-Filter::~Filter() {
-  if (read_callbacks_ != nullptr) {
-    read_callbacks_->connection().removeConnectionCallbacks(*this);
-  }
-  if (state_) {
-    state_->fail("hbone forwarding filter destroyed before CONNECT readiness");
-  }
-}
-
-void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
-  state_ = std::dynamic_pointer_cast<ConnectState>(
-      callbacks.connection().streamInfo().filterState()->getDataSharedMutableGeneric(
-          ConnectState::Key));
-  TcpProxy::Filter::initializeReadFilterCallbacks(callbacks);
-  // No upstream pool has been created yet. Intercept its close notifications
-  // before TCP proxy starts flushing the downstream connection.
-  upstream_callbacks_ = std::make_shared<ConnectCallbacks>(this, state_);
-  callbacks.connection().addConnectionCallbacks(*this);
-}
-
-void Filter::ConnectCallbacks::onEvent(Network::ConnectionEvent event) {
-  // The newer TCP proxy pool reports pre-CONNECT transport failures through
-  // UpstreamCallbacks instead of onGenericPoolFailure. Its upstream StreamInfo
-  // still carries the reason, including an outer-HBONE rejection.
-  // Draining callbacks no longer have a parent filter or a downstream to reject.
-  if (parent_ != nullptr && state_ && state_->phase() == ConnectState::Phase::Pending &&
-      (event == Network::ConnectionEvent::LocalClose ||
-       event == Network::ConnectionEvent::RemoteClose)) {
-    auto& info = parent_->getStreamInfo();
-    if (info.upstreamInfo() &&
-        permanentConnectRejection(info.upstreamInfo()->upstreamTransportFailureReason())) {
-      static_cast<Filter*>(parent_)->rejectConnect(
-          info.upstreamInfo()->upstreamTransportFailureReason(),
-          info.upstreamInfo()->upstreamHost());
-      return;
-    }
-  }
-  if (state_ && state_->phase() == ConnectState::Phase::Accepted &&
-      (event == Network::ConnectionEvent::LocalClose ||
-       event == Network::ConnectionEvent::RemoteClose)) {
-    state_->fail("hbone upstream closed before CONNECT readiness");
-  }
-  // Pending attempts still belong to TCP proxy's retry policy; established
-  // streams retain normal forwarding and drain semantics.
-  TcpProxy::Filter::UpstreamCallbacks::onEvent(event);
-}
-
-Network::FilterStatus Filter::onNewConnection() {
-  if (!state_) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                        "hbone adapter transport socket is missing");
-    return Network::FilterStatus::StopIteration;
-  }
-  const auto* disable_tunneling =
-      read_callbacks_->connection()
-          .streamInfo()
-          .filterState()
-          ->getDataReadOnly<StreamInfo::BoolAccessor>(TcpProxy::DisableTunnelingFilterStateKey);
-  if (disable_tunneling != nullptr && disable_tunneling->value()) {
-    state_->fail("hbone adapter cannot disable CONNECT tunneling");
-    read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush,
-                                        "hbone adapter cannot disable CONNECT tunneling");
-    return Network::FilterStatus::StopIteration;
-  }
-  return TcpProxy::Filter::onNewConnection();
-}
-
-void Filter::onGenericPoolReady(StreamInfo::StreamInfo* info,
-                                std::unique_ptr<TcpProxy::GenericUpstream>&& upstream,
-                                Upstream::HostDescriptionConstSharedPtr& host,
-                                const Network::ConnectionInfoProvider& address_provider,
-                                Ssl::ConnectionInfoConstSharedPtr ssl_info) {
-  const auto state = state_;
-  TcpProxy::Filter::onGenericPoolReady(info, std::move(upstream), host, address_provider, ssl_info);
-  // A close during the base callback wins over acceptance. The socket delivers
-  // readiness on a later dispatcher iteration, never inside the HTTP decoder.
-  state->accept();
-}
-
-void Filter::onGenericPoolFailure(ConnectionPool::PoolFailureReason reason,
-                                  absl::string_view failure_reason,
-                                  Upstream::HostDescriptionConstSharedPtr host) {
-  if (const auto status = rejectedStatus(failure_reason, "tunnel_response:")) {
-    rejectConnect(absl::StrCat(RejectionPrefix, *status), std::move(host));
-    return;
-  }
-  if (permanentConnectRejection(failure_reason)) {
-    rejectConnect(failure_reason, std::move(host));
-    return;
-  }
-  failure_reason_ = std::string(failure_reason);
-  TcpProxy::Filter::onGenericPoolFailure(reason, failure_reason, std::move(host));
-}
-
-void Filter::rejectConnect(absl::string_view reason, Upstream::HostDescriptionConstSharedPtr host) {
-  // Copy before deleting the pool: reason may refer to its upstream StreamInfo.
-  failure_reason_ = std::string(reason);
-  state_->fail(failure_reason_);
-  connecting_ = false;
-  read_callbacks_->upstreamHost(host);
-  getStreamInfo().upstreamInfo()->setUpstreamHost(host);
-  getStreamInfo().upstreamInfo()->setUpstreamTransportFailureReason(failure_reason_);
-  getStreamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
-  getStreamInfo().setResponseCodeDetails(failure_reason_);
-  // A CONNECT decoder may still be on the stack. Do not run the base failure
-  // callback: it reports an outlier failure and schedules TCP proxy retries.
-  read_callbacks_->connection().dispatcher().deferredDelete(std::move(generic_conn_pool_));
-  TcpProxy::Filter::onInitFailure(UpstreamFailureReason::ConnectFailed);
-}
-
-void Filter::onInitFailure(UpstreamFailureReason reason) {
-  if (state_) {
-    state_->fail(failure_reason_.empty() ? "hbone CONNECT establishment failed" : failure_reason_);
-  }
-  TcpProxy::Filter::onInitFailure(reason);
-}
-
-void Filter::onEvent(Network::ConnectionEvent event) {
-  if (state_ && (event == Network::ConnectionEvent::LocalClose ||
-                 event == Network::ConnectionEvent::RemoteClose)) {
-    state_->fail("hbone internal peer closed before CONNECT readiness");
-  }
 }
 
 } // namespace Hbone

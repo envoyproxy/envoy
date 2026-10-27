@@ -1,12 +1,15 @@
 #include "envoy/extensions/upstreams/http/generic/v3/generic_connection_pool.pb.h"
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
 
+#include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/router/router_filter_interface.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
@@ -14,6 +17,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/istio/filters/network/hbone/source/hbone.h"
 #include "contrib/istio/filters/network/hbone/source/pool.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -217,16 +221,17 @@ public:
     return std::make_unique<
         envoy::extensions::upstreams::tcp::generic::v3::GenericConnectionPoolProto>();
   }
-  TcpProxy::GenericConnPoolPtr createGenericConnPool(Upstream::HostConstSharedPtr,
-                                                     Upstream::ThreadLocalCluster&,
-                                                     TcpProxy::TunnelingConfigHelperOptConstRef,
-                                                     Upstream::LoadBalancerContext*,
-                                                     Tcp::ConnectionPool::UpstreamCallbacks&,
-                                                     Http::StreamDecoderFilterCallbacks&,
-                                                     StreamInfo::StreamInfo&) const override {
+  TcpProxy::GenericConnPoolPtr
+  createGenericConnPool(Upstream::HostConstSharedPtr, Upstream::ThreadLocalCluster&,
+                        TcpProxy::TunnelingConfigHelperOptConstRef, Upstream::LoadBalancerContext*,
+                        Tcp::ConnectionPool::UpstreamCallbacks& callbacks,
+                        Http::StreamDecoderFilterCallbacks&,
+                        StreamInfo::StreamInfo&) const override {
+    upstream_callbacks_ = &callbacks;
     return std::move(pool_);
   }
   mutable TcpProxy::GenericConnPoolPtr pool_;
+  mutable Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_{};
 };
 
 class HboneTcpPoolTest : public testing::Test {
@@ -240,8 +245,8 @@ protected:
   }
 
   TcpProxy::GenericConnPoolPtr create(Upstream::LoadBalancerContext* context) {
-    return factory_.createGenericConnPool(nullptr, cluster_, {}, context, upstream_callbacks_,
-                                          decoder_callbacks_, info_);
+    return factory_.createGenericConnPool(nullptr, cluster_, tunneling_config_, context,
+                                          upstream_callbacks_, decoder_callbacks_, info_);
   }
 
   void initialize() {
@@ -276,6 +281,7 @@ protected:
   TcpInnerFactory inner_factory_;
   Registry::InjectFactory<TcpProxy::GenericConnPoolFactory> registration_{inner_factory_};
   TcpPoolFactory factory_;
+  TcpProxy::TunnelingConfigHelperOptConstRef tunneling_config_;
   StrictMock<MockTcpPool>* inner_{};
   TcpProxy::GenericConnectionPoolCallbacks* adapter_callbacks_{};
   TcpProxy::GenericConnPoolPtr pool_;
@@ -333,6 +339,200 @@ TEST_F(HboneTcpPoolTest, RejectionIsDeferredAndCloseCanDestroyPool) {
 }
 
 TEST_F(HboneTcpPoolTest, DestructionRemovesAlreadyScheduledRejection) {
+  initialize();
+  reject();
+  pool_.reset();
+  run();
+}
+
+class MockTcpUpstream : public TcpProxy::GenericUpstream {
+public:
+  MOCK_METHOD(bool, readDisable, (bool), (override));
+  MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool), (override));
+  MOCK_METHOD(void, addBytesSentCallback, (Network::Connection::BytesSentCb), (override));
+  MOCK_METHOD(Tcp::ConnectionPool::ConnectionData*, onDownstreamEvent,
+              (Network::ConnectionEvent, absl::string_view), (override));
+  MOCK_METHOD(bool, startUpstreamSecureTransport, (), (override));
+  MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, getUpstreamConnectionSslInfo, (), (override));
+  MOCK_METHOD(StreamInfo::DetectedCloseType, detectedCloseType, (), (const, override));
+  MOCK_METHOD(absl::string_view, localCloseReason, (), (const, override));
+};
+
+class HboneTunnelPoolTest : public HboneTcpPoolTest {
+protected:
+  HboneTunnelPoolTest() {
+    configureTunnel();
+    info_.filterState()->setData(ConnectState::Key, state_);
+    info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+  }
+
+  void configureTunnel(bool use_post = false) {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config;
+    TestUtility::loadFromYaml(R"EOF(
+stat_prefix: hbone
+cluster: hbone
+tunneling_config:
+  hostname: "app:8080"
+)EOF",
+                              config);
+    config.mutable_tunneling_config()->set_use_post(use_post);
+    tcp_config_ = std::make_shared<TcpProxy::Config>(config, factory_context_);
+    tunneling_config_ = tcp_config_->tunnelingConfigHelper();
+  }
+
+  void ready(bool close_during_callback = false) {
+    auto upstream = std::make_unique<StrictMock<MockTcpUpstream>>();
+    inner_upstream_ = upstream.get();
+    Upstream::HostDescriptionConstSharedPtr host;
+    EXPECT_CALL(downstream_, connectionInfoProvider());
+    EXPECT_CALL(callbacks_, onGenericPoolReady(&info_, _, _, _, nullptr))
+        .WillOnce([this, close_during_callback](auto*, auto&& upstream, auto&, auto&, auto) {
+          upstream_ = std::move(upstream);
+          pool_.reset();
+          if (close_during_callback) {
+            EXPECT_CALL(*inner_upstream_,
+                        onDownstreamEvent(Network::ConnectionEvent::LocalClose, _))
+                .WillOnce(Return(nullptr));
+            upstream_->onDownstreamEvent(Network::ConnectionEvent::LocalClose);
+          }
+        });
+    adapter_callbacks_->onGenericPoolReady(&info_, std::move(upstream), host,
+                                           downstream_.connectionInfoProvider(), nullptr);
+  }
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::shared_ptr<TcpProxy::Config> tcp_config_;
+  ConnectStateSharedPtr state_{std::make_shared<ConnectState>()};
+  StrictMock<MockTcpUpstream>* inner_upstream_{};
+  std::unique_ptr<TcpProxy::GenericUpstream> upstream_;
+};
+
+TEST_F(HboneTunnelPoolTest, UnpairedTunnelUsesStockPool) {
+  StreamInfo::StreamInfoImpl unpaired{time_system_, nullptr,
+                                      StreamInfo::FilterState::LifeSpan::Connection};
+  auto pool = factory_.createGenericConnPool(nullptr, cluster_, tunneling_config_, &context_,
+                                             upstream_callbacks_, decoder_callbacks_, unpaired);
+  EXPECT_EQ(inner_, pool.get());
+  EXPECT_EQ(&upstream_callbacks_, inner_factory_.upstream_callbacks_);
+}
+
+TEST_F(HboneTunnelPoolTest, RequiresDownstreamConnection) {
+  EXPECT_EQ(nullptr, create(nullptr));
+  EXPECT_EQ(nullptr, inner_factory_.upstream_callbacks_);
+}
+
+TEST_F(HboneTunnelPoolTest, RequiresTunneling) {
+  tunneling_config_ = {};
+  EXPECT_EQ(nullptr, create(&context_));
+  EXPECT_EQ(ConnectState::Phase::Failed, state_->phase());
+  EXPECT_EQ(nullptr, inner_factory_.upstream_callbacks_);
+}
+
+TEST_F(HboneTunnelPoolTest, RejectsDisabledTunneling) {
+  info_.filterState()->setData(TcpProxy::DisableTunnelingFilterStateKey,
+                               std::make_shared<StreamInfo::BoolAccessorImpl>(true));
+  EXPECT_EQ(nullptr, create(&context_));
+  EXPECT_EQ(ConnectState::Phase::Failed, state_->phase());
+  EXPECT_EQ(nullptr, inner_factory_.upstream_callbacks_);
+}
+
+TEST_F(HboneTunnelPoolTest, RejectsPostTunneling) {
+  configureTunnel(true);
+  EXPECT_EQ(nullptr, create(&context_));
+  EXPECT_EQ(ConnectState::Phase::Failed, state_->phase());
+  EXPECT_EQ(nullptr, inner_factory_.upstream_callbacks_);
+}
+
+TEST_F(HboneTunnelPoolTest, NullInnerPoolDoesNotAccept) {
+  inner_factory_.pool_.reset();
+  EXPECT_EQ(nullptr, create(&context_));
+  EXPECT_EQ(ConnectState::Phase::Pending, state_->phase());
+}
+
+TEST_F(HboneTunnelPoolTest, ReadyDestroysPoolAndTransfersCallbacksToUpstream) {
+  initialize();
+  EXPECT_EQ(ConnectState::Phase::Pending, state_->phase());
+  ready();
+  EXPECT_EQ(nullptr, pool_);
+  EXPECT_EQ(ConnectState::Phase::Accepted, state_->phase());
+  EXPECT_CALL(upstream_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
+      .WillOnce([this](auto) {
+        // The guard must fail readiness before TCP proxy starts flushing buffered data.
+        EXPECT_EQ(ConnectState::Phase::Failed, state_->phase());
+      });
+  inner_factory_.upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+}
+
+TEST_F(HboneTunnelPoolTest, CloseDuringReadyCallbackWinsOverAcceptance) {
+  initialize();
+  ready(true);
+  EXPECT_EQ(ConnectState::Phase::Failed, state_->phase());
+}
+
+TEST_F(HboneTunnelPoolTest, UpstreamDestructionCancelsDeferredReadiness) {
+  initialize();
+  ready();
+  upstream_.reset();
+  EXPECT_EQ(ConnectState::Phase::Failed, state_->phase());
+}
+
+TEST_F(HboneTunnelPoolTest, EstablishedCloseRetainsNormalSemantics) {
+  initialize();
+  ready();
+  state_->connected();
+  EXPECT_CALL(upstream_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  inner_factory_.upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  upstream_.reset();
+  EXPECT_EQ(ConnectState::Phase::Connected, state_->phase());
+}
+
+TEST_F(HboneTunnelPoolTest, TransientFailureAllowsAnotherTunnelAttempt) {
+  initialize();
+  EXPECT_CALL(callbacks_,
+              onGenericPoolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure,
+                                   "tunnel_response:503", nullptr))
+      .WillOnce([this](auto, auto, auto) { pool_.reset(); });
+  adapter_callbacks_->onGenericPoolFailure(
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "tunnel_response:503", nullptr);
+  EXPECT_EQ(ConnectState::Phase::Pending, state_->phase());
+  EXPECT_EQ("tunnel_response:503", state_->failureReason());
+}
+
+TEST_F(HboneTunnelPoolTest, TransientTransportEventUsesNormalRetryCallbacks) {
+  initialize();
+  info_.upstreamInfo()->setUpstreamTransportFailureReason("TLS error");
+  EXPECT_CALL(upstream_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
+  inner_factory_.upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(ConnectState::Phase::Pending, state_->phase());
+  EXPECT_EQ("TLS error", state_->failureReason());
+  EXPECT_FALSE(info_.hasAnyResponseFlag());
+}
+
+TEST_F(HboneTunnelPoolTest, PermanentRejectionSkipsTcpProxyFailureCallback) {
+  initialize();
+  adapter_callbacks_->onGenericPoolFailure(
+      ConnectionPool::PoolFailureReason::RemoteConnectionFailure, "tunnel_response:401", nullptr);
+  EXPECT_EQ("istio_hbone_connect_rejected:401", state_->failureReason());
+  EXPECT_EQ(ConnectState::Phase::Failed, state_->phase());
+  // A subsequent close must not enter TCP proxy's retry/outlier path either.
+  inner_factory_.upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(downstream_,
+              close(Network::ConnectionCloseType::NoFlush, "istio_hbone_connect_rejected:401"))
+      .WillOnce([this](auto, auto) { pool_.reset(); });
+  run();
+}
+
+TEST_F(HboneTunnelPoolTest, NestedTransportRejectionSkipsTcpProxyEventCallback) {
+  initialize();
+  info_.upstreamInfo()->setUpstreamTransportFailureReason(Rejection);
+  inner_factory_.upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(Rejection, state_->failureReason());
+  EXPECT_CALL(downstream_, close(Network::ConnectionCloseType::NoFlush, Rejection))
+      .WillOnce([this](auto, auto) { pool_.reset(); });
+  run();
+}
+
+TEST_F(HboneTunnelPoolTest, CancellationRemovesScheduledRejection) {
   initialize();
   reject();
   pool_.reset();

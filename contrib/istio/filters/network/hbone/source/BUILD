@@ -24,16 +24,18 @@ envoy_cc_contrib_extension(
         ":hbone_lib",
         "//envoy/router:router_filter_interface",
         "//envoy/router:router_interface",
+        "//envoy/stream_info:bool_accessor_interface",
         "//envoy/tcp:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
+        "//source/common/tcp_proxy:upstream_lib",
         "//source/extensions/upstreams/http/generic:config",
         "//source/extensions/upstreams/tcp/generic:config",
         "@envoy_api//contrib/envoy/extensions/filters/network/istio_hbone/v3alpha:pkg_cc_proto",
     ],
 )
 
-# Selecting the filter (or transport alias) also links the application pool
+# Selecting the filter (or transport alias) also links the connection pool
 # factories required by CONNECT wait.
 envoy_cc_contrib_extension(
     name = "config",
@@ -47,6 +49,7 @@ envoy_cc_contrib_extension(
         "//source/common/config:utility_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:transport_socket_options_lib",
+        "//source/common/tcp_proxy",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/transport_sockets/internal_upstream:config",
         "@envoy_api//contrib/envoy/extensions/filters/network/istio_hbone/v3alpha:pkg_cc_proto",
@@ -60,10 +63,8 @@ envoy_cc_library(
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
-        "//envoy/stream_info:bool_accessor_interface",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/network:raw_buffer_socket_lib",
-        "//source/common/tcp_proxy",
         "//source/extensions/io_socket/user_space:io_handle_lib",
         "//source/extensions/transport_sockets/internal_upstream",
         "@abseil-cpp//absl/strings",
