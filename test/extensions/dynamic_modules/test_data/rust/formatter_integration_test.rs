@@ -140,7 +140,7 @@ impl FormatterProvider for TestProvider {
       ProviderKind::Const => "constant".to_string(),
     };
     match self.max_length {
-      Some(max_length) if value.len() > max_length => Some(value[..max_length].to_string()),
+      Some(max_length) if value.len() > max_length => Some(value[.. max_length].to_string()),
       _ => Some(value),
     }
   }

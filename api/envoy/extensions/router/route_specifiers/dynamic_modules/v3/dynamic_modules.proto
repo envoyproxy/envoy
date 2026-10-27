@@ -126,6 +126,8 @@ message RouteOverride {
   // query string, which is preserved, and the result is capped at
   // :ref:`max_rewritten_path_bytes
   // <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.max_rewritten_path_bytes>`.
+  // When the module records a prefix rewrite rule, the rule wins, and the regex rewrite applies to
+  // a path the rule does not apply to when the request headers are finalized.
   type.matcher.v3.RegexMatchAndSubstitute regex_rewrite = 9;
 
   // Tracing configuration replacing the tracing settings of the produced route, overriding the
@@ -205,8 +207,8 @@ message DynamicModuleRouteSpecifier {
   google.protobuf.BoolValue validate_clusters = 9;
 
   // The maximum length of a request path a module rewrite may produce, covering the full ``:path``
-  // value including the query string. A rewrite whose result would exceed it is rejected. If not
-  // specified, defaults to 65536.
+  // value including the query string. A rewrite whose result would exceed it is rejected, or not
+  // applied when the request headers are finalized. If not specified, defaults to 65536.
   google.protobuf.UInt32Value max_rewritten_path_bytes = 10 [(validate.rules).uint32 = {gt: 0}];
 
   // An opaque identifier the module reads with ``get_config_specifier_instance_id``, so that two

@@ -135,9 +135,11 @@ public:
   const std::string CONNECTION_LIMIT_PREFIX = "envoy.connection_limit_prefix";
   // Stats prefix for the RBAC network filter
   const std::string RBAC_PREFIX = "envoy.rbac_prefix";
+  // Rules/shadow rules stats prefix for the RBAC network filter
+  const std::string RBAC_RULES_PREFIX = "envoy.rbac_rules_prefix";
   // Stats prefix for the RBAC http filter
   const std::string RBAC_HTTP_PREFIX = "envoy.rbac_http_prefix";
-  // Policy name for the RBAC http filter
+  // Policy name for the RBAC filters
   const std::string RBAC_POLICY_NAME = "envoy.rbac_policy_name";
   // Stats prefix for the TCP Proxy network filter
   const std::string TCP_PREFIX = "envoy.tcp_prefix";

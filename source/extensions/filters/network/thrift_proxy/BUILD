@@ -53,11 +53,13 @@ envoy_cc_extension(
         "//envoy/access_log:access_log_interface",
         "//envoy/registry",
         "//source/common/config:utility_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/router:rds_lib",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
@@ -266,6 +268,8 @@ envoy_cc_library(
     deps = [
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/config:well_known_names",
+        "//source/common/stats:utility_lib",
     ],
 )
 

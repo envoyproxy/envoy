@@ -6,6 +6,8 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
@@ -21,6 +23,22 @@ using testing::Eq;
 using testing::Ge;
 namespace Envoy {
 namespace {
+
+bool dualStackUdpIsBindable() {
+  const auto address = Network::Test::getAnyAddress(Network::Address::IpVersion::v6, true);
+  auto& syscalls = Api::OsSysCallsSingleton::get();
+  const auto fd = syscalls.socket(AF_INET6, SOCK_DGRAM, 0).return_value_;
+  if (!SOCKET_VALID(fd)) {
+    return false;
+  }
+  const int v6only = 0;
+  const bool supported =
+      syscalls.setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)).return_value_ ==
+          0 &&
+      syscalls.bind(fd, address->sockAddr(), address->sockAddrLen()).return_value_ == 0;
+  syscalls.close(fd);
+  return supported;
+}
 
 class UdpReverseFilter : public Network::UdpListenerReadFilter {
 public:
@@ -130,7 +148,23 @@ typed_config:
 
     config_helper_.addListenerFilter(listener_filter_config);
 
+    initialize();
+  }
+
+  // Whether the stats store derives tags with the explicit-tags logic rather than the legacy
+  // tag-extraction rules. Both modes must produce identical stat names, tag-extracted names and
+  // tags, so the two IP versions run the server in different modes.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v6; }
+
+  void initialize() override {
+    // The mode is read during server initialization, before the runtime loader exists, so it has
+    // to be set directly rather than with addRuntimeOverride().
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
+                                  explicitTags());
     BaseIntegrationTest::initialize();
+    auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->useExplicitTags(), explicitTags());
   }
 
   struct DrainFilterConfig {
@@ -247,7 +281,7 @@ typed_config:
   "@type": type.googleapis.com/google.protobuf.Struct
 )EOF");
 
-    BaseIntegrationTest::initialize();
+    initialize();
   }
 
   void requestResponseWithListenerAddress(
@@ -327,6 +361,30 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   requestResponseWithListenerAddress(*listener_address);
 }
 
+TEST_P(UdpProxyIntegrationTest, DualStackListenerRepliesToIpv4Client) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "This regression requires an IPv4 client and upstream.";
+  }
+  if (!dualStackUdpIsBindable()) {
+    GTEST_SKIP() << "An IPv6 UDP socket with IPV6_V6ONLY=0 cannot bind [::]:0.";
+  }
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* address = bootstrap.mutable_static_resources()
+                        ->mutable_listeners(0)
+                        ->mutable_address()
+                        ->mutable_socket_address();
+    address->set_address("::");
+    address->set_ipv4_compat(true);
+  });
+  setup(1);
+  const auto listener_address =
+      *Network::Utility::resolveUrl(fmt::format("udp://127.0.0.1:{}", lookupPort("listener_0")));
+  // This helper checks both payloads, the IPv4 reply endpoint and transmit counters.
+  // The reply uses the original IPv6 listener fd and the normalized IPv4 peer.
+  requestResponseWithListenerAddress(*listener_address);
+  EXPECT_EQ(0, test_server_->counter("udp.foo.downstream_sess_tx_errors")->value());
+}
+
 TEST_P(UdpProxyIntegrationTest, UpstreamBindConfigSourceAddress) {
   if (version_ != Network::Address::IpVersion::v4) {
     GTEST_SKIP();
@@ -360,6 +418,78 @@ TEST_P(UdpProxyIntegrationTest, UpstreamBindConfigSourceAddress) {
   EXPECT_EQ("world", response_datagram.buffer_->toString());
   EXPECT_EQ(listener_address->asString(), response_datagram.addresses_.peer_->asString());
 }
+
+#if defined(__linux__) && defined(ENVOY_ENABLE_QUIC)
+TEST_P(UdpProxyIntegrationTest, UpstreamGsoPreservesDatagramsAndReplies) {
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGso()) {
+    GTEST_SKIP() << "UDP GSO is not supported";
+  }
+  setup(1, std::nullopt, R"EOF(
+  upstream_packet_writer_config:
+    name: envoy.udp_packet_writer.gso
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+)EOF");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                  lookupPort("listener_0")));
+  Network::Test::UdpSyncPeer client(version_);
+  const std::vector<std::string> payloads{"packet-1", "packet-2", "", "", "short", "packet-3"};
+  uint64_t total_bytes = 0;
+  for (const auto& payload : payloads) {
+    client.write(payload, *listener_address);
+    total_bytes += payload.length();
+  }
+  for (const auto& payload : payloads) {
+    Network::UdpRecvData request;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request));
+    EXPECT_EQ(payload, request.buffer_->toString());
+    fake_upstreams_[0]->sendUdpDatagram(payload, request.addresses_.peer_);
+    Network::UdpRecvData response;
+    client.recv(response);
+    EXPECT_EQ(payload, response.buffer_->toString());
+  }
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams", Eq(payloads.size()));
+  test_server_->waitForCounter("cluster.cluster_0.udp.upstream.total_bytes_sent", Eq(total_bytes));
+  test_server_->waitForGauge("cluster.cluster_0.udp.upstream.internal_buffer_size", Eq(0));
+}
+
+TEST_P(UdpProxyIntegrationTest, UpstreamGsoPreservesOriginalSourceIp) {
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+      !Api::OsSysCallsSingleton::get().supportsIpTransparent(version_)) {
+    GTEST_SKIP() << "UDP GSO and transparent sockets are required.";
+  }
+  setup(1, std::nullopt, R"EOF(
+  use_original_src_ip: true
+  upstream_packet_writer_config:
+    name: envoy.udp_packet_writer.gso
+    typed_config:
+      '@type': type.googleapis.com/envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+)EOF");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                  lookupPort("listener_0")));
+  const auto client_address = Network::Utility::parseInternetAddressAndPortNoThrow(
+      version_ == Network::Address::IpVersion::v4 ? "127.0.0.2:0" : "[::1]:0");
+  Network::UdpListenSocket client(client_address, nullptr, true);
+  const Buffer::OwnedImpl request("hello");
+  const auto result =
+      Network::Utility::writeToSocket(client.ioHandle(), request, nullptr, *listener_address);
+  ASSERT_TRUE(result.ok());
+  ASSERT_EQ(request.length(), result.return_value_);
+
+  Network::UdpRecvData received;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(received));
+  EXPECT_EQ(request.toString(), received.buffer_->toString());
+  ASSERT_NE(nullptr, received.addresses_.peer_->ip());
+  EXPECT_EQ(client_address->ip()->addressAsString(),
+            received.addresses_.peer_->ip()->addressAsString());
+  EXPECT_NE(0, received.addresses_.peer_->ip()->port());
+  test_server_->waitForCounter("cluster.cluster_0.udp.upstream.total_bytes_sent",
+                               Eq(request.length()));
+  test_server_->waitForGauge("cluster.cluster_0.udp.upstream.internal_buffer_size", Eq(0));
+}
+#endif
 
 // Verify downstream drops are handled correctly with stats.
 TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
@@ -885,6 +1015,23 @@ TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterBasicLoopback) {
   // Although the default cluster is cluster_1 which does not exist, the per session cluster setter
   // filter will set the session cluster to cluster_0 .
   requestResponseWithListenerAddress(*listener_address);
+}
+
+// The stat prefix is an explicit tag of the stats in both stats modes.
+TEST_P(UdpProxyIntegrationTest, StatsAreTagged) {
+  setup(1);
+
+  const auto total = test_server_->counter("udp.foo.downstream_sess_total");
+  ASSERT_NE(total.get(), nullptr);
+  EXPECT_EQ("udp.downstream_sess_total", total->tagExtractedName());
+  EXPECT_THAT(total->tags(),
+              testing::UnorderedElementsAreArray(Stats::TagVector{{"envoy.udp_prefix", "foo"}}));
+
+  const auto active = test_server_->gauge("udp.foo.downstream_sess_active");
+  ASSERT_NE(active.get(), nullptr);
+  EXPECT_EQ("udp.downstream_sess_active", active->tagExtractedName());
+  EXPECT_THAT(active->tags(),
+              testing::UnorderedElementsAreArray(Stats::TagVector{{"envoy.udp_prefix", "foo"}}));
 }
 
 } // namespace

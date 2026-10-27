@@ -99,6 +99,15 @@ vhds:
     return config_update_info;
   }
 
+  envoy::config::route::v3::RouteConfiguration
+  routeConfiguration(const RouteConfigUpdateReceiver& receiver) {
+    envoy::config::route::v3::RouteConfiguration route_config;
+    if (receiver.configInfo().has_value()) {
+      EXPECT_OK(MessageUtil::unpackTo(receiver.configInfo().value().config_, route_config));
+    }
+    return route_config;
+  }
+
   ProtoTraitsImpl proto_traits_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Init::ManagerImpl init_manager_{"test route config"};
@@ -244,7 +253,7 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
       TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
-  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ(0UL, routeConfiguration(*config_update_info).virtual_hosts_size());
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
@@ -254,9 +263,9 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, removed_resources, "1"));
 
-  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
-  EXPECT_TRUE(messageDifferencer_.Equals(
-      vhost, config_update_info->protobufConfigurationCast().virtual_hosts(0)));
+  EXPECT_EQ(1UL, routeConfiguration(*config_update_info).virtual_hosts_size());
+  EXPECT_TRUE(
+      messageDifferencer_.Equals(vhost, routeConfiguration(*config_update_info).virtual_hosts(0)));
 }
 
 // verify that an RDS update of virtual hosts leaves VHDS virtual hosts intact
@@ -304,7 +313,7 @@ vhds:
 
   // The route configuration configures VHDS, so it isn't published until the initial VHDS fetch
   // has landed.
-  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ(0UL, routeConfiguration(*config_update_info).virtual_hosts_size());
 
   auto vhost = buildVirtualHost("vhost_vhds1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
@@ -313,14 +322,14 @@ vhds:
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       decoded_resources.refvec_, removed_resources, "1"));
-  EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ(2UL, routeConfiguration(*config_update_info).virtual_hosts_size());
 
   EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
 
-  EXPECT_EQ(3UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
-  auto actual_vhost_0 = config_update_info->protobufConfigurationCast().virtual_hosts(0);
-  auto actual_vhost_1 = config_update_info->protobufConfigurationCast().virtual_hosts(1);
-  auto actual_vhost_2 = config_update_info->protobufConfigurationCast().virtual_hosts(2);
+  EXPECT_EQ(3UL, routeConfiguration(*config_update_info).virtual_hosts_size());
+  auto actual_vhost_0 = routeConfiguration(*config_update_info).virtual_hosts(0);
+  auto actual_vhost_1 = routeConfiguration(*config_update_info).virtual_hosts(1);
+  auto actual_vhost_2 = routeConfiguration(*config_update_info).virtual_hosts(2);
   EXPECT_TRUE("vhost_rds1" == actual_vhost_0.name() || "vhost_rds1" == actual_vhost_1.name() ||
               "vhost_rds1" == actual_vhost_2.name());
   EXPECT_TRUE("vhost_rds2" == actual_vhost_0.name() || "vhost_rds2" == actual_vhost_1.name() ||
@@ -516,7 +525,8 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsSurviveRdsUpdateThatKeepsTheSubscription
   // The published configuration still carries the answered virtual host, merged with the new RDS
   // virtual host, so the locally served answer stays correct.
   std::vector<std::string> vhost_names;
-  for (const auto& vhost : config_update_info->protobufConfigurationCast().virtual_hosts()) {
+  const auto current_config = routeConfiguration(*config_update_info);
+  for (const auto& vhost : current_config.virtual_hosts()) {
     vhost_names.push_back(vhost.name());
   }
   EXPECT_THAT(vhost_names, ::testing::UnorderedElementsAre("vhost_rds1", "vhost1"));
@@ -549,7 +559,7 @@ vhds:
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
   // The route configuration configures VHDS, so it isn't published until the initial VHDS fetch
   // has landed.
-  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ(0UL, routeConfiguration(*config_update_info).virtual_hosts_size());
 
   // Add a VHDS virtual host with the same name as one of the RDS virtual hosts
   auto vhost = buildVirtualHost("overlapping_vhost", "vhost.vhds.domain");
@@ -561,13 +571,13 @@ vhds:
       decoded_resources.refvec_, removed_resources, "1"));
 
   // Should have 2 virtual hosts: vhost_rds_only from RDS + overlapping_vhost from VHDS
-  EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  const auto current_config = routeConfiguration(*config_update_info);
+  EXPECT_EQ(2UL, current_config.virtual_hosts_size());
 
   // Verify the VHDS version of the overlapping vhost is used (with vhds domain, not rds domain)
   bool found_vhds_version = false;
   bool found_rds_only = false;
-  for (int i = 0; i < config_update_info->protobufConfigurationCast().virtual_hosts_size(); ++i) {
-    const auto& vh = config_update_info->protobufConfigurationCast().virtual_hosts(i);
+  for (const auto& vh : current_config.virtual_hosts()) {
     if (vh.name() == "overlapping_vhost") {
       // The VHDS version should have "vhost.vhds.domain", not "vhost.rds.domain"
       EXPECT_EQ("vhost.vhds.domain", vh.domains(0));
@@ -636,12 +646,12 @@ vhds:
   EXPECT_OK(config_update_info->onRdsUpdate(updated_route_config, "2"));
 
   // Should have 2: vhost_rds_new from RDS + overlapping_vhost from VHDS
-  EXPECT_EQ(2UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  const auto current_config = routeConfiguration(*config_update_info);
+  EXPECT_EQ(2UL, current_config.virtual_hosts_size());
 
   // Verify VHDS version still takes precedence after RDS update
   bool found_vhds_version = false;
-  for (int i = 0; i < config_update_info->protobufConfigurationCast().virtual_hosts_size(); ++i) {
-    const auto& vh = config_update_info->protobufConfigurationCast().virtual_hosts(i);
+  for (const auto& vh : current_config.virtual_hosts()) {
     if (vh.name() == "overlapping_vhost") {
       EXPECT_EQ("vhost.vhds.domain", vh.domains(0));
       found_vhds_version = true;
@@ -673,7 +683,7 @@ vhds:
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
   // The route configuration configures VHDS, so it isn't published until the initial VHDS fetch
   // has landed.
-  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ(0UL, routeConfiguration(*config_update_info).virtual_hosts_size());
 
   // Add a VHDS virtual host with the same name as the RDS one
   auto vhost = buildVirtualHost("overlapping_vhost", "vhost.vhds.domain");
@@ -685,9 +695,9 @@ vhds:
       decoded_resources.refvec_, removed_resources, "1"));
 
   // VHDS version should override
-  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ(1UL, routeConfiguration(*config_update_info).virtual_hosts_size());
   EXPECT_EQ("vhost.vhds.domain",
-            config_update_info->protobufConfigurationCast().virtual_hosts(0).domains(0));
+            routeConfiguration(*config_update_info).virtual_hosts(0).domains(0));
 
   // Now remove the VHDS virtual host
   const auto no_added_resources = buildAddedResources({});
@@ -699,11 +709,10 @@ vhds:
       no_decoded_resources.refvec_, resources_to_remove, "2"));
 
   // The RDS virtual host should reappear
-  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
-  EXPECT_EQ("overlapping_vhost",
-            config_update_info->protobufConfigurationCast().virtual_hosts(0).name());
+  EXPECT_EQ(1UL, routeConfiguration(*config_update_info).virtual_hosts_size());
+  EXPECT_EQ("overlapping_vhost", routeConfiguration(*config_update_info).virtual_hosts(0).name());
   EXPECT_EQ("vhost.rds.domain",
-            config_update_info->protobufConfigurationCast().virtual_hosts(0).domains(0));
+            routeConfiguration(*config_update_info).virtual_hosts(0).domains(0));
 }
 
 // verify that with the runtime guard disabled, RDS and VHDS virtual hosts with the same name are
@@ -740,7 +749,8 @@ vhds:
       decoded_resources.refvec_, removed_resources, "1"));
 
   // Both the RDS and the VHDS versions of overlapping_vhost are kept, RDS first.
-  const auto& virtual_hosts = config_update_info->protobufConfigurationCast().virtual_hosts();
+  const auto current_config = routeConfiguration(*config_update_info);
+  const auto& virtual_hosts = current_config.virtual_hosts();
   ASSERT_EQ(2, virtual_hosts.size());
   EXPECT_EQ("overlapping_vhost", virtual_hosts[0].name());
   EXPECT_EQ("vhost.rds.domain", virtual_hosts[0].domains(0));

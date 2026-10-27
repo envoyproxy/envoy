@@ -934,6 +934,7 @@ private:
   // Remove when removing runtime feature `http2_fix_goaway_loadshed_point`.
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_reset_stream_on_begin_headers_{nullptr};
   bool sent_go_away_on_dispatch_{false};
 };
 

@@ -6,6 +6,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/config/metadata.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -123,6 +124,25 @@ public:
     TestUtility::loadFromYaml(std::string(yaml), proto_config);
     return Envoy::Router::ConfigImpl::create(proto_config, context_, creation_status_visitor_,
                                              init_manager_, false);
+  }
+
+  uint64_t counterValue(absl::string_view name) {
+    return context_.store_.counter(absl::StrCat("dynamicmodulescustom.route_specifier.test.", name))
+        .value();
+  }
+
+  // Finalizes the request headers through the route entry, after checking that the entry reports
+  // the path it finalizes through currentUrlPathAfterRewrite.
+  Http::TestRequestHeaderMapImpl finalize(const Envoy::Router::RouteEntry& entry,
+                                          Http::TestRequestHeaderMapImpl headers,
+                                          bool insert_envoy_original_path = true) {
+    Formatter::Context formatter_context(&headers);
+    const std::string expected_path =
+        entry.currentUrlPathAfterRewrite(headers, formatter_context, stream_info_);
+    entry.finalizeRequestHeaders(headers, formatter_context, stream_info_,
+                                 insert_envoy_original_path);
+    EXPECT_EQ(expected_path, headers.getPathValue());
+    return headers;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -889,6 +909,257 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideMetadataLayersUnderModuleMe
   EXPECT_EQ("module", fields.at("group").string_value());
   EXPECT_EQ("carried", fields.at("extra").string_value());
   EXPECT_TRUE(metadata.typed_filter_metadata().contains("envoy.test.typed"));
+}
+
+// A route configuration whose only route has the given action, under the rewrite rule module in the
+// given mode with a route override that carries a regex rewrite and one that carries none.
+std::string rewriteRuleConfigYaml(absl::string_view mode,
+                                  absl::string_view route_action = "{cluster: matched_cluster}",
+                                  absl::string_view extra = "") {
+  return fmt::format(R"EOF(
+name: test_route_config
+virtual_hosts:
+- name: test_vhost
+  domains: ["*"]
+  routes:
+  - match: {{prefix: "/"}}
+    route: {}
+  route_specifiers:
+  - name: envoy.router.route_specifiers.dynamic_modules
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
+{}
+)EOF",
+                     route_action,
+                     specifierYaml("route_specifier_rewrite_rule",
+                                   fmt::format(R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: {}
+      route_overrides:
+      - override_id: rewrite
+        regex_rewrite:
+          pattern: {{regex: "^/(.+)$"}}
+          substitution: '/regex/\1'
+      - override_id: plain
+        retry_policy: {{num_retries: 1}}
+{})EOF",
+                                               mode, extra)));
+}
+
+// Whether the last call of the rewrite rule module was accepted.
+std::string ruleAccepted(const Envoy::Router::Route& route) {
+  return Envoy::Config::Metadata::metadataValue(&route.metadata(), "envoy.test.rule", "accepted")
+      .string_value();
+}
+
+// Matches finalized request headers by their path and their x-envoy-original-path, which is empty
+// when they carry none.
+MATCHER_P2(HasPaths, path, original_path, "") {
+  *result_listener << "with path " << arg.getPathValue() << " and original path "
+                   << arg.getEnvoyOriginalPathValue();
+  return arg.getPathValue() == path && arg.getEnvoyOriginalPathValue() == original_path;
+}
+
+// A rule applies to the path the request carries when its headers are finalized, so the route
+// rewrites a request it was not built for the way a configured route does.
+TEST_F(DynamicModuleRouteSpecifierTest, PrefixRewriteRuleAppliesToTheFinalizedPath) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("literal"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1?x=1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/API/v2?y=2")),
+              HasPaths("/internal/v2?y=2", "/API/v2?y=2"));
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v3"), false), HasPaths("/internal/v3", ""));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A rule over the whole path replaces the path without its query string and fragment.
+TEST_F(DynamicModuleRouteSpecifierTest, WholePathPrefixRewriteRuleKeepsTheQuery) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("whole-path"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/anything/else?q=1#fragment")),
+              HasPaths("/fixed?q=1#fragment", "/anything/else?q=1#fragment"));
+}
+
+// An invalid rule, or one that cannot apply to the current request, is rejected and records
+// nothing.
+class RejectedPrefixRewriteRuleTest : public DynamicModuleRouteSpecifierTest,
+                                      public testing::WithParamInterface<std::string> {};
+
+INSTANTIATE_TEST_SUITE_P(Modes, RejectedPrefixRewriteRuleTest,
+                         testing::Values("not-prefix", "whole-path-with-matched",
+                                         "empty-replacement", "invalid-replacement", "unknown-span",
+                                         "too-long", "relative-replacement", "query-in-replacement",
+                                         "fragment-in-replacement", "result-too-long"));
+
+TEST_P(RejectedPrefixRewriteRuleTest, RecordsNothing) {
+  const auto config = loadRaw(rewriteRuleConfigYaml(GetParam(), "{cluster: matched_cluster}",
+                                                    "      max_rewritten_path_bytes: 16\n"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("false", ruleAccepted(*route.route));
+  // Only the metadata was recorded, which needs no route entry wrapper.
+  EXPECT_EQ(nullptr, dynamic_cast<const DynamicModuleRouteEntry*>(route.route->routeEntry()));
+}
+
+// A literal span ends before the query string and fragment, so a matched that reaches into them is
+// rejected even though it is a prefix of the path the request carries.
+TEST_F(DynamicModuleRouteSpecifierTest, LiteralSpanEndsBeforeTheQueryAndFragment) {
+  for (const auto& [mode, path] : std::vector<std::pair<std::string, std::string>>{
+           {"query-in-matched", "/api?x=1"}, {"fragment-in-matched", "/api#x"}}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadRaw(rewriteRuleConfigYaml(mode, "{cluster: matched_cluster}"));
+    ASSERT_TRUE(config.ok());
+    const auto route = config.value()->route(requestHeaders(path), stream_info_, 0);
+    ASSERT_NE(nullptr, route.route);
+    EXPECT_EQ("false", ruleAccepted(*route.route));
+  }
+}
+
+// A recorded path takes precedence over a rule, which is then neither applied nor counted.
+TEST_F(DynamicModuleRouteSpecifierTest, RecordedPathTakesPrecedenceOverPrefixRewriteRule) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("path-wins"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v2")), HasPaths("/literal", "/api/v2"));
+  EXPECT_THAT(finalize(*entry, requestHeaders("/other")), HasPaths("/literal", "/other"));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A rule takes precedence over the regex rewrite of a selected route override, which applies to a
+// path the rule does not when the request headers are finalized and then records that path over
+// the original path the request carries.
+TEST_F(DynamicModuleRouteSpecifierTest, PrefixRewriteRuleTakesPrecedenceOverRouteOverrideRegex) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("rule-over-override"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v2")), HasPaths("/internal/v2", "/api/v2"));
+  auto other = requestHeaders("/other?q=1");
+  other.setEnvoyOriginalPath("/carried");
+  EXPECT_THAT(finalize(*entry, std::move(other)), HasPaths("/regex/other?q=1", "/other?q=1"));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A recorded path takes precedence over the regex rewrite of a selected route override.
+TEST_F(DynamicModuleRouteSpecifierTest, RecordedPathTakesPrecedenceOverRouteOverrideRegex) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("path-over-override"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/api/v2")),
+              HasPaths("/literal", "/api/v2"));
+}
+
+// Without a rule the regex rewrite of a selected route override applies when the decision
+// resolves, so the route carries the path it produced and keeps an original path the request
+// carries.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideRegexRewriteAppliesWhenTheDecisionResolves) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("override-only"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  auto headers = requestHeaders("/other?q=1");
+  headers.setEnvoyOriginalPath("/carried");
+  EXPECT_THAT(finalize(*entry, std::move(headers)), HasPaths("/regex/api/v1", "/carried"));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A later rule replaces the rule of an earlier call.
+TEST_F(DynamicModuleRouteSpecifierTest, LaterPrefixRewriteRuleReplacesTheEarlierOne) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("replaced"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/api/v1")),
+              HasPaths("/second/v1", "/api/v1"));
+}
+
+// A rejected rule records nothing, so the rule of an earlier call stays.
+TEST_F(DynamicModuleRouteSpecifierTest, RejectedPrefixRewriteRuleKeepsTheEarlierOne) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("rejected-after-accepted"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("false", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/api/v1")),
+              HasPaths("/first/v1", "/api/v1"));
+}
+
+// A rule that does not apply when the request headers are finalized leaves the rewrite of the route
+// in effect and is counted.
+TEST_F(DynamicModuleRouteSpecifierTest, PrefixRewriteRuleThatDoesNotApplyLeavesTheRouteRewrite) {
+  const auto config = loadRaw(
+      rewriteRuleConfigYaml("literal", R"({cluster: matched_cluster, prefix_rewrite: "/route/"})"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/other/x")), HasPaths("/route/other/x", "/other/x"));
+  EXPECT_EQ(1, counterValue("rewrite_not_applied"));
+
+  // Where the rule applies it replaces the rewrite of the route.
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v2")), HasPaths("/internal/v2", "/api/v2"));
+  EXPECT_EQ(1, counterValue("rewrite_not_applied"));
+}
+
+// A rule that does not apply, followed by a regex rewrite that yields nothing, here one over the
+// bound, leaves the rewrite of the route in effect and is counted.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideRegexRewriteThatYieldsNothingIsCounted) {
+  const auto config = loadRaw(rewriteRuleConfigYaml(
+      "rule-over-override", R"({cluster: matched_cluster, prefix_rewrite: "/route/"})",
+      "      max_rewritten_path_bytes: 16\n"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/a-path-past-the-bound")),
+              HasPaths("/route/a-path-past-the-bound", "/a-path-past-the-bound"));
+  EXPECT_EQ(1, counterValue("rewrite_not_applied"));
+}
+
+// A route override that carries no rewrite leaves the rewrite of the route in effect, uncounted.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideWithoutARewriteLeavesTheRouteRewrite) {
+  const auto config = loadRaw(rewriteRuleConfigYaml(
+      "no-rewrite", R"({cluster: matched_cluster, prefix_rewrite: "/route/"})"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = dynamic_cast<const DynamicModuleRouteEntry*>(route.route->routeEntry());
+  ASSERT_NE(nullptr, entry);
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v1")), HasPaths("/route/api/v1", "/api/v1"));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
 }
 
 } // namespace

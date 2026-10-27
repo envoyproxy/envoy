@@ -1483,10 +1483,26 @@ num_retries: 10
       Utility::convertCoreToRouteRetryPolicy(core_retry_policy,
                                              "5xx,gateway-error,connect-failure,reset");
   EXPECT_EQ(route_retry_policy.num_retries().value(), 10);
-  EXPECT_EQ(route_retry_policy.per_try_timeout().seconds(), 10);
+  EXPECT_FALSE(route_retry_policy.has_per_try_timeout());
   EXPECT_EQ(route_retry_policy.retry_back_off().base_interval().seconds(), 1);
   EXPECT_EQ(route_retry_policy.retry_back_off().max_interval().seconds(), 10);
   EXPECT_EQ(route_retry_policy.retry_on(), "5xx,gateway-error,connect-failure,reset");
+
+  const std::string core_policy_with_per_try_timeout = R"(
+retry_back_off:
+  base_interval: 1s
+  max_interval: 2s
+per_try_timeout: 3s
+num_retries: 10
+)";
+  envoy::config::core::v3::RetryPolicy core_retry_policy_with_per_try_timeout;
+  TestUtility::loadFromYaml(core_policy_with_per_try_timeout,
+                            core_retry_policy_with_per_try_timeout);
+  const envoy::config::route::v3::RetryPolicy route_retry_policy_with_per_try_timeout =
+      Utility::convertCoreToRouteRetryPolicy(core_retry_policy_with_per_try_timeout, "");
+  EXPECT_EQ(route_retry_policy_with_per_try_timeout.retry_back_off().base_interval().seconds(), 1);
+  EXPECT_EQ(route_retry_policy_with_per_try_timeout.retry_back_off().max_interval().seconds(), 2);
+  EXPECT_EQ(route_retry_policy_with_per_try_timeout.per_try_timeout().seconds(), 3);
 
   const std::string core_policy2 = R"(
 retry_back_off:
