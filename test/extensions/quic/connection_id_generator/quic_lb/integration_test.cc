@@ -37,6 +37,7 @@ public:
   }
 
   void writeEncryptionParameters(uint8_t version, absl::string_view key, bool update = false) {
+    const char version_byte = static_cast<char>(version);
     TestEnvironment::writeStringToFileForTest(
         update ? "quic_lb.next.yaml" : "quic_lb.yaml",
         absl::StrCat(R"EOF(
@@ -50,7 +51,7 @@ resources:
                      Base64::encode(key.data(), key.size()), R"EOF(
         configuration_version:
           inline_bytes: )EOF",
-                     Base64::encode(&version, sizeof(version)), "\n"),
+                     Base64::encode(&version_byte, sizeof(version_byte)), "\n"),
         false);
     if (update) {
       TestEnvironment::renameFile(TestEnvironment::temporaryPath("quic_lb.next.yaml"),
