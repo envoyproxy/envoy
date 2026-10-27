@@ -70,9 +70,7 @@ public:
   }
 
   const std::string& responseBody() const { return response_body_; }
-  const Router::HeaderParser& responseHeadersParser() const {
-    return *response_headers_parser_;
-  }
+  const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
 
 private:
   // Abstract abort provider.
