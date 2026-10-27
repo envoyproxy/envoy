@@ -474,6 +474,20 @@ using LocalityWeights = std::vector<uint32_t>;
 using LocalityWeightsSharedPtr = std::shared_ptr<LocalityWeights>;
 using LocalityWeightsConstSharedPtr = std::shared_ptr<const LocalityWeights>;
 
+// A host set's hosts in a form other than flat vectors. Defined in upstream_impl.h.
+class HostSetSnapshot;
+using HostSetSnapshotConstSharedPtr = std::shared_ptr<const HostSetSnapshot>;
+
+/**
+ * Sizes of a host set's hosts(), healthyHosts(), degradedHosts() and excludedHosts().
+ */
+struct HostCounts {
+  size_t hosts{};
+  size_t healthy{};
+  size_t degraded{};
+  size_t excluded{};
+};
+
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
@@ -505,6 +519,20 @@ public:
    * @return a shared ptr to the vector returned by healthyHosts().
    */
   virtual HealthyHostVectorConstSharedPtr healthyHostsPtr() const PURE;
+
+  /**
+   * @return the host counts. An implementation that keeps its hosts in another form can answer
+   *         without building the vectors.
+   */
+  virtual HostCounts hostCounts() const {
+    return {hosts().size(), healthyHosts().size(), degradedHosts().size(), excludedHosts().size()};
+  }
+
+  /**
+   * @return a snapshot of this set's hosts for workers to adopt, or nullptr when the flat vectors
+   *         are the current representation.
+   */
+  virtual HostSetSnapshotConstSharedPtr snapshot() const { return nullptr; }
 
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
@@ -657,6 +685,9 @@ public:
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality;
+    // When set, a snapshot for the host set to adopt in place of the flat views above, which are
+    // then null.
+    HostSetSnapshotConstSharedPtr snapshot;
   };
 
   /**
