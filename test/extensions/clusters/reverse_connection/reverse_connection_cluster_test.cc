@@ -108,6 +108,7 @@ public:
   // Set up the upstream extension components (socket interface and extension).
   void setupUpstreamExtension() {
     // Create the socket interface.
+    extension_.reset();
     socket_interface_ =
         std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptor>(server_context_);
 
@@ -207,8 +208,7 @@ public:
 
     // Let the extension create and own its TLS slot and manager to avoid duplicate timer/file
     // event creation.
-    NiceMock<Server::MockInstance> instance;
-    extension_->onServerInitialized(instance);
+    extension_->onWorkerThreadInitialized();
   }
 
   // Helper to add a socket to the manager for testing.
@@ -1151,6 +1151,7 @@ public:
   // Set up the upstream extension components (socket interface and extension).
   void setupUpstreamExtension() {
     // Create the socket interface.
+    extension_.reset();
     socket_interface_ =
         std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptor>(server_context_);
 
@@ -1167,8 +1168,7 @@ public:
     }
 
     // Let the extension create and manage its own TLS slot and timer.
-    NiceMock<Server::MockInstance> instance;
-    extension_->onServerInitialized(instance);
+    extension_->onWorkerThreadInitialized();
 
     // Get the registered socket interface from the global registry and set up its extension.
     auto* registered_socket_interface =
