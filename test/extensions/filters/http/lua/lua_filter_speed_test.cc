@@ -432,6 +432,9 @@ public:
   Http::StreamDecoderFilterCallbacks& decoderCallbacks() { return decoder_callbacks_; }
   uint64_t errors() { return counterValue("bench.lua.errors"); }
   uint64_t executions() { return counterValue("bench.lua.executions"); }
+  bool executionTimeRecorded() const {
+    return stats_store_.histogramRecordedValues("bench.lua.stream_execution_time_us");
+  }
 
 private:
   // A name no counter has is a harness bug, not a zero: counter() would create one and report it.
@@ -465,6 +468,8 @@ void runScript(benchmark::State& state, absl::string_view code, bool clear_route
   // Warm the VM and prove the script actually runs before anything is timed.
   harness.oneRequest();
   RELEASE_ASSERT(harness.executions() > 0, "script never ran");
+  RELEASE_ASSERT(harness.executionTimeRecorded() == track_execution_time,
+                 "track_execution_time did not reach the filter");
 
   for (auto _ : state) {
     harness.oneRequest();
@@ -513,8 +518,9 @@ LUA_SCRIPT_BENCHMARK_CFG(RepeatHeaderAddNoRouteClear, kRepeatHeaderAdd, false)
 LUA_SCRIPT_BENCHMARK_CFG(RepeatHeaderReplaceNoRouteClear, kRepeatHeaderReplace, false)
 LUA_SCRIPT_BENCHMARK_CFG(HeadersMetadataNoRouteClear, kHeadersMetadata, false)
 
-// `track_execution_time` reads the clock twice per handler and records one sample per stream. The
-// delta between an arm and its Tracked twin is what the histogram costs.
+// `track_execution_time` reads the clock twice per handler and records one sample per stream. These
+// arms send headers only, so the delta between an arm and its Tracked twin is the histogram's cost
+// for a stream with no body or local reply.
 #define LUA_SCRIPT_BENCHMARK_TRACKED(Name, Code)                                                   \
   void BM_##Name##Tracked(benchmark::State& state) { runScript(state, Code, true, true); }        \
   BENCHMARK(BM_##Name##Tracked);

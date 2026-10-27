@@ -241,6 +241,13 @@ public:
   // after start()/onData()/onTrailers() return and reports errors via Filter::scriptError().
   const absl::Status& coroutineStatus() const { return coroutine_status_; }
 
+  // Whether the script is yielded until the next body chunk, the whole body or the trailers, so
+  // that onData() or onTrailers() may resume it.
+  bool awaitingStream() const {
+    return state_ == State::WaitForBodyChunk || state_ == State::WaitForBody ||
+           state_ == State::WaitForTrailers;
+  }
+
   void onReset() {
     if (http_request_) {
       http_request_->cancel();
@@ -623,8 +630,9 @@ public:
   void scriptError(const absl::Status& status);
 
   // Counts the enclosing scope as script execution when the configuration tracks execution time.
-  // Only the outermost of nested scopes reads the clock, so a callback that re-enters the filter,
-  // such as the encoder path of a local reply sent from a script, is not counted twice.
+  // Only the outermost of nested scopes reads the clock, so a callback that runs inside the
+  // script, such as onSuccess() for an httpCall() that fails before it yields, is not counted
+  // twice.
   class ExecutionTimer {
   public:
     explicit ExecutionTimer(Filter& filter);
@@ -632,6 +640,20 @@ public:
 
   private:
     Filter& filter_;
+  };
+
+  // Stops counting for the enclosing scope, which runs filter chain work on the script's behalf.
+  // A local reply runs every encoder filter and the codec, and can destroy the stream, so the
+  // time counted so far must already be in the sample when onDestroy() records it. A script
+  // handler that runs inside the scope counts itself.
+  class ExecutionPause {
+  public:
+    explicit ExecutionPause(Filter& filter);
+    ~ExecutionPause();
+
+  private:
+    Filter& filter_;
+    uint32_t paused_depth_{};
   };
 
   // Http::StreamFilterBase
@@ -810,8 +832,6 @@ private:
   Stats::Histogram* const execution_time_histogram_;
   std::chrono::nanoseconds execution_time_{};
   MonotonicTime execution_start_;
-  uint32_t execution_depth_{};
-  bool executed_{};
 
   // These coroutines used to be owned by the stream handles. After investigating #3570, it
   // became clear that there is a circular memory reference when a coroutine yields. Basically,
@@ -832,6 +852,7 @@ private:
   EncoderCallbacks encoder_callbacks_{*this};
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
+  uint32_t execution_depth_{};
   bool destroyed_{};
 };
 

@@ -499,7 +499,10 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 
   // Once we respond we treat that as the end of the script even if there is more code. Thus we
   // yield.
-  callbacks_.respond(std::move(headers), body.get(), state);
+  {
+    Filter::ExecutionPause pause(filter_);
+    callbacks_.respond(std::move(headers), body.get(), state);
+  }
   state_ = State::Responded;
   return lua_yield(state, 0);
 }
@@ -560,8 +563,7 @@ void StreamHandleWrapper::onSuccess(const Http::AsyncClient::Request&,
   ENVOY_LOG(debug, "async HTTP response complete");
   http_request_ = nullptr;
   // Ends before continueIteration(), which runs the rest of the filter chain.
-  std::optional<Filter::ExecutionTimer> timer;
-  timer.emplace(filter_);
+  std::optional<Filter::ExecutionTimer> timer(std::in_place, filter_);
 
   // We need to build a table with the headers as return param 1. The body will be return param 2.
   lua_newtable(coroutine_.luaState());
@@ -1120,8 +1122,23 @@ Filter::ExecutionTimer::~ExecutionTimer() {
   }
 }
 
+Filter::ExecutionPause::ExecutionPause(Filter& filter) : filter_(filter) {
+  if (filter_.execution_time_histogram_ != nullptr && filter_.execution_depth_ > 0) {
+    filter_.execution_time_ += filter_.time_source_.monotonicTime() - filter_.execution_start_;
+    paused_depth_ = std::exchange(filter_.execution_depth_, 0);
+  }
+}
+
+Filter::ExecutionPause::~ExecutionPause() {
+  if (paused_depth_ > 0) {
+    filter_.execution_depth_ = paused_depth_;
+    filter_.execution_start_ = filter_.time_source_.monotonicTime();
+  }
+}
+
 void Filter::onDestroy() {
-  if (execution_time_histogram_ != nullptr && executed_) {
+  const bool executed = request_coroutine_ != nullptr || response_coroutine_ != nullptr;
+  if (execution_time_histogram_ != nullptr && executed) {
     execution_time_histogram_->recordValue(
         std::chrono::duration_cast<std::chrono::microseconds>(execution_time_).count());
   }
@@ -1143,7 +1160,6 @@ Filter::doHeaders(StreamHandleRef& handle, Filters::Common::Lua::CoroutinePtr& c
   }
   ASSERT(setup);
   ExecutionTimer timer(*this);
-  executed_ = true;
   coroutine = setup->createCoroutine();
 
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
@@ -1170,7 +1186,10 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
                                       bool end_stream) {
   Http::FilterDataStatus status = Http::FilterDataStatus::Continue;
   if (handle.get() != nullptr) {
-    ExecutionTimer timer(*this);
+    std::optional<ExecutionTimer> timer;
+    if (handle.get()->awaitingStream()) {
+      timer.emplace(*this);
+    }
     handle.markLive();
     status = handle.get()->onData(data, end_stream);
     // Copy the status out before scriptError(), which may reset (destroy) the wrapper.
@@ -1188,7 +1207,10 @@ Http::FilterDataStatus Filter::doData(StreamHandleRef& handle, Buffer::Instance&
 Http::FilterTrailersStatus Filter::doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers) {
   Http::FilterTrailersStatus status = Http::FilterTrailersStatus::Continue;
   if (handle.get() != nullptr) {
-    ExecutionTimer timer(*this);
+    std::optional<ExecutionTimer> timer;
+    if (handle.get()->awaitingStream()) {
+      timer.emplace(*this);
+    }
     handle.markLive();
     status = handle.get()->onTrailers(trailers);
     // Copy the status out before scriptError(), which may reset (destroy) the wrapper.

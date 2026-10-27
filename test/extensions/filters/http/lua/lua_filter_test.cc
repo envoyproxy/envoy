@@ -5517,13 +5517,23 @@ TEST_F(LuaHttpFilterTest, ExecutionTimeExcludesYieldedTime) {
     end
   )EOF",
                            true);
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  bool continued = false;
+  // Each read checks what has run, so a window that misses the resume or covers
+  // continueIteration() fails here rather than producing the same arithmetic.
   EXPECT_CALL(mock_time_, monotonicTime())
       .WillOnce(Return(atMicros(100)))
       .WillOnce(Return(atMicros(103)))
-      .WillOnce(Return(atMicros(5000100)))
-      .WillOnce(Return(atMicros(5000102)));
+      .WillOnce(Invoke([&] {
+        EXPECT_FALSE(request_headers.has("status"));
+        return atMicros(5000100);
+      }))
+      .WillOnce(Invoke([&] {
+        EXPECT_EQ("200", request_headers.get_("status"));
+        EXPECT_FALSE(continued);
+        return atMicros(5000102);
+      }));
 
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
@@ -5540,21 +5550,72 @@ TEST_F(LuaHttpFilterTest, ExecutionTimeExcludesYieldedTime) {
 
   Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).WillOnce(Invoke([&] { continued = true; }));
   callbacks->onSuccess(request, std::move(response_message));
   filter_->onDestroy();
 
-  EXPECT_EQ("200", request_headers.get_("status"));
+  EXPECT_TRUE(continued);
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
               testing::ElementsAre(5));
 }
 
-// A local reply sent from a script runs the response handler from inside the request handler.
-// Only the outer handler reads the clock, so the nested one is not counted twice.
-TEST_F(LuaHttpFilterTest, ExecutionTimeCountsNestedHandlersOnce) {
+// onSuccess() for an httpCall() that fails before it yields runs inside the script, so only the
+// outer handler reads the clock.
+TEST_F(LuaHttpFilterTest, ExecutionTimeCountsAnInlineHttpCallFailureOnce) {
   setupExecutionTimeFilter(R"EOF(
     function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "GET",
+          [":path"] = "/",
+          [":authority"] = "foo"
+        },
+        nil,
+        5000)
+      request_handle:headers():add("status", headers[":status"])
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime())
+      .WillOnce(Return(atMicros(100)))
+      .WillOnce(Return(atMicros(109)));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
+        return nullptr;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  filter_->onDestroy();
+
+  EXPECT_EQ("503", request_headers.get_("status"));
+  EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
+              testing::ElementsAre(9));
+}
+
+// A local reply sent after an httpCall() resume runs the encoder chain synchronously, and on
+// HTTP/1 the stream is destroyed before respond() returns. The reply's encoder work is excluded,
+// the response handler it runs counts itself, and the sample taken in onDestroy() already holds
+// the resume.
+TEST_F(LuaHttpFilterTest, ExecutionTimeExcludesALocalReplyAndRecordsOnDestroyInsideIt) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+      local headers, body = request_handle:httpCall(
+        "cluster",
+        {
+          [":method"] = "GET",
+          [":path"] = "/",
+          [":authority"] = "foo"
+        },
+        nil,
+        5000)
       request_handle:respond({[":status"] = "403"}, "nope")
     end
     function envoy_on_response(response_handle)
@@ -5563,8 +5624,29 @@ TEST_F(LuaHttpFilterTest, ExecutionTimeCountsNestedHandlersOnce) {
   )EOF",
                            true);
   EXPECT_CALL(mock_time_, monotonicTime())
-      .WillOnce(Return(atMicros(100)))
-      .WillOnce(Return(atMicros(109)));
+      .WillOnce(Return(atMicros(100)))  // decodeHeaders starts
+      .WillOnce(Return(atMicros(103)))  // and yields on httpCall(): 3
+      .WillOnce(Return(atMicros(1000))) // onSuccess() resumes
+      .WillOnce(Return(atMicros(1004))) // respond() pauses: 4
+      .WillOnce(Return(atMicros(1010))) // envoy_on_response starts
+      .WillOnce(Return(atMicros(1012))) // and ends: 2
+      .WillOnce(Return(atMicros(1500))) // respond() returns, after the encoder chain
+      .WillOnce(Return(atMicros(1501))); // onSuccess() ends, after the sample was taken
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callbacks = nullptr;
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                           const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      }));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, true));
+  ASSERT_NE(callbacks, nullptr);
 
   Http::TestResponseHeaderMapImpl local_reply_headers;
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
@@ -5573,16 +5655,105 @@ TEST_F(LuaHttpFilterTest, ExecutionTimeCountsNestedHandlersOnce) {
                            const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         modify_headers(local_reply_headers);
         filter_->encodeHeaders(local_reply_headers, true);
+        filter_->onDestroy();
       }));
-  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
-            filter_->decodeHeaders(request_headers, true));
-  filter_->onDestroy();
+  Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+      Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+  callbacks->onSuccess(request, std::move(response_message));
 
   EXPECT_EQ("bar", local_reply_headers.get_("foo"));
   EXPECT_EQ(2, stats_store_.counter("test.lua.executions").value());
   EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
               testing::ElementsAre(9));
+}
+
+// Time yielded on body() is excluded; the resume when the body completes is counted.
+TEST_F(LuaHttpFilterTest, ExecutionTimeExcludesBodyWait) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+      local body = request_handle:body()
+      request_handle:headers():add("len", tostring(body:length()))
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime())
+      .WillOnce(Return(atMicros(100)))
+      .WillOnce(Return(atMicros(103)))
+      .WillOnce(Return(atMicros(9000100)))
+      .WillOnce(Return(atMicros(9000102)));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, true));
+  filter_->onDestroy();
+
+  EXPECT_EQ("5", request_headers.get_("len"));
+  EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
+              testing::ElementsAre(5));
+}
+
+// Body chunks and trailers that arrive after the script finished read no clock.
+TEST_F(LuaHttpFilterTest, ExecutionTimeReadsNoClockAfterTheScriptFinishes) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("foo", "bar")
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime())
+      .WillOnce(Return(atMicros(100)))
+      .WillOnce(Return(atMicros(103)));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  Buffer::OwnedImpl data("hello");
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  }
+  Http::TestRequestTrailerMapImpl trailers{{"t", "v"}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+  filter_->onDestroy();
+
+  EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
+              testing::ElementsAre(3));
+}
+
+// A handler that ran for less than a microsecond still records a sample, of 0.
+TEST_F(LuaHttpFilterTest, ExecutionTimeRecordsZeroForASubMicrosecondStream) {
+  setupExecutionTimeFilter(R"EOF(
+    function envoy_on_request(request_handle)
+    end
+  )EOF",
+                           true);
+  EXPECT_CALL(mock_time_, monotonicTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(100))))
+      .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(600))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  filter_->onDestroy();
+
+  EXPECT_THAT(stats_store_.histogramValues(std::string(kExecutionTimeHistogram), false),
+              testing::ElementsAre(0));
+}
+
+// The histogram is in microseconds and named under the filter's own stat_prefix.
+TEST_F(LuaHttpFilterTest, ExecutionTimeHistogramNameAndUnit) {
+  envoy::extensions::filters::http::lua::v3::Lua proto_config;
+  proto_config.mutable_default_source_code()->set_inline_string(
+      "function envoy_on_request(request_handle) end");
+  proto_config.set_stat_prefix("my_script");
+  proto_config.set_track_execution_time(true);
+  setupConfig(proto_config, envoy::extensions::filters::http::lua::v3::LuaPerRoute());
+  filter_ = std::make_unique<Filter>(config_, mock_time_);
+
+  Stats::HistogramOptConstRef histogram =
+      stats_store_.findHistogramByString("test.lua.my_script.stream_execution_time_us");
+  ASSERT_TRUE(histogram);
+  EXPECT_EQ(Stats::Histogram::Unit::Microseconds, histogram->unit());
+  EXPECT_FALSE(stats_store_.findHistogramByString(std::string(kExecutionTimeHistogram)));
 }
 
 // A stream on which no handler ran records nothing.

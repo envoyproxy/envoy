@@ -163,7 +163,12 @@ message Lua {
   // ``envoy_on_request`` and ``envoy_on_response`` and over every resume of their coroutines, and
   // includes creating each coroutine and its stream handle. It excludes the time a script spends
   // yielded, waiting on an ``httpCall()`` response, a body or trailers, since the worker is free to
-  // run other streams meanwhile. A stream on which no handler ran records nothing.
+  // run other streams meanwhile. The encoder filters and codec that a local reply sent with
+  // ``respond()`` runs are excluded too, while a script handler they invoke counts itself. A stream
+  // on which no handler ran records nothing. Scripts supplied per route by :ref:`LuaPerRoute
+  // <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>` are counted in this filter's
+  // histogram, and as an upstream filter each upstream request, retries included, records its own
+  // sample.
   //
   // Defaults to false, which creates no histogram and reads no clock. See :ref:`statistics
   // <config_http_filters_lua_stats>`.
