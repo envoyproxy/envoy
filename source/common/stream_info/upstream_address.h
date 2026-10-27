@@ -19,7 +19,8 @@ public:
   UpstreamAddress(Network::Address::InstanceConstSharedPtr ip)
       : Network::Address::InstanceAccessor(ip) {}
   std::optional<std::string> serializeAsString() const override {
-    return getAddress() ? std::make_optional(getAddress()->asString()) : std::nullopt;
+    const auto address = getAddress();
+    return address ? std::make_optional(address->asString()) : std::nullopt;
   }
   static const std::string& key() {
     CONSTRUCT_ON_FIRST_USE(std::string, "envoy.stream.upstream_address");
