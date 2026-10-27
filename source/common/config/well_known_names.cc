@@ -224,6 +224,9 @@ TagNameValues::TagNameValues() {
   // connection_limit.(<stat_prefix>.)*
   addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
 
+  // mirror.(<stat_prefix>.)*
+  addTokenized(MIRROR_PREFIX, "mirror.$.**");
+
   // [http.|cluster.]<stat_prefix>.rbac.[<optional rules stat_prefix>.]policy.(<policy
   // name>.).(allowed|shadow_allowed|denied|shadow_denied)
   addRe2(

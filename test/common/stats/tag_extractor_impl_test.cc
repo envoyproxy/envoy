@@ -482,6 +482,13 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("connection_limit.my_connection_limit_prefix.limited_connections",
                          "connection_limit.limited_connections", {connection_limit_prefix});
 
+  // Request Mirror Policy Prefix
+  Tag mirror_prefix;
+  mirror_prefix.name_ = tag_names.MIRROR_PREFIX;
+  mirror_prefix.value_ = "my_mirror_prefix";
+  regex_tester.testRegex("mirror.my_mirror_prefix.rq_started", "mirror.rq_started",
+                         {mirror_prefix});
+
   // RBAC Filter Prefix
   Tag rbac_prefix;
   rbac_prefix.name_ = tag_names.RBAC_PREFIX;

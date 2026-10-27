@@ -3,6 +3,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
@@ -338,6 +339,7 @@ public:
     const std::string& cluster_name = Config::TagNames::get().CLUSTER_NAME;
     const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
     const std::string& listener_address = Config::TagNames::get().LISTENER_ADDRESS;
+    const std::string& mirror_prefix = Config::TagNames::get().MIRROR_PREFIX;
     const std::string& response_code_class = Config::TagNames::get().RESPONSE_CODE_CLASS;
     const std::string& tcp_prefix = Config::TagNames::get().TCP_PREFIX;
     const std::string& xds_resource_name = Config::TagNames::get().XDS_RESOURCE_NAME;
@@ -417,6 +419,9 @@ public:
          "listener.admin.http.downstream_rq_completed",
          {{hcm_prefix, "admin"}}},
 #endif
+        // Request mirror policy scope, `source/common/router/config_impl.cc`.
+        {"mirror.mirror_stats.rq_sampled", "mirror.rq_sampled", {{mirror_prefix, "mirror_stats"}}},
+        {"mirror.mirror_stats.rq_started", "mirror.rq_started", {{mirror_prefix, "mirror_stats"}}},
         // SDS scope, `source/common/secret/sds_api.cc`.
         {"sds.server_cert.key_rotation_failed",
          "sds.key_rotation_failed",
@@ -506,6 +511,19 @@ resources:
     std::ignore = metrics_sink->mutable_typed_config()->PackFrom(metrics_config);
 #endif
   });
+
+  // A request mirror policy with a stat prefix, which creates the `mirror.<stat prefix>.` scope.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_0");
+        mirror_policy->set_stat_prefix("mirror_stats");
+      });
 
   initialize();
 

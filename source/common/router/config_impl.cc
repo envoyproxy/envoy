@@ -410,8 +410,13 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
   }
 
   if (!config.stat_prefix().empty()) {
-    auto holder = std::make_shared<ShadowPolicyStatsHolder>(
-        factory_context.scope().createScope(absl::StrCat("mirror.", config.stat_prefix(), ".")));
+    // mirror.(<stat_prefix>.)*
+    auto holder =
+        std::make_shared<ShadowPolicyStatsHolder>(factory_context.scope().createScopeWithTaggedName(
+            "mirror",
+            {Stats::TagStringView{Envoy::Config::TagNames::get().MIRROR_PREFIX,
+                                  config.stat_prefix()}},
+            absl::StrCat("mirror.", config.stat_prefix())));
     // Share ownership with the holder so that the scope outlives in-flight mirror requests.
     stats_ = ShadowPolicyStatsSharedPtr(holder, &holder->stats_);
   }
