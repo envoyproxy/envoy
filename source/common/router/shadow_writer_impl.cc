@@ -36,8 +36,11 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
                               const Http::AsyncClient::RequestOptions& options,
                               const ShadowPolicyStatsSharedPtr& stats) {
   const auto thread_local_cluster =
-      getClusterAndPreprocessHeadersAndOptions(cluster, request->headers(), options, stats);
+      getClusterAndPreprocessHeadersAndOptions(cluster, request->headers(), options);
   if (thread_local_cluster == nullptr) {
+    if (stats != nullptr) {
+      stats->rq_no_cluster_.inc();
+    }
     return;
   }
   Http::AsyncClient& async_client = thread_local_cluster->httpAsyncClient();
@@ -46,6 +49,7 @@ void ShadowWriterImpl::shadow(const std::string& cluster, Http::RequestMessagePt
     async_client.send(std::move(request), *this, options);
     return;
   }
+  stats->rq_started_.inc();
   auto* callbacks = new ShadowRequestCallbacks(stats, async_client.dispatcher());
   if (async_client.send(std::move(request), *callbacks, options) == nullptr) {
     callbacks->onStartFailed();
@@ -57,14 +61,18 @@ ShadowWriterImpl::streamingShadow(const std::string& cluster, Http::RequestHeade
                                   const Http::AsyncClient::RequestOptions& options,
                                   const ShadowPolicyStatsSharedPtr& stats) {
   const auto thread_local_cluster =
-      getClusterAndPreprocessHeadersAndOptions(cluster, *headers, options, stats);
+      getClusterAndPreprocessHeadersAndOptions(cluster, *headers, options);
   if (thread_local_cluster == nullptr) {
+    if (stats != nullptr) {
+      stats->rq_no_cluster_.inc();
+    }
     return nullptr;
   }
   Http::AsyncClient& async_client = thread_local_cluster->httpAsyncClient();
   if (stats == nullptr) {
     return async_client.startRequest(std::move(headers), *this, options);
   }
+  stats->rq_started_.inc();
   auto* callbacks = new ShadowRequestCallbacks(stats, async_client.dispatcher());
   Http::AsyncClient::OngoingRequest* request =
       async_client.startRequest(std::move(headers), *callbacks, options);
@@ -76,15 +84,12 @@ ShadowWriterImpl::streamingShadow(const std::string& cluster, Http::RequestHeade
 
 Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAndOptions(
     absl::string_view cluster, Http::RequestHeaderMap& headers,
-    const Http::AsyncClient::RequestOptions& options, const ShadowPolicyStatsSharedPtr& stats) {
+    const Http::AsyncClient::RequestOptions& options) {
   // It's possible that the cluster specified in the route configuration no longer exists due
   // to a CDS removal. Check that it still exists before shadowing.
   const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster);
   if (thread_local_cluster == nullptr) {
     ENVOY_LOG(debug, "shadow cluster '{}' does not exist", cluster);
-    if (stats != nullptr) {
-      stats->rq_no_cluster_.inc();
-    }
     return nullptr;
   }
 
@@ -94,9 +99,6 @@ Upstream::ThreadLocalCluster* ShadowWriterImpl::getClusterAndPreprocessHeadersAn
   }
 
   const_cast<Http::AsyncClient::RequestOptions&>(options).setIsShadow(true);
-  if (stats != nullptr) {
-    stats->rq_started_.inc();
-  }
   return thread_local_cluster;
 }
 

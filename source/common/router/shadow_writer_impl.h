@@ -38,9 +38,10 @@ public:
                                     const Http::ResponseHeaderMap*) override {}
 
 private:
-  Upstream::ThreadLocalCluster* getClusterAndPreprocessHeadersAndOptions(
-      absl::string_view cluster, Http::RequestHeaderMap& headers,
-      const Http::AsyncClient::RequestOptions& options, const ShadowPolicyStatsSharedPtr& stats);
+  Upstream::ThreadLocalCluster*
+  getClusterAndPreprocessHeadersAndOptions(absl::string_view cluster,
+                                           Http::RequestHeaderMap& headers,
+                                           const Http::AsyncClient::RequestOptions& options);
   Upstream::ClusterManager& cm_;
 };
 
