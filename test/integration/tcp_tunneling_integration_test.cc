@@ -639,6 +639,92 @@ INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationIntegrationTest,
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+// Reproducer for https://github.com/envoyproxy/envoy/issues/28329.
+// The upstream sends a large body and then a FIN while the downstream CONNECT request is still
+// open. The downstream HTTP/2 client advertises a small window and does not read, so most of the
+// body is still queued in Envoy when Envoy reads the FIN. The client must receive every byte.
+class ConnectTerminationLargeResponseIntegrationTest : public ConnectTerminationIntegrationTest {
+public:
+  void initialize() override {
+    // Let Envoy read the whole upstream body and the FIN without upstream back pressure.
+    config_helper_.setBufferLimits(32 * 1024 * 1024, 32 * 1024 * 1024);
+    ConnectTerminationIntegrationTest::initialize();
+  }
+
+  void setUpConnectionWithSmallWindow() {
+    envoy::config::core::v3::Http2ProtocolOptions http2_options =
+        Http2::Utility::initializeAndValidateOptions(
+            envoy::config::core::v3::Http2ProtocolOptions())
+            .value();
+    http2_options.set_allow_connect(true);
+    http2_options.mutable_initial_stream_window_size()->set_value(65535);
+    http2_options.mutable_initial_connection_window_size()->set_value(65535);
+    codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+    auto encoder_decoder = codec_client_->startRequest(connect_headers_);
+    request_encoder_ = &encoder_decoder.first;
+    response_ = std::move(encoder_decoder.second);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_raw_upstream_connection_));
+    response_->waitForHeaders();
+  }
+
+  // The upstream writes `size` bytes followed by a FIN. The test thread does not run the client
+  // dispatcher until waitForAnyTermination(), so the client sends no WINDOW_UPDATE before Envoy
+  // has read the FIN. Envoy closes the upstream connection while it handles the FIN.
+  void upstreamSendsBodyAndFin(uint64_t size) {
+    ASSERT_TRUE(fake_raw_upstream_connection_->write(std::string(size, 'a'), true));
+    test_server_->waitForCounter("cluster.cluster_0.upstream_cx_destroy", Ge(1));
+    ASSERT_TRUE(response_->waitForAnyTermination());
+  }
+
+  void expectCompleteBody(uint64_t size) {
+    EXPECT_EQ(size, response_->body().size());
+    EXPECT_TRUE(response_->complete())
+        << "stream reset without END_STREAM, reason: "
+        << Http::Utility::resetReasonToString(response_->resetReason());
+  }
+};
+
+// Fails: Envoy resets the stream with INTERNAL_ERROR and drops the queued DATA frames.
+TEST_P(ConnectTerminationLargeResponseIntegrationTest, UpstreamFinWithOpenRequest) {
+  initialize();
+  setUpConnectionWithSmallWindow();
+
+  const uint64_t size = 4 * 1024 * 1024;
+  upstreamSendsBodyAndFin(size);
+  expectCompleteBody(size);
+  cleanupUpstreamAndDownstream();
+}
+
+// Control: the body fits in the client window, so no DATA frame is queued at the FIN.
+TEST_P(ConnectTerminationLargeResponseIntegrationTest, SmallBodyUpstreamFinWithOpenRequest) {
+  initialize();
+  setUpConnectionWithSmallWindow();
+
+  const uint64_t size = 16 * 1024;
+  upstreamSendsBodyAndFin(size);
+  expectCompleteBody(size);
+  cleanupUpstreamAndDownstream();
+}
+
+// Control: the client ends the request first, so Envoy does not reset the stream.
+TEST_P(ConnectTerminationLargeResponseIntegrationTest, UpstreamFinAfterRequestEnd) {
+  initialize();
+  setUpConnectionWithSmallWindow();
+
+  codec_client_->sendData(*request_encoder_, "", true);
+  ASSERT_TRUE(fake_raw_upstream_connection_->waitForHalfClose());
+
+  const uint64_t size = 4 * 1024 * 1024;
+  upstreamSendsBodyAndFin(size);
+  expectCompleteBody(size);
+  cleanupUpstreamAndDownstream();
+}
+
+INSTANTIATE_TEST_SUITE_P(HttpAndIpVersions, ConnectTerminationLargeResponseIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP1})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 // Test with proxy protocol headers.
 class ProxyProtocolConnectTerminationIntegrationTest : public ConnectTerminationIntegrationTest {
 protected:
