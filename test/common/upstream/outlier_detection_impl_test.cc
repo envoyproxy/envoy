@@ -1,8 +1,11 @@
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 #include "envoy/common/time.h"
@@ -41,6 +44,31 @@ using testing::SaveArg;
 namespace Envoy {
 namespace Upstream {
 namespace Outlier {
+
+class SuccessRateAccumulatorTestPeer {
+public:
+  static uint64_t getCounters(const SuccessRateAccumulator& acc) {
+    return acc.counters_.load(std::memory_order_relaxed);
+  }
+  static void setCounters(SuccessRateAccumulator& acc, uint64_t val) {
+    acc.counters_.store(val, std::memory_order_relaxed);
+  }
+  static bool isSaturated(const SuccessRateAccumulator& acc) {
+    return (acc.counters_.load(std::memory_order_relaxed) &
+            SuccessRateAccumulator::SATURATED_BIT) != 0;
+  }
+  static uint64_t getBackupSnapshot(const SuccessRateAccumulator& acc) {
+    return acc.backup_snapshot_;
+  }
+  static void setBackupSnapshot(SuccessRateAccumulator& acc, uint64_t snapshot) {
+    acc.backup_snapshot_ = snapshot;
+    acc.has_backup_ = true;
+  }
+  static std::pair<uint64_t, uint64_t> unpackSnapshot(const SuccessRateAccumulator& acc) {
+    return {(acc.backup_snapshot_ >> 32) & 0x7FFFFFFFU, acc.backup_snapshot_ & 0x7FFFFFFFU};
+  }
+};
+
 namespace {
 
 TEST(OutlierDetectorImplFactoryTest, NoDetector) {
@@ -3212,6 +3240,408 @@ detect_degraded_hosts: true
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000), _));
   interval_timer_->invokeCallback();
   EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::DEGRADED_OUTLIER_DETECTION));
+}
+
+TEST(OutlierSuccessRateMonitorTest, EmptyInitialWindow) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+
+  // Before any rotation has completed, getSuccessRateAndVolume returns nullopt.
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+
+  // A rotation on an empty window also yields nullopt.
+  monitor.updateCurrentSuccessRateBucket();
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+
+  // Consecutive empty windows continue to return nullopt.
+  for (int i = 0; i < 5; ++i) {
+    monitor.updateCurrentSuccessRateBucket();
+    EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+  }
+}
+
+TEST(OutlierSuccessRateMonitorTest, BasicOutcomes) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+
+  // 100% success
+  for (int i = 0; i < 100; ++i) {
+    monitor.incReqCounters(true);
+  }
+  monitor.updateCurrentSuccessRateBucket();
+  auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  ASSERT_TRUE(sample.has_value());
+  EXPECT_EQ(100, sample->second);
+  EXPECT_DOUBLE_EQ(100.0, sample->first);
+
+  // 0% success (100 failures)
+  for (int i = 0; i < 100; ++i) {
+    monitor.incReqCounters(false);
+  }
+  monitor.updateCurrentSuccessRateBucket();
+  sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  ASSERT_TRUE(sample.has_value());
+  EXPECT_EQ(100, sample->second);
+  EXPECT_DOUBLE_EQ(0.0, sample->first);
+
+  // 90% success (90 success, 10 failure)
+  for (int i = 0; i < 90; ++i) {
+    monitor.incReqCounters(true);
+  }
+  for (int i = 0; i < 10; ++i) {
+    monitor.incReqCounters(false);
+  }
+  monitor.updateCurrentSuccessRateBucket();
+  sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  ASSERT_TRUE(sample.has_value());
+  EXPECT_EQ(100, sample->second);
+  EXPECT_DOUBLE_EQ(90.0, sample->first);
+
+  // 50% success (50 success, 50 failure)
+  for (int i = 0; i < 50; ++i) {
+    monitor.incReqCounters(true);
+  }
+  for (int i = 0; i < 50; ++i) {
+    monitor.incReqCounters(false);
+  }
+  monitor.updateCurrentSuccessRateBucket();
+  sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  ASSERT_TRUE(sample.has_value());
+  EXPECT_EQ(100, sample->second);
+  EXPECT_DOUBLE_EQ(50.0, sample->first);
+}
+
+TEST(OutlierSuccessRateMonitorTest, ConsecutiveRotations) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+
+  for (uint64_t r = 1; r <= 15; ++r) {
+    const uint64_t requests = r * 10;
+    for (uint64_t i = 0; i < requests; ++i) {
+      monitor.incReqCounters(true);
+    }
+    monitor.updateCurrentSuccessRateBucket();
+    const auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+    ASSERT_TRUE(sample.has_value());
+    EXPECT_EQ(requests, sample->second);
+    EXPECT_DOUBLE_EQ(100.0, sample->first);
+  }
+
+  // Trailing empty window
+  monitor.updateCurrentSuccessRateBucket();
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+}
+
+struct ThreadJoiner {
+  std::vector<std::thread>& threads;
+  std::atomic<bool>* start_signal{nullptr};
+
+  ThreadJoiner(std::vector<std::thread>& t, std::atomic<bool>* start = nullptr)
+      : threads(t), start_signal(start) {}
+
+  ~ThreadJoiner() {
+    if (start_signal != nullptr) {
+      start_signal->store(true, std::memory_order_release);
+    }
+    for (auto& t : threads) {
+      if (t.joinable()) {
+        t.join();
+      }
+    }
+  }
+};
+
+struct SingleThreadJoiner {
+  std::thread& thread;
+  std::atomic<bool>* stop_signal{nullptr};
+  ~SingleThreadJoiner() {
+    if (stop_signal != nullptr) {
+      stop_signal->store(true, std::memory_order_release);
+    }
+    if (thread.joinable()) {
+      thread.join();
+    }
+  }
+};
+
+TEST(OutlierSuccessRateMonitorTest, ConcurrentMixedAccountingAndRotation) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+  constexpr int num_workers = 4;
+  constexpr int requests_per_worker = 25000;
+  std::atomic<uint64_t> total_success_submitted{0};
+  std::atomic<uint64_t> total_failed_submitted{0};
+  std::atomic<bool> start{false};
+
+  std::vector<std::thread> workers;
+  workers.reserve(num_workers);
+  ThreadJoiner joiner(workers, &start);
+
+  for (int w = 0; w < num_workers; ++w) {
+    workers.emplace_back([&, w] {
+      while (!start.load(std::memory_order_acquire)) {
+      }
+      for (int i = 0; i < requests_per_worker; ++i) {
+        const bool success = ((i + w) % 3 != 0); // 2/3 success, 1/3 failure
+        if (success) {
+          total_success_submitted.fetch_add(1, std::memory_order_relaxed);
+        } else {
+          total_failed_submitted.fetch_add(1, std::memory_order_relaxed);
+        }
+        monitor.incReqCounters(success);
+      }
+    });
+  }
+
+  uint64_t total_recorded_volume = 0;
+  uint64_t total_recorded_success = 0;
+  start.store(true, std::memory_order_release);
+
+  for (int r = 0; r < 15; ++r) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    monitor.updateCurrentSuccessRateBucket();
+    const auto [tot, succ] =
+        SuccessRateAccumulatorTestPeer::unpackSnapshot(monitor.successRateAccumulator());
+    total_recorded_volume += tot;
+    total_recorded_success += succ;
+    if (tot > 0) {
+      EXPECT_LE(succ, tot);
+      auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+      EXPECT_TRUE(sample.has_value());
+      if (sample.has_value()) {
+        EXPECT_EQ(tot, sample->second);
+        EXPECT_DOUBLE_EQ(static_cast<double>(succ) * 100.0 / static_cast<double>(tot),
+                         sample->first);
+      }
+    }
+  }
+
+  for (auto& w : workers) {
+    if (w.joinable()) {
+      w.join();
+    }
+  }
+
+  monitor.updateCurrentSuccessRateBucket();
+  const auto [final_tot, final_succ] =
+      SuccessRateAccumulatorTestPeer::unpackSnapshot(monitor.successRateAccumulator());
+  total_recorded_volume += final_tot;
+  total_recorded_success += final_succ;
+  if (final_tot > 0) {
+    EXPECT_LE(final_succ, final_tot);
+    auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+    EXPECT_TRUE(sample.has_value());
+    if (sample.has_value()) {
+      EXPECT_EQ(final_tot, sample->second);
+      EXPECT_DOUBLE_EQ(static_cast<double>(final_succ) * 100.0 / static_cast<double>(final_tot),
+                       sample->first);
+    }
+  }
+
+  const uint64_t total_submitted = total_success_submitted.load() + total_failed_submitted.load();
+  EXPECT_EQ(num_workers * requests_per_worker, total_submitted);
+  EXPECT_EQ(total_submitted, total_recorded_volume);
+  EXPECT_EQ(total_success_submitted.load(), total_recorded_success);
+}
+
+TEST(OutlierSuccessRateMonitorTest, PackedCounterCapacityAndBoundaryBehavior) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+  const uint32_t limit = SuccessRateAccumulator::CAPACITY_LIMIT;
+
+  // 1. (limit - 1) requests, valid sample:
+  // Reachable state: start at limit - 2, record one request to reach limit - 1.
+  const uint64_t state_near =
+      (static_cast<uint64_t>(limit - 2) << 32) | static_cast<uint64_t>(limit - 2);
+  SuccessRateAccumulatorTestPeer::setCounters(monitor.successRateAccumulator(), state_near);
+
+  monitor.incReqCounters(true);
+  EXPECT_FALSE(SuccessRateAccumulatorTestPeer::isSaturated(monitor.successRateAccumulator()));
+
+  monitor.updateCurrentSuccessRateBucket();
+  auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  EXPECT_TRUE(sample.has_value());
+  if (sample.has_value()) {
+    EXPECT_EQ(limit - 1, sample->second);
+    EXPECT_DOUBLE_EQ(100.0, sample->first);
+  }
+
+  // 2. Exactly limit requests, invalid sample even without saturation flag:
+  // Reachable state: start at limit - 1, record one request to reach exactly limit.
+  const uint64_t state_pre_limit =
+      (static_cast<uint64_t>(limit - 1) << 32) | static_cast<uint64_t>(limit - 1);
+  SuccessRateAccumulatorTestPeer::setCounters(monitor.successRateAccumulator(), state_pre_limit);
+
+  monitor.incReqCounters(true);
+  EXPECT_FALSE(SuccessRateAccumulatorTestPeer::isSaturated(monitor.successRateAccumulator()));
+
+  monitor.updateCurrentSuccessRateBucket();
+  // Snapshot with total >= CAPACITY_LIMIT is rejected even though SATURATED_BIT was not set.
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+
+  // 3. One additional recording attempt after capacity, saturation flag becomes set:
+  // Reachable state: window that reached exactly limit.
+  const uint64_t state_at_limit =
+      (static_cast<uint64_t>(limit) << 32) | static_cast<uint64_t>(limit);
+  SuccessRateAccumulatorTestPeer::setCounters(monitor.successRateAccumulator(), state_at_limit);
+
+  monitor.incReqCounters(true);
+  EXPECT_TRUE(SuccessRateAccumulatorTestPeer::isSaturated(monitor.successRateAccumulator()));
+
+  // 4. Further attempts do not wrap or modify saturated state:
+  const uint64_t saturated_state =
+      SuccessRateAccumulatorTestPeer::getCounters(monitor.successRateAccumulator());
+  for (int i = 0; i < 10; ++i) {
+    monitor.incReqCounters(true);
+    monitor.incReqCounters(false);
+  }
+  EXPECT_EQ(saturated_state,
+            SuccessRateAccumulatorTestPeer::getCounters(monitor.successRateAccumulator()));
+
+  // 5. Rotation clears the saturated state:
+  monitor.updateCurrentSuccessRateBucket();
+  EXPECT_FALSE(SuccessRateAccumulatorTestPeer::isSaturated(monitor.successRateAccumulator()));
+  EXPECT_EQ(0ULL, SuccessRateAccumulatorTestPeer::getCounters(monitor.successRateAccumulator()));
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+
+  // 6. Following interval records valid data normally:
+  for (int i = 0; i < 50; ++i) {
+    monitor.incReqCounters(true);
+  }
+  for (int i = 0; i < 50; ++i) {
+    monitor.incReqCounters(false);
+  }
+  monitor.updateCurrentSuccessRateBucket();
+  sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  EXPECT_TRUE(sample.has_value());
+  if (sample.has_value()) {
+    EXPECT_EQ(100, sample->second);
+    EXPECT_DOUBLE_EQ(50.0, sample->first);
+  }
+
+  // Invariant validation: success > total rejected
+  SuccessRateAccumulatorTestPeer::setBackupSnapshot(monitor.successRateAccumulator(),
+                                                    (10ULL << 32) | 20ULL);
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+}
+
+TEST(OutlierSuccessRateMonitorTest, ValidIntervalFollowingSaturatedInterval) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+  const uint32_t limit = SuccessRateAccumulator::CAPACITY_LIMIT;
+
+  // Saturated Interval 1
+  SuccessRateAccumulatorTestPeer::setCounters(monitor.successRateAccumulator(),
+                                              ((uint64_t)limit << 32) | limit);
+  monitor.incReqCounters(true);
+  monitor.updateCurrentSuccessRateBucket();
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+
+  // Valid Interval 2
+  for (int i = 0; i < 50; ++i) {
+    monitor.incReqCounters(true);
+  }
+  monitor.updateCurrentSuccessRateBucket();
+  auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  EXPECT_TRUE(sample.has_value());
+  if (sample.has_value()) {
+    EXPECT_EQ(50, sample->second);
+    EXPECT_DOUBLE_EQ(100.0, sample->first);
+  }
+}
+
+TEST(OutlierSuccessRateMonitorTest, DelayedWorkerIntervalAttribution) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+  const uint32_t limit = SuccessRateAccumulator::CAPACITY_LIMIT;
+
+  // Window 1 at capacity
+  SuccessRateAccumulatorTestPeer::setCounters(monitor.successRateAccumulator(),
+                                              ((uint64_t)limit << 32) | limit);
+
+  std::atomic<bool> worker_started{false};
+  std::atomic<bool> allow_worker_record{false};
+
+  // Worker delayed across rotation of saturated window
+  std::thread worker([&] {
+    worker_started.store(true, std::memory_order_release);
+    while (!allow_worker_record.load(std::memory_order_acquire)) {
+      std::this_thread::yield();
+    }
+    monitor.incReqCounters(true);
+  });
+  SingleThreadJoiner worker_joiner(worker, &allow_worker_record);
+
+  while (!worker_started.load(std::memory_order_acquire)) {
+    std::this_thread::yield();
+  }
+
+  // Dispatcher rotates Window 1 -> Window 2
+  monitor.updateCurrentSuccessRateBucket();
+  EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
+
+  // Window 2 receives 20 requests on main thread
+  for (int i = 0; i < 20; ++i) {
+    monitor.incReqCounters(true);
+  }
+
+  // Unblock delayed worker to record in Window 2
+  allow_worker_record.store(true, std::memory_order_release);
+  if (worker.joinable()) {
+    worker.join();
+  }
+
+  // Dispatcher rotates Window 2 -> Window 3
+  monitor.updateCurrentSuccessRateBucket();
+
+  // Window 2 must cleanly attribute all 21 requests without corruption from Window 1 saturation
+  auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  EXPECT_TRUE(sample.has_value());
+  if (sample.has_value()) {
+    EXPECT_EQ(21, sample->second);
+    EXPECT_DOUBLE_EQ(100.0, sample->first);
+  }
+}
+
+TEST(OutlierSuccessRateMonitorTest, StructuralAbsenceOfSplitAccountingAcrossRotation) {
+  SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
+  std::atomic<bool> start{false};
+  std::atomic<bool> stop{false};
+  std::atomic<uint64_t> recorded{0};
+
+  std::thread writer([&] {
+    while (!start.load(std::memory_order_acquire)) {
+    }
+    while (!stop.load(std::memory_order_relaxed)) {
+      monitor.incReqCounters(true);
+      recorded.fetch_add(1, std::memory_order_relaxed);
+    }
+  });
+  SingleThreadJoiner writer_joiner(writer, &stop);
+
+  start.store(true, std::memory_order_release);
+  while (recorded.load() == 0) {
+    std::this_thread::yield();
+  }
+  uint64_t accumulated_volume = 0;
+
+  for (int i = 0; i < 50; ++i) {
+    std::this_thread::sleep_for(std::chrono::microseconds(200));
+    monitor.updateCurrentSuccessRateBucket();
+    auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+    if (sample.has_value()) {
+      accumulated_volume += sample->second;
+      EXPECT_DOUBLE_EQ(100.0, sample->first);
+      EXPECT_GT(sample->second, 0);
+    }
+  }
+
+  stop.store(true, std::memory_order_release);
+  if (writer.joinable()) {
+    writer.join();
+  }
+
+  monitor.updateCurrentSuccessRateBucket();
+  auto final_sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
+  if (final_sample.has_value()) {
+    accumulated_volume += final_sample->second;
+    EXPECT_DOUBLE_EQ(100.0, final_sample->first);
+  }
+
+  EXPECT_EQ(recorded.load(), accumulated_volume);
 }
 
 } // namespace
