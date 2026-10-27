@@ -59,6 +59,22 @@ TEST_F(FilterTest, BasicAuth) {
   EXPECT_EQ("user2", request_headers_user2.get_("x-username"));
 }
 
+TEST_F(FilterTest, BasicAuthSchemeIsCaseInsensitive) {
+  for (absl::string_view scheme : {"basic", "BASIC", "bAsIc"}) {
+    // user1:test1
+    Http::TestRequestHeaderMapImpl request_headers{
+        {"Authorization", absl::StrCat(scheme, " dXNlcjE6dGVzdDE=")}};
+    request_headers.setScheme("http");
+    request_headers.setHost("host");
+    request_headers.setPath("/");
+    ON_CALL(decoder_filter_callbacks_, requestHeaders())
+        .WillByDefault(testing::Return(Http::RequestHeaderMapOptRef(request_headers)));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+    EXPECT_EQ("user1", request_headers.get_("x-username"));
+  }
+}
+
 TEST_F(FilterTest, BasicAuthSetsDynamicMetadataOnSuccessWhenEnabled) {
   UserMap users;
   users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
