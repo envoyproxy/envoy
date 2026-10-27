@@ -2769,6 +2769,94 @@ virtual_hosts:
   }
 }
 
+TEST_F(RouteMatcherTest, VirtualHostExists) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: exact_vhost
+  domains: ["example.com", "foo.bar.com"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+- name: wildcard_suffix_vhost
+  domains: ["*.wildcard-suffix.com"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+- name: wildcard_prefix_vhost
+  domains: ["wildcard-prefix.*"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+  factory_context_.cluster_manager_.initializeClusters({"dummy"}, {});
+
+  // Without default virtual host and with ignore_port_in_host_matching = false
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+    // Exact domain match (returns true)
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_TRUE(config.virtualHostExists("foo.bar.com"));
+
+    // Case-insensitive match (returns true)
+    EXPECT_TRUE(config.virtualHostExists("EXAMPLE.COM"));
+    EXPECT_TRUE(config.virtualHostExists("Foo.Bar.Com"));
+
+    // Non-existent domain (returns false when no default virtual host is configured)
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com"));
+    EXPECT_FALSE(config.virtualHostExists("example.org"));
+
+    // Wildcard domain match (suffix and prefix)
+    EXPECT_TRUE(config.virtualHostExists("sub.wildcard-suffix.com"));
+    EXPECT_TRUE(config.virtualHostExists("wildcard-prefix.net"));
+    EXPECT_FALSE(config.virtualHostExists("wildcard-suffix.com"));
+    EXPECT_FALSE(config.virtualHostExists("other-prefix.com"));
+
+    // Port in domain with ignore_port_in_host_matching = false (returns false)
+    EXPECT_FALSE(config.virtualHostExists("example.com:8080"));
+    EXPECT_FALSE(config.virtualHostExists("sub.wildcard-suffix.com:443"));
+  }
+
+  // Set ignore_port_in_host_matching to true
+  route_configuration.set_ignore_port_in_host_matching(true);
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+
+    // Port in domain with ignore_port_in_host_matching = true (returns true)
+    EXPECT_TRUE(config.virtualHostExists("example.com:8080"));
+    EXPECT_TRUE(config.virtualHostExists("EXAMPLE.COM:8080"));
+    EXPECT_TRUE(config.virtualHostExists("sub.wildcard-suffix.com:443"));
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com:8080"));
+  }
+
+  // Default virtual host ("*") returns true for arbitrary domains
+  const std::string default_vhost_yaml = R"EOF(
+virtual_hosts:
+- name: default_vhost
+  domains: ["*"]
+  routes:
+  - match:
+      prefix: ""
+    route:
+      cluster: dummy
+  )EOF";
+  auto default_route_configuration = parseRouteConfigurationFromYaml(default_vhost_yaml);
+  {
+    TestConfigImpl config(default_route_configuration, factory_context_, true, creation_status_);
+
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_TRUE(config.virtualHostExists("any.random.domain.org"));
+    EXPECT_TRUE(config.virtualHostExists(""));
+  }
+}
+
 TEST_F(RouteMatcherTest, Priority) {
   const std::string yaml = R"EOF(
 virtual_hosts:

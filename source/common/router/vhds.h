@@ -23,6 +23,7 @@
 #include "source/common/protobuf/utility.h"
 
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Router {
@@ -51,9 +52,9 @@ public:
                                        const std::string& domain) {
     return route_config_name + "/" + domain;
   }
-  static std::string aliasToDomainName(const std::string& alias) {
+  static absl::string_view aliasToDomainName(absl::string_view alias) {
     const auto pos = alias.find_last_of('/');
-    return pos == std::string::npos ? alias : alias.substr(pos + 1);
+    return pos == absl::string_view::npos ? alias : alias.substr(pos + 1);
   }
 
 private:

@@ -185,8 +185,7 @@ vhds:
   EXPECT_EQ("foo", provider.configCast()->name());
   EXPECT_TRUE(provider.configInfo().has_value());
   auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
-  EXPECT_TRUE(config_impl->virtualHostExists(
-      Http::TestRequestHeaderMapImpl{{":authority", "example.com"}}));
+  EXPECT_TRUE(config_impl->virtualHostExists("example.com"));
 }
 
 // An inline route configuration that uses VHDS warms up: whatever initializes with it, i.e. the
@@ -261,8 +260,7 @@ vhds:
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   const auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
-  EXPECT_TRUE(
-      config_impl->virtualHostExists(Http::TestRequestHeaderMapImpl{{":authority", "vhds.com"}}));
+  EXPECT_TRUE(config_impl->virtualHostExists("vhds.com"));
 }
 
 // Validates that multiple on-demand VHDS request with a static route works.
@@ -368,10 +366,8 @@ vhds:
   EXPECT_TRUE(cb2_called);
 
   auto config_impl = std::static_pointer_cast<const ConfigImpl>(provider.configCast());
-  EXPECT_TRUE(config_impl->virtualHostExists(
-      Http::TestRequestHeaderMapImpl{{":authority", "example1.com"}}));
-  EXPECT_TRUE(config_impl->virtualHostExists(
-      Http::TestRequestHeaderMapImpl{{":authority", "example2.com"}}));
+  EXPECT_TRUE(config_impl->virtualHostExists("example1.com"));
+  EXPECT_TRUE(config_impl->virtualHostExists("example2.com"));
 }
 
 class StaticVhdsOnDemandTest : public StaticRouteConfigProviderImplTest {
