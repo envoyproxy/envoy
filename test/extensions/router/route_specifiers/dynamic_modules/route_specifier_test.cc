@@ -6,12 +6,14 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/config/metadata.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/router/route_specifiers/dynamic_modules/config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -30,6 +32,7 @@ namespace DynamicModules {
 namespace {
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
+using ::testing::_;
 using ::testing::HasSubstr;
 using ::testing::NiceMock;
 
@@ -123,6 +126,25 @@ public:
     TestUtility::loadFromYaml(std::string(yaml), proto_config);
     return Envoy::Router::ConfigImpl::create(proto_config, context_, creation_status_visitor_,
                                              init_manager_, false);
+  }
+
+  uint64_t counterValue(absl::string_view name) {
+    return context_.store_.counter(absl::StrCat("dynamicmodulescustom.route_specifier.test.", name))
+        .value();
+  }
+
+  // Finalizes the request headers through the route entry, after checking that the entry reports
+  // the path it finalizes through currentUrlPathAfterRewrite.
+  Http::TestRequestHeaderMapImpl finalize(const Envoy::Router::RouteEntry& entry,
+                                          Http::TestRequestHeaderMapImpl headers,
+                                          bool insert_envoy_original_path = true) {
+    Formatter::Context formatter_context(&headers);
+    const std::string expected_path =
+        entry.currentUrlPathAfterRewrite(headers, formatter_context, stream_info_);
+    entry.finalizeRequestHeaders(headers, formatter_context, stream_info_,
+                                 insert_envoy_original_path);
+    EXPECT_EQ(expected_path, headers.getPathValue());
+    return headers;
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -889,6 +911,1012 @@ TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideMetadataLayersUnderModuleMe
   EXPECT_EQ("module", fields.at("group").string_value());
   EXPECT_EQ("carried", fields.at("extra").string_value());
   EXPECT_TRUE(metadata.typed_filter_metadata().contains("envoy.test.typed"));
+}
+
+// A route configuration whose only route has the given action, under the rewrite rule module in the
+// given mode with a route override that carries a regex rewrite and one that carries none.
+std::string rewriteRuleConfigYaml(absl::string_view mode,
+                                  absl::string_view route_action = "{cluster: matched_cluster}",
+                                  absl::string_view extra = "") {
+  return fmt::format(R"EOF(
+name: test_route_config
+virtual_hosts:
+- name: test_vhost
+  domains: ["*"]
+  routes:
+  - match: {{prefix: "/"}}
+    route: {}
+  route_specifiers:
+  - name: envoy.router.route_specifiers.dynamic_modules
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
+{}
+)EOF",
+                     route_action,
+                     specifierYaml("route_specifier_rewrite_rule",
+                                   fmt::format(R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: {}
+      route_overrides:
+      - override_id: rewrite
+        regex_rewrite:
+          pattern: {{regex: "^/(.+)$"}}
+          substitution: '/regex/\1'
+      - override_id: plain
+        retry_policy: {{num_retries: 1}}
+{})EOF",
+                                               mode, extra)));
+}
+
+// Whether the last call of the rewrite rule module was accepted.
+std::string ruleAccepted(const Envoy::Router::Route& route) {
+  return Envoy::Config::Metadata::metadataValue(&route.metadata(), "envoy.test.rule", "accepted")
+      .string_value();
+}
+
+// Matches finalized request headers by their path and their x-envoy-original-path, which is empty
+// when they carry none.
+MATCHER_P2(HasPaths, path, original_path, "") {
+  *result_listener << "with path " << arg.getPathValue() << " and original path "
+                   << arg.getEnvoyOriginalPathValue();
+  return arg.getPathValue() == path && arg.getEnvoyOriginalPathValue() == original_path;
+}
+
+// A rule applies to the path the request carries when its headers are finalized, so the route
+// rewrites a request it was not built for the way a configured route does.
+TEST_F(DynamicModuleRouteSpecifierTest, PrefixRewriteRuleAppliesToTheFinalizedPath) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("literal"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1?x=1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/API/v2?y=2")),
+              HasPaths("/internal/v2?y=2", "/API/v2?y=2"));
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v3"), false), HasPaths("/internal/v3", ""));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A rule over the whole path replaces the path without its query string and fragment.
+TEST_F(DynamicModuleRouteSpecifierTest, WholePathPrefixRewriteRuleKeepsTheQuery) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("whole-path"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/anything/else?q=1#fragment")),
+              HasPaths("/fixed?q=1#fragment", "/anything/else?q=1#fragment"));
+}
+
+// An invalid rule, or one that cannot apply to the current request, is rejected and records
+// nothing.
+class RejectedPrefixRewriteRuleTest : public DynamicModuleRouteSpecifierTest,
+                                      public testing::WithParamInterface<std::string> {};
+
+INSTANTIATE_TEST_SUITE_P(Modes, RejectedPrefixRewriteRuleTest,
+                         testing::Values("not-prefix", "whole-path-with-matched",
+                                         "empty-replacement", "invalid-replacement", "unknown-span",
+                                         "too-long", "relative-replacement", "query-in-replacement",
+                                         "fragment-in-replacement", "result-too-long"));
+
+TEST_P(RejectedPrefixRewriteRuleTest, RecordsNothing) {
+  const auto config = loadRaw(rewriteRuleConfigYaml(GetParam(), "{cluster: matched_cluster}",
+                                                    "      max_rewritten_path_bytes: 16\n"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("false", ruleAccepted(*route.route));
+  // Only the metadata was recorded, which needs no route entry wrapper.
+  EXPECT_EQ(nullptr, dynamic_cast<const DynamicModuleRouteEntry*>(route.route->routeEntry()));
+}
+
+// A literal span ends before the query string and fragment, so a matched that reaches into them is
+// rejected even though it is a prefix of the path the request carries.
+TEST_F(DynamicModuleRouteSpecifierTest, LiteralSpanEndsBeforeTheQueryAndFragment) {
+  for (const auto& [mode, path] : std::vector<std::pair<std::string, std::string>>{
+           {"query-in-matched", "/api?x=1"}, {"fragment-in-matched", "/api#x"}}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadRaw(rewriteRuleConfigYaml(mode, "{cluster: matched_cluster}"));
+    ASSERT_TRUE(config.ok());
+    const auto route = config.value()->route(requestHeaders(path), stream_info_, 0);
+    ASSERT_NE(nullptr, route.route);
+    EXPECT_EQ("false", ruleAccepted(*route.route));
+  }
+}
+
+// A recorded path takes precedence over a rule whatever the call order, so the rule is then neither
+// applied nor counted.
+TEST_F(DynamicModuleRouteSpecifierTest, RecordedPathTakesPrecedenceOverPrefixRewriteRule) {
+  for (const std::string mode : {"path-wins", "rule-then-path"}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadRaw(rewriteRuleConfigYaml(mode));
+    ASSERT_TRUE(config.ok());
+    const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+    ASSERT_NE(nullptr, route.route);
+    EXPECT_EQ("true", ruleAccepted(*route.route));
+    const auto* entry = route.route->routeEntry();
+    ASSERT_NE(nullptr, entry);
+
+    EXPECT_THAT(finalize(*entry, requestHeaders("/api/v2")), HasPaths("/literal", "/api/v2"));
+    EXPECT_THAT(finalize(*entry, requestHeaders("/other")), HasPaths("/literal", "/other"));
+  }
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A rule takes precedence over the regex rewrite of a selected route override whatever the call
+// order. The regex rewrite applies to a path the rule does not when the request headers are
+// finalized, and then records that path over the original path the request carries.
+TEST_F(DynamicModuleRouteSpecifierTest, PrefixRewriteRuleTakesPrecedenceOverRouteOverrideRegex) {
+  for (const std::string mode : {"rule-over-override", "rule-then-override"}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadRaw(rewriteRuleConfigYaml(mode));
+    ASSERT_TRUE(config.ok());
+    const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+    ASSERT_NE(nullptr, route.route);
+    EXPECT_EQ("true", ruleAccepted(*route.route));
+    const auto* entry = route.route->routeEntry();
+    ASSERT_NE(nullptr, entry);
+
+    EXPECT_THAT(finalize(*entry, requestHeaders("/api/v2")), HasPaths("/internal/v2", "/api/v2"));
+    auto other = requestHeaders("/other?q=1");
+    other.setEnvoyOriginalPath("/carried");
+    EXPECT_THAT(finalize(*entry, std::move(other)), HasPaths("/regex/other?q=1", "/other?q=1"));
+  }
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A rule applies to a path exactly when it produces one, which checking it does without building
+// the path.
+TEST(PrefixRewriteRuleTest, AppliesToAgreesWithApply) {
+  const PrefixRewriteRule literal{"/api", "/internal"};
+  const PrefixRewriteRule whole_path{std::nullopt, "/fixed"};
+  const PrefixRewriteRule empty_replacement{"/api", ""};
+  for (const PrefixRewriteRule* rule : {&literal, &whole_path, &empty_replacement}) {
+    for (const absl::string_view path : {"/api/v1", "/API/v1?q=1#f", "/api", "/ap", "/other"}) {
+      for (const size_t max_bytes : {0, 6, 9, 11, 12, 64}) {
+        SCOPED_TRACE(absl::StrCat(path, " ", max_bytes));
+        EXPECT_EQ(rule->apply(path, max_bytes).has_value(), rule->appliesTo(path, max_bytes));
+      }
+    }
+  }
+}
+
+// A recorded path takes precedence over the regex rewrite of a selected route override.
+TEST_F(DynamicModuleRouteSpecifierTest, RecordedPathTakesPrecedenceOverRouteOverrideRegex) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("path-over-override"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/api/v2")),
+              HasPaths("/literal", "/api/v2"));
+}
+
+// Without a rule the regex rewrite of a selected route override applies when the decision
+// resolves, so the route carries the path it produced and keeps an original path the request
+// carries.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideRegexRewriteAppliesWhenTheDecisionResolves) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("override-only"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  auto headers = requestHeaders("/other?q=1");
+  headers.setEnvoyOriginalPath("/carried");
+  EXPECT_THAT(finalize(*entry, std::move(headers)), HasPaths("/regex/api/v1", "/carried"));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+// A later rule replaces the rule of an earlier call.
+TEST_F(DynamicModuleRouteSpecifierTest, LaterPrefixRewriteRuleReplacesTheEarlierOne) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("replaced"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/api/v1")),
+              HasPaths("/second/v1", "/api/v1"));
+}
+
+// A rejected rule records nothing, so the rule of an earlier call stays.
+TEST_F(DynamicModuleRouteSpecifierTest, RejectedPrefixRewriteRuleKeepsTheEarlierOne) {
+  const auto config = loadRaw(rewriteRuleConfigYaml("rejected-after-accepted"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("false", ruleAccepted(*route.route));
+  EXPECT_THAT(finalize(*route.route->routeEntry(), requestHeaders("/api/v1")),
+              HasPaths("/first/v1", "/api/v1"));
+}
+
+// A rule that does not apply when the request headers are finalized leaves the rewrite of the route
+// in effect and is counted.
+TEST_F(DynamicModuleRouteSpecifierTest, PrefixRewriteRuleThatDoesNotApplyLeavesTheRouteRewrite) {
+  const auto config = loadRaw(
+      rewriteRuleConfigYaml("literal", R"({cluster: matched_cluster, prefix_rewrite: "/route/"})"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/other/x")), HasPaths("/route/other/x", "/other/x"));
+  EXPECT_EQ(1, counterValue("rewrite_not_applied"));
+
+  // Where the rule applies it replaces the rewrite of the route.
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v2")), HasPaths("/internal/v2", "/api/v2"));
+  EXPECT_EQ(1, counterValue("rewrite_not_applied"));
+}
+
+// A rule that does not apply, followed by a regex rewrite that yields nothing, here one over the
+// bound, leaves the rewrite of the route in effect and is counted.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideRegexRewriteThatYieldsNothingIsCounted) {
+  const auto config = loadRaw(rewriteRuleConfigYaml(
+      "rule-over-override", R"({cluster: matched_cluster, prefix_rewrite: "/route/"})",
+      "      max_rewritten_path_bytes: 16\n"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = route.route->routeEntry();
+  ASSERT_NE(nullptr, entry);
+
+  EXPECT_THAT(finalize(*entry, requestHeaders("/a-path-past-the-bound")),
+              HasPaths("/route/a-path-past-the-bound", "/a-path-past-the-bound"));
+  EXPECT_EQ(1, counterValue("rewrite_not_applied"));
+}
+
+// A route override that carries no rewrite leaves the rewrite of the route in effect, uncounted.
+TEST_F(DynamicModuleRouteSpecifierTest, RouteOverrideWithoutARewriteLeavesTheRouteRewrite) {
+  const auto config = loadRaw(rewriteRuleConfigYaml(
+      "no-rewrite", R"({cluster: matched_cluster, prefix_rewrite: "/route/"})"));
+  ASSERT_TRUE(config.ok());
+  const auto route = config.value()->route(requestHeaders("/api/v1"), stream_info_, 0);
+  ASSERT_NE(nullptr, route.route);
+  EXPECT_EQ("true", ruleAccepted(*route.route));
+  const auto* entry = dynamic_cast<const DynamicModuleRouteEntry*>(route.route->routeEntry());
+  ASSERT_NE(nullptr, entry);
+  EXPECT_THAT(finalize(*entry, requestHeaders("/api/v1")), HasPaths("/route/api/v1", "/api/v1"));
+  EXPECT_EQ(0, counterValue("rewrite_not_applied"));
+}
+
+constexpr int CacheDisabled =
+    envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Disabled;
+constexpr int CacheMiss = envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Miss;
+constexpr int CacheHit = envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Hit;
+constexpr int CacheHitVerify =
+    envoy_dynamic_module_type_route_specifier_built_route_lookup_result_HitVerify;
+
+// A built_route_cache block keeping max_entries routes per worker, followed by the given fields.
+std::string builtRouteCacheYaml(uint32_t max_entries, absl::string_view fields = "") {
+  return fmt::format("      built_route_cache:\n        max_entries_per_worker: {}\n{}",
+                     max_entries, fields);
+}
+
+// The built route cache module in the given mode with the given cache block and the route overrides
+// and templates it selects.
+std::string builtRouteCacheModuleYaml(absl::string_view mode, absl::string_view cache) {
+  return specifierYaml("route_specifier_built_route_cache",
+                       fmt::format(R"EOF(      failure_policy: PASS_THROUGH
+      specifier_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+        value: {}
+{}      route_overrides:
+      - override_id: override_1
+        retry_policy: {{num_retries: 1}}
+      - override_id: override_2
+        retry_policy: {{num_retries: 2}}
+      - override_id: with_metadata
+        metadata:
+          filter_metadata:
+            envoy.test.cache: {{from: override}}
+      - override_id: regex
+        regex_rewrite:
+          pattern: {{regex: "^/(.+)$"}}
+          substitution: '/regex/\1'
+      route_templates:
+      - template_id: only
+        route:
+          match: {{prefix: "/"}}
+          route: {{cluster: module_cluster}}
+      - template_id: direct
+        route:
+          match: {{prefix: "/"}}
+          direct_response: {{status: 204}}
+      - template_id: weighted
+        route:
+          match: {{prefix: "/"}}
+          route:
+            weighted_clusters:
+              clusters:
+              - {{name: cluster_a, weight: 50}}
+              - {{name: cluster_b, weight: 50}}
+      - template_id: header
+        route:
+          match: {{prefix: "/"}}
+          route: {{cluster_header: x-cluster}}
+      - template_id: never
+        route:
+          match: {{prefix: "/never"}}
+          route: {{cluster: module_cluster}}
+)EOF",
+                                   mode, cache));
+}
+
+class DynamicModuleBuiltRouteCacheTest : public DynamicModuleRouteSpecifierTest {
+public:
+  void SetUp() override {
+    auto module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath("route_specifier_built_route_cache", "c"),
+        /*do_not_close=*/true);
+    ASSERT_TRUE(module.ok());
+    module_ = std::move(module.value());
+    verificationRandom(1);
+  }
+
+  // Sets the random value that decides whether a hit is verified. A hit is verified when the value
+  // is a multiple of verify_one_in.
+  void verificationRandom(uint64_t value) {
+    ON_CALL(context_.api_.random_, random()).WillByDefault(testing::Return(value));
+  }
+
+  // Reads one of the values the module exports for tests.
+  int moduleValue(const std::string& getter) {
+    auto function = module_->getFunctionPointer<int (*)(void)>(getter);
+    EXPECT_TRUE(function.ok());
+    return function.ok() ? function.value()() : -1;
+  }
+  int lastCacheResult() { return moduleValue("getLastCacheResult"); }
+
+  // Resolves the route of a request for the path that carries the cache key.
+  Envoy::Router::RouteConstSharedPtr resolve(Envoy::Router::ConfigImpl& config, uint64_t key,
+                                             uint64_t random = 1,
+                                             absl::string_view path = "/api/v1") {
+    auto headers = requestHeaders(path);
+    headers.addCopy(Http::LowerCaseString("x-key"), absl::StrCat(key));
+    return config.route(headers, stream_info_, random).route;
+  }
+
+  uint64_t entries() {
+    return context_.store_
+        .gauge("dynamicmodulescustom.route_specifier.test.built_route_cache_entries",
+               Stats::Gauge::ImportMode::NeverImport)
+        .value();
+  }
+
+  Extensions::DynamicModules::DynamicModulePtr module_;
+};
+
+// A hit returns the route the miss built for the key, so the route is built once.
+TEST_F(DynamicModuleBuiltRouteCacheTest, HitReturnsTheRouteTheMissBuilt) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), 1);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  const auto second = resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  ASSERT_NE(nullptr, first);
+  EXPECT_EQ(first, second);
+  EXPECT_EQ("cached_cluster", second->routeEntry()->clusterName());
+
+  const auto other = resolve(*config.value(), 2);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_NE(first, other);
+  EXPECT_EQ(1, counterValue("built_route_cache_hit"));
+  EXPECT_EQ(2, counterValue("built_route_cache_miss"));
+  EXPECT_EQ(2, entries());
+}
+
+// A decision that fails is not cached.
+TEST_F(DynamicModuleBuiltRouteCacheTest, FailedDecisionIsNotCached) {
+  const auto config =
+      loadConfig(builtRouteCacheModuleYaml("direct-entry", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), 1);
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_EQ(2, counterValue("failure_override_on_non_route_entry"));
+  EXPECT_EQ(0, entries());
+}
+
+// A verified hit uses the route the module recorded, and evicts the cached route when it was
+// recorded differently, so a later request builds the route again.
+TEST_F(DynamicModuleBuiltRouteCacheTest, VerifiedHitEvictsARouteRecordedDifferently) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml(
+      "inconsistent", builtRouteCacheYaml(16, "        verify_one_in: 2\n")));
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), 1);
+  EXPECT_EQ(first, resolve(*config.value(), 1));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+
+  verificationRandom(2);
+  const auto second = resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+  ASSERT_NE(nullptr, second);
+  EXPECT_EQ("module_cluster", first->routeEntry()->clusterName());
+  EXPECT_EQ("cluster_b", second->routeEntry()->clusterName());
+  EXPECT_EQ(1, counterValue("built_route_cache_verify"));
+  EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
+  EXPECT_EQ(0, entries());
+
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_EQ(1, entries());
+}
+
+// A verified hit whose recording fails differs from a template cached as it is, which it evicts.
+TEST_F(DynamicModuleBuiltRouteCacheTest, VerifiedHitWhoseRecordingFailsEvictsTheRoute) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml(
+      "failing-verify", builtRouteCacheYaml(16, "        verify_one_in: 2\n")));
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), 1);
+  EXPECT_EQ(1, entries());
+  verificationRandom(2);
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+  EXPECT_EQ(1, counterValue("failure_override_on_non_route_entry"));
+  EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
+  EXPECT_EQ(0, entries());
+}
+
+// A verified recording that depends on the request path could not be cached itself, so it evicts
+// the cached route even when it records the same path for this request, and a later request for
+// another path does not reuse that path.
+TEST_F(DynamicModuleBuiltRouteCacheTest,
+       VerifiedHitWhoseRecordingDependsOnTheRequestPathEvictsTheRoute) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml(
+      "prefix-rewrite-when-verified", builtRouteCacheYaml(16, "        verify_one_in: 2\n")));
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), 1);
+  EXPECT_EQ(1, entries());
+  verificationRandom(2);
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+  EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
+  EXPECT_EQ(0, entries());
+
+  verificationRandom(1);
+  resolve(*config.value(), 1, 1, "/api/v2");
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+}
+
+// A template cached as it is differs from a verified recording that carries only route overrides.
+TEST_F(DynamicModuleBuiltRouteCacheTest, VerifiedHitFindsRouteOverridesMissingFromACachedTemplate) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml(
+      "inconsistent-metadata", builtRouteCacheYaml(16, "        verify_one_in: 1\n")));
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), 1);
+  const auto second = resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+  ASSERT_NE(nullptr, second);
+  EXPECT_NE(first, second);
+  EXPECT_TRUE(second->metadata().filter_metadata().contains("envoy.test.cache"));
+  EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
+}
+
+// A verified hit whose recording matches keeps the cached route, whether it carries route entry
+// overrides, only route overrides, the metadata of a selected route override, or is the template
+// as it is.
+TEST_F(DynamicModuleBuiltRouteCacheTest, VerifiedHitKeepsARouteRecordedTheSame) {
+  for (const std::string mode : {"cached", "route-only", "override-metadata", "bare"}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadConfig(
+        builtRouteCacheModuleYaml(mode, builtRouteCacheYaml(16, "        verify_one_in: 2\n")));
+    ASSERT_TRUE(config.ok());
+    const auto first = resolve(*config.value(), 1);
+    ASSERT_NE(nullptr, first);
+    verificationRandom(2);
+    resolve(*config.value(), 1);
+    EXPECT_EQ(CacheHitVerify, lastCacheResult());
+    verificationRandom(1);
+    EXPECT_EQ(first, resolve(*config.value(), 1));
+    EXPECT_EQ(CacheHit, lastCacheResult());
+  }
+  EXPECT_EQ(4, counterValue("built_route_cache_verify"));
+  EXPECT_EQ(0, counterValue("built_route_cache_verify_mismatch"));
+}
+
+// A verified hit uses a route of its own built from the recording, so the user data it records
+// fires the destroy hook once that route goes, while the cached route stays.
+TEST_F(DynamicModuleBuiltRouteCacheTest, VerifiedHitKeepsTheUserDataItRecordsOnItsOwnRoute) {
+  const auto config = loadConfig(
+      builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16, "        verify_one_in: 1\n")));
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), 1);
+  auto second = resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+  ASSERT_NE(nullptr, second);
+  EXPECT_NE(first, second);
+  EXPECT_EQ(0, counterValue("route_destroy"));
+  second.reset();
+  EXPECT_EQ(1, counterValue("route_destroy"));
+  EXPECT_EQ(1, entries());
+}
+
+// A hit is verified with a chance of one in verify_one_in, which defaults to 1024, and zero
+// verifies none.
+TEST_F(DynamicModuleBuiltRouteCacheTest, VerificationIsSampled) {
+  const auto sampled = loadConfig(
+      builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16, "        verify_one_in: 3\n")));
+  ASSERT_TRUE(sampled.ok());
+  resolve(*sampled.value(), 1);
+  for (const uint64_t value : {1, 2, 3, 4, 6}) {
+    verificationRandom(value);
+    resolve(*sampled.value(), 1);
+  }
+  EXPECT_EQ(5, counterValue("built_route_cache_hit"));
+  EXPECT_EQ(2, counterValue("built_route_cache_verify"));
+
+  const auto defaulted = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(defaulted.ok());
+  resolve(*defaulted.value(), 1);
+  for (const uint64_t value : {512, 1023}) {
+    verificationRandom(value);
+    resolve(*defaulted.value(), 1);
+    EXPECT_EQ(CacheHit, lastCacheResult());
+  }
+  verificationRandom(1024);
+  resolve(*defaulted.value(), 1);
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+
+  const auto unverified = loadConfig(
+      builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16, "        verify_one_in: 0\n")));
+  ASSERT_TRUE(unverified.ok());
+  resolve(*unverified.value(), 1);
+  verificationRandom(0);
+  resolve(*unverified.value(), 1);
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  EXPECT_EQ(3, counterValue("built_route_cache_verify"));
+}
+
+// The cache keys a route by the template as well, so two templates share no route for one key.
+TEST_F(DynamicModuleBuiltRouteCacheTest, TemplateIsPartOfTheKey) {
+  const auto config =
+      loadConfig(builtRouteCacheModuleYaml("template-by-header", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto resolve_template = [&](absl::string_view template_id) {
+    auto headers = requestHeaders("/api/v1");
+    headers.addCopy(Http::LowerCaseString("x-template"), template_id);
+    return config.value()->route(headers, stream_info_, 1).route;
+  };
+  const auto only = resolve_template("only");
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  const auto direct = resolve_template("direct");
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  ASSERT_NE(nullptr, only);
+  EXPECT_NE(only, direct);
+  EXPECT_EQ(2, entries());
+  EXPECT_EQ(only, resolve_template("only"));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  EXPECT_EQ(direct, resolve_template("direct"));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+}
+
+// A hit ignores what the module records, so no route is built for it.
+TEST_F(DynamicModuleBuiltRouteCacheTest, HitIgnoresTheRecording) {
+  const auto config =
+      loadConfig(builtRouteCacheModuleYaml("hit-then-record", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), 1);
+  const auto second = resolve(*config.value(), 1);
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  ASSERT_NE(nullptr, second);
+  EXPECT_EQ(first, second);
+  EXPECT_EQ("cached_cluster", second->routeEntry()->clusterName());
+  EXPECT_EQ(0, counterValue("route_destroy"));
+}
+
+// A template whose cluster is picked per request builds a route specific to the request, so the
+// cache is not in effect for it.
+TEST_F(DynamicModuleBuiltRouteCacheTest, WeightedTemplateIsNotCached) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml("weighted", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), 1, 10);
+  EXPECT_EQ(CacheDisabled, lastCacheResult());
+  const auto second = resolve(*config.value(), 1, 60);
+  ASSERT_NE(nullptr, first);
+  ASSERT_NE(nullptr, second);
+  EXPECT_EQ("cluster_a", first->routeEntry()->clusterName());
+  EXPECT_EQ("cluster_b", second->routeEntry()->clusterName());
+  EXPECT_EQ(2, counterValue("built_route_cache_disabled"));
+  EXPECT_EQ(0, counterValue("built_route_cache_miss"));
+  EXPECT_EQ(0, entries());
+}
+
+// A template whose cluster a request header names is not cached either, nor one whose match does
+// not hold for the request.
+TEST_F(DynamicModuleBuiltRouteCacheTest, ClusterHeaderTemplateIsNotCached) {
+  const auto config =
+      loadConfig(builtRouteCacheModuleYaml("template-by-header", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto resolve_template = [&](absl::string_view template_id) {
+    auto headers = requestHeaders("/api/v1");
+    headers.addCopy(Http::LowerCaseString("x-template"), template_id);
+    headers.addCopy(Http::LowerCaseString("x-cluster"), "header_cluster");
+    return config.value()->route(headers, stream_info_, 1).route;
+  };
+  const auto route = resolve_template("header");
+  EXPECT_EQ(CacheDisabled, lastCacheResult());
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ("header_cluster", route->routeEntry()->clusterName());
+  resolve_template("never");
+  EXPECT_EQ(CacheDisabled, lastCacheResult());
+  EXPECT_EQ(2, counterValue("built_route_cache_disabled"));
+  EXPECT_EQ(0, entries());
+}
+
+// A full worker evicts a route the CLOCK hand finds unused since it last passed, sparing one used
+// since then.
+TEST_F(DynamicModuleBuiltRouteCacheTest, FullCacheEvictsARouteNotUsedRecently) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(3)));
+  ASSERT_TRUE(config.ok());
+  for (uint64_t key = 1; key <= 4; ++key) {
+    resolve(*config.value(), key);
+  }
+  // The hand cleared every route, evicted the first and stopped at the second.
+  EXPECT_EQ(1, counterValue("built_route_cache_evict"));
+  EXPECT_EQ(3, entries());
+  resolve(*config.value(), 2);
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  // The second route was used since the hand passed it, so the third is evicted instead.
+  resolve(*config.value(), 5);
+  EXPECT_EQ(2, counterValue("built_route_cache_evict"));
+  resolve(*config.value(), 2);
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  resolve(*config.value(), 3);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  // The hand now points at the second route, unused since it last passed, so the sixth takes its
+  // place.
+  resolve(*config.value(), 6);
+  resolve(*config.value(), 5);
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  // Nothing else holds the evicted routes, so each fired the destroy hook.
+  EXPECT_EQ(4, counterValue("built_route_cache_evict"));
+  EXPECT_EQ(4, counterValue("route_destroy"));
+}
+
+// A worker sweeps the routes idle for longer than the entry age, also when it is idle, and runs
+// the sweep only while it caches a route.
+TEST_F(DynamicModuleBuiltRouteCacheTest, SweepEvictsIdleRoutes) {
+  auto* timer = new NiceMock<Event::MockTimer>(&context_.thread_local_.dispatcher_);
+  // Armed by the two inserts into an empty cache and by the nine sweeps that leave a route behind.
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1000), _)).Times(11);
+  const auto config = loadConfig(
+      builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16, "        max_idle_time: 4s\n")));
+  ASSERT_TRUE(config.ok());
+  EXPECT_FALSE(timer->enabled_);
+  resolve(*config.value(), 1);
+  EXPECT_TRUE(timer->enabled_);
+  const auto second = resolve(*config.value(), 2);
+  for (int i = 0; i < 3; ++i) {
+    timer->invokeCallback();
+  }
+  // A use before the age passes keeps the route.
+  resolve(*config.value(), 2);
+  timer->invokeCallback();
+  timer->invokeCallback();
+  EXPECT_EQ(1, counterValue("built_route_cache_evict"));
+  EXPECT_EQ(1, counterValue("route_destroy"));
+  EXPECT_EQ(1, entries());
+  // The second route moved into the slot the first left and is still found.
+  EXPECT_EQ(second, resolve(*config.value(), 2));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+
+  for (int i = 0; i < 5; ++i) {
+    timer->invokeCallback();
+  }
+  EXPECT_EQ(0, entries());
+  EXPECT_FALSE(timer->enabled_);
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_TRUE(timer->enabled_);
+}
+
+// A sweep evicts every route that went idle, also several at once.
+TEST_F(DynamicModuleBuiltRouteCacheTest, SweepEvictsEveryIdleRoute) {
+  auto* timer = new NiceMock<Event::MockTimer>(&context_.thread_local_.dispatcher_);
+  const auto config = loadConfig(
+      builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16, "        max_idle_time: 4s\n")));
+  ASSERT_TRUE(config.ok());
+  for (uint64_t key = 1; key <= 3; ++key) {
+    resolve(*config.value(), key);
+  }
+  for (int i = 0; i < 4; ++i) {
+    timer->invokeCallback();
+  }
+  EXPECT_EQ(3, entries());
+  timer->invokeCallback();
+  EXPECT_EQ(3, counterValue("built_route_cache_evict"));
+  EXPECT_EQ(0, entries());
+}
+
+// The entry age defaults to 600 seconds, which a worker sweeps every quarter of.
+TEST_F(DynamicModuleBuiltRouteCacheTest, DefaultEntryAgeIsSweptEveryQuarter) {
+  auto* timer = new NiceMock<Event::MockTimer>(&context_.thread_local_.dispatcher_);
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(150000), _));
+  const auto config = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), 1);
+}
+
+// Destroying the route configuration releases the cached routes, each firing the destroy hook once,
+// and destroys the specifier configuration.
+TEST_F(DynamicModuleBuiltRouteCacheTest, TeardownReleasesCachedRoutes) {
+  const int routes_before = moduleValue("getRouteDestroyCount");
+  const int configs_before = moduleValue("getConfigDestroyCount");
+  {
+    const auto config = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16)));
+    ASSERT_TRUE(config.ok());
+    resolve(*config.value(), 1);
+    resolve(*config.value(), 2);
+    resolve(*config.value(), 1);
+    EXPECT_EQ(0, counterValue("route_destroy"));
+  }
+  EXPECT_EQ(2, counterValue("route_destroy"));
+  EXPECT_EQ(routes_before + 2, moduleValue("getRouteDestroyCount"));
+  EXPECT_EQ(configs_before + 1, moduleValue("getConfigDestroyCount"));
+  EXPECT_EQ(0, entries());
+}
+
+// A stream that holds a cached route when the configuration goes keeps it, and the destroy hook
+// fires once the stream releases it.
+TEST_F(DynamicModuleBuiltRouteCacheTest, StreamHoldingACachedRouteReleasesItLast) {
+  const int routes_before = moduleValue("getRouteDestroyCount");
+  Envoy::Router::RouteConstSharedPtr held;
+  {
+    const auto config = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16)));
+    ASSERT_TRUE(config.ok());
+    held = resolve(*config.value(), 1);
+  }
+  EXPECT_EQ(routes_before, moduleValue("getRouteDestroyCount"));
+  held.reset();
+  EXPECT_EQ(routes_before + 1, moduleValue("getRouteDestroyCount"));
+}
+
+// A module that sets no key builds a route per request as it does without a cache.
+TEST_F(DynamicModuleBuiltRouteCacheTest, DecisionWithoutAKeyIsNotCached) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml("no-key", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  EXPECT_NE(resolve(*config.value(), 1), resolve(*config.value(), 1));
+  EXPECT_EQ(0, counterValue("built_route_cache_miss"));
+  EXPECT_EQ(0, entries());
+}
+
+// The cache is not in effect without a selected template, or without a configured cache.
+TEST_F(DynamicModuleBuiltRouteCacheTest, CacheIsDisabledWithoutATemplateOrAConfiguration) {
+  const auto without_template =
+      loadConfig(builtRouteCacheModuleYaml("key-without-template", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(without_template.ok());
+  const auto route = resolve(*without_template.value(), 1);
+  EXPECT_EQ(CacheDisabled, lastCacheResult());
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ("uncached", route->routeEntry()->clusterName());
+
+  const auto without_cache = loadConfig(builtRouteCacheModuleYaml("cached", ""));
+  ASSERT_TRUE(without_cache.ok());
+  const auto first = resolve(*without_cache.value(), 1);
+  EXPECT_EQ(CacheDisabled, lastCacheResult());
+  EXPECT_NE(first, resolve(*without_cache.value(), 1));
+  EXPECT_EQ(3, counterValue("built_route_cache_disabled"));
+}
+
+// The cache is not in effect on a thread that thread local storage does not know, nor on a worker
+// that has not set it up yet.
+TEST_F(DynamicModuleBuiltRouteCacheTest, ThreadWithoutTheCacheResolvesWithoutIt) {
+  context_.thread_local_.defer_data_ = true;
+  const auto config = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheDisabled, lastCacheResult());
+  context_.thread_local_.call();
+  context_.thread_local_.registered_ = false;
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheDisabled, lastCacheResult());
+  context_.thread_local_.registered_ = true;
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_EQ(2, counterValue("built_route_cache_disabled"));
+}
+
+// Selecting the template again after the lookup discards it, so the route is not cached.
+TEST_F(DynamicModuleBuiltRouteCacheTest, SelectingATemplateDiscardsTheLookup) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml("reselect", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), 1);
+  resolve(*config.value(), 1);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_EQ(0, entries());
+}
+
+// Unsetting the template after the lookup discards it, so the regex rewrite of a route override
+// selected for the route matching resolved applies when the decision resolves.
+TEST_F(DynamicModuleBuiltRouteCacheTest, UnsettingTheTemplateDiscardsTheLookup) {
+  const auto config =
+      loadConfig(builtRouteCacheModuleYaml("unset-after-key", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto route = resolve(*config.value(), 1);
+  ASSERT_NE(nullptr, route);
+  EXPECT_THAT(finalize(*route->routeEntry(), requestHeaders("/api/v2")),
+              HasPaths("/regex/api/v1", "/api/v2"));
+  EXPECT_EQ(0, entries());
+}
+
+// A later key replaces the lookup, so the route is cached for the key of the last call.
+TEST_F(DynamicModuleBuiltRouteCacheTest, LaterKeyReplacesTheLookup) {
+  const auto config = loadConfig(builtRouteCacheModuleYaml("rekey", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), 1);
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_EQ(1, entries());
+  EXPECT_EQ(first, resolve(*config.value(), 1));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  EXPECT_EQ(3, counterValue("built_route_cache_miss"));
+}
+
+// A recording that depends on the path of the current request is not cached. It does after
+// set_prefix_rewrite, even once set_path replaces the path, after a rule replaced an accepted one,
+// and after a rule was rejected for the path, while a rule that applies is cached and rewrites
+// later requests.
+TEST_F(DynamicModuleBuiltRouteCacheTest, RecordingThatDependsOnTheRequestPathIsNotCached) {
+  for (const std::string mode : {"prefix-rewrite", "prefix-rewrite-then-path", "replaced-rule"}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadConfig(builtRouteCacheModuleYaml(mode, builtRouteCacheYaml(16)));
+    ASSERT_TRUE(config.ok());
+    resolve(*config.value(), 1);
+    resolve(*config.value(), 1);
+    EXPECT_EQ(CacheMiss, lastCacheResult());
+    EXPECT_EQ(0, entries());
+  }
+
+  const auto rule = loadConfig(builtRouteCacheModuleYaml("rule", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(rule.ok());
+  const auto rejected = resolve(*rule.value(), 1, 1, "/other");
+  ASSERT_NE(nullptr, rejected);
+  EXPECT_EQ("fallback_cluster", rejected->routeEntry()->clusterName());
+  EXPECT_EQ(0, entries());
+  const auto cached = resolve(*rule.value(), 1, 1, "/api/v1");
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  EXPECT_EQ(1, entries());
+  ASSERT_NE(nullptr, cached);
+  EXPECT_EQ(cached, resolve(*rule.value(), 1, 1, "/api/v2"));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  EXPECT_THAT(finalize(*cached->routeEntry(), requestHeaders("/api/v2")),
+              HasPaths("/internal/v2", "/api/v2"));
+}
+
+// A cached route that carries a rule serves only the paths the rule applies to, so a request for
+// another path is a miss the module decides afresh, whose route does not replace the cached one.
+TEST_F(DynamicModuleBuiltRouteCacheTest, CachedRuleServesOnlyThePathsItAppliesTo) {
+  for (const std::string mode : {"rule", "rule-for-api"}) {
+    SCOPED_TRACE(mode);
+    const auto config = loadConfig(builtRouteCacheModuleYaml(mode, builtRouteCacheYaml(16)));
+    ASSERT_TRUE(config.ok());
+    const auto cached = resolve(*config.value(), 1, 1, "/api/v1");
+    const auto other = resolve(*config.value(), 1, 1, "/other");
+    EXPECT_EQ(CacheMiss, lastCacheResult());
+    ASSERT_NE(nullptr, other);
+    EXPECT_EQ("fallback_cluster", other->routeEntry()->clusterName());
+    EXPECT_EQ(1, entries());
+    EXPECT_EQ(cached, resolve(*config.value(), 1, 1, "/api/v2"));
+    EXPECT_EQ(CacheHit, lastCacheResult());
+  }
+}
+
+// For a decision the cache looks up, the regex rewrite of a selected route override applies when
+// the request headers are finalized, so the cached route rewrites the path of each request.
+TEST_F(DynamicModuleBuiltRouteCacheTest, CachedRouteOverrideRegexRewritesEachRequest) {
+  const auto config =
+      loadConfig(builtRouteCacheModuleYaml("override-regex", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(config.ok());
+  const auto cached = resolve(*config.value(), 1);
+  ASSERT_NE(nullptr, cached);
+  EXPECT_EQ(cached, resolve(*config.value(), 1, 1, "/api/v2"));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+  EXPECT_THAT(finalize(*cached->routeEntry(), requestHeaders("/api/v2")),
+              HasPaths("/regex/api/v2", "/api/v2"));
+}
+
+// A specifier on a route configuration cannot build templates, so it rejects a built route cache.
+TEST_F(DynamicModuleBuiltRouteCacheTest, BuiltRouteCacheRequiresARouteBuilder) {
+  const auto config = loadRaw(fmt::format(R"EOF(
+name: test_route_config
+virtual_hosts:
+- name: test_vhost
+  domains: ["*"]
+  routes:
+  - match: {{prefix: "/"}}
+    route: {{cluster: matched_cluster}}
+route_specifiers:
+- name: envoy.router.route_specifiers.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
+    dynamic_module_config:
+      name: route_specifier_built_route_cache
+      do_not_close: true
+    specifier_name: test_route_specifier
+    stat_prefix: test
+    failure_policy: PASS_THROUGH
+    built_route_cache:
+      max_entries_per_worker: 16
+)EOF"));
+  EXPECT_THAT(config.status(),
+              HasStatusMessage(HasSubstr("built_route_cache requires a route specifier configured "
+                                         "on a virtual host or a route")));
+}
+
+// A decision the module records after a hit, or a status that skips the route, wins over the hit.
+TEST_F(DynamicModuleBuiltRouteCacheTest, DecisionsAndSkipWinOverAHit) {
+  struct TestCase {
+    std::string mode;
+    std::string counter;
+    uint64_t increment;
+    std::string cluster;
+  };
+  for (const TestCase& test_case : std::vector<TestCase>{
+           {"hit-then-no-route", "decision_no_route", 1, ""},
+           {"hit-then-pass-through", "decision_pass_through", 1, "matched_cluster"},
+           {"hit-then-error", "decision_error", 1, "matched_cluster"},
+           // Skipping the only route runs the chain once more with no route left.
+           {"hit-then-skip", "route_skipped", 2, ""},
+       }) {
+    SCOPED_TRACE(test_case.mode);
+    const auto config =
+        loadConfig(builtRouteCacheModuleYaml(test_case.mode, builtRouteCacheYaml(16)));
+    ASSERT_TRUE(config.ok());
+    const auto cached = resolve(*config.value(), 1);
+    ASSERT_NE(nullptr, cached);
+    EXPECT_EQ("cached_cluster", cached->routeEntry()->clusterName());
+    const uint64_t before = counterValue(test_case.counter);
+    const auto route = resolve(*config.value(), 1);
+    EXPECT_EQ(CacheHit, lastCacheResult());
+    EXPECT_EQ(before + test_case.increment, counterValue(test_case.counter));
+    if (test_case.cluster.empty()) {
+      EXPECT_EQ(nullptr, route);
+    } else {
+      ASSERT_NE(nullptr, route);
+      EXPECT_EQ(test_case.cluster, route->routeEntry()->clusterName());
+    }
+  }
+}
+
+// A verified hit whose recording differs in any one field evicts the cached route.
+class VerifiedHitFieldTest : public DynamicModuleBuiltRouteCacheTest,
+                             public testing::WithParamInterface<std::string> {};
+
+INSTANTIATE_TEST_SUITE_P(Fields, VerifiedHitFieldTest,
+                         testing::Values("cluster", "timeout", "idle-timeout",
+                                         "max-stream-duration", "body-buffer-limit", "priority",
+                                         "cluster-not-found", "override", "metadata",
+                                         "filter-disabled", "route-name", "path", "rule", "host",
+                                         "request-header-add", "request-header-remove",
+                                         "response-header-add", "response-header-remove",
+                                         "user-data"));
+
+TEST_P(VerifiedHitFieldTest, DifferenceEvictsTheRoute) {
+  const auto config = loadConfig(
+      builtRouteCacheModuleYaml("vary", builtRouteCacheYaml(16, "        verify_one_in: 1\n")));
+  ASSERT_TRUE(config.ok());
+  const auto request = [&](absl::string_view value) {
+    auto headers = requestHeaders("/api/v1");
+    headers.addCopy(Http::LowerCaseString("x-vary"), GetParam());
+    headers.addCopy(Http::LowerCaseString("x-value"), value);
+    return config.value()->route(headers, stream_info_, 0).route;
+  };
+  const auto first = request("1");
+  EXPECT_EQ(CacheMiss, lastCacheResult());
+  const auto second = request("2");
+  EXPECT_EQ(CacheHitVerify, lastCacheResult());
+  ASSERT_NE(nullptr, second);
+  EXPECT_NE(first, second);
+  EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
+  EXPECT_EQ(0, entries());
 }
 
 } // namespace

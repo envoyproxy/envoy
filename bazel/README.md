@@ -731,8 +731,13 @@ To generate coverage results, make sure you are using a Clang toolchain and have
 `llvm-profdata` in your `PATH`. Then run:
 
 ```
-test/run_envoy_bazel_coverage.sh
+bazel run @envoy_toolshed//coverage:run -- \
+    --config=test-coverage \
+    --validate-target=//tools/coverage:report.validate
 ```
+
+`test/run_envoy_bazel_coverage.sh` remains available as a compatibility wrapper and honours the
+`FUZZ_COVERAGE` and `VALIDATE_COVERAGE` environment variables.
 
 **Note** that it is important to ensure that the versions of `clang`, `llvm-cov` and `llvm-profdata`
 are consistent and that they match the most recent Clang/LLVM toolchain version in use by Envoy (see
@@ -742,22 +747,33 @@ toolchain](https://github.com/envoyproxy/envoy-build-tools/blob/main/build_conta
 The summary results are printed to the standard output and the full coverage
 report is available in `generated/coverage/coverage.html`.
 
-To generate coverage results for fuzz targets, use the `FUZZ_COVERAGE` environment variable, e.g.:
+To generate coverage results for fuzz targets, use `--fuzz` and specify both fuzz coverage configs:
 ```
-FUZZ_COVERAGE=true VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
+bazel run @envoy_toolshed//coverage:run -- \
+    --fuzz \
+    --config=fuzz-coverage \
+    --validate-config=fuzz-coverage-config \
+    --validate-target=//tools/coverage:report.validate
 ```
 This generates a coverage report for fuzz targets after running the target for one minute against fuzzing engine libfuzzer using its coprus as initial seed inputs. The full coverage report will be available in `generated/fuzz_coverage/coverage.html`.
+
+Use `--no-validate` to skip threshold validation.
 
 The latest coverage report for main is available
 [here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
-passing coverage targets as the command-line arguments and using the `VALIDATE_COVERAGE` environment
-variable, e.g. for a fuzz test:
+passing coverage targets after `--` and using `--no-validate` to skip threshold validation, e.g. for a
+fuzz test:
 
 ```
-FUZZ_COVERAGE=true VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh //test/common/common:base64_fuzz_test
+bazel run @envoy_toolshed//coverage:run -- \
+    --fuzz \
+    --config=fuzz-coverage \
+    --validate-config=fuzz-coverage-config \
+    --no-validate \
+    -- //test/common/common:base64_fuzz_test
 ```
 
 # Cleaning the build and test artifacts

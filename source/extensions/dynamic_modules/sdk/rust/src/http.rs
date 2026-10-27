@@ -2,10 +2,23 @@ use crate::abi::envoy_dynamic_module_type_metrics_result;
 use crate::buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use crate::utility::HeaderPairSlice;
 use crate::{
-  abi, bytes_to_module_buffer, ffi_export, str_to_module_buffer, strs_to_module_buffers,
-  ClusterHostCount, EnvoyCounterId, EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId,
-  EnvoyGenericSecretId, EnvoyHistogramId, EnvoyHistogramVecId, NewHttpFilterConfigFunction,
-  NewHttpFilterPerRouteConfigFunction, TimingInfo, NEW_HTTP_FILTER_CONFIG_FUNCTION,
+  abi,
+  bytes_to_module_buffer,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  ClusterHostCount,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyGenericSecretId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
+  NewHttpFilterConfigFunction,
+  NewHttpFilterPerRouteConfigFunction,
+  TimingInfo,
+  NEW_HTTP_FILTER_CONFIG_FUNCTION,
   NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION,
 };
 #[cfg(any(test, feature = "mock"))]
@@ -33,8 +46,8 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
   /// This is called when the new event is scheduled via the
   /// [`EnvoyHttpFilterConfigScheduler::commit`] for this [`HttpFilterConfig`].
   ///
-  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object,
-  ///   for example to emit the metrics defined on it.
+  /// * `envoy_config` can be used to interact with the underlying Envoy filter config object, for
+  ///   example to emit the metrics defined on it.
   /// * `event_id` is the ID of the event that was scheduled with
   ///   [`EnvoyHttpFilterConfigScheduler::commit`] to distinguish multiple scheduled events.
   fn on_scheduled(&self, _envoy_config: &mut EnvoyHttpFilterConfigImpl, _event_id: u64) {}
@@ -412,9 +425,10 @@ pub trait EnvoyHttpFilterConfig {
   /// `name` is the name of the secret: for a static secret the name in the bootstrap
   /// configuration, and for a dynamic secret the resource name requested from the SDS server.
   ///
-  /// `sds_config_source` is the JSON serialized `envoy.config.core.v3.ConfigSource` describing where
-  /// to fetch the secret from, so that the value is updated whenever the SDS server pushes a new
-  /// version. Pass `None` to look the name up among the statically configured secrets instead.
+  /// `sds_config_source` is the JSON serialized `envoy.config.core.v3.ConfigSource` describing
+  /// where to fetch the secret from, so that the value is updated whenever the SDS server pushes
+  /// a new version. Pass `None` to look the name up among the statically configured secrets
+  /// instead.
   ///
   /// This can only be called while the filter config is being created, i.e. from
   /// [`HttpFilterConfig`]'s constructor. Returns `None` if the secret cannot be subscribed to, for
@@ -4955,13 +4969,15 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_http_filter_request_body(
   filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
   end_of_stream: bool,
 ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
+  use abi::envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationNoBuffer;
+
   with_in_module_filter(
     "envoy_dynamic_module_on_http_filter_request_body",
     filter_ptr,
     |filter| filter.on_request_body(&mut EnvoyHttpFilterImpl::new(envoy_ptr), end_of_stream),
   )
   // Fail-closed: stop iteration without buffering further data.
-  .unwrap_or(abi::envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationNoBuffer)
+  .unwrap_or(StopIterationNoBuffer)
 }
 
 /// # Safety

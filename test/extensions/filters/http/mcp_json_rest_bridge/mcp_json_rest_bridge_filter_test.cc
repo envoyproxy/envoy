@@ -856,6 +856,74 @@ TEST_F(McpJsonRestBridgeFilterTest, InvalidInputJsonReturnsError) {
           R"json({"error":{"code":-32700,"message":"JSON parse error"},"id":null,"jsonrpc":"2.0"})json"));
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, HeadersOnlyPostRequestReturnsParseError) {
+  ASSERT_OK(makeFilter());
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::BadRequest),
+                             StrEq(R"json({"code":-32700,"message":"JSON parse error"})json"), _, _,
+                             StrEq("mcp_json_rest_bridge_request_failed_to_parse_json_rpc")));
+
+  Protobuf::Struct expected_metadata;
+  MessageUtil::loadFromJson(R"json({
+    "status": "mcp_json_rest_bridge_request_failed_to_parse_json_rpc"
+  })json",
+                            expected_metadata);
+
+  EXPECT_CALL(
+      decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // Simulates how the router filter handles the local response.
+  response_headers_ = {{"content-type", "text/plain"}, {"content-length", "123456"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+  Buffer::OwnedImpl response_body(R"json({"code":-32700,"message":"JSON parse error"})json");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(),
+              StrEq(std::to_string(response_body.length())));
+  EXPECT_EQ(
+      nlohmann::json::parse(response_body.toString()),
+      nlohmann::json::parse(
+          R"json({"error":{"code":-32700,"message":"JSON parse error"},"id":null,"jsonrpc":"2.0"})json"));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, EmptyRequestBodyReturnsParseError) {
+  ASSERT_OK(makeFilter());
+
+  // The body is still expected, so decodeHeaders() must not reply yet.
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _)).Times(0);
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // This newer expectation takes precedence over the one above.
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::BadRequest),
+                             StrEq(R"json({"code":-32700,"message":"JSON parse error"})json"), _, _,
+                             StrEq("mcp_json_rest_bridge_request_failed_to_parse_json_rpc")));
+
+  Protobuf::Struct expected_metadata;
+  MessageUtil::loadFromJson(R"json({
+    "status": "mcp_json_rest_bridge_request_failed_to_parse_json_rpc"
+  })json",
+                            expected_metadata);
+
+  EXPECT_CALL(
+      decoder_callbacks_.stream_info_,
+      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+
+  Buffer::OwnedImpl body;
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, InvalidProtocolVersionParamsReturnsError) {
   ASSERT_OK(makeFilter());
 
@@ -4235,6 +4303,82 @@ TEST_F(McpJsonRestBridgeStreamingFilterTest, TrailersEmptyBodyEmitsPrefixAndSuff
   EXPECT_EQ(filter_->encodeTrailers(response_trailers), Http::FilterTrailersStatus::Continue);
 }
 
+TEST_F(McpJsonRestBridgeStreamingFilterTest, HeadersOnly204EmitsSyntheticSuccessResult) {
+  sendToolsCallRequest();
+
+  const std::string expected =
+      R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"","type":"text"}],"isError":false}})json";
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected](Buffer::Instance& data, bool) {
+        EXPECT_EQ(nlohmann::json::parse(data.toString()), nlohmann::json::parse(expected));
+      }));
+
+  response_headers_ = {{":status", "204"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(expected.size())));
+  EXPECT_EQ(response_headers_.getStatusValue(), "200");
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest, HeadersOnly5xxEmitsSyntheticErrorResult) {
+  sendToolsCallRequest();
+
+  const std::string expected =
+      R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"","type":"text"}],"isError":true}})json";
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected](Buffer::Instance& data, bool) {
+        EXPECT_EQ(nlohmann::json::parse(data.toString()), nlohmann::json::parse(expected));
+      }));
+
+  response_headers_ = {{":status", "503"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(expected.size())));
+  EXPECT_EQ(response_headers_.getStatusValue(), "200");
+}
+
+TEST_F(McpJsonRestBridgeStreamingFilterTest,
+       StatelessHeadersOnly204EmitsSyntheticSuccessResultWithResultType) {
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge
+      stateless_proto_config;
+
+  TestUtility::loadFromYaml(R"yaml(
+server_info:
+  max_supported_protocol_version: "2026-07-28"
+tool_config:
+  tools:
+    - name: get_api_key
+      http_rule:
+        get: "/v1/apiKeys"
+      text_content_streaming_enabled: true
+)yaml",
+                            stateless_proto_config);
+
+  ASSERT_OK_AND_ASSIGN(config_, McpJsonRestBridgeFilterConfig::create(stateless_proto_config));
+
+  filter_ = std::make_unique<McpJsonRestBridgeFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  sendToolsCallRequest(true);
+
+  const std::string expected =
+      R"json({"id":123,"jsonrpc":"2.0","result":{"content":[{"text":"","type":"text"}],"isError":false,"resultType":"complete"}})json";
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
+      .WillOnce(Invoke([&expected](Buffer::Instance& data, bool) {
+        EXPECT_EQ(nlohmann::json::parse(data.toString()), nlohmann::json::parse(expected));
+      }));
+
+  response_headers_ = {{":status", "204"}};
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
+            Http::FilterHeadersStatus::Continue);
+  EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
+  EXPECT_THAT(response_headers_.getContentLengthValue(), StrEq(std::to_string(expected.size())));
+  EXPECT_EQ(response_headers_.getStatusValue(), "200");
+}
+
 TEST_F(McpJsonRestBridgeStreamingFilterTest, SseResponseStreaming) {
   sendToolsCallRequest();
 
@@ -4795,6 +4939,16 @@ TEST_P(McpHttpMethodFilterTest, NonPostMethodsReturnMethodNotAllowed) {
   EXPECT_THAT(
       additional_response_headers.get(Http::LowerCaseString("allow"))[0]->value().getStringView(),
       StrEq("POST"));
+
+  // Simulate how the filter manager passes the local response through the encoder filter chain.
+  EXPECT_EQ(filter_->encodeHeaders(additional_response_headers, /*end_stream=*/false),
+            Http::FilterHeadersStatus::Continue);
+  Buffer::OwnedImpl response_body("HTTP Method Not Allowed");
+  EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
+            Http::FilterDataStatus::Continue);
+  EXPECT_THAT(additional_response_headers.getStatusValue(), StrEq("405"));
+  EXPECT_THAT(additional_response_headers.getContentLengthValue(), StrEq("23"));
+  EXPECT_THAT(response_body.toString(), StrEq("HTTP Method Not Allowed"));
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, ToolsListPerRouteConfig) {
@@ -5191,7 +5345,9 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalStatelessResponseIncludesResul
             EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
             EXPECT_EQ(parsed_response["id"], "req-2");
 
-            // New 2026-07-28 result field.
+            // New 2026-07-28 result fields (with default cacheScope and ttlMs).
+            EXPECT_EQ(parsed_response["result"]["cacheScope"], "public");
+            EXPECT_EQ(parsed_response["result"]["ttlMs"], 0);
             EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
 
             auto tools = parsed_response["result"]["tools"];
@@ -5205,6 +5361,468 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalStatelessResponseIncludesResul
             modify_headers(headers);
             EXPECT_EQ("application/json", headers.getContentTypeValue());
           }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalStatelessResponseWithFilterConfigCacheConfigPublicAndTtl) {
+  proto_config_.Clear();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  auto* tool_config = proto_config_.mutable_tool_config();
+  auto* cache_config = tool_config->mutable_tool_list_local()->mutable_cache_config();
+  cache_config->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PUBLIC);
+  cache_config->mutable_ttl()->set_seconds(300);
+
+  auto* tool = tool_config->add_tools();
+  tool->set_name("my_local_tool");
+  tool->mutable_tool_list_config()->set_title("My Local Tool");
+  tool->mutable_tool_list_config()->set_description("Does a local thing.");
+  tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK(makeFilter());
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+  request_headers_.setCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+  request_headers_.addCopy(Http::LowerCaseString("mcp-method"), "tools/list");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(
+          testing::Invoke([](Http::Code, absl::string_view body,
+                             std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                             const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+            auto parsed_response = nlohmann::json::parse(body);
+
+            EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
+            EXPECT_EQ(parsed_response["id"], "req-2");
+            EXPECT_EQ(parsed_response["result"]["cacheScope"], "public");
+            EXPECT_EQ(parsed_response["result"]["ttlMs"], 300000);
+            EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
+
+            auto tools = parsed_response["result"]["tools"];
+            EXPECT_EQ(tools.size(), 1);
+            EXPECT_EQ(tools[0]["name"], "my_local_tool");
+
+            Http::TestResponseHeaderMapImpl headers;
+            modify_headers(headers);
+            EXPECT_EQ("application/json", headers.getContentTypeValue());
+          }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalStatelessResponseWithPerRouteCacheConfigPrivateAndSubSecondTtl) {
+  proto_config_.Clear();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      override_config;
+  auto* override_tool_config = override_config.add_tool_config();
+  auto* cache_config = override_tool_config->mutable_tool_list_local()->mutable_cache_config();
+  cache_config->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE);
+  cache_config->mutable_ttl()->set_seconds(60);
+  cache_config->mutable_ttl()->set_nanos(500000000);
+
+  auto* tool = override_tool_config->add_tools();
+  tool->set_name("my_local_tool");
+  tool->mutable_tool_list_config()->set_title("My Local Tool");
+  tool->mutable_tool_list_config()->set_description("Does a local thing.");
+  tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK_AND_ASSIGN(auto override_ptr, McpJsonRestBridgePerRouteConfig::create(override_config));
+
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
+      .WillByDefault(testing::Return(override_ptr.get()));
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+  request_headers_.setCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+  request_headers_.addCopy(Http::LowerCaseString("mcp-method"), "tools/list");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(
+          testing::Invoke([](Http::Code, absl::string_view body,
+                             std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                             const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+            auto parsed_response = nlohmann::json::parse(body);
+
+            EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
+            EXPECT_EQ(parsed_response["id"], "req-2");
+            EXPECT_EQ(parsed_response["result"]["cacheScope"], "private");
+            EXPECT_EQ(parsed_response["result"]["ttlMs"], 60500);
+            EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
+
+            auto tools = parsed_response["result"]["tools"];
+            EXPECT_EQ(tools.size(), 1);
+            EXPECT_EQ(tools[0]["name"], "my_local_tool");
+
+            Http::TestResponseHeaderMapImpl headers;
+            modify_headers(headers);
+            EXPECT_EQ("application/json", headers.getContentTypeValue());
+          }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalStatelessResponseInheritsFallbackCacheConfigWhenOmitted) {
+  proto_config_.Clear();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_proto;
+  auto* exact_config = per_route_proto.add_tool_config();
+  exact_config->mutable_default_server_info()->set_host("a.com");
+  exact_config->mutable_default_server_info()->set_path("/mcp");
+  exact_config->mutable_tool_list_local();
+  auto* exact_tool = exact_config->add_tools();
+  exact_tool->set_name("tool_exact");
+  exact_tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  auto* fallback_config = per_route_proto.add_tool_config();
+  fallback_config->mutable_default_server_info()->set_path("/mcp");
+  auto* fallback_cache = fallback_config->mutable_tool_list_local()->mutable_cache_config();
+  fallback_cache->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE);
+  fallback_cache->mutable_ttl()->set_seconds(30);
+  auto* fallback_tool = fallback_config->add_tools();
+  fallback_tool->set_name("tool_fallback");
+  fallback_tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK_AND_ASSIGN(auto override_ptr, McpJsonRestBridgePerRouteConfig::create(per_route_proto));
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
+      .WillByDefault(testing::Return(override_ptr.get()));
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setHost("a.com");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+  request_headers_.setCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+  request_headers_.addCopy(Http::LowerCaseString("mcp-method"), "tools/list");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        auto parsed_response = nlohmann::json::parse(body);
+        EXPECT_EQ(parsed_response["result"]["cacheScope"], "private");
+        EXPECT_EQ(parsed_response["result"]["ttlMs"], 30000);
+        EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
+
+        auto tools = parsed_response["result"]["tools"];
+        ASSERT_EQ(tools.size(), 2);
+        EXPECT_EQ(tools[0]["name"], "tool_exact");
+        EXPECT_EQ(tools[1]["name"], "tool_fallback");
+      }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalStatelessResponseExplicitCacheConfigOverridesFallback) {
+  proto_config_.Clear();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_proto;
+  auto* exact_config = per_route_proto.add_tool_config();
+  exact_config->mutable_default_server_info()->set_host("a.com");
+  exact_config->mutable_default_server_info()->set_path("/mcp");
+  auto* exact_cache = exact_config->mutable_tool_list_local()->mutable_cache_config();
+  exact_cache->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PUBLIC);
+  exact_cache->mutable_ttl()->set_seconds(300);
+  auto* exact_tool = exact_config->add_tools();
+  exact_tool->set_name("tool_exact");
+  exact_tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  auto* fallback_config = per_route_proto.add_tool_config();
+  fallback_config->mutable_default_server_info()->set_path("/mcp");
+  auto* fallback_cache = fallback_config->mutable_tool_list_local()->mutable_cache_config();
+  fallback_cache->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE);
+  fallback_cache->mutable_ttl()->set_seconds(0);
+  auto* fallback_tool = fallback_config->add_tools();
+  fallback_tool->set_name("tool_fallback");
+  fallback_tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK_AND_ASSIGN(auto override_ptr, McpJsonRestBridgePerRouteConfig::create(per_route_proto));
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
+      .WillByDefault(testing::Return(override_ptr.get()));
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setHost("a.com");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+  request_headers_.setCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+  request_headers_.addCopy(Http::LowerCaseString("mcp-method"), "tools/list");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        auto parsed_response = nlohmann::json::parse(body);
+        EXPECT_EQ(parsed_response["result"]["cacheScope"], "public");
+        EXPECT_EQ(parsed_response["result"]["ttlMs"], 300000);
+        EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
+
+        auto tools = parsed_response["result"]["tools"];
+        ASSERT_EQ(tools.size(), 2);
+        EXPECT_EQ(tools[0]["name"], "tool_exact");
+        EXPECT_EQ(tools[1]["name"], "tool_fallback");
+      }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalStatelessResponseExplicitEmptyCacheConfigResetsFallbackToDefaults) {
+  proto_config_.Clear();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
+      per_route_proto;
+  auto* exact_config = per_route_proto.add_tool_config();
+  exact_config->mutable_default_server_info()->set_host("a.com");
+  exact_config->mutable_default_server_info()->set_path("/mcp");
+  exact_config->mutable_tool_list_local()->mutable_cache_config();
+  auto* exact_tool = exact_config->add_tools();
+  exact_tool->set_name("tool_exact");
+  exact_tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  auto* fallback_config = per_route_proto.add_tool_config();
+  fallback_config->mutable_default_server_info()->set_path("/mcp");
+  auto* fallback_cache = fallback_config->mutable_tool_list_local()->mutable_cache_config();
+  fallback_cache->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE);
+  fallback_cache->mutable_ttl()->set_seconds(30);
+  auto* fallback_tool = fallback_config->add_tools();
+  fallback_tool->set_name("tool_fallback");
+  fallback_tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK_AND_ASSIGN(auto override_ptr, McpJsonRestBridgePerRouteConfig::create(per_route_proto));
+  ON_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig)
+      .WillByDefault(testing::Return(override_ptr.get()));
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setHost("a.com");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+  request_headers_.setCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+  request_headers_.addCopy(Http::LowerCaseString("mcp-method"), "tools/list");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        auto parsed_response = nlohmann::json::parse(body);
+        EXPECT_EQ(parsed_response["result"]["cacheScope"], "public");
+        EXPECT_EQ(parsed_response["result"]["ttlMs"], 0);
+        EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
+
+        auto tools = parsed_response["result"]["tools"];
+        ASSERT_EQ(tools.size(), 2);
+        EXPECT_EQ(tools[0]["name"], "tool_exact");
+        EXPECT_EQ(tools[1]["name"], "tool_fallback");
+      }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalStatelessResponseWithCacheScopeOnlyDefaultsTtlToZero) {
+  proto_config_.Clear();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  auto* tool_config = proto_config_.mutable_tool_config();
+  tool_config->mutable_tool_list_local()->mutable_cache_config()->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE);
+
+  auto* tool = tool_config->add_tools();
+  tool->set_name("my_local_tool");
+  tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK(makeFilter());
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+  request_headers_.setCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+  request_headers_.addCopy(Http::LowerCaseString("mcp-method"), "tools/list");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        auto parsed_response = nlohmann::json::parse(body);
+        EXPECT_EQ(parsed_response["result"]["cacheScope"], "private");
+        EXPECT_EQ(parsed_response["result"]["ttlMs"], 0);
+        EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
+      }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalStatelessResponseWithTtlOnlyDefaultsCacheScopeToPublic) {
+  proto_config_.Clear();
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  auto* tool_config = proto_config_.mutable_tool_config();
+  tool_config->mutable_tool_list_local()->mutable_cache_config()->mutable_ttl()->set_seconds(120);
+
+  auto* tool = tool_config->add_tools();
+  tool->set_name("my_local_tool");
+  tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK(makeFilter());
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+  request_headers_.setCopy(Http::LowerCaseString("mcp-protocol-version"), "2026-07-28");
+  request_headers_.addCopy(Http::LowerCaseString("mcp-method"), "tools/list");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json =
+      R"({"jsonrpc":"2.0","method":"tools/list","id":"req-2","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientCapabilities": {}}}})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        auto parsed_response = nlohmann::json::parse(body);
+        EXPECT_EQ(parsed_response["result"]["cacheScope"], "public");
+        EXPECT_EQ(parsed_response["result"]["ttlMs"], 120000);
+        EXPECT_EQ(parsed_response["result"]["resultType"], "complete");
+      }));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       ToolsListLocalNonStatelessResponseOmitsCacheFieldsEvenWhenConfigured) {
+  proto_config_.Clear();
+  auto* tool_config = proto_config_.mutable_tool_config();
+  auto* cache_config = tool_config->mutable_tool_list_local()->mutable_cache_config();
+  cache_config->set_cache_scope(
+      envoy::extensions::filters::http::mcp_json_rest_bridge::v3::CACHE_SCOPE_PRIVATE);
+  cache_config->mutable_ttl()->set_seconds(300);
+
+  auto* tool = tool_config->add_tools();
+  tool->set_name("my_local_tool");
+  tool->mutable_tool_list_config()->set_input_schema(R"({"type":"object"})");
+
+  ASSERT_OK(makeFilter());
+
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(Http::RequestHeaderMapOptRef(request_headers_)));
+
+  request_headers_.setMethod("POST");
+  request_headers_.setPath("/mcp");
+  request_headers_.setContentType("application/json");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  std::string json = R"({"jsonrpc": "2.0", "method": "tools/list", "id": "req-2"})";
+  Buffer::OwnedImpl data(json);
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK), _, _, Eq(Grpc::Status::WellKnownGrpcStatus::Ok),
+                             StrEq("mcp_json_rest_bridge_tools_list")))
+      .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        auto parsed_response = nlohmann::json::parse(body);
+        EXPECT_FALSE(parsed_response["result"].contains("cacheScope"));
+        EXPECT_FALSE(parsed_response["result"].contains("ttlMs"));
+        EXPECT_FALSE(parsed_response["result"].contains("resultType"));
+        EXPECT_EQ(parsed_response["result"]["tools"].size(), 1);
+      }));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(data, true));
 }
@@ -5250,6 +5868,9 @@ TEST_F(McpJsonRestBridgeFilterTest, ToolsListLocalNoDescription) {
 
             EXPECT_EQ(parsed_response["jsonrpc"], "2.0");
             EXPECT_EQ(parsed_response["id"], "req-2");
+            EXPECT_FALSE(parsed_response["result"].contains("cacheScope"));
+            EXPECT_FALSE(parsed_response["result"].contains("ttlMs"));
+            EXPECT_FALSE(parsed_response["result"].contains("resultType"));
             auto tools = parsed_response["result"]["tools"];
             EXPECT_EQ(tools.size(), 2);
             EXPECT_EQ(tools[0]["name"], "tool_1");

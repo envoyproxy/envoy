@@ -236,6 +236,7 @@ public:
   Stats::StatName ratelimit_error_{pool_.add("ratelimit.error")};
   Stats::StatName ratelimit_failure_mode_allowed_{pool_.add("ratelimit.failure_mode_allowed")};
   Stats::StatName ratelimit_over_limit_{pool_.add("ratelimit.over_limit")};
+  Stats::StatName ratelimit_shadow_over_limit_{pool_.add("ratelimit.shadow_over_limit")};
   Stats::StatName upstream_rq_4xx_{pool_.add("upstream_rq_4xx")};
   Stats::StatName upstream_rq_429_{pool_.add("upstream_rq_429")};
   Stats::StatName upstream_rq_5xx_{pool_.add("upstream_rq_5xx")};
@@ -396,6 +397,38 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
 
   EXPECT_EQ(
       1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+TEST_F(HttpRateLimitFilterTest, OkResponseWithShadowModeDescriptor) {
+  setUpTest(filter_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited))
+      .Times(0);
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  (*descriptor_statuses)[1].set_shadow_over_limit(true);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK,
+                               std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);
+
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_shadow_over_limit_)
+                    .value());
 }
 
 TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
@@ -827,6 +860,40 @@ TEST_F(HttpRateLimitFilterTest, LimitResponse) {
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
   EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
+}
+
+TEST_F(HttpRateLimitFilterTest, LimitResponseWithShadowModeDescriptor) {
+  setUpTest(filter_config_);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  auto descriptor_statuses = std::make_unique<Filters::Common::RateLimit::DescriptorStatusList>(2);
+  (*descriptor_statuses)[1].set_shadow_over_limit(true);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit,
+                               std::move(descriptor_statuses), nullptr, nullptr, "", nullptr);
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_shadow_over_limit_)
+                    .value());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponseWithDynamicMetadata) {

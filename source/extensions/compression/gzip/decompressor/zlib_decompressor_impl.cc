@@ -7,7 +7,6 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -56,9 +55,7 @@ void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
         updateOutput(output_buffer);
       }
 
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.enable_compression_bomb_protection") &&
-          (output_buffer.length() > limit)) {
+      if (output_buffer.length() > limit) {
         stats_.zlib_data_error_.inc();
         ENVOY_LOG(trace,
                   "excessive decompression ratio detected: output "

@@ -2342,6 +2342,13 @@ envoy.load_balancing_policies.override_host:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
+envoy.load_balancing_policies.host_allowlist:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.host_allowlist.v3.HostAllowlist
 envoy.load_balancing_policies.wrr_locality:
   categories:
   - envoy.load_balancing_policies
