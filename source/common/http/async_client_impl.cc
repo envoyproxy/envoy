@@ -105,11 +105,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
       stream_id_(parent.config_->random_.random()),
       router_(options.filter_config_ ? options.filter_config_ : parent.config_,
               parent.config_->default_stats_),
-      stream_info_(Protocol::Http11, parent.dispatcher().timeSource(), nullptr,
-                   options.filter_state != nullptr
-                       ? options.filter_state
-                       : std::make_shared<StreamInfo::FilterStateImpl>(
-                             StreamInfo::FilterState::LifeSpan::FilterChain)),
+      stream_info_(
+          options.protocol.value_or(Protocol::Http11), parent.dispatcher().timeSource(), nullptr,
+          options.filter_state != nullptr ? options.filter_state
+                                          : std::make_shared<StreamInfo::FilterStateImpl>(
+                                                StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
       account_(options.account_), send_xff_(options.send_xff),
       send_internal_(options.send_internal),
@@ -232,6 +232,9 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   }
 
   is_grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
+  if (is_grpc_request_ && stream_info_.protocol().value_or(Protocol::Http11) < Protocol::Http2) {
+    stream_info_.protocol(Protocol::Http2);
+  }
   if (send_internal_) {
     headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   }
