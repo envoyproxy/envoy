@@ -37,11 +37,11 @@ TEST(AppExceptionImplTest, TestEncode) {
 
   InSequence dummy;
   EXPECT_CALL(proto, writeMessageBegin(Ref(buffer), Ref(metadata)))
-      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+      .WillOnce([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
         EXPECT_EQ("method", metadata.methodName());
         EXPECT_EQ(99, metadata.sequenceId());
         EXPECT_EQ(MessageType::Exception, metadata.messageType());
-      }));
+      });
   EXPECT_CALL(proto, writeStructBegin(Ref(buffer), "TApplicationException"));
   EXPECT_CALL(proto, writeFieldBegin(Ref(buffer), "message", FieldType::String, 1));
   EXPECT_CALL(proto, writeString(Ref(buffer), "msg"));
@@ -65,11 +65,11 @@ TEST(AppExceptionImplTest, TestEncodeEmptyMetadata) {
 
   InSequence dummy;
   EXPECT_CALL(proto, writeMessageBegin(Ref(buffer), Ref(metadata)))
-      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+      .WillOnce([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
         EXPECT_EQ("", metadata.methodName());
         EXPECT_EQ(0, metadata.sequenceId());
         EXPECT_EQ(MessageType::Exception, metadata.messageType());
-      }));
+      });
   EXPECT_CALL(proto, writeStructBegin(Ref(buffer), "TApplicationException"));
   EXPECT_CALL(proto, writeFieldBegin(Ref(buffer), "message", FieldType::String, 1));
   EXPECT_CALL(proto, writeString(Ref(buffer), "msg"));

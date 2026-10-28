@@ -43,10 +43,10 @@ protected:
   void initializeForRemote() {
     retry_timer_ = new Event::MockTimer();
 
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
-    }));
+    });
   }
 
   NiceMock<Network::MockListenerInfo> listener_info_;
@@ -487,14 +487,13 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   Http::AsyncClient::Callbacks* async_callbacks = nullptr;
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            if (!async_callbacks) {
-              async_callbacks = &callbacks;
-            }
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        if (!async_callbacks) {
+          async_callbacks = &callbacks;
+        }
+        return &request;
+      });
   NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
   EXPECT_CALL(context_.server_factory_context_, threadLocal())
       .WillRepeatedly(ReturnRef(threadlocal));

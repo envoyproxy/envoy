@@ -25,7 +25,6 @@
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -77,18 +76,17 @@ public:
     // Capture the upstream watermark callbacks the filter registers so tests can
     // simulate upstream back-pressure.
     ON_CALL(callbacks_, addUpstreamWatermarkCallbacks(testing::_))
-        .WillByDefault(
-            Invoke([this](Http::UpstreamWatermarkCallbacks& cb) { watermark_cb_ = &cb; }));
+        .WillByDefault([this](Http::UpstreamWatermarkCallbacks& cb) { watermark_cb_ = &cb; });
     ON_CALL(callbacks_, removeUpstreamWatermarkCallbacks(testing::_))
-        .WillByDefault(
-            Invoke([this](Http::UpstreamWatermarkCallbacks&) { watermark_cb_ = nullptr; }));
+        .WillByDefault([this](Http::UpstreamWatermarkCallbacks&) { watermark_cb_ = nullptr; });
     createFilter();
     // The in-memory buffer delivers completions via dispatcher.post(). Capture
     // those callbacks so the test can run the event loop deterministically.
-    ON_CALL(callbacks_.dispatcher_, post(testing::_))
-        .WillByDefault(Invoke([this](Event::PostCb cb) { posted_.push_back(std::move(cb)); }));
+    ON_CALL(callbacks_.dispatcher_, post(testing::_)).WillByDefault([this](Event::PostCb cb) {
+      posted_.push_back(std::move(cb));
+    });
     ON_CALL(callbacks_, injectDecodedDataToFilterChain(testing::_, testing::_))
-        .WillByDefault(Invoke([this](Buffer::Instance& data, bool end_stream) {
+        .WillByDefault([this](Buffer::Instance& data, bool end_stream) {
           injected_.add(data);
           injected_end_stream_ = end_stream;
           ++inject_calls_;
@@ -97,35 +95,35 @@ public:
           if (watermark_cb_ != nullptr && inject_calls_ == raise_watermark_at_inject_) {
             watermark_cb_->onAboveWriteBufferHighWatermark();
           }
-        }));
+        });
     // Capture continueDecoding() so trailer-terminated streams can assert the
     // held trailers are released after the replayed body.
-    ON_CALL(callbacks_, continueDecoding()).WillByDefault(Invoke([this]() { ++continue_calls_; }));
+    ON_CALL(callbacks_, continueDecoding()).WillByDefault([this]() { ++continue_calls_; });
     // Capture local replies so rejection tests can assert code and details.
     ON_CALL(callbacks_, sendLocalReply(testing::_, testing::_, testing::_, testing::_, testing::_))
-        .WillByDefault(Invoke([this](Http::Code code, absl::string_view,
-                                     std::function<void(Http::ResponseHeaderMap&)>,
-                                     const std::optional<Grpc::Status::GrpcStatus>,
-                                     absl::string_view details) {
+        .WillByDefault([this](Http::Code code, absl::string_view,
+                              std::function<void(Http::ResponseHeaderMap&)>,
+                              const std::optional<Grpc::Status::GrpcStatus>,
+                              absl::string_view details) {
           local_reply_code_ = code;
           local_reply_details_ = std::string(details);
           ++local_reply_calls_;
-        }));
+        });
     // The BufferManager creates its replay callback on its first replay, so the mock is
     // manufactured on demand rather than armed up front. replay_cb_ stays null for a stream that
     // never replays.
     ON_CALL(callbacks_.dispatcher_, createSchedulableCallback_(testing::_))
-        .WillByDefault(Invoke([this](std::function<void()> cb) -> Event::SchedulableCallback* {
+        .WillByDefault([this](std::function<void()> cb) -> Event::SchedulableCallback* {
           replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&callbacks_.dispatcher_, cb);
           return replay_cb_;
-        }));
+        });
     ON_CALL(encoder_callbacks_.dispatcher_, post(testing::_))
-        .WillByDefault(Invoke([this](Event::PostCb cb) { posted_.push_back(std::move(cb)); }));
+        .WillByDefault([this](Event::PostCb cb) { posted_.push_back(std::move(cb)); });
     ON_CALL(encoder_callbacks_.dispatcher_, createSchedulableCallback_(testing::_))
-        .WillByDefault(Invoke([this](std::function<void()> cb) -> Event::SchedulableCallback* {
+        .WillByDefault([this](std::function<void()> cb) -> Event::SchedulableCallback* {
           auto* scb =
               new NiceMock<Event::MockSchedulableCallback>(&encoder_callbacks_.dispatcher_, cb);
-          ON_CALL(*scb, scheduleCallbackCurrentIteration()).WillByDefault(Invoke([this, scb, cb]() {
+          ON_CALL(*scb, scheduleCallbackCurrentIteration()).WillByDefault([this, scb, cb]() {
             scb->enabled_ = true;
             posted_.push_back([scb, cb]() {
               if (scb->enabled_) {
@@ -133,8 +131,8 @@ public:
                 cb();
               }
             });
-          }));
-          ON_CALL(*scb, scheduleCallbackNextIteration()).WillByDefault(Invoke([this, scb, cb]() {
+          });
+          ON_CALL(*scb, scheduleCallbackNextIteration()).WillByDefault([this, scb, cb]() {
             scb->enabled_ = true;
             posted_.push_back([scb, cb]() {
               if (scb->enabled_) {
@@ -142,27 +140,26 @@ public:
                 cb();
               }
             });
-          }));
+          });
           return scb;
-        }));
+        });
     ON_CALL(encoder_callbacks_, injectEncodedDataToFilterChain(testing::_, testing::_))
-        .WillByDefault(Invoke([this](Buffer::Instance& data, bool end_stream) {
+        .WillByDefault([this](Buffer::Instance& data, bool end_stream) {
           encoded_injected_.add(data);
           encoded_injected_end_stream_ = end_stream;
           ++encoded_inject_calls_;
-        }));
-    ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault(Invoke([this]() {
+        });
+    ON_CALL(encoder_callbacks_, continueEncoding()).WillByDefault([this]() {
       ++encode_continue_calls_;
-    }));
+    });
     ON_CALL(encoder_callbacks_,
             sendLocalReply(testing::_, testing::_, testing::_, testing::_, testing::_))
-        .WillByDefault(
-            Invoke([this](Http::Code code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap&)>,
-                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
-              encode_local_reply_code_ = code;
-              ++encode_local_reply_calls_;
-            }));
+        .WillByDefault([this](Http::Code code, absl::string_view,
+                              std::function<void(Http::ResponseHeaderMap&)>,
+                              const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+          encode_local_reply_code_ = code;
+          ++encode_local_reply_calls_;
+        });
   }
 
   // Run at trace so debug/trace-log argument expressions execute too.
@@ -599,21 +596,21 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     ON_CALL(encoder_callbacks_.stream_info_, setDynamicMetadata(testing::_, testing::_))
-        .WillByDefault(Invoke([this](const std::string& ns, const Protobuf::Struct& value) {
+        .WillByDefault([this](const std::string& ns, const Protobuf::Struct& value) {
           metadata_writes_.emplace_back(ns, value);
-        }));
+        });
     ON_CALL(encoder_callbacks_.stream_info_, setDynamicTypedMetadata(testing::_, testing::_))
-        .WillByDefault(Invoke([this](const std::string& ns, const Protobuf::Any& value) {
+        .WillByDefault([this](const std::string& ns, const Protobuf::Any& value) {
           typed_metadata_writes_.emplace_back(ns, value);
-        }));
+        });
     ON_CALL(encoder_callbacks_, addEncodedTrailers())
-        .WillByDefault(Invoke([this]() -> Http::ResponseTrailerMap& {
+        .WillByDefault([this]() -> Http::ResponseTrailerMap& {
           added_trailers_++;
           if (!synthesized_trailers_) {
             synthesized_trailers_ = std::make_unique<Http::TestResponseTrailerMapImpl>();
           }
           return *synthesized_trailers_;
-        }));
+        });
   }
 
   void TearDown() override {

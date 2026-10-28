@@ -46,7 +46,6 @@
 
 using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
-using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
 using ::testing::Not;
@@ -323,7 +322,7 @@ protected:
     Network::MockConnectionCallbacks server_connection_callbacks;
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     EXPECT_CALL(callbacks, onAccept_(_))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
           auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
           // configureInitialCongestionWindow is an unimplemented empty function, this is just to
           // increase code coverage.
@@ -331,7 +330,7 @@ protected:
           server_connection = dispatcher->createServerConnection(
               std::move(socket), std::move(ssl_socket), stream_info);
           server_connection->addConnectionCallbacks(server_connection_callbacks);
-        }));
+        });
     EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
     Network::MockConnectionCallbacks client_connection_callbacks;
@@ -369,14 +368,14 @@ protected:
 
     if (mod == Ssl::SelectionResult::SelectionStatus::Failed) {
       EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
     } else {
       EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
       EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     }

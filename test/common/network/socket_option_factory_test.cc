@@ -74,13 +74,13 @@ TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
   const int type = expected_option.level();
   const int option = expected_option.option();
   EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(int)))
-      .WillOnce(Invoke([type, option](int input_type, int input_option, const void* optval,
-                                      socklen_t) -> Api::SysCallIntResult {
+      .WillOnce([type, option](int input_type, int input_option, const void* optval,
+                               socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(100, *static_cast<const int*>(optval));
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);
         return {0, 0};
-      }));
+      });
 
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND));
@@ -99,13 +99,13 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
   const int option = expected_option.option();
   EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(int)))
       .Times(2)
-      .WillRepeatedly(Invoke([type, option](int input_type, int input_option, const void* optval,
-                                            socklen_t) -> Api::SysCallIntResult {
+      .WillRepeatedly([type, option](int input_type, int input_option, const void* optval,
+                                     socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {0, 0};
-      }));
+      });
   EXPECT_CALL(socket_mock_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v4));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
                                             envoy::config::core::v3::SocketOption::STATE_PREBIND));
@@ -126,13 +126,13 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
   const int option = expected_option.option();
   EXPECT_CALL(socket_mock_, setSocketOption(_, _, _, sizeof(int)))
       .Times(2)
-      .WillRepeatedly(Invoke([type, option](int input_type, int input_option, const void* optval,
-                                            socklen_t) -> Api::SysCallIntResult {
+      .WillRepeatedly([type, option](int input_type, int input_option, const void* optval,
+                                     socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(type, input_type);
         EXPECT_EQ(option, input_option);
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {0, 0};
-      }));
+      });
 
   EXPECT_CALL(socket_mock_, ipVersion()).WillRepeatedly(testing::Return(Address::IpVersion::v6));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
@@ -348,30 +348,29 @@ TEST_F(SocketOptionFactoryTest, TestBuildReusePortBpfCpuSteeringOptions) {
   const auto expected_option = ENVOY_ATTACH_REUSEPORT_CBPF;
   EXPECT_CALL(socket_mock_, setSocketOption(expected_option.level(), expected_option.option(), _,
                                             sizeof(sock_fprog)))
-      .WillOnce(
-          Invoke([&worker_cpus](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
-            const sock_fprog* prog = static_cast<const sock_fprog*>(optval);
-            // LD cpu, then a `JEQ` and RET pair per worker, then a modulo fallback and a return.
-            EXPECT_EQ(2 * worker_cpus.size() + 3, static_cast<size_t>(prog->len));
-            EXPECT_EQ(static_cast<uint16_t>(BPF_LD | BPF_W | BPF_ABS), prog->filter[0].code);
-            EXPECT_EQ(static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_CPU), prog->filter[0].k);
-            for (uint32_t i = 0; i < worker_cpus.size(); i++) {
-              const sock_filter& jeq = prog->filter[1 + 2 * i];
-              const sock_filter& ret = prog->filter[2 + 2 * i];
-              EXPECT_EQ(static_cast<uint16_t>(BPF_JMP | BPF_JEQ | BPF_K), jeq.code);
-              EXPECT_EQ(worker_cpus[i], jeq.k);
-              EXPECT_EQ(0, jeq.jt);
-              EXPECT_EQ(1, jeq.jf);
-              EXPECT_EQ(static_cast<uint16_t>(BPF_RET | BPF_K), ret.code);
-              EXPECT_EQ(i, ret.k);
-            }
-            const sock_filter& fallback = prog->filter[1 + 2 * worker_cpus.size()];
-            EXPECT_EQ(static_cast<uint16_t>(BPF_ALU | BPF_MOD | BPF_K), fallback.code);
-            EXPECT_EQ(static_cast<uint32_t>(worker_cpus.size()), fallback.k);
-            EXPECT_EQ(static_cast<uint16_t>(BPF_RET | BPF_A),
-                      prog->filter[2 + 2 * worker_cpus.size()].code);
-            return {0, 0};
-          }));
+      .WillOnce([&worker_cpus](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+        const sock_fprog* prog = static_cast<const sock_fprog*>(optval);
+        // LD cpu, then a `JEQ` and RET pair per worker, then a modulo fallback and a return.
+        EXPECT_EQ(2 * worker_cpus.size() + 3, static_cast<size_t>(prog->len));
+        EXPECT_EQ(static_cast<uint16_t>(BPF_LD | BPF_W | BPF_ABS), prog->filter[0].code);
+        EXPECT_EQ(static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_CPU), prog->filter[0].k);
+        for (uint32_t i = 0; i < worker_cpus.size(); i++) {
+          const sock_filter& jeq = prog->filter[1 + 2 * i];
+          const sock_filter& ret = prog->filter[2 + 2 * i];
+          EXPECT_EQ(static_cast<uint16_t>(BPF_JMP | BPF_JEQ | BPF_K), jeq.code);
+          EXPECT_EQ(worker_cpus[i], jeq.k);
+          EXPECT_EQ(0, jeq.jt);
+          EXPECT_EQ(1, jeq.jf);
+          EXPECT_EQ(static_cast<uint16_t>(BPF_RET | BPF_K), ret.code);
+          EXPECT_EQ(i, ret.k);
+        }
+        const sock_filter& fallback = prog->filter[1 + 2 * worker_cpus.size()];
+        EXPECT_EQ(static_cast<uint16_t>(BPF_ALU | BPF_MOD | BPF_K), fallback.code);
+        EXPECT_EQ(static_cast<uint32_t>(worker_cpus.size()), fallback.k);
+        EXPECT_EQ(static_cast<uint16_t>(BPF_RET | BPF_A),
+                  prog->filter[2 + 2 * worker_cpus.size()].code);
+        return {0, 0};
+      });
 
   // The program is only attached once the socket is listening.
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
@@ -389,8 +388,8 @@ TEST_F(SocketOptionFactoryTest, TestReusePortBpfCpuSteeringOptionDegradesOnAttac
   const auto expected_option = ENVOY_ATTACH_REUSEPORT_CBPF;
   EXPECT_CALL(socket_mock_, setSocketOption(expected_option.level(), expected_option.option(), _,
                                             sizeof(sock_fprog)))
-      .WillOnce(Invoke(
-          [](int, int, const void*, socklen_t) -> Api::SysCallIntResult { return {-1, EINVAL}; }));
+      .WillOnce(
+          [](int, int, const void*, socklen_t) -> Api::SysCallIntResult { return {-1, EINVAL}; });
 
   // A rejected program degrades to default reuse port hashing rather than failing the listener.
   EXPECT_LOG_CONTAINS(

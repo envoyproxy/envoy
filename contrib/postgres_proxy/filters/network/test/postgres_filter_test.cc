@@ -51,11 +51,11 @@ public:
     EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
     EXPECT_CALL(connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
     ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().PostgresProxy, _))
-        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
+        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, Protobuf::Struct>(
                   NetworkFilterNames::get().PostgresProxy, obj));
-        }));
+        });
   }
 
   Stats::IsolatedStoreImpl store_;
@@ -91,23 +91,23 @@ TEST_P(PostgresFilterTest, ReadData) {
 
   // Simulate reading entire buffer.
   EXPECT_CALL(*decoderPtr, onData)
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
+      .WillOnce(WithArgs<0, 1>([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(data.length());
         return Decoder::Result::ReadyForNext;
-      })));
+      }));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
 
   // Simulate reading entire data in two steps.
   EXPECT_CALL(*decoderPtr, onData)
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
+      .WillOnce(WithArgs<0, 1>([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
         return Decoder::Result::ReadyForNext;
-      })))
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
+      }))
+      .WillOnce(WithArgs<0, 1>([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(156);
         return Decoder::Result::ReadyForNext;
-      })));
+      }));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 0);
 
@@ -115,18 +115,18 @@ TEST_P(PostgresFilterTest, ReadData) {
   // for the third one there was not enough data. There should be 56 bytes
   // of unprocessed data.
   EXPECT_CALL(*decoderPtr, onData)
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
+      .WillOnce(WithArgs<0, 1>([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
         return Decoder::Result::ReadyForNext;
-      })))
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
+      }))
+      .WillOnce(WithArgs<0, 1>([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(100);
         return Decoder::Result::ReadyForNext;
-      })))
-      .WillOnce(WithArgs<0, 1>(Invoke([](Buffer::Instance& data, bool) -> Decoder::Result {
+      }))
+      .WillOnce(WithArgs<0, 1>([](Buffer::Instance& data, bool) -> Decoder::Result {
         data.drain(0);
         return Decoder::Result::NeedMoreData;
-      })));
+      }));
   std::get<0>(GetParam())(filter_.get(), data_, false);
   ASSERT_THAT(std::get<1>(GetParam())(filter_.get()), 56);
 }
@@ -424,10 +424,10 @@ TEST_F(PostgresFilterTest, SplitStartupDelaysUpstreamSSLNegotiation) {
   // Second segment: the rest of the Startup message.
   EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
   EXPECT_CALL(read_callbacks_, injectReadDataToFilterChain(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool) {
+      .WillOnce([](Buffer::Instance& data, bool) {
         ASSERT_EQ(8, data.length());
         ASSERT_EQ(80877103, data.peekBEInt<uint32_t>(4)); // SSL code.
-      }));
+      });
   data_.add(static_cast<char*>(startup.linearize(total_len)) + 4, total_len - 4);
   ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
 }

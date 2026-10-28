@@ -36,10 +36,10 @@ TEST_F(SocketOptionImplTest, HasName) {
   // contains the option name so the operator can debug.
   SocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND, optname, 1};
   EXPECT_CALL(socket_, setSocketOption(_, _, _, _))
-      .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+      .WillOnce([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {-1, 0};
-      }));
+      });
 
   EXPECT_LOG_CONTAINS(
       "warning", "Setting SOL_SOCKET/SO_SNDBUF option on socket failed",
@@ -54,10 +54,10 @@ TEST_F(SocketOptionImplTest, SetOptionSuccessTrue) {
   SocketOptionImpl socket_option{envoy::config::core::v3::SocketOption::STATE_PREBIND,
                                  ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1};
   EXPECT_CALL(socket_, setSocketOption(5, 10, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+      .WillOnce([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {0, 0};
-      }));
+      });
   EXPECT_TRUE(
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
 }
@@ -86,10 +86,10 @@ TEST_F(SocketOptionImplTest, SetOptionWithIpVersionSuccess) {
                                  ENVOY_MAKE_SOCKET_OPTION_NAME(5, 10), 1, std::nullopt,
                                  Network::Address::IpVersion::v4};
   EXPECT_CALL(socket_, setSocketOption(5, 10, _, sizeof(int)))
-      .WillOnce(Invoke([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
+      .WillOnce([](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
         EXPECT_EQ(1, *static_cast<const int*>(optval));
         return {0, 0};
-      }));
+      });
   EXPECT_TRUE(
       socket_option.setOption(socket_, envoy::config::core::v3::SocketOption::STATE_PREBIND));
 }

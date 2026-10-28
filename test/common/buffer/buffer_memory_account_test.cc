@@ -537,15 +537,15 @@ TEST(WatermarkBufferFactoryTest, ShouldOnlyResetAllStreamsGreatThanOrEqualToProv
     EXPECT_EQ(memory_classes_to_account[7].size(), 1);
   });
 
-  EXPECT_CALL(largest_stream_to_reset, resetStream(_)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(largest_stream_to_reset, resetStream(_)).WillOnce([&]() {
     largest_account_to_reset->credit(getBalance(largest_account_to_reset));
     largest_account_to_reset->clearDownstream();
-  }));
+  });
 
-  EXPECT_CALL(stream_to_reset, resetStream(_)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(stream_to_reset, resetStream(_)).WillOnce([&]() {
     account_to_reset->credit(getBalance(account_to_reset));
     account_to_reset->clearDownstream();
-  }));
+  });
 
   EXPECT_CALL(stream_that_should_not_be_reset, resetStream(_)).Times(0);
   // Should call resetStream on all streams in bucket >= 1.
@@ -584,11 +584,11 @@ TEST(WatermarkBufferFactoryTest, ComputesBucketToResetCorrectly) {
   float pressure = 0.0;
   const float pressure_gradation = 1.0 / BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_;
   for (uint32_t i = 0; i < BufferMemoryAccountImpl::NUM_MEMORY_CLASSES_; ++i) {
-    EXPECT_CALL(*reset_handlers.back(), resetStream(_)).WillOnce(Invoke([&]() {
+    EXPECT_CALL(*reset_handlers.back(), resetStream(_)).WillOnce([&]() {
       auto current_account = accounts.back();
       current_account->credit(getBalance(current_account));
       current_account->clearDownstream();
-    }));
+    });
 
     EXPECT_EQ(factory.resetAccountsGivenPressure(pressure), 1);
 

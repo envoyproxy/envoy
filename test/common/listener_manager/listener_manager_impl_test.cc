@@ -759,11 +759,10 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Socket::Type::Datagram, _,
                                  ListenerComponentFactory::BindType::ReusePort, _, 0))
-      .WillOnce(
-          Invoke([this](const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
-                        const Network::Socket::OptionsSharedPtr&,
-                        ListenerComponentFactory::BindType, const Network::SocketCreationOptions&,
-                        uint32_t) { return listener_factory_.socket_; }));
+      .WillOnce([this](const Network::Address::InstanceConstSharedPtr&, Network::Socket::Type,
+                       const Network::Socket::OptionsSharedPtr&, ListenerComponentFactory::BindType,
+                       const Network::SocketCreationOptions&,
+                       uint32_t) { return listener_factory_.socket_; });
   EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(os_sys_calls_, close(_)).WillRepeatedly(Return(Api::SysCallIntResult{0, errno}));
   addOrUpdateListener(listener_proto);
@@ -772,8 +771,8 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   // Stopping listeners must not close connectionless UDP listen sockets, so a hot restart
   // parent can keep reading from them during drain.
   EXPECT_CALL(*worker_, stopListener(_, _, _))
-      .WillOnce(Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
-                          std::function<void()> completion) { completion(); }));
+      .WillOnce([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
+                   std::function<void()> completion) { completion(); });
   EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
   manager_->stopListeners(ListenerManager::StopListenersType::All, {});
@@ -1081,15 +1080,15 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
-      .WillOnce(Invoke(
-          [&real_listener_factory](
-              const Network::Address::InstanceConstSharedPtr& address,
-              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
-              ListenerComponentFactory::BindType bind_type,
-              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-            return real_listener_factory.createListenSocket(
-                address, socket_type, options, bind_type, creation_options, worker_index);
-          }));
+      .WillOnce([&real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
+                                         Network::Socket::Type socket_type,
+                                         const Network::Socket::OptionsSharedPtr& options,
+                                         ListenerComponentFactory::BindType bind_type,
+                                         const Network::SocketCreationOptions& creation_options,
+                                         uint32_t worker_index) {
+        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
+                                                        creation_options, worker_index);
+      });
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -1117,24 +1116,24 @@ filter_chains:
       .WillOnce(Return(-1));
   // Opening the current namespace succeeds; opening the target namespace fails.
   EXPECT_CALL(os_sys_calls_, open(_, _))
-      .WillRepeatedly(Invoke([](const char* pathname, int) -> Api::SysCallIntResult {
+      .WillRepeatedly([](const char* pathname, int) -> Api::SysCallIntResult {
         if (absl::EndsWith(pathname, "/ns/net")) {
           return {3, 0};
         }
         return {-1, ENOENT};
-      }));
+      });
 
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, _, _, 0))
-      .WillOnce(Invoke(
-          [&real_listener_factory](
-              const Network::Address::InstanceConstSharedPtr& address,
-              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
-              ListenerComponentFactory::BindType bind_type,
-              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-            return real_listener_factory.createListenSocket(
-                address, socket_type, options, bind_type, creation_options, worker_index);
-          }));
+      .WillOnce([&real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
+                                         Network::Socket::Type socket_type,
+                                         const Network::Socket::OptionsSharedPtr& options,
+                                         ListenerComponentFactory::BindType bind_type,
+                                         const Network::SocketCreationOptions& creation_options,
+                                         uint32_t worker_index) {
+        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
+                                                        creation_options, worker_index);
+      });
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_THAT(manager_->addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml), "", true)
                   .status()
@@ -1680,9 +1679,9 @@ filter_chains: {}
   ListenerHandle* listener_baz_different_address = expectListenerCreate(true, true);
   // Another socket should be created.
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
-  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
+  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce([listener_baz]() -> void {
     listener_baz->target_.ready();
-  }));
+  });
   EXPECT_CALL(listener_baz_different_address->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_different_address_yaml),
                                   "version4"));
@@ -2008,9 +2007,8 @@ filter_chains: {}
   // Start workers and capture ListenerImpl.
   Network::ListenerConfig* listener_config = nullptr;
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _))
-      .WillOnce(Invoke(
-          [&listener_config](auto, Network::ListenerConfig& config, auto, Runtime::Loader&,
-                             Random::RandomGenerator&) -> void { listener_config = &config; }))
+      .WillOnce([&listener_config](auto, Network::ListenerConfig& config, auto, Runtime::Loader&,
+                                   Random::RandomGenerator&) -> void { listener_config = &config; })
       .RetiresOnSaturation();
 
   EXPECT_CALL(*worker_, start(_, _, _));
@@ -2366,10 +2364,10 @@ filter_chains:
 
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true, true);
   EXPECT_CALL(*listener_factory_.socket_, duplicate());
-  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
+  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce([listener_baz]() -> void {
     // Call the initialize callback during destruction like RDS will.
     listener_baz->target_.ready();
-  }));
+  });
   EXPECT_CALL(listener_baz_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_update1_yaml)));
   EXPECT_EQ(2UL, manager_->listeners().size());
@@ -2870,12 +2868,12 @@ filter_chains:
   // Remove foo into draining.
   std::function<void()> stop_completion;
   EXPECT_CALL(*worker_, stopListener(_, _, _))
-      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
-                                          const Network::ExtraShutdownListenerOptions&,
-                                          std::function<void()> completion) -> void {
+      .WillOnce([&stop_completion](Network::ListenerConfig&,
+                                   const Network::ExtraShutdownListenerOptions&,
+                                   std::function<void()> completion) -> void {
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
-      }));
+      });
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -2932,12 +2930,12 @@ filter_chains:
   // Remove foo into draining.
   std::function<void()> stop_completion;
   EXPECT_CALL(*worker_, stopListener(_, _, _))
-      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
-                                          const Network::ExtraShutdownListenerOptions&,
-                                          std::function<void()> completion) -> void {
+      .WillOnce([&stop_completion](Network::ListenerConfig&,
+                                   const Network::ExtraShutdownListenerOptions&,
+                                   std::function<void()> completion) -> void {
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
-      }));
+      });
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   checkStats(__LINE__, 1, 0, 1, 0, 0, 1, 0);
@@ -3092,17 +3090,17 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
-      .WillOnce(Invoke(
-          [this, &real_listener_factory](
-              const Network::Address::InstanceConstSharedPtr& address,
-              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
-              ListenerComponentFactory::BindType bind_type,
-              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-            // When bind_to_port is equal to false, the BSD socket is not created at main thread.
-            EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
-            return real_listener_factory.createListenSocket(
-                address, socket_type, options, bind_type, creation_options, worker_index);
-          }));
+      .WillOnce([this, &real_listener_factory](
+                    const Network::Address::InstanceConstSharedPtr& address,
+                    Network::Socket::Type socket_type,
+                    const Network::Socket::OptionsSharedPtr& options,
+                    ListenerComponentFactory::BindType bind_type,
+                    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+        // When bind_to_port is equal to false, the BSD socket is not created at main thread.
+        EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
+        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
+                                                        creation_options, worker_index);
+      });
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -3132,17 +3130,17 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
-      .WillOnce(Invoke(
-          [this, &real_listener_factory](
-              const Network::Address::InstanceConstSharedPtr& address,
-              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
-              ListenerComponentFactory::BindType bind_type,
-              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-            // When bind_to_port is equal to false, the BSD socket is not created at main thread.
-            EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
-            return real_listener_factory.createListenSocket(
-                address, socket_type, options, bind_type, creation_options, worker_index);
-          }));
+      .WillOnce([this, &real_listener_factory](
+                    const Network::Address::InstanceConstSharedPtr& address,
+                    Network::Socket::Type socket_type,
+                    const Network::Socket::OptionsSharedPtr& options,
+                    ListenerComponentFactory::BindType bind_type,
+                    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+        // When bind_to_port is equal to false, the BSD socket is not created at main thread.
+        EXPECT_CALL(os_sys_calls_, socket(AF_INET, _, 0)).Times(0);
+        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
+                                                        creation_options, worker_index);
+      });
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
 
@@ -3189,19 +3187,19 @@ filter_chains:
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoBind, _, 0))
-      .WillOnce(Invoke(
-          [this, &syscall_result, &real_listener_factory](
-              const Network::Address::InstanceConstSharedPtr& address,
-              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
-              ListenerComponentFactory::BindType bind_type,
-              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-            EXPECT_CALL(server_, hotRestart).Times(0);
-            // When bind_to_port is equal to false, create socket fd directly, and do not get socket
-            // fd through hot restart.
-            ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
-            return real_listener_factory.createListenSocket(
-                address, socket_type, options, bind_type, creation_options, worker_index);
-          }));
+      .WillOnce([this, &syscall_result, &real_listener_factory](
+                    const Network::Address::InstanceConstSharedPtr& address,
+                    Network::Socket::Type socket_type,
+                    const Network::Socket::OptionsSharedPtr& options,
+                    ListenerComponentFactory::BindType bind_type,
+                    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+        EXPECT_CALL(server_, hotRestart).Times(0);
+        // When bind_to_port is equal to false, create socket fd directly, and do not get socket
+        // fd through hot restart.
+        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
+                                                        creation_options, worker_index);
+      });
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -3229,24 +3227,24 @@ filter_chains:
   // the call to getsockname fails with `WSAEINVAL`. To avoid that we make sure
   // that the bind system actually happens and it does not get mocked.
   ON_CALL(os_sys_calls_, bind(_, _, _))
-      .WillByDefault(Invoke(
+      .WillByDefault(
           [&](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) -> Api::SysCallIntResult {
             Api::SysCallIntResult result = os_sys_calls_actual_.bind(sockfd, addr, addrlen);
             ASSERT(result.return_value_ >= 0);
             return result;
-          }));
+          });
   ListenerHandle* listener_foo = expectListenerCreate(true, true);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0))
-      .WillOnce(Invoke(
-          [this, &syscall_result, &real_listener_factory](
-              const Network::Address::InstanceConstSharedPtr& address,
-              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
-              ListenerComponentFactory::BindType bind_type,
-              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-            ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
-            return real_listener_factory.createListenSocket(
-                address, socket_type, options, bind_type, creation_options, worker_index);
-          }));
+      .WillOnce([this, &syscall_result, &real_listener_factory](
+                    const Network::Address::InstanceConstSharedPtr& address,
+                    Network::Socket::Type socket_type,
+                    const Network::Socket::OptionsSharedPtr& options,
+                    ListenerComponentFactory::BindType bind_type,
+                    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+        ON_CALL(os_sys_calls_, socket(AF_INET, _, 0)).WillByDefault(Return(syscall_result));
+        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
+                                                        creation_options, worker_index);
+      });
   EXPECT_CALL(listener_foo->target_, initialize());
   EXPECT_CALL(*listener_foo, onDestroy());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
@@ -3472,8 +3470,7 @@ filter_chains:
   EXPECT_CALL(*worker_, stopListener(_, _, _));
   Network::ConnectionDrainEvent captured;
   EXPECT_CALL(*worker_, onListenerDrain(_, _))
-      .WillOnce(
-          Invoke([&captured](uint64_t, Network::ConnectionDrainEvent event) { captured = event; }));
+      .WillOnce([&captured](uint64_t, Network::ConnectionDrainEvent event) { captured = event; });
   EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
   EXPECT_EQ(Server::DrainStrategy::Gradual, captured.strategy);
@@ -6468,15 +6465,15 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Metadata) {
   // Extract listener_factory_context avoid accessing private member.
   ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
       .WillByDefault(
-          Invoke([&listener_factory_context, this](
-                     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                         filters,
-                     Configuration::ListenerFactoryContext& context)
-                     -> Filter::ListenerFilterFactoriesList {
+          [&listener_factory_context,
+           this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                     filters,
+                 Configuration::ListenerFactoryContext& context)
+              -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
             return *ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                 filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
-          }));
+          });
   server_.server_factory_context_->cluster_manager_.initializeClusters({"service_foo"}, {});
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   ASSERT_NE(nullptr, listener_factory_context);
@@ -6551,15 +6548,15 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
   // Extract listener_factory_context to unit test functions.
   ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
       .WillByDefault(
-          Invoke([&listener_factory_context, this](
-                     const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
-                         filters,
-                     Configuration::ListenerFactoryContext& context)
-                     -> Filter::ListenerFilterFactoriesList {
+          [&listener_factory_context,
+           this](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
+                     filters,
+                 Configuration::ListenerFactoryContext& context)
+              -> Filter::ListenerFilterFactoriesList {
             listener_factory_context = &context;
             return *ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                 filters, context, *listener_factory_.getTcpListenerConfigProviderManager());
-          }));
+          });
 
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(1U, manager_->listeners().size());
@@ -6584,15 +6581,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
                                          new Network::Address::Ipv4Instance("127.0.0.1", 5678)},
                                      overload_state, false);
 
-  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
-    return socket;
-  }));
+  EXPECT_CALL(callbacks, socket()).WillOnce([&]() -> Network::ConnectionSocket& { return socket; });
 
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
-                           Network::ListenerFilterPtr& filter) -> void {
+      .WillOnce([&](const Network::ListenerFilterMatcherSharedPtr&,
+                    Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-      }));
+      });
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 #endif
@@ -6672,19 +6667,17 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOutbound) {
   EXPECT_CALL(os_sys_calls_, ioctl(_, _, _, _, _, _, _));
   auto filter_state =
       std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::TopSpan);
-  EXPECT_CALL(callbacks, filterState()).WillOnce(Invoke([&]() -> StreamInfo::FilterState& {
+  EXPECT_CALL(callbacks, filterState()).WillOnce([&]() -> StreamInfo::FilterState& {
     return *filter_state;
-  }));
+  });
 #endif
-  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
-    return socket;
-  }));
+  EXPECT_CALL(callbacks, socket()).WillOnce([&]() -> Network::ConnectionSocket& { return socket; });
 
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
-                           Network::ListenerFilterPtr& filter) -> void {
+      .WillOnce([&](const Network::ListenerFilterMatcherSharedPtr&,
+                    Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-      }));
+      });
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
   EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
@@ -6734,15 +6727,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilterStopsIteration) 
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), overload_state, false);
 
-  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
-    return socket;
-  }));
+  EXPECT_CALL(callbacks, socket()).WillOnce([&]() -> Network::ConnectionSocket& { return socket; });
 
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
-                           Network::ListenerFilterPtr& filter) -> void {
+      .WillOnce([&](const Network::ListenerFilterMatcherSharedPtr&,
+                    Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::StopIteration, filter->onAccept(callbacks));
-      }));
+      });
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
 #endif
 }
@@ -6783,15 +6774,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterInbound) {
       std::move(io_handle), std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 1234),
       std::make_unique<Network::Address::Ipv4Instance>("127.0.0.1", 5678), overload_state, false);
 
-  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
-    return socket;
-  }));
+  EXPECT_CALL(callbacks, socket()).WillOnce([&]() -> Network::ConnectionSocket& { return socket; });
 
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
-                           Network::ListenerFilterPtr& filter) -> void {
+      .WillOnce([&](const Network::ListenerFilterMatcherSharedPtr&,
+                    Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-      }));
+      });
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
   EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
@@ -6868,15 +6857,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
       std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678), overload_state, false);
 
-  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
-    return socket;
-  }));
+  EXPECT_CALL(callbacks, socket()).WillOnce([&]() -> Network::ConnectionSocket& { return socket; });
 
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&](const Network::ListenerFilterMatcherSharedPtr&,
-                           Network::ListenerFilterPtr& filter) -> void {
+      .WillOnce([&](const Network::ListenerFilterMatcherSharedPtr&,
+                    Network::ListenerFilterPtr& filter) -> void {
         EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
-      }));
+      });
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
   EXPECT_TRUE(socket.connectionInfoProvider().localAddressRestored());
@@ -6900,13 +6887,13 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
                                                        Network::Address::IpVersion::v4);
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, ListenerComponentFactory::BindType::NoReusePort, _, 0))
-      .WillOnce(Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
-                           const Network::Socket::OptionsSharedPtr& options,
-                           ListenerComponentFactory::BindType,
-                           const Network::SocketCreationOptions&, uint32_t) {
+      .WillOnce([&](Network::Address::InstanceConstSharedPtr, Network::Socket::Type,
+                    const Network::Socket::OptionsSharedPtr& options,
+                    ListenerComponentFactory::BindType, const Network::SocketCreationOptions&,
+                    uint32_t) {
         EXPECT_EQ(options, nullptr);
         return listener_factory_.socket_;
-      }));
+      });
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(1U, manager_->listeners().size());
 }
@@ -7459,15 +7446,15 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, Mptcp) {
 
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, _, _, default_bind_type, creation_options, 0))
-      .WillOnce(Invoke(
-          [&real_listener_factory](
-              const Network::Address::InstanceConstSharedPtr& address,
-              Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
-              ListenerComponentFactory::BindType bind_type,
-              const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
-            return real_listener_factory.createListenSocket(
-                address, socket_type, options, bind_type, creation_options, worker_index);
-          }));
+      .WillOnce([&real_listener_factory](const Network::Address::InstanceConstSharedPtr& address,
+                                         Network::Socket::Type socket_type,
+                                         const Network::Socket::OptionsSharedPtr& options,
+                                         ListenerComponentFactory::BindType bind_type,
+                                         const Network::SocketCreationOptions& creation_options,
+                                         uint32_t worker_index) {
+        return real_listener_factory.createListenSocket(address, socket_type, options, bind_type,
+                                                        creation_options, worker_index);
+      });
 
   EXPECT_TRUE(addOrUpdateListener(listener));
   checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
@@ -8211,10 +8198,10 @@ per_connection_buffer_limit_bytes: 10
     )EOF";
 
   ListenerHandle* listener_baz_update1 = expectListenerCreate(true, true);
-  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce(Invoke([listener_baz]() -> void {
+  EXPECT_CALL(*listener_baz, onDestroy()).WillOnce([listener_baz]() -> void {
     // Call the initialize callback during destruction like RDS will.
     listener_baz->target_.ready();
-  }));
+  });
   EXPECT_CALL(listener_baz_update1->target_, initialize());
   EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_baz_update1_yaml)));
   EXPECT_EQ(2UL, manager_->listeners().size());
@@ -8480,8 +8467,8 @@ filter_chains:
   Network::ConnectionDrainEvent captured;
   // Overrides the AnyNumber() default installed by SetUp().
   EXPECT_CALL(*worker_, onFilterChainDrain(_, _, _))
-      .WillOnce(Invoke([&captured](uint64_t, const std::list<const Network::FilterChain*>&,
-                                   Network::ConnectionDrainEvent event) { captured = event; }));
+      .WillOnce([&captured](uint64_t, const std::list<const Network::FilterChain*>&,
+                            Network::ConnectionDrainEvent event) { captured = event; });
   EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
   Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
   EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
@@ -8795,12 +8782,12 @@ filter_chains:
   // Stop the active listener listener_foo_update1.
   std::function<void()> stop_completion;
   EXPECT_CALL(*worker_, stopListener(_, _, _))
-      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
-                                          const Network::ExtraShutdownListenerOptions&,
-                                          std::function<void()> completion) -> void {
+      .WillOnce([&stop_completion](Network::ListenerConfig&,
+                                   const Network::ExtraShutdownListenerOptions&,
+                                   std::function<void()> completion) -> void {
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
-      }));
+      });
   EXPECT_CALL(*listener_foo_update1->drain_manager_,
               startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -8901,12 +8888,12 @@ filter_chains:
   // Stop the active listener listener_foo_update1.
   std::function<void()> stop_completion;
   EXPECT_CALL(*worker_, stopListener(_, _, _))
-      .WillOnce(Invoke([&stop_completion](Network::ListenerConfig&,
-                                          const Network::ExtraShutdownListenerOptions&,
-                                          std::function<void()> completion) -> void {
+      .WillOnce([&stop_completion](Network::ListenerConfig&,
+                                   const Network::ExtraShutdownListenerOptions&,
+                                   std::function<void()> completion) -> void {
         ASSERT_TRUE(completion != nullptr);
         stop_completion = std::move(completion);
-      }));
+      });
   EXPECT_CALL(*listener_foo_update1->drain_manager_,
               startDrainSequence(Network::DrainDirection::All, _));
   EXPECT_TRUE(manager_->removeListener("foo"));
@@ -10275,18 +10262,17 @@ public:
         new NiceMock<Event::MockSchedulableCallback>(&server_.server_factory_context_->dispatcher_);
     ON_CALL(server_.server_factory_context_->cluster_manager_.subscription_factory_,
             subscriptionFromConfigSource(_, _, _, _, _, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                    Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
                    const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
               auto subscription = std::make_unique<NiceMock<Config::MockSubscription>>();
               ON_CALL(*subscription, start(_))
-                  .WillByDefault(
-                      Invoke([this, &callbacks](const absl::flat_hash_set<std::string>& names) {
-                        fcds_callbacks_[*names.begin()] = &callbacks;
-                      }));
+                  .WillByDefault([this, &callbacks](const absl::flat_hash_set<std::string>& names) {
+                    fcds_callbacks_[*names.begin()] = &callbacks;
+                  });
               return subscription;
-            }));
+            });
   }
 
   // A listener named foo with an inline filter chain named foo, whose matcher selects the filter
@@ -10326,13 +10312,12 @@ on_no_match:
   Configuration::FilterChainFactoryContext& deliverFcdsFilterChain(const std::string& name) {
     Configuration::FilterChainFactoryContext* context = nullptr;
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-        .WillOnce(Invoke(
-            [&context](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                       Configuration::FilterChainFactoryContext& filter_chain_context)
-                -> absl::StatusOr<Filter::NetworkFilterFactoriesList> {
-              context = &filter_chain_context;
-              return Filter::NetworkFilterFactoriesList{};
-            }));
+        .WillOnce([&context](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                             Configuration::FilterChainFactoryContext& filter_chain_context)
+                      -> absl::StatusOr<Filter::NetworkFilterFactoriesList> {
+          context = &filter_chain_context;
+          return Filter::NetworkFilterFactoriesList{};
+        });
     envoy::config::listener::v3::FilterChain filter_chain;
     filter_chain.set_name(name);
     const auto decoded_resources = TestUtility::decodeResources({filter_chain});
@@ -11052,14 +11037,14 @@ filter_chains:
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Socket::Type::Stream, _,
                                  ListenerComponentFactory::BindType::ReusePort, _, 0))
-      .WillOnce(Invoke([this, &captured_options](const Network::Address::InstanceConstSharedPtr&,
-                                                 Network::Socket::Type,
-                                                 const Network::Socket::OptionsSharedPtr& options,
-                                                 ListenerComponentFactory::BindType,
-                                                 const Network::SocketCreationOptions&, uint32_t) {
+      .WillOnce([this, &captured_options](const Network::Address::InstanceConstSharedPtr&,
+                                          Network::Socket::Type,
+                                          const Network::Socket::OptionsSharedPtr& options,
+                                          ListenerComponentFactory::BindType,
+                                          const Network::SocketCreationOptions&, uint32_t) {
         captured_options = options;
         return listener_factory_.socket_;
-      }));
+      });
   EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
       .Times(testing::AnyNumber())
       .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
@@ -11099,14 +11084,14 @@ filter_chains:
   EXPECT_CALL(listener_factory_,
               createListenSocket(_, Network::Socket::Type::Stream, _,
                                  ListenerComponentFactory::BindType::ReusePort, _, 0))
-      .WillOnce(Invoke([this, &captured_options](const Network::Address::InstanceConstSharedPtr&,
-                                                 Network::Socket::Type,
-                                                 const Network::Socket::OptionsSharedPtr& options,
-                                                 ListenerComponentFactory::BindType,
-                                                 const Network::SocketCreationOptions&, uint32_t) {
+      .WillOnce([this, &captured_options](const Network::Address::InstanceConstSharedPtr&,
+                                          Network::Socket::Type,
+                                          const Network::Socket::OptionsSharedPtr& options,
+                                          ListenerComponentFactory::BindType,
+                                          const Network::SocketCreationOptions&, uint32_t) {
         captured_options = options;
         return listener_factory_.socket_;
-      }));
+      });
   EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
       .Times(testing::AnyNumber())
       .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
@@ -11557,8 +11542,8 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(false, true);
   EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
-      .WillOnce(Invoke(
-          [&cb_handle](absl::string_view, const Network::ListenerConfig&) { cb_handle.reset(); }));
+      .WillOnce(
+          [&cb_handle](absl::string_view, const Network::ListenerConfig&) { cb_handle.reset(); });
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   addOrUpdateListener(parseListenerFromV3Yaml(yaml));
   EXPECT_EQ(1U, manager_->listeners().size());
@@ -11712,9 +11697,9 @@ filter_chains:
 
   ListenerHandle* listener_foo = expectListenerCreate(false, false);
   EXPECT_CALL(*callbacks, onListenerAddOrUpdate(absl::string_view("foo"), _))
-      .WillOnce(Invoke([](absl::string_view, const Network::ListenerConfig& listener_config) {
+      .WillOnce([](absl::string_view, const Network::ListenerConfig& listener_config) {
         EXPECT_EQ("foo", listener_config.name());
-      }));
+      });
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
   addOrUpdateListener(parseListenerFromV3Yaml(yaml), "", false);
   EXPECT_EQ(1U, manager_->listeners().size());

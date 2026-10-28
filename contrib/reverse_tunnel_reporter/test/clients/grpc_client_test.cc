@@ -19,7 +19,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -145,12 +144,12 @@ protected:
   void getStream(int times) {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
         .Times(times)
-        .WillRepeatedly(Invoke([this](absl::string_view, absl::string_view,
-                                      Grpc::RawAsyncStreamCallbacks& callbacks,
-                                      const Http::AsyncClient::StreamOptions&) {
+        .WillRepeatedly([this](absl::string_view, absl::string_view,
+                               Grpc::RawAsyncStreamCallbacks& callbacks,
+                               const Http::AsyncClient::StreamOptions&) {
           callbacks_ = &callbacks;
           return async_stream_.get();
-        }));
+        });
   }
 
   GrpcClient::GrpcClientStats getStats() {
@@ -227,10 +226,10 @@ TEST_F(GrpcClientTest, ClientSendsFullPushOnConnect) {
   getStream(1);
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
-      .WillOnce(Invoke([&events](Buffer::InstancePtr& request, bool) {
+      .WillOnce([&events](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, events, true);
         EXPECT_EQ(resp.request_nonce(), 1);
-      }));
+      });
 
   client.onServerInitialized(&mock_reporter_);
 
@@ -264,17 +263,17 @@ TEST_F(GrpcClientTest, ClientSendsDiffAfterFullPush) {
 
   getStream(1);
 
-  EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce(Invoke([&updates]() {
+  EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce([&updates]() {
     return updates[0].connections;
-  }));
+  });
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(total)
-      .WillRepeatedly(Invoke([this, &updates, &cur](Buffer::InstancePtr& request, bool) {
+      .WillRepeatedly([this, &updates, &cur](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, updates[cur], cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
-      }));
+      });
 
   client.onServerInitialized(&mock_reporter_);
   cur++;
@@ -313,15 +312,15 @@ TEST_F(GrpcClientTest, ReportIntervalChangesReflectInClient) {
 
   getStream(1);
 
-  EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce(Invoke([&events]() {
+  EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce([&events]() {
     return events.connections;
-  }));
+  });
 
   // This should be called 3 times.
   // Once for the first message and then twice for the next two increments.
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(3)
-      .WillRepeatedly(Invoke([this, &events, &cur](Buffer::InstancePtr& request, bool) {
+      .WillRepeatedly([this, &events, &cur](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), ++cur);
 
@@ -330,7 +329,7 @@ TEST_F(GrpcClientTest, ReportIntervalChangesReflectInClient) {
         }
 
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
-      }));
+      });
 
   EXPECT_EQ(stats_.send_interval_gauge_.value(),
             DurationUtil::durationToMilliseconds(config_.default_send_interval()));
@@ -363,20 +362,20 @@ TEST_F(GrpcClientTest, FullPushAndDiffOnReconnect) {
   getStream(2);
 
   // getAllConnections is called once per full push (initial + reconnect).
-  EXPECT_CALL(mock_reporter_, getAllConnections()).Times(2).WillRepeatedly(Invoke([&updates]() {
+  EXPECT_CALL(mock_reporter_, getAllConnections()).Times(2).WillRepeatedly([&updates]() {
     return updates[0].connections;
-  }));
+  });
 
   // total + 1: the reconnect triggers an extra full push on top of the normal total sends.
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(total + 1)
-      .WillRepeatedly(Invoke([this, &updates, &cur](Buffer::InstancePtr& request, bool) {
+      .WillRepeatedly([this, &updates, &cur](Buffer::InstancePtr& request, bool) {
         // cur is still 0 during both the initial connect and the reconnect full push,
         // so both correctly validate as full_push=true against updates[0].
         auto resp = validateReq(request, updates[cur], cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
-      }));
+      });
 
   client.onServerInitialized(&mock_reporter_);
 
@@ -429,12 +428,12 @@ TEST_F(GrpcClientTest, DisconnectOnTooManyUnAckedRequests) {
   // disconnects before calling sendMessage, so the total successful sends is max_retries + 1.
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(config_.max_retries() + 1)
-      .WillRepeatedly(Invoke([&events, &cur](Buffer::InstancePtr& request, bool) {
+      .WillRepeatedly([&events, &cur](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
 
         // No ACK is sent. It should eventually disconnect.
-      }));
+      });
 
   EXPECT_CALL(*async_stream_, resetStream());
 
@@ -470,12 +469,12 @@ TEST_F(GrpcClientTest, DisconnectOnNack) {
   getStream(1);
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
-      .WillOnce(Invoke([this, &events](Buffer::InstancePtr& request, bool) {
+      .WillOnce([this, &events](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, events, true);
         EXPECT_EQ(resp.request_nonce(), 1);
         resp.mutable_error_detail()->set_code(Grpc::Status::WellKnownGrpcStatus::Unavailable);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
-      }));
+      });
 
   EXPECT_CALL(*async_stream_, resetStream());
 
@@ -510,11 +509,11 @@ TEST_F(GrpcClientTest, DisconnectOnBufferFull) {
   });
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
-      .WillOnce(Invoke([this, &connect_events](Buffer::InstancePtr& request, bool) {
+      .WillOnce([this, &connect_events](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, connect_events, true);
         EXPECT_EQ(resp.request_nonce(), 1);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
-      }));
+      });
 
   EXPECT_CALL(*async_stream_, resetStream());
 
@@ -552,13 +551,13 @@ TEST_F(GrpcClientTest, OutOfOrderNonce) {
   // succeed before the disconnect fires.
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(config_.max_retries() + 1)
-      .WillRepeatedly(Invoke([this, &events, &cur](Buffer::InstancePtr& request, bool) {
+      .WillRepeatedly([this, &events, &cur](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
 
         resp.set_request_nonce(0);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
-      }));
+      });
 
   EXPECT_CALL(*async_stream_, resetStream());
 
@@ -596,7 +595,7 @@ TEST_F(GrpcClientTest, SkipNonce) {
   // but a late ACK at iteration max_retries advances nonce_acked_ and buys one more send.
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
       .Times(config_.max_retries() + 2)
-      .WillRepeatedly(Invoke([this, &events, &cur](Buffer::InstancePtr& request, bool) {
+      .WillRepeatedly([this, &events, &cur](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, events, cur == 0);
         EXPECT_EQ(resp.request_nonce(), cur + 1);
 
@@ -605,7 +604,7 @@ TEST_F(GrpcClientTest, SkipNonce) {
         if (cur == config_.max_retries()) {
           callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
         }
-      }));
+      });
 
   client.onServerInitialized(&mock_reporter_);
   cur++;
@@ -639,10 +638,10 @@ TEST_F(GrpcClientTest, OkRemoteClose) {
   getStream(1);
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
-      .WillOnce(Invoke([&events](Buffer::InstancePtr& request, bool) {
+      .WillOnce([&events](Buffer::InstancePtr& request, bool) {
         auto response = validateReq(request, events, true);
         EXPECT_EQ(response.request_nonce(), 1);
-      }));
+      });
 
   EXPECT_CALL(*async_stream_, resetStream());
 
@@ -718,10 +717,10 @@ TEST_F(GrpcClientTest, BufferOverflowWhileDisconnectedDoesNotRearmRetry) {
   EXPECT_CALL(mock_reporter_, getAllConnections()).WillOnce(Return(big_update.connections));
 
   EXPECT_CALL(*async_stream_, sendMessageRaw_(_, false))
-      .WillOnce(Invoke([this, &big_update](Buffer::InstancePtr& request, bool) {
+      .WillOnce([this, &big_update](Buffer::InstancePtr& request, bool) {
         auto resp = validateReq(request, big_update, true);
         callbacks_->onReceiveMessageRaw(Grpc::Common::serializeMessage(resp));
-      }));
+      });
 
   EXPECT_CALL(*async_stream_, resetStream());
 

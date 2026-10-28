@@ -331,21 +331,21 @@ TEST_F(SipTraTest, Misc) {
   Grpc::RawAsyncStreamCallbacks* stream_cb;
 
   EXPECT_CALL(*async_client, sendRaw(_, _, _, _, _, _))
-      .WillRepeatedly(Invoke([&](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-                                 Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span&,
-                                 const Http::AsyncClient::RequestOptions&) {
+      .WillRepeatedly([&](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                          Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span&,
+                          const Http::AsyncClient::RequestOptions&) {
         request_cb = &callbacks;
         return async_client->async_request_.get();
-      }));
+      });
 
   async_stream_ = std::make_unique<testing::NiceMock<Grpc::MockAsyncStream>>();
   EXPECT_CALL(*async_client, startRaw(_, _, _, _))
-      .WillRepeatedly(
-          Invoke([&](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                     const Http::AsyncClient::StreamOptions&) {
-            stream_cb = &callbacks;
-            return async_stream_.get();
-          }));
+      .WillRepeatedly([&](absl::string_view, absl::string_view,
+                          Grpc::RawAsyncStreamCallbacks& callbacks,
+                          const Http::AsyncClient::StreamOptions&) {
+        stream_cb = &callbacks;
+        return async_stream_.get();
+      });
 
   auto grpc_client = TrafficRoutingAssistant::GrpcClientImpl(async_client, dispatcher_,
                                                              std::chrono::milliseconds(2000));

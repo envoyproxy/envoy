@@ -19,7 +19,6 @@
 
 using testing::Eq;
 using testing::Ge;
-using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 
@@ -942,7 +941,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   Network::TransportSocketCallbacks* transport_callbacks;
   EXPECT_CALL(*bad_transport_socket, setTransportSocketCallbacks)
       .WillOnce(SaveArgAddress(&transport_callbacks));
-  ON_CALL(*bad_transport_socket, doRead).WillByDefault(InvokeWithoutArgs([&] {
+  ON_CALL(*bad_transport_socket, doRead).WillByDefault([&] {
     Buffer::OwnedImpl buffer;
     transport_callbacks->connection().dispatcher().exit();
     // Read some amount of data; what's more important is whether the socket was remote-closed. That
@@ -952,11 +951,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
                                  ? Network::PostIoAction::Close
                                  : Network::PostIoAction::KeepOpen,
                              0, false};
-  }));
-  ON_CALL(*bad_transport_socket, doWrite).WillByDefault(InvokeWithoutArgs([&] {
+  });
+  ON_CALL(*bad_transport_socket, doWrite).WillByDefault([&] {
     transport_callbacks->connection().dispatcher().exit();
     return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
-  }));
+  });
 
   ConnectionStatusCallbacks connect_callbacks;
   Network::Address::InstanceConstSharedPtr address =

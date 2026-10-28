@@ -50,7 +50,6 @@ using testing::AtLeast;
 using testing::Contains;
 using testing::ElementsAre;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::IsSupersetOf;
 using testing::Key;
 using testing::NiceMock;
@@ -164,7 +163,7 @@ public:
     };
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
+        .WillOnce([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
               nullptr, std::make_unique<Filter>(std::make_shared<Config>(
                            *stats_store_.rootScope(),
@@ -173,21 +172,21 @@ public:
                                                            proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
-        }));
+        });
     conn_->connect();
     if (read) {
       read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
-          .WillOnce(Invoke([&](Network::Connection& connection,
-                               const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
+          .WillOnce([&](Network::Connection& connection,
+                        const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
             return true;
-          }));
+          });
     }
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { maybeExitDispatcher(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { maybeExitDispatcher(); });
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -204,12 +203,12 @@ public:
   void expectData(std::string expected) {
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
+        .WillOnce([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
           EXPECT_EQ(buffer.toString(), expected);
           buffer.drain(expected.length());
           dispatcher_->exit();
           return Network::FilterStatus::Continue;
-        }));
+        });
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
@@ -217,7 +216,7 @@ public:
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
     conn_->close(Network::ConnectionCloseType::NoFlush);
 
@@ -226,7 +225,7 @@ public:
 
   void expectConnectionError() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
@@ -511,68 +510,67 @@ TEST_P(ProxyProtocolTest, ErrorRecv_2) {
 #else
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
+      });
 #endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+      .WillRepeatedly([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+      .WillRepeatedly([this](os_fd_t socket, void* buffer, size_t length, int flags) {
         return os_sys_calls_actual_.send(socket, buffer, length, flags);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
             return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
                 .return_value_;
-          }));
+          });
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
             return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, shutdown(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+      .WillRepeatedly(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); });
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
-  }));
+  });
   EXPECT_CALL(os_sys_calls, accept(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
       .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+      .WillRepeatedly([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+      .WillRepeatedly([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+      .WillRepeatedly([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
-      }));
+      });
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -596,68 +594,67 @@ TEST_P(ProxyProtocolTest, ErrorRecv_1) {
 #else
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
+      });
 #endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+      .WillRepeatedly([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+      .WillRepeatedly([this](os_fd_t socket, void* buffer, size_t length, int flags) {
         return os_sys_calls_actual_.send(socket, buffer, length, flags);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
             return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
                 .return_value_;
-          }));
+          });
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
             return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, shutdown(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+      .WillRepeatedly(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); });
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
-  }));
+  });
   EXPECT_CALL(os_sys_calls, accept(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
       .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+      .WillRepeatedly([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+      .WillRepeatedly([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+      .WillRepeatedly([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
-      }));
+      });
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -920,91 +917,90 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsRecvError) {
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int iovcnt) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, iovcnt);
         if (header_writed) {
           return Api::SysCallSizeResult{-1, 0};
         }
         return x;
-      }));
+      });
 #else
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
+      });
 #endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+      .WillRepeatedly([&](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
         if (header_writed) {
           return Api::SysCallSizeResult{-1, 0};
         }
         return x;
-      }));
+      });
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+      .WillRepeatedly([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+      .WillRepeatedly([this](os_fd_t socket, void* buffer, size_t length, int flags) {
         return os_sys_calls_actual_.send(socket, buffer, length, flags);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
             return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
                 .return_value_;
-          }));
+          });
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
             return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, shutdown(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+      .WillRepeatedly(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); });
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
-  }));
+  });
   EXPECT_CALL(os_sys_calls, accept(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
       .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+      .WillRepeatedly([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+      .WillRepeatedly([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+      .WillRepeatedly([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
-                                    socklen_t optlen) -> int {
+      .WillRepeatedly([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                             socklen_t optlen) -> int {
         return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
             .return_value_;
-      }));
+      });
   connect(false);
   write(buffer, sizeof(buffer));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1143,91 +1139,90 @@ TEST_P(ProxyProtocolTest, V2Fragmented4Error) {
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
+      .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, num_iov);
         if (partial_writed) {
           return Api::SysCallSizeResult{-1, 0};
         }
         return x;
-      }));
+      });
 #else
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
+      });
 #endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+      .WillRepeatedly([&](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
         if (partial_writed) {
           return Api::SysCallSizeResult{-1, 0};
         }
         return x;
-      }));
+      });
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+      .WillRepeatedly([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+      .WillRepeatedly([this](os_fd_t socket, void* buffer, size_t length, int flags) {
         return os_sys_calls_actual_.send(socket, buffer, length, flags);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
             return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
                 .return_value_;
-          }));
+          });
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
             return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, shutdown(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+      .WillRepeatedly(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); });
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
-  }));
+  });
   EXPECT_CALL(os_sys_calls, accept(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
       .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+      .WillRepeatedly([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+      .WillRepeatedly([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+      .WillRepeatedly([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
-                                    socklen_t optlen) -> int {
+      .WillRepeatedly([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                             socklen_t optlen) -> int {
         return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
             .return_value_;
-      }));
+      });
   connect(false);
   write(buffer, 17);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1253,91 +1248,90 @@ TEST_P(ProxyProtocolTest, V2Fragmented5Error) {
 #ifdef WIN32
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) {
+      .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) {
         if (partial_write) {
           return Api::SysCallSizeResult{-1, 0};
         }
         const Api::SysCallSizeResult x = os_sys_calls_actual_.readv(fd, iov, num_iov);
         return x;
-      }));
+      });
 #else
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
+      });
 #endif
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+      .WillRepeatedly([&](os_fd_t fd, void* buf, size_t n, int flags) {
         const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
         if (partial_write) {
           return Api::SysCallSizeResult{-1, 0};
         }
         return x;
-      }));
+      });
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+      .WillRepeatedly([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+      .WillRepeatedly([this](os_fd_t socket, void* buffer, size_t length, int flags) {
         return os_sys_calls_actual_.send(socket, buffer, length, flags);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
             return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
                 .return_value_;
-          }));
+          });
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
             return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, shutdown(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+      .WillRepeatedly(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); });
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
-  }));
+  });
   EXPECT_CALL(os_sys_calls, accept(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
       .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+      .WillRepeatedly([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+      .WillRepeatedly([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+      .WillRepeatedly([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
-                                    socklen_t optlen) -> int {
+      .WillRepeatedly([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                             socklen_t optlen) -> int {
         return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
             .return_value_;
-      }));
+      });
   connect(false);
   write(buffer, 10);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -2442,7 +2436,7 @@ TEST_P(ProxyProtocolTest, Truncated) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   conn_->close(Network::ConnectionCloseType::NoFlush);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -2454,7 +2448,7 @@ TEST_P(ProxyProtocolTest, Closed) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   conn_->close(Network::ConnectionCloseType::NoFlush);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -2478,81 +2472,80 @@ TEST_P(ProxyProtocolTest, DrainError) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([&](os_fd_t fd, void* buf, size_t n, int flags) {
+      .WillRepeatedly([&](os_fd_t fd, void* buf, size_t n, int flags) {
         if (flags != MSG_PEEK) {
           return Api::SysCallSizeResult{-1, 0};
         } else {
           const Api::SysCallSizeResult x = os_sys_calls_actual_.recv(fd, buf, n, flags);
           return x;
         }
-      }));
+      });
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.readv(fd, iov, iovcnt);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, connect(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
+      .WillRepeatedly([this](os_fd_t sockfd, const sockaddr* addr, socklen_t addrlen) {
         return os_sys_calls_actual_.connect(sockfd, addr, addrlen);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t fd, const iovec* iov, int iovcnt) {
+      .WillRepeatedly([this](os_fd_t fd, const iovec* iov, int iovcnt) {
         return os_sys_calls_actual_.writev(fd, iov, iovcnt);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, send(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t socket, void* buffer, size_t length, int flags) {
+      .WillRepeatedly([this](os_fd_t socket, void* buffer, size_t length, int flags) {
         return os_sys_calls_actual_.send(socket, buffer, length, flags);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
             return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
                 .return_value_;
-          }));
+          });
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
             return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, shutdown(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); }));
-  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([this](os_fd_t fd) {
+      .WillRepeatedly(
+          [this](os_fd_t sockfd, int how) { return os_sys_calls_actual_.shutdown(sockfd, how); });
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly([this](os_fd_t fd) {
     return os_sys_calls_actual_.close(fd);
-  }));
+  });
   EXPECT_CALL(os_sys_calls, accept(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [this](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
             return os_sys_calls_actual_.accept(sockfd, addr, addrlen);
-          }));
+          });
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs())
       .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); }));
+      .WillRepeatedly([this]() -> bool { return os_sys_calls_actual_.supportsGetifaddrs(); });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+      .WillRepeatedly([this](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
         return os_sys_calls_actual_.getifaddrs(vector);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
+      .WillRepeatedly([this](os_fd_t sockfd, Api::EnvoyTcpInfo* tcp_info) {
         return os_sys_calls_actual_.socketTcpInfo(sockfd, tcp_info);
-      }));
+      });
   EXPECT_CALL(os_sys_calls, setsockopt_(_, SOL_SOCKET, SO_LINGER, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
-                                    socklen_t optlen) -> int {
+      .WillRepeatedly([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                             socklen_t optlen) -> int {
         return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
             .return_value_;
-      }));
+      });
 
   connect(false);
   write("PROXY TCP4 1.2.3.4 253.253.253.253 65535 1234\r\nmore data");
@@ -2866,14 +2859,14 @@ public:
     conn_->addConnectionCallbacks(connection_callbacks_);
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
+        .WillOnce([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
               nullptr,
               std::make_unique<Filter>(std::make_shared<Config>(
                   *stats_store_.rootScope(),
                   envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           return true;
-        }));
+        });
   }
 
   // Network::ListenerConfig
@@ -2925,15 +2918,15 @@ public:
     conn_->connect();
     read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
     EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
-        .WillOnce(Invoke([&](Network::Connection& connection,
-                             const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
+        .WillOnce([&](Network::Connection& connection,
+                      const Envoy::Filter::NetworkFilterFactoriesList&) -> bool {
           server_connection_ = &connection;
           connection.addConnectionCallbacks(server_callbacks_);
           connection.addReadFilter(read_filter_);
           return true;
-        }));
+        });
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -2945,12 +2938,12 @@ public:
   void expectData(std::string expected) {
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
+        .WillOnce([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
           EXPECT_EQ(buffer.toString(), expected);
           buffer.drain(expected.length());
           dispatcher_->exit();
           return Network::FilterStatus::Continue;
-        }));
+        });
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
@@ -2959,7 +2952,7 @@ public:
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     conn_->close(Network::ConnectionCloseType::NoFlush);
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
@@ -3053,10 +3046,10 @@ TEST(ProxyProtocolConfigFactoryTest, TestCreateFactory) {
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
-                                       Network::ListenerFilterPtr& filter) {
+      .WillOnce([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
+                                Network::ListenerFilterPtr& filter) {
         added_filter = std::move(filter);
-      }));
+      });
   cb(manager);
 
   // Make sure we actually create the correct type!

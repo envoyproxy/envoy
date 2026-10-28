@@ -46,7 +46,6 @@ using testing::ByMove;
 using testing::DoAll;
 using testing::DoDefault;
 using testing::InSequence;
-using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
@@ -118,11 +117,11 @@ class UdpProxyFilterBase : public testing::Test {
 public:
   UdpProxyFilterBase() {
     EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-        .WillRepeatedly(Invoke([&](const char* node, const char* service,
-                                   const struct addrinfo* hints, struct addrinfo** res) {
+        .WillRepeatedly([&](const char* node, const char* service, const struct addrinfo* hints,
+                            struct addrinfo** res) {
           Api::OsSysCallsImpl real;
           return real.getaddrinfo(node, service, hints, res);
-        }));
+        });
   }
 
 protected:
@@ -146,11 +145,11 @@ public:
 
     void expectSetIpTransparentSocketOption() {
       EXPECT_CALL(*socket_->io_handle_, setOption(_, _, _, _))
-          .WillRepeatedly(Invoke([this](int level, int optname, const void* optval,
-                                        socklen_t) -> Api::SysCallIntResult {
+          .WillRepeatedly([this](int level, int optname, const void* optval,
+                                 socklen_t) -> Api::SysCallIntResult {
             sock_opts_[level][optname] = *reinterpret_cast<const int*>(optval);
             return Api::SysCallIntResult{0, 0};
-          }));
+          });
     }
 
     void expectWriteToUpstream(const std::string& data, int sys_errno = 0,
@@ -159,13 +158,13 @@ public:
       EXPECT_CALL(*idle_timer_, enableTimer(parent_.config_->sessionTimeout(), nullptr));
       if (expect_connect) {
         EXPECT_CALL(*socket_->io_handle_, connect(_))
-            .WillOnce(Invoke([connect_sys_errno]() -> Api::SysCallIntResult {
+            .WillOnce([connect_sys_errno]() -> Api::SysCallIntResult {
               if (!connect_sys_errno) {
                 return Api::SysCallIntResult{0, 0};
               } else {
                 return Api::SysCallIntResult{-1, connect_sys_errno};
               }
-            }));
+            });
       } else {
         EXPECT_CALL(*socket_->io_handle_, connect(_)).Times(0);
       }
@@ -173,8 +172,8 @@ public:
         if (expect_connect) {
           EXPECT_CALL(*socket_->io_handle_, wasConnected()).WillOnce(Return(true));
           EXPECT_CALL(*socket_->io_handle_, writev(_, 1))
-              .WillOnce(Invoke([data, sys_errno](const Buffer::RawSlice* slices,
-                                                 uint64_t) -> Api::IoCallUint64Result {
+              .WillOnce([data, sys_errno](const Buffer::RawSlice* slices,
+                                          uint64_t) -> Api::IoCallUint64Result {
                 EXPECT_EQ(data, absl::string_view(static_cast<const char*>(slices[0].mem_),
                                                   slices[0].len_));
                 // For suppression of clang-tidy NewDeleteLeaks rule, don't use the ternary
@@ -184,11 +183,11 @@ public:
                 } else {
                   return makeError(sys_errno);
                 }
-              }));
+              });
         } else {
           EXPECT_CALL(*socket_->io_handle_, wasConnected()).WillOnce(Return(false));
           EXPECT_CALL(*socket_->io_handle_, sendmsg(_, 1, 0, _, _))
-              .WillOnce(Invoke(
+              .WillOnce(
                   [this, data, local_ip, sys_errno](
                       const Buffer::RawSlice* slices, uint64_t, int,
                       const Network::Address::Ip* self_ip,
@@ -208,7 +207,7 @@ public:
                     } else {
                       return makeError(sys_errno);
                     }
-                  }));
+                  });
         }
         // After the first successful write the upstream socket's ephemeral local address becomes
         // available and is captured for access logging. Allow the lookup in any flow.
@@ -229,25 +228,24 @@ public:
       EXPECT_CALL(*socket_->io_handle_, supportsMmsg()).Times(1u);
       // Return the datagram.
       EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _, _))
-          .WillOnce(
-              Invoke([this, data, recv_sys_errno](
-                         Buffer::RawSlice* slices, const uint64_t, uint32_t,
-                         const Network::IoHandle::UdpSaveCmsgConfig&,
-                         Network::IoHandle::RecvMsgOutput& output) -> Api::IoCallUint64Result {
-                if (recv_sys_errno != 0) {
-                  return makeError(recv_sys_errno);
-                } else {
-                  ASSERT(data.size() <= slices[0].len_);
-                  memcpy(slices[0].mem_, data.data(), data.size());
-                  output.msg_[0].peer_address_ = upstream_address_;
-                  return makeNoError(data.size());
-                }
-              }));
+          .WillOnce([this, data, recv_sys_errno](
+                        Buffer::RawSlice* slices, const uint64_t, uint32_t,
+                        const Network::IoHandle::UdpSaveCmsgConfig&,
+                        Network::IoHandle::RecvMsgOutput& output) -> Api::IoCallUint64Result {
+            if (recv_sys_errno != 0) {
+              return makeError(recv_sys_errno);
+            } else {
+              ASSERT(data.size() <= slices[0].len_);
+              memcpy(slices[0].mem_, data.data(), data.size());
+              output.msg_[0].peer_address_ = upstream_address_;
+              return makeNoError(data.size());
+            }
+          });
       if (recv_sys_errno == 0) {
         // Send the datagram downstream.
         EXPECT_CALL(parent_.callbacks_.udp_listener_, send(_))
-            .WillOnce(Invoke([data, send_sys_errno](
-                                 const Network::UdpSendData& send_data) -> Api::IoCallUint64Result {
+            .WillOnce([data, send_sys_errno](
+                          const Network::UdpSendData& send_data) -> Api::IoCallUint64Result {
               // TODO(mattklein123): Verify peer/local address.
               EXPECT_EQ(send_data.buffer_.toString(), data);
               if (send_sys_errno == 0) {
@@ -256,7 +254,7 @@ public:
               } else {
                 return makeError(send_sys_errno);
               }
-            }));
+            });
         // Return an EAGAIN result.
         EXPECT_CALL(*socket_->io_handle_, recvmsg(_, 1, _, _, _))
             .WillOnce(Return(ByMove(
@@ -286,8 +284,7 @@ public:
         peer_address_(std::move(peer_address)) {
     // Disable strict mock warnings.
     ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
-        .WillByDefault(
-            Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
+        .WillByDefault([&](absl::string_view data) { output_.push_back(std::string(data)); });
     ON_CALL(os_sys_calls_, supportsIpTransparent(_)).WillByDefault(Return(true));
     EXPECT_CALL(os_sys_calls_, supportsUdpGro()).Times(AtLeast(0)).WillRepeatedly(Return(true));
     EXPECT_CALL(callbacks_, udpListener()).Times(AtLeast(0));
@@ -351,9 +348,9 @@ public:
         createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
         .WillOnce(SaveArg<1>(&new_session.file_event_cb_));
     // Internal Buffer is Empty, flush will be a no-op
-    ON_CALL(callbacks_.udp_listener_, flush())
-        .WillByDefault(
-            InvokeWithoutArgs([]() -> Api::IoCallUint64Result { return makeNoError(0); }));
+    ON_CALL(callbacks_.udp_listener_, flush()).WillByDefault([]() -> Api::IoCallUint64Result {
+      return makeNoError(0);
+    });
   }
 
   std::shared_ptr<NiceMock<Upstream::MockHost>>
@@ -531,13 +528,13 @@ upstream_packet_writer_config:
     EXPECT_CALL(*session.socket_->io_handle_, resetFileEvents());
     EXPECT_CALL(*state.writer_, isWriteBlocked())
         .WillRepeatedly(testing::ReturnPointee(&state.blocked_));
-    EXPECT_CALL(*state.writer_, setWritable())
-        .Times(testing::AnyNumber())
-        .WillRepeatedly(Invoke([&state] { state.blocked_ = false; }));
+    EXPECT_CALL(*state.writer_, setWritable()).Times(testing::AnyNumber()).WillRepeatedly([&state] {
+      state.blocked_ = false;
+    });
     EXPECT_CALL(*state.writer_, isBatchMode()).WillRepeatedly(Return(true));
-    EXPECT_CALL(*state.writer_, flush()).Times(testing::AnyNumber()).WillRepeatedly(Invoke([] {
+    EXPECT_CALL(*state.writer_, flush()).Times(testing::AnyNumber()).WillRepeatedly([] {
       return makeNoError(0);
-    }));
+    });
     EXPECT_CALL(*session.idle_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
     EXPECT_CALL(*session.socket_->io_handle_, localAddress())
         .Times(testing::AnyNumber())
@@ -560,21 +557,21 @@ upstream_packet_writer_config:
     EXPECT_CALL(*factory_.factory_,
                 createUdpPacketWriter(testing::Ref(*session.socket_->io_handle_), _, _, _))
         .After(socket_setup)
-        .WillOnce(Invoke([&state](Network::IoHandle&, Stats::Scope&, Event::Dispatcher&,
-                                  absl::AnyInvocable<void() &&> on_can_write_cb) {
+        .WillOnce([&state](Network::IoHandle&, Stats::Scope&, Event::Dispatcher&,
+                           absl::AnyInvocable<void() &&> on_can_write_cb) {
           state.on_can_write_cb_ = std::move(on_can_write_cb);
           return Network::UdpPacketWriterPtr(state.writer_);
-        }));
+        });
     return state;
   }
 
   void expectPacket(WriterState& state, absl::string_view payload) {
     EXPECT_CALL(*state.writer_, writePacket(_, nullptr, testing::Ref(*upstream_address_)))
-        .WillOnce(Invoke([payload](const Buffer::Instance& buffer, const Network::Address::Ip*,
-                                   const Network::Address::Instance&) {
+        .WillOnce([payload](const Buffer::Instance& buffer, const Network::Address::Ip*,
+                            const Network::Address::Instance&) {
           EXPECT_EQ(payload, buffer.toString());
           return makeNoError(buffer.length());
-        }));
+        });
   }
 
   void send(absl::string_view payload) {
@@ -615,11 +612,11 @@ TEST_F(UdpProxyUpstreamWriterTest, BufferedBlockedWriteWaitsForWritableEvent) {
   setup(writerConfig());
   auto& state = expectWriterSession();
   EXPECT_CALL(*state.writer_, writePacket(_, _, _))
-      .WillOnce(Invoke([&state](const Buffer::Instance& buffer, const Network::Address::Ip*,
-                                const Network::Address::Instance&) {
+      .WillOnce([&state](const Buffer::Instance& buffer, const Network::Address::Ip*,
+                         const Network::Address::Instance&) {
         state.blocked_ = true;
         return makeNoError(buffer.length());
-      }));
+      });
   EXPECT_CALL(*test_sessions_[0].socket_->io_handle_,
               enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
   send("hello");
@@ -643,10 +640,10 @@ TEST_F(UdpProxyUpstreamWriterTest, ScheduledFlushRetriesAfterWritableNotificatio
   expectPacket(state, "hello");
   send("hello");
   EXPECT_CALL(*state.writer_, flush())
-      .WillOnce(Invoke([&state] {
+      .WillOnce([&state] {
         state.blocked_ = true;
         return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
-      }))
+      })
       .RetiresOnSaturation();
   EXPECT_CALL(*test_sessions_[0].socket_->io_handle_,
               enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
@@ -742,13 +739,13 @@ TEST_F(UdpProxyUpstreamWriterTest, TransparentSourceAddressIsPreserved) {
   EXPECT_CALL(*test_sessions_[0].socket_->io_handle_, localAddress())
       .WillOnce(Return(Network::Utility::parseInternetAddressAndPortNoThrow("0.0.0.0:12345")));
   EXPECT_CALL(*state.writer_, writePacket(_, _, _))
-      .WillOnce(Invoke([this](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
-                              const Network::Address::Instance& peer) {
+      .WillOnce([this](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
+                       const Network::Address::Instance& peer) {
         ASSERT(local_ip != nullptr);
         EXPECT_EQ(peer_address_->ip()->addressAsString(), local_ip->addressAsString());
         EXPECT_EQ(*upstream_address_, peer);
         return makeNoError(buffer.length());
-      }));
+      });
   send("hello");
   auto session = *filter_->activeSessions().begin();
   ASSERT_NE(nullptr, session->streamInfo().upstreamInfo()->upstreamLocalAddress());
@@ -777,14 +774,14 @@ TEST_F(UdpProxyUpstreamWriterTest, TransparentIpv6SourceAddressIsPreserved) {
   auto& state = expectWriterSession(true, upstream);
   EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration());
   EXPECT_CALL(*state.writer_, writePacket(_, _, testing::Ref(*upstream)))
-      .WillOnce(Invoke([&peer](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
-                               const Network::Address::Instance&) {
+      .WillOnce([&peer](const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
+                        const Network::Address::Instance&) {
         EXPECT_NE(nullptr, local_ip);
         if (local_ip != nullptr) {
           EXPECT_EQ(peer->ip()->addressAsString(), local_ip->addressAsString());
         }
         return makeNoError(buffer.length());
-      }));
+      });
   recvDataFromDownstream(peer->asString(), "[2001:db8::3]:80", "hello");
 }
 
@@ -887,10 +884,10 @@ TEST_F(UdpProxyUpstreamWriterTest, UnbufferedBlockedWriteIsNotCountedAsAccepted)
   EXPECT_CALL(*state.flush_, scheduleCallbackCurrentIteration()).Times(0);
   EXPECT_CALL(*test_sessions_[0].socket_->io_handle_,
               enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write));
-  EXPECT_CALL(*state.writer_, writePacket(_, _, _)).WillOnce(InvokeWithoutArgs([&state] {
+  EXPECT_CALL(*state.writer_, writePacket(_, _, _)).WillOnce([&state] {
     state.blocked_ = true;
     return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
-  }));
+  });
   send("hello");
   EXPECT_EQ(0, upstreamCounter("udp.sess_tx_datagrams"));
   EXPECT_EQ(1, upstreamCounter("udp.sess_tx_errors"));
@@ -2358,13 +2355,13 @@ hash_policies:
   auto generated_hash = HashUtil::xxHash64("10.0.0.1");
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Invoke([host, generated_hash](
-                           Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+      .WillOnce([host, generated_hash](
+                    Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
         auto hash = context->computeHashKey();
         EXPECT_TRUE(hash.has_value());
         EXPECT_EQ(generated_hash, hash.value());
         return host;
-      }));
+      });
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -2389,12 +2386,11 @@ matcher:
   auto host = createHost(upstream_address_);
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(
-          Invoke([host](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
-            auto hash = context->computeHashKey();
-            EXPECT_FALSE(hash.has_value());
-            return host;
-          }));
+      .WillOnce([host](Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+        auto hash = context->computeHashKey();
+        EXPECT_FALSE(hash.has_value());
+        return host;
+      });
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -2462,13 +2458,13 @@ hash_policies:
   auto generated_hash = HashUtil::xxHash64("key");
   EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_,
               chooseHost(_))
-      .WillOnce(Invoke([host, generated_hash](
-                           Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
+      .WillOnce([host, generated_hash](
+                    Upstream::LoadBalancerContext* context) -> Upstream::HostConstSharedPtr {
         auto hash = context->computeHashKey();
         EXPECT_TRUE(hash.has_value());
         EXPECT_EQ(generated_hash, hash.value());
         return host;
-      }));
+      });
   expectSessionCreate(upstream_address_);
   test_sessions_[0].expectWriteToUpstream("hello", 0, nullptr, true);
   recvDataFromDownstream("10.0.0.1:1000", "10.0.0.2:80", "hello");
@@ -2674,9 +2670,9 @@ tunneling_config:
   });
 
   auto* upstream = new NiceMock<SessionFilters::MockHttpUpstream>();
-  EXPECT_CALL(*upstream, encodeData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*upstream, encodeData(_)).WillOnce([&](Buffer::Instance&) -> void {
     session->onBelowWriteBufferLowWatermark();
-  }));
+  });
 
   session->onNewSession();
   session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
@@ -2729,17 +2725,17 @@ tunneling_config:
 
   auto* upstream = new NiceMock<SessionFilters::MockHttpUpstream>();
   EXPECT_CALL(*upstream, encodeData(_))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+      .WillOnce([&](Buffer::Instance&) -> void {
         writing = true;
         session->onBelowWriteBufferLowWatermark();
-      }))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
+      })
+      .WillOnce([&](Buffer::Instance&) -> void {
         if (writing) {
           throw EnvoyException("write upstream operation while already during previous write");
         }
 
         resume_post_cb();
-      }));
+      });
 
   session->onNewSession();
   session->onStreamReady(&stream_info, std::unique_ptr<HttpUpstream>{upstream}, upstream_host_,
@@ -2937,12 +2933,12 @@ public:
                                   bool is_ssl = false) {
     EXPECT_CALL(request_encoder_.stream_, addCallbacks(_));
     EXPECT_CALL(request_encoder_, encodeHeaders(_, _))
-        .WillOnce(Invoke([expected_headers](const Http::RequestHeaderMap& headers,
-                                            bool end_stream) -> Http::Status {
+        .WillOnce([expected_headers](const Http::RequestHeaderMap& headers,
+                                     bool end_stream) -> Http::Status {
           EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
           EXPECT_FALSE(end_stream);
           return absl::OkStatus();
-        }));
+        });
 
     upstream_->setRequestEncoder(request_encoder_, is_ssl);
 
@@ -3093,8 +3089,8 @@ TEST_F(HttpUpstreamImplTest, DecodeData) {
   // Since response headers were not received it's considered as a failure.
   EXPECT_CALL(creation_callbacks_, onStreamFailure());
   EXPECT_CALL(callbacks_, onUpstreamData(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_FALSE(end_stream); }))
-      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_TRUE(end_stream); }));
+      .WillOnce([](Buffer::Instance&, bool end_stream) { EXPECT_FALSE(end_stream); })
+      .WillOnce([](Buffer::Instance&, bool end_stream) { EXPECT_TRUE(end_stream); });
 
   upstream_->responseDecoder().decodeData(data, /*end_stream=*/false);
   upstream_->responseDecoder().decodeData(data, /*end_stream=*/true);
@@ -3111,8 +3107,8 @@ TEST_F(HttpUpstreamImplTest, DecodeDataAfterSuccessHeaders) {
   EXPECT_CALL(creation_callbacks_, onStreamFailure()).Times(0);
   EXPECT_CALL(creation_callbacks_, onStreamSuccess(_));
   EXPECT_CALL(callbacks_, onUpstreamData(_, _))
-      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_FALSE(end_stream); }))
-      .WillOnce(Invoke([](Buffer::Instance&, bool end_stream) { EXPECT_TRUE(end_stream); }));
+      .WillOnce([](Buffer::Instance&, bool end_stream) { EXPECT_FALSE(end_stream); })
+      .WillOnce([](Buffer::Instance&, bool end_stream) { EXPECT_TRUE(end_stream); });
 
   upstream_->responseDecoder().decodeHeaders(std::move(response_headers), /*end_stream=*/false);
   upstream_->responseDecoder().decodeData(data, /*end_stream=*/false);

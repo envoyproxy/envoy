@@ -42,7 +42,6 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::AnyNumber;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -138,11 +137,11 @@ public:
     EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
         .WillRepeatedly(Return(true));
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-        .WillOnce(Invoke([](Network::Connection& connection,
-                            const Filter::NetworkFilterFactoriesList& filter_factories) {
+        .WillOnce([](Network::Connection& connection,
+                     const Filter::NetworkFilterFactoriesList& filter_factories) {
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
-        }));
+        });
     EXPECT_CALL(*read_filter, onNewConnection())
         // Stop iteration to avoid calling getRead/WriteBuffer().
         .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -238,27 +237,27 @@ public:
       EXPECT_CALL(test.listener_config_, filterChainManager())
           .WillOnce(ReturnRef(filter_chain_manager_));
       EXPECT_CALL(filter_chain_manager_, findFilterChain(_, _))
-          .WillOnce(Invoke(
+          .WillOnce(
               [&test](const Network::ConnectionSocket& socket, const StreamInfo::StreamInfo&) {
                 EXPECT_EQ("h3", socket.requestedApplicationProtocols()[0]);
                 EXPECT_EQ("test.example.com", socket.requestedServerName());
                 return &test.proof_source_->filterChain();
-              }));
+              });
       EXPECT_CALL(test.proof_source_->filterChain(), networkFilterFactories())
           .WillOnce(ReturnRef(filter_factory_));
       EXPECT_CALL(test.listener_config_, filterChainFactory()).Times(2u);
       EXPECT_CALL(test.listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
           .WillRepeatedly(Return(true));
       EXPECT_CALL(test.listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-          .WillOnce(Invoke([](Network::Connection& connection,
-                              const Filter::NetworkFilterFactoriesList& filter_factories) {
+          .WillOnce([](Network::Connection& connection,
+                       const Filter::NetworkFilterFactoriesList& filter_factories) {
             EXPECT_EQ(1u, filter_factories.size());
             Server::Configuration::FilterChainUtility::buildFilterChain(connection,
                                                                         filter_factories);
             dynamic_cast<EnvoyQuicServerSession&>(connection)
                 .set_max_inbound_header_list_size(64 * 1024);
             return true;
-          }));
+          });
       EXPECT_CALL(*read_filter_, onNewConnection())
           // Stop iteration to avoid calling getRead/WriteBuffer().
           .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -368,12 +367,12 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDuringNetworkFilterInstallation) 
   EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const Filter::NetworkFilterFactoriesList& filter_factories) {
+      .WillOnce([](Network::Connection& connection,
+                   const Filter::NetworkFilterFactoriesList& filter_factories) {
         EXPECT_EQ(1u, filter_factories.size());
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
-      }));
+      });
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -610,12 +609,12 @@ TEST_P(EnvoyQuicDispatcherTest, CloseWithGivenFilterChain) {
   EXPECT_CALL(listener_config_.filter_chain_factory_, createQuicListenerFilterChain(_))
       .WillRepeatedly(Return(true));
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
-      .WillOnce(Invoke([](Network::Connection& connection,
-                          const Filter::NetworkFilterFactoriesList& filter_factories) {
+      .WillOnce([](Network::Connection& connection,
+                   const Filter::NetworkFilterFactoriesList& filter_factories) {
         EXPECT_EQ(1u, filter_factories.size());
         Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
         return true;
-      }));
+      });
   EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Return(Network::FilterStatus::StopIteration));
@@ -644,7 +643,7 @@ TEST_P(EnvoyQuicDispatcherTest, DrainConnectionsWithGivenFilterChains) {
   const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
   Network::ConnectionDrainEvent observed;
   EXPECT_CALL(network_connection_callbacks, onDrain(_))
-      .WillOnce(Invoke([&observed](Network::ConnectionDrainEvent event) { observed = event; }));
+      .WillOnce([&observed](Network::ConnectionDrainEvent event) { observed = event; });
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(0);
   const std::list<const Network::FilterChain*> filter_chains{&proof_source_->filterChain()};
   envoy_quic_dispatcher_.drainConnectionsWithFilterChains(
@@ -671,7 +670,7 @@ TEST_P(EnvoyQuicDispatcherTest, DrainAllConnectionsNotifiesEverySession) {
   const MonotonicTime start_time = dispatcher_->timeSource().monotonicTime();
   Network::ConnectionDrainEvent observed;
   EXPECT_CALL(network_connection_callbacks, onDrain(_))
-      .WillOnce(Invoke([&observed](Network::ConnectionDrainEvent event) { observed = event; }));
+      .WillOnce([&observed](Network::ConnectionDrainEvent event) { observed = event; });
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose)).Times(0);
   envoy_quic_dispatcher_.drainAllConnections(
       Network::ConnectionDrainEvent{start_time, Server::DrainStrategy::Gradual});
@@ -697,9 +696,9 @@ TEST_P(EnvoyQuicDispatcherTest, DrainCallbackClosingSessionIsSafe) {
   setUpSessionWithConnectionCallbacks(network_connection_callbacks, read_filter);
 
   EXPECT_CALL(network_connection_callbacks, onDrain(_))
-      .WillOnce(Invoke([read_filter](Network::ConnectionDrainEvent) {
+      .WillOnce([read_filter](Network::ConnectionDrainEvent) {
         read_filter->callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      }));
+      });
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   envoy_quic_dispatcher_.drainAllConnections(Network::ConnectionDrainEvent{});
 }

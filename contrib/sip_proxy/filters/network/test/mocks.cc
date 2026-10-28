@@ -99,12 +99,11 @@ MockTrafficRoutingAssistantHandler::MockTrafficRoutingAssistantHandler(
     Server::Configuration::FactoryContext& context, StreamInfo::StreamInfoImpl& stream_info)
     : TrafficRoutingAssistantHandler(parent, dispatcher, config, context, stream_info) {
   ON_CALL(*this, retrieveTrafficRoutingAssistant(_, _, _, _, _))
-      .WillByDefault(
-          Invoke([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
-                     SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
-            host = "10.0.0.11";
-            return QueryStatus::Continue;
-          }));
+      .WillByDefault([&](const std::string&, const std::string&, const std::optional<TraContextMap>,
+                         SipFilters::DecoderFilterCallbacks&, std::string& host) -> QueryStatus {
+        host = "10.0.0.11";
+        return QueryStatus::Continue;
+      });
 }
 
 MockTrafficRoutingAssistantHandler::~MockTrafficRoutingAssistantHandler() = default;

@@ -15,7 +15,6 @@
 #include "test/mocks/thread_local/mocks.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -39,12 +38,11 @@ public:
                                  Grpc::MockAsyncClient* async_client) {
     EXPECT_CALL(local_info, node());
     EXPECT_CALL(*async_client, startRaw(_, _, _, _))
-        .WillOnce(
-            Invoke([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
-                          const Http::AsyncClient::StreamOptions&) {
-              this->callbacks_ = dynamic_cast<AccessLogCallbacks*>(&cbs);
-              return &this->stream_;
-            }));
+        .WillOnce([this](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& cbs,
+                         const Http::AsyncClient::StreamOptions&) {
+          this->callbacks_ = dynamic_cast<AccessLogCallbacks*>(&cbs);
+          return &this->stream_;
+        });
   }
 
   void expectStreamMessage(const std::string& expected_message_yaml) {
@@ -52,12 +50,12 @@ public:
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(stream_, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
     EXPECT_CALL(stream_, sendMessageRaw_(_, false))
-        .WillOnce(Invoke([expected_message](Buffer::InstancePtr& request, bool) {
+        .WillOnce([expected_message](Buffer::InstancePtr& request, bool) {
           envoy::service::accesslog::v3::StreamAccessLogsMessage message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
-        }));
+        });
   }
 
 private:
@@ -135,12 +133,12 @@ public:
         logger_cache_(async_client_manager_, scope_, tls_, local_info_),
         grpc_access_logger_impl_test_helper_(local_info_, async_client_) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+        .WillOnce([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
-          }));
+          });
           return Grpc::AsyncClientFactoryPtr{factory_};
-        }));
+        });
   }
 
   Grpc::MockAsyncClient* async_client_;
