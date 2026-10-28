@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
@@ -36,7 +37,8 @@ public:
 
   /**
    * Add a listener to the worker and replace the previous listener if any. If the previous listener
-   * doesn't exist, the behavior should be equivalent to add a new listener.
+   * doesn't exist, the behavior should be equivalent to add a new listener. When replacing, the
+   * addresses that the new listener removes must be stopped by stopListenerAddresses() beforehand.
    * @param overridden_listener The previous listener tag to be replaced. nullopt if it's a new
    * listener.
    * @param listener supplies the listener to add.
@@ -132,6 +134,41 @@ public:
    */
   virtual void onListenerDrain(uint64_t listener_tag,
                                Network::ConnectionDrainEvent drain_event) PURE;
+
+  /**
+   * Stop accepting new connections on the addresses that an in place update removed from a
+   * listener. The listeners of the addresses keep using the replaced listener, which must outlive
+   * them, until removeListenerAddresses() or removeListener() removes them.
+   * onListenerAddressesDrain() notifies their connections that they are being drained.
+   * @param listener supplies the listener that the in place update replaced.
+   * @param addresses supplies the removed addresses.
+   * @param completion supplies the completion to be called when the worker has stopped accepting
+   * new connections on the addresses. This completion is called on the worker thread. No locking
+   * is performed by the worker.
+   */
+  virtual void
+  stopListenerAddresses(const Network::ListenerConfig& listener,
+                        const std::vector<Network::Address::InstanceConstSharedPtr>& addresses,
+                        std::function<void()> completion) PURE;
+
+  /**
+   * Notify the connections of the addresses that stopListenerAddresses() stopped for the listener
+   * that they are being drained. Connections are not closed. This is a fire-and-forget operation
+   * that is posted to the worker's dispatcher, so the listener must outlive it.
+   * @param listener supplies the listener passed to stopListenerAddresses().
+   * @param drain_event describes the drain sequence (start time and strategy), captured
+   *        once on the main thread so all connections share a consistent drain timeline.
+   */
+  virtual void onListenerAddressesDrain(const Network::ListenerConfig& listener,
+                                        Network::ConnectionDrainEvent drain_event) PURE;
+
+  /**
+   * Remove the listeners of the addresses that stopListenerAddresses() stopped for the listener and
+   * close the connections accepted on them. This is a fire-and-forget operation that is posted to
+   * the worker's dispatcher, so the listener must outlive it.
+   * @param listener supplies the listener passed to stopListenerAddresses().
+   */
+  virtual void removeListenerAddresses(const Network::ListenerConfig& listener) PURE;
 };
 
 using WorkerPtr = std::unique_ptr<Worker>;

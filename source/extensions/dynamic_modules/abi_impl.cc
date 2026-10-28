@@ -2143,6 +2143,16 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_route_specifier_rewrite_span,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(envoy_dynamic_module_type_route_specifier_built_route_lookup_result,
+          envoy_dynamic_module_callback_route_specifier_lookup_built_route,
+          envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Disabled,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr, uint64_t)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_number,
           false, envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer, double*)

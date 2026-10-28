@@ -6,16 +6,21 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "envoy/common/random_generator.h"
 #include "envoy/common/regex.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/extensions/router/route_specifiers/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/router/route_specifier.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
@@ -49,7 +54,7 @@ using OnRouteSpecifierRouteDestroyType =
 constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
 
 // The statistics of a route specifier.
-#define ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(COUNTER, HISTOGRAM)                               \
+#define ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(COUNTER, GAUGE, HISTOGRAM)                        \
   COUNTER(decision_pass_through)                                                                   \
   COUNTER(decision_has_override)                                                                   \
   COUNTER(decision_has_template)                                                                   \
@@ -67,11 +72,20 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(failure_route_metadata)                                                                  \
   COUNTER(reuse_previous_rejected)                                                                 \
   COUNTER(route_destroy)                                                                           \
+  COUNTER(rewrite_not_applied)                                                                     \
+  COUNTER(built_route_cache_disabled)                                                              \
+  COUNTER(built_route_cache_hit)                                                                   \
+  COUNTER(built_route_cache_miss)                                                                  \
+  COUNTER(built_route_cache_verify)                                                                \
+  COUNTER(built_route_cache_verify_mismatch)                                                       \
+  COUNTER(built_route_cache_evict)                                                                 \
+  GAUGE(built_route_cache_entries, NeverImport)                                                    \
   HISTOGRAM(on_route_duration, Microseconds)                                                       \
   HISTOGRAM(specifier_duration, Microseconds)
 
 struct RouteSpecifierStats {
-  ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+  ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
+                                           GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -105,11 +119,29 @@ struct RouteOverride {
 
 using RouteOverrideMap = absl::flat_hash_map<std::string, RouteOverride>;
 
+// A prefix rewrite a module recorded as a rule, applied to the path the request carries when the
+// request headers are finalized.
+struct PrefixRewriteRule {
+  // The prefix the rule replaces. Unset when the rule replaces the whole path.
+  std::optional<std::string> matched;
+  std::string replacement;
+
+  // The path the rule produces for a request path, or nullopt when the rule does not apply to it or
+  // the result would exceed max_bytes.
+  std::optional<std::string> apply(absl::string_view path, size_t max_bytes) const;
+  // Whether apply produces a path, without building it.
+  bool appliesTo(absl::string_view path, size_t max_bytes) const;
+
+  bool operator==(const PrefixRewriteRule& other) const = default;
+};
+
 // A header mutation a module recorded for a request.
 struct HeaderMutation {
   Http::LowerCaseString key;
   std::string value;
   envoy_dynamic_module_type_route_specifier_header_append_action action;
+
+  bool operator==(const HeaderMutation& other) const = default;
 };
 
 /**
@@ -133,6 +165,10 @@ struct RouteOverrides {
   // Name the module recorded for the route it produces. Unset when the module set none.
   std::optional<std::string> route_name;
   std::optional<std::string> path;
+  std::optional<PrefixRewriteRule> prefix_rewrite_rule;
+  // Whether the regex rewrite of the selected route override applies when the request headers are
+  // finalized rather than when the decision resolves.
+  bool finalize_regex_rewrite{false};
   std::optional<std::string> host;
   std::vector<HeaderMutation> request_headers_to_add;
   std::vector<Http::LowerCaseString> request_headers_to_remove;
@@ -143,6 +179,9 @@ struct RouteOverrides {
   bool hasRouteEntryOverrides() const;
   // Whether anything that any route can carry was recorded.
   bool hasRouteOverrides() const;
+
+  // Whether two recordings build the same route. Every field must take part.
+  bool operator==(const RouteOverrides& other) const;
 };
 
 // The runtime fraction the module is invoked for.
@@ -177,6 +216,9 @@ public:
     std::string id;
     Envoy::Router::MatchableRouteConstSharedPtr route;
     envoy_dynamic_module_type_route_specifier_route_kind kind;
+    // Whether every match returns the same route, which the built route cache requires. A route
+    // whose cluster is resolved per request builds a route for each request instead.
+    bool cacheable;
   };
 
   /**
@@ -288,6 +330,81 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
                                      Extensions::DynamicModules::DynamicModulePtr dynamic_module,
                                      Envoy::Router::RouteSpecifierFactoryContext& context);
 
+// The settings of the built route cache.
+struct BuiltRouteCacheSettings {
+  uint32_t max_entries;
+  std::chrono::milliseconds sweep_interval;
+  // Zero disables verification.
+  uint32_t verify_one_in;
+};
+
+// A route the built route cache holds.
+struct CachedRoute {
+  Envoy::Router::RouteConstSharedPtr route;
+  // The overrides the route was built from, pointing into it. Null when it is the template itself.
+  const RouteOverrides* recorded{nullptr};
+  std::optional<uint64_t> user_data;
+};
+
+/**
+ * A per worker cache of the routes a specifier builds from route templates, keyed by a key the
+ * module sets and by the template. It lives in a thread local slot the specifier owns, because
+ * every cached route holds the configuration. Only its own worker uses it, so it takes no lock.
+ */
+class BuiltRouteCache : public ThreadLocal::ThreadLocalObject {
+public:
+  BuiltRouteCache(Event::Dispatcher& dispatcher, DynamicModuleRouteSpecifierConfigSharedPtr config,
+                  const BuiltRouteCacheSettings& settings, Random::RandomGenerator& random);
+  ~BuiltRouteCache() override;
+
+  // The route cached for the key and the template that serves a request for the path, or nullptr.
+  // A hit marks the route used.
+  const CachedRoute* lookup(uint64_t key, const Envoy::Router::Route* base, absl::string_view path);
+  // Caches a route unless one is cached for the key and the template, evicting one that was not
+  // used recently when the cache is full.
+  void insert(uint64_t key, const Envoy::Router::Route* base, CachedRoute route);
+  void erase(uint64_t key, const Envoy::Router::Route* base);
+  // Whether a hit is verified, with a chance of one in verify_one_in.
+  bool sampleVerification();
+
+private:
+  // The key the module set and the template route, which the cached route keeps alive so that its
+  // address is not reused.
+  using Key = std::pair<uint64_t, const Envoy::Router::Route*>;
+  struct Entry {
+    Key key;
+    CachedRoute value;
+    // The sweep tick of the last use and the reference bit of the CLOCK eviction.
+    uint64_t last_used_tick;
+    bool referenced;
+  };
+
+  // The index of the entry the CLOCK hand evicts next. Only called on a full cache, which keeps the
+  // hand below max_entries.
+  size_t clockVictim();
+  // Evicts the entries idle for longer than the entry age.
+  void sweep();
+  void removeAt(size_t index);
+
+  const DynamicModuleRouteSpecifierConfigSharedPtr config_;
+  const BuiltRouteCacheSettings settings_;
+  Random::RandomGenerator& random_;
+  std::vector<Entry> entries_;
+  absl::flat_hash_map<Key, size_t> index_;
+  size_t hand_{0};
+  uint64_t tick_{0};
+  const Event::TimerPtr sweep_timer_;
+};
+
+// What lookup_built_route found for the selected template.
+struct BuiltRouteLookup {
+  BuiltRouteCache* cache;
+  uint64_t key;
+  // Set on a hit.
+  std::optional<CachedRoute> hit;
+  bool verify{false};
+};
+
 /**
  * Per-decision context passed to the module as the route_specifier_context_envoy_ptr. It bundles
  * the request state the module reads and the decision it is building. Valid only for the duration
@@ -317,6 +434,15 @@ struct RouteSpecifierContext {
   // A u64 the module recorded on the route it produces. Forces the produced route to be wrapped
   // even with no override, so the route destroy hook fires for it. Unset when the module set none.
   std::optional<uint64_t> user_data;
+  // Whether the recording depends on the path of the current request, through set_prefix_rewrite,
+  // a rule rejected for that path or a rule replaced after it was accepted, which keeps the route
+  // out of the built route cache.
+  bool depends_on_request_path{false};
+  // The slot of the built route cache. Null when the specifier configures none.
+  ThreadLocal::TypedSlot<BuiltRouteCache>* built_route_cache_slot{nullptr};
+  // What the last lookup_built_route found for the selected template. Unset when no lookup is in
+  // effect for the decision.
+  std::optional<BuiltRouteLookup> built_route_lookup;
   // Redirect locations built for the getters, kept in a stable container so a buffer handed to the
   // module stays valid until the hook returns even after the current route changes. Built once per
   // route so repeated reads for the same route return the same buffer.
@@ -342,6 +468,8 @@ public:
       Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack,
       std::optional<uint64_t> user_data);
   ~DynamicModuleRoute() override;
+
+  const RouteOverrides& recordedOverrides() const { return overrides_; }
 
   // Router::Route
   const std::string& routeName() const override;
@@ -372,6 +500,8 @@ public:
       Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack,
       std::optional<uint64_t> user_data);
   ~DynamicModuleRouteEntry() override;
+
+  const RouteOverrides& recordedOverrides() const { return overrides_; }
 
   // Router::Route
   const std::string& routeName() const override;
@@ -410,6 +540,12 @@ public:
                                                   bool do_formatting = true) const override;
 
 private:
+  // Whether a prefix rewrite rule or a route override regex rewrite applies when the request
+  // headers are finalized.
+  bool hasFinalizationRewrite() const;
+  // The path the first of those rewrites that applies produces, or nullopt when none applies.
+  std::optional<std::string> finalizationRewrite(absl::string_view path) const;
+
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
   const RouteOverrides overrides_;
   const Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack_;
@@ -446,8 +582,11 @@ enum class Failure {
 class DynamicModuleRouteSpecifier : public Envoy::Router::RouteSpecifier,
                                     public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
-  explicit DynamicModuleRouteSpecifier(DynamicModuleRouteSpecifierConfigSharedPtr config)
-      : config_(std::move(config)) {}
+  // Must be called on the main thread when the configuration sets built_route_cache, since it
+  // allocates the thread local slot of the cache.
+  DynamicModuleRouteSpecifier(DynamicModuleRouteSpecifierConfigSharedPtr config,
+                              const DynamicModuleRouteSpecifierProto& proto_config,
+                              ThreadLocal::SlotAllocator& tls, Random::RandomGenerator& random);
 
   // Router::RouteSpecifier
   Envoy::Router::OnRouteResult
@@ -463,6 +602,8 @@ private:
     Envoy::Router::RouteConstSharedPtr route;
     Envoy::Router::OnRouteStatus status{Envoy::Router::OnRouteStatus::Continue};
     Failure failure{Failure::None};
+    // The overrides the route was built from, pointing into it. Null when wrap built no wrapper.
+    const RouteOverrides* recorded{nullptr};
   };
 
   // on_route_status is the raw value the module returned, which may be outside the known enum
@@ -471,8 +612,18 @@ private:
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
                 Envoy::Router::OnRouteStatus status) const;
+  // Whether the decision recorded a route the cache can hold, which serves every later request that
+  // looks the key up.
+  static bool recordsACacheableRoute(const RouteSpecifierContext& context,
+                                     const Decision& decision);
+  // Evicts the cached route of a verified hit unless the decision recorded it again, as a route the
+  // cache can hold.
+  void verifyCachedRoute(const RouteSpecifierContext& context, const Decision& decision,
+                         const BuiltRouteLookup& lookup) const;
 
   const DynamicModuleRouteSpecifierConfigSharedPtr config_;
+  // Null when the configuration sets no built_route_cache.
+  ThreadLocal::TypedSlotPtr<BuiltRouteCache> built_route_cache_;
 };
 
 } // namespace DynamicModules

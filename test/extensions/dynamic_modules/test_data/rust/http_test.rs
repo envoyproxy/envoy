@@ -813,11 +813,12 @@ fn test_filter_state_callbacks_on_request_headers() {
   envoy_filter
     .expect_set_filter_state_value()
     .withf(|key, value, life_span, stream_sharing| {
+      use abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection;
+
       key == b"shared_filter_state_key"
         && value == b"shared_filter_state_value"
         && *life_span == abi::envoy_dynamic_module_type_filter_state_life_span::Connection
-        && *stream_sharing
-          == abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection
+        && *stream_sharing == SharedWithUpstreamConnection
     })
     .return_const(true)
     .once();

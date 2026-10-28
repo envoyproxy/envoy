@@ -580,7 +580,8 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
 ///
 /// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
 /// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
-/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that
+/// pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],
 ) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
@@ -815,8 +816,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
-/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
-///   mutations
+/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header mutations
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
@@ -1360,8 +1360,8 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 /// # Example
 ///
 /// ```
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true
@@ -1768,7 +1768,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+///   fn new_load_balancer(
+///     &self,
+///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+///   ) -> Option<Box<dyn ClusterLb>> {
 ///     Some(Box::new(MyClusterLb {}))
 ///   }
 /// }

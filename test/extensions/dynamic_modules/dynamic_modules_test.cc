@@ -205,6 +205,10 @@ TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathNotSetFallbackToCw
   std::filesystem::copy(test_lib, staged_lib);
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false);
   EXPECT_OK(module) << "Failed to load module";
+  // Unload the module first, since Windows cannot delete a loaded DLL.
+  if (module.ok()) {
+    module->reset();
+  }
   std::filesystem::remove(staged_lib);
 }
 
@@ -219,6 +223,10 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
   EXPECT_OK(module) << "Failed to load module";
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+  // Unload the module first, since Windows cannot delete a loaded DLL.
+  if (module.ok()) {
+    module->reset();
+  }
   std::filesystem::remove(staged_lib);
 }
 
