@@ -165,10 +165,14 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
     tls_context.mutable_common_tls_context()->add_alpn_protocols("http/1.1");
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
+    if (upstream_tls_stats_store_ == nullptr) {
+      upstream_tls_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>(
+          server_factory_context_.serverScope().symbolTable());
+    }
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
         tls_context, factory_context_, {}, false);
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-        std::move(cfg), context_manager_, server_factory_context_.serverScope());
+        std::move(cfg), context_manager_, *upstream_tls_stats_store_->rootScope());
   } else {
     envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport quic_config;
     quic_config.mutable_downstream_tls_context()->MergeFrom(tls_context);

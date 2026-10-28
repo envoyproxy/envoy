@@ -615,6 +615,10 @@ protected:
   }
 
   std::unique_ptr<Stats::Store> upstream_stats_store_;
+  // Each fake upstream records TLS handshake stats from its own dispatcher thread, so the contexts
+  // built by createUpstreamTlsContext() need a thread-safe store; the mock server scope is not.
+  // Declared before context_manager_ and fake_upstreams_ so it outlives every context using it.
+  std::unique_ptr<Stats::Store> upstream_tls_stats_store_;
 
   // Make sure the test server will be torn down after any fake client.
   // The test server owns the runtime, which is often accessed by client and
