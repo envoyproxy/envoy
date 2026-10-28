@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 #ifndef NULL_PLUGIN
-#include "proxy_wasm_intrinsics_lite.h"
+#include "proxy_wasm_intrinsics.h"
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #endif
@@ -41,7 +41,7 @@ void BodyContext::logBody(WasmBufferType type) {
   uint32_t flags;
   getBufferStatus(type, &buffered_size, &flags);
   auto body = getBufferBytes(type, 0, buffered_size);
-  absl::string_view body_view = body->view();
+  std::string_view body_view = body->view();
 
   // To avoid log too large body.
   if (body_view.size() > 2048) {

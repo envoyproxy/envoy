@@ -40,7 +40,6 @@ bool writeWasmModule(absl::string_view module, const char* path) {
     return false;
   }
 
-  std::cout << "Written " << module.size() << " bytes." << std::endl;
   return true;
 }
 

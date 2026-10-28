@@ -66,7 +66,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNetworkFilterConfigTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::host_test_runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
@@ -76,6 +76,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasm) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -120,6 +121,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineWasm) {
   const std::string yaml = absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                         std::get<0>(GetParam()), R"EOF("
       code:
@@ -145,6 +147,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCode) {
   config:
     name: "test"
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                         std::get<0>(GetParam()), R"EOF("
       code:
@@ -186,6 +189,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadInlineBadCodeFailOpenPolicyNackConfi
     name: "test"
     failure_policy: FAIL_OPEN
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                         std::get<0>(GetParam()), R"EOF("
       code:
@@ -207,6 +211,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailClosed) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -231,6 +236,7 @@ TEST_P(WasmNetworkFilterConfigTest, DEPRECATED_FEATURE_TEST(FilterConfigFailOpen
   config:
     fail_open: true
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -253,6 +259,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigFailOpenPolicy) {
   config:
     failure_policy: FAIL_OPEN
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -274,6 +281,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilitiesUnrestrictedByDefaul
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -301,6 +309,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigCapabilityRestriction) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -330,6 +339,7 @@ TEST_P(WasmNetworkFilterConfigTest, FilterConfigAllowOnVmStart) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -363,6 +373,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                std::get<0>(GetParam()), R"EOF("
       configuration:
@@ -386,6 +397,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromFileWasmInvalidConfig) {
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                std::get<0>(GetParam()), R"EOF("
       configuration:
@@ -420,6 +432,7 @@ TEST_P(WasmNetworkFilterConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -475,6 +488,7 @@ TEST_P(WasmNetworkFilterConfigTest, FailedToGetThreadLocalPlugin) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       configuration:
