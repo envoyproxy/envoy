@@ -121,7 +121,7 @@ tool_config:
     filter_->decodeHeaders(request_headers_, false);
 
     EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::OK, _, _, _, _))
-        .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        .WillOnce([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
           auto resp = nlohmann::json::parse(body);
           auto tools = resp["result"]["tools"];
           EXPECT_EQ(tools.size(), 3);
@@ -129,7 +129,7 @@ tool_config:
           EXPECT_EQ(tools[0]["name"], "tool_exact");
           EXPECT_EQ(tools[1]["name"], "tool_host_only");
           EXPECT_EQ(tools[2]["name"], "tool_path_only");
-        }));
+        });
 
     Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":1,"method":"tools/list"})json");
     filter_->decodeData(body, true);
@@ -146,12 +146,12 @@ tool_config:
     filter_->decodeHeaders(request_headers_, false);
 
     EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::OK, _, _, _, _))
-        .WillOnce(testing::Invoke([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
+        .WillOnce([](Http::Code, absl::string_view body, auto&&, auto&&, auto&&) {
           auto resp = nlohmann::json::parse(body);
           auto tools = resp["result"]["tools"];
           EXPECT_EQ(tools.size(), 1);
           EXPECT_EQ(tools[0]["name"], "tool_path_only");
-        }));
+        });
 
     Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","id":2,"method":"tools/list"})json");
     filter_->decodeData(body, true);

@@ -65,10 +65,10 @@ protected:
   void initializeForRemote() {
     retry_timer_ = new Event::MockTimer();
 
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
-    }));
+    });
   }
 
   void initializeContextInitManager(Init::ExpectableWatcherImpl& init_watcher) {
@@ -525,16 +525,14 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasm) {
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return &request;
+      });
 
   EXPECT_CALL(init_watcher_, ready());
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
@@ -576,16 +574,14 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailOnUncachedThenSucceed) {
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return &request;
+      });
 
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
                             WasmException, "Unable to create Wasm plugin ");
@@ -647,21 +643,20 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
 
   Http::AsyncClient::Callbacks* async_callbacks = nullptr;
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            // Store the callback the first time through for delayed call.
-            if (!async_callbacks) {
-              async_callbacks = &callbacks;
-            } else {
-              // Subsequent send()s happen inline.
-              callbacks.onSuccess(
-                  request,
-                  Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-            }
-            return &request;
-          }));
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        // Store the callback the first time through for delayed call.
+        if (!async_callbacks) {
+          async_callbacks = &callbacks;
+        } else {
+          // Subsequent send()s happen inline.
+          callbacks.onSuccess(
+              request,
+              Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                  new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+        }
+        return &request;
+      });
 
   // Case 1: fail and fetch in the background, got 503, cache failure.
   EXPECT_THROW_WITH_MESSAGE(getFilterFactoryCb(proto_config, factory).status().IgnoreError(),
@@ -693,16 +688,14 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmFailCachedThenSucceed) {
   ::Envoy::Extensions::Common::Wasm::setTimeOffsetForCodeCacheForTesting(std::chrono::seconds(10));
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return &request;
-          }));
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return &request;
+      });
 
   // Case 3: fail and fetch in the background, got 200, cache success.
   Init::ManagerImpl init_manager3{"init_manager3"};
@@ -837,12 +830,11 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteConnectionReset) {
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onFailure(request, Envoy::Http::AsyncClient::FailureReason::Reset);
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks.onFailure(request, Envoy::Http::AsyncClient::FailureReason::Reset);
+        return &request;
+      });
 
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
@@ -880,15 +872,14 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessWith503) {
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks.onSuccess(
-                request,
-                Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks.onSuccess(
+            request,
+            Http::ResponseMessagePtr{new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+                new Http::TestResponseHeaderMapImpl{{":status", "503"}}})});
+        return &request;
+      });
 
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
@@ -925,16 +916,14 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessIncorrectSha256) {
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return &request;
+      });
 
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
@@ -974,22 +963,20 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
       .WillRepeatedly(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
       .Times(num_retries)
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return &request;
-          }));
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return &request;
+      });
 
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
+      .WillRepeatedly([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
         if (--num_retries == 0) {
           EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-              .WillOnce(Invoke(
+              .WillOnce(
                   [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
                     Http::ResponseMessagePtr response(
@@ -998,11 +985,11 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteMultipleRetries) {
                     response->body().add(code);
                     callbacks.onSuccess(request, std::move(response));
                     return &request;
-                  }));
+                  });
         }
 
         retry_timer_cb_();
-      }));
+      });
   EXPECT_CALL(*retry_timer_, disableTimer());
 
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
@@ -1043,16 +1030,14 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
@@ -1062,9 +1047,9 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcode) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   Extensions::Common::Wasm::ContextSharedPtr context;
   EXPECT_CALL(filter_callback, addStreamFilter(_))
-      .WillOnce(Invoke([&context](Http::StreamFilterSharedPtr filter) {
+      .WillOnce([&context](Http::StreamFilterSharedPtr filter) {
         context = std::static_pointer_cast<Extensions::Common::Wasm::Context>(filter);
-      }));
+      });
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   cb(filter_callback);
   EXPECT_EQ(context->wasm(), nullptr);
@@ -1114,16 +1099,14 @@ TEST_P(WasmFilterConfigTest, DEPRECATED_FEATURE_TEST(YamlLoadFromRemoteSuccessBa
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
@@ -1162,16 +1145,14 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteSuccessBadcodeFailOpenPolicy) {
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   Http::FilterFactoryCb cb = getFilterFactoryCb(proto_config, factory).value();
   EXPECT_CALL(init_watcher_, ready());
@@ -1211,14 +1192,13 @@ TEST_P(WasmFilterConfigTest, YamlLoadFromRemoteWasmcreateContext) {
       .WillOnce(ReturnRef(cluster_manager_.thread_local_cluster_.async_client_));
   Http::AsyncClient::Callbacks* async_callbacks = nullptr;
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            if (!async_callbacks) {
-              async_callbacks = &callbacks;
-            }
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        if (!async_callbacks) {
+          async_callbacks = &callbacks;
+        }
+        return &request;
+      });
   NiceMock<Envoy::ThreadLocal::MockInstance> threadlocal;
   setupContextServerFactoryThreadLocal(threadlocal);
   threadlocal.registered_ = false;

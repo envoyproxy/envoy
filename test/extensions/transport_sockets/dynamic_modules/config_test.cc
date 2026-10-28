@@ -25,7 +25,6 @@ using ::Envoy::StatusHelpers::HasStatusMessage;
 using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::ReturnRef;
@@ -322,14 +321,14 @@ TEST_F(DynamicModuleTransportSocketTest, DoReadTransformsData) {
   auto socket = createSocket("xor");
   const std::string plaintext = "hello";
   EXPECT_CALL(io_handle_, recv(testing::_, testing::_, 0))
-      .WillOnce(Invoke([&](void* buffer, size_t length, int) {
+      .WillOnce([&](void* buffer, size_t length, int) {
         EXPECT_GE(length, plaintext.size());
         memcpy(buffer, plaintext.data(), plaintext.size());
         return Api::IoCallUint64Result(plaintext.size(), Api::IoError::none());
-      }))
-      .WillRepeatedly(Invoke([](void*, size_t, int) {
+      })
+      .WillRepeatedly([](void*, size_t, int) {
         return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
-      }));
+      });
 
   Buffer::OwnedImpl buffer;
   Network::IoResult result = socket->doRead(buffer);
@@ -343,11 +342,11 @@ TEST_F(DynamicModuleTransportSocketTest, DoReadYieldsWhenReadBufferShouldDrain) 
   auto socket = createSocket("xor");
   const std::string plaintext = "hello";
   EXPECT_CALL(io_handle_, recv(testing::_, testing::_, 0))
-      .WillOnce(Invoke([&](void* buffer, size_t length, int) {
+      .WillOnce([&](void* buffer, size_t length, int) {
         EXPECT_GE(length, plaintext.size());
         memcpy(buffer, plaintext.data(), plaintext.size());
         return Api::IoCallUint64Result(plaintext.size(), Api::IoError::none());
-      }));
+      });
   EXPECT_CALL(callbacks_, shouldDrainReadBuffer()).WillOnce(testing::Return(true));
   EXPECT_CALL(callbacks_, setTransportSocketIsReadable());
 
@@ -361,9 +360,9 @@ TEST_F(DynamicModuleTransportSocketTest, DoReadYieldsWhenReadBufferShouldDrain) 
 
 TEST_F(DynamicModuleTransportSocketTest, DoReadEndStreamOnPeerClose) {
   auto socket = createSocket("passthrough");
-  EXPECT_CALL(io_handle_, recv(testing::_, testing::_, 0)).WillOnce(Invoke([](void*, size_t, int) {
+  EXPECT_CALL(io_handle_, recv(testing::_, testing::_, 0)).WillOnce([](void*, size_t, int) {
     return Api::IoCallUint64Result(0, Api::IoError::none());
-  }));
+  });
 
   Buffer::OwnedImpl buffer;
   Network::IoResult result = socket->doRead(buffer);
@@ -374,9 +373,9 @@ TEST_F(DynamicModuleTransportSocketTest, DoReadEndStreamOnPeerClose) {
 
 TEST_F(DynamicModuleTransportSocketTest, DoReadErrorClosesConnection) {
   auto socket = createSocket("passthrough");
-  EXPECT_CALL(io_handle_, recv(testing::_, testing::_, 0)).WillOnce(Invoke([](void*, size_t, int) {
+  EXPECT_CALL(io_handle_, recv(testing::_, testing::_, 0)).WillOnce([](void*, size_t, int) {
     return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEbadfError());
-  }));
+  });
 
   Buffer::OwnedImpl buffer;
   Network::IoResult result = socket->doRead(buffer);
@@ -389,14 +388,14 @@ TEST_F(DynamicModuleTransportSocketTest, DoWriteTransformsData) {
   auto socket = createSocket("xor");
   std::string captured;
   EXPECT_CALL(io_handle_, writev(testing::_, testing::_))
-      .WillOnce(Invoke([&](const Buffer::RawSlice* slices, uint64_t num_slice) {
+      .WillOnce([&](const Buffer::RawSlice* slices, uint64_t num_slice) {
         uint64_t total = 0;
         for (uint64_t i = 0; i < num_slice; i++) {
           captured.append(static_cast<const char*>(slices[i].mem_), slices[i].len_);
           total += slices[i].len_;
         }
         return Api::IoCallUint64Result(total, Api::IoError::none());
-      }));
+      });
 
   Buffer::OwnedImpl buffer("world");
   Network::IoResult result = socket->doWrite(buffer, false);
@@ -420,9 +419,9 @@ TEST_F(DynamicModuleTransportSocketTest, DoWriteEndStreamShutsDownWrite) {
 TEST_F(DynamicModuleTransportSocketTest, DoWriteAgainKeepsConnectionOpen) {
   auto socket = createSocket("passthrough");
   EXPECT_CALL(io_handle_, writev(testing::_, testing::_))
-      .WillOnce(Invoke([](const Buffer::RawSlice*, uint64_t) {
+      .WillOnce([](const Buffer::RawSlice*, uint64_t) {
         return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
-      }));
+      });
 
   Buffer::OwnedImpl buffer("world");
   Network::IoResult result = socket->doWrite(buffer, false);
@@ -519,14 +518,14 @@ TEST_F(DynamicModuleTransportSocketTest, DoReadUsesConfiguredKey) {
   auto socket = createSocket("xor", std::string(1, static_cast<char>(configured_key)));
   const std::string plaintext = "hello";
   EXPECT_CALL(io_handle_, recv(testing::_, testing::_, 0))
-      .WillOnce(Invoke([&](void* buffer, size_t length, int) {
+      .WillOnce([&](void* buffer, size_t length, int) {
         EXPECT_GE(length, plaintext.size());
         memcpy(buffer, plaintext.data(), plaintext.size());
         return Api::IoCallUint64Result(plaintext.size(), Api::IoError::none());
-      }))
-      .WillRepeatedly(Invoke([](void*, size_t, int) {
+      })
+      .WillRepeatedly([](void*, size_t, int) {
         return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
-      }));
+      });
 
   Buffer::OwnedImpl buffer;
   socket->doRead(buffer);
@@ -622,29 +621,26 @@ TEST_F(DynamicModuleTransportSocketTest, IoReadReturnsStatusForEachOutcome) {
   char buffer[8];
   size_t bytes_read = 0;
 
-  EXPECT_CALL(io_handle_, recv(testing::_, sizeof(buffer), 0))
-      .WillOnce(Invoke([](void* buf, size_t, int) {
-        memcpy(buf, "ab", 2);
-        return Api::IoCallUint64Result(2, Api::IoError::none());
-      }));
+  EXPECT_CALL(io_handle_, recv(testing::_, sizeof(buffer), 0)).WillOnce([](void* buf, size_t, int) {
+    memcpy(buf, "ab", 2);
+    return Api::IoCallUint64Result(2, Api::IoError::none());
+  });
   EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Success,
             envoy_dynamic_module_callback_transport_socket_io_read(envoy_ptr, buffer,
                                                                    sizeof(buffer), &bytes_read));
   EXPECT_EQ(2, bytes_read);
 
-  EXPECT_CALL(io_handle_, recv(testing::_, sizeof(buffer), 0))
-      .WillOnce(Invoke([](void*, size_t, int) {
-        return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
-      }));
+  EXPECT_CALL(io_handle_, recv(testing::_, sizeof(buffer), 0)).WillOnce([](void*, size_t, int) {
+    return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
+  });
   EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Again,
             envoy_dynamic_module_callback_transport_socket_io_read(envoy_ptr, buffer,
                                                                    sizeof(buffer), &bytes_read));
   EXPECT_EQ(0, bytes_read);
 
-  EXPECT_CALL(io_handle_, recv(testing::_, sizeof(buffer), 0))
-      .WillOnce(Invoke([](void*, size_t, int) {
-        return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEbadfError());
-      }));
+  EXPECT_CALL(io_handle_, recv(testing::_, sizeof(buffer), 0)).WillOnce([](void*, size_t, int) {
+    return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEbadfError());
+  });
   EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Error,
             envoy_dynamic_module_callback_transport_socket_io_read(envoy_ptr, buffer,
                                                                    sizeof(buffer), &bytes_read));
@@ -657,27 +653,25 @@ TEST_F(DynamicModuleTransportSocketTest, IoWriteReturnsStatusForEachOutcome) {
   size_t bytes_written = 0;
 
   EXPECT_CALL(io_handle_, writev(testing::_, 1))
-      .WillOnce(Invoke([](const Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce([](const Buffer::RawSlice* slices, uint64_t) {
         return Api::IoCallUint64Result(slices[0].len_, Api::IoError::none());
-      }));
+      });
   EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Success,
             envoy_dynamic_module_callback_transport_socket_io_write(envoy_ptr, data.data(),
                                                                     data.size(), &bytes_written));
   EXPECT_EQ(data.size(), bytes_written);
 
-  EXPECT_CALL(io_handle_, writev(testing::_, 1))
-      .WillOnce(Invoke([](const Buffer::RawSlice*, uint64_t) {
-        return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
-      }));
+  EXPECT_CALL(io_handle_, writev(testing::_, 1)).WillOnce([](const Buffer::RawSlice*, uint64_t) {
+    return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
+  });
   EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Again,
             envoy_dynamic_module_callback_transport_socket_io_write(envoy_ptr, data.data(),
                                                                     data.size(), &bytes_written));
   EXPECT_EQ(0, bytes_written);
 
-  EXPECT_CALL(io_handle_, writev(testing::_, 1))
-      .WillOnce(Invoke([](const Buffer::RawSlice*, uint64_t) {
-        return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEbadfError());
-      }));
+  EXPECT_CALL(io_handle_, writev(testing::_, 1)).WillOnce([](const Buffer::RawSlice*, uint64_t) {
+    return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEbadfError());
+  });
   EXPECT_EQ(envoy_dynamic_module_type_transport_socket_io_status_Error,
             envoy_dynamic_module_callback_transport_socket_io_write(envoy_ptr, data.data(),
                                                                     data.size(), &bytes_written));
@@ -828,14 +822,14 @@ TEST_F(DynamicModuleTransportSocketTest, StreamInfoIsUnavailableWithinOnSetCallb
 TEST_F(DynamicModuleTransportSocketTest, IoReadToReadBufferReadsIntoConnectionBuffer) {
   auto socket = createSocket("splice", std::nullopt, kSpliceModule);
   EXPECT_CALL(io_handle_, read(testing::_, testing::_))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, std::optional<uint64_t> max_length) {
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t> max_length) {
         EXPECT_EQ(std::numeric_limits<size_t>::max(), max_length);
         buffer.add("hello");
         return Api::IoCallUint64Result(5, Api::IoError::none());
-      }))
-      .WillOnce(Invoke([](Buffer::Instance&, std::optional<uint64_t>) {
+      })
+      .WillOnce([](Buffer::Instance&, std::optional<uint64_t>) {
         return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
-      }));
+      });
 
   Buffer::OwnedImpl buffer;
   Network::IoResult result = socket->doRead(buffer);
@@ -849,11 +843,11 @@ TEST_F(DynamicModuleTransportSocketTest, IoWriteFromWriteBufferWritesConnectionB
   auto socket = createSocket("splice", std::nullopt, kSpliceModule);
   // The module writes until the callback reports the buffer empty, which it does without touching
   // the socket.
-  EXPECT_CALL(io_handle_, write(testing::_)).WillOnce(Invoke([](Buffer::Instance& buffer) {
+  EXPECT_CALL(io_handle_, write(testing::_)).WillOnce([](Buffer::Instance& buffer) {
     const uint64_t length = buffer.length();
     buffer.drain(length);
     return Api::IoCallUint64Result(length, Api::IoError::none());
-  }));
+  });
 
   Buffer::OwnedImpl buffer("world");
   Network::IoResult result = socket->doWrite(buffer, false);
@@ -886,12 +880,12 @@ TEST_F(DynamicModuleTransportSocketTest, CloseAfterPeerResetClosesWithConnection
   auto socket = createSocket("splice", std::nullopt, kSpliceModule);
   EXPECT_CALL(io_handle_, read(testing::_, testing::_))
       .Times(2)
-      .WillRepeatedly(Invoke([](Buffer::Instance&, std::optional<uint64_t>) {
+      .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) {
         return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEbadfError());
-      }));
-  EXPECT_CALL(io_handle_, write(testing::_)).WillOnce(Invoke([](Buffer::Instance&) {
+      });
+  EXPECT_CALL(io_handle_, write(testing::_)).WillOnce([](Buffer::Instance&) {
     return Api::IoCallUint64Result(0, Network::IoSocketError::create(SOCKET_ERROR_CONNRESET));
-  }));
+  });
   Buffer::OwnedImpl read_buffer;
   Buffer::OwnedImpl write_buffer("world");
 

@@ -138,15 +138,15 @@ TEST_F(FilterTest, ValidAltSvc) {
   EXPECT_CALL(*address, ip()).WillOnce(Return(&ip));
   EXPECT_CALL(ip, port()).WillOnce(Return(443));
   EXPECT_CALL(*alternate_protocols_cache_, setAlternatives(_, _))
-      .WillOnce(testing::DoAll(
-          testing::WithArg<0>(Invoke([expected_origin](auto& actual_origin) {
-            EXPECT_EQ(expected_origin, actual_origin)
-                << dumpOrigin(expected_origin) << dumpOrigin(actual_origin);
-          })),
-          testing::WithArg<1>(Invoke([expected_protocols](auto& actual_protocols) {
-            EXPECT_EQ(expected_protocols, actual_protocols) << dumpAlternative(actual_protocols[0]);
-            ;
-          }))));
+      .WillOnce(testing::DoAll(testing::WithArg<0>([expected_origin](auto& actual_origin) {
+                                 EXPECT_EQ(expected_origin, actual_origin)
+                                     << dumpOrigin(expected_origin) << dumpOrigin(actual_origin);
+                               }),
+                               testing::WithArg<1>([expected_protocols](auto& actual_protocols) {
+                                 EXPECT_EQ(expected_protocols, actual_protocols)
+                                     << dumpAlternative(actual_protocols[0]);
+                                 ;
+                               })));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
   filter_->onDestroy();

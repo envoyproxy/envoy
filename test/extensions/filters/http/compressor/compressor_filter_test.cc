@@ -122,7 +122,7 @@ public:
     if (with_compression) {
       if (with_trailers) {
         EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
+            .WillOnce([&](Buffer::Instance& data, bool) { data_.move(data); });
         Http::TestRequestTrailerMapImpl trailers;
         EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
       }
@@ -167,7 +167,7 @@ public:
       EXPECT_EQ("test", headers.get_("content-encoding"));
       if (with_trailers) {
         EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
+            .WillOnce([&](Buffer::Instance& data, bool) { data_.move(data); });
         Http::TestResponseTrailerMapImpl trailers;
         EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
       }
@@ -2524,7 +2524,7 @@ protected:
       EXPECT_EQ(Http::FilterDataStatus::Continue, filter1_->encodeData(data_, !with_trailers));
       if (with_trailers) {
         EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
+            .WillOnce([&](Buffer::Instance& data, bool) { data_.move(data); });
         Http::TestResponseTrailerMapImpl trailers;
         EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter1_->encodeTrailers(trailers));
       }

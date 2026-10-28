@@ -1534,13 +1534,12 @@ TEST_F(DynamicModuleClusterTest, SchedulerCommit) {
   // Capture the posted callback from commit.
   Event::PostCb captured_cb;
   bool first_captured = false;
-  ON_CALL(server_context_.dispatcher_, post(_))
-      .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
-        if (!first_captured) {
-          captured_cb = std::move(cb);
-          first_captured = true;
-        }
-      }));
+  ON_CALL(server_context_.dispatcher_, post(_)).WillByDefault([&](Event::PostCb cb) {
+    if (!first_captured) {
+      captured_cb = std::move(cb);
+      first_captured = true;
+    }
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 42);
@@ -1572,13 +1571,12 @@ TEST_F(DynamicModuleClusterTest, OnScheduledCallback) {
   // Capture the posted callback from commit.
   Event::PostCb captured_cb;
   bool first_captured = false;
-  ON_CALL(server_context_.dispatcher_, post(_))
-      .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
-        if (!first_captured) {
-          captured_cb = std::move(cb);
-          first_captured = true;
-        }
-      }));
+  ON_CALL(server_context_.dispatcher_, post(_)).WillByDefault([&](Event::PostCb cb) {
+    if (!first_captured) {
+      captured_cb = std::move(cb);
+      first_captured = true;
+    }
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 123);
@@ -1634,13 +1632,12 @@ TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
     EXPECT_NE(scheduler_ptr, nullptr);
 
     // Capture the posted callback from commit.
-    ON_CALL(server_context_.dispatcher_, post(_))
-        .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
-          if (!first_captured) {
-            captured_cb = std::move(cb);
-            first_captured = true;
-          }
-        }));
+    ON_CALL(server_context_.dispatcher_, post(_)).WillByDefault([&](Event::PostCb cb) {
+      if (!first_captured) {
+        captured_cb = std::move(cb);
+        first_captured = true;
+      }
+    });
 
     // Commit an event via the ABI callback.
     envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 456);
@@ -1829,12 +1826,11 @@ TEST_F(DynamicModuleClusterTest, HandleDestructorFromWorkerThreadDefersAllTeardo
   // destruction when `result` is torn down, so allow repeated posts and capture the first one
   // from the worker-thread handle destruction.
   Event::PostCb captured_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillRepeatedly(testing::Invoke([&](Event::PostCb cb) {
-        if (!captured_cb) {
-          captured_cb = std::move(cb);
-        }
-      }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    if (!captured_cb) {
+      captured_cb = std::move(cb);
+    }
+  });
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
   auto& thread_factory = Thread::threadFactoryForTest();
@@ -3313,9 +3309,9 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataNumber) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+      .WillByDefault([&](const std::string& name, const Protobuf::Struct& value) {
         (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
-      }));
+      });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string ns = "dynamic_modules.test";
@@ -3360,9 +3356,9 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataString) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+      .WillByDefault([&](const std::string& name, const Protobuf::Struct& value) {
         (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
-      }));
+      });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string ns = "dynamic_modules.test";
@@ -3383,10 +3379,10 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringBatch) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   size_t set_calls = 0;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+      .WillByDefault([&](const std::string& name, const Protobuf::Struct& value) {
         set_calls++;
         (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
-      }));
+      });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -3431,8 +3427,7 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringBatchEdgeCases
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   size_t set_calls = 0;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(
-          testing::Invoke([&](const std::string&, const Protobuf::Struct&) { set_calls++; }));
+      .WillByDefault([&](const std::string&, const Protobuf::Struct&) { set_calls++; });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -3830,12 +3825,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutSuccess) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -3875,12 +3869,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureReset) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -3915,12 +3908,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureExceedBufferLimit) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -3986,14 +3978,13 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutWithBody) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            // Verify the body was attached.
-            EXPECT_EQ(message->body().toString(), "request_body");
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        // Verify the body was attached.
+        EXPECT_EQ(message->body().toString(), "request_body");
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -4031,12 +4022,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutSuccessAfterInModuleClusterCleared) 
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -4077,12 +4067,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureAfterInModuleClusterCleared) 
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};

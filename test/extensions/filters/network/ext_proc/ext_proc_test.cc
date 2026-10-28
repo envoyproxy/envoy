@@ -318,12 +318,11 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeAllow) {
 
   // Set up the client to return our mock stream
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -361,12 +360,11 @@ TEST_F(NetworkExtProcFilterTest, GrpcErrorWithFailureModeDisallow) {
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -395,12 +393,11 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessingReadData) {
   EXPECT_CALL(*stream_ptr, send(_, false));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Initial call should stop iteration until we get a response
   Buffer::OwnedImpl data("test");
@@ -435,12 +432,11 @@ TEST_F(NetworkExtProcFilterTest, NormalProcessingWriteData) {
   EXPECT_CALL(*stream_ptr, send(_, false));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Initial call should stop iteration until we get a response
   Buffer::OwnedImpl data("test");
@@ -475,12 +471,11 @@ TEST_F(NetworkExtProcFilterTest, GrpcCloseHandling) {
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -538,12 +533,11 @@ TEST_F(NetworkExtProcFilterTest, UpdateCloseCallbackStatusEdgeCases) {
   EXPECT_CALL(*stream_ptr, send(_, false));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   EXPECT_CALL(read_callbacks_, disableClose(true));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -585,12 +579,11 @@ TEST_F(NetworkExtProcFilterTest, DownstreamConnectionCloseEvent) {
   EXPECT_CALL(*stream_ptr, send(_, false));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -662,20 +655,18 @@ TEST_F(NetworkExtProcFilterTest, NoMetadataForwardingConfigured) {
 
   // This will capture the request that's sent to the external processor
   EXPECT_CALL(*stream_ptr, send(_, false))
-      .WillOnce(
-          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
-                             bool /*end_stream*/) {
-            // Verify the request doesn't have metadata
-            EXPECT_FALSE(request.has_metadata());
-          }));
+      .WillOnce([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                   bool /*end_stream*/) {
+        // Verify the request doesn't have metadata
+        EXPECT_FALSE(request.has_metadata());
+      });
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -696,26 +687,24 @@ TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
 
   // This will capture the request that's sent to the external processor
   EXPECT_CALL(*stream_ptr, send(_, false))
-      .WillOnce(
-          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
-                             bool /*end_stream*/) {
-            // Verify the request has metadata
-            EXPECT_TRUE(request.has_metadata());
+      .WillOnce([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                   bool /*end_stream*/) {
+        // Verify the request has metadata
+        EXPECT_TRUE(request.has_metadata());
 
-            // Verify it has the expected test-namespace and key-value pair.
-            EXPECT_THAT(request.metadata().filter_metadata(),
-                        UnorderedElementsAre(
-                            Pair("test-namespace",
-                                 HasStructFields(Contains(IsStructString("key1", "value1"))))));
-          }));
+        // Verify it has the expected test-namespace and key-value pair.
+        EXPECT_THAT(
+            request.metadata().filter_metadata(),
+            UnorderedElementsAre(Pair(
+                "test-namespace", HasStructFields(Contains(IsStructString("key1", "value1"))))));
+      });
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -727,14 +716,13 @@ TEST_F(NetworkExtProcFilterTest, UntypedMetadataForwarding) {
   // By default (send_once = false), subsequent chunks also include metadata.
   Buffer::OwnedImpl data2("test2");
   EXPECT_CALL(*stream_ptr, send(_, false))
-      .WillOnce(testing::Invoke(
-          [](envoy::service::network_ext_proc::v3::ProcessingRequest&& request, bool) {
-            EXPECT_TRUE(request.has_metadata());
-            EXPECT_THAT(request.metadata().filter_metadata(),
-                        UnorderedElementsAre(
-                            Pair("test-namespace",
-                                 HasStructFields(Contains(IsStructString("key1", "value1"))))));
-          }));
+      .WillOnce([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request, bool) {
+        EXPECT_TRUE(request.has_metadata());
+        EXPECT_THAT(
+            request.metadata().filter_metadata(),
+            UnorderedElementsAre(Pair(
+                "test-namespace", HasStructFields(Contains(IsStructString("key1", "value1"))))));
+      });
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data2, false));
 }
 
@@ -763,29 +751,27 @@ TEST_F(NetworkExtProcFilterTest, TypedMetadataForwarding) {
 
   // This will capture the request that's sent to the external processor
   EXPECT_CALL(*stream_ptr, send(_, false))
-      .WillOnce(testing::Invoke(
-          [&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
-                         bool /*end_stream*/) {
-            // Verify the request has metadata
-            EXPECT_TRUE(request.has_metadata());
+      .WillOnce([&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                               bool /*end_stream*/) {
+        // Verify the request has metadata
+        EXPECT_TRUE(request.has_metadata());
 
-            // Verify it has the typed-namespace but not other-namespace
-            const auto& typed_metadata = request.metadata().typed_filter_metadata();
-            EXPECT_THAT(typed_metadata, UnorderedElementsAre(Key("typed-namespace")));
+        // Verify it has the typed-namespace but not other-namespace
+        const auto& typed_metadata = request.metadata().typed_filter_metadata();
+        EXPECT_THAT(typed_metadata, UnorderedElementsAre(Key("typed-namespace")));
 
-            // Verify the typed value matches what we set
-            const auto& actual_typed_value = typed_metadata.at("typed-namespace");
-            EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
-            EXPECT_EQ(actual_typed_value.value(), typed_value.value());
-          }));
+        // Verify the typed value matches what we set
+        const auto& actual_typed_value = typed_metadata.at("typed-namespace");
+        EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
+        EXPECT_EQ(actual_typed_value.value(), typed_value.value());
+      });
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -811,32 +797,30 @@ TEST_F(NetworkExtProcFilterTest, BothTypedAndUntypedMetadataForwarding) {
 
   // This will capture the request that's sent to the external processor
   EXPECT_CALL(*stream_ptr, send(_, false))
-      .WillOnce(testing::Invoke(
-          [&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
-                         bool /*end_stream*/) {
-            // Verify the request has metadata
-            EXPECT_TRUE(request.has_metadata());
+      .WillOnce([&typed_value](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                               bool /*end_stream*/) {
+        // Verify the request has metadata
+        EXPECT_TRUE(request.has_metadata());
 
-            // Verify untyped metadata
-            EXPECT_THAT(request.metadata().filter_metadata(),
-                        Contains(Pair("untyped-ns", HasStructFields(Contains(
-                                                        IsStructString("key1", "value1"))))));
+        // Verify untyped metadata
+        EXPECT_THAT(request.metadata().filter_metadata(),
+                    Contains(Pair("untyped-ns",
+                                  HasStructFields(Contains(IsStructString("key1", "value1"))))));
 
-            // Verify typed metadata
-            const auto& typed_metadata = request.metadata().typed_filter_metadata();
-            EXPECT_THAT(typed_metadata, Contains(Key("typed-ns")));
-            const auto& actual_typed_value = typed_metadata.at("typed-ns");
-            EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
-            EXPECT_EQ(actual_typed_value.value(), typed_value.value());
-          }));
+        // Verify typed metadata
+        const auto& typed_metadata = request.metadata().typed_filter_metadata();
+        EXPECT_THAT(typed_metadata, Contains(Key("typed-ns")));
+        const auto& actual_typed_value = typed_metadata.at("typed-ns");
+        EXPECT_EQ(actual_typed_value.type_url(), typed_value.type_url());
+        EXPECT_EQ(actual_typed_value.value(), typed_value.value());
+      });
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -853,20 +837,18 @@ TEST_F(NetworkExtProcFilterTest, MetadataForwardingWithEmptyMetadata) {
 
   // This will capture the request that's sent to the external processor
   EXPECT_CALL(*stream_ptr, send(_, false))
-      .WillOnce(
-          testing::Invoke([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
-                             bool /*end_stream*/) {
-            // Verify the request doesn't have metadata since no matching metadata exists
-            EXPECT_FALSE(request.has_metadata());
-          }));
+      .WillOnce([](envoy::service::network_ext_proc::v3::ProcessingRequest&& request,
+                   bool /*end_stream*/) {
+        // Verify the request doesn't have metadata since no matching metadata exists
+        EXPECT_FALSE(request.has_metadata());
+      });
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -955,12 +937,11 @@ TEST_F(NetworkExtProcFilterTest, WriteMessageTimeout) {
 
   EXPECT_CALL(*stream_ptr, send(_, false));
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Send write data which starts the timer
   EXPECT_CALL(write_callbacks_, disableClose(true));
@@ -999,12 +980,11 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
 
   EXPECT_CALL(*stream_ptr, send(_, false)).Times(2); // Both read and write
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Send both read and write data
   EXPECT_CALL(read_callbacks_, disableClose(true));
@@ -1046,12 +1026,11 @@ TEST_F(NetworkExtProcFilterTest, TimerStopsOnResponse) {
 
   EXPECT_CALL(*stream_ptr, send(_, false));
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Send data which starts the timer
   EXPECT_CALL(read_callbacks_, disableClose(true));
@@ -1098,12 +1077,11 @@ TEST_F(NetworkExtProcFilterTest, WriteTimerStopsOnWriteResponse) {
 
   EXPECT_CALL(*stream_ptr, send(_, false));
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Expect write timer to be enabled when sending write data
   EXPECT_CALL(*write_timer, enableTimer(_, _));
@@ -1143,12 +1121,11 @@ TEST_F(NetworkExtProcFilterTest, TimeoutCleanupOnGrpcError) {
 
   EXPECT_CALL(*stream_ptr, send(_, false));
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Send data which starts the timer
   EXPECT_CALL(read_callbacks_, disableClose(true));
@@ -1186,12 +1163,11 @@ TEST_F(NetworkExtProcFilterTest, ZeroTimeoutDisabled) {
   auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
   EXPECT_CALL(*stream, send(_, false));
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   Buffer::OwnedImpl data("test");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
@@ -1509,12 +1485,11 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestream) {
 
   EXPECT_CALL(*stream_ptr, send(_, false));
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Initial call, should intercept and send request
   Buffer::OwnedImpl data("test");
@@ -1546,12 +1521,11 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestreamBalancedCallbacks) {
   EXPECT_CALL(*stream_ptr, send(_, false));
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // Initial call should disable close callbacks
   EXPECT_CALL(read_callbacks_, disableClose(true));
@@ -1582,12 +1556,11 @@ TEST_F(NetworkExtProcFilterTest, CloseSidestreamMultipleOutstandingBalancedCallb
   EXPECT_CALL(*stream_ptr, send(_, false)).Times(3);
 
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce(testing::Invoke(
-          [&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-              Http::AsyncClient::StreamOptions&,
-              Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-            return std::move(stream);
-          }));
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
+                    Http::AsyncClient::StreamOptions&,
+                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
+        return std::move(stream);
+      });
 
   // 3 initial calls should disable close callbacks each time
   EXPECT_CALL(read_callbacks_, disableClose(true)).Times(3);

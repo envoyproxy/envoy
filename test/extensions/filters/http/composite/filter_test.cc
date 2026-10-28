@@ -2200,9 +2200,9 @@ TEST(CompositePerRouteConfigTest, ReleasedOffMainThreadIsPostedToMainDispatcher)
   auto config = std::make_unique<CompositePerRouteConfig>(makeNeverMatchTree(), dispatcher);
 
   Event::PostCb posted;
-  EXPECT_CALL(dispatcher, post(_)).WillOnce(testing::Invoke([&posted](Event::PostCb callback) {
+  EXPECT_CALL(dispatcher, post(_)).WillOnce([&posted](Event::PostCb callback) {
     posted = std::move(callback);
-  }));
+  });
   config.reset();
   ASSERT_TRUE(posted != nullptr);
 

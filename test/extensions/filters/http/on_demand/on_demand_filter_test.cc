@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -120,8 +119,8 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersRouteConfigUpdateCompletesSynchronou
   // Invoke the route config update callback synchronously, before requestRouteConfigUpdate()
   // returns, i.e. while decode_headers_active_ is still true.
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
-      .WillOnce(Invoke(
-          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); }));
+      .WillOnce(
+          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); });
   // continueDecoding() must not be called from within decodeHeaders().
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   filter_->decodeHeaders(headers, true);
@@ -318,10 +317,10 @@ TEST_F(OnDemandFilterTest, NoRecreateStreamVhdsResolutionTriggersOnDemandCds) {
   // The route is unknown until VHDS resolves the virtual host, and resolved
   // thereafter.
   bool vhds_resolved = false;
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Invoke([&]() -> OptRef<const Router::Route> {
+  ON_CALL(decoder_callbacks_, route()).WillByDefault([&]() -> OptRef<const Router::Route> {
     return makeOptRefFromPtr<const Router::Route>(vhds_resolved ? decoder_callbacks_.route_.get()
                                                                 : nullptr);
-  }));
+  });
 
   // Initial decodeHeaders: route missing -> VHDS requested, StopIteration. CDS is
   // not reached yet because the route is still unknown.

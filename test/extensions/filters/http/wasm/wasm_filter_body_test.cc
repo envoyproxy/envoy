@@ -126,7 +126,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
   Buffer::OwnedImpl bufferedBody;
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&bufferedBody));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-      .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
+      .WillRepeatedly([&bufferedBody](BufferFunction f) { f(bufferedBody); });
 
   Buffer::OwnedImpl data1("hello");
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
@@ -139,14 +139,14 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
   // The second call to decodeData() will result in the addDecodedData() callback being called
   // because the VM's onRequestBody() returned StopIterationAndBuffer.
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+      .WillOnce([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); });
 
   Buffer::OwnedImpl data2(" again ");
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data2, false));
 
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+      .WillOnce([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); });
 
   Buffer::OwnedImpl data3("hello");
   EXPECT_CALL(filter(),
@@ -176,7 +176,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestroyFilterInTheAddDecodedD
   Buffer::OwnedImpl bufferedBody;
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&bufferedBody));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-      .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
+      .WillRepeatedly([&bufferedBody](BufferFunction f) { f(bufferedBody); });
 
   Buffer::OwnedImpl data1("hello");
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
@@ -189,7 +189,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestroyFilterInTheAddDecodedD
   // The second call to decodeData() will result in the addDecodedData() callback being called
   // because the VM's onRequestBody() returned StopIterationAndBuffer.
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+      .WillOnce([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); });
 
   Buffer::OwnedImpl data2(" again ");
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))));
@@ -198,8 +198,9 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestroyFilterInTheAddDecodedD
   // The addDecodedData() may result in buffer overflow and the local reply will be sent. It may
   // destroy the filter. We mock the onDestroy() to ensure the filter will not call into the VM
   // after it is destroyed.
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
-      .WillOnce(Invoke([this](Buffer::Instance&, bool) { filter().onDestroy(); }));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _)).WillOnce([this](Buffer::Instance&, bool) {
+    filter().onDestroy();
+  });
 
   Buffer::OwnedImpl data3("hello");
   EXPECT_CALL(filter(), log_(_, _)).Times(0);
@@ -290,7 +291,7 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferThenStreamBody) {
   Buffer::OwnedImpl bufferedBody;
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&bufferedBody));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
-      .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
+      .WillRepeatedly([&bufferedBody](BufferFunction f) { f(bufferedBody); });
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"x-test-operation", "BufferTwoBodies"}};
@@ -336,7 +337,7 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
 
   Buffer::OwnedImpl bufferedBody;
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
-      .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
+      .WillRepeatedly([&bufferedBody](BufferFunction f) { f(bufferedBody); });
 
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
                                                    {"x-test-operation", "BufferTwoBodies"}};
@@ -353,14 +354,14 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
   // The second call to encodeData() will result in the addEncodedData() callback being called
   // because the VM's onResponseBody() returned StopIterationAndBuffer.
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
-      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+      .WillOnce([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); });
 
   Buffer::OwnedImpl data2(", there, ");
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data2, false));
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
-      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+      .WillOnce([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); });
 
   Buffer::OwnedImpl data3("world!");
   EXPECT_CALL(filter(),
