@@ -19,7 +19,7 @@ constexpr double MAX_HITS_ADDEND = 1000000000;
 RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
                                  Server::Configuration::CommonFactoryContext& context,
                                  absl::Status& creation_status, bool no_limit)
-    : apply_on_stream_done_(config.apply_on_stream_done()),
+    : apply_on_stream_done_(config.apply_on_stream_done()), stop_on_match_(config.stop_on_match()),
       x_ratelimit_option_(config.x_ratelimit_option()) {
   if (config.has_hits_addend()) {
     if (!config.hits_addend().format().empty()) {
@@ -187,7 +187,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
   }
 }
 
-void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
+bool RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
                                           const Http::ResponseHeaderMap* response_headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
@@ -196,7 +196,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
   for (const Envoy::RateLimit::DescriptorProducerPtr& action : actions_) {
     Envoy::RateLimit::DescriptorEntry entry;
     if (!action->populateDescriptor(entry, local_service_cluster, headers, stream_info)) {
-      return;
+      return false;
     }
     if (!entry.key_.empty()) {
       descriptor.entries_.emplace_back(std::move(entry));
@@ -230,7 +230,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
       descriptor.hits_addend_ = static_cast<uint64_t>(hits_addend);
     } else {
       ENVOY_LOG_EVERY_POW_2(warn, "Invalid hits_addend: {}", hits_addend_value.DebugString());
-      return;
+      return false;
     }
 
   } else if (hits_addend_.has_value()) {
@@ -248,6 +248,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
   // Populate enable_x_rate_limit_headers.
   descriptor.x_ratelimit_option_ = x_ratelimit_option_;
   descriptors.emplace_back(std::move(descriptor));
+  return true;
 }
 
 RateLimitConfig::RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit>& configs,
@@ -270,8 +271,12 @@ void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
     if (generator.applyOnStreamDone() != on_stream_done) {
       continue;
     }
-    generator.populateDescriptors(headers, response_headers, stream_info, local_service_cluster,
-                                  descriptors);
+    const bool populated = generator.populateDescriptors(headers, response_headers, stream_info,
+                                                         local_service_cluster, descriptors);
+    // A matching policy with stop_on_match ends the search; later policies are skipped.
+    if (populated && generator.stopOnMatch()) {
+      return;
+    }
   }
 }
 
