@@ -29,7 +29,10 @@ private:
       Server::Configuration::ExtraFactoryContext& extra_context) override;
 };
 
+using UpstreamAlternateProtocolsCacheFilterFactory = AlternateProtocolsCacheFilterFactory;
+
 DECLARE_FACTORY(AlternateProtocolsCacheFilterFactory);
+DECLARE_FACTORY(UpstreamAlternateProtocolsCacheFilterFactory);
 
 } // namespace AlternateProtocolsCache
 } // namespace HttpFilters
