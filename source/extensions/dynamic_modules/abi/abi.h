@@ -11840,7 +11840,7 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
  * update_merge_window, so one call can carry several health changes. Each host is listed once, and
  * hosts removed since the previous update are reported only by the member update getters. A
  * worker's first update lists every host as added together with any pending health changes, so the
- * module must apply the report idempotently. It is only valid during
+ * module must tolerate a change it has already applied. It is only valid during
  * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
  *
  * Envoy only knows this when the cluster keeps persistent host partitions, which requires
