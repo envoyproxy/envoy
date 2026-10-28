@@ -4,6 +4,7 @@
 
 #include "source/common/http/headers.h"
 #include "source/extensions/filters/http/cache_v2/cache_sessions.h"
+#include "source/extensions/filters/http/cache_v2/cache_sessions_impl.h"
 
 #include "test/extensions/filters/http/cache_v2/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -620,83 +621,210 @@ TEST_F(CacheSessionsTest, CacheHitGoesDirectlyToCachedResponses) {
   pumpDispatcher();
 }
 
-TEST_F(CacheSessionsTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAgain) {
-  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
-  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
+TEST_F(CacheSessionsTest, CacheInsertFailureResetsLookupsAndWillLookupAgain) {
+  auto second_dispatcher = api_->allocateDispatcher("second_subscriber");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _)).Times(2);
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(3);
+  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a"))).Times(2);
   ActiveLookupResultPtr result1, result2, result3;
-  auto response_headers = cacheableResponseHeadersByExpire();
   cache_sessions_->lookup(testLookupRequest("/a"),
                           [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
-  cache_sessions_->lookup(testLookupRequest("/a"),
+  cache_sessions_->lookup(testLookupRequest("/a", *second_dispatcher),
                           [&result2](ActiveLookupResultPtr r) { result2 = std::move(r); });
   pumpDispatcher();
-  // Cache miss.
   consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
   pumpDispatcher();
-  // Upstream request should have been sent.
-  ASSERT_THAT(fake_upstreams_.size(), Eq(1));
-  EXPECT_THAT(fake_upstream_sent_headers_[0],
-              Pointee(IsSupersetOfHeaders(Http::TestRequestHeaderMapImpl{{":path", "/a"}})));
-  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(1));
   std::shared_ptr<CacheProgressReceiver> progress;
-  EXPECT_CALL(
-      *mock_http_cache_,
-      insert(_, KeyHasPath("/a"), Pointee(IsSupersetOfHeaders(*response_headers)), _, IsNull(), _))
-      .WillOnce([&](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata,
-                    HttpSourcePtr,
-                    std::shared_ptr<CacheProgressReceiver> receiver) { progress = receiver; });
-  consumeCallback(fake_upstream_get_headers_callbacks_[0])(
-      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::End);
+  EXPECT_CALL(*mock_http_cache_, insert)
+      .WillRepeatedly(
+          [&](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata, HttpSourcePtr,
+              std::shared_ptr<CacheProgressReceiver> receiver) { progress = std::move(receiver); });
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(cacheableResponseHeadersByExpire(),
+                                                           EndStream::End);
   pumpDispatcher();
-  Mock::VerifyAndClearExpectations(mock_http_cache_);
-  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
-  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
-  progress->onInsertFailed(absl::InternalError("test error"));
+  progress->onInsertFailed(absl::UnavailableError("upstream reset"));
+  EXPECT_EQ(result1, nullptr);
+  EXPECT_EQ(result2, nullptr);
   pumpDispatcher();
-  ASSERT_THAT(result1->http_source_, NotNull());
-  ASSERT_THAT(result2->http_source_, NotNull());
-  MockFunction<void(Http::ResponseHeaderMapPtr, EndStream)> header_callback1, header_callback2;
-  EXPECT_CALL(header_callback1,
-              Call(Pointee(Http::IsSupersetOfHeaders(*response_headers)), EndStream::End));
-  EXPECT_CALL(header_callback2,
-              Call(Pointee(Http::IsSupersetOfHeaders(*response_headers)), EndStream::End));
-  result1->http_source_->getHeaders(header_callback1.AsStdFunction());
-  result2->http_source_->getHeaders(header_callback2.AsStdFunction());
-  // Both requests should have a fresh upstream for pass-through.
-  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(3));
-  consumeCallback(fake_upstream_get_headers_callbacks_[1])(
-      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::End);
-  consumeCallback(fake_upstream_get_headers_callbacks_[2])(
-      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::End);
-  pumpDispatcher();
-  // A new request should provoke a new lookup because the previous insertion failed.
-  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_EQ(result2, nullptr);
+  second_dispatcher->run(Event::Dispatcher::RunType::Block);
+  ASSERT_NE(result1, nullptr);
+  ASSERT_NE(result2, nullptr);
+  EXPECT_EQ(result1->status_, CacheEntryStatus::UpstreamReset);
+  EXPECT_EQ(result2->status_, CacheEntryStatus::UpstreamReset);
+  EXPECT_EQ(result1->http_source_, nullptr);
+  EXPECT_EQ(result2->http_source_, nullptr);
+  EXPECT_EQ(fake_upstreams_.size(), 1);
+
+  // The next request starts a new cache lookup and a new population request.
   cache_sessions_->lookup(testLookupRequest("/a"),
                           [&result3](ActiveLookupResultPtr r) { result3 = std::move(r); });
   pumpDispatcher();
-  // Should have sent a second lookup.
-  ASSERT_THAT(captured_lookup_callbacks_.size(), Eq(2));
-  // Cache miss again.
+  ASSERT_EQ(captured_lookup_callbacks_.size(), 2);
   consumeCallback(captured_lookup_callbacks_[1])(LookupResult{});
   pumpDispatcher();
-  // Should be the original request, the two that pass-through, and the new request.
-  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(4));
-  EXPECT_CALL(
-      *mock_http_cache_,
-      insert(_, KeyHasPath("/a"), Pointee(IsSupersetOfHeaders(*response_headers)), _, IsNull(), _))
-      .WillOnce([&](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata,
-                    HttpSourcePtr,
-                    std::shared_ptr<CacheProgressReceiver> receiver) { progress = receiver; });
-  consumeCallback(fake_upstream_get_headers_callbacks_[3])(
-      Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::End);
+  ASSERT_EQ(fake_upstreams_.size(), 2);
+  consumeCallback(fake_upstream_get_headers_callbacks_[1])(cacheableResponseHeaders(),
+                                                           EndStream::End);
   pumpDispatcher();
-  Mock::VerifyAndClearExpectations(mock_http_cache_);
+  progress->onInsertFailed(absl::UnavailableError("another upstream reset"));
+  pumpDispatcher();
+  ASSERT_NE(result3, nullptr);
+  EXPECT_EQ(result3->status_, CacheEntryStatus::UpstreamReset);
+  EXPECT_EQ(result3->http_source_, nullptr);
+  EXPECT_EQ(fake_upstreams_.size(), 2);
+}
+
+TEST_F(CacheSessionsTest, LateInsertFailureDoesNotAbortReplacementUpstream) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _)).Times(2);
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
   EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
-  progress->onInsertFailed(absl::InternalError("test error"));
+  ActiveLookupResultPtr original_result, replacement_result;
+  cache_sessions_->lookup(testLookupRangeRequest("/a", 0, 4),
+                          [&](ActiveLookupResultPtr r) { original_result = std::move(r); });
   pumpDispatcher();
-  ASSERT_THAT(result3->http_source_, NotNull());
-  // Should be yet another upstream request for the new pass-through.
-  ASSERT_THAT(fake_upstream_get_headers_callbacks_.size(), Eq(5));
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+  std::shared_ptr<CacheProgressReceiver> original_progress, replacement_progress;
+  EXPECT_CALL(*mock_http_cache_, insert)
+      .WillOnce([&](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata,
+                    HttpSourcePtr, std::shared_ptr<CacheProgressReceiver> receiver) {
+        original_progress = std::move(receiver);
+      })
+      .WillOnce([&](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata,
+                    HttpSourcePtr, std::shared_ptr<CacheProgressReceiver> receiver) {
+        replacement_progress = std::move(receiver);
+      });
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(cacheableResponseHeaders(10),
+                                                           EndStream::More);
+  pumpDispatcher();
+  auto reader = std::make_unique<testing::StrictMock<MockCacheReader>>();
+  EXPECT_CALL(*reader, getBody)
+      .WillOnce([](Event::Dispatcher&, AdjustedByteRange, GetBodyCallback&& cb) {
+        cb(nullptr, EndStream::Reset);
+      });
+  original_progress->onHeadersInserted(std::move(reader), cacheableResponseHeaders(10), false);
+  original_progress->onBodyInserted(AdjustedByteRange(0, 5), false);
+  pumpDispatcher();
+  ASSERT_NE(original_result, nullptr);
+  testing::StrictMock<MockFunction<void(Buffer::InstancePtr, EndStream)>> body_cb;
+  EXPECT_CALL(body_cb, Call(IsNull(), EndStream::Reset));
+  original_result->http_source_->getBody(AdjustedByteRange(0, 5), body_cb.AsStdFunction());
+  pumpDispatcher();
+
+  // A cache read error has aborted this session, but its insertion is still in flight.
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&](ActiveLookupResultPtr r) { replacement_result = std::move(r); });
+  pumpDispatcher();
+  consumeCallback(captured_lookup_callbacks_[1])(LookupResult{});
+  pumpDispatcher();
+  ASSERT_EQ(fake_upstream_get_headers_callbacks_.size(), 2);
+
+  // The original slow upstream resets while the replacement is waiting for headers.
+  // Previously this cleared the replacement's subscribers, then receiving its headers crashed.
+  original_progress->onInsertFailed(absl::UnavailableError("upstream reset"));
+  pumpDispatcher();
+  EXPECT_EQ(replacement_result, nullptr);
+  EXPECT_EQ(fake_upstreams_.size(), 2);
+  consumeCallback(fake_upstream_get_headers_callbacks_[1])(cacheableResponseHeaders(10),
+                                                           EndStream::More);
+  pumpDispatcher();
+  ASSERT_NE(replacement_progress, nullptr);
+  replacement_progress->onHeadersInserted(std::make_unique<testing::StrictMock<MockCacheReader>>(),
+                                          cacheableResponseHeaders(10), false);
+  pumpDispatcher();
+  ASSERT_NE(replacement_result, nullptr);
+  EXPECT_EQ(replacement_result->status_, CacheEntryStatus::Miss);
+
+  original_progress->onHeadersInserted(std::make_unique<testing::StrictMock<MockCacheReader>>(),
+                                       cacheableResponseHeaders(10), false);
+  original_progress->onBodyInserted(AdjustedByteRange(5, 10), true);
+  original_progress->onTrailersInserted(std::make_unique<Http::TestResponseTrailerMapImpl>());
+
+  // Clients retaining the failed session must reset instead of reading the replacement.
+  testing::StrictMock<MockFunction<void(Http::ResponseHeaderMapPtr, EndStream)>> headers_cb;
+  EXPECT_CALL(headers_cb, Call(IsNull(), EndStream::Reset));
+  original_result->http_source_->getHeaders(headers_cb.AsStdFunction());
+  EXPECT_CALL(body_cb, Call(IsNull(), EndStream::Reset));
+  original_result->http_source_->getBody(AdjustedByteRange(0, 5), body_cb.AsStdFunction());
+  testing::StrictMock<MockFunction<void(Http::ResponseTrailerMapPtr, EndStream)>> trailers_cb;
+  EXPECT_CALL(trailers_cb, Call(IsNull(), EndStream::Reset));
+  original_result->http_source_->getTrailers(trailers_cb.AsStdFunction());
+  pumpDispatcher();
+}
+
+TEST_F(CacheSessionsTest, LateCacheReadDoesNotReviveFailedSession) {
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
+  ActiveLookupResultPtr result;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+  std::shared_ptr<CacheProgressReceiver> progress;
+  EXPECT_CALL(*mock_http_cache_, insert)
+      .WillOnce(
+          [&](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata, HttpSourcePtr,
+              std::shared_ptr<CacheProgressReceiver> receiver) { progress = std::move(receiver); });
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(cacheableResponseHeaders(10),
+                                                           EndStream::More);
+  pumpDispatcher();
+  auto reader = std::make_unique<testing::StrictMock<MockCacheReader>>();
+  GetBodyCallback read_callback;
+  EXPECT_CALL(*reader, getBody)
+      .WillOnce([&](Event::Dispatcher&, AdjustedByteRange, GetBodyCallback&& cb) {
+        read_callback = std::move(cb);
+      });
+  progress->onHeadersInserted(std::move(reader), cacheableResponseHeaders(10), false);
+  progress->onBodyInserted(AdjustedByteRange(0, 5), false);
+  pumpDispatcher();
+  testing::StrictMock<MockFunction<void(Buffer::InstancePtr, EndStream)>> body_cb;
+  EXPECT_CALL(body_cb, Call(IsNull(), EndStream::Reset));
+  result->http_source_->getBody(AdjustedByteRange(0, 5), body_cb.AsStdFunction());
+  pumpDispatcher();
+  ASSERT_TRUE(read_callback);
+  progress->onInsertFailed(absl::UnavailableError("upstream reset"));
+  pumpDispatcher();
+  // The subscriber has already been reset. A successful late read must be discarded.
+  consumeCallback(read_callback)(std::make_unique<Buffer::OwnedImpl>("abcde"), EndStream::More);
+  testing::StrictMock<MockFunction<void(Http::ResponseHeaderMapPtr, EndStream)>> headers_cb;
+  EXPECT_CALL(headers_cb, Call(IsNull(), EndStream::Reset));
+  result->http_source_->getHeaders(headers_cb.AsStdFunction());
+  pumpDispatcher();
+}
+
+TEST_F(CacheSessionsTest, FailedSessionResetsLateLookupsAndDiscardsUpstreamHeaders) {
+  auto request = testLookupRequest("/a");
+  auto session = std::make_shared<CacheSession>(
+      std::static_pointer_cast<CacheSessionsImpl>(cache_sessions_), request->key());
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
+  EXPECT_CALL(*mock_http_cache_, insert).Times(0);
+  ActiveLookupResultPtr result;
+  session->getLookupResult(std::move(request),
+                           [&](ActiveLookupResultPtr r) { result = std::move(r); });
+  pumpDispatcher();
+  consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+  pumpDispatcher();
+  session->onInsertFailed(absl::UnavailableError("upstream reset"));
+  pumpDispatcher();
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->status_, CacheEntryStatus::UpstreamReset);
+  EXPECT_EQ(result->http_source_, nullptr);
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(cacheableResponseHeaders(),
+                                                           EndStream::End);
+
+  // A lookup that already acquired this session before the abort must also reset.
+  result.reset();
+  session->getLookupResult(testLookupRequest("/a"),
+                           [&](ActiveLookupResultPtr r) { result = std::move(r); });
+  EXPECT_EQ(result, nullptr);
+  pumpDispatcher();
+  ASSERT_NE(result, nullptr);
+  EXPECT_EQ(result->status_, CacheEntryStatus::UpstreamReset);
+  EXPECT_EQ(result->http_source_, nullptr);
 }
 
 TEST_F(CacheSessionsTest, CacheInsertFailureResetsStreamingContexts) {

@@ -52,6 +52,11 @@ persistent caches. They can be fully custom caches, or wrappers/adapters around 
 Built-in cache storage backends include :ref:`SimpleHttpCacheV2Config <envoy_v3_api_msg_extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config>`
 (in-memory) and :ref:`FileSystemHttpCacheV2Config <envoy_v3_api_msg_extensions.http.cache_v2.file_system_http_cache.v3.FileSystemHttpCacheV2Config>` (persistent; LRU).
 
+If an upstream response resets while it is being inserted into the cache, requests waiting for that insertion
+are reset. A subsequent request performs a new cache lookup and can start a new upstream fetch. Requests using
+the aborted response cannot continue by reading from the later fetch. Each lookup aborted without a response
+source increments the ``cache.event`` counter with ``event_type=upstream_reset``.
+
 Architecture and extension points
 ---------------------------------
 
