@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 licenses(["notice"])  # Apache 2
 
@@ -7,4 +7,10 @@ go_library(
     srcs = ["string.go"],
     importpath = "github.com/envoyproxy/envoy/contrib/golang/common/go/utils",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "utils_test",
+    srcs = ["string_test.go"],
+    embed = [":utils"],
 )

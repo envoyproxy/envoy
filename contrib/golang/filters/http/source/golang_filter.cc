@@ -672,9 +672,10 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 
     auto len = key.length();
     // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
-    // is safe.
+    // is safe. Only the length is stored: writing go_buf (a Go pointer) into Go memory from C++
+    // would skip the Go write barrier. The Go side sets the data pointers from go_buf and these
+    // lengths, in the same order.
     go_strs[i].n = len;
-    go_strs[i].p = go_buf;
     // go_buf is the heap memory of go, and the length is the total length of all keys and values in
     // the header. So use memcpy is safe.
     memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
@@ -685,7 +686,6 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
     go_strs[i].n = len;
     // go_buf may be an invalid pointer in Golang side when len is 0.
     if (len > 0) {
-      go_strs[i].p = go_buf;
       memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
       go_buf += len;
     }
@@ -1536,9 +1536,11 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_dat
   }
 
   auto weak_ptr = weak_from_this();
-  getDispatcher().post([this, weak_ptr, path, value_data, value_len, rc] {
+  // path points into Go memory that is only valid for the duration of the cgo call; copy it
+  // before posting.
+  getDispatcher().post([this, weak_ptr, path_str = std::string(path), value_data, value_len, rc] {
     if (!weak_ptr.expired() && !hasDestroyed()) {
-      *rc = getStringPropertyCommon(path, value_data, value_len);
+      *rc = getStringPropertyCommon(path_str, value_data, value_len);
       dynamic_lib_->envoyGoRequestSemaDec(req_);
     } else {
       ENVOY_LOG(info, "golang filter has gone or destroyed in getStringProperty");
