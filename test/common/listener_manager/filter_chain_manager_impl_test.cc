@@ -145,27 +145,26 @@ public:
   void setupFcdsUpdateMocks(MockListenerComponentFactory& listener_component_factory) {
     ON_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
             subscriptionFromConfigSource(_, _, _, _, _, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                    Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
                    const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
               fcds_subscription_callbacks_.push_back(&callbacks);
               return std::make_unique<NiceMock<Config::MockSubscription>>();
-            }));
+            });
     ON_CALL(listener_component_factory, createNetworkFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
-                      Configuration::FilterChainFactoryContext&)
-                       -> absl::StatusOr<Filter::NetworkFilterFactoriesList> {
-              return Filter::NetworkFilterFactoriesList{};
-            }));
+        .WillByDefault([](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>&,
+                          Configuration::FilterChainFactoryContext&)
+                           -> absl::StatusOr<Filter::NetworkFilterFactoriesList> {
+          return Filter::NetworkFilterFactoriesList{};
+        });
     ON_CALL(parent_context_.server_factory_context_.xds_manager_,
             pause(fcds_filter_chain_type_url_))
-        .WillByDefault(Invoke([this](const std::string&) {
+        .WillByDefault([this](const std::string&) {
           fcds_xds_paused_ = true;
           fcds_pause_count_++;
           return std::make_unique<Cleanup>([this]() { fcds_xds_paused_ = false; });
-        }));
+        });
   }
 
   // Intermediate states.
@@ -489,15 +488,15 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
 
   EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([&fcds_callbacks, &subscription](
-                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                           Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                           Config::OpaqueResourceDecoderSharedPtr,
-                           const Config::SubscriptionOptions&) mutable
-                           -> absl::StatusOr<Config::SubscriptionPtr> {
+      .WillOnce([&fcds_callbacks, &subscription](const envoy::config::core::v3::ConfigSource&,
+                                                 absl::string_view, Stats::Scope&,
+                                                 Config::SubscriptionCallbacks& callbacks,
+                                                 Config::OpaqueResourceDecoderSharedPtr,
+                                                 const Config::SubscriptionOptions&) mutable
+                    -> absl::StatusOr<Config::SubscriptionPtr> {
         fcds_callbacks = &callbacks;
         return std::move(subscription);
-      }));
+      });
 
   MockFcdsClientCallbacks callbacks;
   auto handle_or_status =
@@ -541,9 +540,9 @@ TEST_P(FilterChainManagerImplTest, FcdsSharedFilterChainManagerBasic) {
 
   Network::DrainableFilterChainSharedPtr drained_chain;
   EXPECT_CALL(callbacks, drainFilterChain(_))
-      .WillOnce(Invoke([&drained_chain](Network::DrainableFilterChainSharedPtr draining) {
+      .WillOnce([&drained_chain](Network::DrainableFilterChainSharedPtr draining) {
         drained_chain = draining;
-      }));
+      });
 
   const auto decoded_resources_v2 = TestUtility::decodeResources({filter_chain_v2});
   EXPECT_OK(fcds_callbacks->onConfigUpdate(decoded_resources_v2.refvec_, removed_resources, "v2"));
@@ -579,15 +578,15 @@ TEST_P(FilterChainManagerImplTest, FcdsSubscriptionHandleIsActive) {
   auto subscription = std::make_unique<NiceMock<Config::MockSubscription>>();
   EXPECT_CALL(parent_context_.server_factory_context_.cluster_manager_.subscription_factory_,
               subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([&fcds_callbacks, &subscription](
-                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                           Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                           Config::OpaqueResourceDecoderSharedPtr,
-                           const Config::SubscriptionOptions&) mutable
-                           -> absl::StatusOr<Config::SubscriptionPtr> {
+      .WillOnce([&fcds_callbacks, &subscription](const envoy::config::core::v3::ConfigSource&,
+                                                 absl::string_view, Stats::Scope&,
+                                                 Config::SubscriptionCallbacks& callbacks,
+                                                 Config::OpaqueResourceDecoderSharedPtr,
+                                                 const Config::SubscriptionOptions&) mutable
+                    -> absl::StatusOr<Config::SubscriptionPtr> {
         fcds_callbacks = &callbacks;
         return std::move(subscription);
-      }));
+      });
 
   MockFcdsClientCallbacks callbacks;
   auto handle_or_status =

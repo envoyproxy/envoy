@@ -70,7 +70,6 @@ using ::Envoy::StatusHelpers::HasStatus;
 using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
-using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -140,11 +139,11 @@ struct ResolverData {
 
   void expectResolve(Network::MockDnsResolver& dns_resolver) {
     EXPECT_CALL(dns_resolver, resolve(_, _, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                             Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                      Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           dns_callback_ = cb;
           return &active_dns_query_;
-        }))
+        })
         .RetiresOnSaturation();
   }
 
@@ -257,12 +256,12 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
                     port_value: 443
   )EOF";
   EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+      .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
-      }));
+      });
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,

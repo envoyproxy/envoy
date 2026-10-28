@@ -49,10 +49,10 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
   EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_(_)).Times(AnyNumber());
 
   EXPECT_CALL(callbacks_.route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
-      .WillRepeatedly(Invoke(Http::Utility::isSafeRequest));
-  ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+      .WillRepeatedly(Http::Utility::isSafeRequest);
+  ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault([this] {
     return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
-  }));
+  });
 
   // Wire up a real RouteStatsContextImpl so that route-level retry stats are populated.
   route_stat_names_ = std::make_unique<RouteStatNames>(stats_store_.symbolTable());
@@ -152,9 +152,9 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(_, std::optional<uint64_t>(200)));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([expected_count](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
-      }));
+      });
   ASSERT(response_decoder);
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
@@ -224,16 +224,15 @@ void RouterTestBase::expectNewStreamWithImmediateEncoder(Http::RequestEncoder& e
                                                          Http::ResponseDecoder** response_decoder,
                                                          Http::Protocol protocol) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-      .WillOnce(Invoke([this, &encoder, response_decoder,
-                        protocol](Http::ResponseDecoder& decoder,
-                                  Http::ConnectionPool::Callbacks& callbacks,
-                                  const Http::ConnectionPool::Instance::StreamOptions&)
-                           -> Http::ConnectionPool::Cancellable* {
+      .WillOnce([this, &encoder, response_decoder, protocol](
+                    Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                    const Http::ConnectionPool::Instance::StreamOptions&)
+                    -> Http::ConnectionPool::Cancellable* {
         *response_decoder = &decoder;
         callbacks.onPoolReady(encoder, cm_.thread_local_cluster_.conn_pool_.host_,
                               upstream_stream_info_, protocol);
         return nullptr;
-      }));
+      });
 }
 
 void RouterTestBase::recreateFilter() {
@@ -280,9 +279,9 @@ void RouterTestBase::executeMetadataTest(
     std::function<void(const std::vector<Router::MetadataMatchCriterionConstSharedPtr>&)>
         validator) {
   EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
-      .WillOnce(Invoke([this, validator](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                                         std::optional<Http::Protocol>,
-                                         Upstream::LoadBalancerContext* context) {
+      .WillOnce([this, validator](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                                  std::optional<Http::Protocol>,
+                                  Upstream::LoadBalancerContext* context) {
         auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
         validator(match);
 
@@ -290,7 +289,7 @@ void RouterTestBase::executeMetadataTest(
         EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
 
         return Upstream::HttpPoolData([]() {}, &this->cm_.thread_local_cluster_.conn_pool_);
-      }));
+      });
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));

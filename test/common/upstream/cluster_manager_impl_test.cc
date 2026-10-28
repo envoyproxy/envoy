@@ -40,8 +40,6 @@ using ::testing::_;
 using ::testing::DoAll;
 using ::testing::HasSubstr;
 using ::testing::InSequence;
-using ::testing::Invoke;
-using ::testing::InvokeWithoutArgs;
 using ::testing::Mock;
 using ::testing::NiceMock;
 using ::testing::Return;
@@ -1671,11 +1669,10 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithOverrideHost) {
       .WillRepeatedly(
           Return(OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_11001)));
 
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
-        EXPECT_EQ("127.0.0.1:11001", host->address()->asStringView());
-        return to_create;
-      }));
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce([&](HostConstSharedPtr host) {
+    EXPECT_EQ("127.0.0.1:11001", host->address()->asStringView());
+    return to_create;
+  });
   EXPECT_CALL(*to_create, addIdleCallback(_));
 
   auto opt_cp_1 = cluster_manager_->getThreadLocalCluster("cluster_1")
@@ -1702,12 +1699,11 @@ TEST_F(ClusterManagerImplTest, SelectOverrideHostTestWithNonExistingHost) {
       .WillRepeatedly(Return(
           OptRef<const Upstream::LoadBalancerContext::OverrideHost>(override_host_non_existing)));
 
-  EXPECT_CALL(factory_, allocateTcpConnPool_(_))
-      .WillOnce(testing::Invoke([&](HostConstSharedPtr host) {
-        EXPECT_THAT(host->address()->asStringView(),
-                    testing::AnyOf("127.0.0.1:11001", "127.0.0.1:11002"));
-        return to_create;
-      }));
+  EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce([&](HostConstSharedPtr host) {
+    EXPECT_THAT(host->address()->asStringView(),
+                testing::AnyOf("127.0.0.1:11001", "127.0.0.1:11002"));
+    return to_create;
+  });
   EXPECT_CALL(*to_create, addIdleCallback(_));
 
   auto opt_cp = cluster_manager_->getThreadLocalCluster("cluster_1")
@@ -2265,9 +2261,9 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   // Set up the scenario seen in Issue 903 where initialize() ultimately results
   // in the removeCluster() call. In the real bug this was a long and complex call
   // chain.
-  EXPECT_CALL(cluster.cluster_, initialize(_)).WillOnce(Invoke([&](std::function<void()>) -> void {
+  EXPECT_CALL(cluster.cluster_, initialize(_)).WillOnce([&](std::function<void()>) -> void {
     init_helper_.removeCluster(cluster);
-  }));
+  });
 
   // Now call initializeSecondaryClusters which will exercise maybeFinishInitialize()
   // which calls initialize() on the members of the secondary init list.
@@ -2384,8 +2380,9 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
     EXPECT_CALL(*conn_pool_vector.back(), addIdleCallback(_));
     EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
         .WillOnce(Return(conn_pool_vector.back()));
-    EXPECT_CALL(downstream_connection, hashKey)
-        .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
+    EXPECT_CALL(downstream_connection, hashKey).WillOnce([i](std::vector<uint8_t>& hash_key) {
+      hash_key.push_back(i);
+    });
     EXPECT_EQ(
         conn_pool_vector.back(),
         HttpPoolDataPeer::getPool(
@@ -2396,9 +2393,9 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection) {
   }
 
   // Check that the first entry is still in the pool map
-  EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
+  EXPECT_CALL(downstream_connection, hashKey).WillOnce([](std::vector<uint8_t>& hash_key) {
     hash_key.push_back(0);
-  }));
+  });
   EXPECT_EQ(
       conn_pool_vector.front(),
       HttpPoolDataPeer::getPool(
@@ -2464,15 +2461,15 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
   EXPECT_CALL(*pool, addIdleCallback(_));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .WillOnce(testing::WithArg<5>(
-          Invoke([pool, created_registry_ptr = &created_registry](
-                     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) {
+          [pool, created_registry_ptr = &created_registry](
+              OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) {
             EXPECT_TRUE(network_observer_registry.has_value());
             *created_registry_ptr = network_observer_registry.ptr();
             return pool;
-          })));
-  EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
+          }));
+  EXPECT_CALL(downstream_connection, hashKey).WillOnce([](std::vector<uint8_t>& hash_key) {
     hash_key.push_back(0);
-  }));
+  });
   EXPECT_EQ(pool,
             HttpPoolDataPeer::getPool(cluster1->httpConnPool(
                 cluster_manager_->getThreadLocalCluster("added_via_api")->chooseHost(nullptr).host,
@@ -2482,12 +2479,12 @@ TEST_F(ClusterManagerImplTest, PassDownNetworkObserverRegistryToConnectionPool) 
   EXPECT_CALL(*pool, addIdleCallback(_));
   EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .WillOnce(testing::WithArg<5>(
-          Invoke([pool, created_registry](
-                     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) {
+          [pool, created_registry](
+              OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) {
             EXPECT_TRUE(network_observer_registry.has_value());
             EXPECT_EQ(created_registry, network_observer_registry.ptr());
             return pool;
-          })));
+          }));
   EXPECT_EQ(pool,
             HttpPoolDataPeer::getPool(cluster_added_via_api->httpConnPool(
                 cluster_manager_->getThreadLocalCluster("added_via_api")->chooseHost(nullptr).host,
@@ -2527,17 +2524,18 @@ TEST_F(ClusterManagerImplTest, ConnectionPoolPerDownstreamConnection_tcp) {
     conn_pool_vector.push_back(new Tcp::ConnectionPool::MockInstance());
     EXPECT_CALL(*conn_pool_vector.back(), addIdleCallback(_));
     EXPECT_CALL(factory_, allocateTcpConnPool_(_)).WillOnce(Return(conn_pool_vector.back()));
-    EXPECT_CALL(downstream_connection, hashKey)
-        .WillOnce(Invoke([i](std::vector<uint8_t>& hash_key) { hash_key.push_back(i); }));
+    EXPECT_CALL(downstream_connection, hashKey).WillOnce([i](std::vector<uint8_t>& hash_key) {
+      hash_key.push_back(i);
+    });
     EXPECT_EQ(conn_pool_vector.back(),
               TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
                                            ->tcpConnPool(ResourcePriority::Default, &lb_context)));
   }
 
   // Check that the first entry is still in the pool map
-  EXPECT_CALL(downstream_connection, hashKey).WillOnce(Invoke([](std::vector<uint8_t>& hash_key) {
+  EXPECT_CALL(downstream_connection, hashKey).WillOnce([](std::vector<uint8_t>& hash_key) {
     hash_key.push_back(0);
-  }));
+  });
   EXPECT_EQ(conn_pool_vector.front(),
             TcpPoolDataPeer::getPool(cluster_manager_->getThreadLocalCluster("cluster_1")
                                          ->tcpConnPool(ResourcePriority::Default, &lb_context)));
@@ -2829,10 +2827,10 @@ TEST_F(ClusterManagerImplTest, WarmingClusterBlocksCdsUntilWarmed) {
   bool cds_resumed = false;
   ON_CALL(factory_.server_context_.xds_manager_,
           pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+      .WillByDefault([&](const std::string&) -> Config::ScopedResume {
         cds_paused = true;
         return makePauseHandle(cds_resumed);
-      }));
+      });
 
   // A plain static cluster (no SDS) that will stay warming until we trigger the callback.
   const std::string cluster_yaml = R"EOF(
@@ -2879,10 +2877,10 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithWaitForWarmOnInitFalseDoesNotBl
   bool cds_paused = false;
   ON_CALL(factory_.server_context_.xds_manager_,
           pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+      .WillByDefault([&](const std::string&) -> Config::ScopedResume {
         cds_paused = true;
         return std::make_unique<Cleanup>([]() {});
-      }));
+      });
 
   const std::string cluster_yaml = R"EOF(
     name: no_wait_cluster
@@ -2926,10 +2924,10 @@ TEST_F(ClusterManagerImplTest,
   bool cds_resumed = false;
   ON_CALL(factory_.server_context_.xds_manager_,
           pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+      .WillByDefault([&](const std::string&) -> Config::ScopedResume {
         cds_paused = true;
         return makePauseHandle(cds_resumed);
-      }));
+      });
 
   // Cluster A: wait_for_warm_on_init: false — should not block CDS.
   const std::string no_wait_cluster_yaml = R"EOF(
@@ -3007,10 +3005,10 @@ TEST_F(ClusterManagerImplTest, WarmingClusterWithDefaultWaitForWarmOnInitBlocksC
   bool cds_paused = false;
   ON_CALL(factory_.server_context_.xds_manager_,
           pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+      .WillByDefault([&](const std::string&) -> Config::ScopedResume {
         cds_paused = true;
         return std::make_unique<Cleanup>([]() {});
-      }));
+      });
 
   // The default waitForWarmOnInit() returns true, so any warming cluster blocks CDS.
   const std::string cluster_yaml = R"EOF(
@@ -3052,10 +3050,10 @@ TEST_F(ClusterManagerImplTest, RemovingWarmingClusterReleasesCdsPause) {
   bool cds_resumed = false;
   ON_CALL(factory_.server_context_.xds_manager_,
           pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+      .WillByDefault([&](const std::string&) -> Config::ScopedResume {
         cds_paused = true;
         return makePauseHandle(cds_resumed);
-      }));
+      });
 
   const std::string cluster_yaml = R"EOF(
     name: warming_cluster
@@ -3102,10 +3100,10 @@ TEST_F(ClusterManagerImplTest, UpdatingWarmingClusterToSkipCdsPauseReleasesHandl
   bool cds_resumed = false;
   ON_CALL(factory_.server_context_.xds_manager_,
           pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+      .WillByDefault([&](const std::string&) -> Config::ScopedResume {
         cds_paused = true;
         return makePauseHandle(cds_resumed);
-      }));
+      });
 
   // add cluster with wait_for_warm_on_init: true (default), CDS should be paused.
   const std::string cluster_yaml_v1 = R"EOF(
@@ -3166,10 +3164,10 @@ TEST_F(ClusterManagerImplTest, ShutdownCancelsCdsPauseBeforeMuxTeardown) {
   bool cds_resumed = false;
   ON_CALL(factory_.server_context_.xds_manager_,
           pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()))
-      .WillByDefault(testing::Invoke([&](const std::string&) -> Config::ScopedResume {
+      .WillByDefault([&](const std::string&) -> Config::ScopedResume {
         cds_paused = true;
         return makePauseHandle(cds_resumed);
-      }));
+      });
 
   // Add a warming cluster so a live CDS pause handle is acquired.
   const std::string cluster_yaml = R"EOF(

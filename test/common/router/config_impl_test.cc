@@ -4172,7 +4172,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4189,7 +4189,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
@@ -4251,7 +4251,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4268,7 +4268,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
