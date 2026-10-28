@@ -248,6 +248,7 @@ envoy_cc_library(
         ":address_lib",
         ":cidr_range_lib",
         ":utility_lib",
+        "//envoy/common:optref_lib",
         "//source/common/common:assert_lib",
         "@abseil-cpp//absl/container:node_hash_set",
         "@abseil-cpp//absl/numeric:int128",

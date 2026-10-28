@@ -45,11 +45,11 @@ public:
       std::sort(actual.begin(), actual.end());
       EXPECT_EQ(expected, actual);
 
-      const auto* data_set = trie_->getDataSet(address);
+      const auto data_set = trie_->getDataSet(address);
       if (expected.empty()) {
-        EXPECT_EQ(nullptr, data_set);
+        EXPECT_FALSE(data_set.has_value());
       } else {
-        ASSERT_NE(nullptr, data_set);
+        ASSERT_TRUE(data_set.has_value());
         std::vector<std::string> actual_set(data_set->begin(), data_set->end());
         std::sort(actual_set.begin(), actual_set.end());
         EXPECT_EQ(expected, actual_set);

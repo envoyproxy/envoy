@@ -166,8 +166,8 @@ template <class Inputs> static void lcTrieLookupDataSet(benchmark::State& state,
     UNREFERENCED_PARAMETER(_);
     i++;
     i %= address_inputs.addresses_.size();
-    const auto* data = lc_trie->getDataSet(address_inputs.addresses_[i]);
-    output_tags += data == nullptr ? 0 : data->size();
+    const auto data = lc_trie->getDataSet(address_inputs.addresses_[i]);
+    output_tags += data.has_value() ? data->size() : 0;
   }
   benchmark::DoNotOptimize(output_tags);
 }

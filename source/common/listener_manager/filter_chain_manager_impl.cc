@@ -704,8 +704,8 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDestinatio
                             : FilterChain::fakeAddress();
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
-  const auto* data = destination_ips_trie.getDataSet(address);
-  if (data != nullptr) {
+  const auto data = destination_ips_trie.getDataSet(address);
+  if (data.has_value()) {
     ASSERT(data->size() == 1);
     return findFilterChainForServerName(**data->begin(), socket);
   }
@@ -792,8 +792,8 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForDirectSour
                             ? socket_address
                             : FilterChain::fakeAddress();
 
-  const auto* data = direct_source_ips_trie.getDataSet(address);
-  if (data != nullptr) {
+  const auto data = direct_source_ips_trie.getDataSet(address);
+  if (data.has_value()) {
     ASSERT(data->size() == 1);
     return findFilterChainForSourceTypes(**data->begin(), socket);
   }
@@ -843,8 +843,8 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
                             : FilterChain::fakeAddress();
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
-  const auto* data = source_ips_trie.getDataSet(address);
-  if (data == nullptr) {
+  const auto data = source_ips_trie.getDataSet(address);
+  if (!data.has_value()) {
     return nullptr;
   }
 
