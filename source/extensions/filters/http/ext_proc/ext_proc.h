@@ -58,6 +58,8 @@ struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class FilterConfig;
+
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
   explicit ExtProcLoggingInfo(const Envoy::Protobuf::Struct& filter_metadata)
@@ -148,6 +150,12 @@ public:
   const ProcessingEffects&
   processingEffects(envoy::config::core::v3::TrafficDirection traffic_direction) const;
   const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
+  // Records the filter config that created this object.
+  void setOwner(std::weak_ptr<const FilterConfig> owner) { owner_ = std::move(owner); }
+  bool isOwnedBy(const FilterConfig& config) const {
+    const auto owner = owner_.lock();
+    return owner != nullptr && owner.get() == &config;
+  }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
   void setDestination(absl::string_view destination) { destination_ = destination; }
   const std::string& destination() const {
@@ -196,6 +204,9 @@ private:
   bool received_immediate_response_{false};
   // The gRPC status when the openStream() operation fails.
   Grpc::Status::GrpcStatus grpc_status_before_first_call_ = Grpc::Status::Ok;
+  // The filter config that created this object; see setOwner(). Held weakly so neither
+  // extends the config's lifetime nor matches a different config at a reused address.
+  std::weak_ptr<const FilterConfig> owner_;
 };
 
 class ThreadLocalStreamManager;
@@ -724,9 +735,12 @@ private:
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
-  // Hold a shared_ptr so the logging info object outlives any later overwrite of the
-  // FilterState entry at the same key (e.g. by another filter sharing the same
-  // ``http_filters[].name``); a raw pointer here can dangle after such an overwrite.
+  // Shared with FilterState entry keyed by the filter name.
+  // Only reused by instances of the same FilterConfig;
+  // null if the key is held by another filter
+  // in which case no logging info is recorded.
+  // Shared ownership keeps it valid even if the
+  // FilterState entry is later replaced
   std::shared_ptr<ExtProcLoggingInfo> logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;

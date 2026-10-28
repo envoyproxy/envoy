@@ -243,6 +243,12 @@ protected:
       ASSERT_TRUE(processor_connection_->close());
       ASSERT_TRUE(processor_connection_->waitForDisconnect());
     }
+
+    if (second_processor_connection_) {
+      ASSERT_TRUE(second_processor_connection_->close());
+      ASSERT_TRUE(second_processor_connection_->waitForDisconnect());
+    }
+
     cleanupUpstreamAndDownstream();
   }
 
@@ -287,6 +293,48 @@ typed_config:
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
+  // Two ext_proc filters sharing the same ``http_filters[].name``.
+  // Net order: [ext_proc (server 0), ext_proc (server 1, failure_mode_allow), router].
+  void initializeDuplicateExtProcConfig() {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC.
+      ConfigHelper::setHttp2(
+          *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
+      // Clusters for the two side-stream gRPC servers.
+      for (int i = 0; i < 2; ++i) {
+        auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+        std::string cluster_name = absl::StrCat("side_stream_server_", i);
+        server_cluster->set_name(cluster_name);
+        server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
+      }
+
+      // Prepend first, so it ends up second in the chain.
+      envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor second_config;
+      setGrpcService(*second_config.mutable_grpc_service(), "side_stream_server_1",
+                     grpc_upstreams_[1]->localAddress());
+      second_config.set_failure_mode_allow(true);
+      second_config.mutable_processing_mode()->set_response_header_mode(
+          envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SKIP);
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter second_filter;
+      second_filter.set_name("envoy.filters.http.ext_proc");
+      std::ignore = second_filter.mutable_typed_config()->PackFrom(second_config);
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(second_filter));
+
+      setGrpcService(*proto_config_.mutable_grpc_service(), "side_stream_server_0",
+                     grpc_upstreams_[0]->localAddress());
+      proto_config_.mutable_processing_mode()->set_response_header_mode(
+          envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::SKIP);
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter first_filter;
+      first_filter.set_name("envoy.filters.http.ext_proc");
+      std::ignore = first_filter.mutable_typed_config()->PackFrom(proto_config_);
+      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(first_filter));
+    });
+
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+    setDownstreamProtocol(Http::CodecType::HTTP2);
+  }
+
   IntegrationStreamDecoderPtr sendDownstreamRequest() {
     auto conn = makeClientConnection(lookupPort("http"));
     codec_client_ = makeHttpConnection(std::move(conn));
@@ -299,6 +347,9 @@ typed_config:
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
+
+  FakeHttpConnectionPtr second_processor_connection_;
+  FakeStreamPtr second_processor_stream_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcFilterStateCollisionIntegrationTest,
@@ -347,6 +398,49 @@ TEST_P(ExtProcFilterStateCollisionIntegrationTest, LoggingInfoSurvivesFilterStat
 
   ASSERT_TRUE(authz_conn->close());
   ASSERT_TRUE(authz_conn->waitForDisconnect());
+}
+
+// Two ext_proc filters sharing the same name must not share one ExtProcLoggingInfo, otherwise
+// their callout stats clobber each other. The second filter fails open; that must not be
+// recorded in the logging info owned by the first filter.
+TEST_P(ExtProcFilterStateCollisionIntegrationTest, DuplicateNameDoesNotShareLoggingInfo) {
+  useAccessLog("%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:failed_open)%");
+  initializeDuplicateExtProcConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequest();
+
+  // First filter: continue processing.
+  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ProcessingRequest first_req;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, first_req));
+  ASSERT_TRUE(first_req.has_request_headers());
+  processor_stream_->startGrpcStream();
+  ProcessingResponse first_resp;
+  first_resp.mutable_request_headers();
+  processor_stream_->sendGrpcMessage(first_resp);
+
+  // Second filter: fail its stream so it fails open.
+  ASSERT_TRUE(
+      grpc_upstreams_[1]->waitForHttpConnection(*dispatcher_, second_processor_connection_));
+  ASSERT_TRUE(
+      second_processor_connection_->waitForNewStream(*dispatcher_, second_processor_stream_));
+  ProcessingRequest second_req;
+  ASSERT_TRUE(second_processor_stream_->waitForGrpcMessage(*dispatcher_, second_req));
+  ASSERT_TRUE(second_req.has_request_headers());
+  second_processor_stream_->startGrpcStream();
+  second_processor_stream_->finishGrpcStream(Grpc::Status::Internal);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Only the second filter failed open...
+  test_server_->waitForCounter("http.config_test.ext_proc.failure_mode_allowed", testing::Eq(1));
+  // ...and that must not leak into the first filter's logging info.
+  EXPECT_EQ("0", waitForAccessLog(access_log_name_));
 }
 
 } // namespace Envoy
