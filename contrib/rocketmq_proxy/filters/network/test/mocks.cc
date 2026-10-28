@@ -17,14 +17,14 @@ MockActiveMessage::MockActiveMessage(ConnectionManager& conn_manager, RemotingCo
     : ActiveMessage(conn_manager, std::move(request)) {
   route_ = std::make_shared<NiceMock<Router::MockRoute>>();
 
-  ON_CALL(*this, onError(_)).WillByDefault(Invoke([&](absl::string_view error_message) {
+  ON_CALL(*this, onError(_)).WillByDefault([&](absl::string_view error_message) {
     ActiveMessage::onError(error_message);
-  }));
+  });
   ON_CALL(*this, onReset()).WillByDefault(Return());
-  ON_CALL(*this, sendResponseToDownstream()).WillByDefault(Invoke([&]() {
+  ON_CALL(*this, sendResponseToDownstream()).WillByDefault([&]() {
     ActiveMessage::sendResponseToDownstream();
-  }));
-  ON_CALL(*this, metadata()).WillByDefault(Invoke([&]() { return ActiveMessage::metadata(); }));
+  });
+  ON_CALL(*this, metadata()).WillByDefault([&]() { return ActiveMessage::metadata(); });
   ON_CALL(*this, route()).WillByDefault(Return(route_));
 }
 MockActiveMessage::~MockActiveMessage() = default;
