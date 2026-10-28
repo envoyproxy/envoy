@@ -55,9 +55,10 @@ public:
 
   /**
    * @return true if no later rate limit policy should be evaluated once this one has produced a
-   *         descriptor.
+   *         descriptor. Defaults to false so existing implementations keep evaluating every
+   *         policy.
    */
-  virtual bool stopOnMatch() const PURE;
+  virtual bool stopOnMatch() const { return false; }
 
   /**
    * Potentially populate the descriptor array with new descriptors to query.

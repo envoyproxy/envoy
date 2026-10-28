@@ -273,8 +273,9 @@ void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
     }
     const bool populated = generator.populateDescriptors(headers, response_headers, stream_info,
                                                          local_service_cluster, descriptors);
-    // A matching policy with stop_on_match ends the search; later policies are skipped.
-    if (populated && generator.stopOnMatch()) {
+    // A matching policy with stop_on_match ends the search; later policies are skipped. A
+    // descriptor with no entries (every action skipped via skip_if_absent) is not a match.
+    if (populated && generator.stopOnMatch() && !descriptors.back().entries_.empty()) {
       return;
     }
   }
