@@ -522,17 +522,22 @@ The example pins a route to Claude on an illustrative gateway, statically, with
             text_format_source:
               inline_string: "claude-sonnet-4-5"
 
-A binding in JSON also edits the body and the request headers. Claude on Vertex AI takes the
-model in the path alone and the Vertex AI API version in the body, not in the API's header:
+A binding in JSON also edits the body and the request headers, with the same
+:ref:`KeyValueMutation <envoy_v3_api_msg_config.core.v3.KeyValueMutation>` and
+:ref:`HeaderMutation <envoy_v3_api_msg_config.common.mutation_rules.v3.HeaderMutation>`
+messages other filters use. Claude on Vertex AI takes the model in the path alone and the
+Vertex AI API version in the body, not in the API's header:
 
 .. code-block:: json
 
   {
     "uri_pattern": "/v1/projects/my-project/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
-    "mutations": [
-      {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true},
-      {"header": "anthropic-version"}
+    "body_mutations": [
+      {"remove": "model"},
+      {"append": {"record": {"key": "anthropic_version", "value": "vertex-2023-10-16"}, "action": "ADD_IF_ABSENT"}}
+    ],
+    "header_mutations": [
+      {"remove": "anthropic-version"}
     ]
   }
 
@@ -543,14 +548,19 @@ automatically, so requests to Anthropic need no extra path or header configurati
 
   {
     "uri_pattern": "/v1/messages",
-    "mutations": [
-      {"header": "anthropic-version", "value": "2023-06-01", "keep_existing": true}
+    "header_mutations": [
+      {"append": {"header": {"key": "anthropic-version", "value": "2023-06-01"}, "append_action": "ADD_IF_ABSENT"}}
     ]
   }
 
-A binding's mutations apply on top of the API's own, so a binding that only adds a header keeps
-the API's body edits. A mutation naming a field or header the API's also name replaces that one
-edit, which is how the Vertex binding above removes the API's version header.
+A binding's mutations apply on top of the API's own, header edits first, so a binding that only
+adds a header keeps the API's body edits. A mutation naming a field or header the API's also
+name replaces that one edit, which is how the Vertex binding above removes the API's version
+header. The action is named explicitly: ``OVERWRITE_IF_EXISTS_OR_ADD`` sets, ``ADD_IF_ABSENT``
+sets where absent, ``remove`` removes. The enum default ``APPEND_IF_EXISTS_OR_ADD``,
+``OVERWRITE_IF_EXISTS``, ``remove_on_match``, ``raw_value`` and the deprecated ``append`` and
+``entry`` fields are rejected for now. A value is not a format string: only ``{model}`` and the
+client's path variables are replaced.
 
 Use header mutations only for non-secret API headers; pass credentials via
 ``request_headers_to_add`` or :ref:`credential_injector <config_http_filters_credential_injector>`.

@@ -69,6 +69,98 @@ absl::StatusOr<std::optional<nlohmann::json>> toJson(const Protobuf::Value& valu
   return nlohmann::json::parse(*text);
 }
 
+// Only these header mutations are accepted: a removal, or a write with `ADD_IF_ABSENT` or
+// `OVERWRITE_IF_EXISTS_OR_ADD`. The enum's default, `APPEND_IF_EXISTS_OR_ADD`, is rejected too, so
+// the action is always named: a binding that spells out what it means keeps meaning it if more
+// is accepted later.
+absl::StatusOr<LlmBinding::Mutation>
+headerMutation(const envoy::config::common::mutation_rules::v3::HeaderMutation& proto) {
+  using envoy::config::core::v3::HeaderValueOption;
+  LlmBinding::Mutation mutation;
+  switch (proto.action_case()) {
+  case envoy::config::common::mutation_rules::v3::HeaderMutation::kRemove:
+    mutation.header = proto.remove();
+    break;
+  case envoy::config::common::mutation_rules::v3::HeaderMutation::kAppend: {
+    const HeaderValueOption& option = proto.append();
+    mutation.header = option.header().key();
+    if (option.has_append() || !option.header().raw_value().empty()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("a binding writes the `", mutation.header,
+                       "` header with `value` and `append_action`, not `raw_value` or `append`"));
+    }
+    switch (option.append_action()) {
+    case HeaderValueOption::ADD_IF_ABSENT:
+      mutation.keep_existing = true;
+      break;
+    case HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD:
+      break;
+    default:
+      return absl::InvalidArgumentError(
+          absl::StrCat("a binding cannot write the `", mutation.header, "` header with ",
+                       HeaderValueOption::HeaderAppendAction_Name(option.append_action())));
+    }
+    mutation.value = nlohmann::json(option.header().value());
+    break;
+  }
+  default:
+    return absl::InvalidArgumentError("a binding's header mutation is a `remove` or an `append`");
+  }
+  if (mutation.header.empty()) {
+    return absl::InvalidArgumentError("a binding mutation names no body field or header");
+  }
+  if (const absl::Status status = validateHeaderMutation(mutation); !status.ok()) {
+    return status;
+  }
+  return mutation;
+}
+
+// Only these body mutations are accepted: a removal, or a write of any JSON value with
+// `ADD_IF_ABSENT` or `OVERWRITE_IF_EXISTS_OR_ADD`. The enum's default, `APPEND_IF_EXISTS_OR_ADD`,
+// is rejected too, as for a header.
+absl::StatusOr<LlmBinding::Mutation>
+bodyMutation(const envoy::config::core::v3::KeyValueMutation& proto) {
+  using envoy::config::core::v3::KeyValueAppend;
+  LlmBinding::Mutation mutation;
+  if (proto.has_append() == !proto.remove().empty()) {
+    return absl::InvalidArgumentError(
+        "a binding's body mutation sets exactly one of `append` and `remove`");
+  }
+  if (!proto.has_append()) {
+    mutation.body_field = proto.remove();
+    return mutation;
+  }
+  const KeyValueAppend& option = proto.append();
+  if (option.has_entry()) {
+    return absl::InvalidArgumentError("a binding's body mutation writes `record`, not `entry`");
+  }
+  mutation.body_field = option.record().key();
+  if (mutation.body_field.empty()) {
+    return absl::InvalidArgumentError("a binding mutation names no body field or header");
+  }
+  switch (option.action()) {
+  case KeyValueAppend::ADD_IF_ABSENT:
+    mutation.keep_existing = true;
+    break;
+  case KeyValueAppend::OVERWRITE_IF_EXISTS_OR_ADD:
+    break;
+  default:
+    return absl::InvalidArgumentError(
+        absl::StrCat("a binding cannot write the `", mutation.body_field, "` field with ",
+                     KeyValueAppend::KeyValueAppendAction_Name(option.action())));
+  }
+  absl::StatusOr<std::optional<nlohmann::json>> value = toJson(option.record().value());
+  if (!value.ok()) {
+    return value.status();
+  }
+  if (!value->has_value()) {
+    return absl::InvalidArgumentError(absl::StrCat("a binding writes the `", mutation.body_field,
+                                                   "` field with no value; `remove` it instead"));
+  }
+  mutation.value = **std::move(value);
+  return mutation;
+}
+
 // `text` with each `{name}` replaced by its value.
 absl::StatusOr<std::string> fillPlaceholders(absl::string_view text,
                                              UriPattern::ValueLookup value) {
@@ -210,37 +302,26 @@ LlmBinding::create(const envoy::type::ai::v3::LLMBinding& proto) {
     }
     pattern = *std::move(parsed);
   }
+  // `header_mutations` and `body_mutations` are flattened into one list, headers then body, each
+  // keeping its own order. Order across the two does not matter: a header edit never reads or
+  // writes a body field, nor the reverse. Order within each does, e.g. a removal and then an
+  // `ADD_IF_ABSENT` of the same header.
   std::vector<Mutation> mutations;
-  mutations.reserve(proto.mutations_size());
-  for (const envoy::type::ai::v3::LLMBinding::Mutation& mutation : proto.mutations()) {
-    Mutation converted;
-    switch (mutation.target_case()) {
-    case envoy::type::ai::v3::LLMBinding::Mutation::kBodyField:
-      converted.body_field = mutation.body_field();
-      break;
-    case envoy::type::ai::v3::LLMBinding::Mutation::kHeader:
-      converted.header = mutation.header();
-      break;
-    case envoy::type::ai::v3::LLMBinding::Mutation::TARGET_NOT_SET:
-      break;
+  mutations.reserve(proto.header_mutations_size() + proto.body_mutations_size());
+  for (const envoy::config::common::mutation_rules::v3::HeaderMutation& mutation :
+       proto.header_mutations()) {
+    absl::StatusOr<Mutation> converted = headerMutation(mutation);
+    if (!converted.ok()) {
+      return converted.status();
     }
-    if (converted.body_field.empty() && converted.header.empty()) {
-      return absl::InvalidArgumentError("a binding mutation names no body field or header");
+    mutations.push_back(*std::move(converted));
+  }
+  for (const envoy::config::core::v3::KeyValueMutation& mutation : proto.body_mutations()) {
+    absl::StatusOr<Mutation> converted = bodyMutation(mutation);
+    if (!converted.ok()) {
+      return converted.status();
     }
-    if (mutation.has_value()) {
-      absl::StatusOr<std::optional<nlohmann::json>> value = toJson(mutation.value());
-      if (!value.ok()) {
-        return value.status();
-      }
-      converted.value = *std::move(value);
-    }
-    converted.keep_existing = mutation.keep_existing();
-    if (converted.isHeader()) {
-      if (const absl::Status status = validateHeaderMutation(converted); !status.ok()) {
-        return status;
-      }
-    }
-    mutations.push_back(std::move(converted));
+    mutations.push_back(*std::move(converted));
   }
   return std::make_shared<const LlmBinding>(std::move(pattern), std::move(mutations));
 }

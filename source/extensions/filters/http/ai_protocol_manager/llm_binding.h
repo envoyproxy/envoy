@@ -37,6 +37,7 @@ struct HeaderMutation {
 // where that differs from the API's own. Built once, then shared and never changed.
 class LlmBinding {
 public:
+  // One edit, from a `KeyValueMutation` (body) or a `HeaderMutation` (header).
   struct Mutation {
     // A top-level body member. Empty for a header mutation.
     std::string body_field;
@@ -45,7 +46,7 @@ public:
     // nullopt removes the field or header. In a string, `{name}` is replaced by that request
     // value. A header's value is always a string.
     std::optional<nlohmann::json> value;
-    // Write only where the field or header is absent.
+    // Write only where the field or header is absent (`ADD_IF_ABSENT`).
     bool keep_existing{false};
 
     bool isHeader() const { return !header.empty(); }

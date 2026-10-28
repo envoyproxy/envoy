@@ -1411,7 +1411,7 @@ TEST(TranscodingEngineTest, RequestBindingIsDataInThePack) {
                   .protocol = LLMProtocol::OpenAiResponses,
                   .binding = parseBinding(
                       R"({"uri_pattern": "/v2/engines/{model}:{predict|streamPredict?stream=1}",)"
-                      R"( "mutations": [{"body_field": "model"}, {"body_field": "stream"}]})"),
+                      R"( "body_mutations": [{"remove": "model"}, {"remove": "stream"}]})"),
               }),
               IsOk());
   const TranscodeLeg to_ir{PayloadKind::Request, TranscodeDirection::ToIr,
@@ -1752,9 +1752,9 @@ TEST(TranscodingEngineTest, ResponseBindingEditsTheBodyAfterValidation) {
 
   const LlmBindingConstSharedPtr vertex_claude = parseBinding(R"({
     "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
-    "mutations": [
-      {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    "body_mutations": [
+      {"remove": "model"},
+      {"append": {"record": {"key": "anthropic_version", "value": "vertex-2023-10-16"}, "action": "ADD_IF_ABSENT"}}
     ]
   })");
   nlohmann::json doc = nlohmann::json::parse(R"({

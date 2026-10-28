@@ -981,9 +981,9 @@ TEST_F(TranscoderFilterTest, JsonBindingSendsTheRequestToClaudeOnVertexAi) {
       Http::TestRequestHeaderMapImpl{{":method", "POST"}, {":path", "/v1/chat/completions"}};
   setBinding(FilterStateKeys::BindingResponse, R"({
     "uri_pattern": "/v1/projects/acme/locations/us-east5/publishers/anthropic/models/{model}:{rawPredict|streamRawPredict}",
-    "mutations": [
-      {"body_field": "model"},
-      {"body_field": "anthropic_version", "value": "vertex-2023-10-16", "keep_existing": true}
+    "body_mutations": [
+      {"remove": "model"},
+      {"append": {"record": {"key": "anthropic_version", "value": "vertex-2023-10-16"}, "action": "ADD_IF_ABSENT"}}
     ]
   })");
   setInstruction(FilterStateKeys::ModelResolved, "claude-sonnet-4-5@20250929");
