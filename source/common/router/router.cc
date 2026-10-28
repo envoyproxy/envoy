@@ -591,7 +591,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_->virtualHost().virtualCluster(headers);
+  request_vcluster_ = route_->virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }

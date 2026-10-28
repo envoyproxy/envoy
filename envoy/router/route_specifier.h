@@ -164,7 +164,8 @@ using MatchableRouteConstSharedPtr = std::shared_ptr<const MatchableRoute>;
  * Builds routes that belong to the configuration the specifier is configured on, so that a
  * specifier can select one of them for a request instead of restating every route field itself.
  * A built route inherits from its virtual host and route configuration exactly like a configured
- * route does.
+ * route does. The builder also builds the virtual clusters of that virtual host that a specifier
+ * selects by name.
  *
  * Only valid for the duration of the createRouteSpecifier() call it was handed to, because it
  * borrows the init manager that the routes it builds warm up with.
@@ -184,6 +185,16 @@ public:
    */
   virtual absl::StatusOr<MatchableRouteConstSharedPtr>
   build(const envoy::config::route::v3::Route& route, bool validate_clusters) PURE;
+
+  /**
+   * Build a virtual cluster of the virtual host that a specifier selects by name rather than by
+   * matching headers. It has the stats of a virtual cluster of that name on the virtual host,
+   * configured or not, and it can outlive the builder.
+   *
+   * @param name the name of the virtual cluster.
+   * @return the virtual cluster, or an error status if the name is empty.
+   */
+  virtual absl::StatusOr<VirtualClusterConstPtr> buildVirtualCluster(absl::string_view name) PURE;
 };
 
 /**

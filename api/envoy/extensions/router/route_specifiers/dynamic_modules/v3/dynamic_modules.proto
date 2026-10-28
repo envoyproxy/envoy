@@ -170,7 +170,7 @@ message BuiltRouteCache {
 }
 
 // Configuration for the dynamic modules route specifier.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message DynamicModuleRouteSpecifier {
   // Specifies the shared object level configuration. This field is required.
   //
@@ -248,4 +248,13 @@ message DynamicModuleRouteSpecifier {
   // A per worker cache of the routes the module builds from route templates. It requires a
   // specifier configured on a virtual host or a route. If not specified, no route is cached.
   BuiltRouteCache built_route_cache = 12;
+
+  // The virtual clusters the module may count a request in with ``set_virtual_cluster_name``, in
+  // place of the :ref:`virtual cluster <envoy_v3_api_msg_config.route.v3.VirtualCluster>` the
+  // virtual host matches the request against. A request counted in one of them uses the stats of
+  // the virtual cluster of that name on the virtual host, so the stats keep their names when the
+  // virtual host stops configuring the virtual cluster. It requires a specifier configured on a
+  // virtual host or a route. The names must be unique.
+  repeated string virtual_cluster_names = 13
+      [(validate.rules).repeated = {items {string {min_len: 1}}}];
 }

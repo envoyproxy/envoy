@@ -30,7 +30,7 @@ enum mode {
   ROUTE_ONLY,
   // Selects the route override "with_metadata", whose metadata is layered into the recording.
   OVERRIDE_METADATA,
-  // Records the cluster and the field the x-vary header names, set from the x-value header.
+  // Records the cluster and what the x-vary header names, set from the x-value header.
   VARY,
   // Selects the template the x-template header names and records nothing.
   TEMPLATE_BY_HEADER,
@@ -200,7 +200,7 @@ static void record_route(envoy_dynamic_module_type_route_specifier_context_envoy
   envoy_dynamic_module_callback_route_specifier_set_route_user_data(ctx, 7);
 }
 
-// Records cached_cluster and the one field x-vary names, so that two requests that carry different
+// Records cached_cluster and what x-vary names, so that two requests that carry different
 // values of x-value record different routes for one key.
 static void record_varied(envoy_dynamic_module_type_route_specifier_context_envoy_ptr ctx) {
   envoy_dynamic_module_callback_route_specifier_set_cluster_name(ctx, buffer("cached_cluster"));
@@ -264,6 +264,20 @@ static void record_varied(envoy_dynamic_module_type_route_specifier_context_envo
         ctx, named(name, sizeof(name), "x-removed-", value));
   } else if (header_is(field, "user-data")) {
     envoy_dynamic_module_callback_route_specifier_set_route_user_data(ctx, value_number);
+  } else if (header_is(field, "virtual-cluster")) {
+    envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(
+        ctx, named(name, sizeof(name), "vcluster_", value));
+  } else if (header_is(field, "replaced-virtual-cluster")) {
+    // Names vcluster_1 and then the virtual cluster of the value, and records what both calls
+    // returned, so that a test sees a later name replace the first and an undeclared one keep it.
+    const bool first = envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(
+        ctx, buffer("vcluster_1"));
+    const bool second = envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(
+        ctx, named(name, sizeof(name), "vcluster_", value));
+    char accepted[8];
+    snprintf(accepted, sizeof(accepted), "%d,%d", first, second);
+    envoy_dynamic_module_callback_route_specifier_set_route_metadata_string(
+        ctx, buffer("envoy.test.cache"), buffer("accepted"), buffer(accepted));
   }
 }
 

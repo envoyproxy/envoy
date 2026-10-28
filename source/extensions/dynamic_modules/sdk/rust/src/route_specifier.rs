@@ -1055,6 +1055,20 @@ impl RouteSpecifierContext {
     }
   }
 
+  /// Count the request in a virtual cluster declared in the route specifier configuration by name,
+  /// in place of the one the virtual host matches. Recording one for a direct response or a
+  /// redirect fails the decision.
+  ///
+  /// Returns `false` when the name is not declared.
+  pub fn set_virtual_cluster_name(&mut self, virtual_cluster_name: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(
+        self.envoy_ptr,
+        crate::str_to_module_buffer(virtual_cluster_name),
+      )
+    }
+  }
+
   /// Select a route override declared in the route specifier configuration by override_id.
   ///
   /// Returns `false` when the override_id is not declared.

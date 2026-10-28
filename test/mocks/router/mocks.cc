@@ -180,6 +180,9 @@ MockRoute::MockRoute() {
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
   ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(*virtual_host_));
   ON_CALL(*this, virtualHostSharedPtr()).WillByDefault(Return(virtual_host_));
+  ON_CALL(*this, virtualCluster(_)).WillByDefault([this](const Http::HeaderMap& headers) {
+    return virtualHost().virtualCluster(headers);
+  });
 
   // Route entry methods.
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(route_entry_.cluster_name_));

@@ -231,6 +231,11 @@ public:
       return absl::InvalidArgumentError(absl::StrCat("no test route specifier named ", key));
     }
     route_builders_[key] = context.routeBuilder().ptr();
+    if (const auto name_it = virtual_cluster_names_.find(key);
+        name_it != virtual_cluster_names_.end()) {
+      virtual_clusters_.insert_or_assign(
+          key, context.routeBuilder()->buildVirtualCluster(name_it->second));
+    }
     return it->second;
   }
 
@@ -244,6 +249,9 @@ public:
   absl::flat_hash_map<std::string, RouteSpecifierSharedPtr> specifiers_;
   // The route builder each specifier was created with, to check which levels can build routes.
   absl::flat_hash_map<std::string, RouteBuilder*> route_builders_;
+  // The virtual cluster to build for a specifier, by config key, and what building it returned.
+  absl::flat_hash_map<std::string, std::string> virtual_cluster_names_;
+  absl::flat_hash_map<std::string, absl::StatusOr<VirtualClusterConstPtr>> virtual_clusters_;
 };
 
 envoy::config::core::v3::TypedExtensionConfig testSpecifierConfig(const std::string& key) {
@@ -344,9 +352,10 @@ protected:
 
   VirtualHostRoute route(const Config& config) { return config.route(headers_, stream_info_, 0); }
 
+  // Declared first, so that its store outlives the virtual clusters the factory keeps.
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   TestRouteSpecifierFactory factory_;
   Registry::InjectFactory<RouteSpecifierFactory> registered_{factory_};
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Http::TestRequestHeaderMapImpl headers_{
       {":authority", "host"}, {":path", "/"}, {"x-forwarded-proto", "http"}};
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
@@ -539,6 +548,74 @@ virtual_hosts:
   ASSERT_NE(nullptr, result.vhost);
   EXPECT_EQ(replacement->virtualHostSharedPtr(), result.vhost);
   EXPECT_EQ(result.vhost.get(), std::addressof(result.route->virtualHost()));
+}
+
+// A virtual cluster the route builder builds counts in the stats of the virtual cluster of the same
+// name configured on the virtual host. A route that delegates to a configured route reports the
+// virtual cluster its virtual host matches.
+TEST_F(RouteSpecifierConfigImplTest, BuiltVirtualClusterSharesTheStatsOfTheConfiguredOne) {
+  EXPECT_CALL(*registerSpecifier("vhost"), onRoute(_, _, _, _, _))
+      .WillOnce(wrapWith("vhost", trace_));
+  factory_.virtual_cluster_names_["vhost"] = "rides";
+
+  const std::string yaml = R"EOF(
+name: config
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  route_specifiers:
+  - name: envoy.test.route_specifier
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: vhost
+  routes:
+  - match: {prefix: "/"}
+    name: matched
+    route: {cluster: some_cluster}
+  virtual_clusters:
+  - name: rides
+    headers:
+    - name: ":path"
+      string_match: {exact: "/"}
+  )EOF";
+
+  const auto config_impl = config(yaml);
+  ASSERT_NE(nullptr, config_impl);
+  const auto& built = factory_.virtual_clusters_.at("vhost");
+  ASSERT_TRUE(built.ok());
+  EXPECT_EQ("rides", (*built)->name());
+  const Stats::Counter& counter = (*built)->stats().upstream_rq_total_;
+  EXPECT_EQ("vhost.vhost.vcluster.rides.upstream_rq_total", counter.name());
+  EXPECT_EQ("vhost.vcluster.upstream_rq_total", counter.tagExtractedName());
+
+  VirtualHostRoute result = route(*config_impl);
+  ASSERT_NE(nullptr, result.route);
+  const VirtualCluster* configured = result.route->virtualCluster(headers_);
+  ASSERT_NE(nullptr, configured);
+  EXPECT_NE(configured, built->get());
+  EXPECT_EQ(&counter, &configured->stats().upstream_rq_total_);
+}
+
+// A virtual cluster needs a name to count its stats under.
+TEST_F(RouteSpecifierConfigImplTest, VirtualClusterWithoutANameIsNotBuilt) {
+  registerSpecifier("vhost");
+  factory_.virtual_cluster_names_["vhost"] = "";
+
+  const std::string yaml = R"EOF(
+name: config
+virtual_hosts:
+- name: vhost
+  domains: ["*"]
+  route_specifiers:
+  - name: envoy.test.route_specifier
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: vhost
+  )EOF";
+
+  ASSERT_NE(nullptr, config(yaml));
+  EXPECT_THAT(factory_.virtual_clusters_.at("vhost").status(),
+              HasStatusMessage("virtual cluster name must not be empty"));
 }
 
 // Makes the specifier hand back the route it was given together with `status`, recording the

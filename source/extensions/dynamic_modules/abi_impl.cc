@@ -2288,6 +2288,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_unset_route_templa
 WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_timeout,
                envoy_dynamic_module_type_route_specifier_context_envoy_ptr, uint64_t)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_early_header_mutation_add_header, false,
           envoy_dynamic_module_type_early_header_mutation_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)

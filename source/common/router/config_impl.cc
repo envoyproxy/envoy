@@ -179,6 +179,15 @@ RouteBuilderImpl::build(const envoy::config::route::v3::Route& route, bool valid
       vhost_->globalRouteConfig().ignorePathParametersInPathMatching());
 }
 
+absl::StatusOr<VirtualClusterConstPtr>
+RouteBuilderImpl::buildVirtualCluster(absl::string_view name) {
+  if (name.empty()) {
+    return absl::InvalidArgumentError("virtual cluster name must not be empty");
+  }
+  return vhost_->createNamedVirtualCluster(
+      name, factory_context_.routerContext().virtualClusterStatNames());
+}
+
 namespace {
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
@@ -1788,6 +1797,21 @@ CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
 CommonVirtualHostImpl::CatchAllVirtualCluster::CatchAllVirtualCluster(
     Stats::Scope& scope, const VirtualClusterStatNames& stat_names, Stats::StatName vhost_stat_name)
     : VirtualClusterBase(std::nullopt, stat_names.other_, scope, stat_names, vhost_stat_name) {}
+
+CommonVirtualHostImpl::NamedVirtualCluster::NamedVirtualCluster(
+    absl::string_view name, Stats::ScopeSharedPtr scope, const VirtualClusterStatNames& stat_names,
+    Stats::StatName vhost_stat_name)
+    : StatNameProvider(name, scope->symbolTable()),
+      VirtualClusterBase(std::string(name), stat_name_storage_.statName(), *scope, stat_names,
+                         vhost_stat_name),
+      scope_(std::move(scope)) {}
+
+VirtualClusterConstPtr
+CommonVirtualHostImpl::createNamedVirtualCluster(absl::string_view name,
+                                                 const VirtualClusterStatNames& stat_names) const {
+  return std::make_unique<NamedVirtualCluster>(name, stats_scope_, stat_names,
+                                               stat_name_storage_.statName());
+}
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 

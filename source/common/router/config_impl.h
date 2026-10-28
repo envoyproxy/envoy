@@ -234,6 +234,7 @@ public:
   // Router::RouteBuilder
   absl::StatusOr<MatchableRouteConstSharedPtr> build(const envoy::config::route::v3::Route& route,
                                                      bool validate_clusters) override;
+  absl::StatusOr<VirtualClusterConstPtr> buildVirtualCluster(absl::string_view name) override;
 
 private:
   const CommonVirtualHostSharedPtr vhost_;
@@ -419,6 +420,11 @@ public:
   }
   const Stats::ScopeSharedPtr& statsScope() const { return stats_scope_; }
 
+  // Builds a virtual cluster that is selected by name rather than by matching headers, with the
+  // stats of a virtual cluster of that name on this virtual host, configured or not.
+  VirtualClusterConstPtr createNamedVirtualCluster(absl::string_view name,
+                                                   const VirtualClusterStatNames& stat_names) const;
+
 private:
   CommonVirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                         const CommonConfigSharedPtr& global_route_config,
@@ -469,6 +475,14 @@ private:
   struct CatchAllVirtualCluster : public VirtualClusterBase {
     CatchAllVirtualCluster(Stats::Scope& scope, const VirtualClusterStatNames& stat_names,
                            Stats::StatName vhost_stat_name);
+  };
+
+  // Keeps the scope its stats are created in, since the route specifier that owns it can outlive
+  // the virtual host.
+  struct NamedVirtualCluster : public StatNameProvider, public VirtualClusterBase {
+    NamedVirtualCluster(absl::string_view name, Stats::ScopeSharedPtr scope,
+                        const VirtualClusterStatNames& stat_names, Stats::StatName vhost_stat_name);
+    const Stats::ScopeSharedPtr scope_;
   };
 
   const std::string name_;
