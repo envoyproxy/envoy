@@ -880,6 +880,11 @@ public:
   virtual void sendGoAwayAndClose(bool graceful) = 0;
 
   /**
+   * Marks the downstream connection to be drained once the current HTTP stream completes.
+   */
+  virtual void drainConnectionUponCompletion() = 0;
+
+  /**
    * Recreates the current stream, optionally with replacement headers. Returns false if the
    * recreation could not be initiated, for example when the request body has not been fully
    * received. On success the filter chain is destroyed before the current event hook returns and

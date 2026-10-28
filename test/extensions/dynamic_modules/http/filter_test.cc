@@ -424,6 +424,7 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   EXPECT_CALL(downstream_callbacks, clearRouteCache());
   EXPECT_CALL(downstream_callbacks, refreshRouteCluster());
+  EXPECT_CALL(stream_info, setShouldDrainConnectionUponCompletion(true));
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
       .WillRepeatedly(
           testing::Return(OptRef<DownstreamStreamFilterCallbacks>(downstream_callbacks)));

@@ -3539,6 +3539,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_recreate_stream, false
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_clear_route_cluster_cache,
                envoy_dynamic_module_type_http_filter_envoy_ptr)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_http_drain_connection_upon_completion,
+               envoy_dynamic_module_type_http_filter_envoy_ptr)
+
 WEAK_STUB(size_t, envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe, 0,
           envoy_dynamic_module_type_http_filter_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
