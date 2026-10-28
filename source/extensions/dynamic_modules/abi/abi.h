@@ -10589,6 +10589,11 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
  * envoy_dynamic_module_callback_cluster_lb_get_healthy_host returns a healthy host pointer by
  * index at the given priority level.
  *
+ * With use_persistent_host_partitions, the first index getter for a host list after an update
+ * builds that list, which is O(N) on the worker. The healthy, total and degraded host count getters
+ * and envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts do not. The locality getters build
+ * the healthy per-locality list the same way.
+ *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
  * @param priority is the priority level.
  * @param index is the index of the host in the healthy host list.
@@ -11839,6 +11844,54 @@ typedef struct envoy_dynamic_module_type_packed_address {
 bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
     envoy_dynamic_module_type_packed_address* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count returns how
+ * many hosts changed health since the previous update this worker applied, so a module can patch
+ * its healthy set from the current envoy_dynamic_module_on_cluster_lb_on_host_membership_update
+ * call instead of rereading every host. Envoy merges updates within the cluster's
+ * update_merge_window, so one call can carry several health changes. Each host is listed once, and
+ * hosts removed since the previous update are reported only by the member update getters. It is
+ * only valid during
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
+ *
+ * Envoy only knows this when the cluster keeps persistent host partitions, which requires
+ * use_persistent_host_partitions in the cluster's ClusterConfig, and no health refresh happened
+ * since the previous update. A refresh covers every host, and with an active health checker it
+ * precedes a worker's first update. Otherwise it returns false and the module must reread the hosts
+ * it tracks.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param result receives the count. Its contents are unspecified when the callback returns false.
+ * @return true if the count is known, false on a null pointer, outside the callback, or when Envoy
+ * does not know which hosts changed health.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host returns a host
+ * whose health changed since the previous update this worker applied, with its priority and current
+ * health. The health is read when this is called, so it can be newer than the host lists of the
+ * same update. The host pointer stays valid while the host is in the cluster's host set. Valid
+ * indexes are below the count from
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count. It is only
+ * valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread
+ * that runs it.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the health-changed list.
+ * @param priority receives the host's priority. Its contents are unspecified when the callback
+ * returns nullptr.
+ * @param health receives the host's current health. Its contents are unspecified when the callback
+ * returns nullptr.
+ * @return the host pointer, or nullptr on a null pointer, an out-of-bounds index, outside the
+ * callback, or when Envoy does not know which hosts changed health.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, uint32_t* priority,
+    envoy_dynamic_module_type_host_health* health);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
