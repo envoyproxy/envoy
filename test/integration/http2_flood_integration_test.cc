@@ -650,12 +650,13 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
 
 // Verify detection of flood by the RST_STREAM frame sent on pending flush timeout
 TEST_P(Http2FloodMitigationTest, RstStreamOverflowOnPendingFlushTimeout) {
+  // Shorten only the pending flush timer. A short stream_idle_timeout would also time out the
+  // pre-fill stream, whose idle timer response data does not reset, before its response is proxied.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
-        hcm.mutable_stream_idle_timeout()->set_seconds(0);
-        constexpr uint64_t IdleTimeoutMs = 400;
-        hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+        constexpr uint64_t FlushTimeoutMs = 400;
+        hcm.mutable_stream_flush_timeout()->set_nanos(FlushTimeoutMs * 1000 * 1000);
       });
 
   // Pending flush timer is started when upstream response has completed but there is no window to
