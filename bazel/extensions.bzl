@@ -16,8 +16,12 @@ _MODULES_SEGMENT = "/modules/"
 _SOURCE_JSON_SUFFIX = "/source.json"
 _LLVM_VERSION = "22.1.8"
 
-def _llvm_repo_build(llvm_version):
-    return render_llvm_repo_build(llvm_version.split(".")[0])
+def _llvm_repo_build(llvm_version, is_host = False):
+    # is_host scopes the generated exports_files() glob to LLVM files only, for
+    # repos backed by a host LLVM install (envoy_llvm.host) rooted at a system
+    # prefix such as /usr. The alias repo over a clean minimal tarball keeps the
+    # default broad glob.
+    return render_llvm_repo_build(llvm_version.split(".")[0], is_host = is_host)
 
 def _write_llvm_bzl(repository_ctx, llvm_version, llvm_lib_dir, is_host):
     major = llvm_version.split(".")[0]
@@ -84,7 +88,7 @@ def _host_llvm_repo_impl(repository_ctx):
             _symlink_directory_contents(repository_ctx, path, directory)
     repository_ctx.file(
         "BUILD.bazel",
-        _llvm_repo_build(version),
+        _llvm_repo_build(version, is_host = True),
     )
     _write_llvm_bzl(repository_ctx, version, lib_dir, True)
 
