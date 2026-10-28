@@ -19,6 +19,12 @@ determine whether or not the content should be compressed. The content is
 compressed and then sent to the client with the appropriate headers, if
 response and request allow.
 
+When an otherwise compressible request or response has no ``content-length``
+header, the filter delays compression until it receives nonempty body data. Headers are held until that data
+arrives or the stream ends. If the stream ends without body data, including when
+it ends with trailers, the filter leaves the body uncompressed and does not add a
+``content-encoding`` header.
+
 Currently the filter supports :ref:`gzip <envoy_v3_api_msg_extensions.compression.gzip.compressor.v3.Gzip>`,
 :ref:`brotli <envoy_v3_api_msg_extensions.compression.brotli.compressor.v3.Brotli>`
 and :ref:`zstd <envoy_v3_api_msg_extensions.compression.zstd.compressor.v3.Zstd>`

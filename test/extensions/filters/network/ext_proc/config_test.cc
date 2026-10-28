@@ -33,9 +33,12 @@ TEST_F(ConfigTest, BasicConfigTest) {
   processing_mode->set_process_write(
       envoy::extensions::filters::network::ext_proc::v3::ProcessingMode::STREAMED);
 
+  proto_config.mutable_metadata_options()->mutable_send_once()->set_value(true);
+
   Config config(proto_config, scope_);
 
   EXPECT_TRUE(config.failureModeAllow());
+  EXPECT_TRUE(config.sendOnce());
 
   const auto& returned_mode = config.processingMode();
   EXPECT_EQ(returned_mode.process_read(),
@@ -51,6 +54,7 @@ TEST_F(ConfigTest, DefaultValues) {
 
   // Test the default value for failureModeAllow (should be false by default in protobuf)
   EXPECT_FALSE(config.failureModeAllow());
+  EXPECT_FALSE(config.sendOnce());
 
   const auto& mode = config.processingMode();
   // Check default values according to protobuf definition

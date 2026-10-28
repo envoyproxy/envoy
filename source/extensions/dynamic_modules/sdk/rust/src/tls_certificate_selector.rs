@@ -7,9 +7,20 @@
 //! [`crate::NEW_TLS_CERTIFICATE_SELECTOR_CONFIG_FUNCTION`].
 
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
-  strs_to_module_buffers, wrap_into_c_void_ptr, EnvoyBuffer, EnvoyCounterId, EnvoyCounterVecId,
-  EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  EnvoyBuffer,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
 };
 #[cfg(any(test, feature = "mock"))]
 use mockall::*;

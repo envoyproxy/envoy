@@ -164,13 +164,16 @@ private:
 // A route carrying a per-route request declaration is a declared AI endpoint,
 // and its payload is the filter's to manage: parsed strictly, with a malformed
 // one rejected so Envoy and the backend cannot read the same body differently.
-// A route without one is parsed only if the filter opted into
-// parse_unconfigured_routes -- offered for compatibility with chains that want
-// a parsed body on ordinary routes, never a reason to fail a request -- and is
-// otherwise untouched. That opt-in covers routes that never asked for it, so it
-// takes only a request it can hold to end of stream without stalling it, which
-// rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
-// endpoint carries no such gate.
+// A filter ahead can declare the endpoint instead, by naming the client's API
+// in `envoy.ai.llm_protocol.request` filter state; such a request is held only
+// if it can be held to end of stream (see below), since the writer may not
+// have looked at its framing. A route without either is parsed only if the
+// filter opted into parse_unconfigured_routes -- offered for compatibility with
+// chains that want a parsed body on ordinary routes, never a reason to fail a
+// request -- and is otherwise untouched. That opt-in covers routes that never
+// asked for it, so it takes only a request it can hold to end of stream
+// without stalling it, which rules out gRPC and Connect streaming, upgrades,
+// and CONNECT. A route-declared endpoint carries no such gate.
 //
 // At end of payload the configured AI filters run over the parsed document
 // (filter_manager.h); payload schema validation is one of them. Normalization
@@ -213,7 +216,8 @@ private:
   // Terminates the stream with a 400 for a payload that failed to parse.
   void rejectInvalidPayload(const absl::Status& status);
 
-  // Whether the route handed its request payload to the filter, which is also
+  // Whether the request payload was handed to the filter -- by the route's
+  // declaration or by filter state naming the client's API -- which is also
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
 

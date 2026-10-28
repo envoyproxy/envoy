@@ -1040,6 +1040,46 @@ TEST_F(IoHandleImplTest, ClosedPeerHandleAllowsWrite) {
   // We suddenly close the peer handle, even though there is data left to send to it.
   io_handle_peer_->close();
   EXPECT_TRUE(io_handle_->isWriteUnblocked());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Write));
+  schedulable_cb->invokeCallback();
+}
+
+TEST_F(IoHandleImplTest, PeerCloseDoesNotActivateDisabledWrite) {
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read);
+  ASSERT_FALSE(schedulable_cb->enabled_);
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read));
+  schedulable_cb->invokeCallback();
+}
+
+TEST_F(IoHandleImplTest, PeerCloseCombinesReadAndBlockedWriteNotifications) {
+  io_handle_peer_->setWatermarks(128);
+  Buffer::OwnedImpl buf(std::string(256, 'a'));
+  ASSERT_TRUE(io_handle_->write(buf).ok());
+  ASSERT_FALSE(io_handle_peer_->canReceiveData());
+
+  auto schedulable_cb = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  io_handle_->initializeFileEvent(
+      dispatcher_,
+      [this](uint32_t events) {
+        cb_.called(events);
+        return absl::OkStatus();
+      },
+      Event::FileTriggerType::Edge, Event::FileReadyType::Read | Event::FileReadyType::Write);
+  ASSERT_FALSE(schedulable_cb->enabled_);
+  ASSERT_TRUE(io_handle_peer_->close().ok());
+  ASSERT_TRUE(schedulable_cb->enabled_);
+  EXPECT_CALL(cb_, called(Event::FileReadyType::Read | Event::FileReadyType::Write));
+  schedulable_cb->invokeCallback();
 }
 
 TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {

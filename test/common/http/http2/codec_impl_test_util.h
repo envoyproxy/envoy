@@ -72,6 +72,9 @@ public:
           if (name == Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch) {
             return &server_go_away_and_close_on_dispatch;
           }
+          if (name == Server::LoadShedPointName::get().H2ServerResetStreamOnBeginHeaders) {
+            return &server_reset_stream_on_begin_headers;
+          }
           return nullptr;
         }));
   }
@@ -79,6 +82,7 @@ public:
   testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   testing::NiceMock<Server::MockLoadShedPoint> server_go_away_on_dispatch;
   testing::NiceMock<Server::MockLoadShedPoint> server_go_away_and_close_on_dispatch;
+  testing::NiceMock<Server::MockLoadShedPoint> server_reset_stream_on_begin_headers;
 };
 
 class TestServerConnectionImpl : public TestCodecStatsProvider,

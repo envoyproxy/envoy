@@ -2749,6 +2749,100 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, SpanTagSetInOnStreamCompleteIsFinalized) {
+  setup(SetupOpts().setTracing(true));
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator())
+      .WillRepeatedly(Return(nullptr));
+
+  // Catch-all first so gmock LIFO gives the specific setTag priority.
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  {
+    InSequence s;
+    EXPECT_CALL(*span, setTag(Eq("custom.endpoint"), Eq("backend-a")));
+    EXPECT_CALL(*span, finishSpan());
+  }
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb factory = createDecoderFilterFactoryCb(filter);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, onStreamComplete()).WillOnce(Invoke([&]() {
+    filter->callbacks_->activeSpan().setTag("custom.endpoint", "backend-a");
+  }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+        decoder_->streamInfo().setResponseCodeDetails("");
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+}
+
+TEST_F(HttpConnectionManagerImplTest, SpanTagSetInOnStreamCompleteIsFinalizedOnReset) {
+  setup(SetupOpts().setTracing(true));
+
+  auto* span = new NiceMock<Tracing::MockSpan>();
+  EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator())
+      .WillRepeatedly(Return(nullptr));
+
+  // Catch-all first so gmock LIFO gives the specific setTag priority.
+  EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+  {
+    InSequence s;
+    EXPECT_CALL(*span, setTag(Eq("custom.endpoint"), Eq("unknown")));
+    EXPECT_CALL(*span, finishSpan());
+  }
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        FilterFactoryCb factory = createDecoderFilterFactoryCb(filter);
+        callbacks.setFilterConfigName("");
+        factory(callbacks);
+        return true;
+      }));
+
+  EXPECT_CALL(*filter, onStreamComplete()).WillOnce(Invoke([&]() {
+    filter->callbacks_->activeSpan().setTag("custom.endpoint", "unknown");
+  }));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":method", "GET"}, {":authority", "host"}, {":path", "/"}}};
+        decoder_->decodeHeaders(std::move(headers), true);
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(HttpConnectionManagerImplTest, TestRemoteDownstreamDisconnectAccessLog) {
   setup();
 

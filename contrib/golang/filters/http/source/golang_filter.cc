@@ -455,6 +455,10 @@ void Filter::continueStatusInternal(ProcessorState& state, GolangStatus status) 
     auto trailers = state.trailers;
     auto done = doTrailerGo(state, *trailers);
     if (done) {
+      state.continueDoData();
+      if (hasDestroyed()) {
+        return;
+      }
       state.continueProcessing();
     }
   }

@@ -735,6 +735,8 @@ TEST_P(OnDemandIntegrationTest, PerCertTlsParamsAppliedAfterAsyncSelection) {
   envoy::extensions::transport_sockets::tls::v3::TlsParameters params;
   params.add_cipher_suites("ECDHE-RSA-AES256-GCM-SHA384");
   cert_tls_params_ = params;
+  // Cipher suites only apply to TLS 1.2.
+  ssl_options_.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
   setup();
 
   auto conn = createClientConnection();

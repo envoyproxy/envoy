@@ -10,6 +10,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_join.h"
@@ -113,7 +114,10 @@ public:
       buffer_content_size = 5;
     }
     populateBuffer(buffer_content_size);
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+    const bool defer_compression = with_compression && headers.ContentLength() == nullptr;
+    EXPECT_EQ(defer_compression ? Http::FilterHeadersStatus::StopIteration
+                                : Http::FilterHeadersStatus::Continue,
+              filter_->decodeHeaders(headers, false));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
     if (with_compression) {
       if (with_trailers) {
@@ -152,12 +156,15 @@ public:
     EXPECT_EQ(Http::Filter1xxHeadersStatus::Continue, filter_->encode1xxHeaders(continue_headers));
     Http::MetadataMap metadata_map{{"metadata", "metadata"}};
     EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata_map));
-    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+    const bool defer_compression = with_compression && headers.ContentLength() == nullptr;
+    EXPECT_EQ(defer_compression ? Http::FilterHeadersStatus::StopIteration
+                                : Http::FilterHeadersStatus::Continue,
+              filter_->encodeHeaders(headers, false));
 
     if (with_compression) {
+      EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
       EXPECT_EQ("", headers.get_("content-length"));
       EXPECT_EQ("test", headers.get_("content-encoding"));
-      EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, !with_trailers));
       if (with_trailers) {
         EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
             .WillOnce(Invoke([&](Buffer::Instance& data, bool) { data_.move(data); }));
@@ -193,6 +200,170 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
 };
+
+// Exercise both compression-status settings and both ways of ending a body stream.
+class CompressorFilterUnknownLengthTest
+    : public CompressorFilterTest,
+      public testing::WithParamInterface<std::tuple<bool, bool>> {
+public:
+  void SetUp() override {
+    setUpFilter(fmt::format(R"EOF(
+{{
+  "request_direction_config": {{}},
+  "response_direction_config": {{"status_header_enabled": {}}},
+  "compressor_library": {{
+    "name": "test",
+    "typed_config": {{
+      "@type": "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip"
+    }}
+  }}
+}}
+)EOF",
+                            std::get<0>(GetParam())));
+  }
+
+  bool withTrailers() const { return std::get<1>(GetParam()); }
+
+  void expectUncompressed(const CompressorStats& stats) {
+    EXPECT_EQ(0, stats.compressed_.value());
+    EXPECT_EQ(1, stats.not_compressed_.value());
+    EXPECT_EQ(0, stats.total_uncompressed_bytes_.value());
+    EXPECT_EQ(0, stats.total_compressed_bytes_.value());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(StatusHeaderAndTrailers, CompressorFilterUnknownLengthTest,
+                         testing::Combine(testing::Bool(), testing::Bool()));
+
+TEST_P(CompressorFilterUnknownLengthTest, HeadersOnly) {
+  Http::TestRequestHeaderMapImpl request{{":method", "POST"}, {"accept-encoding", "test"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request, true));
+  EXPECT_EQ("", request.get_("content-encoding"));
+  Http::TestResponseHeaderMapImpl response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response, true));
+  EXPECT_EQ("", response.get_("content-encoding"));
+  expectUncompressed(config_->requestDirectionConfig().stats());
+  expectUncompressed(config_->responseDirectionConfig().stats());
+}
+
+TEST_P(CompressorFilterUnknownLengthTest, ZeroContentLength) {
+  Http::TestRequestHeaderMapImpl request{
+      {":method", "POST"}, {"accept-encoding", "test"}, {"content-length", "0"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request, false));
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(empty, true));
+  EXPECT_EQ("", request.get_("content-encoding"));
+  Http::TestResponseHeaderMapImpl response{{":status", "200"}, {"content-length", "0"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty, true));
+  EXPECT_EQ("", response.get_("content-encoding"));
+  expectUncompressed(config_->requestDirectionConfig().stats());
+  expectUncompressed(config_->responseDirectionConfig().stats());
+}
+
+TEST_P(CompressorFilterUnknownLengthTest, EmptyRequest) {
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty, false));
+  if (withTrailers()) {
+    Http::TestRequestTrailerMapImpl trailers{{"x-test-trailer", "value"}};
+    EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _)).Times(0);
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+    EXPECT_EQ("value", trailers.get_("x-test-trailer"));
+  } else {
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(empty, true));
+  }
+  EXPECT_EQ("", headers.get_("content-encoding"));
+  EXPECT_EQ(0, empty.length());
+  expectUncompressed(config_->requestDirectionConfig().stats());
+}
+
+TEST_P(CompressorFilterUnknownLengthTest, EmptyResponse) {
+  Http::TestRequestHeaderMapImpl request{{":method", "GET"}, {"accept-encoding", "test"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request, true));
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"etag", "\"original\""}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(empty, false));
+  if (withTrailers()) {
+    Http::TestResponseTrailerMapImpl trailers{{"x-test-trailer", "value"}};
+    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _)).Times(0);
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+    EXPECT_EQ("value", trailers.get_("x-test-trailer"));
+  } else {
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(empty, true));
+  }
+  EXPECT_EQ("", headers.get_("content-encoding"));
+  EXPECT_EQ("", headers.get_("x-envoy-compression-status"));
+  EXPECT_EQ("\"original\"", headers.get_("etag"));
+  EXPECT_EQ("Accept-Encoding", headers.get_("vary"));
+  EXPECT_EQ(0, empty.length());
+  expectUncompressed(config_->responseDirectionConfig().stats());
+  EXPECT_EQ(1, config_->responseDirectionConfig().responseStats().header_compressor_used_.value());
+}
+
+TEST_P(CompressorFilterUnknownLengthTest, NonEmptyRequestAfterEmptyData) {
+  compressor_factory_->setExpectedCompressCalls(withTrailers() ? 2 : 1);
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty, false));
+  EXPECT_EQ("", headers.get_("content-encoding"));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, !withTrailers()));
+  EXPECT_EQ("test", headers.get_("content-encoding"));
+  if (withTrailers()) {
+    Http::TestRequestTrailerMapImpl trailers;
+    EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(trailers));
+  }
+  const auto& stats = config_->requestDirectionConfig().stats();
+  EXPECT_EQ(1, stats.compressed_.value());
+  EXPECT_EQ(0, stats.not_compressed_.value());
+  EXPECT_EQ(5, stats.total_uncompressed_bytes_.value());
+}
+
+TEST_P(CompressorFilterUnknownLengthTest, NonEmptyResponseAfterEmptyData) {
+  compressor_factory_->setExpectedCompressCalls(withTrailers() ? 2 : 1);
+  Http::TestRequestHeaderMapImpl request{{":method", "GET"}, {"accept-encoding", "test"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request, true));
+  Http::TestResponseHeaderMapImpl headers{{":status", "200"}, {"etag", "\"original\""}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->encodeHeaders(headers, false));
+  Buffer::OwnedImpl empty;
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->encodeData(empty, false));
+  EXPECT_EQ("", headers.get_("content-encoding"));
+  EXPECT_EQ("\"original\"", headers.get_("etag"));
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, !withTrailers()));
+  EXPECT_EQ("test", headers.get_("content-encoding"));
+  EXPECT_EQ("", headers.get_("etag"));
+  EXPECT_EQ(std::get<0>(GetParam()) ? "test;Compressed;OriginalLength=" : "",
+            headers.get_("x-envoy-compression-status"));
+  if (withTrailers()) {
+    Http::TestResponseTrailerMapImpl trailers;
+    EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true));
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+  }
+  const auto& stats = config_->responseDirectionConfig().stats();
+  EXPECT_EQ(1, stats.compressed_.value());
+  EXPECT_EQ(0, stats.not_compressed_.value());
+  EXPECT_EQ(5, stats.total_uncompressed_bytes_.value());
+  EXPECT_EQ(1, config_->responseDirectionConfig().responseStats().header_compressor_used_.value());
+}
+
+TEST_P(CompressorFilterUnknownLengthTest, RuntimeGuardDisabled) {
+  TestScopedStaticReloadableFeaturesRuntime runtime({{"compressor_skip_empty_body", false}});
+  compressor_factory_->setExpectedCompressCalls(0);
+  Http::TestRequestHeaderMapImpl request{{":method", "POST"}, {"accept-encoding", "test"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request, false));
+  EXPECT_EQ("test", request.get_("content-encoding"));
+  Http::TestResponseHeaderMapImpl response{{":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response, false));
+  EXPECT_EQ("test", response.get_("content-encoding"));
+  EXPECT_EQ(1, config_->requestDirectionConfig().stats().compressed_.value());
+  EXPECT_EQ(1, config_->responseDirectionConfig().stats().compressed_.value());
+}
 
 enum class PerRouteConfig { None, Empty, Enabled, Disabled };
 

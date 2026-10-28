@@ -36,11 +36,13 @@ protected:
     // destructor of alloc_ is called, and hence the symbol_table_.numSymbols()
     // will be greater than zero at this point.
     if (!are_stats_marked_for_deletion_) {
-      EXPECT_EQ(0, symbol_table_.numSymbols());
+      EXPECT_EQ(num_base_symbols_, symbol_table_.numSymbols());
     }
   }
 
   SymbolTableImpl symbol_table_;
+  // Symbols pre-encoded by the table itself (the well-known stat names).
+  const uint64_t num_base_symbols_{symbol_table_.numSymbols()};
   // Declare the pool before the allocator because the allocator could contain
   // a TestSinkPredicates object whose lifetime should be bounded by that of the pool.
   StatNamePool pool_;

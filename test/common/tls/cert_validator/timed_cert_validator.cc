@@ -65,6 +65,9 @@ ValidationResults TimedCertValidator::doVerifyCertChain(
             (result.tls_alert.has_value() ? result.tls_alert.value() : SSL_AD_CERTIFICATE_UNKNOWN));
       });
   validation_timer_->enableTimer(validation_time_out_ms_);
+  if (on_validation_started_ != nullptr) {
+    on_validation_started_();
+  }
   return {ValidationResults::ValidationStatus::Pending,
           Envoy::Ssl::ClientValidationStatus::NotValidated, std::nullopt, std::nullopt};
 }

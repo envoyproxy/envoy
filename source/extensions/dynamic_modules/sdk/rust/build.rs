@@ -115,6 +115,24 @@ fn main() {
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
+  // Bake the prefix into the exported macro: env! inside its body would read the
+  // consuming crate's environment instead of the SDK's environment.
+  println!("cargo:rerun-if-env-changed=ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX");
+  let prefix = env::var("ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX").unwrap_or_default();
+  std::fs::write(
+    out_path.join("export_name.rs"),
+    format!(
+      r#"
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __export_name_impl {{
+  ($name:expr) => {{ concat!({prefix:?}, $name) }};
+}}
+"#
+    ),
+  )
+  .expect("Couldn't write export naming macro");
+
   let bindings = bindgen::Builder::default()
     .header(abi_header.to_str().unwrap())
     .clang_args(bazel_clang_args())
@@ -126,8 +144,15 @@ fn main() {
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
     .parse_callbacks(Box::new(TrimEnumNameFromVariantName));
 
+  // A dynamic module DLL imports the Envoy callbacks from the Envoy executable. A static module
+  // (non-empty prefix) is linked into the Envoy binary itself, where the callbacks are defined
+  // directly, so the import stubs would collide with those definitions.
   #[cfg(target_os = "windows")]
-  let bindings = bindings.extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]");
+  let bindings = if prefix.is_empty() {
+    bindings.extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]")
+  } else {
+    bindings
+  };
 
   let bindings = bindings.generate().expect("Unable to generate bindings");
 

@@ -5028,6 +5028,52 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDi
   EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
+TEST_P(Http2CodecImplTest, ServerBeginHeadersLoadShedPointResetsStream) {
+  initialize();
+  ASSERT_EQ(0, server_stats_store_.counter("http2.stream_refused_errors").value());
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+
+  EXPECT_CALL(server_->server_reset_stream_on_begin_headers, shouldShedLoad())
+      .WillOnce(Return(true));
+  EXPECT_CALL(client_stream_callbacks,
+              onResetStream(StreamResetReason::RemoteRefusedStreamReset, _));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.stream_refused_errors").value());
+
+  // Verify that the connection remains alive and a subsequent request is admitted when
+  // shouldShedLoad() returns false.
+  MockResponseDecoder response_decoder2;
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder2);
+  MockStreamCallbacks client_stream_callbacks2;
+  request_encoder2->getStream().addCallbacks(client_stream_callbacks2);
+
+  EXPECT_CALL(server_->server_reset_stream_on_begin_headers, shouldShedLoad())
+      .WillOnce(Return(false));
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder_ = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks_);
+        return request_decoder_;
+      }));
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).WillOnce(InvokeWithoutArgs([&]() -> void {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, true);
+  }));
+  EXPECT_CALL(response_decoder2, decodeHeaders_(_, true));
+
+  EXPECT_OK(request_encoder2->encodeHeaders(request_headers, true));
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.stream_refused_errors").value());
+}
+
 TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
   // Per https://datatracker.ietf.org/doc/html/rfc9113#section-8.2.1,
   // leading & trailing whitespace characters in headers are not valid, but this is a new

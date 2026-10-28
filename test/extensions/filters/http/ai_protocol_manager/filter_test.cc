@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
@@ -32,6 +33,43 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AiProtocolManager {
 namespace {
+
+// Wraps the in-memory store and records each write's size and end_stream flag.
+class RecordingExternalBufferFactory : public ExternalBufferFactory {
+public:
+  struct Write {
+    uint64_t size;
+    bool end_stream;
+  };
+
+  using ExternalBufferFactory::createBuffer;
+  ExternalBufferPtr createBuffer(Event::Dispatcher& dispatcher) override {
+    return std::make_unique<RecordingBuffer>(inner_.createBuffer(dispatcher), writes_);
+  }
+
+  std::vector<Write> writes_;
+
+private:
+  class RecordingBuffer : public ExternalBuffer {
+  public:
+    RecordingBuffer(ExternalBufferPtr inner, std::vector<Write>& writes)
+        : inner_(std::move(inner)), writes_(writes) {}
+    void write(Buffer::InstancePtr data, bool end_stream, WriteCallback cb) override {
+      writes_.push_back({data->length(), end_stream});
+      inner_->write(std::move(data), end_stream, std::move(cb));
+    }
+    void read(uint64_t offset, uint64_t length, ReadCallback cb) override {
+      inner_->read(offset, length, std::move(cb));
+    }
+    uint64_t length() const override { return inner_->length(); }
+
+  private:
+    ExternalBufferPtr inner_;
+    std::vector<Write>& writes_;
+  };
+
+  InMemoryExternalBufferFactory inner_;
+};
 
 class AiProtocolManagerFilterTest : public testing::Test {
 public:
@@ -359,6 +397,24 @@ TEST_F(AiProtocolManagerFilterTest, LargePayloadReplayedInChunks) {
   EXPECT_TRUE(injected_end_stream_);
   EXPECT_EQ(injected_.length(), big.size());
   EXPECT_EQ(injected_.toString(), big);
+}
+
+// A last frame with end_stream reaches the store as one write carrying end_stream.
+TEST_F(AiProtocolManagerFilterTest, FinalFrameEndStreamReachesStoreInOneWrite) {
+  auto recording = std::make_shared<RecordingExternalBufferFactory>();
+  factory_ = recording;
+  engageIgnoringPayload();
+
+  const std::string chunk(64 * 1024, 'x'); // At the write flush threshold.
+  Buffer::OwnedImpl body(chunk);
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  ASSERT_EQ(recording->writes_.size(), 1);
+  EXPECT_EQ(recording->writes_[0].size, chunk.size());
+  EXPECT_TRUE(recording->writes_[0].end_stream);
+  EXPECT_TRUE(injected_end_stream_);
+  EXPECT_EQ(injected_.toString(), chunk);
 }
 
 // Destroying the filter mid-flight cancels pending callbacks; no replay occurs.
@@ -1084,6 +1140,28 @@ TEST_F(AiProtocolManagerFilterResponseTest, RouteScopingDefaultsToConfiguredRout
   EXPECT_EQ(counterValue("token_usage_found"), 1);
 }
 
+// A request API named in `envoy.ai.llm_protocol.request` filter state declares
+// the endpoint as a per-route entry would: token usage is extracted on a route
+// with no per-route config, without include_unconfigured_routes, and the
+// response is read as that API.
+TEST_F(AiProtocolManagerFilterResponseTest, FilterStateRequestApiScopesTheRouteIn) {
+  envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManager proto_config;
+  proto_config.mutable_response_handling()->mutable_token_usage();
+  setupWithProto(proto_config);
+  encoder_callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::LlmProtocolRequest,
+      std::make_shared<RequestLlmProtocol>(LLMProtocol::AnthropicMessages),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  sendHeaders("application/json");
+  // Anthropic-style usage keys with no shape marker: auto-detection alone
+  // could not place it, so the record's API shows the declared one was used.
+  sendData("{\"usage\":{\"input_tokens\":5,\"output_tokens\":7}}", true);
+  const auto typed = singleTypedWrite("envoy.ai.token_usage");
+  ASSERT_TRUE(typed.has_value());
+  EXPECT_EQ(typed->llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(counterValue("token_usage_found"), 1);
+}
+
 // The backend API left in filter state outranks the per-route response API,
 // which outranks the per-route request API, which outranks the configured
 // fallback.
@@ -1535,6 +1613,105 @@ TEST_F(AiProtocolManagerFilterStateTest, UnspecifiedFilterStateLeavesTheRoute) {
   ASSERT_EQ(seen.size(), 1);
   EXPECT_EQ(seen[0].protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(seen[0].request_protocol, LLMProtocol::OpenAiChatCompletions);
+}
+
+// A route-declared endpoint publishes its request API to filter state when no filter ahead
+// named one, so a later reader with no route to consult -- an upstream instance of this
+// filter -- learns the client's API the same way either way.
+TEST_F(AiProtocolManagerFilterStateTest, PublishesTheRoutesRequestApiWhenFilterStateNamesNone) {
+  setRouteConfig();
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(RequestLlmProtocol::fromFilterState(*callbacks_.stream_info_.filterState()),
+            LLMProtocol::OpenAiChatCompletions);
+}
+
+// What a filter ahead named stands: the route's API is not written over it.
+TEST_F(AiProtocolManagerFilterStateTest, DoesNotOverwriteARequestApiAFilterAheadNamed) {
+  runWithFilterState(LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(RequestLlmProtocol::fromFilterState(*callbacks_.stream_info_.filterState()),
+            LLMProtocol::AnthropicMessages);
+}
+
+// A route that declares an endpoint without naming its API has nothing to publish.
+TEST_F(AiProtocolManagerFilterStateTest, PublishesNothingForARouteThatNamesNoApi) {
+  PerRouteProto unnamed;
+  unnamed.mutable_request();
+  setRouteConfig(unnamed);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+  EXPECT_EQ(RequestLlmProtocol::fromFilterState(*callbacks_.stream_info_.filterState()),
+            LLMProtocol::Unspecified);
+}
+
+// Filter state naming the client's API declares the endpoint by itself: on a route with no
+// per-route entry the AI filters run, with that API, as they would on a declared route.
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateDeclaresAnEndpointWithoutARouteEntry) {
+  std::vector<ContextRecordingAiFilter::Seen> seen;
+  createFilterWithAiFilters({[&](const AiFilterContext& context) -> AiFilterSharedPtr {
+    return std::make_unique<ContextRecordingAiFilter>(context, seen);
+  }});
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::LlmProtocolRequest,
+      std::make_shared<RequestLlmProtocol>(LLMProtocol::AnthropicMessages),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(
+      R"({"model":"claude-3","max_tokens":10,"messages":[{"role":"user","content":"hi"}]})");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 0);
+  ASSERT_EQ(seen.size(), 1);
+  EXPECT_EQ(seen[0].protocol, LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(seen[0].request_protocol, LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(seen[0].request_binding, nullptr);
+  EXPECT_EQ(nlohmann::json::parse(injected_.toString())["model"], "rewritten");
+  EXPECT_TRUE(injected_end_stream_);
+}
+
+// An endpoint filter state declares is held to a declared route's standard: a malformed body
+// is rejected rather than forwarded as best-effort parsing would.
+TEST_F(AiProtocolManagerFilterStateTest, AnEndpointFilterStateDeclaresIsParsedStrictly) {
+  createFilter(/*parse_unconfigured_routes=*/false);
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::LlmProtocolRequest,
+      std::make_shared<RequestLlmProtocol>(LLMProtocol::OpenAiChatCompletions),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  EXPECT_EQ(decodeHeadersEngaging(), Http::FilterHeadersStatus::StopIteration);
+
+  Buffer::OwnedImpl body(R"({"model":)");
+  EXPECT_EQ(filter_->decodeData(body, true), Http::FilterDataStatus::StopIterationNoBuffer);
+  drain();
+
+  EXPECT_EQ(local_reply_calls_, 1);
+  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
+  EXPECT_EQ(counterValue("request_parse_error"), 1);
+}
+
+// Filter state is set against a request whose framing the writer may not have looked at, so
+// it declares an endpoint only for a request that can be held to end of stream: a gRPC
+// stream, an upgrade, or a body that is not JSON passes through untouched.
+TEST_F(AiProtocolManagerFilterStateTest, FilterStateDoesNotDeclareARequestThatCannotBeHeld) {
+  callbacks_.stream_info_.filterState()->setData(
+      FilterStateKeys::LlmProtocolRequest,
+      std::make_shared<RequestLlmProtocol>(LLMProtocol::OpenAiChatCompletions),
+      StreamInfo::FilterState::LifeSpan::FilterChain);
+  for (const Http::TestRequestHeaderMapImpl& headers :
+       {Http::TestRequestHeaderMapImpl{
+            {":method", "POST"}, {":path", "/pkg.Svc/Call"}, {"content-type", "application/grpc"}},
+        Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                       {":path", "/ws"},
+                                       {"connection", "upgrade"},
+                                       {"upgrade", "websocket"},
+                                       {"content-type", "application/json"}},
+        Http::TestRequestHeaderMapImpl{
+            {":method", "POST"}, {":path", "/upload"}, {"content-type", "text/plain"}}}) {
+    createFilter(/*parse_unconfigured_routes=*/false);
+    request_headers_ = headers;
+    EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+              Http::FilterHeadersStatus::Continue)
+        << request_headers_.getPathValue();
+  }
 }
 
 TEST_F(AiProtocolManagerFilterTest, DoesNotRunAiFiltersOnUnconfiguredRoute) {
