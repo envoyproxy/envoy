@@ -616,6 +616,12 @@ bool ConnPoolImplBase::isIdleImpl() const {
   See PR 30807 description for explanation why idle callbacks are deleted after being called.
 */
 void ConnPoolImplBase::checkForIdleAndNotify() {
+  if (deferred_deleting_) {
+    // This pool is awaiting deferred deletion and has already been removed from
+    // its ConnPoolMap (or replaced by a successor under the same key). Firing the
+    // idle callbacks here would re-enter ConnPoolMap::erasePool() with a stale key.
+    return;
+  }
   if (isIdleImpl()) {
     ENVOY_LOG(debug, "invoking {} idle callback(s) - is_draining_for_deletion_={}",
               idle_callbacks_.size(), is_draining_for_deletion_);
