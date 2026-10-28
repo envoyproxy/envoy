@@ -16,7 +16,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -78,8 +77,7 @@ MockReadFilterCallbacks::~MockReadFilterCallbacks() = default;
 MockReadFilter::MockReadFilter() {
   ON_CALL(*this, onData(_, _)).WillByDefault(Return(FilterStatus::StopIteration));
   EXPECT_CALL(*this, initializeReadFilterCallbacks(_))
-      .WillOnce(
-          Invoke([this](ReadFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+      .WillOnce([this](ReadFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; });
 }
 
 MockReadFilter::~MockReadFilter() = default;
@@ -93,18 +91,15 @@ MockWriteFilterCallbacks::~MockWriteFilterCallbacks() = default;
 
 MockWriteFilter::MockWriteFilter() {
   EXPECT_CALL(*this, initializeWriteFilterCallbacks(_))
-      .WillOnce(Invoke(
-          [this](WriteFilterCallbacks& callbacks) -> void { write_callbacks_ = &callbacks; }));
+      .WillOnce([this](WriteFilterCallbacks& callbacks) -> void { write_callbacks_ = &callbacks; });
 }
 MockWriteFilter::~MockWriteFilter() = default;
 
 MockFilter::MockFilter() {
   EXPECT_CALL(*this, initializeReadFilterCallbacks(_))
-      .WillOnce(
-          Invoke([this](ReadFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+      .WillOnce([this](ReadFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; });
   EXPECT_CALL(*this, initializeWriteFilterCallbacks(_))
-      .WillOnce(Invoke(
-          [this](WriteFilterCallbacks& callbacks) -> void { write_callbacks_ = &callbacks; }));
+      .WillOnce([this](WriteFilterCallbacks& callbacks) -> void { write_callbacks_ = &callbacks; });
 }
 
 MockFilter::~MockFilter() = default;
@@ -137,9 +132,7 @@ MockFilterChain::MockFilterChain() {
 MockFilterChain::~MockFilterChain() = default;
 
 MockFilterChainInfo::MockFilterChainInfo() {
-  ON_CALL(*this, name()).WillByDefault(Invoke([this]() {
-    return absl::string_view{filter_chain_name_};
-  }));
+  ON_CALL(*this, name()).WillByDefault([this]() { return absl::string_view{filter_chain_name_}; });
 }
 
 MockFilterChainManager::MockFilterChainManager() = default;
@@ -157,15 +150,13 @@ MockListenSocket::MockListenSocket()
   ON_CALL(*this, options()).WillByDefault(ReturnRef(options_));
   ON_CALL(*this, ioHandle()).WillByDefault(ReturnRef(*io_handle_));
   ON_CALL(testing::Const(*this), ioHandle()).WillByDefault(ReturnRef(*io_handle_));
-  ON_CALL(*this, close()).WillByDefault(Invoke([this]() { socket_is_open_ = false; }));
-  ON_CALL(testing::Const(*this), isOpen()).WillByDefault(Invoke([this]() {
-    return socket_is_open_;
-  }));
+  ON_CALL(*this, close()).WillByDefault([this]() { socket_is_open_ = false; });
+  ON_CALL(testing::Const(*this), isOpen()).WillByDefault([this]() { return socket_is_open_; });
   ON_CALL(*this, ipVersion())
       .WillByDefault(Return(connection_info_provider_->localAddress()->ip()->version()));
-  ON_CALL(*this, duplicate()).WillByDefault(Invoke([]() {
+  ON_CALL(*this, duplicate()).WillByDefault([]() {
     return std::make_unique<NiceMock<MockListenSocket>>();
-  }));
+  });
 }
 
 MockSocketOption::MockSocketOption() {
@@ -192,15 +183,9 @@ MockListener::MockListener() = default;
 MockListener::~MockListener() { onDestroy(); }
 
 MockConnectionHandler::MockConnectionHandler() {
-  ON_CALL(*this, incNumConnections()).WillByDefault(Invoke([this]() {
-    ++num_handler_connections_;
-  }));
-  ON_CALL(*this, decNumConnections()).WillByDefault(Invoke([this]() {
-    --num_handler_connections_;
-  }));
-  ON_CALL(*this, numConnections()).WillByDefault(Invoke([this]() {
-    return num_handler_connections_;
-  }));
+  ON_CALL(*this, incNumConnections()).WillByDefault([this]() { ++num_handler_connections_; });
+  ON_CALL(*this, decNumConnections()).WillByDefault([this]() { --num_handler_connections_; });
+  ON_CALL(*this, numConnections()).WillByDefault([this]() { return num_handler_connections_; });
 }
 MockConnectionHandler::~MockConnectionHandler() = default;
 
