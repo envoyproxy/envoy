@@ -63,6 +63,11 @@ public:
   const std::string H3ServerGoAwayOnDispatch =
       "envoy.load_shed_points.http3_server_go_away_on_dispatch";
 
+  // Envoy will reject new HTTP3 streams at the codec level on CreateIncomingStream by resetting
+  // the stream with QUIC_STREAM_REQUEST_REJECTED before allocating stream objects.
+  const std::string H3ServerResetStreamOnCreatingStream =
+      "envoy.load_shed_points.http3_server_reset_stream_on_creating_stream";
+
   // Envoy will close the TCP proxy downstream connection upon receiving
   // data if under memory pressure.
   const std::string TcpProxyOnData = "envoy.load_shed_points.tcp_proxy_on_data";

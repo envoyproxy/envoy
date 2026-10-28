@@ -136,6 +136,19 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
                   this->id(), id));
     return nullptr;
   }
+  // Never shed unidirectional control/QPACK streams.
+  if (quic::QuicUtils::IsBidirectionalStreamId(id, version()) &&
+      should_reset_stream_on_creating_stream_ != nullptr &&
+      should_reset_stream_on_creating_stream_->shouldShedLoad()) {
+    codec_stats_->tx_reset_.inc();
+    incrementSentQuicResetStreamErrorStats(
+        quic::QuicResetStreamError::FromInternal(quic::QUIC_STREAM_REQUEST_REJECTED),
+        /*from_self=*/true,
+        /*is_upstream=*/false);
+    InsertLocallyClosedStreamsHighestOffset(id, 0);
+    ResetStream(id, quic::QUIC_STREAM_REQUEST_REJECTED);
+    return nullptr;
+  }
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, codec_stats_.value(),
                                           http3_options_.value(), headers_with_underscores_action_);
   ActivateStream(absl::WrapUnique(stream));
