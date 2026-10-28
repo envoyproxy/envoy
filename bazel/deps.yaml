@@ -149,7 +149,7 @@ c-ares:
   project_desc: "C library for asynchronous DNS requests"
   project_url: "https://c-ares.haxx.se/"
   apparent_name: c_ares
-  release_date: "2026-07-07"
+  release_date: "2026-10-20"
   use_category:
   - dataplane_core
   - controlplane
