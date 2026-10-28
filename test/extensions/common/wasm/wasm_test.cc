@@ -23,6 +23,7 @@
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "include/proxy-wasm/bytecode_util.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
@@ -80,6 +81,39 @@ public:
     scope_ = stats_store_.createScope("wasm.");
   }
 
+  void loadTestModule(absl::string_view module, absl::optional<bool> allow_precompiled) {
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    auto* vm_config = plugin_config.mutable_vm_config();
+    vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    vm_config->mutable_configuration()->set_value("source-canary");
+    if (allow_precompiled.has_value()) {
+      vm_config->set_allow_precompiled(*allow_precompiled);
+    }
+    const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/", module)));
+    ASSERT_FALSE(code.empty());
+    auto plugin = std::make_shared<Plugin>(plugin_config,
+                                           envoy::config::core::v3::TrafficDirection::UNSPECIFIED,
+                                           local_info_, nullptr);
+    auto wasm = std::make_shared<Wasm>(plugin->wasmConfig(), "", scope_, *api_, cluster_manager_,
+                                       *dispatcher_);
+    if (allow_precompiled.value_or(false)) {
+      std::string_view precompiled;
+      ASSERT_TRUE(proxy_wasm::BytecodeUtil::getCustomSection(
+          code, wasm->wasm_vm()->getPrecompiledSectionName(), precompiled));
+      ASSERT_FALSE(precompiled.empty());
+      // V8::load exclusively deserializes when given a nonempty precompiled section;
+      // it returns false on rejection rather than falling back to compiling the source.
+      // Verified against proxy-wasm-cpp-host 0.0.0-260704-f2db56a.envoy.1 (upstream f2db56a).
+      // If the host reintroduces a source-compilation fallback, this test will false-pass
+      // and must be revisited.
+    }
+    ASSERT_TRUE(wasm->load(code, vm_config->allow_precompiled()));
+    ASSERT_TRUE(wasm->initialize());
+    EXPECT_LOG_CONTAINS("info", "on_vm_start source-canary",
+                        ASSERT_NE(wasm->start(plugin), nullptr));
+  }
+
   Upstream::MockClusterManager cluster_manager_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
@@ -90,9 +124,83 @@ public:
   RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
+// Intentionally retain the full matrix: this is the primary cross-runtime coverage after
+// other suites were trimmed to the first sandbox runtime.
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest,
                          Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
+
+TEST_P(WasmCommonTest, LoadFromSourceWithoutPrecompiled) {
+  if (std::get<0>(GetParam()) == "null") {
+    GTEST_SKIP() << "Requires a sandbox runtime";
+  }
+  loadTestModule("test_cpp_source.wasm", absl::nullopt);
+}
+
+TEST_P(WasmCommonTest, PrecompiledSectionStrippedWhenNotAllowed) {
+  if (std::get<0>(GetParam()) == "null") {
+    GTEST_SKIP() << "Requires a sandbox runtime";
+  }
+  if (std::get<0>(GetParam()) != "v8") {
+    loadTestModule("test_cpp.wasm", false);
+    return;
+  }
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto* vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime("envoy.wasm.runtime.v8");
+  vm_config->mutable_configuration()->set_value("source-canary");
+  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
+  ASSERT_FALSE(code.empty());
+  auto plugin = std::make_shared<Plugin>(
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
+  auto make_wasm = [&] {
+    return std::make_shared<Wasm>(plugin->wasmConfig(), "", scope_, *api_, cluster_manager_,
+                                  *dispatcher_);
+  };
+  auto wasm = make_wasm();
+  std::string_view precompiled;
+  ASSERT_TRUE(proxy_wasm::BytecodeUtil::getCustomSection(
+      code, wasm->wasm_vm()->getPrecompiledSectionName(), precompiled));
+  ASSERT_FALSE(precompiled.empty());
+
+  // proxy-wasm-cpp-host 0.0.0-260704-f2db56a.envoy.1 passes this payload to V8 14.6.202.10's
+  // wasm::Module::deserialize (src/wasm/c-api.cc): [LEB128 wire size][wire bytes][native module].
+  // Preserve the size (trusted before allocation) and wire bytes; flip only the native magic.
+  // HeaderMatches in src/wasm/wasm-serialization.cc rejects it before decoding the wire bytes
+  // or reading native-code sizes, even if the module is already cached.
+  uint64_t wire_size = 0;
+  size_t prefix_size = 0;
+  for (uint32_t shift = 0;; shift += 7) {
+    ASSERT_LT(prefix_size, precompiled.size());
+    ASSERT_LT(shift, 64);
+    const auto byte = static_cast<uint8_t>(precompiled[prefix_size++]);
+    ASSERT_TRUE(shift != 63 || byte <= 1);
+    wire_size |= static_cast<uint64_t>(byte & 0x7f) << shift;
+    if ((byte & 0x80) == 0) {
+      break;
+    }
+  }
+  ASSERT_LT(wire_size, precompiled.size() - prefix_size);
+  ASSERT_GE(precompiled.size() - prefix_size - wire_size, sizeof(uint32_t));
+  const size_t native_offset = precompiled.data() - code.data() + prefix_size + wire_size;
+  code[native_offset] ^= 1;
+
+  ASSERT_TRUE(wasm->load(code, /*allow_precompiled=*/false));
+  ASSERT_TRUE(wasm->initialize());
+  EXPECT_LOG_CONTAINS("info", "on_vm_start source-canary", ASSERT_NE(wasm->start(plugin), nullptr));
+
+  auto wasm_precompiled = make_wasm();
+  EXPECT_FALSE(wasm_precompiled->load(code, /*allow_precompiled=*/true));
+}
+
+TEST_P(WasmCommonTest, PrecompiledModuleIsUsedWhenAllowed) {
+  if (std::get<0>(GetParam()) != "v8") {
+    GTEST_SKIP() << "Requires V8 precompiled modules";
+  }
+  loadTestModule("test_cpp.wasm", true);
+}
 
 TEST_P(WasmCommonTest, WasmFailState) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
@@ -186,7 +294,7 @@ TEST_P(WasmCommonTest, Logging) {
   EXPECT_EQ(std::unique_ptr<ContextBase>(wasm->createContext(plugin)), nullptr);
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm);
   auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
-  EXPECT_TRUE(wasm_weak.lock()->load(code, false));
+  EXPECT_TRUE(wasm_weak.lock()->load(code, true));
   EXPECT_TRUE(wasm_weak.lock()->initialize());
   auto thread_local_wasm = std::make_shared<Wasm>(wasm_handle, *dispatcher_);
   thread_local_wasm.reset();
@@ -241,6 +349,7 @@ TEST_P(WasmCommonTest, BadSignature) {
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
+  // Deliberately load the non-precompiled bad-signature module from source.
   EXPECT_TRUE(wasm->load(code, false));
   EXPECT_FALSE(wasm->initialize());
   EXPECT_TRUE(wasm->isFailed());
@@ -264,7 +373,7 @@ TEST_P(WasmCommonTest, Segv) {
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   TestContext* root_context = nullptr;
   wasm->setCreateContextForTesting(
@@ -304,7 +413,7 @@ TEST_P(WasmCommonTest, DivByZero) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -342,7 +451,7 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -377,7 +486,7 @@ TEST_P(WasmCommonTest, Utilities) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -440,7 +549,7 @@ TEST_P(WasmCommonTest, Stats) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -479,7 +588,7 @@ TEST_P(WasmCommonTest, Foreign) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -518,7 +627,7 @@ TEST_P(WasmCommonTest, OnForeign) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   TestContext* test_context = nullptr;
   wasm->setCreateContextForTesting(
@@ -560,7 +669,7 @@ TEST_P(WasmCommonTest, WASI) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -585,6 +694,7 @@ TEST_P(WasmCommonTest, VmCache) {
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  vm_config->set_allow_precompiled(true);
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
@@ -674,6 +784,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    vm_config->set_allow_precompiled(true);
     Protobuf::BytesValue vm_configuration_bytes;
     vm_configuration_bytes.set_value(vm_configuration);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
@@ -777,6 +888,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  vm_config->set_allow_precompiled(true);
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
@@ -902,7 +1014,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // expect no call because proxy_on_vm_start is restricted
@@ -948,7 +1060,7 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // proxy_on_vm_start will trigger proxy_log and fd_write, but expect no call because both are
@@ -1000,7 +1112,7 @@ TEST_P(WasmCommonTest, AllowLog) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // Expect proxy_log since allowed, but no call to WASI since restricted
@@ -1047,7 +1159,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   wasm->setCreateContextForTesting(
@@ -1095,7 +1207,7 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // Expect two calls to proxy_log, from proxy_on_vm_start and from proxy_on_context_create
@@ -1143,7 +1255,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
@@ -1517,6 +1629,7 @@ root_id: "panic during request processing"
 failure_policy: FAIL_RELOAD
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"
@@ -1636,6 +1749,7 @@ root_id: "panic during request processing"
 failure_policy: FAIL_CLOSED
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"
@@ -1714,6 +1828,7 @@ name: "{}_test_wasm_reload"
 root_id: "panic during request processing"
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"
@@ -1793,6 +1908,7 @@ root_id: "panic during request processing"
 failure_policy: FAIL_OPEN
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"

@@ -33,8 +33,12 @@ public:
 
   void TearDown() override { fake_upstream_connection_.reset(); }
 
-  void setupWasmFilter(const std::string& config, const std::string& root_id = "") {
+  void setupWasmFilter(const std::string& config, const std::string& root_id = "",
+                       const std::string& module_override = "", bool allow_precompiled = true) {
     bool downstream = std::get<2>(GetParam());
+    const std::string module =
+        module_override.empty() ? absl::StrCat(root_id.empty() ? "headers" : root_id, "_cpp.wasm")
+                                : module_override;
     const std::string yaml = TestEnvironment::substitute(absl::StrCat(
         R"EOF(
           name: envoy.filters.http.wasm
@@ -47,14 +51,16 @@ public:
               vm_config:
                 vm_id: "vm_id"
                 runtime: envoy.wasm.runtime.)EOF",
-        std::get<0>(GetParam()), R"EOF(
+        std::get<0>(GetParam()),
+        allow_precompiled ? "\n                allow_precompiled: true" : "", R"EOF(
                 configuration:
                   "@type": type.googleapis.com/google.protobuf.StringValue
                   value: )EOF",
         config, R"EOF(
                 code:
                   local:
-                    filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/test_cpp.wasm"
+                    filename: "{{ test_rundir }}/test/extensions/filters/http/wasm/test_data/)EOF",
+        module, R"EOF("
         )EOF"));
     config_helper_.prependFilter(yaml, downstream);
 
@@ -137,6 +143,32 @@ INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFilterIntegrationTest,
                          Common::Wasm::dual_filter_with_codecs_sandbox_runtime_and_cpp_values,
                          Common::Wasm::wasmDualFilterWithCodecsTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmFilterIntegrationTest);
+
+TEST_P(WasmFilterIntegrationTest, LoadFromSourceWithoutPrecompiled) {
+  if (std::get<0>(GetParam()) != "v8" || !std::get<2>(GetParam()) ||
+      std::get<3>(GetParam()) != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "A single V8 downstream HTTP1 source-loading canary";
+  }
+  setupWasmFilter("headers", "", "headers_cpp_source.wasm", false);
+  HttpIntegrationTest::initialize();
+
+  const Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                       {":method", "GET"},
+                                                       {":path", "/resize?type=jpg"},
+                                                       {":authority", "host"},
+                                                       {"server", "client-id"}};
+  const Http::TestRequestHeaderMapImpl expected_request_headers{{":method", "GET"},
+                                                                {":path", "/resize?type=jpg"},
+                                                                {":authority", "host"},
+                                                                {"newheader", "newheadervalue"},
+                                                                {"server", "envoy-wasm"}};
+  const Http::TestResponseHeaderMapImpl upstream_response_headers{
+      {":status", "200"}, {"content-type", "application/json"}};
+  const Http::TestResponseHeaderMapImpl expected_response_headers{
+      {":status", "200"}, {"content-type", "application/json"}, {"test-status", "OK"}};
+  runTest(request_headers, {}, expected_request_headers, "", upstream_response_headers, {},
+          expected_response_headers, "");
+}
 
 TEST_P(WasmFilterIntegrationTest, HeadersManipulation) {
   setupWasmFilter("headers");
