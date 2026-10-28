@@ -1523,6 +1523,8 @@ public:
     return shared_config_->internalOnlyHeaders();
   }
   const std::string& name() const override { return shared_config_->name(); }
+  void setAwaitingInitialVhdsUpdate(bool awaiting) { awaiting_initial_vhds_update_ = awaiting; }
+  bool awaitingInitialVhdsUpdate() const override { return awaiting_initial_vhds_update_; }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
   bool mostSpecificHeaderMutationsWins() const override {
     return shared_config_->mostSpecificHeaderMutationsWins();
@@ -1552,6 +1554,7 @@ protected:
 private:
   CommonConfigSharedPtr shared_config_;
   std::unique_ptr<RouteMatcher> route_matcher_;
+  bool awaiting_initial_vhds_update_{false};
 };
 
 /**

@@ -612,5 +612,143 @@ TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
   cleanupUpstreamAndDownstream();
 }
 
+class VhdsWarmingBlocksUnmatchedRequestsIntegrationTest : public VhdsIntegrationTest {
+public:
+  void initialize() override {
+    useRdsWithVhosts();
+    if (routeConfigType() == RouteConfigType::Static) {
+      config_helper_.addConfigModifier(
+          [&](envoy::extensions::filters::network::http_connection_manager::v3::
+                  HttpConnectionManager& hcm) -> void {
+            hcm.clear_rds();
+            auto* route_config = hcm.mutable_route_config();
+            route_config->CopyFrom(warmingBlocksUnmatchedRequestsRdsConfig());
+          });
+    }
+
+    setUpstreamCount(2);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+
+    defer_listener_finalization_ = true;
+    HttpIntegrationTest::initialize();
+
+    AssertionResult result =
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+
+    if (routeConfigType() == RouteConfigType::Rds) {
+      result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+      RELEASE_ASSERT(result, result.message());
+      xds_stream_->startGrpcStream();
+
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
+                                              {"my_route"}, true));
+      sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+          Config::TestTypeUrl::get().RouteConfiguration,
+          {warmingBlocksUnmatchedRequestsRdsConfig()}, "1");
+    }
+
+    test_server_->waitUntilListenersReady();
+    registerTestServerPorts({"http"});
+  }
+
+  envoy::config::route::v3::RouteConfiguration warmingBlocksUnmatchedRequestsRdsConfig() const {
+    auto config = rdsConfig();
+    config.mutable_vhds()->mutable_warming_blocks_unmatched_requests();
+    return config;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+                         VHDS_INTEGRATION_PARAMS, vhdsTestParamsToString);
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       ServesStaticImmediatelyAndHoldsDynamicUntilVhdsUpdate) {
+  initialize();
+
+  // 1. Connect to VHDS.
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  vhds_stream_->startGrpcStream();
+
+  // Envoy makes the initial wildcard VHDS request without blocking startup.
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 2. Static virtual host is served immediately while VHDS is in flight.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+
+  // 3. Dynamic virtual host request (with body) is held while initial wildcard VHDS is in flight.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto response = codec_client_->makeRequestWithBody(request_headers, 128);
+
+  // Request is held; verify it does not complete immediately.
+  EXPECT_FALSE(response->waitForEndStream(std::chrono::milliseconds(100)));
+
+  // 4. Send the initial wildcard VHDS response delivering the virtual host.
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 5. Held request and its buffered body are woken up and forwarded upstream.
+  waitForNextUpstreamRequest(1);
+  EXPECT_EQ(128U, upstream_request_->bodyLength());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // 6. Subsequent unmatched request immediately receives 404 without waiting.
+  Http::TestRequestHeaderMapImpl unknown_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "unknown.com"}};
+  auto unknown_response = codec_client_->makeHeaderOnlyRequest(unknown_headers);
+  ASSERT_TRUE(unknown_response->waitForEndStream());
+  EXPECT_EQ("404", unknown_response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(VhdsWarmingBlocksUnmatchedRequestsIntegrationTest,
+       UnmatchedVhdsResponseWakesHeldRequestTo404) {
+  initialize();
+
+  // 1. Connect to VHDS.
+  auto result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
+  RELEASE_ASSERT(result, result.message());
+  vhds_stream_->startGrpcStream();
+
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 2. Static virtual host is served immediately.
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+
+  // 3. Dynamic virtual host request is held.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Request is held; verify it does not complete immediately.
+  EXPECT_FALSE(response->waitForEndStream(std::chrono::milliseconds(100)));
+
+  // 4. Send initial wildcard VHDS response delivering an unrelated virtual host.
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost,
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
+          virtualHostYaml("my_route/vhost_other", "other.com"))},
+      {}, "1", vhds_stream_.get());
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                           vhds_stream_.get()));
+
+  // 5. Held request is woken up and completes with 404 because no matching vhost was added.
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy

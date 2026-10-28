@@ -107,6 +107,12 @@ vhds:
     return route_config;
   }
 
+  bool configAwaitingInitialVhdsUpdate(const RouteConfigUpdateReceiver& receiver) {
+    const auto config =
+        std::dynamic_pointer_cast<const Router::Config>(receiver.parsedConfiguration());
+    return config != nullptr && config->awaitingInitialVhdsUpdate();
+  }
+
   ProtoTraitsImpl proto_traits_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
   Init::ManagerImpl init_manager_{"test route config"};
@@ -529,6 +535,82 @@ TEST_F(VhdsTest, VhdsAnsweredResourceIdsSurviveRdsUpdateThatKeepsTheSubscription
     vhost_names.push_back(vhost.name());
   }
   EXPECT_THAT(vhost_names, ::testing::UnorderedElementsAre("vhost_rds1", "vhost1"));
+}
+
+const char warming_blocks_unmatched_requests_config[] = R"EOF(
+name: my_route
+vhds:
+  config_source:
+    api_config_source:
+      api_type: DELTA_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+  warming_blocks_unmatched_requests: {}
+)EOF";
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsDoesNotBlockInitAndWarmsImmediately) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(config_update_info->warmingBlocksUnmatchedRequests());
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(config_update_info->configWarming());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  // updateOnDemand is a no-op when warming_blocks_unmatched_requests is enabled.
+  EXPECT_CALL(*factory_context_.cluster_manager_.subscription_factory_.subscription_,
+              requestOnDemandUpdate(_))
+      .Times(0);
+  config_update_info->updateOnDemand("vhost1");
+
+  // Push the initial VHDS update.
+  const auto added_resources = buildAddedResources({buildVirtualHost("vhost1", "vhost1.com")});
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::route::v3::VirtualHost>(added_resources);
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      decoded_resources.refvec_, {}, "2"));
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  const auto current_config = routeConfiguration(*config_update_info);
+  EXPECT_EQ(1, current_config.virtual_hosts().size());
+  EXPECT_EQ("vhost1", current_config.virtual_hosts(0).name());
+}
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsEmptyInitialUpdateResolvesWarming) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  // Send an empty initial VHDS response.
+  EXPECT_OK(factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+      {}, {}, "2"));
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
+  EXPECT_EQ(0, routeConfiguration(*config_update_info).virtual_hosts().size());
+}
+
+TEST_F(VhdsTest, WarmingBlocksUnmatchedRequestsFailureResolvesWarming) {
+  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
+      warming_blocks_unmatched_requests_config);
+  RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
+
+  EXPECT_TRUE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_TRUE(configAwaitingInitialVhdsUpdate(*config_update_info));
+
+  // Send an update failure.
+  factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdateFailed(
+      Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, nullptr);
+
+  EXPECT_FALSE(config_update_info->awaitingInitialVhdsUpdate());
+  EXPECT_FALSE(configAwaitingInitialVhdsUpdate(*config_update_info));
 }
 
 } // namespace
