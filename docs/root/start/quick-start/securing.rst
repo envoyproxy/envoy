@@ -140,6 +140,13 @@ presented certificate. In particular, ``ACCEPT_UNTRUSTED`` delegates the trust d
 and is not mutual authentication by itself. Keep a trusted CA and the appropriate
 validation policy when using this example to authenticate clients.
 
+Enforcement of ``require_client_certificate`` without a trusted CA is enabled by
+default. To temporarily restore the previous behavior, set runtime guard
+``envoy.reloadable_features.require_client_certificate_without_ca`` to ``false``.
+The guard is evaluated when a TLS context is created. After changing it, reload the
+affected TLS contexts or restart Envoy; existing TLS contexts and established
+connections are not changed.
+
 You can further restrict the authentication of connecting clients by specifying the allowed
 "Subject Alternative Names" in
 :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`,

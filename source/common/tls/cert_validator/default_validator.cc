@@ -673,10 +673,12 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
 
 absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
                                                               bool require_client_cert) {
-  if (require_client_cert) {
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
-  }
   if (config_ == nullptr || config_->caCert().empty()) {
+    if (require_client_cert &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.require_client_certificate_without_ca")) {
+      SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+    }
     return absl::OkStatus();
   }
 
@@ -725,6 +727,9 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     SSL_CTX_set_client_CA_list(ctx, list.release());
   }
 
+  if (require_client_cert) {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
+  }
   // Set the verify_depth
   if (config_->maxVerifyDepth().has_value()) {
     uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
