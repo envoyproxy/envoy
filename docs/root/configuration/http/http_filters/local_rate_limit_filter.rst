@@ -129,6 +129,73 @@ path, then 10 req/min are allowed. But if they come from a downstream service
 cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
 1000 req/min are allowed.
 
+.. _config_http_filters_local_rate_limit_stop_on_match:
+
+Stopping at the first match
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, the token bucket of every matched descriptor is consumed. Setting
+:ref:`stop_on_match <envoy_v3_api_field_config.route.v3.RateLimit.stop_on_match>` on a rate limit
+action makes the filter skip all later rate limit actions once that action has produced a
+descriptor, so later buckets are not consumed. Earlier actions still apply, so actions that should
+always count must be placed before the first one with the flag. Route actions are evaluated before
+virtual host actions, so a match on a route action with the flag also skips the virtual host
+actions.
+
+A rate limit action produces a descriptor when every one of its ``actions`` populates. This does
+not require a configured descriptor with a token bucket for it, so a rate limit action that always
+populates, such as one using ``request_headers`` on a header that is always present, stops the
+search even when its descriptor matches no bucket. The default token bucket is still consumed according to
+:ref:`always_consume_default_token_bucket <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.always_consume_default_token_bucket>`.
+
+This makes tiered limits easy to express. In the following configuration, ``client-a`` only consumes
+the 100 req/min bucket while every other client consumes a shared 10 req/min bucket:
+
+.. code-block:: yaml
+
+  stat_prefix: http_local_rate_limiter
+  token_bucket:
+    max_tokens: 1000
+    tokens_per_fill: 1000
+    fill_interval: 60s
+  filter_enabled:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  descriptors:
+  - entries:
+    - key: tier
+      value: client-a
+    token_bucket:
+      max_tokens: 100
+      tokens_per_fill: 100
+      fill_interval: 60s
+  - entries:
+    - key: tier
+      value: default
+    token_bucket:
+      max_tokens: 10
+      tokens_per_fill: 10
+      fill_interval: 60s
+  rate_limits:
+  - actions:
+    - header_value_match:
+        descriptor_key: tier
+        descriptor_value: client-a
+        headers:
+        - name: x-user-id
+          string_match:
+            exact: client-a
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_key: tier
+        descriptor_value: default
+
 Statistics
 ----------
 

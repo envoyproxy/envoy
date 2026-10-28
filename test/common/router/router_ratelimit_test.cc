@@ -334,6 +334,19 @@ actions:
 
   EXPECT_EQ(2UL, rate_limit_entry_->stage());
   EXPECT_EQ("no_ratelimit", rate_limit_entry_->disableKey());
+  EXPECT_FALSE(rate_limit_entry_->stopOnMatch());
+}
+
+TEST_F(RateLimitPolicyEntryTest, StopOnMatch) {
+  const std::string yaml = R"EOF(
+stop_on_match: true
+actions:
+- remote_address: {}
+  )EOF";
+
+  setupTest(yaml);
+
+  EXPECT_TRUE(rate_limit_entry_->stopOnMatch());
 }
 
 TEST_F(RateLimitPolicyEntryTest, RemoteAddress) {

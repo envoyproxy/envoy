@@ -291,8 +291,11 @@ void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors
   }
 
   const Router::RouteEntry* route_entry = route->routeEntry();
-  // Get all applicable rate limit policy entries for the route.
-  populateDescriptors(route_entry->rateLimitPolicy(), descriptors, headers);
+  // Get all applicable rate limit policy entries for the route. A route entry with stop_on_match
+  // that produced a descriptor also skips the virtual host entries.
+  if (populateDescriptors(route_entry->rateLimitPolicy(), descriptors, headers)) {
+    return;
+  }
   VhRateLimitOptions vh_rate_limit_option = getVirtualHostRateLimitOption(route);
 
   switch (vh_rate_limit_option) {
@@ -310,7 +313,7 @@ void Filter::populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
+bool Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                                  std::vector<RateLimit::Descriptor>& descriptors,
                                  Http::RequestHeaderMap& headers) {
   for (const Router::RateLimitPolicyEntry& rate_limit :
@@ -320,9 +323,15 @@ void Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_polic
     if (!disable_key.empty()) {
       continue;
     }
+    const size_t size_before = descriptors.size();
     rate_limit.populateDescriptors(descriptors, used_config_->localInfo().clusterName(), headers,
                                    decoder_callbacks_->streamInfo());
+    // A matching entry with stop_on_match ends the search; later entries are skipped.
+    if (rate_limit.stopOnMatch() && descriptors.size() > size_before) {
+      return true;
+    }
   }
+  return false;
 }
 
 VhRateLimitOptions Filter::getVirtualHostRateLimitOption(OptRef<const Router::Route> route) {

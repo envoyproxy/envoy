@@ -275,7 +275,8 @@ private:
                                     const Http::RequestHeaderMap& headers,
                                     const Http::ResponseHeaderMap* response_headers,
                                     bool on_stream_done);
-  void populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
+  // Returns true when an entry with stop_on_match produced a descriptor, which ends the search.
+  bool populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
                                              std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                              const Http::RequestHeaderMap& headers,
                                              bool on_stream_done);

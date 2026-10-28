@@ -2154,7 +2154,7 @@ message VirtualCluster {
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 // Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
@@ -2810,6 +2810,25 @@ message RateLimit {
 
   // Descriptor level X-RateLimit headers options which may override the filter level setting.
   XRateLimitOption x_ratelimit_option = 7;
+
+  // If set to true and this configuration produces a descriptor for a request, no later
+  // configuration is evaluated for that request. Earlier configurations are not affected, so
+  // configurations that should always apply must be placed before the first one with this
+  // field set. This allows ordered, tiered limits without negating earlier configurations:
+  // put the more specific configurations first, each with this field set, and a catch-all
+  // configuration last.
+  //
+  // Route configurations are evaluated before virtual host configurations, so a match on a
+  // route configuration with this field set also skips the virtual host configurations.
+  // Configurations with :ref:`apply_on_stream_done
+  // <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are evaluated
+  // separately from the request-time configurations, so each phase stops on its own.
+  //
+  // A configuration produces a descriptor when all of its actions populate. For the HTTP local
+  // rate limit filter this does not require a configured token bucket for the descriptor.
+  //
+  // Currently, this is only supported by the HTTP global and local rate limit filters.
+  bool stop_on_match = 8;
 }
 
 // .. attention::

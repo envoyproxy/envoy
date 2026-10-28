@@ -135,6 +135,25 @@ public:
   domain: foo
   )EOF";
 
+  // Inlined entries: the first cannot populate, the second stops on match, the third is skipped.
+  const std::string stop_on_match_inlined_config_ = R"EOF(
+  domain: "bar"
+  rate_limits:
+  - actions:
+    - request_headers:
+        header_name: "x-missing"
+        descriptor_key: "missing"
+    stop_on_match: true
+  - actions:
+    - request_headers:
+        header_name: "x-header-name"
+        descriptor_key: "header-name"
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_value: "generic-key"
+  )EOF";
+
   const std::string rate_limited_status_config_ = R"EOF(
   domain: foo
   rate_limited_status:
@@ -2628,6 +2647,194 @@ TEST_F(HttpRateLimitFilterTest, FailureModeHundredPercentFailsClose) {
                     ->statsScope()
                     .counterFromStatName(ratelimit_failure_mode_allowed_)
                     .value());
+}
+
+// A route entry with stop_on_match that produces a descriptor ends the search before the virtual
+// host entries are evaluated, even when they are included.
+TEST_F(HttpRateLimitFilterTest, StopOnMatchSkipsVirtualHost) {
+  setUpTest(filter_config_);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, stopOnMatch()).WillRepeatedly(Return(true));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(0);
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
+
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_), _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// A route entry with stop_on_match that produces nothing does not stop the search, so the virtual
+// host entries are still evaluated.
+TEST_F(HttpRateLimitFilterTest, StopOnMatchWithoutMatchFallsThroughToVirtualHost) {
+  setUpTest(filter_config_);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, stopOnMatch()).WillRepeatedly(Return(true));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _));
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0));
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_two_));
+
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_two_), _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// Entries before the stopping one still apply; entries after it are skipped.
+TEST_F(HttpRateLimitFilterTest, StopOnMatchWithinRoutePolicy) {
+  setUpTest(filter_config_);
+  NiceMock<Router::MockRateLimitPolicyEntry> stopping_route_rate_limit;
+  NiceMock<Router::MockRateLimitPolicyEntry> skipped_route_rate_limit;
+  auto& entries =
+      filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_;
+  entries.emplace_back(stopping_route_rate_limit);
+  entries.emplace_back(skipped_route_rate_limit);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(stopping_route_rate_limit, stopOnMatch()).WillRepeatedly(Return(true));
+  EXPECT_CALL(stopping_route_rate_limit, populateDescriptors(_, _, _, _))
+      .WillOnce(Invoke([this](std::vector<RateLimit::Descriptor>& descriptors, const std::string&,
+                              const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+        descriptors.push_back(descriptor_two_[0]);
+      }));
+  EXPECT_CALL(skipped_route_rate_limit, populateDescriptors(_, _, _, _)).Times(0);
+
+  const std::vector<RateLimit::Descriptor> expected{descriptor_[0], descriptor_two_[0]};
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(expected), _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(
+      1U, filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_ok_).value());
+}
+
+// A stop at request time does not affect the stream-done entries, which are evaluated separately.
+TEST_F(HttpRateLimitFilterTest, StopOnMatchPerPhase) {
+  setUpTest(filter_config_);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_, includeVirtualHostRateLimits())
+      .WillOnce(Return(true));
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  ON_CALL(route_rate_limit_, stopOnMatch()).WillByDefault(Return(true));
+  ON_CALL(vh_rate_limit_, applyOnStreamDone()).WillByDefault(Return(true));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_));
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
+      .Times(0);
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_), _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+
+  // The stream-done virtual host entry is still evaluated on destroy.
+  testing::Mock::VerifyAndClearExpectations(client_);
+  testing::Mock::VerifyAndClearExpectations(
+      &filter_callbacks_.route_->route_entry_.rate_limit_policy_);
+  testing::Mock::VerifyAndClearExpectations(
+      &filter_callbacks_.route_->virtual_host_->rate_limit_policy_);
+  testing::Mock::VerifyAndClearExpectations(&route_rate_limit_);
+  ON_CALL(route_rate_limit_, stopOnMatch()).WillByDefault(Return(true));
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0));
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(SetArgReferee<0>(descriptor_two_));
+  EXPECT_CALL(*client_, limit(_, "foo", testing::ContainerEq(descriptor_two_), _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_CALL(*client_, detach());
+  filter_->onDestroy();
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+}
+
+// stop_on_match on the filter-level inlined rate limits.
+TEST_F(HttpRateLimitFilterTest, StopOnMatchInlinedRateLimits) {
+  setUpTest(stop_on_match_inlined_config_);
+  request_headers_.addCopy("x-header-name", "header-value");
+
+  EXPECT_CALL(*client_, limit(_, "bar",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"header-name", "header-value"}}}}),
+                              _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// stop_on_match on the per-route inlined rate limits.
+TEST_F(HttpRateLimitFilterTest, StopOnMatchPerRouteRateLimits) {
+  const std::string route_config_yaml = R"EOF(
+  domain: "per-route"
+  rate_limits:
+  - actions:
+    - request_headers:
+        header_name: "x-header-name"
+        descriptor_key: "header-name"
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_value: "generic-key"
+  )EOF";
+  setUpTest(filter_config_, route_config_yaml);
+  request_headers_.addCopy("x-header-name", "header-value");
+
+  EXPECT_CALL(*client_, limit(_, "per-route",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"header-name", "header-value"}}}}),
+                              _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
 TEST_F(HttpRateLimitFilterTest, InlinedRateLimitAction) {
