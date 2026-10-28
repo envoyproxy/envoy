@@ -39,6 +39,11 @@ public:
                             std::set<std::string>&& added_resource_ids,
                             const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                             const std::string& version_info) PURE;
+
+  /**
+   * Called when a VHDS subscription fails (e.g. gRPC error or timeout on config update).
+   */
+  virtual void onVhdsFailure() PURE;
 };
 
 /**
@@ -46,6 +51,20 @@ public:
  */
 class RouteConfigUpdateReceiver : public Rds::RouteConfigUpdateReceiver {
 public:
+  /**
+   * @return bool whether warming blocks unmatched requests is configured.
+   */
+  virtual bool warmingBlocksUnmatchedRequests() const { return false; }
+
+  /**
+   * @return bool whether the receiver is awaiting the initial wildcard VHDS update.
+   */
+  virtual bool awaitingInitialVhdsUpdate() const { return false; }
+
+  /**
+   * Called when a VHDS subscription fails (e.g. gRPC error or timeout on config update).
+   */
+  virtual void onVhdsFailure() {}
   /**
    * Requests an on-demand VHDS update for the given alias. Does nothing if the current route
    * configuration doesn't configure VHDS.

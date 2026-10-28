@@ -1796,6 +1796,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   ASSERT(!cached_route_);
   refreshCachedRoute();
 
+  if (!hasCachedRoute() && snapped_route_config_ != nullptr &&
+      snapped_route_config_->awaitingInitialVhdsUpdate() &&
+      route_config_update_requester_.has_value() && !request_headers_->getHostValue().empty()) {
+    state_.waiting_for_vhds_ = true;
+    state_.deferred_end_stream_ = end_stream;
+    vhds_update_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(
+        [this](bool) -> void { onInitialVhdsUpdateComplete(); });
+    requestRouteConfigUpdate(vhds_update_callback_);
+    resetIdleTimer();
+    return;
+  }
+
   if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
     filter_manager_.streamInfo().setTraceReason(
         ConnectionManagerUtility::mutateTracingRequestHeader(
@@ -1881,7 +1893,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   maybeRecordLastByteReceived(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (!state_.deferred_to_next_io_iteration_ && !state_.waiting_for_vhds_) {
     filter_manager_.decodeData(data, end_stream);
   } else {
     if (!deferred_data_) {
@@ -1905,7 +1917,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
     return;
   }
   maybeRecordLastByteReceived(true);
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (!state_.deferred_to_next_io_iteration_ && !state_.waiting_for_vhds_) {
     request_trailers_ = std::move(trailers);
     filter_manager_.decodeTrailers(*request_trailers_);
   } else {
@@ -1919,7 +1931,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
 void ConnectionManagerImpl::ActiveStream::decodeMetadata(MetadataMapPtr&& metadata_map) {
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   resetIdleTimer();
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (!state_.deferred_to_next_io_iteration_ && !state_.waiting_for_vhds_) {
     // After going through filters, the ownership of metadata_map will be passed to terminal filter.
     // The terminal filter may encode metadata_map to the next hop immediately or store metadata_map
     // and encode later when connection pool is ready.
@@ -2849,13 +2861,15 @@ void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
 }
 
 void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason, absl::string_view) {
+  state_.waiting_for_vhds_ = false;
+  vhds_update_callback_.reset();
   connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   connection_manager_.doEndStream(*this);
 }
 
 bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
   // TODO(yanavlasov): Merge this with the filter manager continueIteration() method
-  if (!state_.deferred_to_next_io_iteration_) {
+  if (state_.waiting_for_vhds_ || !state_.deferred_to_next_io_iteration_) {
     return false;
   }
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
@@ -2883,6 +2897,63 @@ bool ConnectionManagerImpl::ActiveStream::onDeferredRequestProcessing() {
     filter_manager_.decodeTrailers(*request_trailers_);
   }
   return true;
+}
+
+void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
+  if (canDestroyStream() || !state_.waiting_for_vhds_) {
+    return;
+  }
+  state_.waiting_for_vhds_ = false;
+  vhds_update_callback_.reset();
+
+  refreshRouteConfigSnapshot();
+  clearRouteCache();
+  refreshCachedRoute();
+
+  ScopeTrackerScopeState scope(this,
+                               connection_manager_.read_callbacks_->connection().dispatcher());
+  ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
+
+  if (!state_.is_internally_created_) { // Only mutate tracing headers on first pass.
+    filter_manager_.streamInfo().setTraceReason(
+        ConnectionManagerUtility::mutateTracingRequestHeader(
+            *request_headers_, connection_manager_.runtime_, *connection_manager_.config_,
+            cached_route_.value().get()));
+  }
+
+  filter_manager_.streamInfo().setRequestHeaders(*request_headers_);
+  const FilterManager::CreateChainResult create_chain_result =
+      filter_manager_.createDownstreamFilterChain();
+  if (create_chain_result.upgradeAccepted()) {
+    connection_manager_.stats_.named_.downstream_cx_upgrades_total_.inc();
+    connection_manager_.stats_.named_.downstream_cx_upgrades_active_.inc();
+    state_.successful_upgrade_ = true;
+  }
+
+  if (connection_manager_.config_->flushAccessLogOnNewRequest()) {
+    log(AccessLog::AccessLogType::DownstreamStart);
+  }
+
+  if (hasCachedRoute()) {
+    if (create_chain_result.upgradeRejected()) {
+      filter_manager_.streamInfo().setShouldDrainConnectionUponCompletion(true);
+      connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
+      sendLocalReply(Code::Forbidden, "", nullptr, std::nullopt,
+                     StreamInfo::ResponseCodeDetails::get().UpgradeFailed);
+      return;
+    }
+  }
+
+  if (connection_manager_tracing_config_.has_value()) {
+    traceRequest();
+  }
+
+  state_.deferred_to_next_io_iteration_ = true;
+  if (!connection_manager_.shouldDeferRequestProxyingToNextIoCycle()) {
+    onDeferredRequestProcessing();
+  }
+
+  resetIdleTimer();
 }
 
 bool ConnectionManagerImpl::shouldDeferRequestProxyingToNextIoCycle() {
