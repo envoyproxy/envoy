@@ -21,7 +21,6 @@ using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -598,10 +597,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, AddResolvedHostFilterStateMetadata
   EXPECT_CALL(callbacks_, dispatcher());
 
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
-      .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
-                           ProxyFilter::LoadDnsCacheEntryCallbacks&) {
+      .WillOnce([&](absl::string_view, uint16_t, bool, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
-      }));
+      });
 
   EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
@@ -647,10 +645,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, UpdateResolvedHostFilterStateMetad
   EXPECT_CALL(callbacks_, dispatcher());
 
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
-      .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
-                           ProxyFilter::LoadDnsCacheEntryCallbacks&) {
+      .WillOnce([&](absl::string_view, uint16_t, bool, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
-      }));
+      });
 
   EXPECT_CALL(*host_info, address()).Times(2).WillRepeatedly(Return(host_info->address_));
 
@@ -696,10 +693,9 @@ TEST_F(UpstreamResolvedHostFilterStateHelper, IgnoreFilterStateMetadataNullAddre
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
       .WillOnce(Return(circuit_breakers_));
   EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
-      .WillOnce(Invoke([&](absl::string_view, uint16_t, bool,
-                           ProxyFilter::LoadDnsCacheEntryCallbacks&) {
+      .WillOnce([&](absl::string_view, uint16_t, bool, ProxyFilter::LoadDnsCacheEntryCallbacks&) {
         return MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::InCache, nullptr, host_info};
-      }));
+      });
 
   EXPECT_CALL(*host_info, address());
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable,

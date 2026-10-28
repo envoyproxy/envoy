@@ -51,7 +51,6 @@
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
@@ -181,16 +180,16 @@ protected:
     ON_CALL(udp_listener_config_, packetWriterFactory())
         .WillByDefault(ReturnRef(udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
-        .WillByDefault(
-            Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
-                       absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
+        .WillByDefault([&](Network::IoHandle& io_handle, Stats::Scope& scope,
+                           Envoy::Event::Dispatcher&,
+                           absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
-              return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
+          return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
-              UNREFERENCED_PARAMETER(scope);
-              return std::make_unique<Network::UdpDefaultWriter>(io_handle);
+          UNREFERENCED_PARAMETER(scope);
+          return std::make_unique<Network::UdpDefaultWriter>(io_handle);
 #endif
-            }));
+        });
   }
 
   void initialize() {
@@ -243,12 +242,12 @@ protected:
         .WillRepeatedly(Return(true));
     EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .Times(connection_count)
-        .WillRepeatedly(Invoke([](Network::Connection& connection,
-                                  const Filter::NetworkFilterFactoriesList& filter_factories) {
+        .WillRepeatedly([](Network::Connection& connection,
+                           const Filter::NetworkFilterFactoriesList& filter_factories) {
           EXPECT_EQ(1u, filter_factories.size());
           Server::Configuration::FilterChainUtility::buildFilterChain(connection, filter_factories);
           return true;
-        }));
+        });
     EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
         .Times(connection_count);
 
@@ -818,18 +817,17 @@ protected:
   }
 
   void makeCidGeneratorFactory(absl::StatusOr<Network::Socket::OptionConstSharedPtr> option) {
-    EXPECT_CALL(config_factory_, createQuicConnectionIdGeneratorFactory)
-        .WillOnce(Invoke([this, option]() {
-          auto result = std::make_unique<StrictMock<MockEnvoyQuicConnectionIdGeneratorFactory>>();
-          cid_generator_factory_ = result.get();
+    EXPECT_CALL(config_factory_, createQuicConnectionIdGeneratorFactory).WillOnce([this, option]() {
+      auto result = std::make_unique<StrictMock<MockEnvoyQuicConnectionIdGeneratorFactory>>();
+      cid_generator_factory_ = result.get();
 
-          EXPECT_CALL(*cid_generator_factory_, createCompatibleLinuxBpfSocketOption(2u))
-              .WillOnce(Return(option));
-          EXPECT_CALL(*cid_generator_factory_, getCompatibleConnectionIdWorkerSelector(2u))
-              .WillOnce(Return(default_cid_worker_selector_));
+      EXPECT_CALL(*cid_generator_factory_, createCompatibleLinuxBpfSocketOption(2u))
+          .WillOnce(Return(option));
+      EXPECT_CALL(*cid_generator_factory_, getCompatibleConnectionIdWorkerSelector(2u))
+          .WillOnce(Return(default_cid_worker_selector_));
 
-          return result;
-        }));
+      return result;
+    });
   }
 
   Network::MockListenSocketFactory*
@@ -917,11 +915,11 @@ TEST_F(ActiveQuicListenerFactoryInitializeWorkerRoutingTest, PostsSocketOptions)
   std::vector<Network::Socket*> setopt_sockets;
   EXPECT_CALL(*mock_option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .Times(2)
-      .WillRepeatedly(Invoke([&setopt_sockets](Network::Socket& socket,
-                                               envoy::config::core::v3::SocketOption::SocketState) {
+      .WillRepeatedly([&setopt_sockets](Network::Socket& socket,
+                                        envoy::config::core::v3::SocketOption::SocketState) {
         setopt_sockets.push_back(&socket);
         return true;
-      }));
+      });
 
   EXPECT_OK(factory_->initializeWorkerRouting(socket_factories_));
 
@@ -1024,12 +1022,12 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreation) {
   // Expect createQuicPacketWriter to be called, and return our dummy writer.
   FakeQuicPacketWriter* raw_writer = nullptr;
   EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _, _))
-      .WillOnce(Invoke([&raw_writer](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
-                                     absl::AnyInvocable<void()>, uint32_t) -> QuicPacketWriterPtr {
+      .WillOnce([&raw_writer](Network::IoHandle&, Stats::Scope&, Envoy::Event::Dispatcher&,
+                              absl::AnyInvocable<void()>, uint32_t) -> QuicPacketWriterPtr {
         auto writer = std::make_unique<FakeQuicPacketWriter>();
         raw_writer = writer.get();
         return writer;
-      }));
+      });
 
   // Initialize the listener. This will trigger createQuicPacketWriter.
   initialize();
@@ -1051,7 +1049,7 @@ TEST_P(ActiveQuicListenerTest, DirectQuicPacketWriterCreationNullWriter) {
   // Expect createQuicPacketWriter to return nullptr.
   EXPECT_CALL(quic_packet_writer_factory, createQuicPacketWriter(_, _, _, _, _))
       .Times(testing::AnyNumber())
-      .WillRepeatedly(testing::InvokeWithoutArgs([]() -> QuicPacketWriterPtr { return nullptr; }));
+      .WillRepeatedly([]() -> QuicPacketWriterPtr { return nullptr; });
 
   listener_factory_ = createQuicListenerFactory(yamlForQuicConfig());
   EXPECT_CALL(listener_config_, filterChainManager())

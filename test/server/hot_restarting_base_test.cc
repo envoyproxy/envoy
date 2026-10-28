@@ -34,9 +34,9 @@ TEST_F(HotRestartingBaseTest, SendMsgRetryFailsAfterRetries) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
-      .WillRepeatedly(Invoke(
-          [&](os_fd_t, const msghdr*, int) { return Api::SysCallSizeResult{0, ECONNREFUSED}; }));
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillRepeatedly([&](os_fd_t, const msghdr*, int) {
+    return Api::SysCallSizeResult{0, ECONNREFUSED};
+  });
 
   std::string dst_path = "/tmp/dst";
   sockaddr_un sun;
@@ -55,15 +55,14 @@ TEST_F(HotRestartingBaseTest, SendMsgRetrySucceedsEventually) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   bool retried = false;
-  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t, const msghdr*, int) {
-        if (!retried) {
-          retried = true;
-          return Api::SysCallSizeResult{0, ECONNREFUSED};
-        }
+  EXPECT_CALL(os_sys_calls, sendmsg(_, _, _)).WillRepeatedly([&](os_fd_t, const msghdr*, int) {
+    if (!retried) {
+      retried = true;
+      return Api::SysCallSizeResult{0, ECONNREFUSED};
+    }
 
-        return Api::SysCallSizeResult{30, 0};
-      }));
+    return Api::SysCallSizeResult{30, 0};
+  });
 
   std::string dst_path = "/tmp/dst";
   sockaddr_un sun;

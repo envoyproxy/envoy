@@ -35,7 +35,6 @@
 using testing::_;
 using testing::Eq;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -64,12 +63,12 @@ public:
     EXPECT_CALL(validation_context_, dynamicValidationVisitor())
         .WillRepeatedly(ReturnRef(validation_visitor_));
 
-    ON_CALL(outer_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(outer_init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
-    ON_CALL(outer_init_manager_, initialize(_))
-        .WillByDefault(Invoke(
-            [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
+    });
+    ON_CALL(outer_init_manager_, initialize(_)).WillByDefault([this](const Init::Watcher& watcher) {
+      init_target_handle_->initialize(watcher);
+    });
   }
 
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }

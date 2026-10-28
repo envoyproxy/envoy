@@ -22,8 +22,6 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::WithArg;
 
 namespace Envoy {
@@ -55,13 +53,13 @@ public:
   void setup() {
     EXPECT_CALL(hot_restart_os_sys_calls_, shmUnlink(_)).Times(AnyNumber());
     EXPECT_CALL(hot_restart_os_sys_calls_, shmOpen(_, _, _));
-    EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([this](off_t size) {
+    EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>([this](off_t size) {
       buffer_.resize(size);
       return Api::SysCallIntResult{0, 0};
-    })));
-    EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(InvokeWithoutArgs([this]() {
-      return Api::SysCallPtrResult{buffer_.data(), 0};
     }));
+    EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce([this]() {
+      return Api::SysCallPtrResult{buffer_.data(), 0};
+    });
     // We bind two sockets, from both ends (parent and child), totaling four sockets to be bound.
     // The socket for child->parent RPCs, and the socket for parent->child UDP forwarding
     // in support of QUIC during hot restart.
@@ -257,14 +255,13 @@ TEST_F(HotRestartImplTest, IsInitializingReflectsLifecyclePhases) {
   EXPECT_CALL(hot_restart_os_sys_calls_, shmOpen(_, _, _)).Times(2).WillRepeatedly([]() {
     return Api::SysCallIntResult{1, 0};
   });
-  EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([&buffer](off_t size) {
+  EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>([&buffer](off_t size) {
     buffer.resize(size);
     return Api::SysCallIntResult{0, 0};
-  })));
-  EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _))
-      .Times(2)
-      .WillRepeatedly(
-          InvokeWithoutArgs([&buffer]() { return Api::SysCallPtrResult{buffer.data(), 0}; }));
+  }));
+  EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).Times(2).WillRepeatedly([&buffer]() {
+    return Api::SysCallPtrResult{buffer.data(), 0};
+  });
   EXPECT_CALL(os_sys_calls_, bind(_, _, _)).Times(8);
   EXPECT_CALL(os_sys_calls_, close(_)).Times(8);
   EXPECT_CALL(hot_restart_os_sys_calls_, shmUnlink(_));

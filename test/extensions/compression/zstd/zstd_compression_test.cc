@@ -12,8 +12,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -41,19 +39,18 @@ protected:
 
   Event::DispatcherPtr setupDispatcher() {
     auto dispatcher = std::make_unique<Event::MockDispatcher>();
-    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
+    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillRepeatedly([this] {
       Filesystem::MockWatcher* mock_watcher = new Filesystem::MockWatcher();
       EXPECT_CALL(
           *mock_watcher,
           addWatch(_, Filesystem::Watcher::Events::MovedTo | Filesystem::Watcher::Events::Modified,
                    _))
-          .WillRepeatedly(
-              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                watch_cbs_.push_back(cb);
-                return absl::OkStatus();
-              }));
+          .WillRepeatedly([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+            watch_cbs_.push_back(cb);
+            return absl::OkStatus();
+          });
       return mock_watcher;
-    }));
+    });
     return dispatcher;
   }
 

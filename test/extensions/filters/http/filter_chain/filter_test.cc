@@ -24,7 +24,6 @@ namespace {
 
 using testing::_;
 using testing::ElementsAre;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -77,9 +76,9 @@ public:
 
     // Record the order in which filters are applied to the chain. The production code calls
     // setFilterConfigName() with the configured filter name right before adding each filter.
-    ON_CALL(callbacks_, setFilterConfigName(_))
-        .WillByDefault(Invoke(
-            [this](absl::string_view name) { applied_filters_.push_back(std::string(name)); }));
+    ON_CALL(callbacks_, setFilterConfigName(_)).WillByDefault([this](absl::string_view name) {
+      applied_filters_.push_back(std::string(name));
+    });
     ON_CALL(callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
   }
 
@@ -324,9 +323,9 @@ TEST_F(FilterChainFactoryTest, PerRouteConfigReleasedOffMainThreadIsPostedToMain
   )EOF");
 
   Event::PostCb posted;
-  EXPECT_CALL(main_dispatcher, post(_)).WillOnce(Invoke([&posted](Event::PostCb callback) {
+  EXPECT_CALL(main_dispatcher, post(_)).WillOnce([&posted](Event::PostCb callback) {
     posted = std::move(callback);
-  }));
+  });
   per_route_configs_.clear();
   ASSERT_TRUE(posted != nullptr);
 

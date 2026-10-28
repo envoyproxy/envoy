@@ -3079,6 +3079,16 @@ void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
   downstream_callbacks->refreshRouteCluster();
 }
 
+void envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (stream_info == nullptr) {
+    return;
+  }
+  stream_info->setShouldDrainConnectionUponCompletion(true);
+}
+
 } // extern "C"
 } // namespace HttpFilters
 } // namespace DynamicModules

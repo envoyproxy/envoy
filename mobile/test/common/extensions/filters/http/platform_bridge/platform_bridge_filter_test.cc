@@ -609,9 +609,9 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnRequestData) {
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
       .Times(2)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
-      }));
+      });
 
   setUpFilter("StopAndBufferOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -735,9 +735,9 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnRequestData) {
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
       .Times(1)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
-      }));
+      });
 
   setUpFilter("StopAndBufferThenResumeOnRequestData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -818,9 +818,9 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnData)
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
       .Times(2)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
-      }));
+      });
 
   setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -979,9 +979,9 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnTrail
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
       .Times(3)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
-      }));
+      });
 
   setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -1104,9 +1104,9 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenResumeOnResum
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
       .Times(4)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
-      }));
+      });
 
   setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -1232,9 +1232,9 @@ TEST_F(PlatformBridgeFilterTest, StopOnRequestHeadersThenBufferThenDontResumeOnR
       .WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
       .Times(4)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(decoding_buffer);
-      }));
+      });
 
   setUpFilter("StopOnRequestHeadersThenBufferThenResumeOnResumeDecoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -1619,9 +1619,9 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferOnResponseData) {
       .WillRepeatedly(Return(&encoding_buffer));
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
       .Times(2)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(encoding_buffer);
-      }));
+      });
 
   setUpFilter("StopAndBufferOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -1690,9 +1690,9 @@ TEST_F(PlatformBridgeFilterTest, StopAndBufferThenResumeOnResponseData) {
       .WillRepeatedly(Return(&encoding_buffer));
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
       .Times(1)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(encoding_buffer);
-      }));
+      });
 
   setUpFilter("StopAndBufferThenResumeOnResponseData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -1772,9 +1772,9 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnData
       .WillRepeatedly(Return(&encoding_buffer));
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
       .Times(2)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(encoding_buffer);
-      }));
+      });
 
   setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnData", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -1933,9 +1933,9 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnTrai
       .WillRepeatedly(Return(&encoding_buffer));
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
       .Times(3)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(encoding_buffer);
-      }));
+      });
 
   setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnTrailers", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);
@@ -2058,9 +2058,9 @@ TEST_F(PlatformBridgeFilterTest, StopOnResponseHeadersThenBufferThenResumeOnResu
       .WillRepeatedly(Return(&encoding_buffer));
   EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer(_))
       .Times(4)
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(encoding_buffer);
-      }));
+      });
 
   setUpFilter("StopOnResponseHeadersThenBufferThenResumeOnResumeEncoding", &platform_filter);
   EXPECT_EQ(invocations.init_filter_calls, 1);

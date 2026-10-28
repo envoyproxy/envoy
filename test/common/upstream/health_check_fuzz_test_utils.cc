@@ -30,14 +30,14 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(
 
   EXPECT_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
       .Times(testing::AnyNumber())
-      .WillRepeatedly(testing::InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+      .WillRepeatedly([&]() -> Network::ClientConnection* {
         uint32_t index = connection_index_.front();
         connection_index_.pop_front();
         return test_sessions_[index]->client_connection_;
-      }));
+      });
   EXPECT_CALL(*health_checker_, createCodecClient_(_, _))
-      .WillRepeatedly(Invoke([&](Upstream::Host::CreateConnectionData& conn_data,
-                                 Http::CodecType) -> Http::CodecClient* {
+      .WillRepeatedly([&](Upstream::Host::CreateConnectionData& conn_data,
+                          Http::CodecType) -> Http::CodecClient* {
         if (!health_check_map.empty()) {
           const auto& health_check_config =
               health_check_map.at(conn_data.host_description_->address()->asString());
@@ -55,7 +55,7 @@ void HttpHealthCheckerImplTestBase::expectClientCreate(
             Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_, nullptr,
             Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
         return test_session.codec_client_;
-      }));
+      });
 }
 
 void HttpHealthCheckerImplTestBase::expectStreamCreate(size_t index) {
@@ -110,27 +110,26 @@ void GrpcHealthCheckerImplTestBaseUtils::expectClientCreate(size_t index) {
 
   EXPECT_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
       .Times(testing::AnyNumber())
-      .WillRepeatedly(testing::InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+      .WillRepeatedly([&]() -> Network::ClientConnection* {
         uint32_t index = connection_index_.front();
         connection_index_.pop_front();
         return test_sessions_[index]->client_connection_;
-      }));
+      });
 
   EXPECT_CALL(*health_checker_, createCodecClient_(_))
-      .WillRepeatedly(
-          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-            uint32_t index = codec_index_.front();
-            codec_index_.pop_front();
-            TestSession& test_session = *test_sessions_[index];
-            std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                new NiceMock<Upstream::MockClusterInfo>()};
-            Event::MockDispatcher dispatcher_;
+      .WillRepeatedly([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+        uint32_t index = codec_index_.front();
+        codec_index_.pop_front();
+        TestSession& test_session = *test_sessions_[index];
+        std::shared_ptr<Upstream::MockClusterInfo> cluster{
+            new NiceMock<Upstream::MockClusterInfo>()};
+        Event::MockDispatcher dispatcher_;
 
-            test_session.codec_client_ = new CodecClientForTest(
-                Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
-                nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-            return test_session.codec_client_;
-          }));
+        test_session.codec_client_ = new CodecClientForTest(
+            Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_, nullptr,
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+        return test_session.codec_client_;
+      });
 }
 
 void GrpcHealthCheckerImplTestBaseUtils::expectStreamCreate(size_t index) {

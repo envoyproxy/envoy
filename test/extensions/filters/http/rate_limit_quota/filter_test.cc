@@ -1020,12 +1020,12 @@ bucket_matchers:
 
   // Expect sendLocalReply to be called with UNAVAILABLE gRPC status and custom message
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke(
-          [](Http::Code, absl::string_view body_text, std::function<void(Http::ResponseHeaderMap&)>,
-             const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view) {
-            EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Unavailable);
-            EXPECT_EQ(body_text, "Service temporarily unavailable");
-          }));
+      .WillOnce([](Http::Code, absl::string_view body_text,
+                   std::function<void(Http::ResponseHeaderMap&)>,
+                   const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view) {
+        EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::Unavailable);
+        EXPECT_EQ(body_text, "Service temporarily unavailable");
+      });
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(headers, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
@@ -1066,10 +1066,9 @@ TEST_F(FilterTest, DenyResponseDefaultBehavior) {
 
   // Should use default behavior (std::nullopt for gRPC status)
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(
-          Invoke([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
-                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                    absl::string_view) { EXPECT_EQ(grpc_status, std::nullopt); }));
+      .WillOnce([](Http::Code, absl::string_view, std::function<void(Http::ResponseHeaderMap&)>,
+                   const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                   absl::string_view) { EXPECT_EQ(grpc_status, std::nullopt); });
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
@@ -1195,7 +1194,7 @@ matcher_list:
 
   // Expect sendLocalReply to be called with custom gRPC message in body_text parameter
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [](Http::Code, absl::string_view body, std::function<void(Http::ResponseHeaderMap&)>,
              const std::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
             // Check that the custom message is in the body_text parameter (for gRPC message)
@@ -1204,7 +1203,7 @@ matcher_list:
             EXPECT_EQ(grpc_status, Grpc::Status::WellKnownGrpcStatus::ResourceExhausted);
             // Check that details contains our debug info
             EXPECT_EQ(details, "rate_limited_by_quota");
-          }));
+          });
 
   Http::FilterHeadersStatus status = filter_->decodeHeaders(headers, false);
   EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);

@@ -32,16 +32,16 @@ void UberWriteFilterFuzzer::fuzzerSetup() {
   write_filter_callbacks_ = std::make_shared<NiceMock<Network::MockWriteFilterCallbacks>>();
   read_filter_callbacks_ = std::make_shared<NiceMock<Network::MockReadFilterCallbacks>>();
   ON_CALL(write_filter_callbacks_->connection_, addWriteFilter(_))
-      .WillByDefault(Invoke([&](Network::WriteFilterSharedPtr write_filter) -> void {
+      .WillByDefault([&](Network::WriteFilterSharedPtr write_filter) -> void {
         write_filter->initializeWriteFilterCallbacks(*write_filter_callbacks_);
         write_filter_ = write_filter;
-      }));
+      });
   ON_CALL(write_filter_callbacks_->connection_, addFilter(_))
-      .WillByDefault(Invoke([&](Network::FilterSharedPtr filter) -> void {
+      .WillByDefault([&](Network::FilterSharedPtr filter) -> void {
         filter->initializeReadFilterCallbacks(*read_filter_callbacks_);
         filter->initializeWriteFilterCallbacks(*write_filter_callbacks_);
         write_filter_ = filter;
-      }));
+      });
   factory_context_.prepareSimulatedSystemTime();
 
   // Set featureEnabled for mongo_proxy

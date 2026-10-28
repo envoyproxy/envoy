@@ -19,7 +19,6 @@
 
 using testing::Eq;
 using testing::Ge;
-using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 
@@ -942,7 +941,7 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
   Network::TransportSocketCallbacks* transport_callbacks;
   EXPECT_CALL(*bad_transport_socket, setTransportSocketCallbacks)
       .WillOnce(SaveArgAddress(&transport_callbacks));
-  ON_CALL(*bad_transport_socket, doRead).WillByDefault(InvokeWithoutArgs([&] {
+  ON_CALL(*bad_transport_socket, doRead).WillByDefault([&] {
     Buffer::OwnedImpl buffer;
     transport_callbacks->connection().dispatcher().exit();
     // Read some amount of data; what's more important is whether the socket was remote-closed. That
@@ -952,11 +951,11 @@ TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {
                                  ? Network::PostIoAction::Close
                                  : Network::PostIoAction::KeepOpen,
                              0, false};
-  }));
-  ON_CALL(*bad_transport_socket, doWrite).WillByDefault(InvokeWithoutArgs([&] {
+  });
+  ON_CALL(*bad_transport_socket, doWrite).WillByDefault([&] {
     transport_callbacks->connection().dispatcher().exit();
     return Network::IoResult{Network::PostIoAction::KeepOpen, 0, false};
-  }));
+  });
 
   ConnectionStatusCallbacks connect_callbacks;
   Network::Address::InstanceConstSharedPtr address =
@@ -1536,6 +1535,43 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayAndClosesConn
   // The second request is ignored and will not complete, since the connection manager stops network
   // filter iteration.
   EXPECT_FALSE(second_request_decoder->complete());
+}
+
+TEST_P(LoadShedPointIntegrationTest, Http2ServerResetStreamOnBeginHeaders) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http2_server_reset_stream_on_begin_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http2_server_reset_stream_on_begin_headers.scale_percent",
+      Eq(100));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForReset());
+  EXPECT_EQ(Http::StreamResetReason::RemoteRefusedStreamReset, response->resetReason());
+  test_server_->waitForCounter("http2.stream_refused_errors", Eq(1));
+
+  updateResource(0.80);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http2_server_reset_stream_on_begin_headers.scale_percent",
+      Eq(0));
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
 }
 
 TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreatingCodec) {
