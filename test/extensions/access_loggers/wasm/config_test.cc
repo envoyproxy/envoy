@@ -72,7 +72,7 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmAccessLogConfigTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::host_test_runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
@@ -99,6 +99,7 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   envoy::extensions::access_loggers::wasm::v3::WasmAccessLog config;
   config.mutable_config()->mutable_vm_config()->set_runtime(
       absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  config.mutable_config()->mutable_vm_config()->set_allow_precompiled(true);
   std::string code;
   if (std::get<0>(GetParam()) != "null") {
     code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
@@ -144,6 +145,7 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                std::get<0>(GetParam()), R"EOF("
       configuration:
@@ -166,6 +168,7 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                std::get<0>(GetParam()), R"EOF("
       configuration:
@@ -196,6 +199,7 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromRemoteWasmCreateFilter) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       code:
@@ -250,6 +254,7 @@ TEST_P(WasmAccessLogConfigTest, FailedToGetThreadLocalPlugin) {
   const std::string yaml = TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:
     vm_config:
+      allow_precompiled: true
       runtime: "envoy.wasm.runtime.)EOF",
                                                                     std::get<0>(GetParam()), R"EOF("
       configuration:
