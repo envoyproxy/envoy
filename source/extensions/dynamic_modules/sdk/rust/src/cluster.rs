@@ -855,13 +855,13 @@ pub trait EnvoyClusterLoadBalancer: Send {
   /// call instead of rereading every host. Envoy merges updates within the cluster's
   /// `update_merge_window`, so one call can carry several health changes. Each host is listed
   /// once, and hosts removed since the previous update are reported only by
-  /// [`EnvoyClusterLoadBalancer::get_member_update_host`]. A worker's first update lists every host
-  /// as added together with any pending health changes, so tolerate a change already applied. It
-  /// is only valid during the `on_host_membership_update` callback.
+  /// [`EnvoyClusterLoadBalancer::get_member_update_host`]. It is only valid during the
+  /// `on_host_membership_update` callback.
   ///
   /// Returns `None` outside the callback, or when Envoy does not know which hosts changed health:
-  /// the cluster does not keep persistent host partitions, or an update since the previous one
-  /// replaced them. The module must then reread the hosts it tracks.
+  /// the cluster does not keep persistent host partitions, or a health refresh happened since the
+  /// previous update. A refresh covers every host, and with an active health checker it precedes a
+  /// worker's first update. The module must then reread the hosts it tracks.
   fn get_member_update_health_changed_host_count(&self) -> Option<usize>;
 
   /// Returns a host whose health changed since the previous update this worker applied, with its

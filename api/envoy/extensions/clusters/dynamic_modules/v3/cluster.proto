@@ -61,6 +61,7 @@ message ClusterConfig {
   // reads a host list by index builds a flat copy of that list after each update. Host lists are no
   // longer in insertion order, so an index, such as the one
   // ``envoy_dynamic_module_callback_cluster_lb_set_host_data`` takes, can refer to a different host
-  // after an add. Bulk adds are slower than with the default storage.
+  // after an add. Bulk adds are slower than with the default storage. An aggregate cluster that lists
+  // this cluster rebuilds all of its host lists on every worker after each update.
   bool use_persistent_host_partitions = 4;
 }

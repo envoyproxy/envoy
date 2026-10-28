@@ -580,8 +580,8 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
-  // Hosts whose health changed in the current membership update, or nullptr outside the callback or
-  // when unknown (a priority without persistent partitions, or a wholesale replace).
+  // Hosts whose health changed since the previous update this worker applied, or nullptr outside
+  // the callback or when unknown (a priority without persistent partitions, or a health refresh).
   const Upstream::HostVector* healthChangedHosts();
 
   // Returns the priority set that this load balancer subscribes to for host membership updates.

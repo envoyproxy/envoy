@@ -10578,8 +10578,9 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
  * index at the given priority level.
  *
  * With use_persistent_host_partitions, the first index getter for a host list after an update
- * builds that list, which is O(N) on the worker. The count getters and
- * envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts do not.
+ * builds that list, which is O(N) on the worker. The healthy, total and degraded host count getters
+ * and envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts do not. The locality getters build
+ * the healthy per-locality list the same way.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
  * @param priority is the priority level.
@@ -11838,14 +11839,15 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
  * its healthy set from the current envoy_dynamic_module_on_cluster_lb_on_host_membership_update
  * call instead of rereading every host. Envoy merges updates within the cluster's
  * update_merge_window, so one call can carry several health changes. Each host is listed once, and
- * hosts removed since the previous update are reported only by the member update getters. A
- * worker's first update lists every host as added together with any pending health changes, so the
- * module must tolerate a change it has already applied. It is only valid during
+ * hosts removed since the previous update are reported only by the member update getters. It is
+ * only valid during
  * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
  *
  * Envoy only knows this when the cluster keeps persistent host partitions, which requires
- * use_persistent_host_partitions in the cluster's ClusterConfig, and no update since the previous
- * one replaced them. Otherwise it returns false and the module must reread the hosts it tracks.
+ * use_persistent_host_partitions in the cluster's ClusterConfig, and no health refresh happened
+ * since the previous update. A refresh covers every host, and with an active health checker it
+ * precedes a worker's first update. Otherwise it returns false and the module must reread the hosts
+ * it tracks.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
  * @param result receives the count. Its contents are unspecified when the callback returns false.
