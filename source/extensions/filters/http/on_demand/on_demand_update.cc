@@ -118,23 +118,34 @@ getOdCdsConfig(const ProtoConfig& proto_config) {
 
 } // namespace
 
-OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
-    : behavior_(std::move(behavior)) {}
+OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior,
+                                           OptRef<Upstream::ClusterManager> cm,
+                                           OptRef<Stats::Scope> scope)
+    : behavior_(std::move(behavior)), cm_(cm.ptr()) {
+  if (scope.has_value()) {
+    stat_names_.emplace(scope->symbolTable());
+  }
+}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    absl::Status& creation_status) {
+    absl::Status& creation_status, OptRef<Stats::Scope> scope)
+    : cm_(&cm) {
   auto behavior_or =
       createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
   behavior_ = std::move(behavior_or.value());
+  if (scope.has_value()) {
+    stat_names_.emplace(scope->symbolTable());
+  }
 }
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
-    absl::Status& creation_status) {
+    absl::Status& creation_status)
+    : cm_(&cm) {
   auto behavior_or =
       createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor);
   SET_AND_RETURN_IF_NOT_OK(behavior_or.status(), creation_status);
@@ -198,6 +209,10 @@ void OnDemandRouteUpdate::handleOnDemandCds(const Router::Route& route,
     return;
   }
   filter_iteration_state_ = Http::FilterHeadersStatus::StopIteration;
+  if (config_->cm().has_value() && config_->statNames().has_value()) {
+    cluster_name_ = cluster_name;
+    fetch_start_time_ = callbacks_->dispatcher().timeSource().monotonicTime();
+  }
   auto callback = std::make_unique<Upstream::ClusterDiscoveryCallback>(
       [this](Upstream::ClusterDiscoveryStatus cluster_status) {
         onClusterDiscoveryCompletion(cluster_status);
@@ -237,6 +252,8 @@ void OnDemandRouteUpdate::setDecoderFilterCallbacks(Http::StreamDecoderFilterCal
 void OnDemandRouteUpdate::onDestroy() {
   route_config_updated_callback_.reset();
   cluster_discovery_handle_.reset();
+  fetch_start_time_.reset();
+  cluster_name_.clear();
 }
 
 // This is the callback which is called when an update requested in requestRouteConfigUpdate()
@@ -297,8 +314,31 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   callbacks_->continueDecoding();
 }
 
+void OnDemandRouteUpdate::maybeRecordDiscoveryTime(
+    Upstream::ClusterDiscoveryStatus cluster_status) {
+  if (cluster_status != Upstream::ClusterDiscoveryStatus::Available ||
+      !fetch_start_time_.has_value()) {
+    return;
+  }
+  auto* thread_local_cluster = config_->cm()->getThreadLocalCluster(cluster_name_);
+  if (thread_local_cluster == nullptr) {
+    return;
+  }
+  const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+      callbacks_->dispatcher().timeSource().monotonicTime() - *fetch_start_time_);
+  thread_local_cluster->info()
+      ->statsScope()
+      .histogramFromStatName(config_->statNames()->discovery_time_,
+                             Stats::Histogram::Unit::Milliseconds)
+      .recordValue(elapsed.count());
+}
+
 void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     Upstream::ClusterDiscoveryStatus cluster_status) {
+  maybeRecordDiscoveryTime(cluster_status);
+  fetch_start_time_.reset();
+  cluster_name_.clear();
+
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
 
