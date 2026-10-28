@@ -1992,6 +1992,132 @@ TEST_F(FilterManagerPerFilterBufferTest, ResponseTooLargeOwnedByFilterThatExceed
   filter_manager_->destroyFilters();
 }
 
+TEST_F(FilterManagerPerFilterBufferTest, PrependAndMoveIntoFilterBufferUpdateTotal) {
+  initializeChain(true);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+  records_[1].decode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndWatermark;
+  };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", false);
+
+  // The total only crosses the limit with the last of the three added bytes.
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  filters_[1]->decoder_callbacks_->modifyDecodingBuffer([](Buffer::Instance& buffer) {
+    Buffer::OwnedImpl prefix("p");
+    buffer.prepend(prefix);
+    Buffer::OwnedImpl suffix("ss");
+    buffer.move(suffix, 1);
+    buffer.move(suffix, 1, false);
+  });
+  EXPECT_EQ("paaass", filters_[1]->decoder_callbacks_->decodingBuffer()->toString());
+  testing::Mock::VerifyAndClearExpectations(&filter_manager_callbacks_);
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"paaass", false}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ModifyAndResumeRequestBufferWithStreamLevelState) {
+  initializeChain(false, false);
+  records_[1].decode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  filter_manager_->decodeHeaders(*request_headers_, false);
+  decodeData("aaa", true);
+
+  filters_[1]->decoder_callbacks_->modifyDecodingBuffer(
+      [](Buffer::Instance& buffer) { buffer.add("!"); });
+  // End of stream comes from the stream-level flag.
+  filters_[1]->decoder_callbacks_->continueDecoding();
+  EXPECT_EQ((Chunks{{"aaa!", true}}), records_[2].decoded_data);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ModifyAndResumeResponseBufferWithStreamLevelState) {
+  initializeChain(false, false);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndBuffer;
+  };
+  encodeHeaders(false);
+  encodeData("aaa", true);
+
+  filters_[1]->encoder_callbacks_->modifyEncodingBuffer(
+      [](Buffer::Instance& buffer) { buffer.add("!"); });
+  // End of stream comes from the stream-level flag.
+  filters_[1]->encoder_callbacks_->continueEncoding();
+  EXPECT_EQ((Chunks{{"aaa!", true}}), sent_data_);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseTooLargeFromLoweredLimitHasNoOwner) {
+  initializeChain(true);
+  bufferResponseBodyAtTwoFilters();
+
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
+  filter_manager_->setBufferLimit(2);
+  EXPECT_FALSE(filter_manager_->streamInfo().filterState()->hasData<LocalReplyOwnerObject>(
+      LocalReplyFilterStateKey));
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, RaisingLimitAboveStreamBufferReleasesWatermark) {
+  initializeChain(false);
+  bufferRequestBodyAtTwoFilters(FilterDataStatus::StopIterationAndWatermark);
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterAboveWriteBufferHighWatermark());
+  filters_[0]->decoder_callbacks_->setBufferLimit(2);
+
+  EXPECT_CALL(filter_manager_callbacks_, onDecoderFilterBelowWriteBufferLowWatermark());
+  filters_[0]->decoder_callbacks_->setBufferLimit(100);
+
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest, ResponseStreamBufferAboveLimitCallsWatermarkCallbacks) {
+  initializeChain(false);
+  filter_manager_->decodeHeaders(*request_headers_, true);
+  MockDownstreamWatermarkCallbacks watermark_callbacks;
+  filters_[2]->decoder_callbacks_->addDownstreamWatermarkCallbacks(watermark_callbacks);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+  records_[1].encode_headers = [](bool) { return FilterHeadersStatus::StopIteration; };
+  records_[1].encode_data = [](Buffer::Instance&, bool) {
+    return FilterDataStatus::StopIterationAndWatermark;
+  };
+
+  EXPECT_CALL(watermark_callbacks, onAboveWriteBufferHighWatermark());
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge()).Times(0);
+  encodeHeaders(false);
+  encodeData("aaaaaa", false);
+
+  // Raising the limit re-applies it to the existing stream buffer.
+  EXPECT_CALL(watermark_callbacks, onBelowWriteBufferLowWatermark());
+  filters_[0]->decoder_callbacks_->setBufferLimit(100);
+
+  filters_[2]->decoder_callbacks_->removeDownstreamWatermarkCallbacks(watermark_callbacks);
+  filter_manager_->destroyFilters();
+}
+
+TEST_F(FilterManagerPerFilterBufferTest,
+       ResponseStreamBufferAboveLimitReportsTooLargeWhenBuffering) {
+  initializeChain(false);
+  filters_[0]->decoder_callbacks_->setBufferLimit(5);
+
+  EXPECT_CALL(filter_manager_callbacks_, onResponseDataTooLarge());
+  EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(ContainsHeader(":status", "500"), _));
+  bufferResponseBodyAtTwoFilters();
+
+  filter_manager_->destroyFilters();
+}
+
 } // namespace
 } // namespace Http
 } // namespace Envoy
