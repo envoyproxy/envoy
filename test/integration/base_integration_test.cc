@@ -81,8 +81,15 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
                                                std::move(above_overflow));
           }));
   ON_CALL(factory_context_storage_->server_context_, api()).WillByDefault(ReturnRef(*api_));
-  ON_CALL(*factory_context_storage_, statsScope())
-      .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  ON_CALL(*factory_context_storage_, statsScope()).WillByDefault(ReturnRef(stats_scope_));
+  ON_CALL(*factory_context_storage_, scope()).WillByDefault(ReturnRef(stats_scope_));
+  ON_CALL(*factory_context_storage_, serverScope()).WillByDefault(ReturnRef(stats_scope_));
+  ON_CALL(factory_context_storage_->server_context_, scope())
+      .WillByDefault(ReturnRef(stats_scope_));
+  ON_CALL(factory_context_storage_->server_context_, serverScope())
+      .WillByDefault(ReturnRef(stats_scope_));
+  ON_CALL(*server_factory_context_storage_, scope()).WillByDefault(ReturnRef(stats_scope_));
+  ON_CALL(*server_factory_context_storage_, serverScope()).WillByDefault(ReturnRef(stats_scope_));
   ON_CALL(factory_context_storage_->server_context_, sslContextManager())
       .WillByDefault(ReturnRef(context_manager_));
   ON_CALL(factory_context_storage_->server_context_, threadLocal())
