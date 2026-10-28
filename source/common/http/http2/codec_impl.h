@@ -850,6 +850,10 @@ private:
   // remove streams from the map when they are closed in order to avoid calls to resetStreamWorker
   // after the stream has been removed from the active list.
   std::map<int32_t, StreamImpl*> pending_deferred_reset_streams_;
+  // Streams with a deferred reset whose END_STREAM frame has been sent. Only used with the
+  // `http2_deferred_reset_waits_for_end_stream` runtime feature, so that sendPendingFrames() does
+  // not scan the streams that still wait in pending_deferred_reset_streams_.
+  std::map<int32_t, StreamImpl*> ready_deferred_reset_streams_;
   bool dispatching_ : 1 = false;
   bool raised_goaway_ : 1 = false;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;

@@ -1419,6 +1419,12 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
       const bool end_stream_sent = flags & FLAG_END_STREAM;
       stream->local_end_stream_sent_ = end_stream_sent;
       if (end_stream_sent) {
+        // The deferred reset of this stream can be sent now. sendPendingFrames() sends it after
+        // this send pass.
+        if (deferred_reset_waits_for_end_stream_ &&
+            pending_deferred_reset_streams_.erase(stream->stream_id_) > 0) {
+          ready_deferred_reset_streams_.emplace(stream->stream_id_, stream);
+        }
         stream->onEndStreamEncoded();
       }
     }
@@ -1625,6 +1631,7 @@ Status ConnectionImpl::onStreamClose(StreamImpl* stream, uint32_t error_code) {
     current_stream_id_.reset();
     // TODO(antoniovicente) Test coverage for onCloseStream before deferred reset handling happens.
     pending_deferred_reset_streams_.erase(stream->stream_id_);
+    ready_deferred_reset_streams_.erase(stream->stream_id_);
 
     connection_.dispatcher().deferredDelete(stream->removeFromList(active_streams_));
     // Any unconsumed data must be consumed before the stream is deleted.
@@ -1786,28 +1793,22 @@ Status ConnectionImpl::sendPendingFrames() {
   //       response. A peer that never opens its window is bounded by the stream flush timeout.
   //       Without the `http2_deferred_reset_waits_for_end_stream` runtime feature, the deferred
   //       reset is best effort and pending data frames are dropped if they could not be sent.
-  if (!pending_deferred_reset_streams_.empty()) {
-    bool reset_any = false;
-    auto it = pending_deferred_reset_streams_.begin();
-    while (it != pending_deferred_reset_streams_.end()) {
+  //       With the feature, onFrameSend() moves a stream to ready_deferred_reset_streams_ when its
+  //       END_STREAM frame is sent, and only those streams are reset here. Streams that still wait
+  //       for window are not scanned on every send.
+  auto& streams_to_reset = deferred_reset_waits_for_end_stream_ ? ready_deferred_reset_streams_
+                                                                : pending_deferred_reset_streams_;
+  if (!streams_to_reset.empty()) {
+    while (!streams_to_reset.empty()) {
+      auto it = streams_to_reset.begin();
       auto* stream = it->second;
       // Sanity check: the stream's id matches the map key.
       ASSERT(it->first == stream->stream_id_);
-      if (deferred_reset_waits_for_end_stream_ && !stream->local_end_stream_sent_) {
-        ++it;
-        continue;
-      }
-      const int32_t stream_id = it->first;
-      pending_deferred_reset_streams_.erase(it);
+      streams_to_reset.erase(it);
       ASSERT(stream->deferred_reset_);
       stream->resetStreamWorker(stream->deferred_reset_.value());
-      reset_any = true;
-      // Resetting may close other streams, so look up the next one again.
-      it = pending_deferred_reset_streams_.upper_bound(stream_id);
     }
-    if (reset_any) {
-      RETURN_IF_ERROR(sendPendingFrames());
-    }
+    RETURN_IF_ERROR(sendPendingFrames());
   }
 
   // After all pending frames have been written into the outbound buffer check if any of
