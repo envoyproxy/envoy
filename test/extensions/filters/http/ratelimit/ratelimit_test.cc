@@ -2789,6 +2789,37 @@ TEST_F(HttpRateLimitFilterTest, StopOnMatchPerPhase) {
                                nullptr, "", nullptr);
 }
 
+// A route entry with stop_on_match that only produced an empty descriptor (every action skipped
+// through skip_if_absent) does not stop the search.
+TEST_F(HttpRateLimitFilterTest, StopOnMatchIgnoresEmptyDescriptor) {
+  setUpTest(filter_config_);
+  NiceMock<Router::MockRateLimitPolicyEntry> catch_all_route_rate_limit;
+  filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
+      catch_all_route_rate_limit);
+
+  EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, getApplicableRateLimit(0));
+  EXPECT_CALL(route_rate_limit_, stopOnMatch()).WillRepeatedly(Return(true));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillOnce(Invoke([](std::vector<RateLimit::Descriptor>& descriptors, const std::string&,
+                          const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+        descriptors.push_back(RateLimit::Descriptor{});
+      }));
+  EXPECT_CALL(catch_all_route_rate_limit, populateDescriptors(_, _, _, _))
+      .WillOnce(Invoke([this](std::vector<RateLimit::Descriptor>& descriptors, const std::string&,
+                              const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+        descriptors.push_back(descriptor_two_[0]);
+      }));
+
+  EXPECT_CALL(*client_, limit(_, "foo", testing::SizeIs(2), _, _, 0))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
+                               nullptr, "", nullptr);
+          })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
 // stop_on_match on the filter-level inlined rate limits.
 TEST_F(HttpRateLimitFilterTest, StopOnMatchInlinedRateLimits) {
   setUpTest(stop_on_match_inlined_config_);

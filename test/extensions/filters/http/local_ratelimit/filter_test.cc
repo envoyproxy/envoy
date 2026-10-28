@@ -1222,6 +1222,30 @@ TEST_F(DescriptorFilterTest, StopOnMatchSkipsVirtualHost) {
   EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.ok"));
 }
 
+// A route entry with stop_on_match that only produced an empty descriptor does not stop the
+// search, so the next entry still runs and its one-token bucket is consumed.
+TEST_F(DescriptorFilterTest, StopOnMatchIgnoresEmptyDescriptor) {
+  setUpTest(fmt::format(stop_on_match_descriptor_config_yaml, "OVERRIDE"));
+  NiceMock<Router::MockRateLimitPolicyEntry> second_route_rate_limit;
+  decoder_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
+      second_route_rate_limit);
+
+  EXPECT_CALL(route_rate_limit_, stopOnMatch()).WillRepeatedly(Return(true));
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
+      .WillRepeatedly(Invoke([](std::vector<RateLimit::Descriptor>& descriptors, const std::string&,
+                                const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+        descriptors.push_back(RateLimit::Descriptor{});
+      }));
+  EXPECT_CALL(second_route_rate_limit, populateDescriptors(_, _, _, _))
+      .WillRepeatedly(testing::SetArgReferee<0>(descriptor_));
+
+  auto headers = Http::TestRequestHeaderMapImpl();
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, findCounter("test.http_local_rate_limit.rate_limited"));
+}
+
 // With stop_on_match on the inlined override entry, client-a only consumes its override bucket
 // and never touches the one-token default bucket. Other clients fall through to the default tier.
 TEST_F(DescriptorFilterTest, StopOnMatchInlinedRateLimits) {

@@ -135,21 +135,28 @@ Stopping at the first match
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 By default, the token bucket of every matched descriptor is consumed. Setting
-:ref:`stop_on_match <envoy_v3_api_field_config.route.v3.RateLimit.stop_on_match>` on a rate limit
-action makes the filter skip all later rate limit actions once that action has produced a
-descriptor, so later buckets are not consumed. Earlier actions still apply, so actions that should
-always count must be placed before the first one with the flag. Route actions are evaluated before
-virtual host actions, so a match on a route action with the flag also skips the virtual host
-actions.
+:ref:`stop_on_match <envoy_v3_api_field_config.route.v3.RateLimit.stop_on_match>` on a
+:ref:`rate limit configuration <envoy_v3_api_msg_config.route.v3.RateLimit>` makes the filter skip
+all later configurations once that configuration has matched, so later buckets are not consumed.
+Earlier configurations still apply, so configurations that should always count must be placed
+before the first one with the flag. Route configurations are evaluated before virtual host
+configurations, so a match on a route configuration with the flag also skips the virtual host
+configurations.
 
-A rate limit action produces a descriptor when every one of its ``actions`` populates. This does
-not require a configured descriptor with a token bucket for it, so a rate limit action that always
+A configuration matches when every one of its ``actions`` populates and the resulting descriptor
+has at least one entry, so a configuration whose actions are all skipped through
+``skip_if_absent`` does not stop the search. A configuration whose
+:ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate
+does not stop the search either, so the request falls through to later configurations. A match does
+not require a configured descriptor with a token bucket for it, so a configuration that always
 populates, such as one using ``request_headers`` on a header that is always present, stops the
 search even when its descriptor matches no bucket. The default token bucket is still consumed according to
 :ref:`always_consume_default_token_bucket <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.always_consume_default_token_bucket>`.
 
-This makes tiered limits easy to express. In the following configuration, ``client-a`` only consumes
-the 100 req/min bucket while every other client consumes a shared 10 req/min bucket:
+This makes tiered limits easy to express. In the following configuration, ``client-a`` consumes
+the 100 req/min bucket and not the shared 10 req/min bucket that every other client consumes. All
+requests also consume the 1000 req/min default token bucket, since
+``always_consume_default_token_bucket`` defaults to true:
 
 .. code-block:: yaml
 

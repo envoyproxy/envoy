@@ -2814,9 +2814,8 @@ message RateLimit {
   // If set to true and this configuration produces a descriptor for a request, no later
   // configuration is evaluated for that request. Earlier configurations are not affected, so
   // configurations that should always apply must be placed before the first one with this
-  // field set. This allows ordered, tiered limits without negating earlier configurations:
-  // put the more specific configurations first, each with this field set, and a catch-all
-  // configuration last.
+  // field set. This allows ordered, tiered limits: put the more specific configurations first,
+  // each with this field set, and a catch-all configuration last.
   //
   // Route configurations are evaluated before virtual host configurations, so a match on a
   // route configuration with this field set also skips the virtual host configurations.
@@ -2824,10 +2823,19 @@ message RateLimit {
   // <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are evaluated
   // separately from the request-time configurations, so each phase stops on its own.
   //
-  // A configuration produces a descriptor when all of its actions populate. For the HTTP local
-  // rate limit filter this does not require a configured token bucket for the descriptor.
+  // Only later configurations of the same :ref:`stage
+  // <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped, since each filter only
+  // evaluates the configurations of its own stage.
   //
-  // Currently, this is only supported by the HTTP global and local rate limit filters.
+  // A configuration matches when all of its actions populate and the resulting descriptor has at
+  // least one entry. A configuration whose actions are all skipped through ``skip_if_absent`` does
+  // not match and does not stop the search. Neither does a configuration whose
+  // :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to
+  // evaluate, so such a request falls through to later configurations. For the HTTP local rate limit filter a match does not
+  // require a configured token bucket for the descriptor.
+  //
+  // Currently, this is only supported by the HTTP global and local rate limit filters. Other
+  // filters that use this message, such as the Thrift rate limit filter, ignore it.
   bool stop_on_match = 8;
 }
 

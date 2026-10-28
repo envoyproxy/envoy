@@ -326,8 +326,10 @@ bool Filter::populateDescriptors(const Router::RateLimitPolicy& rate_limit_polic
     const size_t size_before = descriptors.size();
     rate_limit.populateDescriptors(descriptors, used_config_->localInfo().clusterName(), headers,
                                    decoder_callbacks_->streamInfo());
-    // A matching entry with stop_on_match ends the search; later entries are skipped.
-    if (rate_limit.stopOnMatch() && descriptors.size() > size_before) {
+    // A matching entry with stop_on_match ends the search; later entries are skipped. A
+    // descriptor with no entries (every action skipped via skip_if_absent) is not a match.
+    if (rate_limit.stopOnMatch() && descriptors.size() > size_before &&
+        !descriptors.back().entries_.empty()) {
       return true;
     }
   }
