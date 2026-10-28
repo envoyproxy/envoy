@@ -5,6 +5,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
 
 licenses(["notice"])  # Apache 2
@@ -14,6 +15,7 @@ envoy_package()
 wasm_rust_binary(
     name = "async_call_rust.wasm",
     srcs = ["async_call_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -23,6 +25,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "body_rust.wasm",
     srcs = ["body_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -32,6 +35,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "close_stream_rust.wasm",
     srcs = ["close_stream_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -41,6 +45,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "deferred_data_rust.wasm",
     srcs = ["deferred_data_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
     ],
@@ -49,6 +54,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "grpc_call_rust.wasm",
     srcs = ["grpc_call_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@cu//:protobuf",
         "@proxy-wasm-rust-sdk//:proxy_wasm",
@@ -59,6 +65,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "grpc_stream_rust.wasm",
     srcs = ["grpc_stream_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@cu//:protobuf",
         "@proxy-wasm-rust-sdk//:proxy_wasm",
@@ -69,6 +76,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "headers_rust.wasm",
     srcs = ["headers_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     wasi = True,
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
@@ -79,6 +87,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "metadata_rust.wasm",
     srcs = ["metadata_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -88,6 +97,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "panic_rust.wasm",
     srcs = ["panic_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -97,6 +107,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "resume_call_rust.wasm",
     srcs = ["resume_call_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -106,6 +117,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "shared_data_rust.wasm",
     srcs = ["shared_data_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -115,6 +127,7 @@ wasm_rust_binary(
 wasm_rust_binary(
     name = "shared_queue_rust.wasm",
     srcs = ["shared_queue_rust.rs"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -150,19 +163,25 @@ envoy_cc_test_library(
 )
 
 envoy_wasm_cc_binary(
-    name = "test_cpp.wasm",
-    srcs = [
-        "test_async_call_cpp.cc",
-        "test_body_cpp.cc",
-        "test_close_stream_cpp.cc",
-        "test_cpp.cc",
-        "test_grpc_call_cpp.cc",
-        "test_grpc_stream_cpp.cc",
-        "test_panic_cpp.cc",
-        "test_resume_call_cpp.cc",
-        "test_shared_data_cpp.cc",
-        "test_shared_queue_cpp.cc",
-    ],
+    name = "headers_cpp.wasm",
+    srcs = ["test_cpp.cc"],
+    copts = ["-DWASM_TEST_CPP_HEADERS_ONLY=1"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "headers_cpp_source.wasm",
+    srcs = ["test_cpp.cc"],
+    copts = ["-DWASM_TEST_CPP_HEADERS_ONLY=1"],
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+    # Deliberately NOT precompiled: from-source V8 canary.
+)
+
+envoy_wasm_cc_binary(
+    name = "advanced_cpp.wasm",
+    srcs = ["test_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
     protobuf = "lite",
     deps = [
         ":test_cc_proto",
@@ -172,6 +191,77 @@ envoy_wasm_cc_binary(
         "//source/extensions/common/wasm/ext:verify_signature_cc_proto",
         "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
     ],
+)
+
+envoy_wasm_cc_binary(
+    name = "body_cpp.wasm",
+    srcs = ["test_body_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "async_call_cpp.wasm",
+    srcs = ["test_async_call_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "resume_call_cpp.wasm",
+    srcs = ["test_resume_call_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "close_stream_cpp.wasm",
+    srcs = ["test_close_stream_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "grpc_call_cpp.wasm",
+    srcs = ["test_grpc_call_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    protobuf = "lite",
+    deps = [
+        ":test_cc_proto",
+        "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
+    ],
+)
+
+envoy_wasm_cc_binary(
+    name = "grpc_stream_cpp.wasm",
+    srcs = ["test_grpc_stream_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    protobuf = "lite",
+    deps = [
+        ":test_cc_proto",
+        "@proxy-wasm-cpp-sdk//contrib:contrib_lib",
+    ],
+)
+
+envoy_wasm_cc_binary(
+    name = "shared_data_cpp.wasm",
+    srcs = ["test_shared_data_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "shared_queue_cpp.wasm",
+    srcs = ["test_shared_queue_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
+)
+
+envoy_wasm_cc_binary(
+    name = "panic_cpp.wasm",
+    srcs = ["test_panic_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+    deps = ["@proxy-wasm-cpp-sdk//contrib:contrib_lib"],
 )
 
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.

@@ -75,6 +75,7 @@ public:
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_vm_id("vm_id");
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
+    vm_config->set_allow_precompiled(true);
     Protobuf::StringValue vm_configuration_string;
     vm_configuration_string.set_value(vm_configuration_);
     std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
@@ -184,6 +185,7 @@ getWasmPluginConfigForTest(absl::string_view runtime, absl::string_view wasm_fil
       root_id: '{}'
       vm_config:
         runtime: 'envoy.wasm.runtime.{}'
+        allow_precompiled: true
         configuration:
           "@type": "type.googleapis.com/google.protobuf.StringValue"
           value: '{}'

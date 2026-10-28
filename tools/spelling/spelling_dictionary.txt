@@ -58,6 +58,7 @@ ECN
 ECS
 EdDSA
 EKS
+LEB
 Millicores
 NID
 NIST
