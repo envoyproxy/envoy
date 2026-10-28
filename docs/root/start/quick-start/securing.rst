@@ -133,6 +133,13 @@ and specify a mutually trusted certificate authority:
    :emphasize-lines: 6, 8-10
    :caption: :download:`envoy-demo-tls-client-auth.yaml <_include/envoy-demo-tls-client-auth.yaml>`
 
+Requiring a client certificate controls certificate presentation during the handshake;
+it is separate from verifying the certificate's trust chain. Configuring
+``require_client_certificate`` without a trusted CA does not establish trust in a
+presented certificate. In particular, ``ACCEPT_UNTRUSTED`` delegates the trust decision
+and is not mutual authentication by itself. Keep a trusted CA and the appropriate
+validation policy when using this example to authenticate clients.
+
 You can further restrict the authentication of connecting clients by specifying the allowed
 "Subject Alternative Names" in
 :ref:`match_typed_subject_alt_names <envoy_v3_api_field_extensions.transport_sockets.tls.v3.CertificateValidationContext.match_typed_subject_alt_names>`,

@@ -804,6 +804,37 @@ private:
   Api::ApiPtr api_ = Api::createApiForTest();
 };
 
+TEST(DefaultCertValidatorTest, ClientCertificateRequirementWithoutCa) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+  CleanMockCertValidationConfig accept_untrusted("no-ca");
+  const Ssl::CertificateValidationContextConfig* configs[] = {nullptr, &accept_untrusted};
+
+  for (const auto* config : configs) {
+    SCOPED_TRACE(config == nullptr ? "no validation context" : "accept untrusted without CA");
+    for (bool required : {false, true}) {
+      SCOPED_TRACE(required);
+      DefaultCertValidator validator(config, stats, context);
+      bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+      ASSERT_NE(ssl_ctx, nullptr);
+      auto verify_mode =
+          validator.initializeSslContexts({ssl_ctx.get()}, false, *store.rootScope());
+      ASSERT_OK(verify_mode);
+      SSL_CTX_set_verify(ssl_ctx.get(), verify_mode.value(), nullptr);
+
+      ASSERT_OK(validator.addClientValidationContext(ssl_ctx.get(), required));
+
+      EXPECT_EQ(required ? SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT : verify_mode.value(),
+                SSL_CTX_get_verify_mode(ssl_ctx.get()));
+      STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+      if (ca_list != nullptr) {
+        EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+      }
+    }
+  }
+}
+
 TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore store;
