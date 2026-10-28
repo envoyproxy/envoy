@@ -50,6 +50,7 @@ CROSSSLOT
 ECN
 ECS
 EKS
+LEB
 Millicores
 NID
 NIST

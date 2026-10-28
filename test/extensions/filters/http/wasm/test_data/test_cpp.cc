@@ -2,14 +2,21 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
 #include "test/extensions/filters/http/wasm/test_data/test.pb.h"
+#endif
 
 #ifndef NULL_PLUGIN
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
 #include "proxy_wasm_intrinsics_lite.h"
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
 #include "source/extensions/common/wasm/ext/sign.pb.h"
+#else
+#include "proxy_wasm_intrinsics.h"
+#endif
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #include "absl/base/casts.h"
@@ -178,6 +185,7 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
       }
     }
 
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
     {
       // Validate a valid CEL expression
       const std::string expr = R"(
@@ -201,6 +209,7 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
         }
       }
     }
+#endif
 
     {
       // Create a syntactically wrong CEL expression
@@ -379,6 +388,7 @@ void TestContext::onLog() {
     if (getValue({"xds", "cluster_metadata", "filter_metadata", "namespace", "key"}, &cluster_metadata)) {
       logWarn("cluster metadata: " + cluster_metadata);
     }
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
   } else if (test == "property") {
     setFilterState("wasm_state", "wasm_value");
     auto path = getRequestHeader(":path");
@@ -603,6 +613,7 @@ void TestContext::onLog() {
         }
       }
     }
+#endif
   }
 }
 
@@ -641,6 +652,7 @@ void TestRootContext::onTick() {
     if (getValue({"xds", "node", "metadata", "wasm_node_list_key", "1"}, &list_value)) {
       logDebug("unexpected list value outside the range");
     }
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
   } else if (test_ == "property") {
     uint64_t t;
     if (WasmResult::Ok != proxy_get_current_time_nanoseconds(&t)) {
@@ -1197,6 +1209,7 @@ void TestRootContext::onTick() {
       }
       ::free(out);
     }
+#endif
   }
 }
 
