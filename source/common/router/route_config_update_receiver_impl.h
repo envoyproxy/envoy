@@ -79,6 +79,9 @@ public:
     return base_.configInfo();
   }
   void updateOnDemand(const std::string& alias) override {
+    if (warmingBlocksUnmatchedRequests()) {
+      return;
+    }
     if (vhds_subscription_ != nullptr) {
       // try_emplace keeps the answered state of an id that is requested again.
       requested_vhds_resource_ids_.try_emplace(alias, false);
@@ -107,6 +110,11 @@ public:
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
   void onVhdsConfigPublished() override;
+  bool warmingBlocksUnmatchedRequests() const override {
+    return warming_blocks_unmatched_requests_;
+  }
+  bool awaitingInitialVhdsUpdate() const override { return awaiting_initial_vhds_update_; }
+  void onVhdsFailure() override;
 
 private:
   static void notifyCallback(const ConfigImpl& config, const std::string& alias,
@@ -150,6 +158,8 @@ private:
   // A flag used to determine if this instance of RouteConfigUpdateReceiverImpl hasn't been
   // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
   std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
+  bool warming_blocks_unmatched_requests_{false};
+  bool awaiting_initial_vhds_update_{false};
 };
 
 } // namespace Router
