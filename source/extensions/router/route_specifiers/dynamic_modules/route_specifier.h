@@ -48,6 +48,8 @@ using OnRouteSpecifierConfigDestroyType =
 using OnRouteSpecifierOnRouteType = decltype(&envoy_dynamic_module_on_route_specifier_on_route);
 using OnRouteSpecifierRouteDestroyType =
     decltype(&envoy_dynamic_module_on_route_specifier_route_destroy);
+using OnRouteSpecifierUserDataDiscardType =
+    decltype(&envoy_dynamic_module_on_route_specifier_user_data_discard);
 
 // The default custom stat namespace which prepends all user-defined metrics.
 // This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
@@ -72,6 +74,7 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(failure_route_metadata)                                                                  \
   COUNTER(reuse_previous_rejected)                                                                 \
   COUNTER(route_destroy)                                                                           \
+  COUNTER(user_data_discard)                                                                       \
   COUNTER(rewrite_not_applied)                                                                     \
   COUNTER(built_route_cache_disabled)                                                              \
   COUNTER(built_route_cache_hit)                                                                   \
@@ -250,7 +253,9 @@ public:
   const std::optional<RuntimeFraction>& runtimeFraction() const { return runtime_fraction_; }
   const std::string& specifierInstanceId() const { return specifier_instance_id_; }
   OnRouteSpecifierRouteDestroyType onRouteDestroy() const { return on_route_destroy_; }
+  OnRouteSpecifierUserDataDiscardType onUserDataDiscard() const { return on_user_data_discard_; }
   uint32_t maxRewrittenPathBytes() const { return max_rewritten_path_bytes_; }
+  bool hasBuiltRouteCache() const { return has_built_route_cache_; }
   bool failClosed() const { return fail_closed_; }
   bool continueMatchingOnFailure() const { return continue_matching_on_failure_; }
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
@@ -265,9 +270,9 @@ public:
   // newDynamicModuleRouteSpecifierConfig() succeeds.
   OnRouteSpecifierConfigDestroyType on_config_destroy_{nullptr};
   OnRouteSpecifierOnRouteType on_route_{nullptr};
-  // Optional hook, null when the module does not export it, in which case route user data is a no
-  // op.
+  // Optional hooks, null when the module does not export them, in which case Envoy skips them.
   OnRouteSpecifierRouteDestroyType on_route_destroy_{nullptr};
+  OnRouteSpecifierUserDataDiscardType on_user_data_discard_{nullptr};
 
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
@@ -305,6 +310,7 @@ private:
   bool config_new_validate_clusters_{false};
   const std::optional<RuntimeFraction> runtime_fraction_;
   const uint32_t max_rewritten_path_bytes_;
+  const bool has_built_route_cache_;
   const bool fail_closed_;
   const bool continue_matching_on_failure_;
   Upstream::ClusterManager& cluster_manager_;
