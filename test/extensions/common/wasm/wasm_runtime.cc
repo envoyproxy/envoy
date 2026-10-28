@@ -31,12 +31,15 @@ std::vector<std::string> languages(bool cpp_only) {
   return languages;
 }
 
-std::vector<std::tuple<std::string, std::string>> wasmTestMatrix(bool include_nullvm,
-                                                                 bool cpp_only) {
+std::vector<std::tuple<std::string, std::string>> wasmTestMatrix(bool include_nullvm, bool cpp_only,
+                                                                 bool single_runtime) {
   std::vector<std::tuple<std::string, std::string>> values;
   for (const auto& runtime : sandboxRuntimes()) {
     for (const auto& language : languages(cpp_only)) {
       values.push_back(std::make_tuple(runtime, language));
+    }
+    if (single_runtime) {
+      break;
     }
   }
   if (include_nullvm) {
@@ -46,9 +49,10 @@ std::vector<std::tuple<std::string, std::string>> wasmTestMatrix(bool include_nu
 }
 
 std::vector<std::tuple<std::string, std::string, bool>>
-wasmDualFilterTestMatrix(bool include_nullvm, bool cpp_only) {
+wasmDualFilterTestMatrix(bool include_nullvm, bool cpp_only, bool single_runtime) {
   std::vector<std::tuple<std::string, std::string, bool>> values;
-  for (const auto& p : Envoy::Extensions::Common::Wasm::wasmTestMatrix(include_nullvm, cpp_only)) {
+  for (const auto& p :
+       Envoy::Extensions::Common::Wasm::wasmTestMatrix(include_nullvm, cpp_only, single_runtime)) {
     values.push_back(std::make_tuple(std::get<0>(p), std::get<1>(p), true));
     values.push_back(std::make_tuple(std::get<0>(p), std::get<1>(p), false));
   }

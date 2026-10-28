@@ -49,6 +49,7 @@ public:
     *plugin_config.mutable_vm_config()->mutable_runtime() =
         absl::StrCat("envoy.wasm.runtime.", runtime);
     *plugin_config.mutable_vm_config()->mutable_vm_id() = vm_id_;
+    plugin_config.mutable_vm_config()->set_allow_precompiled(true);
     plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration_);
     plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info_);
@@ -91,7 +92,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest,
-                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::first_sandbox_runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTest);
 
@@ -106,13 +107,13 @@ public:
                   "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/stats_cpp.wasm"))
             : "WasmStatsCpp";
     EXPECT_FALSE(code.empty());
-    EXPECT_TRUE(wasm_->load(code, false));
+    EXPECT_TRUE(wasm_->load(code, true));
     EXPECT_TRUE(wasm_->initialize());
   }
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
+                         Envoy::Extensions::Common::Wasm::host_test_runtime_and_cpp_values);
 
 class WasmTestMatrix : public WasmTestBase,
                        public testing::TestWithParam<std::tuple<std::string, std::string>> {
@@ -132,8 +133,9 @@ protected:
   std::string code_;
 };
 
-INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
-                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_language_values);
+INSTANTIATE_TEST_SUITE_P(
+    RuntimesAndLanguages, WasmTestMatrix,
+    Envoy::Extensions::Common::Wasm::first_sandbox_runtime_and_language_values);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
 TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
@@ -144,7 +146,7 @@ TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm_);
   auto wasm_handler = std::make_unique<Extensions::Common::Wasm::WasmHandle>(std::move(wasm_));
 
-  EXPECT_TRUE(wasm_weak.lock()->load(code_, false));
+  EXPECT_TRUE(wasm_weak.lock()->load(code_, true));
   EXPECT_TRUE(wasm_weak.lock()->initialize());
   auto context = static_cast<TestContext*>(wasm_weak.lock()->start(plugin_));
   if (std::get<1>(GetParam()) == "cpp") {
@@ -176,6 +178,7 @@ TEST_P(WasmTest, BadSignature) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/bad_signature_cpp.wasm"));
   EXPECT_FALSE(code.empty());
+  // Deliberately load the non-precompiled bad-signature module from source.
   EXPECT_TRUE(wasm_->load(code, false));
   EXPECT_FALSE(wasm_->initialize());
   EXPECT_TRUE(wasm_->isFailed());
@@ -186,7 +189,7 @@ TEST_P(WasmTest, Segv) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->load(code, true));
   EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before badptr")));
@@ -199,7 +202,7 @@ TEST_P(WasmTest, DivByZero) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->load(code, true));
   EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before div by zero")));
@@ -212,7 +215,7 @@ TEST_P(WasmTest, IntrinsicGlobals) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/emscripten_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->load(code, true));
   EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("NaN nan")));
@@ -231,7 +234,7 @@ TEST_P(WasmTest, Asm2Wasm) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/asm2wasm_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->load(code, true));
   EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("out 0 0 0")));

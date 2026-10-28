@@ -501,16 +501,45 @@ TEST_F(TranscoderFilterTest, RejectsToIrWhenSourceProtocolIsUnspecified) {
   EXPECT_EQ(counterValue("transcoded"), 0);
 }
 
-// Rejects `FROM_IR` when the route declared no response protocol, so the target backend protocol
-// is `Unspecified`.
-TEST_F(TranscoderFilterTest, RejectsFromIrWhenTargetProtocolIsUnspecified) {
+// `FROM_IR` with no backend API named by the route or filter state takes the backend to speak the
+// client's API: the request leaves as it came, counted as `backend_defaulted`, not `unresolved`.
+// This is a route with no backend, such as a local reply, with the client's API named ahead.
+TEST_F(TranscoderFilterTest, FromIrWithNoBackendApiAssumesTheClients) {
+  const std::string payload =
+      R"({"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]})";
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions, payload);
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(local_reply_code_, Http::Code::OK);
+  EXPECT_EQ(forwarded(), nlohmann::json::parse(payload));
+  EXPECT_EQ(request_headers_.getPathValue(), "/v1/chat/completions");
+  EXPECT_EQ(counterValue("backend_defaulted"), 1);
+  EXPECT_EQ(counterValue("unresolved"), 0);
+  EXPECT_EQ(counterValue("failed"), 0);
+}
+
+// A backend named by the route is not defaulted, so a request that translates does not count.
+TEST_F(TranscoderFilterTest, FromIrWithABackendApiDoesNotDefault) {
+  target_protocol_ = LLMProtocol::AnthropicMessages;
   runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
                   R"({"model":"claude-sonnet-4-5","messages":[{"role":"user","content":"hi"}]})");
 
-  EXPECT_EQ(local_reply_code_, Http::Code::BadRequest);
-  EXPECT_THAT(local_reply_details_, testing::HasSubstr("no target backend protocol is set"));
-  EXPECT_EQ(counterValue("unresolved"), 1);
-  EXPECT_EQ(counterValue("transcoded"), 0);
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(counterValue("backend_defaulted"), 0);
+}
+
+// A route that declares a response binding but no response API: the backend is defaulted to the
+// client's, and the route's binding still applies, since the backend is still the route's.
+TEST_F(TranscoderFilterTest, RouteResponseBindingAppliesToADefaultedBackend) {
+  route_response_binding_ = *LlmBinding::parse("/gateway/{model}/{chat|chat-stream}");
+
+  runSingleDecode(TranscoderProto::FROM_IR, LLMProtocol::OpenAiChatCompletions,
+                  R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})");
+
+  ASSERT_TRUE(status_.ok()) << status_;
+  EXPECT_EQ(request_headers_.getPathValue(), "/gateway/gpt-4o/chat");
+  EXPECT_EQ(counterValue("backend_defaulted"), 1);
+  EXPECT_EQ(counterValue("unresolved"), 0);
 }
 
 // When `request_handling` is unset (`DIRECTION_UNSPECIFIED`), the filter forwards the request

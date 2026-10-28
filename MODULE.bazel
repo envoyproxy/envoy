@@ -13,7 +13,7 @@ bazel_dep(name = "apple_support", version = "2.10.1")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
 bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
-bazel_dep(name = "bazel_features", version = "1.51.0")
+bazel_dep(name = "bazel_features", version = "1.53.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boringssl", version = "0.20260929.0")
 bazel_dep(name = "boringssl-fips", version = "0.20260929.0.envoy.1")
@@ -21,16 +21,16 @@ bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy.1")
 bazel_dep(name = "brotli", version = "1.2.0-260930-42a2ed4.envoy")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
-bazel_dep(name = "c-ares", version = "1.34.6.bcr.1")
+bazel_dep(name = "c-ares", version = "1.34.6.bcr.3")
 bazel_dep(name = "cel-cpp", version = "0.16.1.envoy")
 bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.6.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.6.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.9.envoy")
+bazel_dep(name = "envoy_toolshed_jq", version = "0.5.9.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.bcr.1")
-bazel_dep(name = "fmt", version = "12.2.0")
+bazel_dep(name = "fmt", version = "12.2.0.bcr.1")
 bazel_dep(name = "gazelle", version = "0.54.0")
 bazel_dep(name = "googleapis", version = "0.0.0-20251003-2193a2bf")
 bazel_dep(name = "googleapis-cc", version = "1.0.0")
@@ -49,9 +49,9 @@ bazel_dep(name = "kafka", version = "3.9.2.envoy")
 bazel_dep(name = "libcircllhist", version = "0.3.2.envoy")
 bazel_dep(name = "libmaxminddb", version = "1.12.2")
 bazel_dep(name = "libprotobuf-mutator", version = "1.5.bcr.1")
-bazel_dep(name = "librdkafka", version = "2.15.0")
+bazel_dep(name = "librdkafka", version = "2.15.0.bcr.1")
 bazel_dep(name = "libevent", version = "2.2.2-alpha.envoy")
-bazel_dep(name = "libbpf", version = "1.7.0.envoy")
+bazel_dep(name = "libbpf", version = "1.7.0.envoy.1")
 bazel_dep(name = "libsxg", version = "0.0.0-210708-beaa393.envoy")
 bazel_dep(name = "liburing", version = "2.15.envoy.1")
 bazel_dep(name = "toolchains_llvm", version = "1.9.1.envoy")
@@ -82,10 +82,10 @@ bazel_dep(name = "qatzip", version = "2.0.0.envoy")
 bazel_dep(name = "quiche", version = "0.0.0-261019-67bce2e.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
-bazel_dep(name = "rules_apple", version = "5.1.0")
+bazel_dep(name = "rules_apple", version = "5.3.1")
 bazel_dep(name = "rules_buf", version = "0.5.4")
-bazel_dep(name = "rules_cc", version = "0.2.26")
-bazel_dep(name = "rules_foreign_cc", version = "0.16.0")
+bazel_dep(name = "rules_cc", version = "0.2.27")
+bazel_dep(name = "rules_foreign_cc", version = "0.17.0")
 bazel_dep(name = "rules_go", version = "0.63.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_license", version = "1.0.0")
@@ -93,10 +93,10 @@ bazel_dep(name = "rules_pkg", version = "1.3.0")
 bazel_dep(name = "rules_proto", version = "7.1.0")
 bazel_dep(name = "rules_proto_grpc", version = "5.8.0")
 bazel_dep(name = "rules_proto_grpc_cpp", version = "5.8.0")
-bazel_dep(name = "rules_python", version = "2.4.3")
+bazel_dep(name = "rules_python", version = "2.4.5")
 bazel_dep(name = "rules_rust", version = "0.74.0.envoy")
 bazel_dep(name = "rules_shell", version = "0.8.0")
-bazel_dep(name = "rules_swift", version = "4.0.1")
+bazel_dep(name = "rules_swift", version = "4.2.2")
 bazel_dep(name = "spdlog", version = "1.17.0")
 bazel_dep(name = "sql-parser", version = "0.0.0-260715-52e5ad1.envoy")
 bazel_dep(name = "su-exec", version = "0.3.envoy")
@@ -126,7 +126,7 @@ bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 fuzzing_ext = use_extension("@rules_fuzzing//fuzzing/private:extensions.bzl", "non_module_dependencies")
 use_repo(fuzzing_ext, "rules_fuzzing_oss_fuzz")
 
-bazel_dep(name = "rules_shellcheck", version = "0.6.4", dev_dependency = True, repo_name = "shellcheck")
+bazel_dep(name = "rules_shellcheck", version = "0.7.0", dev_dependency = True, repo_name = "shellcheck")
 
 ####################################################################################
 # deps: Overrides
@@ -181,8 +181,19 @@ register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-to
 
 # LLVM toolchain configuration
 sysroot_ext = use_extension("@envoy_toolshed//sysroot:extensions.bzl", "sysroot_extension")
-sysroot_ext.setup(stdcc_version = "13")
-use_repo(sysroot_ext, "sysroot_linux_amd64", "sysroot_linux_arm64")
+sysroot_ext.setup()
+
+# TODO(phlax): remove once the hermetic gcc toolchain provides libstdc++ for //compat/openssl/prefixer
+sysroot_ext.setup(
+    name_prefix = "libstdcxx",
+    stdcc_version = "13",
+)
+use_repo(
+    sysroot_ext,
+    "libstdcxx_sysroot_linux_amd64",
+    "sysroot_linux_amd64",
+    "sysroot_linux_arm64",
+)
 
 sanitizer_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "sanitizer_extension")
 sanitizer_ext.setup()
@@ -191,6 +202,10 @@ use_repo(sanitizer_ext, "msan_libs", "tsan_libs")
 grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grcov_extension")
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
+
+unwind_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "unwind_extension")
+unwind_ext.setup()
+use_repo(unwind_ext, "unwind_libs")
 
 # Prebuilt wee8 (V8) static library, selected via the //bazel:wee8_engine alias.
 wee8_ext = use_extension("@envoy_toolshed//v8:extensions.bzl", "wee8_prebuilt_extension")
@@ -223,6 +238,20 @@ llvm.toolchain(
     name = "llvm_toolchain",
     cxx_standard = {"": "c++20"},
     exec_os = "linux",
+    # The pinned runtime build settings do not cover cxx_cross_lib's explicit libc++/libc modes.
+    extra_link_flags = {
+        target: [
+            "-rtlib=compiler-rt",
+            "-unwindlib=libunwind",
+            "-static-libgcc",
+            "-lpthread",
+            "-ldl",
+        ]
+        for target in [
+            "linux-aarch64",
+            "linux-x86_64",
+        ]
+    },
     llvm_version = "22.1.8",
 )
 llvm.toolchain_root(
@@ -420,6 +449,8 @@ rust.toolchain(
     sha256s = {
         "2026-10-01/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz": "1d954ab36bcf943913bda4dfee0174f1cac84060aed948e57b43df38790e2fee",
         "2026-10-01/rustc-nightly-x86_64-unknown-linux-gnu.tar.xz": "e5be3443efda4a8e6fe3b9ab81cebff29a539cd12932faa37df8a6ad2d8684b2",
+        "2026-10-01/rustfmt-nightly-aarch64-unknown-linux-gnu.tar.xz": "b295395704fbd7af046cbd495a1f3313b1d78e75a61d4c5b337af889a71d8dd9",
+        "2026-10-01/rustc-nightly-aarch64-unknown-linux-gnu.tar.xz": "a7faaf267839af1bf2364a3a4aae36486de340c26f61ae6c31575802231cee41",
     },
     versions = ["1.97.1"],
 )

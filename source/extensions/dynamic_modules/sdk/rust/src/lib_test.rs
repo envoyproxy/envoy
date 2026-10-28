@@ -12519,6 +12519,11 @@ struct StubRouteDecision {
   route_typed_metadata: Option<(String, Vec<u8>)>,
   filter_disabled: Option<(String, bool)>,
   path: Option<String>,
+  prefix_rewrite_rule: Option<(
+    abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+    String,
+    String,
+  )>,
   host: Option<String>,
   route_name: Option<String>,
   request_headers: Vec<(
@@ -12553,6 +12558,7 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     route_typed_metadata: None,
     filter_disabled: None,
     path: None,
+    prefix_rewrite_rule: None,
     host: None,
     route_name: None,
     request_headers: Vec::new(),
@@ -13272,6 +13278,36 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_path(
   true
 }
 
+// Maps each key onto a result, so a test can observe every arm of the SDK conversion.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  key: u64,
+) -> abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result {
+  match key {
+    1 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Miss,
+    2 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Hit,
+    3 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::HitVerify,
+    _ => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Disabled,
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  span: abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+  matched: abi::envoy_dynamic_module_type_module_buffer,
+  replacement: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let replacement = unsafe { stub_specifier_string(replacement) };
+  if replacement.is_empty() {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().prefix_rewrite_rule =
+    Some((span, unsafe { stub_specifier_string(matched) }, replacement));
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_host(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
@@ -13861,6 +13897,29 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_filter_disabled("", true));
   assert!(ctx.set_path("/rewritten"));
   assert!(!ctx.set_path("rewritten"));
+  for (key, result) in [
+    (0, route_specifier::BuiltRouteLookupResult::Disabled),
+    (1, route_specifier::BuiltRouteLookupResult::Miss),
+    (2, route_specifier::BuiltRouteLookupResult::Hit),
+    (3, route_specifier::BuiltRouteLookupResult::HitVerify),
+  ] {
+    assert_eq!(result, ctx.lookup_built_route(key));
+  }
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::WholePath, "", "/fixed"));
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::WholePath,
+      String::new(),
+      "/fixed".to_string()
+    )),
+    STUB_ROUTE_DECISION
+      .lock()
+      .unwrap()
+      .prefix_rewrite_rule
+      .clone()
+  );
+  assert!(!ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", ""));
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", "/internal"));
   assert!(ctx.set_host("example.com"));
   assert!(!ctx.set_host(""));
   assert!(ctx.set_route_name("module_route"));
@@ -13931,6 +13990,14 @@ fn test_route_specifier_context_records_decision() {
   );
   assert_eq!(Some(("filter".to_string(), true)), decision.filter_disabled);
   assert_eq!(Some("/rewritten".to_string()), decision.path);
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::Literal,
+      "/api".to_string(),
+      "/internal".to_string()
+    )),
+    decision.prefix_rewrite_rule
+  );
   assert_eq!(Some("example.com".to_string()), decision.host);
   assert_eq!(Some("module_route".to_string()), decision.route_name);
   assert_eq!(
