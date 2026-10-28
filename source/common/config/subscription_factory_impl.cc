@@ -132,7 +132,7 @@ SubscriptionFactoryImpl::subscriptionFromConfigSource(
     const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, absl::string_view resource_name, SingletonSubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
-  auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks);
+  auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks, resource_name);
   absl::StatusOr<SubscriptionPtr> sub_or_error =
       subscriptionFromConfigSource(config, type_url, scope, *adapter, resource_decoder, options);
   if (!sub_or_error.ok()) {

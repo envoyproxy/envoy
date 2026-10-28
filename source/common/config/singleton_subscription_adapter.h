@@ -14,7 +14,8 @@ namespace Config {
 
 class SingletonSubscriptionCallbacksAdapter : public SubscriptionCallbacks {
 public:
-  SingletonSubscriptionCallbacksAdapter(SingletonSubscriptionCallbacks& callbacks);
+  SingletonSubscriptionCallbacksAdapter(SingletonSubscriptionCallbacks& callbacks,
+                                        absl::string_view resource_name);
 
   // SotW xDS Overload
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
@@ -29,6 +30,7 @@ public:
 
 private:
   SingletonSubscriptionCallbacks& callbacks_;
+  const std::string resource_name_;
 };
 
 class SingletonSubscriptionImpl : public SingletonSubscription {
