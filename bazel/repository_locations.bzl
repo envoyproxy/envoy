@@ -271,7 +271,9 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/c-ares/c-ares/releases/download/v{version}/c-ares-{version}.tar.gz"],
         use_category = ["dataplane_core", "controlplane"],
         release_date = "2025-12-08",
-        cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
+        # TODO(phlax): add this back when the scanner supports a cpe list
+        # cpe = "cpe:2.3:a:c-ares_project:c-ares:*",
+        cpe = "cpe:2.3:a:c-ares:c-ares:*",
         license = "c-ares",
         license_url = "https://github.com/c-ares/c-ares/blob/cares-{underscore_version}/LICENSE.md",
     ),
