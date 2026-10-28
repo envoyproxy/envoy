@@ -5450,7 +5450,8 @@ TEST_F(DynamicModuleClusterPersistentPartitionsTest, OtherPrioritiesAreNotRebuil
   EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(lb_ptr, 0));
 }
 
-// A health update for a host outside the cluster fails as it does without the flag.
+// Callers resolve a health update's host through the cluster, so a host outside it is a bug. The
+// update fails without scanning the host sets.
 TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthUpdateForForeignHost) {
   enablePersistentPartitions();
   auto cluster = createDecCluster();
@@ -5458,9 +5459,37 @@ TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthUpdateForForeignHost)
   ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts));
 
   auto foreign_host = Upstream::makeTestHost(cluster->info(), "tcp://127.0.0.1:55555");
-  EXPECT_FALSE(
-      cluster->updateHostHealth(foreign_host, envoy_dynamic_module_type_host_health_Unhealthy));
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(cluster->updateHostHealth(
+                       foreign_host, envoy_dynamic_module_type_host_health_Unhealthy)),
+                   "health update for a host the persistent host set does not hold");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[0]->hostCounts().healthy);
+}
+
+// Native load balancing policies read the flat host vectors on every update, so the option is
+// rejected for them.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, RequiresClusterProvidedLbPolicy) {
+  for (const std::string policy :
+       {"ROUND_ROBIN", "LEAST_REQUEST", "RANDOM", "RING_HASH", "MAGLEV"}) {
+    SCOPED_TRACE(policy);
+    const std::string yaml = fmt::format(R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: {}
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+    use_persistent_host_partitions: true
+)EOF",
+                                         policy);
+    EXPECT_THAT(
+        createCluster(yaml),
+        HasStatusMessage(HasSubstr(
+            "use_persistent_host_partitions requires LB policy CLUSTER_PROVIDED, got " + policy)));
+  }
 }
 
 // With a health checker, initialization and health check results re-partition inside the
@@ -5575,9 +5604,20 @@ TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthChangedHostsDuringMem
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
                          lb_ptr, 0, &priority, nullptr));
 
-  // A membership-only update reports no health changes. The real membership callback it fires ends
-  // the simulated one, so start another.
+  // Until the cluster manager hands the snapshot out, a membership update still reports the health
+  // changes before it. The real membership callback it fires ends the simulated one, so start
+  // another.
   EXPECT_EQ(1, cluster->removeHosts({p0_hosts[1]}));
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &none, &none);
+  DynamicModuleClusterTestPeer::setUpdatedPriorities(*lb_instance, {0});
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, &count));
+  EXPECT_EQ(1, count);
+
+  // After a hand-out, a membership-only update reports no health changes.
+  cluster->prioritySet().hostSetsPerPriority()[0]->snapshot();
+  std::vector<Upstream::HostSharedPtr> more_hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10004"}, {1}, more_hosts, 0));
   DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &none, &none);
   DynamicModuleClusterTestPeer::setUpdatedPriorities(*lb_instance, {0});
   ASSERT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(

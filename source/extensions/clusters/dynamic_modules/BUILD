@@ -59,6 +59,7 @@ envoy_cc_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:function_ref",
     ],
 )
 

@@ -592,8 +592,13 @@ bool DynamicModuleCluster::updateHostHealth(Upstream::HostSharedPtr host,
     break;
   }
 
-  // A persistent host set re-partitions just this host.
-  if (applyPersistentHealthChange(host)) {
+  // A persistent host set re-partitions just this host. Callers resolve the host through
+  // `host_map_`, so it is a member.
+  if (config_->use_persistent_host_partitions_) {
+    if (!applyPersistentHealthChange(host)) {
+      IS_ENVOY_BUG("health update for a host the persistent host set does not hold");
+      return false;
+    }
     ENVOY_LOG(debug, "Updated health status for host to {} at priority {}.",
               static_cast<int>(health_status), host->priority());
     return true;
@@ -668,7 +673,10 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
     std::vector<Upstream::HostVector> removed_by_priority(
         priority_set_.hostSetsPerPriority().size());
     for (const auto& h : removed_hosts) {
-      ASSERT(h->priority() < removed_by_priority.size());
+      if (h->priority() >= removed_by_priority.size()) {
+        IS_ENVOY_BUG("removed host has a priority the cluster does not have");
+        continue;
+      }
       removed_by_priority[h->priority()].emplace_back(h);
     }
     for (uint32_t priority = 0; priority < removed_by_priority.size(); ++priority) {
@@ -903,11 +911,11 @@ const Upstream::HostVector* DynamicModuleLoadBalancer::healthChangedHosts() {
       const auto* host_set = priority < host_sets.size()
                                  ? dynamic_cast<const PersistentHostSet*>(host_sets[priority].get())
                                  : nullptr;
-      if (host_set == nullptr || !host_set->healthChangedHosts().has_value()) {
+      auto changed = host_set != nullptr ? host_set->healthChangedHosts() : std::nullopt;
+      if (!changed.has_value()) {
         return nullptr;
       }
-      const auto& changed = *host_set->healthChangedHosts();
-      hosts.insert(hosts.end(), changed.begin(), changed.end());
+      hosts.insert(hosts.end(), changed->begin(), changed->end());
     }
     health_changed_hosts_ = std::move(hosts);
   }
@@ -1059,6 +1067,13 @@ DynamicModuleClusterFactory::createClusterWithConfig(
         fmt::format("cluster: LB policy {} is not valid for cluster type "
                     "'envoy.clusters.dynamic_modules'. Supported policies are CLUSTER_PROVIDED, "
                     "LEAST_REQUEST, ROUND_ROBIN, RANDOM, RING_HASH, and MAGLEV.",
+                    envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy)));
+  }
+  // Native policies read the flat host vectors on every update, which this option exists to avoid.
+  if (proto_config.use_persistent_host_partitions() && !is_module_lb) {
+    return absl::InvalidArgumentError(
+        fmt::format("cluster: use_persistent_host_partitions requires LB policy CLUSTER_PROVIDED, "
+                    "got {}.",
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy)));
   }
 

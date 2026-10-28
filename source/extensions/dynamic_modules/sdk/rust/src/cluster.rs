@@ -850,21 +850,26 @@ pub trait EnvoyClusterLoadBalancer: Send {
     is_added: bool,
   ) -> Option<PackedAddress>;
 
-  /// Returns how many hosts changed health in the update that triggered the current
-  /// [`ClusterLb::on_host_membership_update`] call, so the module can patch its healthy set
-  /// instead of rereading every host. Added and removed hosts are reported by
-  /// [`EnvoyClusterLoadBalancer::get_member_update_host`] instead, and a membership-only update
-  /// reports zero. It is only valid during the `on_host_membership_update` callback.
+  /// Returns how many hosts changed health since the previous update this worker applied, so the
+  /// module can patch its healthy set from the current [`ClusterLb::on_host_membership_update`]
+  /// call instead of rereading every host. Envoy merges updates within the cluster's
+  /// `update_merge_window`, so one call can carry several health changes. Each host is listed
+  /// once, and hosts removed since the previous update are reported only by
+  /// [`EnvoyClusterLoadBalancer::get_member_update_host`]. A worker's first update lists every host
+  /// as added together with any pending health changes, so apply the report idempotently. It is
+  /// only valid during the `on_host_membership_update` callback.
   ///
   /// Returns `None` outside the callback, or when Envoy does not know which hosts changed health:
-  /// the cluster does not keep persistent host partitions, or the update replaced them wholesale.
-  /// The module must then reread the hosts it tracks.
+  /// the cluster does not keep persistent host partitions, or an update since the previous one
+  /// replaced them. The module must then reread the hosts it tracks.
   fn get_member_update_health_changed_host_count(&self) -> Option<usize>;
 
-  /// Returns a host whose health changed in the update that triggered the current
-  /// [`ClusterLb::on_host_membership_update`] call, with its priority and current health. Valid
-  /// indexes are below [`EnvoyClusterLoadBalancer::get_member_update_health_changed_host_count`].
-  /// It is only valid during the `on_host_membership_update` callback.
+  /// Returns a host whose health changed since the previous update this worker applied, with its
+  /// priority and current health. The health is read when this is called, so it can be newer than
+  /// the host lists of the same update. The host pointer stays valid while the host is in the
+  /// cluster's host set. Valid indexes are below
+  /// [`EnvoyClusterLoadBalancer::get_member_update_health_changed_host_count`]. It is only valid
+  /// during the `on_host_membership_update` callback.
   ///
   /// Returns `None` when the index is out of bounds or the count is unknown.
   fn get_member_update_health_changed_host(

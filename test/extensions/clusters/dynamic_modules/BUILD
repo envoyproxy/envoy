@@ -73,6 +73,8 @@ envoy_extension_cc_test(
         "//source/extensions/clusters/dynamic_modules:persistent_host_set_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

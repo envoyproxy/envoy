@@ -2,6 +2,7 @@
 #include <map>
 #include <memory>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,8 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/upstream/cluster_info.h"
+#include "test/test_common/logging.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -29,6 +32,7 @@ protected:
     // The factory is installed before any host set exists, as ClusterImplBase does.
     priority_set_.setHostSetFactory(&PersistentHostSet::create);
     priority_set_.getOrCreateHostSet(0);
+    worker_.setHostSetFactory(&PersistentHostSet::create);
   }
 
   PersistentHostSet& hostSet(uint32_t priority) {
@@ -37,12 +41,12 @@ protected:
   }
 
   // Applies a membership delta the way the dynamic-modules cluster does: patch the host set, then
-  // hand its snapshot to the priority set with the same delta.
+  // hand its snapshot to the priority set with the same delta. Unlike the cluster manager, this
+  // does not hand the snapshot out.
   void delta(uint32_t priority, const HostVector& added, const HostVector& removed) {
     auto snapshot = hostSet(priority).applyMembershipDelta(added, removed);
     priority_set_.updateHosts(priority, HostSetImpl::snapshotUpdateHostsParams(snapshot), nullptr,
                               added, removed, std::nullopt, std::nullopt);
-    EXPECT_EQ(snapshot, priority_set_.hostSetsPerPriority()[priority]->snapshot());
   }
 
   // Applies a health change the same way. Returns false if the host set does not hold `host`.
@@ -77,6 +81,21 @@ protected:
       buckets.push_back(std::move(bucket));
     }
     return std::make_shared<HostsPerLocalityImpl>(std::move(buckets), false);
+  }
+
+  // Hands out priority 0's snapshot as the cluster manager does when it posts an update, and
+  // returns the health-changed hosts a worker adopting it reports.
+  std::optional<std::vector<std::string>> handOut() {
+    worker_.updateHosts(
+        0,
+        HostSetImpl::snapshotUpdateHostsParams(priority_set_.hostSetsPerPriority()[0]->snapshot()),
+        nullptr, {}, {}, std::nullopt, std::nullopt);
+    const auto changed = dynamic_cast<const PersistentHostSet&>(*worker_.hostSetsPerPriority()[0])
+                             .healthChangedHosts();
+    if (!changed.has_value()) {
+      return std::nullopt;
+    }
+    return addresses(*changed);
   }
 
   static std::vector<std::string> addresses(const HostVector& hosts) {
@@ -132,6 +151,8 @@ protected:
 
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   MainPrioritySetImpl priority_set_;
+  // A worker-side priority set that adopts what handOut() hands out.
+  PrioritySetImpl worker_;
   HostVector members_;
 };
 
@@ -214,8 +235,9 @@ TEST_F(PersistentHostPartitionsTest, LocalityBucketsFollowMembership) {
   expectMatchesFullPartition();
 }
 
-// Random membership deltas, health changes and occasional full updates keep every view equal to a
-// full pass over the current membership.
+// Random membership deltas, health changes, health refreshes and hand-outs keep every view equal to
+// a full pass over the current membership, and each hand-out reports exactly the members whose
+// health changed since the previous one.
 TEST_F(PersistentHostPartitionsTest, RandomDeltasMatchFullPartition) {
   const std::vector<std::string> zones{"a", "b", "c"};
   HostVector pool;
@@ -233,10 +255,24 @@ TEST_F(PersistentHostPartitionsTest, RandomDeltasMatchFullPartition) {
   const auto is_member = [&](const HostSharedPtr& host) {
     return std::find(members_.begin(), members_.end(), host) != members_.end();
   };
+  // The health changes the next hand-out must report, or nullopt after a refresh. A hand-out keeps
+  // reporting the same list until the next change starts a new one.
+  std::optional<std::set<std::string>> expected_changed = std::set<std::string>{};
+  bool handed_out = false;
+  // Start from an empty delta so there is always a snapshot to hand out.
+  delta(0, {}, {});
+  const auto begin_change = [&]() {
+    if (handed_out) {
+      expected_changed = std::set<std::string>{};
+      handed_out = false;
+    }
+  };
 
   for (int step = 0; step < 400; ++step) {
+    SCOPED_TRACE(absl::StrCat("step ", step));
     const size_t op = pick(100);
-    if (op < 35) {
+    if (op < 30) {
+      begin_change();
       HostVector added;
       for (size_t n = 1 + pick(5); n > 0; --n) {
         const HostSharedPtr& host = pool[pick(pool.size())];
@@ -246,15 +282,20 @@ TEST_F(PersistentHostPartitionsTest, RandomDeltasMatchFullPartition) {
       }
       delta(0, added, {});
       members_.insert(members_.end(), added.begin(), added.end());
-    } else if (op < 60 && !members_.empty()) {
+    } else if (op < 55 && !members_.empty()) {
+      begin_change();
       HostVector removed;
       for (size_t n = 1 + pick(5); n > 0 && !members_.empty(); --n) {
         const size_t index = pick(members_.size());
         removed.push_back(members_[index]);
+        if (expected_changed.has_value()) {
+          expected_changed->erase(members_[index]->address()->asString());
+        }
         members_.erase(members_.begin() + index);
       }
       delta(0, {}, removed);
-    } else if (op < 95 && !members_.empty()) {
+    } else if (op < 85 && !members_.empty()) {
+      begin_change();
       const HostSharedPtr& host = members_[pick(members_.size())];
       const Host::HealthFlag flag = flags[pick(flags.size())];
       if (host->healthFlagGet(flag)) {
@@ -267,35 +308,69 @@ TEST_F(PersistentHostPartitionsTest, RandomDeltasMatchFullPartition) {
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       }
       EXPECT_TRUE(healthChange(0, host));
+      if (expected_changed.has_value()) {
+        expected_changed->insert(host->address()->asString());
+      }
+    } else if (op < 88) {
+      begin_change();
+      auto snapshot = hostSet(0).refreshHealth();
+      priority_set_.updateHosts(0, HostSetImpl::snapshotUpdateHostsParams(snapshot), nullptr, {},
+                                {}, std::nullopt, std::nullopt);
+      expected_changed = std::nullopt;
     } else {
-      // A full update makes the given vectors authoritative; later deltas must build on them.
-      priority_set_.updateHosts(0,
-                                HostSetImpl::partitionHosts(std::make_shared<HostVector>(members_),
-                                                            groupByLocality(members_)),
-                                nullptr, {}, {}, std::nullopt, std::nullopt);
+      const auto reported = handOut();
+      ASSERT_EQ(expected_changed.has_value(), reported.has_value());
+      if (reported.has_value()) {
+        EXPECT_EQ(std::vector<std::string>(expected_changed->begin(), expected_changed->end()),
+                  *reported);
+      }
+      handed_out = true;
     }
     expectMatchesFullPartition();
   }
 }
 
-// A delta publishes a snapshot of the partitions, and a full update publishes none because its flat
-// views are already current. Flat host sets never publish one.
-TEST_F(PersistentHostPartitionsTest, SnapshotFollowsTheCurrentRepresentation) {
+// A delta publishes a snapshot of the partitions. Flat host sets never publish one.
+TEST_F(PersistentHostPartitionsTest, DeltasPublishSnapshots) {
   const HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
   EXPECT_EQ(nullptr, host_set.snapshot());
 
   members_ = {makeHost(1, "a"), makeHost(2, "b")};
-  delta(0, members_, {});
-  EXPECT_NE(nullptr, host_set.snapshot());
-
-  priority_set_.updateHosts(0,
-                            HostSetImpl::partitionHosts(std::make_shared<HostVector>(members_),
-                                                        groupByLocality(members_)),
-                            nullptr, {}, {}, std::nullopt, std::nullopt);
-  EXPECT_EQ(nullptr, host_set.snapshot());
+  auto snapshot = hostSet(0).applyMembershipDelta(members_, {});
+  priority_set_.updateHosts(0, HostSetImpl::snapshotUpdateHostsParams(snapshot), nullptr, members_,
+                            {}, std::nullopt, std::nullopt);
+  EXPECT_NE(nullptr, snapshot);
+  EXPECT_EQ(snapshot, host_set.snapshot());
 
   HostSetImpl flat_host_set(0, std::nullopt, std::nullopt);
   EXPECT_EQ(nullptr, flat_host_set.snapshot());
+}
+
+// Nothing hands a persistent host set a non-empty full update, so patching after one is a bug.
+TEST_F(PersistentHostPartitionsTest, DeltaAfterNonEmptyFullUpdateIsABug) {
+  members_ = {makeHost(1, "a")};
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(std::make_shared<HostVector>(members_),
+                                                        groupByLocality(members_)),
+                            nullptr, members_, {}, std::nullopt, std::nullopt);
+  EXPECT_ENVOY_BUG(hostSet(0).applyMembershipDelta({makeHost(2, "a")}, {}),
+                   "persistent host set patched after a non-empty full update");
+}
+
+// A change must not start before the snapshot of the previous one reaches updateHosts().
+TEST_F(PersistentHostPartitionsTest, ChangeBeforeUpdateHostsIsABug) {
+  const HostSharedPtr host = makeHost(1, "a");
+  hostSet(0).applyMembershipDelta({host}, {});
+  EXPECT_ENVOY_BUG(hostSet(0).applyMembershipDelta({}, {host}),
+                   "persistent host set changed before its last snapshot reached updateHosts()");
+}
+
+// A host in both lists of one delta ends up present.
+TEST_F(PersistentHostPartitionsTest, HostAddedAndRemovedInOneDeltaIsPresent) {
+  const HostSharedPtr host = makeHost(1, "a");
+  delta(0, {host}, {host});
+  members_ = {host};
+  expectMatchesFullPartition();
 }
 
 // A worker adopting snapshots matches the main-thread partitions, and an adopted view does not
@@ -369,22 +444,12 @@ TEST_F(PersistentHostPartitionsTest, PointerAccessorsMatchViews) {
   EXPECT_EQ(0, host_set.hostCounts().excluded);
 }
 
-// Removing a host whose locality has no bucket, or after a full update without a per-locality
-// layout, leaves the views equal to a full pass.
+// Removing a host whose locality has no bucket leaves the views equal to a full pass.
 TEST_F(PersistentHostPartitionsTest, RemoveWithoutLocalityBucket) {
   members_ = {makeHost(1, "a"), makeHost(2, "b")};
   delta(0, members_, {});
   delta(0, {}, {makeHost(3, "z")});
   expectMatchesFullPartition();
-
-  priority_set_.updateHosts(0,
-                            HostSetImpl::partitionHosts(std::make_shared<HostVector>(members_),
-                                                        HostsPerLocalityImpl::empty()),
-                            nullptr, {}, {}, std::nullopt, std::nullopt);
-  delta(0, {}, {members_[0]});
-  const HostSet& host_set = *priority_set_.hostSetsPerPriority()[0];
-  EXPECT_EQ(1, host_set.hostCounts().hosts);
-  EXPECT_EQ(addresses({members_[1]}), addresses(host_set.hosts()));
 }
 
 // Each update records which hosts' health changed, and snapshots carry that to workers.
@@ -416,14 +481,86 @@ TEST_F(PersistentHostPartitionsTest, HealthChangedHostsFollowUpdates) {
   worker_set = publish({}, {});
   EXPECT_EQ(HostVector{members_[1]}, worker_set->healthChangedHosts());
 
+  // The change after a hand-out starts a new list.
   delta(0, {}, {members_[0]});
   EXPECT_TRUE(host_set.healthChangedHosts()->empty());
+}
 
-  priority_set_.updateHosts(0,
-                            HostSetImpl::partitionHosts(std::make_shared<HostVector>(members_),
-                                                        groupByLocality(members_)),
-                            nullptr, {}, {}, std::nullopt, std::nullopt);
-  EXPECT_FALSE(host_set.healthChangedHosts().has_value());
+// Health changes inside one cluster manager merge window, where no snapshot is handed out between
+// them, all reach the next hand-out, which then starts a new list.
+TEST_F(PersistentHostPartitionsTest, HealthChangesAccumulateUntilHandedOut) {
+  members_ = {makeHost(1, "a"), makeHost(2, "b"), makeHost(3, "a")};
+  delta(0, members_, {});
+  EXPECT_EQ(std::vector<std::string>{}, handOut());
+
+  members_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[0]));
+  members_[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[1]));
+  // Flipping a host back is still one change, listed once.
+  members_[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[0]));
+  EXPECT_EQ(addresses({members_[0], members_[1]}), handOut());
+
+  members_[2]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[2]));
+  EXPECT_EQ(addresses({members_[2]}), handOut());
+  // A hand-out without a change in between reports the same list again.
+  EXPECT_EQ(addresses({members_[2]}), handOut());
+  expectMatchesFullPartition();
+}
+
+// A membership delta inside the merge window keeps the pending health changes of the hosts it does
+// not remove, and drops those of the hosts it removes.
+TEST_F(PersistentHostPartitionsTest, HealthChangesSurviveMembershipDeltas) {
+  members_ = {makeHost(1, "a"), makeHost(2, "b"), makeHost(3, "a")};
+  delta(0, members_, {});
+  EXPECT_EQ(std::vector<std::string>{}, handOut());
+
+  members_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[0]));
+  members_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[1]));
+  const HostSharedPtr added = makeHost(4, "c");
+  delta(0, {added}, {members_[1]});
+  EXPECT_EQ(addresses({members_[0]}), handOut());
+
+  members_ = {members_[0], members_[2], added};
+  expectMatchesFullPartition();
+}
+
+// A health refresh makes the pending health changes unknown until the next hand-out.
+TEST_F(PersistentHostPartitionsTest, RefreshHealthMakesPendingChangesUnknown) {
+  members_ = {makeHost(1, "a"), makeHost(2, "b")};
+  delta(0, members_, {});
+  members_[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[0]));
+  auto snapshot = hostSet(0).refreshHealth();
+  priority_set_.updateHosts(0, HostSetImpl::snapshotUpdateHostsParams(snapshot), nullptr, {}, {},
+                            std::nullopt, std::nullopt);
+  members_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[1]));
+  EXPECT_EQ(std::nullopt, handOut());
+
+  members_[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  EXPECT_TRUE(healthChange(0, members_[1]));
+  EXPECT_EQ(addresses({members_[1]}), handOut());
+}
+
+// The bulk healthy walk visits the healthy hosts in healthyHosts() order, on the main thread and on
+// a worker.
+TEST_F(PersistentHostPartitionsTest, ForEachHealthyHostMatchesHealthyHosts) {
+  members_ = {makeHost(1, "a"), makeHost(2, "b"), makeHost(3, "c"), makeHost(4, "a")};
+  members_[1]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  delta(0, members_, {});
+  handOut();
+  for (const HostSet* host_set :
+       {priority_set_.hostSetsPerPriority()[0].get(), worker_.hostSetsPerPriority()[0].get()}) {
+    HostVector walked;
+    dynamic_cast<const PersistentHostSet&>(*host_set).forEachHealthyHost(
+        [&walked](const HostSharedPtr& host) { walked.push_back(host); });
+    EXPECT_EQ(host_set->healthyHosts(), walked);
+  }
 }
 
 } // namespace

@@ -10577,6 +10577,10 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
  * envoy_dynamic_module_callback_cluster_lb_get_healthy_host returns a healthy host pointer by
  * index at the given priority level.
  *
+ * With use_persistent_host_partitions, the first index getter for a host list after an update
+ * builds that list, which is O(N) on the worker. The count getters and
+ * envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts do not.
+ *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
  * @param priority is the priority level.
  * @param index is the index of the host in the healthy host list.
@@ -11830,16 +11834,18 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count returns how
- * many hosts changed health in the update that triggered the current
- * envoy_dynamic_module_on_cluster_lb_on_host_membership_update call, so a module can patch its
- * healthy set instead of rereading every host. Hosts added or removed by the update are reported by
- * the member update getters instead, and a membership-only update reports zero. It is only valid
- * during envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that
- * runs it.
+ * many hosts changed health since the previous update this worker applied, so a module can patch
+ * its healthy set from the current envoy_dynamic_module_on_cluster_lb_on_host_membership_update
+ * call instead of rereading every host. Envoy merges updates within the cluster's
+ * update_merge_window, so one call can carry several health changes. Each host is listed once, and
+ * hosts removed since the previous update are reported only by the member update getters. A
+ * worker's first update lists every host as added together with any pending health changes, so the
+ * module must apply the report idempotently. It is only valid during
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
  *
  * Envoy only knows this when the cluster keeps persistent host partitions, which requires
- * use_persistent_host_partitions in the cluster's ClusterConfig, and the update patched them rather
- * than replacing them. Otherwise it returns false and the module must reread the hosts it tracks.
+ * use_persistent_host_partitions in the cluster's ClusterConfig, and no update since the previous
+ * one replaced them. Otherwise it returns false and the module must reread the hosts it tracks.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
  * @param result receives the count. Its contents are unspecified when the callback returns false.
@@ -11851,9 +11857,10 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_h
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host returns a host
- * whose health changed in the update that triggered the current
- * envoy_dynamic_module_on_cluster_lb_on_host_membership_update call, with its priority and current
- * health. Valid indexes are below the count from
+ * whose health changed since the previous update this worker applied, with its priority and current
+ * health. The health is read when this is called, so it can be newer than the host lists of the
+ * same update. The host pointer stays valid while the host is in the cluster's host set. Valid
+ * indexes are below the count from
  * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count. It is only
  * valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread
  * that runs it.

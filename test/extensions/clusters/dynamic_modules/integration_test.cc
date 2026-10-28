@@ -509,9 +509,51 @@ TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HostChurnConverg
   }
   EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
   EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
-  // Each worker's converging update is the final health flip, which Envoy reports.
+  // Envoy reports the health flips merged into each worker's later updates.
   EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
             2);
+}
+
+// Two health flips inside one update_merge_window, followed by a removal that cancels the merged
+// update. Each load balancer patches its healthy set only from the reported deltas, so it matches
+// Envoy's healthy hosts only if the removal's update carries both flips.
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthChangesMergedIntoRemoval) {
+  concurrency_ = 2;
+  initializeWithDecCluster("health_patch_removal");
+
+  // Stop here if the load balancers never converge, rather than waiting on a request with no host.
+  ASSERT_NO_FATAL_FAILURE(test_server_->waitForCounter(
+      "dynamicmodulescustom.health_patch_converged_total", testing::Ge(2)));
+  EXPECT_EQ(0, test_server_->counter("dynamicmodulescustom.health_patch_unknown_total")->value());
+  EXPECT_GE(test_server_->counter("cluster_manager.update_merge_cancelled")->value(), 1);
+  EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Three health flips inside one update_merge_window, delivered together when the merge timer fires.
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthChangesMergedByWindow) {
+  concurrency_ = 2;
+  initializeWithDecCluster("health_patch_window");
+
+  // Stop here if the load balancers never converge, rather than waiting on a request with no host.
+  ASSERT_NO_FATAL_FAILURE(test_server_->waitForCounter(
+      "dynamicmodulescustom.health_patch_converged_total", testing::Ge(2)));
+  EXPECT_EQ(0, test_server_->counter("dynamicmodulescustom.health_patch_unknown_total")->value());
+  EXPECT_GE(test_server_->counter("cluster_manager.cluster_updated_via_merge")->value(), 1);
+  EXPECT_EQ(4, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Verifies that the cluster lifecycle callbacks fire correctly during cluster

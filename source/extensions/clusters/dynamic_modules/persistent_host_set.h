@@ -5,14 +5,21 @@
 
 #include "source/common/upstream/upstream_impl.h"
 
+#include "absl/functional/function_ref.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
 
 /**
- * Host set whose partitions are persistent maps patched by membership and health deltas. Flat views
- * are built on the first read after a change. A full `updateHosts()` replaces the partitions.
+ * Host set whose partitions are persistent maps patched by membership and health deltas. Each flat
+ * view is built on its first read after a change.
+ *
+ * The main thread's set starts empty and only changes through applyMembershipDelta(),
+ * applyHostHealthChange() and refreshHealth(), each followed by updateHosts() with the snapshot it
+ * returned. A worker's set only adopts snapshots from the main thread. Neither receives a non-empty
+ * flat update.
  */
 class PersistentHostSet : public Upstream::HostSetImpl {
 public:
@@ -29,50 +36,33 @@ public:
   }
 
   // Upstream::HostSet
-  const Upstream::HostVector& hosts() const override { return *flat().hosts; }
-  Upstream::HostVectorConstSharedPtr hostsPtr() const override { return flat().hosts; }
-  const Upstream::HostVector& healthyHosts() const override { return flat().healthy_hosts->get(); }
-  Upstream::HealthyHostVectorConstSharedPtr healthyHostsPtr() const override {
-    return flat().healthy_hosts;
-  }
-  const Upstream::HostVector& degradedHosts() const override {
-    return flat().degraded_hosts->get();
-  }
-  Upstream::DegradedHostVectorConstSharedPtr degradedHostsPtr() const override {
-    return flat().degraded_hosts;
-  }
-  const Upstream::HostVector& excludedHosts() const override {
-    return flat().excluded_hosts->get();
-  }
-  Upstream::ExcludedHostVectorConstSharedPtr excludedHostsPtr() const override {
-    return flat().excluded_hosts;
-  }
+  const Upstream::HostVector& hosts() const override { return *hostsPtr(); }
+  Upstream::HostVectorConstSharedPtr hostsPtr() const override;
+  const Upstream::HostVector& healthyHosts() const override { return healthyHostsPtr()->get(); }
+  Upstream::HealthyHostVectorConstSharedPtr healthyHostsPtr() const override;
+  const Upstream::HostVector& degradedHosts() const override { return degradedHostsPtr()->get(); }
+  Upstream::DegradedHostVectorConstSharedPtr degradedHostsPtr() const override;
+  const Upstream::HostVector& excludedHosts() const override { return excludedHostsPtr()->get(); }
+  Upstream::ExcludedHostVectorConstSharedPtr excludedHostsPtr() const override;
   const Upstream::HostsPerLocality& hostsPerLocality() const override {
-    return *flat().hosts_per_locality;
+    return *hostsPerLocalityPtr();
   }
-  Upstream::HostsPerLocalityConstSharedPtr hostsPerLocalityPtr() const override {
-    return flat().hosts_per_locality;
-  }
+  Upstream::HostsPerLocalityConstSharedPtr hostsPerLocalityPtr() const override;
   const Upstream::HostsPerLocality& healthyHostsPerLocality() const override {
-    return *flat().healthy_hosts_per_locality;
+    return *healthyHostsPerLocalityPtr();
   }
-  Upstream::HostsPerLocalityConstSharedPtr healthyHostsPerLocalityPtr() const override {
-    return flat().healthy_hosts_per_locality;
-  }
+  Upstream::HostsPerLocalityConstSharedPtr healthyHostsPerLocalityPtr() const override;
   const Upstream::HostsPerLocality& degradedHostsPerLocality() const override {
-    return *flat().degraded_hosts_per_locality;
+    return *degradedHostsPerLocalityPtr();
   }
-  Upstream::HostsPerLocalityConstSharedPtr degradedHostsPerLocalityPtr() const override {
-    return flat().degraded_hosts_per_locality;
-  }
+  Upstream::HostsPerLocalityConstSharedPtr degradedHostsPerLocalityPtr() const override;
   const Upstream::HostsPerLocality& excludedHostsPerLocality() const override {
-    return *flat().excluded_hosts_per_locality;
+    return *excludedHostsPerLocalityPtr();
   }
-  Upstream::HostsPerLocalityConstSharedPtr excludedHostsPerLocalityPtr() const override {
-    return flat().excluded_hosts_per_locality;
-  }
+  Upstream::HostsPerLocalityConstSharedPtr excludedHostsPerLocalityPtr() const override;
   Upstream::HostCounts hostCounts() const override;
 
+  // Hands out the current snapshot. Health changes after this start a new health-changed list.
   Upstream::HostSetSnapshotConstSharedPtr snapshot() const override;
 
   // Upstream::HostSetImpl
@@ -85,46 +75,49 @@ public:
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt) override;
 
-  // Patches the partitions with a membership delta and returns their snapshot, to be passed to
-  // PrioritySet::updateHosts() with the same delta. Locality weights are not supported.
+  // The changes below each return a snapshot that must reach updateHosts() before the next change.
+  // Patches the partitions with a membership delta. A host in both lists ends up present. Locality
+  // weights are not supported.
   Upstream::HostSetSnapshotConstSharedPtr
   applyMembershipDelta(const Upstream::HostVector& hosts_added,
                        const Upstream::HostVector& hosts_removed);
-  // Re-partitions `host` after its health changed and returns the snapshot, or nullptr if this set
-  // does not hold `host`.
+  // Re-partitions `host` after its health changed, or returns nullptr if this set does not hold it.
   Upstream::HostSetSnapshotConstSharedPtr
   applyHostHealthChange(const Upstream::HostSharedPtr& host);
-  // Re-partitions every host after an unknown set of health changes and returns the snapshot.
+  // Re-partitions every host after an unknown set of health changes.
   Upstream::HostSetSnapshotConstSharedPtr refreshHealth();
 
-  // Hosts whose health changed in the update that produced the current partitions, or nullopt when
-  // that update replaced the partitions wholesale.
-  const std::optional<Upstream::HostVector>& healthChangedHosts() const { return health_changed_; }
+  // Members whose health changed since the previous snapshot() hand-out, in the current snapshot,
+  // or nullopt when that is unknown. Hosts removed since then are not listed.
+  std::optional<Upstream::HostVector> healthChangedHosts() const;
+
+  // Calls `fn` for each healthy host, in healthyHosts() order, without building the flat view.
+  void forEachHealthyHost(absl::FunctionRef<void(const Upstream::HostSharedPtr&)> fn) const;
 
 private:
   struct Partitions;
   // Which representation is current.
   enum class Source { Flat, Partitions, Snapshot };
 
-  // Returns the flat views, building them from the current partitions or snapshot if needed.
-  const Upstream::PrioritySet::UpdateHostsParams& flat() const;
   // The snapshot of the current partitions, or nullptr when the flat views are current.
   Upstream::HostSetSnapshotConstSharedPtr currentSnapshot() const;
-  // Makes `partitions_` current so a delta can be applied to it.
-  void syncPartitions();
+  // Makes `partitions_` current and starts a new health-changed list if the last one was handed
+  // out, so a change can be applied.
+  void beginChange();
   // Marks `partitions_` current, drops the stale flat views, and returns their snapshot.
-  Upstream::HostSetSnapshotConstSharedPtr
-  partitionsChanged(std::optional<Upstream::HostVector> health_changed);
+  Upstream::HostSetSnapshotConstSharedPtr partitionsChanged();
 
   std::unique_ptr<Partitions> partitions_;
   // Adopted from another host set; current while `source_` is Snapshot.
   Upstream::HostSetSnapshotConstSharedPtr adopted_snapshot_;
   // Snapshot of `partitions_`, built on demand while `source_` is Partitions.
   mutable Upstream::HostSetSnapshotConstSharedPtr partitions_snapshot_;
-  // Flat views: the source after a full update, otherwise a cache built on first read.
+  // Flat views: the source after a full update, otherwise each one is built on its first read.
   mutable Upstream::PrioritySet::UpdateHostsParams flat_;
-  mutable bool flat_built_{true};
-  std::optional<Upstream::HostVector> health_changed_;
+  // Whether snapshot() handed out the current health-changed list.
+  mutable bool health_changes_handed_out_{false};
+  // Whether the snapshot of the last change has yet to reach updateHosts().
+  bool change_pending_{false};
   Source source_{Source::Flat};
 };
 

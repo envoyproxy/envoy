@@ -16,9 +16,11 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
+#include "source/extensions/clusters/dynamic_modules/persistent_host_set.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 
+using Envoy::Extensions::Clusters::DynamicModules::PersistentHostSet;
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
@@ -391,16 +393,27 @@ bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
   if (priority >= host_sets.size()) {
     return false;
   }
-  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
-  *hosts_size_out = healthy_hosts.size();
+  const auto& host_set = *host_sets[priority];
+  const size_t healthy_count = host_set.hostCounts().healthy;
+  *hosts_size_out = healthy_count;
   // Write nothing when the buffer is too small so a caller cannot act on a partial healthy set.
-  if (healthy_hosts.size() > hosts_capacity) {
+  if (healthy_count > hosts_capacity) {
     return false;
   }
   // The fill loop writes through hosts_out, so reject a null buffer that claims nonzero capacity.
-  if (hosts_out == nullptr && !healthy_hosts.empty()) {
+  if (hosts_out == nullptr && healthy_count != 0) {
     return false;
   }
+  // A persistent host set is walked directly, so this does not build its flat healthy view.
+  if (const auto* persistent = dynamic_cast<const PersistentHostSet*>(&host_set);
+      persistent != nullptr) {
+    size_t i = 0;
+    persistent->forEachHealthyHost([&](const Envoy::Upstream::HostSharedPtr& host) {
+      hosts_out[i++] = const_cast<Envoy::Upstream::Host*>(host.get());
+    });
+    return true;
+  }
+  const auto& healthy_hosts = host_set.healthyHosts();
   for (size_t i = 0; i < healthy_hosts.size(); i++) {
     hosts_out[i] = const_cast<Envoy::Upstream::Host*>(healthy_hosts[i].get());
   }
