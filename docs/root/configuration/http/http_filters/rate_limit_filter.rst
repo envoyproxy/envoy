@@ -148,13 +148,20 @@ placed before the first one with the flag. Route configurations are evaluated be
 configurations, so a match on a route configuration with the flag also skips the virtual host
 configurations. Configurations that
 :ref:`apply on stream done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>` are
-evaluated separately, so a stop at request time does not affect them.
+evaluated separately, so a stop at request time does not affect them. Only later configurations of
+the same :ref:`stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>` are skipped.
 
-A configuration produces a descriptor when all of its actions populate. If an action cannot
-populate, for example because a header is missing, the configuration does not stop the search.
+A configuration matches when all of its actions populate and the resulting descriptor has at least
+one entry. If an action cannot populate, for example because a required header is missing, the
+configuration does not stop the search. The same holds when every action is skipped through
+``skip_if_absent``, because the resulting descriptor is empty. A configuration whose
+:ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate,
+for example because the header it reads is missing or not a number, does not match either, so the
+request falls through to later configurations.
 
 With the following configuration, a request with ``x-user-id: client-a`` only produces the
-``("tier", "client-a")`` descriptor and any other request produces ``("user", "<x-user-id>")``:
+``("tier", "client-a")`` descriptor, and a request with any other ``x-user-id`` value produces
+``("user", "<x-user-id>")``. A request without the ``x-user-id`` header produces no descriptor:
 
 .. code-block:: yaml
 
