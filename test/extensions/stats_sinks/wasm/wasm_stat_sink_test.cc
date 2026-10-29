@@ -57,7 +57,7 @@ public:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonContextTest,
-                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::host_test_runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmCommonContextTest, OnStat) {

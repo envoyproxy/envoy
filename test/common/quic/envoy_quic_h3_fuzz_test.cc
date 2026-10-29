@@ -124,9 +124,9 @@ struct Harness {
     ON_CALL(writer_, WritePacket(_, _, _, _, _, _))
         .WillByDefault(testing::Return(quic::WriteResult(quic::WRITE_STATUS_OK, 0)));
     ON_CALL(http_connection_callbacks_, newStream(_, _))
-        .WillByDefault(Invoke([&](Http::ResponseEncoder&, bool) -> Http::RequestDecoder& {
+        .WillByDefault([&](Http::ResponseEncoder&, bool) -> Http::RequestDecoder& {
           return orphan_request_decoder_;
-        }));
+        });
   }
 
   void fuzz(const test::common::quic::QuicH3FuzzCase& input) {

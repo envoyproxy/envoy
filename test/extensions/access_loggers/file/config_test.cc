@@ -80,13 +80,13 @@ public:
     stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info_.setResponseCode(200);
 
-    EXPECT_CALL(*file, write(_)).WillOnce(Invoke([expected, is_json](absl::string_view got) {
+    EXPECT_CALL(*file, write(_)).WillOnce([expected, is_json](absl::string_view got) {
       if (is_json) {
         EXPECT_TRUE(TestUtility::jsonStringEqual(std::string(got), std::string(expected)));
       } else {
         EXPECT_EQ(got, expected);
       }
-    }));
+    });
     logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   }
 

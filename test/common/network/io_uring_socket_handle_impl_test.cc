@@ -189,12 +189,12 @@ TEST_F(IoUringSocketHandleTest, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
 
   EXPECT_CALL(os_sys_calls,
               setsockopt_(test_fd, SOL_SOCKET, SO_LINGER, testing::_, sizeof(struct linger)))
-      .WillOnce(testing::Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+      .WillOnce([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
         const auto* l = static_cast<const struct linger*>(optval);
         EXPECT_EQ(1, l->l_onoff);
         EXPECT_EQ(0, l->l_linger);
         return 0;
-      }));
+      });
 
   io_handle.setAbortiveClose();
   auto res = io_handle.close();

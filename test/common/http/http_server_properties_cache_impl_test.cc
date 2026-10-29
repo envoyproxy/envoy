@@ -7,7 +7,6 @@
 
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -30,9 +29,9 @@ public:
         protocol1_(alpn1_, hostname1_, port1_, expiration1_),
         protocol2_(alpn2_, hostname2_, port2_, expiration2_), protocols1_({protocol1_}),
         protocols2_({protocol2_}) {
-    ON_CALL(dispatcher_, approximateMonotonicTime()).WillByDefault(Invoke([this]() {
+    ON_CALL(dispatcher_, approximateMonotonicTime()).WillByDefault([this]() {
       return dispatcher_.timeSource().monotonicTime();
-    }));
+    });
   }
 
   void initialize() {
@@ -343,10 +342,10 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoad) {
   if (store_ == nullptr) {
     return;
   }
-  EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+  EXPECT_CALL(*store_, iterate(_)).WillOnce([&](KeyValueStore::ConstIterateCb fn) {
     fn("foo", "bar");
     fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|2|3");
-  }));
+  });
 
   // When the cache is created, there should be a warning log for the bad cache
   // entry.
@@ -367,9 +366,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
   if (store_ == nullptr) {
     return;
   }
-  EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+  EXPECT_CALL(*store_, iterate(_)).WillOnce([&](KeyValueStore::ConstIterateCb fn) {
     fn("https://hostname1:1", "clear|5|0");
-  }));
+  });
   initialize();
 
   EXPECT_CALL(*store_, addOrUpdate(_, _, _)).Times(0);
@@ -380,9 +379,9 @@ TEST_P(HttpServerPropertiesCacheImplTest, CacheLoadSrttOnly) {
 TEST_P(HttpServerPropertiesCacheImplTest, ShouldNotUpdateStoreOnCacheLoad) {
   if (store_ != nullptr) {
     EXPECT_CALL(*store_, addOrUpdate(_, _, _)).Times(0);
-    EXPECT_CALL(*store_, iterate(_)).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+    EXPECT_CALL(*store_, iterate(_)).WillOnce([&](KeyValueStore::ConstIterateCb fn) {
       fn("https://hostname1:1", "alpn1=\"hostname1:1\"; ma=5|0|0");
-    }));
+    });
   }
   initialize();
 }

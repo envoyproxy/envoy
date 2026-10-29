@@ -148,14 +148,14 @@ protected:
     }
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(An<const std::vector<DecodedResourcePtr>&>(), version_info))
-        .WillOnce(Invoke([](const std::vector<DecodedResourcePtr>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourcePtr>& resources, const std::string&) {
           for (size_t i = 0; i < resources.size(); ++i) {
             EXPECT_NE(resources[i]->resource().GetArena(), nullptr);
             if (i > 0) {
               EXPECT_EQ(resources[i]->resource().GetArena(), resources[0]->resource().GetArena());
             }
           }
-        }));
+        });
     return state_->handleResponse(response);
   }
 
@@ -467,13 +467,13 @@ TEST_F(SotwSubscriptionStateTest, TypeUrlMismatch) {
   std::ignore = response.add_resources()->PackFrom(resource("resource"));
   EXPECT_CALL(callbacks_,
               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _))
-      .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+      .WillOnce([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
         EXPECT_TRUE(IsSubstring(
             "", "",
             "type URL type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment embedded "
             "in an individual Any does not match the message-wide type URL badtypeurl",
             e->what()));
-      }));
+      });
   EXPECT_CALL(*ttl_timer_, disableTimer());
   state_->handleResponse(response);
 }

@@ -660,12 +660,11 @@ TEST(HttpExtProcConfigTest, GrpcClientIsCreatedWithServerScope) {
   Stats::Scope* client_scope = nullptr;
   EXPECT_CALL(context.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&client_scope](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope& scope,
-                          bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
-            client_scope = &scope;
-            return absl::InternalError("no client for this test");
-          }));
+      .WillOnce([&client_scope](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope& scope,
+                                bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+        client_scope = &scope;
+        return absl::InternalError("no client for this test");
+      });
 
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
   filter->setDecoderFilterCallbacks(decoder_callbacks);

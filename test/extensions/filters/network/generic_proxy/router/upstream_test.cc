@@ -29,42 +29,40 @@ namespace {
 class MockUpstreamRequestCallbacks : public UpstreamRequestCallbacks {
 public:
   MockUpstreamRequestCallbacks() {
-    ON_CALL(*this, onUpstreamFailure(_, _)).WillByDefault(testing::Invoke([&](auto, auto) {
+    ON_CALL(*this, onUpstreamFailure(_, _)).WillByDefault([&](auto, auto) {
       if (upstream_ != nullptr) {
         upstream_->removeUpstreamRequest(1);
         upstream_->cleanUp(true);
       }
-    }));
-    ON_CALL(*this, onConnectionClose(_)).WillByDefault(testing::Invoke([&](auto) {
+    });
+    ON_CALL(*this, onConnectionClose(_)).WillByDefault([&](auto) {
       if (upstream_ != nullptr) {
         upstream_->removeUpstreamRequest(1);
         upstream_->cleanUp(true);
       }
-    }));
-    ON_CALL(*this, onDecodingSuccess(_, _))
-        .WillByDefault(testing::Invoke([&](ResponseHeaderFramePtr frame, auto) {
-          if (upstream_ != nullptr) {
-            if (frame->frameFlags().endStream()) {
-              upstream_->removeUpstreamRequest(frame->frameFlags().streamId());
-              upstream_->cleanUp(false);
-            }
-          }
-        }));
-    ON_CALL(*this, onDecodingSuccess(_))
-        .WillByDefault(testing::Invoke([&](ResponseCommonFramePtr frame) {
-          if (upstream_ != nullptr) {
-            if (frame->frameFlags().endStream()) {
-              upstream_->removeUpstreamRequest(frame->frameFlags().streamId());
-              upstream_->cleanUp(false);
-            }
-          }
-        }));
-    ON_CALL(*this, onDecodingFailure(_)).WillByDefault(testing::Invoke([&](auto) {
+    });
+    ON_CALL(*this, onDecodingSuccess(_, _)).WillByDefault([&](ResponseHeaderFramePtr frame, auto) {
+      if (upstream_ != nullptr) {
+        if (frame->frameFlags().endStream()) {
+          upstream_->removeUpstreamRequest(frame->frameFlags().streamId());
+          upstream_->cleanUp(false);
+        }
+      }
+    });
+    ON_CALL(*this, onDecodingSuccess(_)).WillByDefault([&](ResponseCommonFramePtr frame) {
+      if (upstream_ != nullptr) {
+        if (frame->frameFlags().endStream()) {
+          upstream_->removeUpstreamRequest(frame->frameFlags().streamId());
+          upstream_->cleanUp(false);
+        }
+      }
+    });
+    ON_CALL(*this, onDecodingFailure(_)).WillByDefault([&](auto) {
       if (upstream_ != nullptr) {
         upstream_->removeUpstreamRequest(1);
         upstream_->cleanUp(true);
       }
-    }));
+    });
   }
 
   MOCK_METHOD(void, onUpstreamFailure,
@@ -109,8 +107,7 @@ public:
         .WillByDefault(Return(ByMove(std::move(mock_client_codec_))));
 
     ON_CALL(*mock_client_codec_raw_, setCodecCallbacks(_))
-        .WillByDefault(testing::Invoke(
-            [&](ClientCodecCallbacks& callbacks) { cocec_callbacks_ = &callbacks; }));
+        .WillByDefault([&](ClientCodecCallbacks& callbacks) { cocec_callbacks_ = &callbacks; });
   }
 
   std::shared_ptr<BoundGenericUpstream> createBoundGenericUpstream(size_t connection_id = 1) {
@@ -297,9 +294,9 @@ TEST_F(UpstreamTest, BoundGenericUpstreamRepeatedRequestsThatAreWaitingResponse)
   EXPECT_CALL(mock_upstream_request_callbacks_2, onUpstreamSuccess());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -388,9 +385,9 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccess) {
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -405,17 +402,16 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccess) {
   auto unknown_response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   unknown_response->stream_frame_flags_ = FrameFlags(3);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        // Will be ignored.
-        cocec_callbacks_->onDecodingSuccess(std::move(unknown_response), {});
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    // Will be ignored.
+    cocec_callbacks_->onDecodingSuccess(std::move(unknown_response), {});
 
-        EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingSuccess(_, _));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_2), {});
+    EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingSuccess(_, _));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_2), {});
 
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
-      }));
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
+  });
 
   Buffer::OwnedImpl fake_buffer;
   fake_buffer.add("fake data");
@@ -448,9 +444,9 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccessWithMultipleFrames) {
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -465,17 +461,16 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccessWithMultipleFrames) {
   auto unknown_response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   unknown_response->stream_frame_flags_ = FrameFlags(3);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        // Will be ignored.
-        cocec_callbacks_->onDecodingSuccess(std::move(unknown_response), {});
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    // Will be ignored.
+    cocec_callbacks_->onDecodingSuccess(std::move(unknown_response), {});
 
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
 
-        EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingSuccess(_, _));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_2), {});
-      }));
+    EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingSuccess(_, _));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_2), {});
+  });
 
   Buffer::OwnedImpl fake_buffer;
   fake_buffer.add("fake data");
@@ -493,19 +488,18 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingSuccessWithMultipleFrames) {
   auto unknown_response_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   unknown_response_frame->stream_frame_flags_ = FrameFlags(3);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        // Will be ignored.
-        cocec_callbacks_->onDecodingSuccess(std::move(unknown_response_frame));
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    // Will be ignored.
+    cocec_callbacks_->onDecodingSuccess(std::move(unknown_response_frame));
 
-        EXPECT_CALL(mock_upstream_connection_, close(_)).Times(0);
-        EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingSuccess(_));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_2_frame));
+    EXPECT_CALL(mock_upstream_connection_, close(_)).Times(0);
+    EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingSuccess(_));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_2_frame));
 
-        EXPECT_CALL(mock_upstream_connection_, close(_)).Times(0);
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_1_frame));
-      }));
+    EXPECT_CALL(mock_upstream_connection_, close(_)).Times(0);
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_1_frame));
+  });
 
   generic_upstream->onUpstreamData(fake_buffer, false);
 
@@ -533,9 +527,9 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailureAndNoUpstreamConnectionC
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -547,16 +541,15 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailureAndNoUpstreamConnectionC
   auto response_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response_2->stream_frame_flags_ = FrameFlags(2);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        // Upstream is not set into the mock upstream request callbacks. So the
-        // onDecodingFailure() will not clean up the upstream and will not result
-        // in the upstream connection close.
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_));
-        EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingFailure(_));
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    // Upstream is not set into the mock upstream request callbacks. So the
+    // onDecodingFailure() will not clean up the upstream and will not result
+    // in the upstream connection close.
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_));
+    EXPECT_CALL(mock_upstream_request_callbacks_2, onDecodingFailure(_));
 
-        cocec_callbacks_->onDecodingFailure("test");
-      }));
+    cocec_callbacks_->onDecodingFailure("test");
+  });
 
   Buffer::OwnedImpl fake_buffer;
   fake_buffer.add("fake data");
@@ -586,9 +579,9 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailure) {
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -600,59 +593,54 @@ TEST_F(UpstreamTest, BoundGenericUpstreamDecodingFailure) {
   auto response_2 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response_2->stream_frame_flags_ = FrameFlags(2);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        EXPECT_EQ(cocec_callbacks_->connection().ptr(), &mock_upstream_connection_);
-        EXPECT_EQ(cocec_callbacks_->upstreamCluster().ptr(),
-                  &thread_local_cluster_.tcp_conn_pool_.host_->cluster_);
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    EXPECT_EQ(cocec_callbacks_->connection().ptr(), &mock_upstream_connection_);
+    EXPECT_EQ(cocec_callbacks_->upstreamCluster().ptr(),
+              &thread_local_cluster_.tcp_conn_pool_.host_->cluster_);
 
-        std::vector<uint32_t> called_decoding_failure;
-        std::vector<uint32_t> called_connection_close;
+    std::vector<uint32_t> called_decoding_failure;
+    std::vector<uint32_t> called_connection_close;
 
-        EXPECT_CALL(mock_upstream_connection_, close(_));
+    EXPECT_CALL(mock_upstream_connection_, close(_));
 
-        ON_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_))
-            .WillByDefault(testing::Invoke([&](auto) {
-              called_decoding_failure.push_back(1);
-              generic_upstream->removeUpstreamRequest(1);
-              generic_upstream->cleanUp(true);
-            }));
-        ON_CALL(mock_upstream_request_callbacks_1, onConnectionClose(_))
-            .WillByDefault(testing::Invoke([&](auto) {
-              called_connection_close.push_back(1);
-              generic_upstream->removeUpstreamRequest(1);
-              // The onConnectionClose() is called when the upstream connection is closed.
-              // When the upstream connection is closed because the onDecodingFailure(),
-              // the upstream was already cleaned up. So, the cleanUp() here do anything.
-              generic_upstream->cleanUp(true);
-            }));
-        ON_CALL(mock_upstream_request_callbacks_2, onDecodingFailure(_))
-            .WillByDefault(testing::Invoke([&](auto) {
-              called_decoding_failure.push_back(2);
-              generic_upstream->removeUpstreamRequest(2);
-              generic_upstream->cleanUp(true);
-            }));
-        ON_CALL(mock_upstream_request_callbacks_2, onConnectionClose(_))
-            .WillByDefault(testing::Invoke([&](auto) {
-              called_connection_close.push_back(2);
-              generic_upstream->removeUpstreamRequest(2);
-              // The onConnectionClose() is called when the upstream connection is closed.
-              // When the upstream connection is closed because the onDecodingFailure(),
-              // the upstream was already cleaned up. So, the cleanUp() here do anything.
-              generic_upstream->cleanUp(true);
-            }));
-        EXPECT_CALL(mock_downstream_connection_1_, close(_));
+    ON_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_)).WillByDefault([&](auto) {
+      called_decoding_failure.push_back(1);
+      generic_upstream->removeUpstreamRequest(1);
+      generic_upstream->cleanUp(true);
+    });
+    ON_CALL(mock_upstream_request_callbacks_1, onConnectionClose(_)).WillByDefault([&](auto) {
+      called_connection_close.push_back(1);
+      generic_upstream->removeUpstreamRequest(1);
+      // The onConnectionClose() is called when the upstream connection is closed.
+      // When the upstream connection is closed because the onDecodingFailure(),
+      // the upstream was already cleaned up. So, the cleanUp() here do anything.
+      generic_upstream->cleanUp(true);
+    });
+    ON_CALL(mock_upstream_request_callbacks_2, onDecodingFailure(_)).WillByDefault([&](auto) {
+      called_decoding_failure.push_back(2);
+      generic_upstream->removeUpstreamRequest(2);
+      generic_upstream->cleanUp(true);
+    });
+    ON_CALL(mock_upstream_request_callbacks_2, onConnectionClose(_)).WillByDefault([&](auto) {
+      called_connection_close.push_back(2);
+      generic_upstream->removeUpstreamRequest(2);
+      // The onConnectionClose() is called when the upstream connection is closed.
+      // When the upstream connection is closed because the onDecodingFailure(),
+      // the upstream was already cleaned up. So, the cleanUp() here do anything.
+      generic_upstream->cleanUp(true);
+    });
+    EXPECT_CALL(mock_downstream_connection_1_, close(_));
 
-        cocec_callbacks_->onDecodingFailure("test");
+    cocec_callbacks_->onDecodingFailure("test");
 
-        EXPECT_EQ(1, called_decoding_failure.size());
-        EXPECT_EQ(1, called_connection_close.size());
+    EXPECT_EQ(1, called_decoding_failure.size());
+    EXPECT_EQ(1, called_connection_close.size());
 
-        // One of callbacks' onDecodingFailure() will be called first. And the other one's
-        // onConnectionClose() will be called then.
-        EXPECT_TRUE((called_decoding_failure[0] == 1 && called_connection_close[0] == 2) ||
-                    (called_decoding_failure[0] == 2 && called_connection_close[0] == 1));
-      }));
+    // One of callbacks' onDecodingFailure() will be called first. And the other one's
+    // onConnectionClose() will be called then.
+    EXPECT_TRUE((called_decoding_failure[0] == 1 && called_connection_close[0] == 2) ||
+                (called_decoding_failure[0] == 2 && called_connection_close[0] == 1));
+  });
 
   Buffer::OwnedImpl fake_buffer;
   fake_buffer.add("fake data");
@@ -685,9 +673,9 @@ TEST_F(UpstreamTest, BoundGenericUpstreamUpstreamConnectionClose) {
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -783,9 +771,9 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccess) {
   EXPECT_EQ(1, generic_upstream->waitingUpstreamRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -794,11 +782,10 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccess) {
   auto response_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response_1->stream_frame_flags_ = FrameFlags(1);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
-      }));
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
+  });
 
   Buffer::OwnedImpl fake_buffer;
   // Empty buffer will be ignored.
@@ -825,9 +812,9 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccessWithMultipleFrames) {
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
@@ -836,11 +823,10 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccessWithMultipleFrames) {
   auto response_1 = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response_1->stream_frame_flags_ = FrameFlags(1, FrameFlags::FLAG_EMPTY);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
-      }));
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_, _));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_1), {});
+  });
 
   Buffer::OwnedImpl fake_buffer;
   // Empty buffer will be ignored.
@@ -854,12 +840,11 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingSuccessWithMultipleFrames) {
   auto response_1_frame = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
   response_1_frame->stream_frame_flags_ = FrameFlags(1);
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        EXPECT_CALL(mock_upstream_connection_, close(_)).Times(0);
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_));
-        cocec_callbacks_->onDecodingSuccess(std::move(response_1_frame));
-      }));
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    EXPECT_CALL(mock_upstream_connection_, close(_)).Times(0);
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingSuccess(_));
+    cocec_callbacks_->onDecodingSuccess(std::move(response_1_frame));
+  });
 
   generic_upstream->onUpstreamData(fake_buffer, false);
 
@@ -882,21 +867,20 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamDecodingFailure) {
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());
   EXPECT_EQ(1, generic_upstream->waitingResponseRequestsSize());
 
-  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _))
-      .WillOnce(testing::Invoke([&](Buffer::Instance&, bool) {
-        EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_));
-        EXPECT_CALL(mock_upstream_connection_, close(_));
+  EXPECT_CALL(*mock_client_codec_raw_, decode(_, _)).WillOnce([&](Buffer::Instance&, bool) {
+    EXPECT_CALL(mock_upstream_request_callbacks_1, onDecodingFailure(_));
+    EXPECT_CALL(mock_upstream_connection_, close(_));
 
-        cocec_callbacks_->onDecodingFailure("test");
-      }));
+    cocec_callbacks_->onDecodingFailure("test");
+  });
 
   Buffer::OwnedImpl fake_buffer;
   fake_buffer.add("fake data");
@@ -921,9 +905,9 @@ TEST_F(UpstreamTest, OwnedGenericUpstreamUpstreamConnectionClose) {
   EXPECT_EQ(0, generic_upstream->waitingResponseRequestsSize());
 
   EXPECT_CALL(*thread_local_cluster_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
-      .WillOnce(testing::Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
+      .WillOnce([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) {
         mock_upstream_connection_.addConnectionCallbacks(cb);
-      }));
+      });
   thread_local_cluster_.tcp_conn_pool_.poolReady(mock_upstream_connection_);
 
   EXPECT_EQ(0, generic_upstream->waitingUpstreamRequestsSize());

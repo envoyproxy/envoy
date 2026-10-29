@@ -26,6 +26,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "include/proxy-wasm/bytecode_util.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
@@ -83,6 +84,37 @@ public:
     scope_ = stats_store_.createScope("wasm.");
   }
 
+  void loadTestModule(absl::string_view module, std::optional<bool> allow_precompiled) {
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    auto* vm_config = plugin_config.mutable_vm_config();
+    vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    vm_config->mutable_configuration()->set_value("source-canary");
+    if (allow_precompiled.has_value()) {
+      vm_config->set_allow_precompiled(*allow_precompiled);
+    }
+    const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+        absl::StrCat("{{ test_rundir }}/test/extensions/common/wasm/test_data/", module)));
+    ASSERT_FALSE(code.empty());
+    auto plugin = std::make_shared<Plugin>(plugin_config, local_info_);
+    auto wasm = std::make_shared<Wasm>(plugin->wasmConfig(), "", scope_, *api_, cluster_manager_,
+                                       *dispatcher_);
+    if (allow_precompiled.value_or(false)) {
+      std::string_view precompiled;
+      ASSERT_TRUE(proxy_wasm::BytecodeUtil::getCustomSection(
+          code, wasm->wasm_vm()->getPrecompiledSectionName(), precompiled));
+      ASSERT_FALSE(precompiled.empty());
+      // V8::load exclusively deserializes when given a nonempty precompiled section;
+      // it returns false on rejection rather than falling back to compiling the source.
+      // Verified against proxy-wasm-cpp-host 0.0.0-260704-f2db56a.envoy.1 (upstream f2db56a).
+      // If the host reintroduces a source-compilation fallback, this test will false-pass
+      // and must be revisited.
+    }
+    ASSERT_TRUE(wasm->load(code, vm_config->allow_precompiled()));
+    ASSERT_TRUE(wasm->initialize());
+    EXPECT_LOG_CONTAINS("info", "on_vm_start source-canary",
+                        ASSERT_NE(wasm->start(plugin), nullptr));
+  }
+
   Upstream::MockClusterManager cluster_manager_;
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
@@ -93,9 +125,82 @@ public:
   RemoteAsyncDataProviderPtr remote_data_provider_;
 };
 
+// Intentionally retain the full matrix: this is the primary cross-runtime coverage after
+// other suites were trimmed to the first sandbox runtime.
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmCommonTest,
                          Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
                          Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
+
+TEST_P(WasmCommonTest, LoadFromSourceWithoutPrecompiled) {
+  if (std::get<0>(GetParam()) == "null") {
+    GTEST_SKIP() << "Requires a sandbox runtime";
+  }
+  loadTestModule("test_cpp_source.wasm", std::nullopt);
+}
+
+TEST_P(WasmCommonTest, PrecompiledSectionStrippedWhenNotAllowed) {
+  if (std::get<0>(GetParam()) == "null") {
+    GTEST_SKIP() << "Requires a sandbox runtime";
+  }
+  if (std::get<0>(GetParam()) != "v8") {
+    loadTestModule("test_cpp.wasm", false);
+    return;
+  }
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto* vm_config = plugin_config.mutable_vm_config();
+  vm_config->set_runtime("envoy.wasm.runtime.v8");
+  vm_config->mutable_configuration()->set_value("source-canary");
+  std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
+  ASSERT_FALSE(code.empty());
+  auto plugin = std::make_shared<Plugin>(plugin_config, local_info_);
+  auto make_wasm = [&] {
+    return std::make_shared<Wasm>(plugin->wasmConfig(), "", scope_, *api_, cluster_manager_,
+                                  *dispatcher_);
+  };
+  auto wasm = make_wasm();
+  std::string_view precompiled;
+  ASSERT_TRUE(proxy_wasm::BytecodeUtil::getCustomSection(
+      code, wasm->wasm_vm()->getPrecompiledSectionName(), precompiled));
+  ASSERT_FALSE(precompiled.empty());
+
+  // proxy-wasm-cpp-host 0.0.0-260704-f2db56a.envoy.1 passes this payload to V8 14.6.202.10's
+  // wasm::Module::deserialize (src/wasm/c-api.cc): [LEB128 wire size][wire bytes][native module].
+  // Preserve the size (trusted before allocation) and wire bytes; flip only the native magic.
+  // HeaderMatches in src/wasm/wasm-serialization.cc rejects it before decoding the wire bytes
+  // or reading native-code sizes, even if the module is already cached.
+  uint64_t wire_size = 0;
+  size_t prefix_size = 0;
+  for (uint32_t shift = 0;; shift += 7) {
+    ASSERT_LT(prefix_size, precompiled.size());
+    ASSERT_LT(shift, 64);
+    const auto byte = static_cast<uint8_t>(precompiled[prefix_size++]);
+    ASSERT_TRUE(shift != 63 || byte <= 1);
+    wire_size |= static_cast<uint64_t>(byte & 0x7f) << shift;
+    if ((byte & 0x80) == 0) {
+      break;
+    }
+  }
+  ASSERT_LT(wire_size, precompiled.size() - prefix_size);
+  ASSERT_GE(precompiled.size() - prefix_size - wire_size, sizeof(uint32_t));
+  const size_t native_offset = precompiled.data() - code.data() + prefix_size + wire_size;
+  code[native_offset] ^= 1;
+
+  ASSERT_TRUE(wasm->load(code, /*allow_precompiled=*/false));
+  ASSERT_TRUE(wasm->initialize());
+  EXPECT_LOG_CONTAINS("info", "on_vm_start source-canary", ASSERT_NE(wasm->start(plugin), nullptr));
+
+  auto wasm_precompiled = make_wasm();
+  EXPECT_FALSE(wasm_precompiled->load(code, /*allow_precompiled=*/true));
+}
+
+TEST_P(WasmCommonTest, PrecompiledModuleIsUsedWhenAllowed) {
+  if (std::get<0>(GetParam()) != "v8") {
+    GTEST_SKIP() << "Requires V8 precompiled modules";
+  }
+  loadTestModule("test_cpp.wasm", true);
+}
 
 TEST_P(WasmCommonTest, WasmFailState) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
@@ -187,7 +292,7 @@ TEST_P(WasmCommonTest, Logging) {
   EXPECT_EQ(std::unique_ptr<ContextBase>(wasm->createContext(plugin)), nullptr);
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm);
   auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
-  EXPECT_TRUE(wasm_weak.lock()->load(code, false));
+  EXPECT_TRUE(wasm_weak.lock()->load(code, true));
   EXPECT_TRUE(wasm_weak.lock()->initialize());
   auto thread_local_wasm = std::make_shared<Wasm>(wasm_handle, *dispatcher_);
   thread_local_wasm.reset();
@@ -241,6 +346,7 @@ TEST_P(WasmCommonTest, BadSignature) {
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
+  // Deliberately load the non-precompiled bad-signature module from source.
   EXPECT_TRUE(wasm->load(code, false));
   EXPECT_FALSE(wasm->initialize());
   EXPECT_TRUE(wasm->isFailed());
@@ -268,7 +374,7 @@ TEST_P(WasmCommonTest, Segv) {
   auto vm_key = proxy_wasm::makeVmKey("", vm_configuration, code);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   TestContext* root_context = nullptr;
   wasm->setCreateContextForTesting(
@@ -312,7 +418,7 @@ TEST_P(WasmCommonTest, DivByZero) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -349,7 +455,7 @@ TEST_P(WasmCommonTest, IntrinsicGlobals) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -383,7 +489,7 @@ TEST_P(WasmCommonTest, Utilities) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -445,7 +551,7 @@ TEST_P(WasmCommonTest, Stats) {
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
 
   EXPECT_NE(wasm, nullptr);
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -527,7 +633,7 @@ TEST_P(WasmCommonTest, MemorySizeGauge) {
   ASSERT_NE(nullptr, gauge);
   EXPECT_EQ(0, gauge->value());
 
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->updateMemoryStats();
   if (std::get<0>(GetParam()) == "null") {
@@ -542,7 +648,7 @@ TEST_P(WasmCommonTest, MemorySizeGauge) {
   // A second VM of the same runtime adds its own share.
   auto wasm2 = std::make_unique<Extensions::Common::Wasm::Wasm>(
       plugin->wasmConfig(), vm_key, scope_, *api_, cluster_manager_, *dispatcher_);
-  EXPECT_TRUE(wasm2->load(code, false));
+  EXPECT_TRUE(wasm2->load(code, true));
   EXPECT_TRUE(wasm2->initialize());
   wasm2->updateMemoryStats();
   const uint64_t size2 = wasm2->wasm_vm()->getMemorySize();
@@ -570,6 +676,7 @@ TEST_P(WasmCommonTest, MemorySizeGaugeThreadLocalPlugin) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(runtime);
+  vm_config->set_allow_precompiled(true);
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
@@ -635,7 +742,7 @@ TEST_P(WasmCommonTest, Foreign) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -673,7 +780,7 @@ TEST_P(WasmCommonTest, OnForeign) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   TestContext* test_context = nullptr;
   wasm->setCreateContextForTesting(
@@ -714,7 +821,7 @@ TEST_P(WasmCommonTest, WASI) {
     code = "CommonWasmTestCpp";
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr, [](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) -> ContextBase* {
@@ -739,6 +846,7 @@ TEST_P(WasmCommonTest, VmCache) {
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  vm_config->set_allow_precompiled(true);
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
@@ -813,6 +921,7 @@ TEST_P(WasmCommonTest, VmCacheEnvVarChange) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   auto* vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  vm_config->set_allow_precompiled(true);
   const std::string code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/common/wasm/test_data/test_cpp.wasm"));
   EXPECT_FALSE(code.empty());
@@ -853,6 +962,8 @@ TEST_P(WasmCommonTest, VmCacheVmConfigChange) {
   EXPECT_FALSE(code.empty());
 
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  // Keep the base source-loaded so the allow_precompiled variant below proves the flag does not
+  // split the VM cache.
   auto* base_vm_config = plugin_config.mutable_vm_config();
   base_vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   base_vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
@@ -890,6 +1001,7 @@ TEST_P(WasmCommonTest, VmCacheVmConfigChange) {
   // would have returned `base_handle` itself.
   {
     auto config = plugin_config;
+    config.mutable_vm_config()->set_allow_precompiled(true);
     config.mutable_vm_config()
         ->mutable_capability_restriction_config()
         ->mutable_allowed_capabilities()
@@ -916,6 +1028,7 @@ TEST_P(WasmCommonTest, DEPRECATED_FEATURE_TEST(VmCacheDeprecatedCapabilityRestri
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   auto* base_vm_config = plugin_config.mutable_vm_config();
   base_vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  base_vm_config->set_allow_precompiled(true);
   base_vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);
 
   auto create = [&](const envoy::extensions::wasm::v3::PluginConfig& config) {
@@ -964,6 +1077,7 @@ TEST_P(WasmCommonTest, RemoteCode) {
 
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    vm_config->set_allow_precompiled(true);
     Protobuf::BytesValue vm_configuration_bytes;
     vm_configuration_bytes.set_value(vm_configuration);
     std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
@@ -988,21 +1102,19 @@ TEST_P(WasmCommonTest, RemoteCode) {
   EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
       .WillOnce(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(code);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(code);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   Init::TargetHandlePtr init_target_handle;
-  EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
+  EXPECT_CALL(init_manager, add(_)).WillOnce([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
-  }));
+  });
   createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
              lifecycle_notifier_, remote_data_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
@@ -1065,6 +1177,7 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
 
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  vm_config->set_allow_precompiled(true);
   Protobuf::StringValue vm_configuration_string;
   vm_configuration_string.set_value(vm_configuration);
   std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
@@ -1093,10 +1206,10 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
   EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
       .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(Invoke([&, retry = num_retries](
-                                 Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                                 const Http::AsyncClient::RequestOptions&) mutable
-                                 -> Http::AsyncClient::Request* {
+      .WillRepeatedly([&, retry = num_retries](Http::RequestMessagePtr&,
+                                               Http::AsyncClient::Callbacks& callbacks,
+                                               const Http::AsyncClient::RequestOptions&) mutable
+                          -> Http::AsyncClient::Request* {
         if (retry-- == 0) {
           Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
               Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
@@ -1109,12 +1222,12 @@ TEST_P(WasmCommonTest, RemoteCodeMultipleRetry) {
           callbacks.onSuccess(request, std::move(response));
           return nullptr;
         }
-      }));
+      });
 
   Init::TargetHandlePtr init_target_handle;
-  EXPECT_CALL(init_manager, add(_)).WillOnce(Invoke([&](const Init::Target& target) {
+  EXPECT_CALL(init_manager, add(_)).WillOnce([&](const Init::Target& target) {
     init_target_handle = target.createHandle("test");
-  }));
+  });
   createWasm(plugin, scope_, cluster_manager, init_manager, *dispatcher_, *api_,
              lifecycle_notifier_, remote_data_provider_,
              [&wasm_handle](const WasmHandleSharedPtr& w) { wasm_handle = w; });
@@ -1174,6 +1287,7 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
   envoy::extensions::wasm::v3::PluginConfig plugin_config;
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+  vm_config->set_allow_precompiled(true);
   Protobuf::BytesValue vm_configuration_bytes;
   vm_configuration_bytes.set_value("vm_cache");
   std::ignore = vm_config->mutable_configuration()->PackFrom(vm_configuration_bytes);
@@ -1205,24 +1319,22 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressRace) {
   EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
       .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const bool success = http_fetch_count++ == 0;
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", success ? "200" : "503"}}}));
-            if (success) {
-              response->body().add(code);
-            }
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillRepeatedly([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const bool success = http_fetch_count++ == 0;
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
+            new Http::TestResponseHeaderMapImpl{{":status", success ? "200" : "503"}}}));
+        if (success) {
+          response->body().add(code);
+        }
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   std::vector<Init::TargetHandlePtr> init_target_handles;
-  EXPECT_CALL(init_manager, add(_)).Times(2).WillRepeatedly(Invoke([&](const Init::Target& target) {
+  EXPECT_CALL(init_manager, add(_)).Times(2).WillRepeatedly([&](const Init::Target& target) {
     init_target_handles.push_back(target.createHandle("test"));
-  }));
+  });
 
   // First createWasm: cache miss, the fetch is deferred until init.
   WasmHandleSharedPtr first_handle;
@@ -1280,6 +1392,7 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressNackOnCacheMiss) {
   auto vm_config = plugin_config.mutable_vm_config();
   vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
   vm_config->set_nack_on_code_cache_miss(true);
+  // allow_precompiled is irrelevant because this test never loads a module.
   // A sha256 not used by any other test so that the static code cache starts empty.
   vm_config->mutable_code()->mutable_remote()->set_sha256(std::string(64, 'a'));
   vm_config->mutable_code()->mutable_remote()->mutable_http_uri()->set_uri(
@@ -1297,12 +1410,11 @@ TEST_P(WasmCommonTest, RemoteCodeInProgressNackOnCacheMiss) {
   EXPECT_CALL(cluster_manager.thread_local_cluster_, httpAsyncClient())
       .WillRepeatedly(ReturnRef(cluster_manager.thread_local_cluster_.async_client_));
   EXPECT_CALL(cluster_manager.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            fetch_callbacks = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        fetch_callbacks = &callbacks;
+        return &request;
+      });
 
   int cb_count = 0;
   auto cb = [&cb_count](const WasmHandleSharedPtr& w) {
@@ -1358,7 +1470,7 @@ TEST_P(WasmCommonTest, RestrictCapabilities) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // expect no call because proxy_on_vm_start is restricted
@@ -1403,7 +1515,7 @@ TEST_P(WasmCommonTest, AllowOnVmStart) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // proxy_on_vm_start will trigger proxy_log and fd_write, but expect no call because both are
@@ -1454,7 +1566,7 @@ TEST_P(WasmCommonTest, AllowLog) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // Expect proxy_log since allowed, but no call to WASI since restricted
@@ -1500,7 +1612,7 @@ TEST_P(WasmCommonTest, AllowWASI) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   wasm->setCreateContextForTesting(
@@ -1547,7 +1659,7 @@ TEST_P(WasmCommonTest, AllowOnContextCreate) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   // Expect two calls to proxy_log, from proxy_on_vm_start and from proxy_on_context_create
@@ -1594,7 +1706,7 @@ TEST_P(WasmCommonTest, ThreadLocalCopyRetainsEnforcement) {
 
   EXPECT_NE(wasm, nullptr);
   auto context = std::make_unique<TestContext>(wasm.get());
-  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->load(code, true));
   EXPECT_TRUE(wasm->initialize());
 
   auto wasm_handle = std::make_shared<Extensions::Common::Wasm::WasmHandle>(std::move(wasm));
@@ -1816,12 +1928,12 @@ public:
   void setupContext() {
     WasmCommonContextTest::setupContext();
     ON_CALL(filter_factory_, createFilterChain(_))
-        .WillByDefault(Invoke([this](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        .WillByDefault([this](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
           auto factory = createWasmFilter();
           callbacks.setFilterConfigName("");
           factory(callbacks);
           return true;
-        }));
+        });
     ON_CALL(filter_manager_callbacks_, requestHeaders())
         .WillByDefault(Return(makeOptRef(*request_headers_)));
     filter_manager_->createDownstreamFilterChain();
@@ -1967,6 +2079,7 @@ root_id: "panic during request processing"
 failure_policy: FAIL_RELOAD
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"
@@ -2086,6 +2199,7 @@ root_id: "panic during request processing"
 failure_policy: FAIL_CLOSED
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"
@@ -2164,6 +2278,7 @@ name: "{}_test_wasm_reload"
 root_id: "panic during request processing"
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"
@@ -2243,6 +2358,7 @@ root_id: "panic during request processing"
 failure_policy: FAIL_OPEN
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"
@@ -2312,6 +2428,7 @@ name: "{}"
 root_id: "panic during request processing"
 vm_config:
   runtime: "envoy.wasm.runtime.{}"
+  allow_precompiled: true
   configuration:
       "@type": "type.googleapis.com/google.protobuf.StringValue"
       value: "some configuration"

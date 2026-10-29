@@ -30,7 +30,6 @@ namespace {
 
 using ::testing::_;
 using ::testing::Contains;
-using ::testing::Invoke;
 using ::testing::IsSupersetOf;
 using ::testing::Key;
 using ::testing::NiceMock;
@@ -314,19 +313,19 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _))
-        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
+        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, Protobuf::Struct>("envoy.filters.http.rbac", obj));
-        }));
+        });
 
     ON_CALL(req_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
+        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
-        }));
+        });
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;

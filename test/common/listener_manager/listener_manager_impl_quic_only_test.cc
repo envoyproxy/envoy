@@ -144,6 +144,10 @@ filter_chain_matcher:
   }
 
   envoy::config::listener::v3::Listener listener_proto = parseListenerFromV3Yaml(yaml);
+  listener_proto.mutable_udp_listener_config()
+      ->mutable_downstream_socket_config()
+      ->mutable_prefer_gro()
+      ->set_value(true);
   ON_CALL(udp_gso_syscall_, supportsUdpGso())
       .WillByDefault(Return(os_sys_calls_actual_.supportsUdpGso()));
   EXPECT_CALL(server_.api_.random_, uuid());
@@ -223,8 +227,8 @@ filter_chain_matcher:
   // Stop listening shouldn't close the socket.
   EXPECT_CALL(server_.dispatcher_, post(_)).WillOnce([](Event::PostCb callback) { callback(); });
   EXPECT_CALL(*worker_, stopListener(_, _, _))
-      .WillOnce(Invoke([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
-                          std::function<void()> completion) { completion(); }));
+      .WillOnce([](Network::ListenerConfig&, const Network::ExtraShutdownListenerOptions&,
+                   std::function<void()> completion) { completion(); });
   manager_->stopListeners(ListenerManager::StopListenersType::All, {});
   EXPECT_CALL(*listener_factory_.socket_, close()).Times(0u);
   EXPECT_TRUE(listener_factory_.socket_->socket_is_open_);
@@ -265,7 +269,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
@@ -337,7 +341,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicPacketWriterFactoryFromConfig) {
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
@@ -438,7 +442,7 @@ udp_listener_config:
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
@@ -500,7 +504,7 @@ listener_filters:
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
                      /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
+                     /* expected_value */ 0,
                      /* expected_num_calls */ 1);
   }
 #endif
@@ -940,9 +944,9 @@ TEST_P(ListenerManagerImplQuicOnlyTest, CidGeneratorRegistersInitTarget) {
   Init::ExpectableTargetImpl child_target("child-target");
 
   EXPECT_CALL(cid_config_factory, createQuicConnectionIdGeneratorFactory(_, _, _))
-      .WillOnce(Invoke([&](const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
-                           Configuration::FactoryContext& context)
-                           -> Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr {
+      .WillOnce([&](const Protobuf::Message&, ProtobufMessage::ValidationVisitor&,
+                    Configuration::FactoryContext& context)
+                    -> Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr {
         EXPECT_EQ(Init::Manager::State::Uninitialized, context.initManager().state());
         context.initManager().add(child_target);
         auto generator_factory =
@@ -950,7 +954,7 @@ TEST_P(ListenerManagerImplQuicOnlyTest, CidGeneratorRegistersInitTarget) {
         ON_CALL(*generator_factory, getCompatibleConnectionIdWorkerSelector(_))
             .WillByDefault(Return([](const Buffer::Instance&, uint32_t) { return 0u; }));
         return generator_factory;
-      }));
+      });
 
   // Mimic LDS delivering the listener while the server init manager is initializing.
   Init::TargetImpl lds_target("lds", [&]() {
@@ -981,10 +985,10 @@ public:
     server_.options_.concurrency_ = concurrency_;
     EXPECT_CALL(worker_factory_, createWorker_())
         .Times(concurrency_ - 1)
-        .WillRepeatedly(Invoke([this]() -> Worker* {
+        .WillRepeatedly([this]() -> Worker* {
           extra_workers_.push_back(new NiceMock<MockWorker>());
           return extra_workers_.back();
-        }));
+        });
   }
 
   void callAddCompletionOnWorkers() {
@@ -1027,10 +1031,10 @@ public:
       bpf_option = worker_routing_status;
     }
     EXPECT_CALL(cid_config_factory_, createQuicConnectionIdGeneratorFactory)
-        .WillOnce(Invoke([bpf_option, init_target](const Protobuf::Message&,
-                                                   ProtobufMessage::ValidationVisitor&,
-                                                   Configuration::FactoryContext& context)
-                             -> Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr {
+        .WillOnce([bpf_option, init_target](const Protobuf::Message&,
+                                            ProtobufMessage::ValidationVisitor&,
+                                            Configuration::FactoryContext& context)
+                      -> Quic::EnvoyQuicConnectionIdGeneratorFactoryPtr {
           if (init_target != nullptr) {
             context.initManager().add(*init_target);
           }
@@ -1039,7 +1043,7 @@ public:
           EXPECT_CALL(*generator_factory, createCompatibleLinuxBpfSocketOption(concurrency_))
               .WillOnce(Return(bpf_option));
           return generator_factory;
-        }));
+        });
   }
 
   void expectCreateUdpListenSocket() {

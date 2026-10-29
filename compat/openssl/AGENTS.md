@@ -3,7 +3,28 @@
 Instructions for AI agents adapting the OpenSSL compatibility layer when new BoringSSL
 symbols are needed (typically after bumping gRPC, BoringSSL, or other deps).
 
-See `README.md` in this directory for the full architectural background.
+See `README.md` in this directory for the full architectural background, `../../bazel/SSL.md` for
+the supported SSL builds, and the "SSL library variants" section of the root `AGENTS.md` for
+Envoy-side handling (`ENVOY_SSL_OPENSSL`, `//bazel:using_openssl`, skipped tests).
+
+## Building and reproducing CI failures
+
+OpenSSL builds use `--config=openssl` (see `.bazelrc`). It swaps `//bazel:ssl` and
+`//bazel:crypto` to this compat layer, defines `ENVOY_SSL_OPENSSL`, disables HTTP/3, and skips
+tests tagged `nofips` or `quiche`. In CI, the openssl check is allowed to fail. It runs
+`ci/do_ci.sh openssl.presubmit` on PRs (only tests affected by the change) and
+`ci/do_ci.sh openssl` post-submit (the full suite plus `//compat/openssl/test/...`).
+
+```bash
+bazel build --config=openssl //source/exe:envoy-static
+bazel test --config=openssl //compat/openssl/test/...
+bazel test --config=openssl //test/common/tls/...   # or the failing Envoy test targets
+```
+
+Before changing this layer, check where the failure comes from. Errors that only appear in Envoy
+code, like a test relying on BoringSSL-only behaviour, may be better handled there. Use
+`#ifdef ENVOY_SSL_OPENSSL`, or `select()` on `//bazel:using_openssl` in BUILD files. Prefer
+fixing this layer when the API exists in BoringSSL and can be mapped to OpenSSL.
 
 ## Architecture in brief
 

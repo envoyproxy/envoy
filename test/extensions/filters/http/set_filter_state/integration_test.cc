@@ -93,8 +93,7 @@ public:
         generic_context, route_proto_config.clear_route_cache());
 
     EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-        .WillOnce(testing::Invoke(
-            [&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+        .WillOnce([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
     auto filter = std::make_shared<SetFilterState>(filter_config);
     filter->setDecoderFilterCallbacks(decoder_callbacks_);
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(info_));

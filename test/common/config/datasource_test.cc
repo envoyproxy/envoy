@@ -53,14 +53,14 @@ protected:
 
   void initialize(AsyncClientSendFunc func, int num_retries = 1) {
     retry_timer_ = new Event::MockTimer();
-    EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    EXPECT_CALL(init_manager_, add(_)).WillOnce([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
+    });
 
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
-    }));
+    });
 
     EXPECT_CALL(*retry_timer_, disableTimer());
     if (!func) {
@@ -74,11 +74,11 @@ protected:
     if (num_retries == 1) {
       EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(AtLeast(1))
-          .WillRepeatedly(Invoke(func));
+          .WillRepeatedly(func);
     } else {
       EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(num_retries)
-          .WillRepeatedly(Invoke(func));
+          .WillRepeatedly(func);
     }
   }
 };

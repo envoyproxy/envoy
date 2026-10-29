@@ -255,18 +255,18 @@ protected:
         register_factory4_(factory4_), register_factory5_(factory5_),
         register_sf_factory1_(sf_factory1_), register_sf_factory2_(sf_factory2_),
         api_(Api::createApiForTest(stats_)) {
-    ON_CALL(dispatcher_, createTimer_(_)).WillByDefault(Invoke([&](Event::TimerCb cb) {
+    ON_CALL(dispatcher_, createTimer_(_)).WillByDefault([&](Event::TimerCb cb) {
       timer_cb_ = cb;
       return new NiceMock<Event::MockTimer>();
-    }));
+    });
   }
 
   void setDispatcherExpectation() {
     timer_ = new NiceMock<Event::MockTimer>();
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&](Event::TimerCb cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([&](Event::TimerCb cb) {
       timer_cb_ = cb;
       return timer_;
-    }));
+    });
   }
 
   envoy::config::overload::v3::OverloadManager parseConfig(const std::string& config) {
@@ -1393,16 +1393,16 @@ TEST_F(OverloadManagerImplTest, TwoNamedReduceTimeoutsActionsRouteAndScaleIndepe
       .WillOnce(Return(ByMove(Event::ScaledRangeTimerManagerPtr{mock_main_manager})));
   EXPECT_CALL(*manager, createScaledRangeTimerManager(_, NotNull()))
       .Times(2)
-      .WillRepeatedly(Invoke([mock_idle_manager, mock_max_manager](
-                                 Event::Dispatcher&,
-                                 const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) {
+      .WillRepeatedly([mock_idle_manager, mock_max_manager](
+                          Event::Dispatcher&,
+                          const Event::ScaledTimerTypeMapConstSharedPtr& timer_minimums) {
         if (timer_minimums->contains(Event::ScaledTimerType::HttpDownstreamIdleConnectionTimeout)) {
           return Event::ScaledRangeTimerManagerPtr{mock_idle_manager};
         }
         ASSERT(
             timer_minimums->contains(Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout));
         return Event::ScaledRangeTimerManagerPtr{mock_max_manager};
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> mock_dispatcher;
   auto scaled_timer_manager = manager->scaledTimerFactory()(mock_dispatcher);

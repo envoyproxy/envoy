@@ -31,6 +31,7 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
+        "//test/common/upstream:snapshot_host_set_lib",
         "//test/common/upstream:utility_lib",
         "//test/integration/load_balancers:custom_lb_policy",
         "//test/test_common:utility_lib",

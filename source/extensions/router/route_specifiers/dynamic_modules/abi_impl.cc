@@ -77,14 +77,26 @@ Envoy::Stats::StatNameTagVector buildTagsForRouteSpecifierMetric(
   return tags;
 }
 
+// Looks up a route metadata value by namespace and key, or nullptr if absent.
+const Protobuf::Value* routeMetadataValue(const envoy::config::core::v3::Metadata& metadata,
+                                          envoy_dynamic_module_type_module_buffer ns,
+                                          envoy_dynamic_module_type_module_buffer key) {
+  const auto filter_it = metadata.filter_metadata().find(toStringView(ns));
+  if (filter_it == metadata.filter_metadata().end()) {
+    return nullptr;
+  }
+  const auto& fields = filter_it->second.fields();
+  const auto field_it = fields.find(toStringView(key));
+  return field_it != fields.end() ? &field_it->second : nullptr;
+}
+
 // Returns a mutable handle to the route metadata value the module is setting, creating the
 // namespace and key when they are absent.
 Protobuf::Value& mutableRouteMetadataValue(RouteSpecifierContext& context,
                                            envoy_dynamic_module_type_module_buffer ns,
                                            envoy_dynamic_module_type_module_buffer key) {
   return Envoy::Config::Metadata::mutableMetadataValue(context.overrides.route_metadata,
-                                                       std::string(toStringView(ns)),
-                                                       std::string(toStringView(key)));
+                                                       toStringView(ns), toStringView(key));
 }
 
 bool knownAppendAction(envoy_dynamic_module_type_route_specifier_header_append_action action) {
@@ -94,6 +106,18 @@ bool knownAppendAction(envoy_dynamic_module_type_route_specifier_header_append_a
   case envoy_dynamic_module_type_route_specifier_header_append_action_OverwriteIfExistsOrAdd:
   case envoy_dynamic_module_type_route_specifier_header_append_action_OverwriteIfExists:
     return true;
+  }
+  return false;
+}
+
+bool knownRewriteSpan(envoy_dynamic_module_type_route_specifier_rewrite_span span) {
+  switch (span) {
+  case envoy_dynamic_module_type_route_specifier_rewrite_span_Literal:
+  case envoy_dynamic_module_type_route_specifier_rewrite_span_WholePath:
+    return true;
+  case envoy_dynamic_module_type_route_specifier_rewrite_span_Sentinel:
+    // Not a span a module passes, handled like any other value this build does not know.
+    break;
   }
   return false;
 }
@@ -212,6 +236,11 @@ void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
   setEnvoyBuffer(result, routeSpecifierConfig(config_envoy_ptr)->specifierInstanceId());
+}
+
+bool envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr) {
+  return routeSpecifierConfig(config_envoy_ptr)->hasBuiltRouteCache();
 }
 
 // ---------------------------------- Metrics ----------------------------------
@@ -598,12 +627,11 @@ bool envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata(
   if (previous == nullptr) {
     return false;
   }
-  const auto& value = Envoy::Config::Metadata::metadataValue(
-      &previous->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
-  if (value.kind_case() != Protobuf::Value::kStringValue) {
+  const Protobuf::Value* value = routeMetadataValue(previous->metadata(), ns, key);
+  if (value == nullptr || value->kind_case() != Protobuf::Value::kStringValue) {
     return false;
   }
-  setEnvoyBuffer(result, value.string_value());
+  setEnvoyBuffer(result, value->string_value());
   return true;
 }
 
@@ -701,12 +729,11 @@ bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata(
   if (route == nullptr) {
     return false;
   }
-  const auto& value = Envoy::Config::Metadata::metadataValue(
-      &route->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
-  if (value.kind_case() != Protobuf::Value::kStringValue) {
+  const Protobuf::Value* value = routeMetadataValue(route->metadata(), ns, key);
+  if (value == nullptr || value->kind_case() != Protobuf::Value::kStringValue) {
     return false;
   }
-  setEnvoyBuffer(result, value.string_value());
+  setEnvoyBuffer(result, value->string_value());
   return true;
 }
 
@@ -718,12 +745,11 @@ bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_numb
   if (route == nullptr) {
     return false;
   }
-  const auto& value = Envoy::Config::Metadata::metadataValue(
-      &route->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
-  if (value.kind_case() != Protobuf::Value::kNumberValue) {
+  const Protobuf::Value* value = routeMetadataValue(route->metadata(), ns, key);
+  if (value == nullptr || value->kind_case() != Protobuf::Value::kNumberValue) {
     return false;
   }
-  *result = value.number_value();
+  *result = value->number_value();
   return true;
 }
 
@@ -752,6 +778,7 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_template(
     return false;
   }
   context->selected_template = route_template;
+  context->built_route_lookup.reset();
   // Evaluate the template now so that the getters reflect the route being produced and the decision
   // reuses it rather than matching a second time. A null result means the match did not hold, which
   // resolve() turns into a template match failure.
@@ -770,7 +797,39 @@ bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
   }
   context->selected_template = nullptr;
   context->selected_route = nullptr;
+  context->built_route_lookup.reset();
   return true;
+}
+
+envoy_dynamic_module_type_route_specifier_built_route_lookup_result
+envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr, uint64_t key) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  context->built_route_lookup.reset();
+  ThreadLocal::TypedSlot<BuiltRouteCache>* slot = context->built_route_cache_slot;
+  OptRef<BuiltRouteCache> cache;
+  // A template that resolves its cluster per request builds a route specific to the request, and
+  // the cache of a worker is set after the configuration is loaded.
+  if (slot != nullptr && context->selected_route != nullptr &&
+      context->selected_template->cacheable && slot->currentThreadRegistered()) {
+    cache = slot->get();
+  }
+  if (!cache.has_value()) {
+    context->config.stats().built_route_cache_disabled_.inc();
+    return envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Disabled;
+  }
+  BuiltRouteLookup& lookup =
+      context->built_route_lookup.emplace(BuiltRouteLookup{cache.ptr(), key});
+  const CachedRoute* hit =
+      cache->lookup(key, context->selected_route.get(), context->headers.getPathValue());
+  if (hit == nullptr) {
+    return envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Miss;
+  }
+  lookup.hit = *hit;
+  lookup.verify = cache->sampleVerification();
+  return lookup.verify
+             ? envoy_dynamic_module_type_route_specifier_built_route_lookup_result_HitVerify
+             : envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Hit;
 }
 
 void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
@@ -867,9 +926,8 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_override(
                    toStringView(override_id));
     return false;
   }
-  // Only the selection is recorded here. The path rewrite and the metadata the override carries
-  // are applied when the decision resolves, so unset_route_override can revert the selection
-  // cleanly and the values the module records itself win whatever the call order.
+  // Only the selection is recorded here, so unset_route_override can revert it cleanly and the
+  // values the module records itself win whatever the call order.
   context->overrides.route_override = entry;
   return true;
 }
@@ -891,6 +949,8 @@ bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
     envoy_dynamic_module_type_module_buffer matched,
     envoy_dynamic_module_type_module_buffer replacement) {
   auto* context = routeSpecifierContext(context_envoy_ptr);
+  // The outcome depends on the path of the current request either way.
+  context->depends_on_request_path = true;
   // Compute the rewritten path once, so it takes precedence over the rewrites of the route the same
   // way set_path does. A matched that is not a prefix, or a result over the bound, is rejected.
   std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
@@ -900,6 +960,46 @@ bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
     return false;
   }
   context->overrides.path = std::move(*rewritten);
+  return true;
+}
+
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_rewrite_span span,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const absl::string_view matched_view = toStringView(matched);
+  const absl::string_view replacement_view = toStringView(replacement);
+  const bool whole_path = span == envoy_dynamic_module_type_route_specifier_rewrite_span_WholePath;
+  // A literal span ends before the query string and fragment, which the rule keeps.
+  if (!knownRewriteSpan(span) || (whole_path && !matched_view.empty()) ||
+      matched_view.find_first_of("?#") != absl::string_view::npos) {
+    return false;
+  }
+  // The replacement starts the path the rule produces, so it must start with a slash like the path
+  // set_path takes, be a valid header value and carry no query string or fragment of its own.
+  if (!absl::StartsWith(replacement_view, "/") ||
+      replacement_view.find_first_of("?#") != absl::string_view::npos ||
+      !Http::HeaderUtility::headerValueIsValid(replacement_view)) {
+    return false;
+  }
+  PrefixRewriteRule rule;
+  if (!whole_path) {
+    rule.matched.emplace(matched_view);
+  }
+  rule.replacement = std::string(replacement_view);
+  // The module learns now that the rule does not fit the request, which finalization only counts.
+  if (!rule.appliesTo(context->headers.getPathValue(), context->config.maxRewrittenPathBytes())) {
+    // The rejection depends on the path, and so may what the module records instead.
+    context->depends_on_request_path = true;
+    return false;
+  }
+  // A cached route only checks the last rule, while the module saw whether the earlier one fit.
+  if (context->overrides.prefix_rewrite_rule.has_value()) {
+    context->depends_on_request_path = true;
+  }
+  context->overrides.prefix_rewrite_rule = std::move(rule);
   return true;
 }
 

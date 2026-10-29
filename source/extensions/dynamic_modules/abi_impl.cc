@@ -568,6 +568,14 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_cluster_lb_get_member_update_host_
           false, envoy_dynamic_module_type_cluster_lb_envoy_ptr, size_t, bool,
           envoy_dynamic_module_type_packed_address*)
 
+WEAK_STUB(bool,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count,
+          false, envoy_dynamic_module_type_cluster_lb_envoy_ptr, size_t*)
+WEAK_STUB(envoy_dynamic_module_type_cluster_host_envoy_ptr,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host, nullptr,
+          envoy_dynamic_module_type_cluster_lb_envoy_ptr, size_t, uint32_t*,
+          envoy_dynamic_module_type_host_health*)
+
 WEAK_STUB_VOID(envoy_dynamic_module_callback_cluster_pre_init_complete,
                envoy_dynamic_module_type_cluster_envoy_ptr)
 
@@ -2040,6 +2048,9 @@ WEAK_STUB(envoy_dynamic_module_type_route_specifier_route_kind,
           envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache, false,
+          envoy_dynamic_module_type_route_specifier_config_envoy_ptr)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_config_has_route_override, false,
           envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
@@ -2142,6 +2153,16 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_route_specifier_set_route_user_data
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite, false,
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_route_specifier_rewrite_span,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
+
+WEAK_STUB(envoy_dynamic_module_type_route_specifier_built_route_lookup_result,
+          envoy_dynamic_module_callback_route_specifier_lookup_built_route,
+          envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Disabled,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr, uint64_t)
 
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_number,
           false, envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
@@ -3527,6 +3548,9 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_http_filter_recreate_stream, false
           envoy_dynamic_module_type_module_http_header*, size_t)
 
 WEAK_STUB_VOID(envoy_dynamic_module_callback_http_clear_route_cluster_cache,
+               envoy_dynamic_module_type_http_filter_envoy_ptr)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_http_drain_connection_upon_completion,
                envoy_dynamic_module_type_http_filter_envoy_ptr)
 
 WEAK_STUB(size_t, envoy_dynamic_module_callback_http_filter_config_generic_secret_subscribe, 0,

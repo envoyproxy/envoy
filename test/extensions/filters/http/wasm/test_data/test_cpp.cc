@@ -3,15 +3,21 @@
 #include <string>
 #include <unordered_map>
 
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
 #include "test/extensions/filters/http/wasm/test_data/test.pb.h"
+#endif
 
 #ifndef NULL_PLUGIN
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
 #include "proxy_wasm_intrinsics_lite.h"
 
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #include "source/extensions/common/wasm/ext/sign.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
+#else
+#include "proxy_wasm_intrinsics.h"
+#endif
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 
@@ -186,6 +192,7 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
       }
     }
 
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
     {
       // Validate a valid CEL expression
       const std::string expr = R"(
@@ -209,6 +216,7 @@ FilterHeadersStatus TestContext::onRequestHeaders(uint32_t, bool) {
         }
       }
     }
+#endif
 
     {
       // Create a syntactically wrong CEL expression
@@ -388,6 +396,7 @@ void TestContext::onLog() {
                  &cluster_metadata)) {
       logWarn("cluster metadata: " + cluster_metadata);
     }
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
   } else if (test == "property") {
     setFilterState("wasm_state", "wasm_value");
     auto path = getRequestHeader(":path");
@@ -613,6 +622,7 @@ void TestContext::onLog() {
         }
       }
     }
+#endif
   }
 }
 
@@ -652,6 +662,7 @@ void TestRootContext::onTick() {
     if (getValue({"xds", "node", "metadata", "wasm_node_list_key", "1"}, &list_value)) {
       logDebug("unexpected list value outside the range");
     }
+#ifndef WASM_TEST_CPP_HEADERS_ONLY
   } else if (test_ == "property") {
     uint64_t t;
     if (WasmResult::Ok != proxy_get_current_time_nanoseconds(&t)) {
@@ -1004,7 +1015,8 @@ void TestRootContext::onTick() {
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
                                                         in.size(), &out, &out_size)) {
         envoy::source::extensions::common::wasm::SignResult result;
-        if (result.ParseFromString(absl::string_view(out, static_cast<int>(out_size))) && result.result()) {
+        if (result.ParseFromString(absl::string_view(out, static_cast<int>(out_size))) &&
+            result.result()) {
           logInfo("signature created successfully");
         } else {
           logError(result.error());
@@ -1027,7 +1039,8 @@ void TestRootContext::onTick() {
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
                                                         in.size(), &out, &out_size)) {
         envoy::source::extensions::common::wasm::SignResult result;
-        if (result.ParseFromString(absl::string_view(out, static_cast<int>(out_size))) && result.result()) {
+        if (result.ParseFromString(absl::string_view(out, static_cast<int>(out_size))) &&
+            result.result()) {
           logCritical("signature should not be ok");
         } else {
           logError(result.error());
@@ -1050,7 +1063,8 @@ void TestRootContext::onTick() {
       if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
                                                         in.size(), &out, &out_size)) {
         envoy::source::extensions::common::wasm::SignResult result;
-        if (result.ParseFromString(absl::string_view(out, static_cast<int>(out_size))) && result.result()) {
+        if (result.ParseFromString(absl::string_view(out, static_cast<int>(out_size))) &&
+            result.result()) {
           logCritical("signature should not be ok");
         } else {
           logError(result.error());
@@ -1172,7 +1186,8 @@ void TestRootContext::onTick() {
                                                         sign_in.data(), sign_in.size(), &sign_out,
                                                         &sign_out_size)) {
         envoy::source::extensions::common::wasm::SignResult sign_result;
-        if (sign_result.ParseFromString(absl::string_view(sign_out, static_cast<int>(sign_out_size))) &&
+        if (sign_result.ParseFromString(
+                absl::string_view(sign_out, static_cast<int>(sign_out_size))) &&
             sign_result.result()) {
           logInfo("signature created successfully, length: " +
                   std::to_string(sign_result.signature().size()));
@@ -1195,7 +1210,8 @@ void TestRootContext::onTick() {
                                                               verify_in.data(), verify_in.size(),
                                                               &verify_out, &verify_out_size)) {
               envoy::source::extensions::common::wasm::VerifySignatureResult verify_result;
-              if (verify_result.ParseFromString(absl::string_view(verify_out, static_cast<int>(verify_out_size))) &&
+              if (verify_result.ParseFromString(
+                      absl::string_view(verify_out, static_cast<int>(verify_out_size))) &&
                   verify_result.result()) {
                 logInfo("end-to-end test passed: signature created and verified successfully");
               } else {
@@ -1239,6 +1255,7 @@ void TestRootContext::onTick() {
       }
       ::free(out);
     }
+#endif
   }
 }
 

@@ -5,7 +5,6 @@
 
 #include "gtest/gtest.h"
 
-using ::testing::Invoke;
 using ::testing::Ref;
 using ::testing::Return;
 
@@ -21,10 +20,10 @@ TEST(DecodedResourceImplTest, All) {
 
   {
     EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource), Ref(arena)))
-        .WillOnce(Invoke([](const Protobuf::Any&,
-                            Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        .WillOnce([](const Protobuf::Any&,
+                     Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
           return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
-        }));
+        });
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(Protobuf::Empty())))
         .WillOnce(Return("some_name"));
     auto decoded_resource =
@@ -44,10 +43,10 @@ TEST(DecodedResourceImplTest, All) {
     resource_wrapper.mutable_resource()->MergeFrom(some_opaque_resource);
     resource_wrapper.set_version("foo");
     EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource), Ref(arena)))
-        .WillOnce(Invoke([](const Protobuf::Any&,
-                            Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        .WillOnce([](const Protobuf::Any&,
+                     Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
           return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
-        }));
+        });
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(Protobuf::Empty()))).Times(0);
     DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper, arena);
     EXPECT_EQ("real_name", decoded_resource.name());
@@ -67,10 +66,10 @@ TEST(DecodedResourceImplTest, All) {
     metadata->mutable_filter_metadata()->insert(
         {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
     EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource), Ref(arena)))
-        .WillOnce(Invoke([](const Protobuf::Any&,
-                            Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        .WillOnce([](const Protobuf::Any&,
+                     Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
           return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
-        }));
+        });
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(Protobuf::Empty()))).Times(0);
     DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper, arena);
     EXPECT_EQ("real_name", decoded_resource.name());
@@ -92,10 +91,10 @@ TEST(DecodedResourceImplTest, All) {
     Protobuf::Any resource_any;
     std::ignore = resource_any.PackFrom(resource_wrapper);
     EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource), Ref(arena)))
-        .WillOnce(Invoke([](const Protobuf::Any&,
-                            Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        .WillOnce([](const Protobuf::Any&,
+                     Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
           return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
-        }));
+        });
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(Protobuf::Empty()))).Times(0);
     DecodedResourceImplPtr decoded_resource =
         *DecodedResourceImpl::fromResource(resource_decoder, resource_any, "1", arena);
@@ -113,10 +112,10 @@ TEST(DecodedResourceImplTest, All) {
     resource_wrapper.add_aliases("bar");
     resource_wrapper.add_aliases("baz");
     EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(Protobuf::Any()), Ref(arena)))
-        .WillOnce(Invoke([](const Protobuf::Any&,
-                            Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        .WillOnce([](const Protobuf::Any&,
+                     Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
           return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
-        }));
+        });
     EXPECT_CALL(resource_decoder, resourceName(_)).Times(0);
     DecodedResourceImpl decoded_resource(resource_decoder, resource_wrapper, arena);
     EXPECT_EQ("real_name", decoded_resource.name());
@@ -137,10 +136,10 @@ TEST(DecodedResourceImplTest, All) {
     metadata->mutable_filter_metadata()->insert(
         {"fake_test_domain", MessageUtil::keyValueStruct("fake_test_key", "fake_test_value")});
     EXPECT_CALL(resource_decoder, decodeResource(ProtoEq(some_opaque_resource), Ref(arena)))
-        .WillOnce(Invoke([](const Protobuf::Any&,
-                            Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
+        .WillOnce([](const Protobuf::Any&,
+                     Protobuf::Arena& a) -> Protobuf::Arena::UniquePtr<Protobuf::Message> {
           return Protobuf::Arena::MakeUnique<Protobuf::Empty>(&a);
-        }));
+        });
     EXPECT_CALL(resource_decoder, resourceName(ProtoEq(Protobuf::Empty()))).Times(0);
     DecodedResourceImplPtr decoded_resource =
         DecodedResourceImpl::fromResource(resource_decoder, resource_wrapper, arena);

@@ -212,10 +212,10 @@ TEST_F(FilterTest, RequestRateLimited) {
   setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\"", "false", "429"));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code code, absl::string_view body,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
+      .WillOnce([](Http::Code code, absl::string_view body,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                   absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
 
@@ -231,7 +231,7 @@ TEST_F(FilterTest, RequestRateLimited) {
                              .getStringView());
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "local_rate_limited");
-      }));
+      });
 
   // Add a custom header to the request.
   // Locally generated reply is configured to refer to this value.
@@ -253,10 +253,10 @@ TEST_F(FilterTest, RequestRateLimitedResourceExhausted) {
   setup(fmt::format(config_yaml, "true", "1", "false", "\"OFF\"", "false", "429"));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code code, absl::string_view body,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
+      .WillOnce([](Http::Code code, absl::string_view body,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                   absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
 
@@ -273,7 +273,7 @@ TEST_F(FilterTest, RequestRateLimitedResourceExhausted) {
         EXPECT_EQ(grpc_status,
                   std::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted));
         EXPECT_EQ(details, "local_rate_limited");
-      }));
+      });
 
   // Add a custom header to the request.
   // Locally generated reply is configured to refer to this value.
@@ -301,10 +301,10 @@ TEST_F(FilterTest, RequestRateLimitedPerConnection) {
   setup(fmt::format(config_yaml, "false", "1", "true", "\"OFF\"", "false", "429"));
 
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code code, absl::string_view body,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                          absl::string_view details) {
+      .WillOnce([](Http::Code code, absl::string_view body,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                   absl::string_view details) {
         EXPECT_EQ(Http::Code::TooManyRequests, code);
         EXPECT_EQ("local_rate_limited", body);
 
@@ -316,7 +316,7 @@ TEST_F(FilterTest, RequestRateLimitedPerConnection) {
 
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "local_rate_limited");
-      }));
+      });
 
   auto request_headers = Http::TestRequestHeaderMapImpl();
   auto expected_headers = Http::TestRequestHeaderMapImpl();
@@ -1138,13 +1138,13 @@ TEST_F(DescriptorFilterTest, RetryAfterHeaderClampsZeroResetToOne) {
   // The bucket has one token, but this request consumes five. The request is rejected while
   // nextTokenAvailable() is zero because a token is already available.
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers;
         modify_headers(response_headers);
         EXPECT_EQ("1", response_headers.get_("retry-after"));
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
 }
@@ -1153,15 +1153,15 @@ TEST_F(FilterTest, RequestRateLimitedWithRetryAfterHeader) {
   setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\"", "true", "429"));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers;
         modify_headers(response_headers);
         // The bucket refills one token every 1000 seconds, so that is when the next token is
         // available.
         EXPECT_EQ("1000", response_headers.get_("retry-after"));
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -1173,13 +1173,13 @@ TEST_F(FilterTest, RequestRateLimitedPreservesCustomRetryAfterHeader) {
   setup(std::string(custom_retry_after_config_yaml));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers;
         modify_headers(response_headers);
         EXPECT_EQ("120", response_headers.get_("retry-after"));
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -1191,13 +1191,13 @@ TEST_F(FilterTest, RequestRateLimitedWithoutRetryAfterHeaderByDefault) {
   setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\"", "false", "429"));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::TooManyRequests, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers;
         modify_headers(response_headers);
         EXPECT_TRUE(response_headers.get(Http::LowerCaseString("retry-after")).empty());
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
@@ -1235,13 +1235,13 @@ TEST_F(FilterTest, RequestRateLimitedWithoutRetryAfterHeaderForNon429Status) {
   setup(fmt::format(config_yaml, "false", "1", "false", "\"OFF\"", "true", "503"));
 
   EXPECT_CALL(decoder_callbacks_2_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _))
-      .WillOnce(Invoke([](Http::Code, absl::string_view,
-                          std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                          const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
+      .WillOnce([](Http::Code, absl::string_view,
+                   std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                   const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
         Http::TestResponseHeaderMapImpl response_headers;
         modify_headers(response_headers);
         EXPECT_TRUE(response_headers.get(Http::LowerCaseString("retry-after")).empty());
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));

@@ -44,19 +44,18 @@ IntegrationTcpClient::IntegrationTcpClient(
       callbacks_(new ConnectionCallbacks(*this)) {
   EXPECT_CALL(factory, createBuffer_(_, _, _))
       .Times(AtLeast(1))
-      .WillOnce(
-          Invoke([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
-                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
-                std::move(below_low), std::move(above_high), std::move(above_overflow));
-            return client_write_buffer_;
-          }))
-      .WillRepeatedly(
-          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+      .WillOnce([&](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
                     absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
-                                               std::move(above_overflow));
-          }));
+        client_write_buffer_ = new NiceMock<MockWatermarkBuffer>(
+            std::move(below_low), std::move(above_high), std::move(above_overflow));
+        return client_write_buffer_;
+      })
+      .WillRepeatedly([](absl::AnyInvocable<void()> below_low,
+                         absl::AnyInvocable<void()> above_high,
+                         absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                           std::move(above_overflow));
+      });
 
   connection_ = dispatcher.createClientConnection(
       *Network::Utility::resolveUrl(fmt::format(

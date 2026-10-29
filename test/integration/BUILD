@@ -400,7 +400,10 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:upstream_includes",
+        "//test/common/upstream:snapshot_host_set_lib",
         "//test/config:utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/test_common:network_utility_lib",
