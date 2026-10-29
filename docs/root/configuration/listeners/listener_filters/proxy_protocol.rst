@@ -89,6 +89,37 @@ the typed dynamic metadata always stores the raw TLV value bytes as is:
               key: "aws_vpce_id"
               value_string_encoding: BASE64
 
+For TLV values that carry a binary unsigned integer, ``value_string_encoding`` can be set to
+``UNSIGNED_INTEGER_BIG_ENDIAN`` to store the value as a decimal string. The value must be 1 to 8
+bytes long; a value of any other length is not stored and is counted in ``tlv_invalid``. For example,
+Google Cloud Private Service Connect sends the PSC connection ID in TLV ``0xE0`` as an 8-byte
+big-endian integer, and identifies the connection by the decimal form of that number:
+
+.. code-block:: yaml
+
+  listener_filters:
+    - name: envoy.filters.listener.proxy_protocol
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.listener.proxy_protocol.v3.ProxyProtocol
+        tlv_location: FILTER_STATE
+        rules:
+          - tlv_type: 0xE0
+            on_tlv_present:
+              key: "psc_connection_id"
+              value_string_encoding: UNSIGNED_INTEGER_BIG_ENDIAN
+            reject_if_absent: true
+
+Required TLVs
+-------------
+
+When a rule sets
+:ref:`reject_if_absent <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule.reject_if_absent>`,
+the filter closes every connection that does not carry a TLV of that type, and increments
+``tlv_missing``. A TLV whose value cannot be encoded with the configured ``value_string_encoding``
+counts as missing. Connections that carry no TLVs at all, such as PROXY protocol version 1 headers,
+version 2 ``LOCAL`` headers, and connections without a PROXY protocol header that are allowed by
+``allow_requests_without_proxy_protocol``, are closed as well.
+
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two
 versions is present.
@@ -116,6 +147,8 @@ This filter emits the following general statistics, rooted at *proxy_proto.[<sta
 
   not_found_disallowed, Counter, "Total number of connections that don't contain the PROXY protocol header and are rejected."
   not_found_allowed, Counter, "Total number of connections that don't contain the PROXY protocol header, but are allowed due to :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`."
+  tlv_invalid, Counter, "Total number of TLV values that were not stored because they cannot be encoded with the configured :ref:`value_string_encoding <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_string_encoding>`."
+  tlv_missing, Counter, "Total number of connections that are rejected because they do not carry a TLV required by :ref:`reject_if_absent <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.Rule.reject_if_absent>`."
 
 The filter also emits the statistics rooted at *proxy_proto.[<stat_prefix>.]versions.<version>*
 for each matched PROXY protocol version. Proxy protocol versions include ``v1`` and ``v2``.

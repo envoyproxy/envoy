@@ -47,6 +47,12 @@ message ProxyProtocol {
       // string (with padding) before being stored. This is useful for binary TLV values that
       // are not valid UTF-8 strings.
       BASE64 = 2;
+
+      // The raw TLV value is read as an unsigned big-endian integer and stored as its decimal
+      // string, for example the 8-byte value ``0x0000000000000102`` is stored as ``258``. The
+      // value must be 1 to 8 bytes long. A value of any other length is not stored, and it is
+      // counted in the ``tlv_invalid`` statistic.
+      UNSIGNED_INTEGER_BIG_ENDIAN = 3;
     }
 
     // The namespace — if this is empty, the filter's namespace will be used.
@@ -76,6 +82,17 @@ message ProxyProtocol {
 
     // If the TLV type is present, apply this metadata KeyValuePair.
     KeyValuePair on_tlv_present = 2;
+
+    // If set to true, the connection is closed in the listener phase when it does not carry a
+    // TLV of this type, and the ``tlv_missing`` statistic is incremented. A TLV whose value
+    // cannot be encoded with the configured
+    // :ref:`value_string_encoding <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_string_encoding>`
+    // counts as missing. This also applies to connections that carry no TLVs: PROXY protocol
+    // version 1 headers, version 2 ``LOCAL`` headers, and connections without a PROXY protocol
+    // header that are let through by
+    // :ref:`allow_requests_without_proxy_protocol <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.allow_requests_without_proxy_protocol>`.
+    // Defaults to false.
+    bool reject_if_absent = 3;
   }
 
   // The list of rules to apply to requests.
