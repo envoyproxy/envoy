@@ -1107,7 +1107,8 @@ WasmResult Context::setProperty(std::string_view path, std::string_view value) {
 }
 
 WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view value,
-                                        StreamInfo::FilterState::LifeSpan life_span) {
+                                        StreamInfo::FilterState::LifeSpan life_span,
+                                        StreamInfo::StreamSharingMayImpactPooling stream_sharing) {
   auto* factory =
       Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(path);
   if (!factory) {
@@ -1124,7 +1125,7 @@ WasmResult Context::setEnvoyFilterState(std::string_view path, std::string_view 
     return WasmResult::NotFound;
   }
 
-  stream_info->filterState()->setData(path, std::move(object), life_span);
+  stream_info->filterState()->setData(path, std::move(object), life_span, stream_sharing);
   return WasmResult::Ok;
 }
 
