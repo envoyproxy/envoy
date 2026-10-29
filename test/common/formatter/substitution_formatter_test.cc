@@ -3697,35 +3697,35 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
       .setResponseTrailers(response_trailer);
 
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(), false);
     EXPECT_EQ("GET", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("GET")));
   }
 
   {
-    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>(), false);
     EXPECT_EQ("/", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("/")));
   }
 
   {
-    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>(), false);
     EXPECT_EQ("GET", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("GET")));
   }
 
   {
-    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>(), false);
     EXPECT_EQ(std::nullopt, formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2));
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2), false);
     EXPECT_EQ("GE", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("GE")));
@@ -3910,35 +3910,35 @@ TEST(SubstitutionFormatterTest, responseHeaderFormatter) {
       .setResponseTrailers(response_trailer);
 
   {
-    ResponseHeaderFormatter formatter(":method", "", std::optional<size_t>());
+    ResponseHeaderFormatter formatter(":method", "", std::optional<size_t>(), false);
     EXPECT_EQ("PUT", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PUT")));
   }
 
   {
-    ResponseHeaderFormatter formatter("test", ":method", std::optional<size_t>());
+    ResponseHeaderFormatter formatter("test", ":method", std::optional<size_t>(), false);
     EXPECT_EQ("test", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("test")));
   }
 
   {
-    ResponseHeaderFormatter formatter(":path", ":method", std::optional<size_t>());
+    ResponseHeaderFormatter formatter(":path", ":method", std::optional<size_t>(), false);
     EXPECT_EQ("PUT", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PUT")));
   }
 
   {
-    ResponseHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>());
+    ResponseHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>(), false);
     EXPECT_EQ(std::nullopt, formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
   {
-    ResponseHeaderFormatter formatter(":method", "", std::optional<size_t>(2));
+    ResponseHeaderFormatter formatter(":method", "", std::optional<size_t>(2), false);
     EXPECT_EQ("PU", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PU")));
@@ -3957,35 +3957,35 @@ TEST(SubstitutionFormatterTest, responseTrailerFormatter) {
       .setResponseTrailers(response_trailer);
 
   {
-    ResponseTrailerFormatter formatter(":method", "", std::optional<size_t>());
+    ResponseTrailerFormatter formatter(":method", "", std::optional<size_t>(), false);
     EXPECT_EQ("POST", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("POST")));
   }
 
   {
-    ResponseTrailerFormatter formatter("test-2", ":method", std::optional<size_t>());
+    ResponseTrailerFormatter formatter("test-2", ":method", std::optional<size_t>(), false);
     EXPECT_EQ("test-2", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("test-2")));
   }
 
   {
-    ResponseTrailerFormatter formatter(":path", ":method", std::optional<size_t>());
+    ResponseTrailerFormatter formatter(":path", ":method", std::optional<size_t>(), false);
     EXPECT_EQ("POST", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("POST")));
   }
 
   {
-    ResponseTrailerFormatter formatter("does_not_exist", "", std::optional<size_t>());
+    ResponseTrailerFormatter formatter("does_not_exist", "", std::optional<size_t>(), false);
     EXPECT_EQ(std::nullopt, formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
   {
-    ResponseTrailerFormatter formatter(":method", "", std::optional<size_t>(2));
+    ResponseTrailerFormatter formatter(":method", "", std::optional<size_t>(2), false);
     EXPECT_EQ("PO", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("PO")));
@@ -4117,7 +4117,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
 
   // The main header is found.
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(), false);
 
     std::string sink;
     EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
@@ -4131,7 +4131,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
 
   // The main header is found and the alternative header is not used.
   {
-    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>(), false);
 
     std::string sink;
     EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
@@ -4145,7 +4145,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
 
   // The main header is missing and the alternative header is used.
   {
-    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>(), false);
 
     std::string sink;
     EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
@@ -4160,7 +4160,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
   // Neither header is found. formatTo() reports the failure and leaves the sink untouched and
   // formatValueTo() leaves the value sink unconsumed.
   {
-    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>(), false);
 
     std::string sink = "existing";
     EXPECT_FALSE(formatter.formatTo(sink, formatter_context, stream_info));
@@ -4174,7 +4174,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
 
   // The value is truncated to the max length.
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2));
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2), false);
 
     std::string sink;
     EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
@@ -4188,7 +4188,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
 
   // formatTo() appends to the sink rather than overwriting it.
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(), false);
 
     std::string sink = "method: ";
     EXPECT_TRUE(formatter.formatTo(sink, formatter_context, stream_info));
@@ -4203,7 +4203,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
     Context special_context;
     special_context.setRequestHeaders(special_header);
 
-    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>(), false);
 
     std::string sink;
     EXPECT_TRUE(formatter.formatTo(sink, special_context, stream_info));
@@ -4221,7 +4221,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
     Context empty_value_context;
     empty_value_context.setRequestHeaders(empty_value_header);
 
-    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter("x-header", "", std::optional<size_t>(), false);
 
     std::string sink = "value: ";
     EXPECT_TRUE(formatter.formatTo(sink, empty_value_context, stream_info));
@@ -4235,7 +4235,7 @@ TEST(SubstitutionFormatterTest, HeaderFormatterFormatToAndFormatValueTo) {
 
   // There are no request headers in the context at all.
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(), false);
     Context empty_context;
 
     std::string sink;
@@ -4271,9 +4271,9 @@ TEST(SubstitutionFormatterTest, HeaderFormattersReadTheirOwnHeaderMap) {
     EXPECT_EQ("\"" + expected + "\"", helper.output());
   };
 
-  expect_value(RequestHeaderFormatter("x-header", "", std::optional<size_t>()), "request");
-  expect_value(ResponseHeaderFormatter("x-header", "", std::optional<size_t>()), "response");
-  expect_value(ResponseTrailerFormatter("x-header", "", std::optional<size_t>()), "trailer");
+  expect_value(RequestHeaderFormatter("x-header", "", std::optional<size_t>(), false), "request");
+  expect_value(ResponseHeaderFormatter("x-header", "", std::optional<size_t>(), false), "response");
+  expect_value(ResponseTrailerFormatter("x-header", "", std::optional<size_t>(), false), "trailer");
 }
 
 TEST(SubstitutionFormatterTest, LocalReplyBodyFormatter) {
