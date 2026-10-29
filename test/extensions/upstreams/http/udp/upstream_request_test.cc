@@ -32,7 +32,6 @@ namespace Udp {
 
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::Eq;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Not;
 using ::testing::NotNull;
@@ -273,7 +272,7 @@ TEST_F(UdpConnPoolTest, ConnectionInfoProviderHasRemoteAddress) {
           remote_address = connection_info_provider.remoteAddress()->asStringView();
         }
       };
-  EXPECT_CALL(mock_callback_, onPoolReady).WillOnce(Invoke(capture_remote_address));
+  EXPECT_CALL(mock_callback_, onPoolReady).WillOnce(capture_remote_address);
   // Mock syscall to make the bind call succeed.
   NiceMock<Envoy::Api::MockOsSysCalls> mock_os_sys_calls;
   Envoy::TestThreadsafeSingletonInjector<Envoy::Api::OsSysCallsImpl> os_sys_calls(

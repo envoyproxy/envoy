@@ -12,6 +12,8 @@
 //!                      Unspecified decision of the ABI in effect.
 //!   `x-template`       the identifier of the route template to select.
 //!   `x-unset-template` the identifier of a template selection to revert or forget.
+//!   `x-cache-key`      a u64 the route is looked up with in the built route cache after the
+//!                      template is selected. On a hit the module records nothing more.
 //!   `x-cluster`        the upstream cluster to route to.
 //!   `x-timeout-ms`     the route timeout to set, in milliseconds.
 //!   `x-idle-timeout-ms` the stream idle timeout to set, in milliseconds.
@@ -25,6 +27,8 @@
 //!   `x-set-host`       the authority of the request sent upstream.
 //!   `x-set-route-name` the name recorded for the route the decision produces.
 //!   `x-prefix-rewrite` a `matched=replacement` pair recorded as a prefix rewrite of the path.
+//!   `x-prefix-rewrite-rule` a `matched=replacement` pair recorded as a prefix rewrite rule, over
+//!                      the whole path when `matched` is empty.
 //!   `x-user-data`      a u64 recorded on the produced route, so the route destroy hook fires.
 //!   `x-append-action`  `append`, `add-if-absent`, `overwrite` or `overwrite-if-exists`, how an
 //!                      added header combines with one of the same name. Defaults to `overwrite`.
@@ -420,6 +424,8 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
       // Tests also unset identifiers that were never selected, so a miss is expected here.
       let _ = ctx.unselect_template(&buffer_to_string(template_id));
     }
+    let cache_hit = read_u64_header(ctx, "x-cache-key")
+      .is_some_and(|key| ctx.lookup_built_route(key) == BuiltRouteLookupResult::Hit);
 
     let mut status = OnRouteStatus::Continue;
     if ctx.get_request_header("x-stop-chain").is_some() {
@@ -430,6 +436,10 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     }
     if ctx.get_request_header("x-skip-route").is_some() {
       status = OnRouteStatus::StopIterationAndSkipRoute;
+    }
+    // Envoy uses the cached route on a hit, so the module records nothing more.
+    if cache_hit {
+      return status;
     }
 
     if let Some(cluster_name) = ctx.get_request_header("x-cluster") {
@@ -489,6 +499,17 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
       if let Some((matched, replacement)) = split_pair(&pair) {
         // Tests also pass a matched that is not a prefix, so a rejection is expected here.
         let _ = ctx.set_prefix_rewrite(matched, replacement);
+      }
+    }
+    if let Some(pair) = ctx.get_request_header("x-prefix-rewrite-rule") {
+      let pair = buffer_to_string(pair);
+      if let Some((matched, replacement)) = split_pair(&pair) {
+        let span = if matched.is_empty() {
+          RewriteSpan::WholePath
+        } else {
+          RewriteSpan::Literal
+        };
+        let _ = ctx.set_prefix_rewrite_rule(span, matched, replacement);
       }
     }
     let append_action = read_append_action(ctx);

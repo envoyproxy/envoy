@@ -129,17 +129,16 @@ public:
   MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& response_body)
       : request_(&mock_cm.thread_local_cluster_.async_client_), response_body_(response_body) {
     ON_CALL(mock_cm.thread_local_cluster_.async_client_, send_(_, _, _))
-        .WillByDefault(
-            Invoke([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              Http::ResponseMessagePtr response_message(
-                  new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                      new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-              response_message->body().add(response_body_);
-              cb.onSuccess(request_, std::move(response_message));
-              called_count_++;
-              return &request_;
-            }));
+        .WillByDefault([this](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                              const Http::AsyncClient::RequestOptions&)
+                           -> Http::AsyncClient::Request* {
+          Http::ResponseMessagePtr response_message(new Http::ResponseMessageImpl(
+              Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+          response_message->body().add(response_body_);
+          cb.onSuccess(request_, std::move(response_message));
+          called_count_++;
+          return &request_;
+        });
   }
 
   int called_count() const { return called_count_; }

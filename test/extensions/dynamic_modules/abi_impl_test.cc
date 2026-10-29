@@ -895,6 +895,13 @@ WEAK_STUB(ClusterLbGetMemberUpdateHostPackedAddress,
           envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(nullptr, 0,
                                                                                          true,
                                                                                          nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHealthChangedHostCount,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+              nullptr, nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHealthChangedHost,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(nullptr, 0,
+                                                                                         nullptr,
+                                                                                         nullptr))
 WEAK_STUB(ClusterUpdateHostHealth,
           envoy_dynamic_module_callback_cluster_update_host_health(
               nullptr, nullptr, envoy_dynamic_module_type_host_health_Healthy))
@@ -2233,6 +2240,8 @@ WEAK_STUB(HttpFilterRecreateStream,
           envoy_dynamic_module_callback_http_filter_recreate_stream(nullptr, nullptr, 0))
 WEAK_STUB(HttpClearRouteClusterCache,
           envoy_dynamic_module_callback_http_clear_route_cluster_cache(nullptr))
+WEAK_STUB(HttpDrainConnectionUponCompletion,
+          envoy_dynamic_module_callback_http_drain_connection_upon_completion(nullptr))
 WEAK_STUB(ListenerFilterSetDetectedTransportProtocol,
           envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(nullptr,
                                                                                         {nullptr,
@@ -2449,6 +2458,12 @@ WEAK_STUB(HealthCheckerGetHostMetadataBool,
                                                                               nullptr))
 WEAK_STUB(HealthCheckerGetHostHealth,
           envoy_dynamic_module_callback_health_checker_get_host_health(nullptr))
+WEAK_STUB(RouteSpecifierSetPrefixRewriteRule,
+          envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+              nullptr, envoy_dynamic_module_type_route_specifier_rewrite_span_Literal, {nullptr, 0},
+              {nullptr, 0}))
+WEAK_STUB(RouteSpecifierLookupBuiltRoute,
+          envoy_dynamic_module_callback_route_specifier_lookup_built_route(nullptr, 1))
 
 } // namespace
 } // namespace DynamicModules

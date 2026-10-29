@@ -199,15 +199,13 @@ protected:
   void expectBufferedRequest(Buffer::Instance& buf) {
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buf));
     EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-        .WillRepeatedly(
-            Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
+        .WillRepeatedly([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); });
   }
 
   void expectBufferedResponse(Buffer::Instance& buf) {
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buf));
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-        .WillRepeatedly(
-            Invoke([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); }));
+        .WillRepeatedly([&buf](Buffer::Instance& new_chunk, Unused) { buf.add(new_chunk); });
   }
 
   std::unique_ptr<MockClient> client_;
@@ -635,8 +633,8 @@ TEST_F(OrderingTest, IncorrectRequestBodyReply) {
   Buffer::OwnedImpl req_buffer;
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&req_buffer));
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillRepeatedly(Invoke(
-          [&req_buffer](Buffer::Instance& new_chunk, Unused) { req_buffer.add(new_chunk); }));
+      .WillRepeatedly(
+          [&req_buffer](Buffer::Instance& new_chunk, Unused) { req_buffer.add(new_chunk); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersPost(true);
@@ -826,9 +824,9 @@ TEST_F(OrderingTest, TimeoutOnResponseBody) {
   Buffer::OwnedImpl buffered_response;
   EXPECT_CALL(encoder_callbacks_, encodingBuffer()).WillRepeatedly(Return(&buffered_response));
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillRepeatedly(Invoke([&buffered_response](Buffer::Instance& new_chunk, Unused) {
+      .WillRepeatedly([&buffered_response](Buffer::Instance& new_chunk, Unused) {
         buffered_response.add(new_chunk);
-      }));
+      });
   auto* response_timer = new MockTimer(&dispatcher_);
   EXPECT_CALL(*response_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));
@@ -865,9 +863,9 @@ TEST_F(OrderingTest, TimeoutOnRequestBody) {
   Buffer::OwnedImpl buffered_request;
   EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&buffered_request));
   EXPECT_CALL(decoder_callbacks_, addDecodedData(_, false))
-      .WillRepeatedly(Invoke([&buffered_request](Buffer::Instance& new_chunk, Unused) {
+      .WillRepeatedly([&buffered_request](Buffer::Instance& new_chunk, Unused) {
         buffered_request.add(new_chunk);
-      }));
+      });
 
   EXPECT_CALL(*request_timer, enableTimer(kMessageTimeout, nullptr));
   EXPECT_CALL(stream_delegate_, send(_, false));

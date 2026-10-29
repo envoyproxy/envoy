@@ -16,7 +16,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -188,13 +187,13 @@ TEST_F(PostgresInspectorTest, StartupMessageDefaultDatabase) {
 
   EXPECT_CALL(socket_, setDetectedTransportProtocol("postgres"));
   EXPECT_CALL(cb_, setDynamicTypedMetadata("envoy.postgres_inspector", _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Any& any) {
+      .WillOnce([](const std::string& ns, const Protobuf::Any& any) {
         EXPECT_EQ("envoy.postgres_inspector", ns);
         envoy::extensions::filters::listener::postgres_inspector::v3alpha::StartupMetadata typed;
         ASSERT_TRUE(any.UnpackTo(&typed));
         EXPECT_EQ("testuser", typed.user());
         EXPECT_EQ("testuser", typed.database());
-      }));
+      });
 
   std::map<std::string, std::string> params = {{"user", "testuser"}};
 
@@ -231,9 +230,9 @@ TEST_F(PostgresInspectorTest, MessageTooLarge) {
 
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
-  ON_CALL(io_handle, close()).WillByDefault(Invoke([]() -> Api::IoCallUint64Result {
+  ON_CALL(io_handle, close()).WillByDefault([]() -> Api::IoCallUint64Result {
     return {0, Api::IoError::none()};
-  }));
+  });
 
   auto data = PostgresTestUtils::createOversizedMessage(200);
   auto buffer = createBuffer(std::move(data));

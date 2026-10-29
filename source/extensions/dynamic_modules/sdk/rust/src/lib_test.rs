@@ -5751,6 +5751,25 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+static DRAIN_CONNECTION_UPON_COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) {
+  DRAIN_CONNECTION_UPON_COMPLETION_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_http_drain_connection_upon_completion() {
+  DRAIN_CONNECTION_UPON_COMPLETION_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  envoy_filter.drain_connection_upon_completion();
+  assert!(DRAIN_CONNECTION_UPON_COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
 // Single-slot store backing the filter state object FFI stubs below.
 static FILTER_STATE_OBJECT: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
   std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
@@ -6473,6 +6492,47 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_hos
   _result: *mut abi::envoy_dynamic_module_type_packed_address,
 ) -> bool {
   false
+}
+
+/// Reports two health-changed hosts for a null load balancer and an unknown count otherwise, so the
+/// real wrapper's `Some` and `None` arms are both reachable.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  result: *mut usize,
+) -> bool {
+  if !lb_envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe {
+    *result = 2;
+  }
+  true
+}
+
+/// Index 0 is a degraded host at priority 1, index 1 a healthy host at priority 0, and any other
+/// index is out of bounds.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  index: usize,
+  priority: *mut u32,
+  health: *mut abi::envoy_dynamic_module_type_host_health,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  let (host, host_priority, host_health) = match index {
+    0 => (
+      0xAB,
+      1,
+      abi::envoy_dynamic_module_type_host_health::Degraded,
+    ),
+    1 => (0xCD, 0, abi::envoy_dynamic_module_type_host_health::Healthy),
+    _ => return std::ptr::null_mut(),
+  };
+  unsafe {
+    *priority = host_priority;
+    *health = host_health;
+  }
+  host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr
 }
 
 #[no_mangle]
@@ -12519,6 +12579,11 @@ struct StubRouteDecision {
   route_typed_metadata: Option<(String, Vec<u8>)>,
   filter_disabled: Option<(String, bool)>,
   path: Option<String>,
+  prefix_rewrite_rule: Option<(
+    abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+    String,
+    String,
+  )>,
   host: Option<String>,
   route_name: Option<String>,
   request_headers: Vec<(
@@ -12553,6 +12618,7 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     route_typed_metadata: None,
     filter_disabled: None,
     path: None,
+    prefix_rewrite_rule: None,
     host: None,
     route_name: None,
     request_headers: Vec::new(),
@@ -13272,6 +13338,36 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_path(
   true
 }
 
+// Maps each key onto a result, so a test can observe every arm of the SDK conversion.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  key: u64,
+) -> abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result {
+  match key {
+    1 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Miss,
+    2 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Hit,
+    3 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::HitVerify,
+    _ => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Disabled,
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  span: abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+  matched: abi::envoy_dynamic_module_type_module_buffer,
+  replacement: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let replacement = unsafe { stub_specifier_string(replacement) };
+  if replacement.is_empty() {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().prefix_rewrite_rule =
+    Some((span, unsafe { stub_specifier_string(matched) }, replacement));
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_host(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
@@ -13861,6 +13957,29 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_filter_disabled("", true));
   assert!(ctx.set_path("/rewritten"));
   assert!(!ctx.set_path("rewritten"));
+  for (key, result) in [
+    (0, route_specifier::BuiltRouteLookupResult::Disabled),
+    (1, route_specifier::BuiltRouteLookupResult::Miss),
+    (2, route_specifier::BuiltRouteLookupResult::Hit),
+    (3, route_specifier::BuiltRouteLookupResult::HitVerify),
+  ] {
+    assert_eq!(result, ctx.lookup_built_route(key));
+  }
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::WholePath, "", "/fixed"));
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::WholePath,
+      String::new(),
+      "/fixed".to_string()
+    )),
+    STUB_ROUTE_DECISION
+      .lock()
+      .unwrap()
+      .prefix_rewrite_rule
+      .clone()
+  );
+  assert!(!ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", ""));
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", "/internal"));
   assert!(ctx.set_host("example.com"));
   assert!(!ctx.set_host(""));
   assert!(ctx.set_route_name("module_route"));
@@ -13931,6 +14050,14 @@ fn test_route_specifier_context_records_decision() {
   );
   assert_eq!(Some(("filter".to_string(), true)), decision.filter_disabled);
   assert_eq!(Some("/rewritten".to_string()), decision.path);
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::Literal,
+      "/api".to_string(),
+      "/internal".to_string()
+    )),
+    decision.prefix_rewrite_rule
+  );
   assert_eq!(Some("example.com".to_string()), decision.host);
   assert_eq!(Some("module_route".to_string()), decision.route_name);
   assert_eq!(

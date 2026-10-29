@@ -15,7 +15,6 @@
 using testing::_;
 using testing::Const;
 using testing::Eq;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -71,17 +70,17 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeUsed) {
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions& opts) {
-            http_callbacks = &callbacks;
-            EXPECT_NE(opts.parsed_retry_policy, nullptr);
-            EXPECT_EQ(opts.parsed_retry_policy->numRetries(), 3);
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions& opts) {
+        http_callbacks = &callbacks;
+        EXPECT_NE(opts.parsed_retry_policy, nullptr);
+        EXPECT_EQ(opts.parsed_retry_policy->numRetries(), 3);
+        return &http_stream;
+      });
 
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onReset();
+  });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -97,22 +96,22 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions)
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions& opts) {
-            http_callbacks = &callbacks;
-            EXPECT_EQ(opts.parsed_retry_policy, nullptr);
-            EXPECT_TRUE(opts.retry_policy.has_value());
-            EXPECT_EQ(opts.retry_policy->num_retries().value(), 5);
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions& opts) {
+        http_callbacks = &callbacks;
+        EXPECT_EQ(opts.parsed_retry_policy, nullptr);
+        EXPECT_TRUE(opts.retry_policy.has_value());
+        EXPECT_EQ(opts.retry_policy->num_retries().value(), 5);
+        return &http_stream;
+      });
 
   envoy::config::route::v3::RetryPolicy caller_retry_policy;
   caller_retry_policy.mutable_num_retries()->set_value(5);
   *caller_retry_policy.mutable_retry_on() = "5xx";
 
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onReset();
+  });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks,
                           Http::AsyncClient::StreamOptions().setRetryPolicy(caller_retry_policy));
@@ -124,12 +123,11 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions)
 TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitNotSetByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([](Http::AsyncClient::StreamCallbacks&,
-                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
-            EXPECT_FALSE(opts.buffer_limit_.has_value());
-            return nullptr;
-          }));
+      .WillOnce([](Http::AsyncClient::StreamCallbacks&,
+                   const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+        EXPECT_FALSE(opts.buffer_limit_.has_value());
+        return nullptr;
+      });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -144,14 +142,14 @@ TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitFromConfig) {
   EXPECT_CALL(http_client_, start(_, _))
       .Times(2)
       .WillRepeatedly(
-          Invoke([](Http::AsyncClient::StreamCallbacks&,
-                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+          [](Http::AsyncClient::StreamCallbacks&,
+             const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
             EXPECT_TRUE(opts.buffer_body_for_retry);
             EXPECT_NE(opts.parsed_retry_policy, nullptr);
             EXPECT_TRUE(opts.buffer_limit_.has_value());
             EXPECT_EQ(opts.buffer_limit_.value_or(0), 1024U * 1024U);
             return nullptr;
-          }));
+          });
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> stream_callbacks;
   auto grpc_stream =
@@ -177,13 +175,12 @@ TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitOverriddenByCallerOptions) 
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([](Http::AsyncClient::StreamCallbacks&,
-                    const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
-            EXPECT_TRUE(opts.buffer_limit_.has_value());
-            EXPECT_EQ(opts.buffer_limit_.value_or(0), 2048U);
-            return nullptr;
-          }));
+      .WillOnce([](Http::AsyncClient::StreamCallbacks&,
+                   const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+        EXPECT_TRUE(opts.buffer_limit_.has_value());
+        EXPECT_EQ(opts.buffer_limit_.value_or(0), 2048U);
+        return nullptr;
+      });
   auto grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,
                                          Http::AsyncClient::StreamOptions().setBufferLimit(2048));
   EXPECT_EQ(grpc_stream, nullptr);
@@ -200,19 +197,19 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
 
   EXPECT_CALL(grpc_callbacks,
               onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
                 return headers.Host()->value() == "test_cluster";
               })));
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onReset();
+  });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -230,16 +227,16 @@ TEST_F(EnvoyAsyncClientImplTest, HttpRcdReportedInGrpcErrorMessage) {
   stream_info.setResponseCodeDetails("upstream_reset");
 
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
   EXPECT_CALL(grpc_callbacks,
               onRemoteClose(Status::WellKnownGrpcStatus::Internal, "upstream_reset"));
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onReset();
+  });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -262,19 +259,19 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
 
   EXPECT_CALL(grpc_callbacks,
               onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
                 return headers.Host()->value() == "demo.com";
               })));
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onReset();
+  });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -305,12 +302,11 @@ TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Es
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
   // Encoding is done after all initial-metadata insertion.
   EXPECT_CALL(grpc_callbacks,
               onCreateInitialMetadata(testing::Truly([](Http::RequestHeaderMap& headers) {
@@ -335,7 +331,7 @@ TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Es
             return true;
           }),
           _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+      .WillOnce([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -359,14 +355,13 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreNotUnescap
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
   EXPECT_CALL(grpc_callbacks, onReceiveInitialMetadata_(_))
-      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers) {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers) {
         EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
                       ->value()
                       .getStringView(),
@@ -378,19 +373,18 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreNotUnescap
         EXPECT_EQ(headers.get(Http::LowerCaseString("somemore-bin"))[0]->value().getStringView(),
                   "5pu05aSaYmlu");
         return true;
-      }));
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) {
-        http_callbacks->onHeaders(
-            std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
-                {"static-binary-metadata-bin", "5L2g5aW977yM5LiW55WM44CC"},
-                {":status", "200"},
-                {"hello-world-in-japanese-bin", "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
-                {"somemore-bin", "5pu05aSaYmlu"}}),
-            // This tells clients it's server initial metadata.
-            /*end_stream=*/false);
-        http_callbacks->onReset();
-      }));
+      });
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onHeaders(
+        std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
+            {"static-binary-metadata-bin", "5L2g5aW977yM5LiW55WM44CC"},
+            {":status", "200"},
+            {"hello-world-in-japanese-bin", "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
+            {"somemore-bin", "5pu05aSaYmlu"}}),
+        // This tells clients it's server initial metadata.
+        /*end_stream=*/false);
+    http_callbacks->onReset();
+  });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -414,15 +408,14 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreNotUnesc
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
   EXPECT_CALL(http_stream, reset()); // onTrailers will trigger reset.
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_))
-      .WillOnce(Invoke([&](const Http::ResponseTrailerMap& headers) {
+      .WillOnce([&](const Http::ResponseTrailerMap& headers) {
         EXPECT_EQ(headers.get(Http::LowerCaseString("static-binary-metadata-bin"))[0]
                       ->value()
                       .getStringView(),
@@ -434,18 +427,17 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreNotUnesc
         EXPECT_EQ(headers.get(Http::LowerCaseString("somemore-bin"))[0]->value().getStringView(),
                   /*更多bin*/ "5pu05aSaYmlu");
         return true;
-      }));
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) {
-        http_callbacks->onHeaders(
-            std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
-                {"static-binary-metadata-bin", "5L2g5aW977yM5LiW55WM44CC"},
-                {":status", "200"},
-                {"hello-world-in-japanese-bin", "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
-                {"somemore-bin", "5pu05aSaYmlu"}}),
-            true);
-        http_callbacks->onReset();
-      }));
+      });
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onHeaders(
+        std::make_unique<Http::TestResponseHeaderMapImpl>(Http::TestResponseHeaderMapImpl{
+            {"static-binary-metadata-bin", "5L2g5aW977yM5LiW55WM44CC"},
+            {":status", "200"},
+            {"hello-world-in-japanese-bin", "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
+            {"somemore-bin", "5pu05aSaYmlu"}}),
+        true);
+    http_callbacks->onReset();
+  });
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
   EXPECT_EQ(grpc_stream, nullptr);
@@ -462,12 +454,11 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
 
   const std::string expected_downstream_local_address = "5.5.5.5";
   EXPECT_CALL(grpc_callbacks,
@@ -476,8 +467,9 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
                 return headers.get(Http::LowerCaseString("downstream-local-address"))[0]->value() ==
                        expected_downstream_local_address;
               })));
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onReset();
+  });
 
   // Prepare the parent context of this call.
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
@@ -503,15 +495,15 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
 
-  EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  EXPECT_CALL(http_stream, sendHeaders(_, _)).WillOnce([&http_callbacks](Http::HeaderMap&, bool) {
+    http_callbacks->onReset();
+  });
 
   Tracing::MockSpan parent_span;
   Tracing::MockSpan* child_span{new Tracing::MockSpan()};
@@ -582,19 +574,18 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap& headers, bool end_stream) {
+      .WillOnce([&http_callbacks](Http::HeaderMap& headers, bool end_stream) {
         UNREFERENCED_PARAMETER(headers);
         UNREFERENCED_PARAMETER(end_stream);
         http_callbacks->onReset();
-      }));
+      });
   EXPECT_CALL(grpc_callbacks, onReceiveTrailingMetadata_(_));
   EXPECT_CALL(grpc_callbacks, onRemoteClose(Status::WellKnownGrpcStatus::Internal, ""));
   auto grpc_stream =
@@ -612,19 +603,18 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
   EXPECT_CALL(http_stream, sendHeaders(_, _))
-      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap& headers, bool end_stream) {
+      .WillOnce([&http_callbacks](Http::HeaderMap& headers, bool end_stream) {
         UNREFERENCED_PARAMETER(headers);
         UNREFERENCED_PARAMETER(end_stream);
         http_callbacks->onReset();
-      }));
+      });
   EXPECT_CALL(grpc_callbacks, onFailure(Status::WellKnownGrpcStatus::Internal, "", _));
   helloworld::HelloRequest request_msg;
 
@@ -669,12 +659,11 @@ TEST_F(EnvoyAsyncClientImplTest, AsyncRequestDetach) {
   ON_CALL(http_stream, streamInfo()).WillByDefault(ReturnRef(stream_info));
 
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
 
   const std::string expected_downstream_local_address = "5.5.5.5";
   EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
@@ -719,12 +708,11 @@ TEST_F(EnvoyAsyncClientImplTest, MultipleFramesWithResetInBetween) {
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(http_client_, start(_, _))
-      .WillOnce(
-          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
-            http_callbacks = &callbacks;
-            return &http_stream;
-          }));
+      .WillOnce([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                const Http::AsyncClient::StreamOptions&) {
+        http_callbacks = &callbacks;
+        return &http_stream;
+      });
 
   auto grpc_stream =
       grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
@@ -739,8 +727,9 @@ TEST_F(EnvoyAsyncClientImplTest, MultipleFramesWithResetInBetween) {
   data.add(&flags, 1);
   data.add(&len, 4);
 
-  EXPECT_CALL(grpc_callbacks, onReceiveMessage_(_))
-      .WillOnce(Invoke([&](const helloworld::HelloReply&) { grpc_stream->resetStream(); }));
+  EXPECT_CALL(grpc_callbacks, onReceiveMessage_(_)).WillOnce([&](const helloworld::HelloReply&) {
+    grpc_stream->resetStream();
+  });
 
   http_callbacks->onData(data, false);
 }
@@ -756,11 +745,11 @@ protected:
     ON_CALL(Const(http_stream_), streamInfo()).WillByDefault(ReturnRef(stream_info_));
     ON_CALL(http_stream_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
     EXPECT_CALL(http_client_, start(_, _))
-        .WillOnce(Invoke([&http_callbacks, this](Http::AsyncClient::StreamCallbacks& callbacks,
-                                                 const Http::AsyncClient::StreamOptions&) {
+        .WillOnce([&http_callbacks, this](Http::AsyncClient::StreamCallbacks& callbacks,
+                                          const Http::AsyncClient::StreamOptions&) {
           http_callbacks = &callbacks;
           return &http_stream_;
-        }));
+        });
     // sendHeaders succeeds (does not reset), so the stream stays open.
     EXPECT_CALL(http_stream_, sendHeaders(_, _));
     grpc_stream = grpc_client_->start(*method_descriptor_, grpc_callbacks,

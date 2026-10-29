@@ -43,7 +43,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -211,11 +210,10 @@ TEST_P(UdpListenerImplBatchWriterTest, NonBatchablePacketsFlushInOrder) {
         Buffer::OwnedImpl older("hello");
         ASSERT_TRUE(writer.writePacket(older, source->ip(), *client_.localAddress()).ok());
         testing::InSequence sequence;
-        EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
-            .WillOnce(Invoke([](int, const msghdr* msg, int) {
-              EXPECT_EQ(5, getPacketLength(msg));
-              return 5;
-            }));
+        EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce([](int, const msghdr* msg, int) {
+          EXPECT_EQ(5, getPacketLength(msg));
+          return 5;
+        });
         const auto send = [&packet, error](const Buffer::RawSlice* slices, uint64_t count) {
           EXPECT_TRUE(TestUtility::rawSlicesEqual(slices, packet.getRawSlices().data(), count));
           if (error != 0) {
@@ -226,11 +224,11 @@ TEST_P(UdpListenerImplBatchWriterTest, NonBatchablePacketsFlushInOrder) {
           return Api::IoCallUint64Result{packet.length(), Api::IoError::none()};
         };
         if (connected) {
-          EXPECT_CALL(io_handle, writev(_, fragmented ? 2 : 1)).WillOnce(Invoke(send));
+          EXPECT_CALL(io_handle, writev(_, fragmented ? 2 : 1)).WillOnce(send);
         } else {
           EXPECT_CALL(io_handle, sendmsg(_, fragmented ? 2 : 1, 0, source->ip(),
                                          testing::Ref(*client_.localAddress())))
-              .WillOnce(testing::WithArgs<0, 1>(Invoke(send)));
+              .WillOnce(testing::WithArgs<0, 1>(send));
         }
         auto result = writer.writePacket(packet, source->ip(), *client_.localAddress());
         EXPECT_EQ(error == 0, result.ok());
@@ -257,21 +255,20 @@ TEST_P(UdpListenerImplBatchWriterTest, SendEmptyDatagramsInOrder) {
   testing::InSequence sequence;
 
   const std::string payload("payload");
-  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce(Invoke([&](int, const msghdr* message, int) {
+  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce([&](int, const msghdr* message, int) {
     EXPECT_EQ(payload.length(), getPacketLength(message));
     return payload.length();
-  }));
+  });
   for (int i = 0; i < 2; ++i) {
-    EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
-        .WillOnce(Invoke([](int, const msghdr* message, int) {
-          EXPECT_EQ(1, message->msg_iovlen);
-          EXPECT_NE(nullptr, message->msg_iov);
-          if (message->msg_iov != nullptr && message->msg_iovlen == 1) {
-            EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
-            EXPECT_EQ(0, message->msg_iov[0].iov_len);
-          }
-          return 0;
-        }));
+    EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce([](int, const msghdr* message, int) {
+      EXPECT_EQ(1, message->msg_iovlen);
+      EXPECT_NE(nullptr, message->msg_iov);
+      if (message->msg_iov != nullptr && message->msg_iovlen == 1) {
+        EXPECT_NE(nullptr, message->msg_iov[0].iov_base);
+        EXPECT_EQ(0, message->msg_iov[0].iov_len);
+      }
+      return 0;
+    });
   }
 
   Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
@@ -308,10 +305,10 @@ TEST_P(UdpListenerImplBatchWriterTest, DropEmptyDatagramWhenRuntimeGuardDisabled
   quic::ScopedGlobalSyscallWrapperOverride os_calls(&os_sys_calls);
 
   const std::string payload("payload");
-  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce(Invoke([&](int, const msghdr* message, int) {
+  EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _)).WillOnce([&](int, const msghdr* message, int) {
     EXPECT_EQ(payload.length(), getPacketLength(message));
     return payload.length();
-  }));
+  });
 
   Address::InstanceConstSharedPtr send_from_addr = getNonDefaultSourceAddress();
   Buffer::OwnedImpl payload_buffer(payload);
@@ -385,10 +382,10 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
 
     // Mock the socket to be write blocked on sendmsg syscall
     EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
-        .WillOnce(Invoke([](int /*sockfd*/, const msghdr* /*msg*/, int /*flags*/) {
+        .WillOnce([](int /*sockfd*/, const msghdr* /*msg*/, int /*flags*/) {
           errno = EWOULDBLOCK;
           return -1;
-        }));
+        });
 
     // Now send the following payload
     Buffer::InstancePtr following_buffer(new Buffer::OwnedImpl());
@@ -419,10 +416,10 @@ TEST_P(UdpListenerImplBatchWriterTest, WriteBlocked) {
     // Reset write blocked status and verify correct buffer is flushed
     udp_packet_writer_->setWritable();
     EXPECT_CALL(os_sys_calls, Sendmsg(_, _, _))
-        .WillOnce(Invoke([&](int /*sockfd*/, const msghdr* msg, int /*flags*/) {
+        .WillOnce([&](int /*sockfd*/, const msghdr* msg, int /*flags*/) {
           EXPECT_EQ(internal_buffer.length(), getPacketLength(msg));
           return internal_buffer.length();
-        }));
+        });
     auto flush_result = udp_packet_writer_->flush();
     EXPECT_TRUE(flush_result.ok());
     EXPECT_EQ(flush_result.return_value_, 0);

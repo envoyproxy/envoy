@@ -110,7 +110,6 @@ public:
 
 private:
   const Envoy::Http::HeaderUtility::HeaderDataPtr header_;
-  const bool match_headers_individually_;
 };
 
 /**

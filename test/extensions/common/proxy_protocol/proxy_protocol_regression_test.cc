@@ -19,7 +19,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -117,7 +116,7 @@ public:
     };
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
-        .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
+        .WillOnce([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
               nullptr,
               std::make_unique<ListenerFilters::ProxyProtocol::Filter>(
@@ -126,21 +125,21 @@ public:
                       envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol())));
           maybeExitDispatcher();
           return true;
-        }));
+        });
     conn_->connect();
     if (read) {
       read_filter_ = std::make_shared<NiceMock<Network::MockReadFilter>>();
       EXPECT_CALL(factory_, createNetworkFilterChain(_, _))
-          .WillOnce(Invoke([&](Network::Connection& connection,
-                               const Filter::NetworkFilterFactoriesList&) -> bool {
+          .WillOnce([&](Network::Connection& connection,
+                        const Filter::NetworkFilterFactoriesList&) -> bool {
             server_connection_ = &connection;
             connection.addConnectionCallbacks(server_callbacks_);
             connection.addReadFilter(read_filter_);
             return true;
-          }));
+          });
     }
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { maybeExitDispatcher(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { maybeExitDispatcher(); });
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -157,12 +156,12 @@ public:
   void expectData(std::string expected) {
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
-        .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
+        .WillOnce([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
           EXPECT_EQ(buffer.toString(), expected);
           buffer.drain(expected.length());
           dispatcher_->exit();
           return Network::FilterStatus::Continue;
-        }));
+        });
 
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
@@ -170,7 +169,7 @@ public:
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
 
     conn_->close(Network::ConnectionCloseType::NoFlush);
 

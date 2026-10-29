@@ -597,6 +597,77 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PrefixRewriteRewritesUpstream
   EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
 }
 
+// A recorded prefix rewrite rule rewrites the path sent upstream, keeping the query string and
+// recording the original path the way a configured route does.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PrefixRewriteRuleRewritesUpstreamPath) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/api/foo?q=1"},
+                               {"x-decision", "unspecified"},
+                               {"x-prefix-rewrite-rule", "/api=/internal"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
+  EXPECT_EQ("/api/foo?q=1", upstream_headers->getEnvoyOriginalPathValue());
+}
+
+// A prefix rewrite rule over the whole path replaces the path without its query string.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, WholePathPrefixRewriteRuleRewritesUpstreamPath) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/anything/here?q=1"},
+                               {"x-decision", "unspecified"},
+                               {"x-prefix-rewrite-rule", "=/fixed"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/fixed?q=1", upstream_headers->getPathValue());
+  EXPECT_EQ("/anything/here?q=1", upstream_headers->getEnvoyOriginalPathValue());
+}
+
+// A route built for a cache key serves the later requests on the worker, and the prefix rewrite
+// rule it carries rewrites the path of each request it applies to.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, BuiltRouteCacheServesLaterRequests) {
+  setupTest(R"EOF(
+built_route_cache:
+  max_entries_per_worker: 16
+  verify_one_in: 0
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto upstream_headers_for = [this](const std::string& path) {
+    auto response = sendRequest({{":path", path},
+                                 {"x-template", "canary"},
+                                 {"x-cache-key", "7"},
+                                 {"x-prefix-rewrite-rule", "/api=/internal"},
+                                 {"x-stop-chain", "true"}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.back().get())
+        ->lastRequestHeaders();
+  };
+
+  upstream_headers_for("/api/one");
+  auto upstream_headers = upstream_headers_for("/api/two");
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/two", upstream_headers->getPathValue());
+  EXPECT_EQ("/api/two", upstream_headers->getEnvoyOriginalPathValue());
+
+  // The cached route does not serve a path its rule does not apply to, so the module decides that
+  // request afresh and its rule is rejected.
+  upstream_headers = upstream_headers_for("/other");
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/other", upstream_headers->getPathValue());
+  EXPECT_EQ(2, counterValue("dynamicmodulescustom.route_specifier.test.built_route_cache_miss"));
+  EXPECT_EQ(1, counterValue("dynamicmodulescustom.route_specifier.test.built_route_cache_hit"));
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.route_specifier.test.rewrite_not_applied"));
+}
+
 // A regex rewrite carried by a selected route override rewrites the path sent upstream when the
 // decision resolves, keeping the query string the same way a prefix rewrite does.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteOverrideRegexRewritesUpstreamPath) {

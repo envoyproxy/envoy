@@ -2250,6 +2250,9 @@ pub trait EnvoyHttpFilter {
   /// headers that affect cluster selection but not the route itself. This is more efficient than
   /// clearing the entire route cache.
   fn clear_route_cluster_cache(&mut self);
+
+  /// Marks the downstream connection to be drained once the current HTTP stream completes.
+  fn drain_connection_upon_completion(&mut self);
 }
 
 /// Trait representing a tracing span.
@@ -4489,6 +4492,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
 
   fn clear_route_cluster_cache(&mut self) {
     unsafe { abi::envoy_dynamic_module_callback_http_clear_route_cluster_cache(self.raw_ptr) }
+  }
+
+  fn drain_connection_upon_completion(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_drain_connection_upon_completion(self.raw_ptr)
+    }
   }
 }
 

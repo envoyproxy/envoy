@@ -27,7 +27,6 @@ using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::IsOk;
 using ::testing::ContainsRegex;
 using ::testing::Eq;
-using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 using ::testing::Not;
 using ::testing::StrictMock;
@@ -170,9 +169,9 @@ public:
     auto header_validator =
         std::make_unique<StrictMock<::Envoy::Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, createClientHeaderValidator(::Envoy::Http::Protocol::Http2, _))
-        .WillOnce(InvokeWithoutArgs([]() {
+        .WillOnce([]() {
           return std::make_unique<StrictMock<::Envoy::Http::MockClientHeaderValidator>>();
-        }));
+        });
     return header_validator;
   }
 };
@@ -207,9 +206,9 @@ public:
     auto header_validator =
         std::make_unique<StrictMock<::Envoy::Http::MockHeaderValidatorFactory>>();
     EXPECT_CALL(*header_validator, createClientHeaderValidator(::Envoy::Http::Protocol::Http2, _))
-        .WillOnce(InvokeWithoutArgs([]() {
+        .WillOnce([]() {
           return std::make_unique<StrictMock<::Envoy::Http::MockClientHeaderValidator>>();
-        }));
+        });
     return header_validator;
   }
 
