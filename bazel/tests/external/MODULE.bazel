@@ -39,5 +39,10 @@ use_repo(
     python = "python_versions",
 )
 
-envoy_toolchains_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_toolchains_extension")
-use_repo(envoy_toolchains_ext, "clang_platform")
+arch_alias_ext = use_extension("@envoy_toolshed//repository:extensions.bzl", "arch_alias_extension")
+arch_alias_ext.alias(
+    name = "clang_platform",
+    aarch64 = "@envoy//bazel/platforms/rbe:linux_arm64",
+    amd64 = "@envoy//bazel/platforms/rbe:linux_x64",
+)
+use_repo(arch_alias_ext, "clang_platform")

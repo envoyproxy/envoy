@@ -882,7 +882,7 @@
   "moduleExtensions": {
     "//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "rNIIWT/9Nn6sjbF0046saR6EjIubEFCOxy5OtUMuHBQ=",
+        "bzlTransitiveDigest": "sxLyeEErQZJaneY7TbCfJhC0+ROJNpQF4dXpvVNyPhs=",
         "usagesDigest": "ZpuEf1KF/TghekxUsMzRsKCv4PB5ZJa/6FZpycpQ1rQ=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -900,36 +900,9 @@
         }
       }
     },
-    "//bazel:extensions.bzl%envoy_llvm_extension": {
-      "general": {
-        "bzlTransitiveDigest": "rNIIWT/9Nn6sjbF0046saR6EjIubEFCOxy5OtUMuHBQ=",
-        "usagesDigest": "4BYUZ/mdJPuAQWeEIHE7qnQUYuQuYlMBfaKaa1HyKcs=",
-        "recordedInputs": [
-          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:,bazel_tools bazel_tools",
-          "REPO_MAPPING:,cu +wasm_cargo+cu",
-          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools",
-          "REPO_MAPPING:,llvm_minimal_linux_x64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64",
-          "REPO_MAPPING:,llvm_minimal_linux_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64",
-          "REPO_MAPPING:,llvm_minimal_macos_arm64 envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64"
-        ],
-        "generatedRepoSpecs": {
-          "llvm_toolchain_llvm": {
-            "repoRuleId": "@@//bazel:extensions.bzl%_llvm_alias_repo",
-            "attributes": {
-              "minimal_linux_x64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_x64//:BUILD.bazel",
-              "minimal_linux_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
-              "minimal_macos_arm64": "@@envoy_toolshed++llvm_minimal_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
-            }
-          }
-        }
-      }
-    },
     "//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "rNIIWT/9Nn6sjbF0046saR6EjIubEFCOxy5OtUMuHBQ=",
+        "bzlTransitiveDigest": "sxLyeEErQZJaneY7TbCfJhC0+ROJNpQF4dXpvVNyPhs=",
         "usagesDigest": "U8oobsNuxeblWpM4u062Qd0yvzmB1Z3JeAu9gEt0mUg=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -951,7 +924,7 @@
     },
     "//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "rNIIWT/9Nn6sjbF0046saR6EjIubEFCOxy5OtUMuHBQ=",
+        "bzlTransitiveDigest": "sxLyeEErQZJaneY7TbCfJhC0+ROJNpQF4dXpvVNyPhs=",
         "usagesDigest": "vG8Xv0QW97RbvNNfjt+m5v5CW9b+v8egs+1c10mWGCM=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_skylib bazel_skylib+",
@@ -965,31 +938,6 @@
           "envoy_repo": {
             "repoRuleId": "@@//bazel:repo.bzl%_envoy_repo",
             "attributes": {}
-          }
-        }
-      }
-    },
-    "//bazel:extensions.bzl%envoy_toolchains_extension": {
-      "general": {
-        "bzlTransitiveDigest": "rNIIWT/9Nn6sjbF0046saR6EjIubEFCOxy5OtUMuHBQ=",
-        "usagesDigest": "7LBd80JtQ6zx+V7v0cdVOeMU0X91H26U4kWEcWkBxfQ=",
-        "recordedInputs": [
-          "REPO_MAPPING:,bazel_skylib bazel_skylib+",
-          "REPO_MAPPING:,bazel_tools bazel_tools",
-          "REPO_MAPPING:,cu +wasm_cargo+cu",
-          "REPO_MAPPING:,envoy_toolshed envoy_toolshed+",
-          "REPO_MAPPING:,rules_rust rules_rust+",
-          "REPO_MAPPING:rules_rust+,bazel_tools bazel_tools"
-        ],
-        "generatedRepoSpecs": {
-          "clang_platform": {
-            "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
-            "attributes": {
-              "aliases": {
-                "amd64": "'@@//bazel/platforms/rbe:linux_x64'",
-                "aarch64": "'@@//bazel/platforms/rbe:linux_arm64'"
-              }
-            }
           }
         }
       }
@@ -1362,10 +1310,10 @@
         }
       }
     },
-    "@@envoy_toolshed+//compile:extensions.bzl%llvm_minimal_extension": {
+    "@@envoy_toolshed+//compile:extensions.bzl%llvm_toolchain_alias_extension": {
       "general": {
         "bzlTransitiveDigest": "/RNVeiO7IiL90xerZdQF28ZpLaeqlC7gARzIr+XJA4w=",
-        "usagesDigest": "sMHYmTogUWnMSRcADatnlChdZgwRocYc+uv9WwqVPO4=",
+        "usagesDigest": "LMxmbGUhxccB3jlJtpXDUjBo9YGa1Sc7exdCY7XjMzs=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "llvm_minimal_linux_x64": {
@@ -1390,6 +1338,14 @@
               "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.32/llvm-minimal-22.1.8-macOS-ARM64.tar.zst",
               "sha256": "ca6c644a6d285d52d62bf7cb206d839623668eaf86cdc25bc0a709cd137a2017",
               "strip_prefix": "llvm-minimal-22.1.8-macOS-ARM64"
+            }
+          },
+          "llvm_toolchain_llvm": {
+            "repoRuleId": "@@envoy_toolshed+//compile:llvm_minimal.bzl%llvm_toolchain_alias",
+            "attributes": {
+              "minimal_linux_x64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_linux_x64//:BUILD.bazel",
+              "minimal_linux_arm64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_linux_arm64//:BUILD.bazel",
+              "minimal_macos_arm64": "@@envoy_toolshed++llvm_toolchain_alias_extension+llvm_minimal_macos_arm64//:BUILD.bazel"
             }
           }
         }
@@ -1554,6 +1510,24 @@
               "linux_aarch64": "@@envoy_toolshed++sq_prebuilt_extension+sq_prebuilt_linux_aarch64//:BUILD.bazel",
               "linux_x86_64": "@@envoy_toolshed++sq_prebuilt_extension+sq_prebuilt_linux_x86_64//:BUILD.bazel",
               "toolchain_type_label": "'@@envoy_toolshed+//pgp:toolchain_type'"
+            }
+          }
+        }
+      }
+    },
+    "@@envoy_toolshed+//repository:extensions.bzl%arch_alias_extension": {
+      "general": {
+        "bzlTransitiveDigest": "oZ1GQvsh/sFXd5CnpYRnLm8vjQfhyjI/+hujmuRzNkY=",
+        "usagesDigest": "OJ+ub/eG+Gc4fG4yyAFr/nlnbpGMRTtqDIvZlMzwxD8=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "clang_platform": {
+            "repoRuleId": "@@envoy_toolshed+//repository:utils.bzl%arch_alias",
+            "attributes": {
+              "aliases": {
+                "amd64": "'@@//bazel/platforms/rbe:linux_x64'",
+                "aarch64": "'@@//bazel/platforms/rbe:linux_arm64'"
+              }
             }
           }
         }
