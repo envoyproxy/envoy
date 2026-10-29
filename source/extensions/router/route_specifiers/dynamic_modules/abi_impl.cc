@@ -902,6 +902,20 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_respons
   return true;
 }
 
+bool envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer virtual_cluster_name) {
+  auto* context = routeSpecifierContext(context_envoy_ptr);
+  const auto* virtual_cluster = context->config.virtualCluster(toStringView(virtual_cluster_name));
+  if (virtual_cluster == nullptr) {
+    ENVOY_LOG_MISC(debug, "dynamic module route specifier selected unknown virtual cluster '{}'",
+                   toStringView(virtual_cluster_name));
+    return false;
+  }
+  context->overrides.virtual_cluster = virtual_cluster;
+  return true;
+}
+
 bool envoy_dynamic_module_callback_route_specifier_set_route_override(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer override_id) {

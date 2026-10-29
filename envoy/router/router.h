@@ -380,6 +380,8 @@ public:
   }
 };
 
+using VirtualClusterConstPtr = std::unique_ptr<const VirtualCluster>;
+
 class RateLimitPolicy;
 class Config;
 class CommonConfig;
@@ -1053,6 +1055,16 @@ public:
    * caller to extend or transfer ownership.
    */
   virtual VirtualHostConstSharedPtr virtualHostSharedPtr() const PURE;
+
+  /**
+   * Determine the virtual cluster a request routed by this route belongs to for use in stats, etc.
+   * By default this is the virtual cluster the owning virtual host matches for the headers.
+   * @param headers supplies the request headers.
+   * @return the virtual cluster or nullptr if there is no match.
+   */
+  virtual const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const {
+    return virtualHost().virtualCluster(headers);
+  }
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

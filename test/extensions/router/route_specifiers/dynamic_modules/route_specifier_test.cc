@@ -241,6 +241,26 @@ TEST_F(DynamicModuleRouteSpecifierTest, DuplicateRouteOverrideId) {
   EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr("duplicate route override id 'slow'")));
 }
 
+// A virtual cluster name may be declared once.
+TEST_F(DynamicModuleRouteSpecifierTest, DuplicateVirtualClusterName) {
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      virtual_cluster_names: [rides, rides]
+)EOF"));
+  EXPECT_THAT(config.status(),
+              HasStatusMessage(HasSubstr("duplicate virtual cluster name 'rides'")));
+}
+
+// A virtual cluster needs a name to count its stats under.
+TEST_F(DynamicModuleRouteSpecifierTest, EmptyVirtualClusterName) {
+  const std::string yaml =
+      specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
+      virtual_cluster_names: [""]
+)EOF");
+  EXPECT_THROW_WITH_REGEX(std::ignore = loadConfig(yaml), EnvoyException,
+                          "value length must be at least");
+}
+
 TEST_F(DynamicModuleRouteSpecifierTest, TemplateWithRouteSpecifiers) {
   const auto config =
       loadConfig(specifierYaml("route_specifier_no_op", R"EOF(      failure_policy: PASS_THROUGH
@@ -589,6 +609,38 @@ route_specifiers:
   EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr(
                                    "route templates require a route specifier configured on a "
                                    "virtual host or a route")));
+}
+
+// A virtual cluster belongs to a virtual host, which a specifier configured on a route
+// configuration does not have, so a configuration that pairs the two is rejected.
+TEST_F(DynamicModuleRouteSpecifierTest, VirtualClusterNamesRequireRouteBuilder) {
+  envoy::config::route::v3::RouteConfiguration proto_config;
+  TestUtility::loadFromYaml(R"EOF(
+name: test_route_config
+virtual_hosts:
+- name: test_vhost
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/"}
+    route: {cluster: matched_cluster}
+route_specifiers:
+- name: envoy.router.route_specifiers.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
+    dynamic_module_config:
+      name: route_specifier_no_op
+      do_not_close: true
+    specifier_name: test_route_specifier
+    stat_prefix: test
+    failure_policy: PASS_THROUGH
+    virtual_cluster_names: [rides]
+)EOF",
+                            proto_config);
+  const auto config = Envoy::Router::ConfigImpl::create(
+      proto_config, context_, creation_status_visitor_, init_manager_, false);
+  EXPECT_THAT(config.status(), HasStatusMessage(HasSubstr(
+                                   "virtual_cluster_names requires a route specifier configured on "
+                                   "a virtual host or a route")));
 }
 
 // With the runtime feature enabled a configured metrics namespace replaces the default, is
@@ -1194,6 +1246,10 @@ constexpr int CacheHit = envoy_dynamic_module_type_route_specifier_built_route_l
 constexpr int CacheHitVerify =
     envoy_dynamic_module_type_route_specifier_built_route_lookup_result_HitVerify;
 
+// The virtual clusters that the vary mode of the built route cache module names.
+constexpr absl::string_view VirtualClusterNames =
+    "      virtual_cluster_names: [vcluster_1, vcluster_2]\n";
+
 // A built_route_cache block keeping max_entries routes per worker, followed by the given fields.
 std::string builtRouteCacheYaml(uint32_t max_entries, absl::string_view fields = "") {
   return fmt::format("      built_route_cache:\n        max_entries_per_worker: {}\n{}",
@@ -1312,6 +1368,80 @@ TEST_F(DynamicModuleBuiltRouteCacheTest, HitReturnsTheRouteTheMissBuilt) {
   EXPECT_EQ(1, counterValue("built_route_cache_hit"));
   EXPECT_EQ(2, counterValue("built_route_cache_miss"));
   EXPECT_EQ(2, entries());
+}
+
+// A route reports the virtual cluster the module names, which has the stats of the virtual cluster
+// of that name on the virtual host, and a hit keeps it. A name the configuration does not declare
+// is not recorded, so the virtual clusters of the virtual host decide.
+TEST_F(DynamicModuleBuiltRouteCacheTest, RouteReportsTheVirtualClusterTheModuleNames) {
+  const std::string specifier =
+      absl::StrCat(builtRouteCacheModuleYaml("vary", builtRouteCacheYaml(16)), VirtualClusterNames);
+  const auto config = loadRaw(fmt::format(R"EOF(
+name: test_route_config
+virtual_hosts:
+- name: test_vhost
+  domains: ["*"]
+  routes:
+  - match: {{prefix: "/"}}
+    route: {{cluster: matched_cluster}}
+  virtual_clusters:
+  - name: api
+    headers:
+    - name: ":path"
+      string_match: {{prefix: "/api"}}
+  route_specifiers:
+  - name: envoy.router.route_specifiers.dynamic_modules
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
+{})EOF",
+                                          specifier));
+  ASSERT_TRUE(config.ok());
+  const auto virtual_cluster_for = [&](absl::string_view key, absl::string_view value) {
+    auto headers = requestHeaders("/api/v1");
+    headers.addCopy(Http::LowerCaseString("x-key"), key);
+    headers.addCopy(Http::LowerCaseString("x-vary"), "virtual-cluster");
+    headers.addCopy(Http::LowerCaseString("x-value"), value);
+    const auto route = config.value()->route(headers, stream_info_, 0).route;
+    EXPECT_NE(nullptr, route);
+    return route != nullptr ? route->virtualCluster(headers) : nullptr;
+  };
+
+  const Envoy::Router::VirtualCluster* named = virtual_cluster_for("1", "1");
+  ASSERT_NE(nullptr, named);
+  EXPECT_EQ("vcluster_1", named->name());
+  EXPECT_EQ("vhost.test_vhost.vcluster.vcluster_1.upstream_rq_total",
+            named->stats().upstream_rq_total_.name());
+  EXPECT_EQ(named, virtual_cluster_for("1", "1"));
+  EXPECT_EQ(CacheHit, lastCacheResult());
+
+  const Envoy::Router::VirtualCluster* matched = virtual_cluster_for("2", "3");
+  ASSERT_NE(nullptr, matched);
+  EXPECT_EQ("api", matched->name());
+}
+
+// A later name replaces the virtual cluster the module named before, while a name the configuration
+// does not declare is rejected and keeps it.
+TEST_F(DynamicModuleBuiltRouteCacheTest, LaterVirtualClusterNameReplacesTheSelection) {
+  const auto config = loadConfig(absl::StrCat(
+      builtRouteCacheModuleYaml("vary", builtRouteCacheYaml(16)), VirtualClusterNames));
+  ASSERT_TRUE(config.ok());
+  // What the two calls returned, followed by the virtual cluster the route counts its requests in.
+  const auto selection = [&](absl::string_view value) {
+    auto headers = requestHeaders("/api/v1");
+    headers.addCopy(Http::LowerCaseString("x-key"), value);
+    headers.addCopy(Http::LowerCaseString("x-vary"), "replaced-virtual-cluster");
+    headers.addCopy(Http::LowerCaseString("x-value"), value);
+    const auto route = config.value()->route(headers, stream_info_, 0).route;
+    if (route == nullptr || route->virtualCluster(headers) == nullptr) {
+      return std::string("none");
+    }
+    return absl::StrCat(
+        Envoy::Config::Metadata::metadataValue(&route->metadata(), "envoy.test.cache", "accepted")
+            .string_value(),
+        " ", route->virtualCluster(headers)->name().value());
+  };
+  EXPECT_EQ("1,1 vcluster_2", selection("2"));
+  EXPECT_EQ("1,0 vcluster_1", selection("3"));
 }
 
 // A decision that fails is not cached.
@@ -1897,11 +2027,12 @@ INSTANTIATE_TEST_SUITE_P(Fields, VerifiedHitFieldTest,
                                          "filter-disabled", "route-name", "path", "rule", "host",
                                          "request-header-add", "request-header-remove",
                                          "response-header-add", "response-header-remove",
-                                         "user-data"));
+                                         "user-data", "virtual-cluster"));
 
 TEST_P(VerifiedHitFieldTest, DifferenceEvictsTheRoute) {
-  const auto config = loadConfig(
-      builtRouteCacheModuleYaml("vary", builtRouteCacheYaml(16, "        verify_one_in: 1\n")));
+  const auto config = loadConfig(absl::StrCat(
+      builtRouteCacheModuleYaml("vary", builtRouteCacheYaml(16, "        verify_one_in: 1\n")),
+      VirtualClusterNames));
   ASSERT_TRUE(config.ok());
   const auto request = [&](absl::string_view value) {
     auto headers = requestHeaders("/api/v1");

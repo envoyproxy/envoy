@@ -2464,6 +2464,9 @@ WEAK_STUB(RouteSpecifierSetPrefixRewriteRule,
               {nullptr, 0}))
 WEAK_STUB(RouteSpecifierLookupBuiltRoute,
           envoy_dynamic_module_callback_route_specifier_lookup_built_route(nullptr, 1))
+WEAK_STUB(RouteSpecifierSetVirtualClusterName,
+          envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(nullptr,
+                                                                                 {nullptr, 0}))
 
 } // namespace
 } // namespace DynamicModules

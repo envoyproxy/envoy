@@ -18574,6 +18574,23 @@ bool envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_respons
     uint32_t status_code);
 
 /**
+ * envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name records the virtual
+ * cluster the request is counted in, replacing the one the virtual host matches. The name must be
+ * one of the virtual_cluster_names the route specifier declares, and a later call replaces the
+ * selection. The request uses the stats of the virtual cluster of that name on the virtual host,
+ * and the %VIRTUAL_CLUSTER_NAME% access log command operator reports the name. It is a route entry
+ * property, so recording it for a direct response or a redirect fails the decision.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param virtual_cluster_name is the name of the virtual cluster. The buffer is owned by the
+ * module.
+ * @return true if the name is declared, false otherwise, in which case nothing changes.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer virtual_cluster_name);
+
+/**
  * envoy_dynamic_module_callback_route_specifier_set_route_metadata_string records the string value
  * of a route metadata entry. The entry is layered onto the metadata of the route, so consumers that
  * read route metadata, such as the rate limit ROUTE_ENTRY action or the METADATA(ROUTE) formatter,

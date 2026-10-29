@@ -12552,6 +12552,7 @@ const STUB_ROUTE_HEADERS: [(&[u8], &[u8]); 2] = [(b":path", b"/index"), (b"env",
 const STUB_ROUTE_VALUE: &str = "route-value";
 const STUB_ROUTE_RANDOM_VALUE: u64 = 0x1234;
 const STUB_ROUTE_TEMPLATE_ID: &str = "canary";
+const STUB_ROUTE_VIRTUAL_CLUSTER_NAME: &str = "rides";
 
 // Toggles that let a single test drive both the found and the not-found branch of a callback.
 static STUB_ROUTE_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
@@ -12572,6 +12573,7 @@ struct StubRouteDecision {
   request_body_buffer_limit: Option<u64>,
   priority: Option<abi::envoy_dynamic_module_type_resource_priority>,
   cluster_not_found_response_code: Option<u32>,
+  virtual_cluster_name: Option<String>,
   route_override: Option<String>,
   route_metadata_string: Option<(String, String, String)>,
   route_metadata_number: Option<(String, String, f64)>,
@@ -12611,6 +12613,7 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     request_body_buffer_limit: None,
     priority: None,
     cluster_not_found_response_code: None,
+    virtual_cluster_name: None,
     route_override: None,
     route_metadata_string: None,
     route_metadata_number: None,
@@ -13228,6 +13231,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_cluster_not_
     .lock()
     .unwrap()
     .cluster_not_found_response_code = Some(status_code);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_virtual_cluster_name(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  virtual_cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let name = unsafe { stub_specifier_string(virtual_cluster_name) };
+  if name != STUB_ROUTE_VIRTUAL_CLUSTER_NAME {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().virtual_cluster_name = Some(name);
   true
 }
 
@@ -13942,6 +13958,8 @@ fn test_route_specifier_context_records_decision() {
   ctx.set_priority(route_specifier::ResourcePriority::High);
   assert!(ctx.set_cluster_not_found_response_code(404));
   assert!(!ctx.set_cluster_not_found_response_code(99));
+  assert!(ctx.set_virtual_cluster_name(STUB_ROUTE_VIRTUAL_CLUSTER_NAME));
+  assert!(!ctx.set_virtual_cluster_name("unknown"));
   assert!(ctx.set_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!ctx.set_route_override("unknown"));
   // Unsetting the selected override reverts it; a second unset has nothing to match. The final
@@ -14028,6 +14046,10 @@ fn test_route_specifier_context_records_decision() {
     decision.priority
   );
   assert_eq!(Some(404), decision.cluster_not_found_response_code);
+  assert_eq!(
+    Some(STUB_ROUTE_VIRTUAL_CLUSTER_NAME.to_string()),
+    decision.virtual_cluster_name
+  );
   assert_eq!(
     Some(STUB_SPECIFIER_OVERRIDE_NAME.to_string()),
     decision.route_override

@@ -51,6 +51,9 @@ public:
   VirtualHostConstSharedPtr virtualHostSharedPtr() const override {
     return base_route_->virtualHostSharedPtr();
   }
+  const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
+    return base_route_->virtualCluster(headers);
+  }
 
 protected:
   const Router::RouteConstSharedPtr base_route_;

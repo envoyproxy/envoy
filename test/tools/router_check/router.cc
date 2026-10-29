@@ -390,14 +390,11 @@ bool RouterCheckTool::compareVirtualCluster(
   }
   const bool has_route_entry =
       tool_config.route_ != nullptr && tool_config.route_->routeEntry() != nullptr;
-  const bool has_virtual_cluster =
-      has_route_entry &&
-      tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_) != nullptr;
+  const Router::VirtualCluster* virtual_cluster =
+      has_route_entry ? tool_config.route_->virtualCluster(*tool_config.request_headers_) : nullptr;
   std::string actual = "";
-  if (has_virtual_cluster) {
-    Stats::StatName stat_name =
-        tool_config.route_->virtualHost().virtualCluster(*tool_config.request_headers_)->statName();
-    actual = tool_config.symbolTable().toString(stat_name);
+  if (virtual_cluster != nullptr) {
+    actual = tool_config.symbolTable().toString(virtual_cluster->statName());
   }
   const bool matches =
       compareResults(actual, expected.virtual_cluster_name().value(), "virtual_cluster_name");

@@ -488,6 +488,41 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverrideOnDirectResponse) {
       testing::Ge(1));
 }
 
+// A request is counted in the virtual cluster the module names, with the stats of the virtual
+// cluster of that name on the virtual host, and the %VIRTUAL_CLUSTER_NAME% access log command
+// operator reports it. A name the configuration does not declare is not recorded.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesVirtualCluster) {
+  useAccessLog("%VIRTUAL_CLUSTER_NAME%");
+  setupTest("virtual_cluster_names: [rides]\n");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{"x-template", "canary"}, {"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_total",
+                               testing::Eq(1));
+  test_server_->waitForCounter("vhost.integration.vcluster.rides.upstream_rq_200", testing::Eq(1));
+  EXPECT_NE(std::string::npos, waitForAccessLog(access_log_name_).find("rides"));
+
+  response = sendRequest({{"x-template", "canary"}, {"x-virtual-cluster", "unknown"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(1, counterValue("vhost.integration.vcluster.rides.upstream_rq_total"));
+  EXPECT_EQ(nullptr, test_server_->counter("vhost.integration.vcluster.unknown.upstream_rq_total"));
+}
+
+// A virtual cluster is a route entry property, so recording one for a route that answers the
+// request directly fails the decision.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, VirtualClusterOnDirectResponse) {
+  setupTest("virtual_cluster_names: [rides]\n");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{"x-template", "direct"}, {"x-virtual-cluster", "rides"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter(
+      "dynamicmodulescustom.route_specifier.test.failure_override_on_non_route_entry",
+      testing::Ge(1));
+  EXPECT_EQ(0, counterValue("vhost.integration.vcluster.rides.upstream_rq_total"));
+}
+
 // The route timeout a module records reaches the upstream request.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, OverridesTimeout) {
   setupTest();

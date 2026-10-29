@@ -21,6 +21,7 @@
 //!   `x-buffer-limit`   the request body buffer limit to set, in bytes.
 //!   `x-priority`       `high` or `default`, the upstream resource priority to set.
 //!   `x-not-found-code` the status code to reply with when the selected cluster does not exist.
+//!   `x-virtual-cluster` the name of the virtual cluster to count the request in.
 //!   `x-override`       the override_id of the route override to select.
 //!   `x-unset-override` the override_id of a route override selection to revert.
 //!   `x-set-path`       the path of the request sent upstream.
@@ -461,6 +462,10 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     if let Some(code) = read_u64_header(ctx, "x-not-found-code") {
       // Tests also pass out of range codes, so a rejection is expected here.
       let _ = ctx.set_cluster_not_found_response_code(u32::try_from(code).unwrap_or(u32::MAX));
+    }
+    if let Some(name) = ctx.get_request_header("x-virtual-cluster") {
+      // Tests also pass names that are not declared, so a rejection is expected here.
+      let _ = ctx.set_virtual_cluster_name(&buffer_to_string(name));
     }
     if let Some(priority) = ctx.get_request_header("x-priority") {
       ctx.set_priority(match priority.as_slice() {

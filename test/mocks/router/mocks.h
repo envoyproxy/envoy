@@ -564,6 +564,7 @@ public:
   MOCK_METHOD(const std::string&, routeName, (), (const));
   MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
   MOCK_METHOD(VirtualHostConstSharedPtr, virtualHostSharedPtr, (), (const));
+  MOCK_METHOD(const VirtualCluster*, virtualCluster, (const Http::HeaderMap& headers), (const));
 
   // Router::RouteEntry
   MOCK_METHOD(const std::string&, clusterName, (), (const));

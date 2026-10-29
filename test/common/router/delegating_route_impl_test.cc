@@ -31,6 +31,11 @@ TEST(DelegatingRoute, DelegatingRouteTest) {
   TEST_METHOD(routeName);
   TEST_METHOD(virtualHost);
 
+  Http::TestRequestHeaderMapImpl headers;
+  TestVirtualCluster virtual_cluster;
+  EXPECT_CALL(*inner_object_ptr, virtualCluster).WillOnce(Return(&virtual_cluster));
+  EXPECT_EQ(&virtual_cluster, wrapper_object.virtualCluster(headers));
+
   std::string name;
   TEST_METHOD(mostSpecificPerFilterConfig, name);
 

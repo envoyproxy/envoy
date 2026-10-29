@@ -127,6 +127,20 @@ entry properties. Module selected route metadata can change authorization decisi
 descriptors and access log fields, so the override set is static configuration chosen by trusted in
 process code.
 
+Virtual clusters
+----------------
+
+A module can count a request in a virtual cluster with ``set_virtual_cluster_name``, in place of
+the virtual cluster the virtual host matches among its
+:ref:`virtual_clusters <envoy_v3_api_field_config.route.v3.VirtualHost.virtual_clusters>`.
+The name must be one of the
+:ref:`virtual_cluster_names <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.virtual_cluster_names>`
+the specifier declares. The request is counted in the stats of the virtual cluster of that name on
+the virtual host, so a virtual host can stop matching requests against its virtual clusters while
+the stats keep their names. A virtual cluster is a route entry property, so recording one for a
+direct response or a redirect fails the decision and counts in
+``failure_override_on_non_route_entry``.
+
 Rewriting the path
 ------------------
 

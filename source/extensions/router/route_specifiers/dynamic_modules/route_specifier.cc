@@ -275,7 +275,8 @@ bool RouteOverrides::hasRouteEntryOverrides() const {
          (route_override != nullptr && route_override->hasRouteEntryProperties()) ||
          path.has_value() || prefix_rewrite_rule.has_value() || host.has_value() ||
          !request_headers_to_add.empty() || !request_headers_to_remove.empty() ||
-         !response_headers_to_add.empty() || !response_headers_to_remove.empty();
+         !response_headers_to_add.empty() || !response_headers_to_remove.empty() ||
+         virtual_cluster != nullptr;
 }
 
 bool RouteOverrides::operator==(const RouteOverrides& other) const {
@@ -287,7 +288,7 @@ bool RouteOverrides::operator==(const RouteOverrides& other) const {
                     overrides.path, overrides.prefix_rewrite_rule, overrides.finalize_regex_rewrite,
                     overrides.host, overrides.request_headers_to_add,
                     overrides.request_headers_to_remove, overrides.response_headers_to_add,
-                    overrides.response_headers_to_remove);
+                    overrides.response_headers_to_remove, overrides.virtual_cluster);
   };
   return fields(*this) == fields(other) && MessageUtil()(route_metadata, other.route_metadata);
 }
@@ -344,6 +345,12 @@ DynamicModuleRouteSpecifierConfig::routeOverride(absl::string_view override_id) 
   return it != route_overrides_.end() ? &it->second : nullptr;
 }
 
+const Envoy::Router::VirtualCluster*
+DynamicModuleRouteSpecifierConfig::virtualCluster(absl::string_view name) const {
+  const auto it = virtual_clusters_.find(name);
+  return it != virtual_clusters_.end() ? it->second.get() : nullptr;
+}
+
 bool DynamicModuleRouteSpecifierConfig::registerRouteTemplate(absl::string_view id,
                                                               absl::string_view serialized_route) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
@@ -388,6 +395,11 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   if (proto_config.has_built_route_cache() && !context.routeBuilder().has_value()) {
     return absl::InvalidArgumentError(
         "built_route_cache requires a route specifier configured on a virtual host or a route");
+  }
+  // A virtual cluster belongs to a virtual host, which a route configuration does not have.
+  if (!proto_config.virtual_cluster_names().empty() && !context.routeBuilder().has_value()) {
+    return absl::InvalidArgumentError(
+        "virtual_cluster_names requires a route specifier configured on a virtual host or a route");
   }
 
   auto on_config_new = dynamic_module->getFunctionPointer<OnRouteSpecifierConfigNewType>(
@@ -480,6 +492,16 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
       }
     }
     config->route_overrides_.emplace(override_id, std::move(entry_or_error.value()));
+  }
+
+  config->virtual_clusters_.reserve(proto_config.virtual_cluster_names().size());
+  for (const std::string& name : proto_config.virtual_cluster_names()) {
+    if (config->virtual_clusters_.contains(name)) {
+      return absl::InvalidArgumentError(fmt::format("duplicate virtual cluster name '{}'", name));
+    }
+    auto virtual_cluster_or_error = route_builder->buildVirtualCluster(name);
+    RETURN_IF_NOT_OK_REF(virtual_cluster_or_error.status());
+    config->virtual_clusters_.emplace(name, std::move(virtual_cluster_or_error.value()));
   }
 
   envoy_dynamic_module_type_envoy_buffer name_buf = {.ptr = config->specifier_name_.data(),
@@ -715,6 +737,12 @@ const Envoy::Router::RouteTracing* DynamicModuleRouteEntry::tracingConfig() cons
   const RouteOverride* entry = overrides_.route_override;
   return entry != nullptr && entry->tracing != nullptr ? entry->tracing.get()
                                                        : DelegatingRouteEntry::tracingConfig();
+}
+
+const Envoy::Router::VirtualCluster*
+DynamicModuleRouteEntry::virtualCluster(const Http::HeaderMap& headers) const {
+  return overrides_.virtual_cluster != nullptr ? overrides_.virtual_cluster
+                                               : DelegatingRouteEntry::virtualCluster(headers);
 }
 
 const std::string& DynamicModuleRouteEntry::clusterName() const {

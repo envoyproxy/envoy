@@ -159,6 +159,9 @@ struct RouteOverrides {
   // Points into the override map of the configuration, which is immutable after construction. Null
   // when the module selected none.
   const RouteOverride* route_override{nullptr};
+  // Points into the virtual clusters of the configuration, which are immutable after construction.
+  // Null when the module selected none.
+  const Envoy::Router::VirtualCluster* virtual_cluster{nullptr};
   // Metadata the module layered onto the route, keyed by namespace. Empty when the module set none.
   envoy::config::core::v3::Metadata route_metadata;
   absl::flat_hash_map<std::string, bool> filter_disabled;
@@ -236,6 +239,13 @@ public:
   const RouteOverride* routeOverride(absl::string_view override_id) const;
 
   /**
+   * @param name the name of the virtual cluster in virtual_cluster_names.
+   * @return the matching virtual cluster, or nullptr when there is none. The returned pointer is
+   * valid for the lifetime of this configuration.
+   */
+  const Envoy::Router::VirtualCluster* virtualCluster(absl::string_view name) const;
+
+  /**
    * Registers a route template from a serialized Route, building it with the route builder of the
    * configuration. Only valid while the in-module configuration is being created.
    * @param id the identifier the module selects the template with.
@@ -292,13 +302,14 @@ private:
   const std::string specifier_name_;
   const std::string specifier_config_;
   const std::string specifier_instance_id_;
-  // Immutable after configuration load, so that the pointers routeTemplate() and
-  // routeOverride() hand out stay valid. A module may add templates during config creation
+  // Immutable after configuration load, so that the pointers routeTemplate(), routeOverride()
+  // and virtualCluster() hand out stay valid. A module may add templates during config creation
   // with registerRouteTemplate(). template_ids_ is a deque so that a template id buffer handed to
   // the module keeps its address when a later registration grows the container.
   absl::flat_hash_map<std::string, Template> templates_;
   std::deque<std::string> template_ids_;
   RouteOverrideMap route_overrides_;
+  absl::flat_hash_map<std::string, Envoy::Router::VirtualClusterConstPtr> virtual_clusters_;
   // Valid only while the in-module configuration is being created, so that the module can register
   // route templates Envoy builds with the route builder of the configuration.
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
@@ -509,6 +520,8 @@ public:
   const Envoy::Config::TypedMetadata& typedMetadata() const override;
   std::optional<bool> filterDisabled(absl::string_view name) const override;
   const Envoy::Router::RouteTracing* tracingConfig() const override;
+  const Envoy::Router::VirtualCluster*
+  virtualCluster(const Http::HeaderMap& headers) const override;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;

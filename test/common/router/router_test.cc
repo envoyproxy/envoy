@@ -7834,6 +7834,29 @@ TEST_F(RouterTest, CanaryStatusFalse) {
                 .value());
 }
 
+// The request is counted in the virtual cluster the route reports, which need not be the one the
+// virtual host matches.
+TEST_F(RouterTest, VirtualClusterFromRoute) {
+  TestVirtualCluster route_virtual_cluster;
+  EXPECT_CALL(*callbacks_.route_, virtualCluster(_)).WillOnce(Return(&route_virtual_cluster));
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+  EXPECT_EQ(1U, route_virtual_cluster.stats().upstream_rq_total_.value());
+  EXPECT_EQ(0U,
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
 TEST_F(RouterTest, AutoHostRewriteEnabled) {
   NiceMock<Http::MockRequestEncoder> encoder;
   std::string req_host{"foo.bar.com"};
