@@ -1791,6 +1791,94 @@ TEST_F(RouterTest, UpstreamTimeout) {
       1U, callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, cm_.thread_local_cluster_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  // The request had been fully sent upstream, so the details carry no phase suffix.
+  EXPECT_EQ(callbacks_.details(), "response_timeout");
+}
+
+// Verify that a global timeout which fires while the upstream request is still waiting on the
+// connection pool records the connecting phase in the response code details.
+TEST_F(RouterTest, UpstreamTimeoutWhileConnecting) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(callbacks_.details(), "response_timeout{connecting}");
+}
+
+// Verify that a global timeout which fires after the connection is ready, but before the request
+// has been fully handed to the upstream codec, records the sending phase.
+TEST_F(RouterTest, UpstreamTimeoutWhileSendingRequest) {
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_->decodeData(data, true);
+
+  // Model an upstream filter chain that is still holding the request body: the downstream request
+  // is complete, so the route timeout is armed, but the codec has not been handed end of stream.
+  StreamInfo::UpstreamTiming& timing =
+      router_->upstreamRequests().front()->streamInfo().upstreamInfo()->upstreamTiming();
+  timing.last_upstream_tx_byte_sent_.reset();
+
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(callbacks_.details(), "response_timeout{sending_request}");
+}
+
+// Verify that the phase suffix is not added when the runtime guard is disabled.
+TEST_F(RouterTest, UpstreamTimeoutPhaseDetailsDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.response_timeout_phase_details", "false"}});
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  EXPECT_CALL(cancellable_, cancel(_));
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(callbacks_.details(), "response_timeout");
 }
 
 // Verify that a gRPC request hitting the global response timeout gets
@@ -4925,6 +5013,8 @@ TEST_F(RouterTest, RetryTimeoutDuringRetryDelay) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   response_timeout_->invokeCallback();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+  // No upstream request was in flight during the retry delay, so there is no phase to report.
+  EXPECT_EQ(callbacks_.details(), "response_timeout");
 }
 
 TEST_F(RouterTest, MaxStreamDurationValidlyConfiguredWithoutRetryPolicy) {
