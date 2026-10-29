@@ -111,20 +111,15 @@ message ExtAuthz {
   // Defaults to ``false``.
   bool shadow_mode = 12;
 
-  // When true, start authorization when the network filter receives a new connection,
-  // without waiting for downstream application data. Subsequent network filters do not
-  // receive their new connection callbacks until the check allows the connection to continue.
-  // This supports server-first protocols when this filter precedes a TCP proxy in IMMEDIATE mode.
+  // Start authorization on a new connection without waiting for downstream data, blocking
+  // subsequent network filters until the check allows the connection to continue. This supports
+  // server-first protocols when this filter precedes a TCP proxy in IMMEDIATE mode.
   //
-  // The check can run before the downstream TLS handshake completes. Client certificate
-  // attributes are therefore not guaranteed to be available. Only enable this option
-  // when authorization does not require attributes from the completed TLS handshake.
-  // Listener filter metadata is available, but metadata from subsequent network filters
-  // is not.
+  // The check may precede TLS handshake completion; do not use policies that require authenticated
+  // client certificate attributes. Metadata from subsequent network filters is also unavailable.
   //
-  // To allow downstream reads, this option sets ``envoy.tcp_proxy.receive_before_connect``
-  // in filter state if absent. An existing boolean true value is preserved. An existing
-  // false value or an object of another type causes the connection to close.
+  // Sets ``envoy.tcp_proxy.receive_before_connect`` to true if absent. An existing boolean true
+  // is preserved; false or an incorrectly typed value closes the connection.
   //
   // Defaults to false, which starts authorization when downstream data is received.
   bool check_on_new_connection = 13;

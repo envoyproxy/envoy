@@ -215,9 +215,7 @@ Authorization-driven routing for server-first protocols
 
 Enable :ref:`check_on_new_connection
 <envoy_v3_api_field_extensions.filters.network.ext_authz.v3.ExtAuthz.check_on_new_connection>`
-to start authorization without waiting for downstream application data. The filter stops iteration
-until authorization completes, so a following TCP proxy in ``IMMEDIATE`` mode selects its route
-after the authorization response has been processed.
+to authorize before TCP proxy selects its route, without waiting for downstream application data.
 
 For dynamic cluster selection, configure the filters in this order:
 
@@ -238,24 +236,18 @@ the set-filter-state configuration is:
       text_format_source:
         inline_string: "%DYNAMIC_METADATA(envoy.filters.network.ext_authz:cluster)%"
 
-With the default enforcement settings, a denial or authorization service error closes the downstream
-connection without opening an upstream connection. ``failure_mode_allow`` and ``shadow_mode``
-retain their existing semantics. Ensure the TCP proxy's fallback cluster is appropriate when
-authorization is disabled or allowed to fail open without returning routing metadata.
+Choose an appropriate TCP proxy fallback cluster for connections allowed without routing metadata,
+such as when authorization is disabled or fails open.
 
 .. attention::
 
-  This check runs before the downstream TLS handshake is guaranteed to complete. TLS inspection
-  can provide ClientHello information such as SNI, but does not authenticate a client certificate.
-  Do not enable this option for policies that require authenticated client certificate attributes.
-  Metadata from listener filters and preceding network filters is available; metadata produced
-  later in the network filter chain is not.
+  Authorization may run before the TLS handshake completes. Do not use policies that require
+  authenticated client certificate attributes. Metadata from subsequent network filters is also
+  unavailable.
 
-When this option is enabled, ext_authz sets ``envoy.tcp_proxy.receive_before_connect`` during
-callback initialization so TCP proxy does not disable downstream reads while authorization is
-pending. This also permits the downstream TLS handshake to progress.
-An existing boolean ``true`` value is preserved. An existing ``false`` value or an object of
-another type causes the connection to close rather than overwriting another filter's state.
+This option sets ``envoy.tcp_proxy.receive_before_connect`` to allow downstream reads, including
+TLS handshake progress. An existing boolean ``true`` is preserved; ``false`` or an incorrectly
+typed value closes the connection.
 
 Metadata Context
 ----------------
