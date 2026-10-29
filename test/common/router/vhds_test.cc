@@ -358,7 +358,7 @@ vhds:
               subscriptionFromConfigSource(_, _, _, _, _, _))
       .Times(0);
   EXPECT_OK(config_update_info->onRdsUpdate(route_config, "1"));
-  EXPECT_EQ(0UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
+  EXPECT_EQ(0UL, routeConfiguration(*config_update_info).virtual_hosts_size());
 
   auto vhost = buildVirtualHost("vhost1", "vhost.first");
   const auto& added_resources = buildAddedResources({vhost});
@@ -369,9 +369,9 @@ vhds:
                   ->onConfigUpdate(decoded_resources.refvec_, removed_resources, "1")
                   .ok());
 
-  EXPECT_EQ(1UL, config_update_info->protobufConfigurationCast().virtual_hosts_size());
-  EXPECT_TRUE(TestUtility::protoEqual(
-      vhost, config_update_info->protobufConfigurationCast().virtual_hosts(0)));
+  EXPECT_EQ(1UL, routeConfiguration(*config_update_info).virtual_hosts_size());
+  EXPECT_TRUE(
+      TestUtility::protoEqual(vhost, routeConfiguration(*config_update_info).virtual_hosts(0)));
 }
 
 // Verify that plain VHDS uses an on-demand subscription without a default collection.
