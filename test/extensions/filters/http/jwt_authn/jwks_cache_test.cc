@@ -268,6 +268,29 @@ TEST_F(JwksCacheTest, TestSubjects) {
   }
 }
 
+// Test algorithm constraints for JwtProvider
+TEST_F(JwksCacheTest, TestAllowedAlgorithms) {
+  setupCache(R"(
+providers:
+  provider1:
+    issuer: issuer1
+    allowed_algorithms:
+    - RS256
+    - ES256
+  provider2:
+    issuer: issuer2
+)");
+
+  auto* data1 = cache_->findByIssuer("issuer1");
+  EXPECT_TRUE(data1->isAlgorithmAllowed("RS256"));
+  EXPECT_TRUE(data1->isAlgorithmAllowed("ES256"));
+  EXPECT_FALSE(data1->isAlgorithmAllowed("HS256"));
+
+  // Without allowed_algorithms, any algorithm is allowed.
+  auto* data2 = cache_->findByIssuer("issuer2");
+  EXPECT_TRUE(data2->isAlgorithmAllowed("HS256"));
+}
+
 // Test lifetime constraints for JwtProvider
 TEST_F(JwksCacheTest, TestLifetime) {
   setupCache(ExpirationConfig);

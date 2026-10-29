@@ -54,7 +54,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //       cache_duration:
 //         seconds: 300
 //
-// [#next-free-field: 22]
+// [#next-free-field: 23]
 message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
@@ -150,6 +150,39 @@ message JwtProvider {
   //       seconds: 86400
   //
   google.protobuf.Duration max_lifetime = 21;
+
+  // If not empty, a JWT is only accepted if the ``alg`` in its header is one of these algorithms.
+  // Other JWTs are rejected before any key is tried. If empty, any algorithm a key in the JWKS
+  // can verify is accepted.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     allowed_algorithms:
+  //     - RS256
+  //     - ES256
+  //
+  repeated string allowed_algorithms = 22 [(validate.rules).repeated = {
+    unique: true
+    items {
+      string {
+        in: "ES256"
+        in: "ES384"
+        in: "ES512"
+        in: "HS256"
+        in: "HS384"
+        in: "HS512"
+        in: "RS256"
+        in: "RS384"
+        in: "RS512"
+        in: "PS256"
+        in: "PS384"
+        in: "PS512"
+        in: "EdDSA"
+      }
+    }
+  }];
 
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.

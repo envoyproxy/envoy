@@ -16,6 +16,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/router/retry_policy_impl.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
@@ -46,6 +47,9 @@ public:
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<JwtVerify::CheckAudience>(audiences);
+
+    allowed_algorithms_.insert(jwt_provider_.allowed_algorithms().begin(),
+                               jwt_provider_.allowed_algorithms().end());
 
     if (jwt_provider_.has_subjects()) {
       sub_matcher_.emplace(jwt_provider_.subjects(), context);
@@ -190,6 +194,10 @@ public:
     return lifetime < *max_exp_;
   }
 
+  bool isAlgorithmAllowed(absl::string_view alg) const override {
+    return allowed_algorithms_.empty() || allowed_algorithms_.contains(alg);
+  }
+
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
 
   bool isExpired() const override { return time_source_.monotonicTime() >= tls_->expire_; }
@@ -245,6 +253,7 @@ private:
   JwksAsyncFetcherPtr async_fetcher_;
   std::optional<Matchers::StringMatcherImpl> sub_matcher_;
   std::optional<absl::Duration> max_exp_;
+  absl::flat_hash_set<std::string> allowed_algorithms_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
