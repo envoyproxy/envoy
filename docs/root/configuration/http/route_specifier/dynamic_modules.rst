@@ -80,7 +80,13 @@ built is alive. ``set_route_user_data`` records a ``u64`` on the produced route,
 route to be wrapped even with no other override, and
 :ref:`on_route_specifier_route_destroy <arch_overview_dynamic_modules>` fires with that value when
 the route is destroyed. The hook may run on any thread and after the stream is gone, since another
-owner may retain the route, so a module must treat it as a lease release only. The
+owner may retain the route, so a module must treat it as a lease release only. A decision that
+builds no route to carry the value hands it instead to
+:ref:`on_route_specifier_user_data_discard <arch_overview_dynamic_modules>`,
+``on_user_data_discard`` in the Rust SDK. This happens for a decision other than ``Unspecified``, a
+skipped route, a decision Envoy cannot honor and a ``Hit`` from ``lookup_built_route``. The hook
+runs on the thread that resolves the route, before the specifier returns. With both hooks exported,
+a module gets back the last value it records for each decision. The
 :ref:`specifier_instance_id
 <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.specifier_instance_id>`
 lets two specifier instances sharing one module tell their routes apart.
@@ -164,7 +170,9 @@ After selecting a template, the module calls ``lookup_built_route`` with a key. 
 the route a previous request on the worker built for the key and the template, and the module
 records nothing more, though a decision or a skip it records still wins over the hit. On a miss the
 module records the route as usual, and Envoy caches the route the decision builds unless a route is
-already cached for the key.
+already cached for the key. A module whose routes rely on the cache can reject a configuration
+without one from its configuration hook, through ``config_has_built_route_cache``,
+``has_built_route_cache`` in the Rust SDK.
 
 The route built for a key serves later requests, so it must be a function of the key. The key covers
 whatever the module reads to decide, including the route it runs for, since one cache serves every
@@ -185,8 +193,9 @@ A worker evicts a route it has not used recently when it is full, and a route id
 ``lookup_built_route`` returns ``HitVerify``. The module then records the route exactly as on a
 miss and Envoy uses the route the recording builds. When the decision fails or its recording
 depends on the path of the request through Envoy or differs from the one the cached route was built
-from, Envoy counts ``built_route_cache_verify_mismatch`` and evicts the cached route. A hit ignores
-the overrides and user data the module records, and a route that carries user data fires
+from, Envoy counts ``built_route_cache_verify_mismatch`` and evicts the cached route. A ``Hit``
+ignores the overrides the module records and hands its user data to
+``on_route_specifier_user_data_discard``. A route that carries user data fires
 ``on_route_specifier_route_destroy`` once neither the cache nor a stream holds it.
 
 Notes
@@ -230,6 +239,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   failure_route_metadata, Counter, Decisions not honored because a typed metadata factory rejected the recorded metadata.
   reuse_previous_rejected, Counter, ReusePrevious decisions rejected because the stream had no previous route.
   route_destroy, Counter, Routes built with user data that were destroyed and fired the route destroy hook.
+  user_data_discard, Counter, User data that no route carried and that the user data discard hook received.
   rewrite_not_applied, Counter, Requests for which neither the prefix rewrite rule nor the route override regex rewrite yielded a path when the request headers were finalized.
   built_route_cache_disabled, Counter, Built route cache lookups that returned ``Disabled``.
   built_route_cache_hit, Counter, Built route cache lookups that found a route.
@@ -239,7 +249,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   built_route_cache_evict, Counter, Cached routes evicted because a worker was full or the route was idle for longer than ``max_idle_time``.
   built_route_cache_entries, Gauge, Routes cached by the workers of the specifiers that share the stat prefix.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.
-  specifier_duration, Histogram, Time in microseconds the specifier spent on a request.
+  specifier_duration, Histogram, Time in microseconds the specifier spent on a request that ``runtime_fraction`` does not skip.
 
 Configuration
 -------------

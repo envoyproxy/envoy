@@ -177,7 +177,8 @@ pub enum BuiltRouteLookupResult {
   Miss,
   /// A route cached for the key serves the request, which Envoy uses when the decision is left
   /// [`RouteDecision::Unspecified`]. The module records nothing more, since Envoy ignores the
-  /// overrides and user data it records.
+  /// overrides it records and hands its user data to
+  /// [`RouteSpecifierConfig::on_user_data_discard`].
   Hit,
   /// A route cached for the key serves the request, and the module records the route exactly as
   /// on a miss. When the decision is left [`RouteDecision::Unspecified`], Envoy uses the route the
@@ -891,10 +892,11 @@ impl RouteSpecifierContext {
   /// routes for a key change over time folds a version of what they depend on into the key.
   ///
   /// On a hit a decision other than [`RouteDecision::Unspecified`] and a skip still apply, while
-  /// the overrides and user data the module records are ignored. A verified hit uses the route its
-  /// recording builds instead, so every user data recorded on a miss or a verified hit stays on a
-  /// route of its own, for which [`RouteSpecifierConfig::on_route_destroy`] fires once neither the
-  /// cache nor a stream holds it.
+  /// the overrides the module records are ignored and its user data goes to
+  /// [`RouteSpecifierConfig::on_user_data_discard`]. A verified hit uses the route its recording
+  /// builds instead, so the user data a miss or a verified hit records stays on a route of its own
+  /// whenever the decision builds one, for which [`RouteSpecifierConfig::on_route_destroy`] fires
+  /// once neither the cache nor a stream holds it.
   pub fn lookup_built_route(&mut self, key: u64) -> BuiltRouteLookupResult {
     BuiltRouteLookupResult::from_abi(unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_lookup_built_route(self.envoy_ptr, key)
@@ -905,7 +907,9 @@ impl RouteSpecifierContext {
   ///
   /// It forces the produced route to be wrapped even with no other override, so that
   /// [`RouteSpecifierConfig::on_route_destroy`] fires for it with this value when the route is
-  /// destroyed. It is effective when the decision is left [`RouteDecision::Unspecified`].
+  /// destroyed. It is effective when the decision is left [`RouteDecision::Unspecified`]. A later
+  /// call replaces the value, and the last value goes to
+  /// [`RouteSpecifierConfig::on_user_data_discard`] instead when no route ends up carrying it.
   pub fn set_route_user_data(&mut self, user_data: u64) {
     unsafe {
       abi::envoy_dynamic_module_callback_route_specifier_set_route_user_data(
@@ -1286,6 +1290,18 @@ pub trait RouteSpecifierConfig: Send + Sync {
   fn on_route_destroy(&self, user_data: u64) {
     let _ = user_data;
   }
+
+  /// Called with the value last recorded by [`RouteSpecifierContext::set_route_user_data`] when the
+  /// decision builds no route to carry it. That is the case for a decision other than
+  /// [`RouteDecision::Unspecified`], a skip, a decision Envoy cannot honor, and a
+  /// [`BuiltRouteLookupResult::Hit`]. It runs on the thread that resolves the route, concurrently
+  /// with other hooks, before the route specifier returns. The last value recorded for a decision
+  /// reaches either this hook or [`RouteSpecifierConfig::on_route_destroy`], never both, so that a
+  /// module can release what it leased for the route in either. It must not block or call back into
+  /// Envoy. The default is a no op.
+  fn on_user_data_discard(&self, user_data: u64) {
+    let _ = user_data;
+  }
 }
 
 /// Envoy-side interface for the route specifier dynamic module.
@@ -1322,6 +1338,10 @@ pub trait EnvoyRouteSpecifierConfig: Send + Sync {
 
   /// The specifier_instance_id of this configuration, empty when it is unset.
   fn specifier_instance_id(&self) -> String;
+
+  /// Whether the configuration sets `built_route_cache`, so that a module whose routes rely on the
+  /// cache can reject a configuration without it.
+  fn has_built_route_cache(&self) -> bool;
 
   /// Define a new counter with the given name and no labels.
   fn define_counter(
@@ -1522,6 +1542,12 @@ impl EnvoyRouteSpecifierConfig for EnvoyRouteSpecifierConfigImpl {
       EnvoyBuffer::new_from_raw(result.ptr as *const u8, result.length)
     };
     String::from_utf8_lossy(buffer.as_slice()).into_owned()
+  }
+
+  fn has_built_route_cache(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(self.raw)
+    }
   }
 
   fn define_counter(
@@ -1903,5 +1929,19 @@ ffi_export! {
   ) {
     let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
     config.on_route_destroy(user_data);
+  }
+}
+
+ffi_export! {
+  /// # Safety
+  ///
+  /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
+  /// by the Envoy dynamic module ABI.
+  unsafe fn envoy_dynamic_module_on_route_specifier_user_data_discard(
+    config_ptr: abi::envoy_dynamic_module_type_route_specifier_config_module_ptr,
+    user_data: u64,
+  ) {
+    let config = &*(config_ptr as *const Box<dyn RouteSpecifierConfig>);
+    config.on_user_data_discard(user_data);
   }
 }

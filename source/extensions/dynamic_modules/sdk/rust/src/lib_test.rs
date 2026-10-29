@@ -12557,6 +12557,7 @@ const STUB_ROUTE_TEMPLATE_ID: &str = "canary";
 static STUB_ROUTE_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
 static STUB_ROUTE_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
 static STUB_ROUTE_STATE_PRESENT: AtomicBool = AtomicBool::new(true);
+static STUB_ROUTE_HAS_BUILT_ROUTE_CACHE: AtomicBool = AtomicBool::new(true);
 // When set, the bulk input route stub reports a direct response instead of a route entry.
 static STUB_ROUTE_DIRECT: AtomicBool = AtomicBool::new(false);
 
@@ -12692,6 +12693,13 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_get_speci
       length: 0,
     };
   }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
+) -> bool {
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[no_mangle]
@@ -13646,6 +13654,53 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
 }
 
 #[test]
+fn test_envoy_dynamic_module_on_route_specifier_user_data_discard() {
+  // Drives the user data discard hook through the FFI entry point, so the boxed trait object gets
+  // the value Envoy hands back.
+  static DISCARDED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+  struct DiscardingConfig;
+  impl route_specifier::RouteSpecifierConfig for DiscardingConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_specifier::RouteSpecifierContext,
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
+    }
+    fn on_user_data_discard(&self, user_data: u64) {
+      DISCARDED.store(user_data, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  struct DefaultConfig;
+  impl route_specifier::RouteSpecifierConfig for DefaultConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_specifier::RouteSpecifierContext,
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
+    }
+  }
+
+  let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| Some(Box::new(DiscardingConfig));
+  let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
+    std::ptr::null_mut(),
+    "test_route_specifier",
+    b"",
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_user_data_discard(config_ptr, 42);
+  }
+  assert_eq!(42, DISCARDED.load(std::sync::atomic::Ordering::SeqCst));
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
+  }
+
+  // The default hook takes the value without panicking.
+  route_specifier::RouteSpecifierConfig::on_user_data_discard(&DefaultConfig, 7);
+}
+
+#[test]
 fn test_envoy_dynamic_module_on_route_specifier_on_route_recovers_from_panic() {
   // Resolution runs on worker threads, so a panic must be caught at the FFI boundary and reported
   // as an error rather than unwinding across the ABI.
@@ -14131,6 +14186,10 @@ fn test_envoy_route_specifier_config_impl() {
   );
   assert!(config.has_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!config.has_route_override("unknown"));
+  assert!(config.has_built_route_cache());
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(!config.has_built_route_cache());
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.store(true, std::sync::atomic::Ordering::SeqCst);
   assert!(config.register_route_template("built", &[1, 2, 3]));
   assert!(!config.register_route_template("", &[1, 2, 3]));
   assert!(!config.register_route_template("built", &[]));

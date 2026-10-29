@@ -2048,6 +2048,9 @@ WEAK_STUB(envoy_dynamic_module_type_route_specifier_route_kind,
           envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache, false,
+          envoy_dynamic_module_type_route_specifier_config_envoy_ptr)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_config_has_route_override, false,
           envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)

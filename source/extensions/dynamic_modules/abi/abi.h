@@ -17480,8 +17480,8 @@ typedef enum envoy_dynamic_module_type_route_specifier_built_route_lookup_result
   // Envoy caches the route the decision builds unless a route is already cached for the key.
   envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Miss = 1,
   // A route cached for the key serves the request, which Envoy uses when the decision is left
-  // Unspecified. The module records nothing more, since Envoy ignores the overrides and user data
-  // it records.
+  // Unspecified. The module records nothing more, since Envoy ignores the overrides it records and
+  // hands its user data to envoy_dynamic_module_on_route_specifier_user_data_discard.
   envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Hit = 2,
   // A route cached for the key serves the request, and the module records the route exactly as on
   // a miss. When the decision is left Unspecified, Envoy uses the route the recording builds, and
@@ -17611,6 +17611,28 @@ void envoy_dynamic_module_on_route_specifier_route_destroy(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     uint64_t user_data);
 
+/**
+ * envoy_dynamic_module_on_route_specifier_user_data_discard is called with the user data last
+ * recorded with envoy_dynamic_module_callback_route_specifier_set_route_user_data when the decision
+ * builds no route to carry it. That is the case for a decision other than Unspecified, a
+ * StopIterationAndSkipRoute status, a decision Envoy cannot honor, and a Hit from
+ * envoy_dynamic_module_callback_route_specifier_lookup_built_route, which uses the cached route. It
+ * is optional, resolved by Envoy with a nullable lookup, and absence is a no op.
+ *
+ * It is called on the thread that resolves the route, concurrently with other hooks, before the
+ * route specifier returns and always before envoy_dynamic_module_on_route_specifier_config_destroy
+ * for the owning configuration. It must not block, allocate heavily or call back into Envoy. With
+ * both hooks exported, the value set_route_user_data last records for a decision reaches either
+ * this hook or on_route_specifier_route_destroy, never both, so a module can release what it
+ * leased for the route in either.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ * @param user_data is the value recorded with set_route_user_data.
+ */
+void envoy_dynamic_module_on_route_specifier_user_data_discard(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
+    uint64_t user_data);
+
 // =============================================================================
 // Route Specifier Callbacks
 // =============================================================================
@@ -17710,6 +17732,18 @@ bool envoy_dynamic_module_callback_route_specifier_config_register_route_templat
 void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache returns whether the
+ * route specifier configuration sets built_route_cache, so that a module whose routes rely on the
+ * cache can reject a configuration without it from the config hook. This may be called from the
+ * config hook or from the request path, since it is immutable after configuration load.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @return true if the configuration sets built_route_cache, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr);
 
 // ------------------- Route Specifier Callbacks - Metrics ---------------------
 
@@ -18338,10 +18372,12 @@ bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
  * key change over time folds a version of what they depend on into the key.
  *
  * On a hit a decision other than Unspecified and a StopIterationAndSkipRoute status still apply,
- * while the overrides and user data the module records are ignored. A verified hit uses the route
- * its recording builds instead, so every user data recorded on a miss or a verified hit stays on a
- * route of its own, which fires envoy_dynamic_module_on_route_specifier_route_destroy once neither
- * the cache nor a stream holds it.
+ * while the overrides the module records are ignored and its user data goes to
+ * envoy_dynamic_module_on_route_specifier_user_data_discard. A verified hit uses the route its
+ * recording builds instead, so the user data a miss or a verified hit records stays on a route of
+ * its own whenever the decision builds one, which fires
+ * envoy_dynamic_module_on_route_specifier_route_destroy once neither the cache nor a stream holds
+ * it.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param key is the key the module identifies the route with.
@@ -18355,11 +18391,13 @@ envoy_dynamic_module_callback_route_specifier_lookup_built_route(
  * envoy_dynamic_module_callback_route_specifier_set_route_user_data records a u64 on the route this
  * decision produces. It forces the produced route to be wrapped even when no other override was
  * recorded, so that envoy_dynamic_module_on_route_specifier_route_destroy fires for it with this
- * value. It is effective when the decision is left Unspecified.
+ * value. It is effective when the decision is left Unspecified. A later call replaces the value,
+ * and the last value goes to envoy_dynamic_module_on_route_specifier_user_data_discard instead when
+ * no route ends up carrying it.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param user_data is the value passed to on_route_specifier_route_destroy when the route is
- * destroyed.
+ * destroyed, or to on_route_specifier_user_data_discard when no route carries it.
  */
 void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
