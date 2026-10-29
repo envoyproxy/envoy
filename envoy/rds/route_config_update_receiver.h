@@ -87,13 +87,7 @@ public:
   virtual const std::optional<RouteConfigProvider::ConfigInfo>& configInfo() const PURE;
 
   /**
-   * @return Protobuf::Message& current RouteConfiguration.
-   */
-  virtual const Protobuf::Message& protobufConfiguration() const PURE;
-
-  /**
    * @return ConfigConstSharedPtr a parsed and validated copy of current RouteConfiguration.
-   * @see protobufConfiguration()
    */
   virtual ConfigConstSharedPtr parsedConfiguration() const PURE;
 

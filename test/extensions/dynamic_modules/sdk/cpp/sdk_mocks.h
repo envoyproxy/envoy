@@ -149,6 +149,10 @@ public:
   MOCK_METHOD(TimingInfo, getTimingInfo, (), (override));
   MOCK_METHOD(std::optional<std::string_view>, getFilterState, (std::string_view key), (override));
   MOCK_METHOD(void, setFilterState, (std::string_view key, std::string_view value), (override));
+  MOCK_METHOD(bool, setFilterStateValue,
+              (std::string_view key, std::string_view value, FilterStateLifeSpan life_span,
+               FilterStateStreamSharing stream_sharing),
+              (override));
   MOCK_METHOD(void, sendLocalResponse,
               (uint32_t status, std::span<const HeaderView> headers, std::string_view body,
                std::string_view detail),
@@ -189,12 +193,14 @@ public:
   MOCK_METHOD(std::optional<ClusterHostCounts>, getClusterHostCounts, (uint32_t priority),
               (override));
   MOCK_METHOD(std::optional<std::string_view>, getUpstreamRemoteAddress, (), (override));
+  MOCK_METHOD(std::optional<std::string_view>, getDownstreamDirectRemoteAddress, (), (override));
   MOCK_METHOD(std::vector<std::string_view>, getUpstreamHostsAttempted, (), (override));
   MOCK_METHOD(std::vector<uint64_t>, getUpstreamConnectionIdsAttempted, (), (override));
   MOCK_METHOD(bool, setUpstreamOverrideHost, (std::string_view host, bool strict), (override));
   MOCK_METHOD(void, resetStream, (HttpFilterStreamResetReason reason, std::string_view details),
               (override));
   MOCK_METHOD(void, sendGoAwayAndClose, (bool graceful), (override));
+  MOCK_METHOD(void, drainConnectionUponCompletion, (), (override));
   MOCK_METHOD(bool, recreateStream, (std::span<const HeaderView> headers), (override));
   MOCK_METHOD(HeaderMap&, requestHeaders, (), (override));
   MOCK_METHOD(BodyBuffer&, bufferedRequestBody, (), (override));

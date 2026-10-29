@@ -576,6 +576,16 @@ public:
         envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
   }
 
+  bool setFilterStateValue(std::string_view key, std::string_view value,
+                           FilterStateLifeSpan life_span,
+                           FilterStateStreamSharing stream_sharing) override {
+    return envoy_dynamic_module_callback_http_set_filter_state_value(
+        host_plugin_ptr_, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
+        envoy_dynamic_module_type_module_buffer{value.data(), value.size()},
+        static_cast<envoy_dynamic_module_type_filter_state_life_span>(life_span),
+        static_cast<envoy_dynamic_module_type_filter_state_stream_sharing>(stream_sharing));
+  }
+
   std::optional<std::string_view> getFilterStateTyped(std::string_view key) override {
     BufferView value{nullptr, 0};
     const bool ret = envoy_dynamic_module_callback_http_get_filter_state_typed(
@@ -806,6 +816,13 @@ public:
     return bufferViewToOptionalStringView(value, found);
   }
 
+  std::optional<std::string_view> getDownstreamDirectRemoteAddress() override {
+    BufferView value{nullptr, 0};
+    const bool found = envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+        host_plugin_ptr_, reinterpret_cast<envoy_dynamic_module_type_envoy_buffer*>(&value));
+    return bufferViewToOptionalStringView(value, found);
+  }
+
   std::vector<std::string_view> getUpstreamHostsAttempted() override {
     const size_t count =
         envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(host_plugin_ptr_);
@@ -855,6 +872,10 @@ public:
 
   void sendGoAwayAndClose(bool graceful) override {
     envoy_dynamic_module_callback_http_filter_send_go_away_and_close(host_plugin_ptr_, graceful);
+  }
+
+  void drainConnectionUponCompletion() override {
+    envoy_dynamic_module_callback_http_drain_connection_upon_completion(host_plugin_ptr_);
   }
 
   bool recreateStream(std::span<const HeaderView> headers) override {

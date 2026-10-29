@@ -18,7 +18,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -117,10 +116,10 @@ public:
         locality())
         .WillByDefault(ReturnRef(upstream_locality_));
     ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
-        .WillByDefault(Invoke([this] {
+        .WillByDefault([this] {
           return Upstream::HostSelectionResponse{
               context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
-        }));
+        });
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
@@ -133,19 +132,18 @@ public:
 
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
                 newStream(_, _, _))
-        .WillOnce(
-            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                       const Http::ConnectionPool::Instance::StreamOptions&)
-                       -> Http::ConnectionPool::Cancellable* {
-              response_decoder = &decoder;
-              EXPECT_CALL(encoder.stream_, connectionInfoProvider())
-                  .WillRepeatedly(ReturnRef(connection_info1_));
-              callbacks.onPoolReady(encoder,
-                                    context_.server_factory_context_.cluster_manager_
-                                        .thread_local_cluster_.conn_pool_.host_,
-                                    stream_info_, Http::Protocol::Http10);
-              return nullptr;
-            }));
+        .WillOnce([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                      const Http::ConnectionPool::Instance::StreamOptions&)
+                      -> Http::ConnectionPool::Cancellable* {
+          response_decoder = &decoder;
+          EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+              .WillRepeatedly(ReturnRef(connection_info1_));
+          callbacks.onPoolReady(encoder,
+                                context_.server_factory_context_.cluster_manager_
+                                    .thread_local_cluster_.conn_pool_.host_,
+                                stream_info_, Http::Protocol::Http10);
+          return nullptr;
+        });
 
     Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
@@ -231,25 +229,25 @@ TEST_F(RouterUpstreamFilterTest, SyncPoolFailureDoesNotDecodeAfterDestroy) {
   // Install the tracking filter ahead of the codec filter via the cluster's filter chain
   // factory, which takes precedence over the router-specified chain.
   EXPECT_CALL(*cluster_info_, createFilterChain(_))
-      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+      .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         callbacks.addStreamDecoderFilter(filter);
         // Fall through to the router-specified chain, which provides the codec filter.
         return false;
-      }));
+      });
 
   // Fail the pool synchronously inside newStream(), the way pending requests circuit
   // breaker overflow does in ConnPoolImplBase::newStreamImpl().
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
               newStream(_, _, _))
-      .WillOnce(Invoke([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks,
-                           const Http::ConnectionPool::Instance::StreamOptions&)
-                           -> Http::ConnectionPool::Cancellable* {
+      .WillOnce([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                    const Http::ConnectionPool::Instance::StreamOptions&)
+                    -> Http::ConnectionPool::Cancellable* {
         callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::Overflow,
                                 "max pending streams overflow",
                                 context_.server_factory_context_.cluster_manager_
                                     .thread_local_cluster_.conn_pool_.host_);
         return nullptr;
-      }));
+      });
 
   // The request should shed cleanly with a 503.
   EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));

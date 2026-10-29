@@ -21,8 +21,6 @@ namespace ConnectionPool {
 
 using testing::AnyNumber;
 using testing::HasSubstr;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::Return;
 
 class TestActiveClient : public ActiveClient {
@@ -197,17 +195,16 @@ public:
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
-    ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
+    ON_CALL(pool_, instantiateActiveClient).WillByDefault([&]() -> ActiveClientPtr {
       auto ret = std::make_unique<NiceMock<TestActiveClient>>(
           pool_, stream_limit_, concurrent_streams_, /*supports_early_data=*/false);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
-    }));
-    ON_CALL(pool_, onPoolReady(_, _))
-        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) {
-          TestActiveClient::incrementActiveStreams(client);
-        }));
+    });
+    ON_CALL(pool_, onPoolReady(_, _)).WillByDefault([](ActiveClient& client, AttachContext&) {
+      TestActiveClient::incrementActiveStreams(client);
+    });
   }
 
 #define CHECK_STATE(active, pending, capacity)                                                     \
@@ -321,17 +318,16 @@ public:
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
-    ON_CALL(pool_, instantiateActiveClient).WillByDefault(Invoke([&]() -> ActiveClientPtr {
+    ON_CALL(pool_, instantiateActiveClient).WillByDefault([&]() -> ActiveClientPtr {
       auto ret = std::make_unique<NiceMock<TestActiveClient>>(
           pool_, stream_limit_, concurrent_streams_, clients_support_early_data_);
       clients_.push_back(ret.get());
       ret->real_host_description_ = descr_;
       return ret;
-    }));
-    ON_CALL(pool_, onPoolReady(_, _))
-        .WillByDefault(Invoke([](ActiveClient& client, AttachContext&) {
-          TestActiveClient::incrementActiveStreams(client);
-        }));
+    });
+    ON_CALL(pool_, onPoolReady(_, _)).WillByDefault([](ActiveClient& client, AttachContext&) {
+      TestActiveClient::incrementActiveStreams(client);
+    });
   }
 
   void newConnectingClient() {
@@ -459,9 +455,9 @@ TEST_F(ConnPoolImplBaseTest, PreconnectOnDisconnect) {
 
   // If a connection fails, existing connections are purged. If a retry causes
   // a new stream, make sure we create the correct number of connections.
-  EXPECT_CALL(pool_, onPoolFailure).WillOnce(InvokeWithoutArgs([&]() -> void {
+  EXPECT_CALL(pool_, onPoolFailure).WillOnce([&]() -> void {
     pool_.newStreamImpl(context_, /*can_send_early_data=*/false);
-  }));
+  });
   EXPECT_CALL(pool_, instantiateActiveClient);
   clients_[0]->close(Network::ConnectionCloseType::NoFlush, "test");
   CHECK_STATE(0 /*active*/, 1 /*pending*/, 2 /*connecting capacity*/);

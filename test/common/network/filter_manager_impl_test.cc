@@ -22,7 +22,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -33,12 +32,12 @@ namespace {
 class NetworkFilterManagerTest : public testing::Test {
 public:
   void SetUp() override {
-    EXPECT_CALL(connection_, getReadBuffer).WillRepeatedly(Invoke([this]() {
+    EXPECT_CALL(connection_, getReadBuffer).WillRepeatedly([this]() {
       return StreamBuffer{read_buffer_, read_end_stream_};
-    }));
-    EXPECT_CALL(connection_, getWriteBuffer).WillRepeatedly(Invoke([this]() {
+    });
+    EXPECT_CALL(connection_, getWriteBuffer).WillRepeatedly([this]() {
       return StreamBuffer{write_buffer_, write_end_stream_};
-    }));
+    });
   }
 
   NiceMock<MockFilterManagerConnection> connection_;
@@ -456,10 +455,10 @@ TEST_F(NetworkFilterManagerTest, MultipleStopIterationAndDontCloseRead) {
 
   // First filter disableClose() and StopIteration.
   EXPECT_CALL(*read_filter_1, onData(BufferString("hello world"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter_1->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(*read_filter_2, onData(_, _)).Times(0);
   EXPECT_CALL(*read_filter_3, onData(_, _)).Times(0);
   manager.onRead();
@@ -470,10 +469,10 @@ TEST_F(NetworkFilterManagerTest, MultipleStopIterationAndDontCloseRead) {
 
   // Continue from first filter.
   EXPECT_CALL(*read_filter_2, onData(BufferString("hello world"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter_2->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   read_filter_1->callbacks_->continueReading();
 
   // One filter is still pending, so we shouldn't close yet.
@@ -505,18 +504,18 @@ TEST_F(NetworkFilterManagerTest, BothReadAndWriteFiltersHoldClose) {
   // Make both read and write filters hold a pending close.
   read_buffer_.add("read_data");
   EXPECT_CALL(*read_filter, onData(BufferString("read_data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   manager.onRead();
 
   write_buffer_.add("write_data");
   EXPECT_CALL(*filter, onWrite(BufferString("write_data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         filter->write_callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   manager.onWrite();
 
   // Try to close the connection.
@@ -549,10 +548,10 @@ TEST_F(NetworkFilterManagerTest, StopIterationAndDontCloseWithLocalClose) {
   // Set up read data.
   read_buffer_.add("test data");
   EXPECT_CALL(*read_filter, onData(BufferString("test data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   manager.onRead();
 
   // Local close should be pending until filter allows it.
@@ -581,10 +580,10 @@ TEST_F(NetworkFilterManagerTest, FinalizeCloseAfterFiltersComplete) {
   // Set up read data with disableClose and StopIteration.
   read_buffer_.add("data");
   EXPECT_CALL(*read_filter, onData(BufferString("data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   manager.onRead();
 
   // Try remote close.
@@ -611,10 +610,10 @@ TEST_F(NetworkFilterManagerTest, LocalAndRemoteCloseRaceCondition) {
 
   read_buffer_.add("data");
   EXPECT_CALL(*read_filter, onData(BufferString("data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   manager.onRead();
 
   // Simulate both local and remote close happening.
@@ -644,10 +643,10 @@ TEST_F(NetworkFilterManagerTest, LocalCloseSocketAndRemoteCloseRace) {
 
   read_buffer_.add("data");
   EXPECT_CALL(*read_filter, onData(BufferString("data"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   manager.onRead();
 
   // Simulate both local and remote close happening.
@@ -691,10 +690,10 @@ TEST_F(NetworkFilterManagerTest, MultipleFiltersWithDifferentStatusResponses) {
   // Continue from stop_filter.
   read_buffer_.add("more");
   EXPECT_CALL(*stop_dont_close_filter, onData(BufferString("testmore"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         stop_dont_close_filter->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   stop_filter->callbacks_->continueReading();
 
   // Now try to close again, should be held.
@@ -727,10 +726,10 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataWithStopIterationAndDontClose) {
   // First read filter disableClose(true).
   read_buffer_.add("original");
   EXPECT_CALL(*read_filter_1, onData(BufferString("original"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter_1->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(*read_filter_2, onData(_, _)).Times(0);
   EXPECT_CALL(*filter, onData(_, _)).Times(0);
   manager.onRead();
@@ -785,10 +784,10 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataWithStopIterationAndDontClose) {
   // Write filter disableClose(true).
   write_buffer_.add("original");
   EXPECT_CALL(*write_filter_2, onWrite(BufferString("original"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         write_filter_2->write_callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(*write_filter_1, onWrite(_, _)).Times(0);
   manager.onWrite();
 
@@ -836,10 +835,10 @@ TEST_F(NetworkFilterManagerTest, ChainedInjectsWithMixedFilterStatus) {
   // First read filter stops the chain with disableClose(true).
   read_buffer_.add("start");
   EXPECT_CALL(*read_filter_1, onData(BufferString("start"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter_1->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   manager.onRead();
 
   // Inject data and continue the chain - second filter returns StopIteration.
@@ -884,20 +883,20 @@ TEST_F(NetworkFilterManagerTest, MultipleInjectDataCallsFromDifferentFilters) {
   // First read filter StopIteration in sequence.
   read_buffer_.add("original");
   EXPECT_CALL(*read_filter_1, onData(BufferString("original"), _))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter_1->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(*read_filter_2, onData(_, _)).Times(0);
   manager.onRead();
 
   // Inject data from first filter.
   Buffer::OwnedImpl data1("data1");
   EXPECT_CALL(*read_filter_2, onData(BufferString("data1"), false))
-      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
         read_filter_2->callbacks_->disableClose(true);
         return FilterStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(*filter, onData(_, _)).Times(0);
   read_filter_1->callbacks_->injectReadDataToFilterChain(data1, false);
 

@@ -161,9 +161,7 @@ public:
           membership_updated_.ready();
           return absl::OkStatus();
         });
-    ON_CALL(initialized_, ready()).WillByDefault(testing::Invoke([this] {
-      init_complete_ = true;
-    }));
+    ON_CALL(initialized_, ready()).WillByDefault([this] { init_complete_ = true; });
     cluster_->initialize([&]() {
       initialized_.ready();
       return absl::OkStatus();
@@ -2136,8 +2134,9 @@ TEST_F(ReverseConnectionClusterTest, HostCreationUpdatesMembership) {
 
   // Capture the callback posted to the dispatcher by chooseHost().
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
@@ -2184,8 +2183,9 @@ TEST_F(ReverseConnectionClusterTest, HostReuseDoesNotDoubleMembership) {
 
   Event::PostCb post_cb;
   // Expect exactly one post (for the first chooseHost only).
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
 
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;
@@ -2235,8 +2235,7 @@ TEST_F(ReverseConnectionClusterTest, MultipleHostsMembershipUpdate) {
   std::vector<Event::PostCb> post_cbs;
   EXPECT_CALL(server_context_.dispatcher_, post(_))
       .Times(2)
-      .WillRepeatedly(
-          testing::Invoke([&post_cbs](Event::PostCb cb) { post_cbs.push_back(std::move(cb)); }));
+      .WillRepeatedly([&post_cbs](Event::PostCb cb) { post_cbs.push_back(std::move(cb)); });
 
   RevConCluster::LoadBalancer lb(cluster_);
 
@@ -2292,8 +2291,9 @@ TEST_F(ReverseConnectionClusterTest, CleanupRemovesHostsFromPrioritySet) {
   addTestSocket("stale-node", "stale-cluster");
 
   Event::PostCb post_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillOnce(testing::Invoke([&post_cb](Event::PostCb cb) { post_cb = std::move(cb); }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&post_cb](Event::PostCb cb) {
+    post_cb = std::move(cb);
+  });
 
   RevConCluster::LoadBalancer lb(cluster_);
   NiceMock<Network::MockConnection> connection;

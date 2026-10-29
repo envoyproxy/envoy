@@ -204,8 +204,9 @@ public:
   }
 
   void initializeWithMetadataOptions(const std::vector<std::string>& untyped_namespaces,
-                                     const std::vector<std::string>& typed_namespaces) {
-    initializeWithModifier([&untyped_namespaces, &typed_namespaces](auto& config) {
+                                     const std::vector<std::string>& typed_namespaces,
+                                     std::optional<bool> send_once = std::nullopt) {
+    initializeWithModifier([&untyped_namespaces, &typed_namespaces, send_once](auto& config) {
       auto* metadata_options = config.mutable_metadata_options();
       auto* forwarding_namespaces = metadata_options->mutable_forwarding_namespaces();
 
@@ -215,6 +216,10 @@ public:
 
       for (const auto& ns : typed_namespaces) {
         forwarding_namespaces->add_typed(ns);
+      }
+
+      if (send_once.has_value()) {
+        metadata_options->mutable_send_once()->set_value(send_once.value());
       }
     });
   }
@@ -1047,6 +1052,44 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
   // Continue normal flow
   sendReadGrpcMessage("client_data_inspected", true, true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+  tcp_client->close();
+}
+
+// Test dynamic metadata forwarding with send_once = true
+TEST_P(NetworkExtProcFilterIntegrationTest, MetadataForwardingSendOnce) {
+  setConnectionMetadata("untyped-ns", {{"key1", "value1"}});
+  setConnectionMetadata("typed-ns", {}, "typed-test-value");
+  initializeWithMetadataOptions({"untyped-ns"}, {"typed-ns"}, true);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // First ProcessingRequest should include dynamic metadata.
+  ProcessingRequest request1;
+  waitForFirstGrpcMessage(request1);
+  EXPECT_TRUE(request1.has_metadata());
+  EXPECT_THAT(
+      request1.metadata().filter_metadata(),
+      Contains(Pair("untyped-ns", HasStructFields(Contains(IsStructString("key1", "value1"))))));
+  EXPECT_THAT(request1.metadata().typed_filter_metadata(), Contains(Key("typed-ns")));
+
+  sendReadGrpcMessage("client_data_inspected", false, true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+
+  // Subsequent ProcessingRequest on the same stream should NOT include dynamic metadata.
+  ASSERT_TRUE(fake_upstream_connection->write("server_response", false));
+  ProcessingRequest write_request;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
+  EXPECT_TRUE(write_request.has_write_data());
+  EXPECT_FALSE(write_request.has_metadata());
+
+  sendWriteGrpcMessage("server_data_inspected", false);
+  tcp_client->waitForData("server_data_inspected");
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();

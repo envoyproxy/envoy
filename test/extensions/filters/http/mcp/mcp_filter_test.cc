@@ -3178,13 +3178,13 @@ TEST_F(McpFilterTest, PerRouteParserConfig) {
 
   // Expect dynamic metadata to be set with extracted field custom_val and group method_group
   EXPECT_CALL(decoder_callbacks_.stream_info_, setDynamicMetadata("envoy.filters.http.mcp", _))
-      .WillOnce(Invoke([](const std::string&, const Protobuf::Struct& metadata) {
+      .WillOnce([](const std::string&, const Protobuf::Struct& metadata) {
         EXPECT_THAT(metadata.fields(),
                     IsSupersetOf(StructMatchers(
                         IsStructStruct("params",
                                        UnorderedElementsAre(IsStructString("custom_val", "hello"))),
                         IsStructString("method_group", "custom_override_group"))));
-      }));
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }

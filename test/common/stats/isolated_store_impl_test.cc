@@ -27,12 +27,14 @@ protected:
     pool_.clear();
     scope_.reset();
     store_.reset();
-    EXPECT_EQ(0, symbol_table_.numSymbols());
+    EXPECT_EQ(num_base_symbols_, symbol_table_.numSymbols());
   }
 
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   SymbolTableImpl symbol_table_;
+  // Symbols pre-encoded by the table itself (the well-known stat names).
+  const uint64_t num_base_symbols_{symbol_table_.numSymbols()};
   std::unique_ptr<IsolatedStoreImpl> store_;
   StatNamePool pool_;
   ScopeSharedPtr scope_;
@@ -443,7 +445,7 @@ protected:
     pool_.clear();
     scope_.reset();
     store_.reset();
-    EXPECT_EQ(0, symbol_table_.numSymbols());
+    EXPECT_EQ(num_base_symbols_, symbol_table_.numSymbols());
   }
 
   // Builds a matcher that rejects stats whose full name starts with the given prefix.
@@ -455,6 +457,8 @@ protected:
   }
 
   SymbolTableImpl symbol_table_;
+  // Symbols pre-encoded by the table itself (the well-known stat names).
+  const uint64_t num_base_symbols_{symbol_table_.numSymbols()};
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<IsolatedStoreImpl> store_;
   StatNamePool pool_;

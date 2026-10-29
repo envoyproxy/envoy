@@ -56,6 +56,8 @@ public:
 
   // The corresponding in-module factory configuration.
   envoy_dynamic_module_type_transport_socket_factory_config_module_ptr in_module_config_ = nullptr;
+  // Whether the sockets of this configuration are on upstream connections.
+  bool is_upstream_ = false;
 
   // Resolved function pointers. All are guaranteed non-null after successful creation.
   OnTransportSocketFactoryConfigDestroyType on_factory_config_destroy_ = nullptr;
@@ -120,6 +122,12 @@ public:
   Buffer::Instance* currentWriteBuffer() const { return current_write_buffer_; }
   bool inSetCallbacks() const { return in_set_callbacks_; }
   void onPeerReset() { peer_reset_ = true; }
+  bool isUpstream() const { return config_->is_upstream_; }
+  bool implementsSecureTransport() const { return config_->implementsSecureTransport(); }
+  // Whether start_splice handed this socket's fd to the engine pump. Once it has, doRead, doWrite,
+  // and the readiness and flush callbacks do nothing.
+  bool spliced() const { return spliced_; }
+  void markSpliced() { spliced_ = true; }
 
 private:
   const DynamicModuleTransportSocketConfigSharedPtr config_;
@@ -133,6 +141,7 @@ private:
   bool in_set_callbacks_ = false;
   // Whether a buffer I/O callback saw the peer reset the connection.
   bool peer_reset_ = false;
+  bool spliced_ = false;
   // Backing store for the string view returned by failureReason.
   mutable std::string failure_reason_;
 };

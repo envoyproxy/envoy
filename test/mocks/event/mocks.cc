@@ -1,5 +1,7 @@
 #include "mocks.h"
 
+#include "source/common/event/worker_id.h"
+
 #include "absl/functional/any_invocable.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -7,7 +9,6 @@
 using testing::_;
 using testing::Assign;
 using testing::DoAll;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
@@ -19,14 +20,13 @@ namespace Event {
 
 MockDispatcher::MockDispatcher() : MockDispatcher("test_thread") {}
 
-MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
+MockDispatcher::MockDispatcher(const std::string& name)
+    : worker_id_(workerIdFromThreadName(name)), name_(name) {
   time_system_ = std::make_unique<GlobalTimeSystem>();
   auto thread_factory = &Api::createApiForTest()->threadFactory();
   Envoy::Thread::ThreadId thread_id = thread_factory->currentThreadId();
   ON_CALL(*this, initializeStats(_, _)).WillByDefault(Return());
-  ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
-    to_delete_.clear();
-  }));
+  ON_CALL(*this, clearDeferredDeleteList()).WillByDefault([this]() -> void { to_delete_.clear(); });
   ON_CALL(*this, createTimer_(_)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledTimer_(_, _)).WillByDefault(ReturnNew<NiceMock<Event::MockTimer>>());
   ON_CALL(*this, createScaledTypedTimer_(_, _))
@@ -39,12 +39,11 @@ MockDispatcher::MockDispatcher(const std::string& name) : name_(name) {
   });
 
   ON_CALL(buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(
-          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
-                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
-                                               std::move(above_overflow));
-          }));
+      .WillByDefault([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                        absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                           std::move(above_overflow));
+      });
   ON_CALL(*this, isThreadSafe()).WillByDefault([thread_factory, thread_id]() {
     return thread_factory->currentThreadId() == thread_id;
   });
@@ -54,10 +53,10 @@ MockDispatcher::~MockDispatcher() = default;
 
 MockTimer::MockTimer() {
   ON_CALL(*this, enableTimer(_, _))
-      .WillByDefault(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject* scope) {
+      .WillByDefault([&](const std::chrono::milliseconds&, const ScopeTrackedObject* scope) {
         enabled_ = true;
         scope_ = scope;
-      }));
+      });
   ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }
@@ -68,10 +67,10 @@ MockTimer::MockTimer(MockDispatcher* dispatcher) : MockTimer() {
       .WillOnce(DoAll(SaveArg<0>(&callback_), Return(this)))
       .RetiresOnSaturation();
   ON_CALL(*this, enableTimer(_, _))
-      .WillByDefault(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject* scope) {
+      .WillByDefault([&](const std::chrono::milliseconds&, const ScopeTrackedObject* scope) {
         enabled_ = true;
         scope_ = scope;
-      }));
+      });
   ON_CALL(*this, disableTimer()).WillByDefault(Assign(&enabled_, false));
   ON_CALL(*this, enabled()).WillByDefault(ReturnPointee(&enabled_));
 }

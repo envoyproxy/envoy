@@ -480,14 +480,14 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestIdGeneratedWhenEnabled) {
   this->setupUpstream();
 
   EXPECT_CALL(this->encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce([&](const Http::RequestHeaderMap& headers, bool) {
         const auto* rid = headers.RequestId();
         EXPECT_NE(rid, nullptr);
         if (rid != nullptr) {
           EXPECT_FALSE(rid->value().empty());
         }
         return Http::okStatus();
-      }));
+      });
 
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
@@ -522,22 +522,22 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestIdHeaderOverrideAndMetadataKeyOver
   this->setupUpstream();
 
   EXPECT_CALL(this->encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+      .WillOnce([&](const Http::RequestHeaderMap& headers, bool) {
         // The default x-request-id should be removed if a custom header is configured.
         EXPECT_EQ(nullptr, headers.RequestId());
         const auto custom = headers.get(Http::LowerCaseString("x-rid"));
         EXPECT_EQ(1, custom.size());
         EXPECT_FALSE(custom[0]->value().empty());
         return Http::okStatus();
-      }));
+      });
 
   EXPECT_CALL(this->downstream_stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](absl::string_view ns, const Protobuf::Struct& st) {
+      .WillOnce([](absl::string_view ns, const Protobuf::Struct& st) {
         EXPECT_EQ(ns, "envoy.filters.network.tcp_proxy");
         const auto& fields = st.fields();
         auto it = fields.find("rid");
         EXPECT_TRUE(it != fields.end());
-      }));
+      });
 
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }

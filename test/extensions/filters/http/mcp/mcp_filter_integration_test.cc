@@ -76,9 +76,6 @@ TEST_P(McpFilterIntegrationTest, ValidJsonRpcPostRequest) {
       [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
         auto it = dynamic_metadata.find("envoy.filters.http.mcp");
-        if (it == dynamic_metadata.end()) {
-          it = dynamic_metadata.find("mcp_proxy");
-        }
         if (it != dynamic_metadata.end()) {
           Protobuf::Struct expected_metadata;
           MessageUtil::loadFromJson(R"json({
@@ -667,9 +664,6 @@ TEST_P(McpFilterIntegrationTest, InvalidJsonBodyPassedThrough) {
       [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
         auto it = dynamic_metadata.find("envoy.filters.http.mcp");
-        if (it == dynamic_metadata.end()) {
-          it = dynamic_metadata.find("mcp_proxy");
-        }
         if (it != dynamic_metadata.end()) {
           Protobuf::Struct expected_metadata;
           MessageUtil::loadFromJson(R"json({
@@ -872,9 +866,6 @@ TEST_P(McpFilterIntegrationTest, RejectNoMcpModeRejectsNonMcp) {
       [&metadata_verified](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& dynamic_metadata = stream_info.dynamicMetadata().filter_metadata();
         auto it = dynamic_metadata.find("envoy.filters.http.mcp");
-        if (it == dynamic_metadata.end()) {
-          it = dynamic_metadata.find("mcp_proxy");
-        }
         if (it != dynamic_metadata.end()) {
           Protobuf::Struct expected_metadata;
           MessageUtil::loadFromJson(R"json({

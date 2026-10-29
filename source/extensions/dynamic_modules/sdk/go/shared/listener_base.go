@@ -1,3 +1,4 @@
+//go:generate mockgen -source=listener_base.go -destination=mocks/mock_listener_base.go -package=mocks
 package shared
 
 // ListenerFilterStatus controls whether Envoy continues listener filter iteration.

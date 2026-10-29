@@ -27,7 +27,6 @@ namespace OpenTelemetry {
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -831,7 +830,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   timer_ =
       new NiceMock<Event::MockTimer>(&context_.server_factory_context_.thread_local_.dispatcher_);
   ON_CALL(context_.server_factory_context_.thread_local_.dispatcher_, createTimer_(_))
-      .WillByDefault(Invoke([this](Event::TimerCb) { return timer_; }));
+      .WillByDefault([this](Event::TimerCb) { return timer_; });
   EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
   // Set up driver
   setupValidDriver();

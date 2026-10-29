@@ -1,10 +1,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/config/endpoint/v3/load_report.pb.h"
 #include "envoy/service/load_stats/v3/lrs.pb.h"
+#include "envoy/type/v3/http.pb.h"
 
 #include "source/common/common/base64.h"
 
@@ -108,9 +110,12 @@ public:
     HttpIntegrationTest::createUpstreams();
   }
 
-  void initialize() override {
+  void initialize() override { initialize(false); }
+
+  void initialize(bool active_health_check) {
     setUpstreamCount(upstream_endpoints_);
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this, active_health_check](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Setup load reporting and corresponding gRPC cluster.
       auto* loadstats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
       loadstats_config->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
@@ -136,6 +141,17 @@ public:
       eds_cluster_config->mutable_eds_config()->mutable_path_config_source()->set_path(
           eds_helper_.edsPath());
       eds_cluster_config->set_service_name("service_name_0");
+      if (active_health_check) {
+        auto* health_check = cluster_0->add_health_checks();
+        health_check->mutable_timeout()->set_seconds(1);
+        health_check->mutable_interval()->CopyFrom(Protobuf::util::TimeUtil::SecondsToDuration(2));
+        health_check->mutable_no_traffic_interval()->CopyFrom(
+            Protobuf::util::TimeUtil::SecondsToDuration(2));
+        health_check->mutable_unhealthy_threshold()->set_value(1);
+        health_check->mutable_healthy_threshold()->set_value(1);
+        health_check->mutable_http_health_check()->set_path("/healthcheck");
+        health_check->mutable_http_health_check()->set_codec_client_type(envoy::type::v3::HTTP1);
+      }
       if (locality_weighted_lb_) {
         cluster_0->mutable_common_lb_config()->mutable_locality_weighted_lb_config();
       }
@@ -163,6 +179,22 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = fake_loadstats_connection_->waitForNewStream(*dispatcher_, loadstats_stream_);
     RELEASE_ASSERT(result, result.message());
+  }
+
+  void respondToHealthCheck(uint32_t endpoint_index, FakeHttpConnectionPtr& connection,
+                            uint32_t response_code) {
+    if (!connection) {
+      const auto result =
+          service_upstream_[endpoint_index]->waitForHttpConnection(*dispatcher_, connection);
+      RELEASE_ASSERT(result, result.message());
+    }
+    auto result = connection->waitForNewStream(*dispatcher_, health_check_request_);
+    RELEASE_ASSERT(result, result.message());
+    result = health_check_request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+    EXPECT_EQ("/healthcheck", health_check_request_->headers().getPathValue());
+    health_check_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", std::to_string(response_code)}}, true);
   }
 
   void mergeLoadStats(envoy::service::load_stats::v3::LoadStatsRequest& loadstats_request,
@@ -472,6 +504,7 @@ public:
   std::string sub_zone_{"winter"};
   FakeHttpConnectionPtr fake_loadstats_connection_;
   FakeStreamPtr loadstats_stream_;
+  FakeStreamPtr health_check_request_;
   FakeUpstream* load_report_upstream_{};
   FakeUpstream* service_upstream_[upstream_endpoints_]{};
   uint32_t load_requests_{};
@@ -486,6 +519,33 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, LoadStatsIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,
                          Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(LoadStatsIntegrationTest, EmptyLocalityAfterHealthCheckFailure) {
+  initialize(true);
+
+  FakeHttpConnectionPtr winter_connection;
+  FakeHttpConnectionPtr dragon_connection;
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  // The load report upstream is index 0, so these health checks target service upstreams 0 and 1.
+  updateClusterLoadAssignment({{0}}, {{1}}, {}, {});
+  respondToHealthCheck(0, winter_connection, 200);
+  respondToHealthCheck(1, dragon_connection, 200);
+  test_server_->waitForGauge("cluster.cluster_0.membership_healthy", Eq(2));
+
+  // EDS removes the dragon endpoint, but active health checking retains it until it fails.
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(2));
+  respondToHealthCheck(1, dragon_connection, 503);
+  test_server_->waitForGauge("cluster.cluster_0.membership_total", Eq(1));
+
+  requestLoadStatsResponse({"cluster_0"});
+  ASSERT_TRUE(waitForLoadStatsRequest({}, 0, false, true));
+  cleanupLoadStatsConnection();
+}
 
 // Validate the load reports for successful requests as cluster membership
 // changes.

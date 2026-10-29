@@ -95,8 +95,7 @@ class TcpUpstreamTest : public ::testing::Test {
 public:
   TcpUpstreamTest() {
     ON_CALL(*mock_router_filter_.cluster_info_, createFilterChain(_))
-        .WillByDefault(
-            Invoke([&](Envoy::Http::FilterChainFactoryCallbacks&) -> bool { return false; }));
+        .WillByDefault([&](Envoy::Http::FilterChainFactoryCallbacks&) -> bool { return false; });
     EXPECT_CALL(mock_router_filter_, downstreamHeaders())
         .Times(AnyNumber())
         .WillRepeatedly(Return(&request_));

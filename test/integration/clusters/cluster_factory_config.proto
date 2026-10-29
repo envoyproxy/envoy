@@ -6,10 +6,14 @@ message CustomStaticConfig1 {
   uint32 priority = 1;
   string address = 2;
   uint32 port_value = 3;
+  // Create host sets that hand workers snapshots.
+  bool use_snapshot_host_set = 4;
 }
 
 message CustomStaticConfig2 {
   uint32 priority = 1;
   string address = 2;
   uint32 port_value = 3;
+  // Create host sets that hand workers snapshots.
+  bool use_snapshot_host_set = 4;
 }

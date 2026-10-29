@@ -142,8 +142,14 @@ class GuardDeprecationRunner(runner.Runner):
 
     @async_property
     async def runtime_features_blame(self) -> list[list[git.Commit, list[str]]]:
+        # `--ignore-rev` is a prefix of the blocked `--ignore-revs-file`, so GitPython
+        # rejects it as unsafe. The options here are hardcoded, so allow them.
         return await asyncio.to_thread(
-            self.git_repo.blame, rev="HEAD", file=RUNTIME_FEATURES_PATH, **dict(BLAME_KWARGS))
+            self.git_repo.blame,
+            rev="HEAD",
+            file=RUNTIME_FEATURES_PATH,
+            allow_unsafe_options=True,
+            **dict(BLAME_KWARGS))
 
     @cached_property
     def runtime_features_re(self) -> Pattern[str]:

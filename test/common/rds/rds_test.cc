@@ -26,6 +26,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -151,6 +152,23 @@ TEST_F(RdsConfigUpdateReceiverTest, OnRdsUpdate) {
   EXPECT_EQ(time2, config_update_->lastUpdated());
 
   EXPECT_EQ(1, config.use_count());
+}
+
+TEST_F(RdsConfigUpdateReceiverTest, EmptyRouteConfig) {
+  setup();
+
+  envoy::config::route::v3::RouteConfiguration empty_config;
+  SystemTime time1(std::chrono::milliseconds(1234567891234));
+  timeSystem().setSystemTime(time1);
+
+  EXPECT_OK(config_update_->onRdsUpdate(empty_config, "empty_version"));
+  EXPECT_TRUE(config_update_->configInfo().has_value());
+  EXPECT_EQ("", config_update_->configInfo().value().name_);
+  EXPECT_EQ("empty_version", config_update_->configInfo().value().version_);
+  Protobuf::Any expected_any;
+  MessageUtil::packFrom(expected_any, empty_config);
+  EXPECT_TRUE(TestUtility::protoEqual(expected_any, config_update_->configInfo().value().config_));
+  EXPECT_EQ(time1, config_update_->lastUpdated());
 }
 
 class RdsConfigProviderManagerTest : public RdsTestBase {

@@ -2045,7 +2045,9 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::forEachSampleStat(
       100, true, [this](absl::string_view name) { scope_.counterFromString(std::string(name)); });
   EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 827616); // Sep 25, 2020
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 0.99 * million_);
+  // The well-known stat names occupy the lowest symbols, shifting these stats
+  // to slightly longer encodings.
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 1.02 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

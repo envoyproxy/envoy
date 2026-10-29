@@ -10,6 +10,7 @@
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/server_context_impl.h"
+#include "source/extensions/transport_sockets/tls/cert_selectors/common/async_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,12 +29,6 @@ struct CertSelectionStats {
                            GENERATE_HISTOGRAM_STRUCT)
 };
 using CertSelectionStatsSharedPtr = std::shared_ptr<CertSelectionStats>;
-
-class AsyncContext;
-using AsyncContextConstSharedPtr = std::shared_ptr<const AsyncContext>;
-using AsyncContextFactory = absl::AnyInvocable<AsyncContextConstSharedPtr(
-    Stats::Scope&, Server::Configuration::ServerFactoryContext&, const Ssl::TlsCertificateConfig&,
-    absl::Status&)>;
 
 using ConfigProto =
     envoy::extensions::transport_sockets::tls::cert_selectors::on_demand_secret::v3::Config;
@@ -61,71 +56,6 @@ private:
   const Common::CallbackHandlePtr remove_cb_handle_;
 };
 using AsyncContextConfigConstPtr = std::unique_ptr<AsyncContextConfig>;
-
-class AsyncContext {
-public:
-  virtual ~AsyncContext() = default;
-
-  explicit AsyncContext(Stats::Scope& scope) : scope_(scope.createScope("")) {}
-
-  /**
-   * @return OCSP policy for the certificate, only needed by the server TLS context.
-   */
-  virtual Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const PURE;
-
-  /**
-   * @return the low-level TLS context stored in this context.
-   */
-  virtual const Ssl::TlsContext& tlsContext() const PURE;
-
-  /**
-   * @return certificate-specific stats scope.
-   */
-  Stats::Scope& certScope() const { return *scope_; }
-
-private:
-  Stats::ScopeSharedPtr scope_;
-};
-
-class ServerAsyncContext : public AsyncContext,
-                           public Extensions::TransportSockets::Tls::ServerContextImpl {
-public:
-  ServerAsyncContext(Stats::Scope& scope,
-                     Server::Configuration::ServerFactoryContext& factory_context,
-                     const Ssl::ServerContextConfig& tls_config,
-                     const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
-      : AsyncContext(scope),
-        ServerContextImpl(
-            certScope(), tls_config,
-            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
-            false, factory_context, /** used by quic */ nullptr, creation_status) {}
-
-  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const override {
-    return ocsp_staple_policy_;
-  }
-  const Ssl::TlsContext& tlsContext() const override;
-};
-
-class ClientAsyncContext : public AsyncContext,
-                           public Extensions::TransportSockets::Tls::ClientContextImpl {
-public:
-  ClientAsyncContext(Stats::Scope& scope,
-                     Server::Configuration::ServerFactoryContext& factory_context,
-                     const Ssl::ClientContextConfig& tls_config,
-                     const Ssl::TlsCertificateConfig& cert_config, absl::Status& creation_status)
-      : AsyncContext(scope),
-        ClientContextImpl(
-            certScope(), tls_config,
-            std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>{cert_config},
-            false, factory_context, creation_status) {}
-
-  Ssl::ServerContextConfig::OcspStaplePolicy ocspStaplePolicy() const override {
-    // This is unused but we must return something.
-    return Ssl::ServerContextConfig::OcspStaplePolicy::LenientStapling;
-  }
-
-  const Ssl::TlsContext& tlsContext() const override;
-};
 
 class Handle : public Ssl::SelectionHandle {
 public:

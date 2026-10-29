@@ -64,6 +64,7 @@ public:
   }
 
   bool await_suspend(std::coroutine_handle<> continuation) {
+    on_coroutine_suspend(promiseBase(continuation));
     continuation_ = continuation;
     if (context_->cancellation()->cancelled()) {
       // If already cancelled, do not suspend and do not call onStart().
@@ -92,6 +93,10 @@ public:
   // [[nodiscard]]: the result carries success/failure/cancellation, so a
   // `co_await leaf;` that drops it is almost always a bug.
   [[nodiscard]] T await_resume() {
+    if (continuation_) {
+      on_coroutine_resume(promiseBase(continuation_));
+    }
+
     // If result_ contains a value (e.g. from tryImmediate()), return that result rather than
     // abortedValue() even if cancellation occurred. This ensures any non-blocking side effects
     // (such as popped items or acquired capacity) remain visible to the caller so that they can
@@ -147,7 +152,8 @@ private:
     // Inline resume at the event-loop boundary. Must touch no members after
     // this: resuming may run the coroutine to completion and destroy this leaf.
     if (continuation_) {
-      continuation_.resume();
+      // complete() can be called from either another coroutine or from normal function.
+      resume_handle(continuation_);
     }
   }
 

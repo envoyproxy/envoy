@@ -23,31 +23,120 @@ envoy_proto_library(
 )
 
 envoy_extension_cc_test(
-    name = "wasm_filter_test",
-    size = "enormous",
-    srcs = ["wasm_filter_test.cc"],
+    name = "wasm_filter_headers_test",
+    size = "large",
+    srcs = [
+        "wasm_filter_headers_test.cc",
+        "wasm_filter_test_base.h",
+    ],
     data = envoy_select_wasm_cpp_tests([
-        "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:headers_cpp.wasm",
+    ]) + envoy_select_wasm_rust_tests([
+        "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
+    ]),
+    extension_names = ["envoy.filters.http.wasm"],
+    rbe_pool = "linux_x64_small",
+    shard_count = 2,
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/http:message_lib",
+        "//source/extensions/filters/http/wasm:wasm_filter_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
+        "//test/extensions/filters/http/wasm/test_data:test_cpp_plugin",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:wasm_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "wasm_filter_body_test",
+    size = "large",
+    srcs = [
+        "wasm_filter_body_test.cc",
+        "wasm_filter_test_base.h",
+    ],
+    data = envoy_select_wasm_cpp_tests([
+        "//test/extensions/filters/http/wasm/test_data:body_cpp.wasm",
+    ]) + envoy_select_wasm_rust_tests([
+        "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
+    ]),
+    extension_names = ["envoy.filters.http.wasm"],
+    rbe_pool = "linux_x64_small",
+    shard_count = 2,
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/http:message_lib",
+        "//source/extensions/filters/http/wasm:wasm_filter_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
+        "//test/extensions/filters/http/wasm/test_data:test_cpp_plugin",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:wasm_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "wasm_filter_async_test",
+    size = "large",
+    srcs = [
+        "wasm_filter_async_test.cc",
+        "wasm_filter_test_base.h",
+    ],
+    data = envoy_select_wasm_cpp_tests([
+        "//test/extensions/filters/http/wasm/test_data:async_call_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:grpc_call_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:grpc_stream_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:resume_call_cpp.wasm",
     ]) + envoy_select_wasm_rust_tests([
         "//test/extensions/filters/http/wasm/test_data:async_call_rust.wasm",
-        "//test/extensions/filters/http/wasm/test_data:body_rust.wasm",
-        "//test/extensions/filters/http/wasm/test_data:close_stream_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:grpc_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:grpc_stream_rust.wasm",
-        "//test/extensions/filters/http/wasm/test_data:headers_rust.wasm",
+        "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
+    ]),
+    extension_names = ["envoy.filters.http.wasm"],
+    rbe_pool = "linux_x64_small",
+    shard_count = 3,
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/http:message_lib",
+        "//source/extensions/filters/http/wasm:wasm_filter_lib",
+        "//test/extensions/common/wasm:wasm_runtime",
+        "//test/extensions/filters/http/wasm/test_data:test_cpp_plugin",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:wasm_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "wasm_filter_misc_test",
+    size = "large",
+    srcs = [
+        "wasm_filter_misc_test.cc",
+        "wasm_filter_test_base.h",
+    ],
+    data = envoy_select_wasm_cpp_tests([
+        "//test/extensions/filters/http/wasm/test_data:advanced_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:close_stream_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:headers_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:panic_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:shared_data_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:shared_queue_cpp.wasm",
+    ]) + envoy_select_wasm_rust_tests([
+        "//test/extensions/filters/http/wasm/test_data:close_stream_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:metadata_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:panic_rust.wasm",
-        "//test/extensions/filters/http/wasm/test_data:resume_call_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_data_rust.wasm",
         "//test/extensions/filters/http/wasm/test_data:shared_queue_rust.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_large",
-    shard_count = 50,
-    tags = [
-        "cpu:4",
-        "skip_on_windows",
-    ],
+    rbe_pool = "linux_x64_small",
+    shard_count = 3,
+    tags = ["skip_on_windows"],
     deps = [
         "//source/common/http:message_lib",
         "//source/extensions/filters/http/wasm:wasm_filter_lib",
@@ -62,14 +151,14 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "config_test",
-    size = "enormous",
+    size = "large",
     srcs = ["config_test.cc"],
     data = envoy_select_wasm_cpp_tests([
-        "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:headers_cpp.wasm",
     ]),
     extension_names = ["envoy.filters.http.wasm"],
-    rbe_pool = "linux_x64_large",
-    shard_count = 16,
+    rbe_pool = "linux_x64_small",
+    shard_count = 4,
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
@@ -92,7 +181,10 @@ envoy_extension_cc_test(
     size = "enormous",
     srcs = ["wasm_filter_integration_test.cc"],
     data = envoy_select_wasm_cpp_tests([
-        "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:body_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:headers_cpp.wasm",
+        "//test/extensions/filters/http/wasm/test_data:headers_cpp_source.wasm",
+        "//test/extensions/filters/http/wasm/test_data:panic_cpp.wasm",
     ]) + envoy_select_wasm_rust_tests([
         "//test/extensions/filters/http/wasm/test_data:deferred_data_rust.wasm",
     ]),
