@@ -95,8 +95,7 @@ size_t ConnPoolImplBase::pendingStreamCount() const { return pending_streams_.si
 
 PendingStreamPtr ConnPoolImplBase::popPendingStream() {
   ASSERT(!pending_streams_.empty());
-  PendingStream& stream = pending_stream_queue_->peek();
-  pending_stream_queue_->pop();
+  PendingStream& stream = pending_stream_queue_->pop();
   PendingStreamPtr pending_stream = stream.removeFromList(pending_streams_);
   ASSERT(pending_streams_.size() == pending_stream_queue_->size());
   return pending_stream;
@@ -116,6 +115,8 @@ void ConnPoolImplBase::updateQueueOverloadedGauge() {
   }
 
   queue_overloaded_ = queue_overloaded;
+  // TODO(nezdolik): Count transitions into the overloaded state. Short-lived overloads between
+  // stats scrapes are not visible through the gauge alone.
   if (queue_overloaded_) {
     host_->cluster().trafficStats()->upstream_queue_overloaded_.inc();
   } else {
@@ -473,16 +474,15 @@ void ConnPoolImplBase::scheduleOnUpstreamReady() {
 
 void ConnPoolImplBase::onUpstreamReady() {
   while (hasPendingStreams() && !ready_clients_.empty()) {
-    PendingStream& stream = pending_stream_queue_->peek();
     ActiveClientPtr& client = ready_clients_.front();
     ENVOY_CONN_LOG(debug, "attaching to next stream", *client);
-    // FIFO pending streams are pulled from the front, where the oldest stream is stored.
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.conn_pool_fix_reentrancy")) {
       PendingStreamPtr pending_stream = popPendingStream();
       cluster_connectivity_state_.decrPendingStreams(1);
       updateQueueOverloadedGauge();
       attachStreamToClient(*client, pending_stream->context());
     } else {
+      PendingStream& stream = pending_stream_queue_->peek();
       attachStreamToClient(*client, stream.context());
       cluster_connectivity_state_.decrPendingStreams(1);
       removePendingStream(stream);
