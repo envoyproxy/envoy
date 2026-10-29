@@ -870,7 +870,8 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
   absl::InlinedVector<std::reference_wrapper<const ShadowPolicy>, 2> active_shadow_policies;
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
-  // runtime keys. Also the method CONNECT doesn't support shadowing.
+  // runtime keys. Also the method CONNECT doesn't support shadowing. Requests answered locally
+  // before host selection never get here, so they are not counted in rq_sampled.
   const absl::string_view method = headers.getMethodValue();
   if (method != Http::Headers::get().MethodValues.Connect) {
     // Use cluster-level shadow policies if they are available (most specific wins).

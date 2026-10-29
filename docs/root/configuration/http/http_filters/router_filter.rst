@@ -506,8 +506,12 @@ routes, virtual hosts or route configurations. Cluster-level :ref:`request_mirro
 emit the same statistics. When a cluster has mirror policies, they replace the route-level
 policies, so only the statistics of the cluster-level policies are updated.
 
-``rq_sampled`` minus ``rq_no_cluster`` minus ``rq_started`` counts the selected requests that were
-not mirrored because the primary request was answered locally before reaching an upstream.
+Mirror policies are evaluated once the router has selected an upstream host for the primary
+request. Requests answered locally before that point, for example because the cluster has no
+healthy upstream or because the request is load shed, are not counted in ``rq_sampled``, and
+neither are CONNECT requests, which are never mirrored. ``rq_sampled`` minus ``rq_no_cluster``
+minus ``rq_started`` counts the selected requests that were not mirrored because an upstream HTTP
+filter answered the primary request locally after the policies were evaluated.
 ``rq_started`` minus ``rq_success``, ``rq_failure`` and ``rq_cancelled`` counts the mirror requests
 still in flight.
 
