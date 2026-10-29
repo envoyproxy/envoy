@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -213,6 +214,18 @@ XdsResourceIdentifier::decodeUrl(absl::string_view resource_url) {
 
 bool XdsResourceIdentifier::hasXdsTpScheme(absl::string_view resource_name) {
   return absl::StartsWith(resource_name, "xdstp:");
+}
+
+absl::StatusOr<std::string>
+XdsResourceIdentifier::normalizeResourceName(absl::string_view resource_name) {
+  if (hasXdsTpScheme(resource_name)) {
+    auto xdstp_resource_or_error = decodeUrn(resource_name);
+    RETURN_IF_NOT_OK_REF(xdstp_resource_or_error.status());
+    EncodeOptions options;
+    options.sort_context_params_ = true;
+    return encodeUrn(xdstp_resource_or_error.value(), options);
+  }
+  return std::string(resource_name);
 }
 
 } // namespace Config

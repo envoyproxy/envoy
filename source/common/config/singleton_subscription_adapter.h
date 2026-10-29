@@ -7,6 +7,7 @@
 #include "envoy/config/subscription.h"
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -14,8 +15,8 @@ namespace Config {
 
 class SingletonSubscriptionCallbacksAdapter : public SubscriptionCallbacks {
 public:
-  SingletonSubscriptionCallbacksAdapter(SingletonSubscriptionCallbacks& callbacks,
-                                        absl::string_view resource_name);
+  static absl::StatusOr<std::unique_ptr<SingletonSubscriptionCallbacksAdapter>>
+  create(SingletonSubscriptionCallbacks& callbacks, absl::string_view resource_name);
 
   // SotW xDS Overload
   absl::Status onConfigUpdate(const std::vector<DecodedResourceRef>& resources,
@@ -29,6 +30,9 @@ public:
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 
 private:
+  SingletonSubscriptionCallbacksAdapter(SingletonSubscriptionCallbacks& callbacks,
+                                        std::string resource_name);
+
   SingletonSubscriptionCallbacks& callbacks_;
   const std::string resource_name_;
 };
