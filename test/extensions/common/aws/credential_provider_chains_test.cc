@@ -220,13 +220,13 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   std::string role_session_name;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
-      .WillOnce(Invoke(WithArg<3>(
+      .WillOnce(WithArg<3>(
           [&role_session_name](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
             role_session_name = provider.role_session_name();
             return nullptr;
-          })));
+          }));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
   credential_provider_config.mutable_assume_role_with_web_identity_provider()
@@ -248,13 +248,13 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   std::string role_arn;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
-      .WillOnce(Invoke(WithArg<3>(
+      .WillOnce(WithArg<3>(
           [&role_arn](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
             role_arn = provider.role_arn();
             return nullptr;
-          })));
+          }));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
   credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
@@ -274,13 +274,13 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
   std::string inline_string;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
-      .WillOnce(Invoke(WithArg<3>(
+      .WillOnce(WithArg<3>(
           [&inline_string](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
             inline_string = provider.web_identity_token_data_source().inline_string();
             return nullptr;
-          })));
+          }));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
   credential_provider_config.mutable_assume_role_with_web_identity_provider()
@@ -299,13 +299,13 @@ TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource)
   std::string inline_string;
 
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _))
-      .WillOnce(Invoke(WithArg<1>(
+      .WillOnce(WithArg<1>(
           [&inline_string](
               const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& provider)
               -> CredentialsProviderSharedPtr {
             inline_string = provider.credentials_data_source().inline_string();
             return nullptr;
-          })));
+          }));
 
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
 
@@ -444,13 +444,13 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567890));
 
   EXPECT_CALL(factories_, createAssumeRoleCredentialsProvider(Ref(context_), _, _, _))
-      .WillOnce(Invoke(WithArg<3>(
+      .WillOnce(WithArg<3>(
           [&role_session_name](
               const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& provider)
               -> CredentialsProviderSharedPtr {
             role_session_name = provider.role_session_name();
             return std::make_shared<MockCredentialsProvider>();
-          })));
+          }));
 
   CommonCredentialsProviderChain chain(context_, "us-east-1", credential_provider_config,
                                        factories_);
@@ -470,7 +470,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFr
   std::string filename;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
-      .WillOnce(Invoke(WithArg<3>(
+      .WillOnce(WithArg<3>(
           [&watched_dir, &filename](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
@@ -479,7 +479,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityCreatesWatchedDirectoryFr
               watched_dir = provider.web_identity_token_data_source().watched_directory().path();
             }
             return std::make_shared<MockCredentialsProvider>();
-          })));
+          }));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
@@ -504,7 +504,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenM
   std::string filename;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
-      .WillOnce(Invoke(WithArg<3>(
+      .WillOnce(WithArg<3>(
           [&watched_dir, &filename](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
@@ -513,7 +513,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityAddsWatchedDirectoryWhenM
               watched_dir = provider.web_identity_token_data_source().watched_directory().path();
             }
             return std::make_shared<MockCredentialsProvider>();
-          })));
+          }));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
@@ -538,14 +538,14 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityPreservesExistingWatchedD
   std::string filename;
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _))
-      .WillOnce(Invoke(WithArg<3>(
+      .WillOnce(WithArg<3>(
           [&watched_dir, &filename](
               const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
                   provider) -> CredentialsProviderSharedPtr {
             filename = provider.web_identity_token_data_source().filename();
             watched_dir = provider.web_identity_token_data_source().watched_directory().path();
             return std::make_shared<MockCredentialsProvider>();
-          })));
+          }));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 

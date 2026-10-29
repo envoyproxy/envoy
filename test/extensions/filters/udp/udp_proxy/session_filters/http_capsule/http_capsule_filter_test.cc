@@ -135,9 +135,9 @@ TEST_F(HttpCapsuleFilterTest, DecapsulateDatagram) {
   datagram.buffer_ = std::make_unique<Buffer::OwnedImpl>();
   datagram.buffer_->add(capsule);
   EXPECT_CALL(write_callbacks_, injectDatagramToFilterChain(_))
-      .WillOnce(Invoke([payload](Network::UdpRecvData& data) -> void {
+      .WillOnce([payload](Network::UdpRecvData& data) -> void {
         EXPECT_EQ(payload, data.buffer_->toString());
-      }));
+      });
   EXPECT_EQ(WriteFilterStatus::StopIteration, filter_->onWrite(datagram));
   EXPECT_EQ(0, datagram.buffer_->length());
 }
@@ -167,9 +167,9 @@ TEST_F(HttpCapsuleFilterTest, DecapsulateSplitPayload) {
   payload2.buffer_ = std::make_unique<Buffer::OwnedImpl>();
   payload2.buffer_->add(capsule.substr(pivot_index));
   EXPECT_CALL(write_callbacks_, injectDatagramToFilterChain(_))
-      .WillOnce(Invoke([payload](Network::UdpRecvData& data) -> void {
+      .WillOnce([payload](Network::UdpRecvData& data) -> void {
         EXPECT_EQ(payload, data.buffer_->toString());
-      }));
+      });
   EXPECT_EQ(WriteFilterStatus::StopIteration, filter_->onWrite(payload2));
   EXPECT_EQ(0, payload2.buffer_->length());
 }
@@ -192,12 +192,12 @@ TEST_F(HttpCapsuleFilterTest, DecapsulateMultipleDatagrams) {
   datagram.buffer_ = std::make_unique<Buffer::OwnedImpl>();
   datagram.buffer_->add(capsule);
   EXPECT_CALL(write_callbacks_, injectDatagramToFilterChain(_))
-      .WillOnce(Invoke([](Network::UdpRecvData& data) -> void {
+      .WillOnce([](Network::UdpRecvData& data) -> void {
         EXPECT_EQ("payload1", data.buffer_->toString());
-      }))
-      .WillOnce(Invoke([](Network::UdpRecvData& data) -> void {
+      })
+      .WillOnce([](Network::UdpRecvData& data) -> void {
         EXPECT_EQ("payload2", data.buffer_->toString());
-      }));
+      });
 
   EXPECT_EQ(WriteFilterStatus::StopIteration, filter_->onWrite(datagram));
   EXPECT_EQ(0, datagram.buffer_->length());

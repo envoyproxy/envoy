@@ -935,17 +935,17 @@ public:
       if (getifaddrs_supported) {
         if (getifaddrs_success) {
           EXPECT_CALL(os_sys_calls, getifaddrs(_))
-              .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+              .WillOnce([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
                 for (uint32_t i = 0; i < ifaddrs.size(); i++) {
                   auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
                   vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
                 }
                 return {0, 0};
-              }));
+              });
         } else {
           EXPECT_CALL(os_sys_calls, getifaddrs(_))
-              .WillOnce(Invoke(
-                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+              .WillOnce(
+                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; });
         }
       }
     } else {
@@ -955,33 +955,31 @@ public:
 
     // These passthrough calls are needed to let the resolver communicate with the DNS server
     EXPECT_CALL(os_sys_calls, accept(_, _, _))
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
               return real_syscall.accept(sockfd, addr, addrlen);
-            }));
+            });
     EXPECT_CALL(os_sys_calls, readv(_, _, _))
-        .WillRepeatedly(
-            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
-              return real_syscall.readv(fd, iov, num_iov);
-            }));
+        .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+          return real_syscall.readv(fd, iov, num_iov);
+        });
     EXPECT_CALL(os_sys_calls, writev(_, _, _))
-        .WillRepeatedly(
-            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
-              return real_syscall.writev(fd, iov, num_iov);
-            }));
+        .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+          return real_syscall.writev(fd, iov, num_iov);
+        });
     EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [&](os_fd_t socket, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
               return real_syscall.send(socket, buffer, length, flags);
-            }));
+            });
     EXPECT_CALL(os_sys_calls, close(_))
-        .WillRepeatedly(Invoke(
-            [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); }));
+        .WillRepeatedly(
+            [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); });
     EXPECT_CALL(os_sys_calls, getaddrinfo(_, _, _, _))
-        .WillRepeatedly(Invoke([&](const char* node, const char* service,
-                                   const struct addrinfo* hints, struct addrinfo** res) {
+        .WillRepeatedly([&](const char* node, const char* service, const struct addrinfo* hints,
+                            struct addrinfo** res) {
           return real_syscall.getaddrinfo(node, service, hints, res);
-        }));
+        });
 
     resolveWithExpectations("some.good.domain", lookup_family, resolution_status,
                             expected_addresses, {}, std::nullopt);

@@ -11,6 +11,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/ascii.h"
@@ -316,10 +317,12 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
       request_config.isContentTypeAllowed(headers) &&
       !headers.getInline(request_content_encoding_handle.handle()) &&
       isTransferEncodingAllowed(headers)) {
-    headers.removeContentLength();
-    headers.setInline(request_content_encoding_handle.handle(), getContentEncoding());
-    request_config.stats().compressed_.inc();
-    request_compressor_ = getCompressorFactory().createCompressor();
+    if (headers.ContentLength() == nullptr &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compressor_skip_empty_body")) {
+      pending_request_headers_ = &headers;
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    startRequestCompression(headers);
   } else {
     request_config.stats().not_compressed_.inc();
   }
@@ -328,6 +331,17 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
 }
 
 Http::FilterDataStatus CompressorFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (pending_request_headers_ != nullptr) {
+    if (data.length() == 0 && !end_stream) {
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+    if (data.length() > 0) {
+      startRequestCompression(*pending_request_headers_);
+    } else {
+      config_->requestDirectionConfig().stats().not_compressed_.inc();
+    }
+    pending_request_headers_ = nullptr;
+  }
   if (request_compressor_ != nullptr) {
     compressAndUpdateStats(request_compressor_, config_->requestDirectionConfig().stats(), data,
                            end_stream);
@@ -336,6 +350,10 @@ Http::FilterDataStatus CompressorFilter::decodeData(Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus CompressorFilter::decodeTrailers(Http::RequestTrailerMap&) {
+  if (pending_request_headers_ != nullptr) {
+    config_->requestDirectionConfig().stats().not_compressed_.inc();
+    pending_request_headers_ = nullptr;
+  }
   if (request_compressor_ != nullptr) {
     Buffer::OwnedImpl empty_buffer;
     // The presence of trailers means the stream is ended, but decodeData()
@@ -407,16 +425,13 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
       isResponseCodeCompressible(headers, config);
   if (!end_stream && isAcceptEncodingAllowed(isEnabledAndContentLengthBigEnough, headers) &&
       isCompressible && isTransferEncodingAllowed(headers)) {
-    if (config.weakenEtagOnCompress()) {
-      weakenEtagHeader(headers);
-    } else {
-      sanitizeEtagHeader(headers);
+    if (headers.ContentLength() == nullptr &&
+        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compressor_skip_empty_body")) {
+      pending_response_headers_ = &headers;
+      insertVaryHeader(headers);
+      return Http::FilterHeadersStatus::StopIteration;
     }
-    headers.removeContentLength();
-    headers.setInline(response_content_encoding_handle.handle(), getContentEncoding());
-    config.stats().compressed_.inc();
-    // Finally instantiate the compressor.
-    response_compressor_ = getCompressorFactory().createCompressor();
+    startResponseCompression(headers);
   } else {
     config.stats().not_compressed_.inc();
   }
@@ -496,24 +511,54 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeadersWithStatusHeader(
     return Http::FilterHeadersStatus::Continue;
   }
 
+  if (headers.ContentLength() == nullptr &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compressor_skip_empty_body")) {
+    pending_response_headers_ = &headers;
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+  startResponseCompression(headers);
+  return Http::FilterHeadersStatus::Continue;
+}
+
+void CompressorFilter::startRequestCompression(Http::RequestHeaderMap& headers) {
+  headers.removeContentLength();
+  headers.setInline(request_content_encoding_handle.handle(), getContentEncoding());
+  config_->requestDirectionConfig().stats().compressed_.inc();
+  request_compressor_ = getCompressorFactory().createCompressor();
+}
+
+void CompressorFilter::startResponseCompression(Http::ResponseHeaderMap& headers) {
+  const auto& config = config_->responseDirectionConfig();
   if (config.weakenEtagOnCompress()) {
     weakenEtagHeader(headers);
   } else {
     sanitizeEtagHeader(headers);
   }
-  std::string content_length = std::string(headers.getContentLengthValue());
+  const std::string content_length(headers.getContentLengthValue());
   headers.removeContentLength();
   headers.setInline(response_content_encoding_handle.handle(), getContentEncoding());
   config.stats().compressed_.inc();
-  // Finally instantiate the compressor.
-  response_compressor_ = config_->makeCompressor();
-  insertEnvoyCompressionStatusHeader(headers, getContentEncoding(),
-                                     Http::Headers::get().EnvoyCompressionStatusValues.Compressed,
-                                     content_length);
-  return Http::FilterHeadersStatus::Continue;
+  response_compressor_ = config.statusHeaderEnabled() ? config_->makeCompressor()
+                                                      : getCompressorFactory().createCompressor();
+  if (config.statusHeaderEnabled()) {
+    insertEnvoyCompressionStatusHeader(headers, getContentEncoding(),
+                                       Http::Headers::get().EnvoyCompressionStatusValues.Compressed,
+                                       content_length);
+  }
 }
 
 Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (pending_response_headers_ != nullptr) {
+    if (data.length() == 0 && !end_stream) {
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+    if (data.length() > 0) {
+      startResponseCompression(*pending_response_headers_);
+    } else {
+      config_->responseDirectionConfig().stats().not_compressed_.inc();
+    }
+    pending_response_headers_ = nullptr;
+  }
   if (response_compressor_ != nullptr) {
     compressAndUpdateStats(response_compressor_, config_->responseDirectionConfig().stats(), data,
                            end_stream);
@@ -522,6 +567,10 @@ Http::FilterDataStatus CompressorFilter::encodeData(Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus CompressorFilter::encodeTrailers(Http::ResponseTrailerMap&) {
+  if (pending_response_headers_ != nullptr) {
+    config_->responseDirectionConfig().stats().not_compressed_.inc();
+    pending_response_headers_ = nullptr;
+  }
   if (response_compressor_ != nullptr) {
     Buffer::OwnedImpl empty_buffer;
     // The presence of trailers means the stream is ended, but encodeData()

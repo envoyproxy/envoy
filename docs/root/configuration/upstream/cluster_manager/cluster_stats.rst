@@ -37,10 +37,17 @@ When :ref:`on-demand cluster discovery <config_http_filters_on_demand>` is confi
 sources emit, next to the usual :ref:`subscription statistics <subscription_statistics>`, the
 following statistics rooted at *cluster_manager.odcds.*.
 
+The discovery counters increment once per discovery, even when multiple requests wait for its
+result. The subscription statistics on this prefix count xDS stream updates instead.
+
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
+  discovery_attempt, Counter, On-demand cluster discoveries started
+  discovery_missing, Counter, On-demand cluster discoveries completed because the requested cluster was missing
+  discovery_success, Counter, On-demand cluster discoveries completed when the requested cluster became available
+  discovery_timeout, Counter, On-demand cluster discoveries that timed out
   known_missing_answers, Counter, Total on-demand cluster discovery requests answered immediately from a remembered "cluster doesn't exist" answer
 
 

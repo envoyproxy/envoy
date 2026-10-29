@@ -14,7 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -76,11 +75,10 @@ TEST_F(Win32SocketHandleImplTest, ReadvWithBufferShouldReadFromBuffer) {
   constexpr int data_length = 10;
   std::string data(data_length, '*');
 
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .WillOnce(Invoke([&](os_fd_t, void* buffer, size_t, int) {
-        memcpy(buffer, data.data(), data_length); // NOLINT(safe-memcpy)
-        return Api::SysCallSizeResult{data_length, 0};
-      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).WillOnce([&](os_fd_t, void* buffer, size_t, int) {
+    memcpy(buffer, data.data(), data_length); // NOLINT(safe-memcpy)
+    return Api::SysCallSizeResult{data_length, 0};
+  });
 
   absl::FixedArray<char> buf(data_length);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
@@ -112,21 +110,20 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekMultipleTimes) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .WillOnce(Invoke([&](os_fd_t, void*, size_t length, int) {
+      .WillOnce([&](os_fd_t, void*, size_t length, int) {
         EXPECT_EQ(10, length);
         return Api::SysCallSizeResult{5, 0};
-      }))
+      })
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
 
   EXPECT_CALL(*file_event_, registerEventIfEmulatedEdge(_));
   absl::FixedArray<char> buf(10);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
   EXPECT_EQ(rc.return_value_, 5);
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .WillOnce(Invoke([&](os_fd_t, void*, size_t length, int) {
-        EXPECT_EQ(5, length);
-        return Api::SysCallSizeResult{5, 0};
-      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).WillOnce([&](os_fd_t, void*, size_t length, int) {
+    EXPECT_EQ(5, length);
+    return Api::SysCallSizeResult{5, 0};
+  });
 
   auto rc2 = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);
   EXPECT_EQ(rc2.return_value_, 10);
@@ -153,8 +150,8 @@ TEST_F(Win32SocketHandleImplTest, RecvWithPeekFlagReturnsFinalError) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(2)
-      .WillOnce(Invoke(
-          [&](os_fd_t, void*, size_t, int) { return Api::SysCallSizeResult{data_length / 2, 0}; }))
+      .WillOnce(
+          [&](os_fd_t, void*, size_t, int) { return Api::SysCallSizeResult{data_length / 2, 0}; })
       .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_CONNRESET}));
 
   absl::FixedArray<char> buf(data_length);
@@ -168,11 +165,10 @@ TEST_F(Win32SocketHandleImplTest, ReadvWithPeekShouldReadFromBuffer) {
   constexpr int data_length = 10;
   std::string data(data_length, '*');
 
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .WillOnce(Invoke([&](os_fd_t, void* buffer, size_t, int) {
-        memcpy(buffer, data.data(), data_length); // NOLINT(safe-memcpy)
-        return Api::SysCallSizeResult{data_length, 0};
-      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).WillOnce([&](os_fd_t, void* buffer, size_t, int) {
+    memcpy(buffer, data.data(), data_length); // NOLINT(safe-memcpy)
+    return Api::SysCallSizeResult{data_length, 0};
+  });
 
   absl::FixedArray<char> buf(data_length);
   auto rc = io_handle_.recv(buf.data(), buf.size(), MSG_PEEK);

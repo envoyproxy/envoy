@@ -40,7 +40,6 @@ namespace HttpFilters {
 namespace Lua {
 namespace {
 
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -361,10 +360,12 @@ public:
 
   Harness(absl::string_view code, bool clear_route_cache = true) {
     ON_CALL(api_, rootScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
-    ON_CALL(decoder_callbacks_, streamInfo())
-        .WillByDefault(Invoke([this]() -> StreamInfo::StreamInfo& { return *stream_info_; }));
-    ON_CALL(encoder_callbacks_, streamInfo())
-        .WillByDefault(Invoke([this]() -> StreamInfo::StreamInfo& { return *stream_info_; }));
+    ON_CALL(decoder_callbacks_, streamInfo()).WillByDefault([this]() -> StreamInfo::StreamInfo& {
+      return *stream_info_;
+    });
+    ON_CALL(encoder_callbacks_, streamInfo()).WillByDefault([this]() -> StreamInfo::StreamInfo& {
+      return *stream_info_;
+    });
     // Without a default action, gmock takes its "uninteresting call" path, which builds the
     // method's name as a std::string on every call. That is pure harness cost, and profiling the
     // binary showed it dominating the mocked calls the filter makes per request.

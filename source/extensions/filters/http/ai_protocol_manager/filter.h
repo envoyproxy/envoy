@@ -17,6 +17,7 @@
 #include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf_parser.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
 #include "source/extensions/filters/http/ai_protocol_manager/stats.h"
@@ -90,16 +91,18 @@ private:
 // route left it undeclared.
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit RouteConfig(const PerRouteProto& proto)
-      : has_request_(proto.has_request()),
-        request_protocol_(protocolFromProto(proto.request().llm_protocol())),
-        response_protocol_(protocolFromProto(proto.response().llm_protocol())) {}
+  // Fails on a binding that does not parse, or one on a side that names no API.
+  static absl::StatusOr<std::unique_ptr<RouteConfig>> create(const PerRouteProto& proto);
 
   // Whether the route hands its request payload to the filter to hold and
   // validate.
   bool hasRequest() const { return has_request_; }
   LLMProtocol requestProtocol() const { return request_protocol_; }
   LLMProtocol responseProtocol() const { return response_protocol_; }
+  // How the route's clients, and its backend, carry their APIs on HTTP; null
+  // when the route names none.
+  const LlmBindingConstSharedPtr& requestBinding() const { return request_binding_; }
+  const LlmBindingConstSharedPtr& responseBinding() const { return response_binding_; }
 
   // The wire API for response extraction on this route: the declared response
   // API, falling back to the declared request API.
@@ -108,9 +111,19 @@ public:
   }
 
 private:
+  RouteConfig(const PerRouteProto& proto, LlmBindingConstSharedPtr&& request_binding,
+              LlmBindingConstSharedPtr&& response_binding)
+      : has_request_(proto.has_request()),
+        request_protocol_(protocolFromProto(proto.request().llm_protocol())),
+        response_protocol_(protocolFromProto(proto.response().llm_protocol())),
+        request_binding_(std::move(request_binding)),
+        response_binding_(std::move(response_binding)) {}
+
   const bool has_request_ = false;
   const LLMProtocol request_protocol_ = LLMProtocol::Unspecified;
   const LLMProtocol response_protocol_ = LLMProtocol::Unspecified;
+  const LlmBindingConstSharedPtr request_binding_;
+  const LlmBindingConstSharedPtr response_binding_;
 };
 
 // AI Protocol Manager HTTP filter (alpha).
@@ -151,13 +164,16 @@ private:
 // A route carrying a per-route request declaration is a declared AI endpoint,
 // and its payload is the filter's to manage: parsed strictly, with a malformed
 // one rejected so Envoy and the backend cannot read the same body differently.
-// A route without one is parsed only if the filter opted into
-// parse_unconfigured_routes -- offered for compatibility with chains that want
-// a parsed body on ordinary routes, never a reason to fail a request -- and is
-// otherwise untouched. That opt-in covers routes that never asked for it, so it
-// takes only a request it can hold to end of stream without stalling it, which
-// rules out gRPC and Connect streaming, upgrades, and CONNECT. A declared
-// endpoint carries no such gate.
+// A filter ahead can declare the endpoint instead, by naming the client's API
+// in `envoy.ai.llm_protocol.request` filter state; such a request is held only
+// if it can be held to end of stream (see below), since the writer may not
+// have looked at its framing. A route without either is parsed only if the
+// filter opted into parse_unconfigured_routes -- offered for compatibility with
+// chains that want a parsed body on ordinary routes, never a reason to fail a
+// request -- and is otherwise untouched. That opt-in covers routes that never
+// asked for it, so it takes only a request it can hold to end of stream
+// without stalling it, which rules out gRPC and Connect streaming, upgrades,
+// and CONNECT. A route-declared endpoint carries no such gate.
 //
 // At end of payload the configured AI filters run over the parsed document
 // (filter_manager.h); payload schema validation is one of them. Normalization
@@ -200,7 +216,8 @@ private:
   // Terminates the stream with a 400 for a payload that failed to parse.
   void rejectInvalidPayload(const absl::Status& status);
 
-  // Whether the route handed its request payload to the filter, which is also
+  // Whether the request payload was handed to the filter -- by the route's
+  // declaration or by filter state naming the client's API -- which is also
   // what makes a parse failure fatal.
   bool isAiEndpoint() const { return route_has_request_; }
 
@@ -236,10 +253,12 @@ private:
 
   // Copied out of the route configuration rather than held by pointer: the route
   // can be re-resolved mid-stream, which would leave a cached pointer dangling,
-  // and these are scalars.
+  // and these are scalars or shared.
   bool route_has_request_{false};
   LLMProtocol request_protocol_{LLMProtocol::Unspecified};
   LLMProtocol route_response_protocol_{LLMProtocol::Unspecified};
+  LlmBindingConstSharedPtr route_request_binding_;
+  LlmBindingConstSharedPtr route_response_binding_;
 
   JsonWithExtBuf request_json_;
   // Cleared once parsing is done with, whether it completed, was abandoned, or

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "envoy/registry/registry.h"
 #include "envoy/router/string_accessor.h"
@@ -30,6 +31,45 @@ LlmProtocolFilterState::getField(absl::string_view field_name) const {
     return llmProtocolName(protocol_);
   }
   return absl::monostate{};
+}
+
+LlmBindingObject::LlmBindingObject(absl::string_view value)
+    : source_(value), binding_(LlmBinding::parse(value)) {}
+
+absl::StatusOr<LlmBindingConstSharedPtr>
+LlmBindingObject::fromFilterState(const StreamInfo::FilterState& filter_state,
+                                  absl::string_view key) {
+  const StreamInfo::FilterState::Object* object = filter_state.getDataReadOnlyGeneric(key);
+  if (object == nullptr) {
+    return nullptr;
+  }
+  if (const auto* binding = dynamic_cast<const LlmBindingObject*>(object); binding != nullptr) {
+    return binding->binding();
+  }
+  return absl::InvalidArgumentError(
+      "the object is not a binding; set the key through its object factory");
+}
+
+const LlmBindingRead*
+LlmBindingReadObject::fromFilterState(const StreamInfo::FilterState& filter_state) {
+  const auto* object =
+      filter_state.getDataReadOnly<LlmBindingReadObject>(FilterStateKeys::BindingRead);
+  return object != nullptr ? &object->read() : nullptr;
+}
+
+StreamInfo::FilterState::Object::FieldType
+LlmBindingReadObject::getField(absl::string_view field_name) const {
+  if (field_name == "model") {
+    if (read_.model.empty()) {
+      return absl::monostate{};
+    }
+    return absl::string_view(read_.model);
+  }
+  const auto variable = read_.path_variables.find(field_name);
+  if (variable == read_.path_variables.end()) {
+    return absl::monostate{};
+  }
+  return absl::string_view(variable->second);
 }
 
 std::optional<absl::string_view> stringFromFilterState(const StreamInfo::FilterState& filter_state,
@@ -84,27 +124,36 @@ public:
 
 REGISTER_FACTORY(ResponseLlmProtocolObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
-class RequestUriPatternObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+// Builds a binding object. Only an empty string yields none: a value that does not parse still
+// sets the key, so the request fails where the binding is read rather than going on without it.
+std::unique_ptr<StreamInfo::FilterState::Object> bindingFromBytes(absl::string_view data) {
+  if (data.empty()) {
+    return nullptr;
+  }
+  return std::make_unique<LlmBindingObject>(data);
+}
+
+class RequestBindingObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
-  std::string name() const override { return std::string(FilterStateKeys::UriPatternRequest); }
+  std::string name() const override { return std::string(FilterStateKeys::BindingRequest); }
   std::unique_ptr<StreamInfo::FilterState::Object>
   createFromBytes(absl::string_view data) const override {
-    return stringFromBytes(data);
+    return bindingFromBytes(data);
   }
 };
 
-REGISTER_FACTORY(RequestUriPatternObjectFactory, StreamInfo::FilterState::ObjectFactory);
+REGISTER_FACTORY(RequestBindingObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
-class ResponseUriPatternObjectFactory : public StreamInfo::FilterState::ObjectFactory {
+class ResponseBindingObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
-  std::string name() const override { return std::string(FilterStateKeys::UriPatternResponse); }
+  std::string name() const override { return std::string(FilterStateKeys::BindingResponse); }
   std::unique_ptr<StreamInfo::FilterState::Object>
   createFromBytes(absl::string_view data) const override {
-    return stringFromBytes(data);
+    return bindingFromBytes(data);
   }
 };
 
-REGISTER_FACTORY(ResponseUriPatternObjectFactory, StreamInfo::FilterState::ObjectFactory);
+REGISTER_FACTORY(ResponseBindingObjectFactory, StreamInfo::FilterState::ObjectFactory);
 
 class RequestModelObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:

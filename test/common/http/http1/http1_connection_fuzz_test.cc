@@ -14,7 +14,6 @@
 #include "gmock/gmock.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Http {
@@ -36,8 +35,8 @@ public:
   Http1Harness(const Http1Settings& server_settings, const Http1Settings& client_settings)
       : server_settings_(server_settings), client_settings_(client_settings) {
     ON_CALL(mock_server_callbacks_, newStream(_, _))
-        .WillByDefault(Invoke(
-            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; }));
+        .WillByDefault(
+            [&](ResponseEncoder&, bool) -> RequestDecoder& { return orphan_request_decoder_; });
   }
 
   void fuzzResponse(Buffer::Instance& payload) {

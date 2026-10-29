@@ -12,7 +12,6 @@
 #include "gmock/gmock.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -49,10 +48,10 @@ TEST_F(HeapShrinkerTest, DoNotShrinkWhenNotConfigured) {
 TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   Server::OverloadActionCb action_cb;
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 
@@ -67,9 +66,11 @@ TEST_F(HeapShrinkerTest, ShrinkWhenTriggered) {
   step();
   EXPECT_EQ(1, shrink_count.value());
 
-  const uint64_t physical_mem_after_shrink =
-      Stats::totalCurrentlyReserved() - Stats::totalPageHeapUnmapped();
-#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
+  const uint64_t reserved_mem_after_shrink = Stats::totalCurrentlyReserved();
+  const uint64_t unmapped_mem_after_shrink = Stats::totalPageHeapUnmapped();
+  ASSERT_GE(reserved_mem_after_shrink, unmapped_mem_after_shrink);
+  const uint64_t physical_mem_after_shrink = reserved_mem_after_shrink - unmapped_mem_after_shrink;
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC) || defined(JEMALLOC)
   EXPECT_GE(physical_mem_before_shrink, physical_mem_after_shrink);
 #else
   EXPECT_EQ(physical_mem_before_shrink, physical_mem_after_shrink);
@@ -92,10 +93,10 @@ TEST_F(HeapShrinkerTest, CustomTimerInterval) {
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
       .WillRepeatedly(Return(std::make_optional(config)));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 
@@ -121,10 +122,10 @@ TEST_F(HeapShrinkerTest, CustomMaxUnfreedMemoryBytes) {
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig())
       .WillRepeatedly(Return(std::make_optional(config)));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 
@@ -139,10 +140,10 @@ TEST_F(HeapShrinkerTest, NoConfigUsesDefaults) {
   Server::OverloadActionCb action_cb;
   EXPECT_CALL(overload_manager_, getShrinkHeapConfig()).WillRepeatedly(Return(std::nullopt));
   EXPECT_CALL(overload_manager_, registerForAction(_, _, _))
-      .WillOnce(Invoke([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
+      .WillOnce([&](const std::string&, Event::Dispatcher&, Server::OverloadActionCb cb) {
         action_cb = cb;
         return true;
-      }));
+      });
 
   HeapShrinker h(dispatcher_, overload_manager_, *stats_.rootScope());
 

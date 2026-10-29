@@ -133,12 +133,21 @@ void BufferManager::onDestroy() {
   }
 }
 
-void BufferManager::onData(Buffer::Instance& data) {
+void BufferManager::onData(Buffer::Instance& data, bool end_stream) {
+  if (end_stream_seen_) {
+    IS_ENVOY_BUG("ai_protocol_manager: data after end of stream");
+    data.drain(data.length());
+    return;
+  }
   const uint64_t accepted = data.length();
   // Queue the bytes, taking ownership now so the filter chain's buffer reference does not dangle
   // across the asynchronous offload. This ownership/serialization is storage-agnostic, so it lives
   // here once rather than in every ExternalBuffer.
   pending_.move(data);
+  if (end_stream) {
+    // Set before flushing, so this frame's write carries end_stream.
+    end_stream_seen_ = true;
+  }
 
   if (buffer_ == nullptr) {
     if (pending_.length() <= config_.max_in_memory_bytes) {

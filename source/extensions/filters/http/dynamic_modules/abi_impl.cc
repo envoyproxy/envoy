@@ -1046,8 +1046,13 @@ void envoy_dynamic_module_callback_http_send_response(
     details_view = "dynamic_module";
   }
 
-  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers, 0,
-                         details_view);
+  // For gRPC requests, keep a 200 reply as OK and let Envoy map any other code to a gRPC status.
+  const std::optional<Grpc::Status::GrpcStatus> grpc_status =
+      status_code == enumToInt(Http::Code::OK)
+          ? std::optional<Grpc::Status::GrpcStatus>(Grpc::Status::WellKnownGrpcStatus::Ok)
+          : std::nullopt;
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers,
+                         grpc_status, details_view);
 }
 
 void envoy_dynamic_module_callback_http_send_response_headers(
@@ -3077,6 +3082,16 @@ void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     return;
   }
   downstream_callbacks->refreshRouteCluster();
+}
+
+void envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (stream_info == nullptr) {
+    return;
+  }
+  stream_info->setShouldDrainConnectionUponCompletion(true);
 }
 
 } // extern "C"

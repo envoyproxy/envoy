@@ -4,6 +4,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
@@ -597,6 +598,77 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PrefixRewriteRewritesUpstream
   EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
 }
 
+// A recorded prefix rewrite rule rewrites the path sent upstream, keeping the query string and
+// recording the original path the way a configured route does.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, PrefixRewriteRuleRewritesUpstreamPath) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/api/foo?q=1"},
+                               {"x-decision", "unspecified"},
+                               {"x-prefix-rewrite-rule", "/api=/internal"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/foo?q=1", upstream_headers->getPathValue());
+  EXPECT_EQ("/api/foo?q=1", upstream_headers->getEnvoyOriginalPathValue());
+}
+
+// A prefix rewrite rule over the whole path replaces the path without its query string.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, WholePathPrefixRewriteRuleRewritesUpstreamPath) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = sendRequest({{":path", "/anything/here?q=1"},
+                               {"x-decision", "unspecified"},
+                               {"x-prefix-rewrite-rule", "=/fixed"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  const auto upstream_headers =
+      reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/fixed?q=1", upstream_headers->getPathValue());
+  EXPECT_EQ("/anything/here?q=1", upstream_headers->getEnvoyOriginalPathValue());
+}
+
+// A route built for a cache key serves the later requests on the worker, and the prefix rewrite
+// rule it carries rewrites the path of each request it applies to.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, BuiltRouteCacheServesLaterRequests) {
+  setupTest(R"EOF(
+built_route_cache:
+  max_entries_per_worker: 16
+  verify_one_in: 0
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto upstream_headers_for = [this](const std::string& path) {
+    auto response = sendRequest({{":path", path},
+                                 {"x-template", "canary"},
+                                 {"x-cache-key", "7"},
+                                 {"x-prefix-rewrite-rule", "/api=/internal"},
+                                 {"x-stop-chain", "true"}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.back().get())
+        ->lastRequestHeaders();
+  };
+
+  upstream_headers_for("/api/one");
+  auto upstream_headers = upstream_headers_for("/api/two");
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/internal/two", upstream_headers->getPathValue());
+  EXPECT_EQ("/api/two", upstream_headers->getEnvoyOriginalPathValue());
+
+  // The cached route does not serve a path its rule does not apply to, so the module decides that
+  // request afresh and its rule is rejected.
+  upstream_headers = upstream_headers_for("/other");
+  ASSERT_NE(nullptr, upstream_headers);
+  EXPECT_EQ("/other", upstream_headers->getPathValue());
+  EXPECT_EQ(2, counterValue("dynamicmodulescustom.route_specifier.test.built_route_cache_miss"));
+  EXPECT_EQ(1, counterValue("dynamicmodulescustom.route_specifier.test.built_route_cache_hit"));
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.route_specifier.test.rewrite_not_applied"));
+}
+
 // A regex rewrite carried by a selected route override rewrites the path sent upstream when the
 // decision resolves, keeping the query string the same way a prefix rewrite does.
 TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteOverrideRegexRewritesUpstreamPath) {
@@ -967,6 +1039,37 @@ typed_config:
                           {"x-echo", "previous-route-metadata"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("absent", header(response->headers(), "x-echo-result"));
+
+  // The read finds no string under a key that holds a number, under a key that is missing, or in a
+  // namespace that is missing.
+  for (const auto& [name, value] : std::vector<std::pair<std::string, std::string>>{
+           {"x-metadata-key", "number"},
+           {"x-metadata-key", "missing"},
+           {"x-metadata-namespace", "envoy.test.missing"}}) {
+    response =
+        sendRequest({{"x-template", "full"}, {"x-echo", "previous-route-metadata"}, {name, value}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("absent", header(response->headers(), "x-echo-result")) << value;
+  }
+}
+
+// The route metadata getters read only a value of the kind they ask for, under a key and in a
+// namespace the route holds.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsRouteMetadataOfTheKindAskedFor) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (const auto& [echo, name, value] :
+       std::vector<std::tuple<std::string, std::string, std::string>>{
+           {"route-metadata", "x-metadata-key", "number"},
+           {"route-metadata", "x-metadata-key", "missing"},
+           {"route-metadata", "x-metadata-namespace", "envoy.test.missing"},
+           {"route-metadata-number", "x-metadata-key", "key"},
+           {"route-metadata-number", "x-metadata-key", "missing"},
+           {"route-metadata-number", "x-metadata-namespace", "envoy.test.missing"}}) {
+    auto response = sendRequest({{"x-template", "full"}, {"x-echo", echo}, {name, value}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("absent", header(response->headers(), "x-echo-result")) << echo << " " << value;
+  }
 }
 
 // ReusePrevious without a previous route is rejected and the failure policy passes it through.
@@ -1010,6 +1113,49 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteUserDataFiresDestroyHook
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.route_destroy",
                                testing::Ge(1));
+}
+
+// User data a decision builds no route for is handed back through the user data discard hook
+// instead of the route destroy hook.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, UnusedRouteUserDataFiresDiscardHook) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The module counts the values it got back for the whole process, which outlives this server.
+  const auto discards = [this]() {
+    auto response = sendRequest({{"x-echo", "discard-count"}});
+    uint64_t count = 0;
+    EXPECT_TRUE(absl::SimpleAtoi(header(response->headers(), "x-echo-result"), &count));
+    return count;
+  };
+  const uint64_t discards_before = discards();
+
+  auto response = sendRequest({{"x-decision", "pass-through"}, {"x-user-data", "42"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(discards_before + 1, discards());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.user_data_discard",
+                               testing::Eq(1));
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.route_specifier.test.route_destroy"));
+}
+
+// A module reads whether its configuration caches built routes.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsWhetherTheConfigurationCachesBuiltRoutes) {
+  setupTest(R"EOF(
+built_route_cache:
+  max_entries_per_worker: 16
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequest({{"x-echo", "has-built-route-cache"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("true", header(response->headers(), "x-echo-result"));
+}
+
+// A module reads that a configuration without built_route_cache caches no built routes.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsThatTheConfigurationCachesNoBuiltRoutes) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequest({{"x-echo", "has-built-route-cache"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("false", header(response->headers(), "x-echo-result"));
 }
 
 // A decision that stops the chain skips the specifiers configured after it, which the second

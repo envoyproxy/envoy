@@ -531,10 +531,10 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, MissThresholdOneMarksDeadOnFirstInval
   NiceMock<Network::MockIoHandle> mock_read_handle;
   EXPECT_CALL(mock_read_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
   EXPECT_CALL(mock_read_handle, read(testing::_, testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer, std::optional<uint64_t>) {
+      .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) {
         buffer.add("XXXXX"); // 5 bytes, not RPING
         return Api::IoCallUint64Result{5, Api::IoError::none()};
-      }));
+      });
 
   socket_manager->onPingResponse(mock_read_handle);
 
@@ -594,11 +594,11 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithReporterConfig) {
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([]() {
     auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, onServerInitialized());
     return reporter;
-  }));
+  });
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
@@ -629,7 +629,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
 
   EXPECT_CALL(reporter_factory, createReporter())
       .Times(1)
-      .WillOnce(Invoke([&node_id, &cluster_id, &tenant_id]() {
+      .WillOnce([&node_id, &cluster_id, &tenant_id]() {
         auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
         EXPECT_CALL(*reporter,
@@ -637,7 +637,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateConnectionReporting) {
                                           testing::Eq(tenant_id), testing::_, testing::Eq(200)));
 
         return reporter;
-      }));
+      });
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
@@ -657,16 +657,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateDisconnectionReporting) {
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter())
-      .Times(1)
-      .WillOnce(Invoke([&node_id, &cluster_id]() {
-        auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&node_id, &cluster_id]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
-        EXPECT_CALL(*reporter, reportDisconnectionEvent(testing::Eq(node_id),
-                                                        testing::Eq(cluster_id), testing::Eq(123)));
+    EXPECT_CALL(*reporter, reportDisconnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
+                                                    testing::Eq(123)));
 
-        return reporter;
-      }));
+    return reporter;
+  });
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);
@@ -686,16 +684,14 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ValidateGoAwayReporting) {
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter())
-      .Times(1)
-      .WillOnce(Invoke([&node_id, &cluster_id]() {
-        auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&node_id, &cluster_id]() {
+    auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
 
-        EXPECT_CALL(*reporter, reportGoAwayEvent(testing::Eq(node_id), testing::Eq(cluster_id),
-                                                 testing::Eq(123)));
+    EXPECT_CALL(*reporter,
+                reportGoAwayEvent(testing::Eq(node_id), testing::Eq(cluster_id), testing::Eq(123)));
 
-        return reporter;
-      }));
+    return reporter;
+  });
 
   extension_ =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config);

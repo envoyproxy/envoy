@@ -915,6 +915,35 @@ TEST(BacktraceClassTest, DumpsSingleLineTrace) {
   EXPECT_THAT((*result)[0], HasSubstr("#0:"));
 }
 
+TEST(BacktraceClassTest, DumpsTraceToStderr) {
+  auto exec = std::make_shared<ManualExecutor>();
+  auto dump = []() {
+    const bool save_log_to_stderr = Backtrace::logToStderr();
+    const bool save_single_line = Backtrace::singleLine();
+    Backtrace::setLogToStderr(true);
+    Backtrace tracer;
+    for (bool single_line : {false, true}) {
+      Backtrace::setSingleLine(single_line);
+      StartStopRecording recording(GetLogSink());
+      testing::internal::CaptureStderr();
+      tracer.logTrace();
+      const std::string output = testing::internal::GetCapturedStderr();
+      EXPECT_THAT(output, StartsWith("Coroutine Backtrace:\n[backtrace] [stderr] #0: "));
+      EXPECT_THAT(output, HasSubstr("[backtrace] [stderr] #3: "));
+      EXPECT_THAT(recording.messages(), IsEmpty());
+    }
+    Backtrace::setSingleLine(save_single_line);
+    Backtrace::setLogToStderr(save_log_to_stderr);
+    return std::vector<std::string>{};
+  };
+  absl::StatusOr<std::vector<std::string>> result = absl::UnavailableError("unset");
+  DetachedHandle handle = launch(
+      backtraceLevel0(std::move(dump)), exec,
+      [&result](absl::StatusOr<std::vector<std::string>> status) { result = std::move(status); });
+  exec->drain();
+  EXPECT_OK(result);
+}
+
 TEST(BacktraceClassTest, DumpsMultiLineTrace) {
   auto exec = std::make_shared<ManualExecutor>();
   LeafController controller;

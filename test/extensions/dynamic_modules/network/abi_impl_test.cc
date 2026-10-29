@@ -2598,9 +2598,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, NetworkFilterSchedulerCommitIn
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 789);
 
@@ -2620,9 +2620,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 999);
 
@@ -2643,9 +2643,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 123);
 
@@ -2666,9 +2666,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
   ASSERT_NE(nullptr, scheduler);
 
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   std::thread foreign(
       [&]() { envoy_dynamic_module_callback_network_filter_scheduler_commit(scheduler, 42); });
@@ -2705,9 +2705,9 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest,
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_network_filter_config_scheduler_commit(scheduler, 456);
 

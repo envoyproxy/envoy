@@ -51,10 +51,7 @@ namespace Envoy {
 class SignalAction : NonCopyable {
 public:
   SignalAction()
-      : guard_size_(sysconf(_SC_PAGE_SIZE)),
-        altstack_size_(
-            std::max(guard_size_ * 4, (static_cast<size_t>(MINSIGSTKSZ) + guard_size_ - 1) /
-                                          guard_size_ * guard_size_)) {
+      : guard_size_(sysconf(_SC_PAGE_SIZE)), altstack_size_(computeAltStackSize(guard_size_)) {
     mapAndProtectStackMemory();
     installSigHandlers();
   }
@@ -74,7 +71,27 @@ public:
    */
   static void sigHandler(int sig, siginfo_t* info, void* context);
 
+  /**
+   * Async-signal-safe description of a fatal signal. Unlike `strsignal()`,
+   * returns static storage without allocating, so it is safe to call from
+   * the signal handler even when the fault originates inside the allocator.
+   *
+   * Public so that it can be exercised directly from a test.
+   */
+  static const char* signalDescription(int sig);
+
 private:
+  static size_t computeAltStackSize(size_t page) {
+    size_t min_size = MINSIGSTKSZ;
+#ifdef _SC_SIGSTKSZ
+    const long dyn = sysconf(_SC_SIGSTKSZ);
+    if (dyn > 0) {
+      min_size = std::max(min_size, static_cast<size_t>(dyn));
+    }
+#endif
+    const size_t want = std::max(page * 16, min_size * 4);
+    return (want + page - 1) / page * page;
+  }
   /**
    * Allocate this many bytes on each side of the area used for alt stack.
    *
@@ -86,8 +103,11 @@ private:
   /**
    * Use this many bytes for the alternate signal handling stack.
    *
-   * Initialized as a multiple of page size (although signalstack will
-   * do alignment as needed).
+   * Sized with headroom for nested signal delivery and the handler's backtrace
+   * and formatting work. The runtime `_SC_SIGSTKSZ` value accounts for larger
+   * signal frames on platforms such as aarch64 with `SVE`; `MINSIGSTKSZ` is used
+   * as a fallback where the runtime value is unavailable. The size is a
+   * multiple of page size (although signalstack will do alignment as needed).
    *
    * Additionally, two guard pages will be allocated to bookend the usable area.
    */

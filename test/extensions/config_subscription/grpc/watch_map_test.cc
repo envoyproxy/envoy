@@ -18,8 +18,6 @@
 
 using ::testing::_;
 using ::testing::AtMost;
-using ::testing::Invoke;
-using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 
 namespace Envoy {
@@ -31,22 +29,27 @@ void expectDeltaUpdate(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& expected_resources,
     const std::vector<std::string>& expected_removals, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
-      .WillOnce(Invoke([expected_resources, expected_removals,
-                        version](const std::vector<DecodedResourceRef>& gotten_resources,
-                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                 const std::string&) {
+      .WillOnce([expected_resources, expected_removals,
+                 version](const std::vector<DecodedResourceRef>& gotten_resources,
+                          const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                          const std::string&) {
         EXPECT_EQ(expected_resources.size(), gotten_resources.size());
         for (size_t i = 0; i < expected_resources.size(); i++) {
           EXPECT_EQ(gotten_resources[i].get().version(), version);
           EXPECT_TRUE(
               TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
+          EXPECT_NE(gotten_resources[i].get().resource().GetArena(), nullptr);
+          if (i > 0) {
+            EXPECT_EQ(gotten_resources[i].get().resource().GetArena(),
+                      gotten_resources[0].get().resource().GetArena());
+          }
         }
         EXPECT_EQ(expected_removals.size(), removed_resources.size());
         for (size_t i = 0; i < expected_removals.size(); i++) {
           EXPECT_EQ(expected_removals[i], removed_resources[i]);
         }
         return absl::OkStatus();
-      }));
+      });
 }
 
 // expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
@@ -59,15 +62,20 @@ void expectDeltaAndSotwUpdate(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& expected_resources,
     const std::vector<std::string>& expected_removals, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(Invoke([expected_resources](const std::vector<DecodedResourceRef>& gotten_resources,
-                                            const std::string&) {
+      .WillOnce([expected_resources](const std::vector<DecodedResourceRef>& gotten_resources,
+                                     const std::string&) {
         EXPECT_EQ(expected_resources.size(), gotten_resources.size());
         for (size_t i = 0; i < expected_resources.size(); i++) {
           EXPECT_TRUE(
               TestUtility::protoEqual(gotten_resources[i].get().resource(), expected_resources[i]));
+          EXPECT_NE(gotten_resources[i].get().resource().GetArena(), nullptr);
+          if (i > 0) {
+            EXPECT_EQ(gotten_resources[i].get().resource().GetArena(),
+                      gotten_resources[0].get().resource().GetArena());
+          }
         }
         return absl::OkStatus();
-      }));
+      });
   expectDeltaUpdate(callbacks, expected_resources, expected_removals, version);
 }
 
@@ -79,11 +87,10 @@ void expectNoUpdate(MockSubscriptionCallbacks& callbacks, const std::string& ver
 void expectEmptySotwNoDeltaUpdate(MockSubscriptionCallbacks& callbacks,
                                   const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(
-          Invoke([](const std::vector<DecodedResourceRef>& gotten_resources, const std::string&) {
-            EXPECT_EQ(gotten_resources.size(), 0);
-            return absl::OkStatus();
-          }));
+      .WillOnce([](const std::vector<DecodedResourceRef>& gotten_resources, const std::string&) {
+        EXPECT_EQ(gotten_resources.size(), 0);
+        return absl::OkStatus();
+      });
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
 
@@ -351,6 +358,52 @@ TEST(WatchMapTest, CacheResourceAddResource) {
   }
 }
 
+// Checks that removing watched resources incrementally via the two-argument updateWatchInterest()
+// cleans up the EDS cache when the last watch loses interest.
+TEST(WatchMapTest, EdsResourcesCacheIncrementalUpdate) {
+  MockSubscriptionCallbacks callbacks1;
+  MockSubscriptionCallbacks callbacks2;
+  TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
+      resource_decoder("cluster_name");
+  NiceMock<MockCustomConfigValidators> config_validators;
+  NiceMock<MockEdsResourcesCache> eds_resources_cache;
+  const std::string eds_type_url =
+      Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>();
+  WatchMap watch_map(eds_type_url, &config_validators,
+                     makeOptRef<EdsResourcesCache>(eds_resources_cache));
+  Watch* watch1 = watch_map.addWatch(callbacks1, resource_decoder);
+  Watch* watch2 = watch_map.addWatch(callbacks2, resource_decoder);
+
+  Protobuf::RepeatedPtrField<Protobuf::Any> updated_resources;
+  envoy::config::endpoint::v3::ClusterLoadAssignment alice;
+  alice.set_cluster_name("alice");
+  std::ignore = updated_resources.Add()->PackFrom(alice);
+
+  // Both watches add interest in alice incrementally.
+  watch_map.updateWatchInterest(watch1, {"alice"}, {});
+  watch_map.updateWatchInterest(watch2, {"alice"}, {});
+
+  // Deliver alice: cached via setResource.
+  expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+  expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version1");
+  EXPECT_CALL(eds_resources_cache, setResource("alice", ProtoEq(alice))).Times(2);
+  doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
+
+  // First watch removes alice while adding bob. Because watch2 still watches alice, alice is NOT
+  // removed from the cache.
+  EXPECT_CALL(eds_resources_cache, removeResource("alice")).Times(0);
+  AddedRemoved added_removed1 = watch_map.updateWatchInterest(watch1, {"bob"}, {"alice"});
+  EXPECT_EQ(absl::flat_hash_set<std::string>({"bob"}), added_removed1.added_);
+  EXPECT_TRUE(added_removed1.removed_.empty());
+
+  // Second watch removes alice incrementally. Now alice has no remaining watchers, so it is
+  // removed from the cache.
+  EXPECT_CALL(eds_resources_cache, removeResource("alice"));
+  AddedRemoved added_removed2 = watch_map.updateWatchInterest(watch2, {}, {"alice"});
+  EXPECT_TRUE(added_removed2.added_.empty());
+  EXPECT_EQ(absl::flat_hash_set<std::string>({"alice"}), added_removed2.removed_);
+}
+
 // These are regression tests for #11877, validate that when two watches point at the same
 // watched resource, and an update to one of the watches removes one or both of them, that
 // WatchMap defers deletes and doesn't crash.
@@ -394,12 +447,12 @@ public:
 };
 
 TEST_F(SameWatchRemoval, SameWatchRemovalSotw) {
-  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
   watch_map_.onConfigUpdate(updated_resources_, "version1");
 }
 
@@ -408,24 +461,24 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
       wrapInResource(updated_resources_, "version1");
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
 
-  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
   watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1");
 }
 
 TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
   *removed_names_proto.Add() = "alice";
-  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
   watch_map_.onConfigUpdate({}, removed_names_proto, "version1");
 }
 
@@ -760,16 +813,16 @@ TEST(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
     cur_resource->add_aliases(not_resolved);
 
     EXPECT_CALL(callbacks3, onConfigUpdate(_, _, _))
-        .WillOnce(Invoke([not_resolved, version](
-                             const std::vector<DecodedResourceRef>& gotten_resources,
-                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        .WillOnce([not_resolved, version](const std::vector<DecodedResourceRef>& gotten_resources,
+                                          const Protobuf::RepeatedPtrField<std::string>&,
+                                          const std::string&) {
           EXPECT_EQ(1, gotten_resources.size());
           EXPECT_EQ(gotten_resources[0].get().version(), version);
           EXPECT_FALSE(gotten_resources[0].get().hasResource());
           EXPECT_EQ(gotten_resources[0].get().name(), not_resolved);
           EXPECT_EQ(gotten_resources[0].get().aliases(), std::vector<std::string>{not_resolved});
           return absl::OkStatus();
-        }));
+        });
 
     Protobuf::RepeatedPtrField<std::string> removed_names_proto;
 
@@ -777,9 +830,9 @@ TEST(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
   }
 }
 
-// appendWatchInterest() adds to a watch's interest without disturbing the names it already
-// watches, and only reports names that are new across the whole subscription in added_.
-TEST(WatchMapTest, AppendWatchInterest) {
+// updateWatchInterest(add, remove) adds to a watch's interest without disturbing the names it
+// already watches, and only reports names that are new across the whole subscription in added_.
+TEST(WatchMapTest, IncrementalUpdateWatchInterest) {
   MockSubscriptionCallbacks callbacks;
   TestUtility::TestOpaqueResourceDecoderImpl<envoy::config::endpoint::v3::ClusterLoadAssignment>
       resource_decoder("cluster_name");
@@ -794,14 +847,14 @@ TEST(WatchMapTest, AppendWatchInterest) {
     EXPECT_TRUE(added_removed.removed_.empty());
   }
   {
-    // Appending Bob keeps Alice and reports only Bob as new to the subscription.
-    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {"bob"});
+    // Adding Bob keeps Alice and reports only Bob as new to the subscription.
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {"bob"}, {});
     EXPECT_EQ(absl::flat_hash_set<std::string>({"bob"}), added_removed.added_);
     EXPECT_TRUE(added_removed.removed_.empty());
   }
   {
-    // Appending an already-watched name (Alice) plus a new one (Carol) reports only Carol.
-    AddedRemoved added_removed = watch_map.appendWatchInterest(watch, {"alice", "carol"});
+    // Adding an already-watched name (Alice) plus a new one (Carol) reports only Carol.
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {"alice", "carol"}, {});
     EXPECT_EQ(absl::flat_hash_set<std::string>({"carol"}), added_removed.added_);
     EXPECT_TRUE(added_removed.removed_.empty());
   }
@@ -821,6 +874,19 @@ TEST(WatchMapTest, AppendWatchInterest) {
     }
     expectDeltaUpdate(callbacks, expected_resources, {}, "version1");
     doDeltaUpdate(watch_map, updated_resources, {}, "version1");
+  }
+  {
+    // Adding Dave while removing Bob and an untracked name (Eve) reports Dave in added_ and Bob
+    // in removed_.
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {"dave"}, {"bob", "eve"});
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"dave"}), added_removed.added_);
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"bob"}), added_removed.removed_);
+  }
+  {
+    // Removing Carol without adding anything reports Carol in removed_.
+    AddedRemoved added_removed = watch_map.updateWatchInterest(watch, {}, {"carol"});
+    EXPECT_TRUE(added_removed.added_.empty());
+    EXPECT_EQ(absl::flat_hash_set<std::string>({"carol"}), added_removed.removed_);
   }
 }
 

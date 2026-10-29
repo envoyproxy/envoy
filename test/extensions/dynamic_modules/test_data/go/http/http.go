@@ -165,6 +165,7 @@ func (p *headerCallbacksFilter) OnRequestHeaders(headers shared.HeaderMap,
 	endOfStream bool) shared.HeadersStatus {
 	p.handle.ClearRouteCache()
 	p.handle.RefreshRouteCluster()
+	p.handle.DrainConnectionUponCompletion()
 
 	testHeaders(headers)
 

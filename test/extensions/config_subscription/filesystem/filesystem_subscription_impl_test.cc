@@ -143,6 +143,13 @@ TEST_F(FilesystemSubscriptionImplTest, UpdateTimeChangedOnUpdateSuccess) {
   EXPECT_TRUE(statsAre(3, 2, 0, 0, 0, TEST_TIME_MILLIS + 1, 7148434200721666028, "0"));
 }
 
+TEST_F(FilesystemSubscriptionImplTest, RequestOnDemandNotImplemented) {
+  EXPECT_ENVOY_BUG(subscription_.requestOnDemandUpdate({"cluster0"}),
+                   "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(subscription_.update({"cluster0"}, {"cluster1"}),
+                   "unexpected request for on demand update");
+}
+
 // TODO(htuch): Add generic test harness support for collection subscriptions so that we can test
 // gRPC/HTTP transports similar to below.
 class FilesystemCollectionSubscriptionImplTest : public testing::Test,
@@ -164,16 +171,15 @@ public:
 
   Event::DispatcherPtr setupDispatcher() {
     auto dispatcher = std::make_unique<Event::MockDispatcher>();
-    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
+    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillOnce([this] {
       Filesystem::MockWatcher* mock_watcher = new Filesystem::MockWatcher();
       EXPECT_CALL(*mock_watcher, addWatch(path_.path(), Filesystem::Watcher::Events::MovedTo, _))
-          .WillOnce(
-              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                on_changed_cb_ = cb;
-                return absl::OkStatus();
-              }));
+          .WillOnce([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+            on_changed_cb_ = cb;
+            return absl::OkStatus();
+          });
       return mock_watcher;
-    }));
+    });
     return dispatcher;
   }
 
@@ -256,7 +262,8 @@ resource:
   )EOF",
                   MessageUtil::getJsonStringFromMessageOrError(inline_entry));
   DecodedResourcesWrapper decoded_resources;
-  decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry));
+  decoded_resources.pushBack(std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry,
+                                                                   *decoded_resources.arena_));
   EXPECT_CALL(callbacks_,
               onConfigUpdate(DecodedResourcesEq(decoded_resources.refvec_), "system.1"));
   updateFile(resource);
@@ -286,8 +293,8 @@ resource:
                   MessageUtil::getJsonStringFromMessageOrError(inline_entry_2));
   {
     DecodedResourcesWrapper decoded_resources_2;
-    decoded_resources_2.pushBack(
-        std::make_unique<DecodedResourceImpl>(resource_decoder, inline_entry_2));
+    decoded_resources_2.pushBack(std::make_unique<DecodedResourceImpl>(
+        resource_decoder, inline_entry_2, *decoded_resources_2.arena_));
     EXPECT_CALL(callbacks_,
                 onConfigUpdate(DecodedResourcesEq(decoded_resources_2.refvec_), "system.2"));
     updateFile(resource_2);
