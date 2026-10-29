@@ -60,7 +60,6 @@ using ::grpc::gcp::HandshakerResult;
 using ::grpc::gcp::HandshakerService;
 using ::testing::_;
 using ::testing::AtLeast;
-using ::testing::Invoke;
 using ::testing::NotNull;
 using ::testing::Return;
 using ::testing::ReturnRefOfCopy;
@@ -857,16 +856,16 @@ TEST_P(TsiSocketTest, HandshakeWithEndOfStreamAfterClientFinished) {
   // From now on, posted callbacks run when the test runs them, as they would after doRead()
   // returns on a real dispatcher.
   std::vector<Event::PostCb> posted;
-  ON_CALL(dispatcher_, post(_)).WillByDefault(Invoke([&posted](Event::PostCb callback) {
+  ON_CALL(dispatcher_, post(_)).WillByDefault([&posted](Event::PostCb callback) {
     posted.push_back(std::move(callback));
-  }));
+  });
 
   // On the server side, read the ClientFinished together with the end of stream.
-  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce([&](Buffer::Instance& buffer) {
     Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), true};
     buffer.move(client_to_server_);
     return result;
-  }));
+  });
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_),
                  "While reading ClientFinished and the end of stream.");
@@ -980,11 +979,11 @@ TEST_P(TsiSocketTest, AsyncHandshakeWithEndOfStreamAfterClientFinished) {
 
   // The server reads the ClientFinished and the end of stream, and waits for the handshaker
   // service.
-  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce([&](Buffer::Instance& buffer) {
     Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), true};
     buffer.move(client_to_server_);
     return result;
-  }));
+  });
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_),
                  "While reading ClientFinished and the end of stream.");

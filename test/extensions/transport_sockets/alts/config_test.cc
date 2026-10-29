@@ -37,7 +37,6 @@
 
 using Envoy::Server::Configuration::MockTransportSocketFactoryContext;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -137,10 +136,10 @@ protected:
   // Envoy is built without Google gRPC. By default, the mock accepts it.
   void disableGoogleGrpc() {
     ON_CALL(asyncClientManager(), factoryForGrpcService(_, _, _))
-        .WillByDefault(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
-                                 bool) -> absl::StatusOr<Grpc::AsyncClientFactoryPtr> {
+        .WillByDefault([](const envoy::config::core::v3::GrpcService&, Stats::Scope&,
+                          bool) -> absl::StatusOr<Grpc::AsyncClientFactoryPtr> {
           return absl::InvalidArgumentError("Google C++ gRPC client is not linked");
-        }));
+        });
   }
 
   // A downstream (server) socket starts its handshake when the client's first handshake message
@@ -153,13 +152,13 @@ protected:
     socket_ = downstream_socket_factory_->createDownstreamTransportSocket();
     socket_->setTransportSocketCallbacks(callbacks_);
     EXPECT_CALL(io_handle_, read(_, _))
-        .WillOnce(Invoke([](Buffer::Instance& buffer, std::optional<uint64_t>) {
+        .WillOnce([](Buffer::Instance& buffer, std::optional<uint64_t>) {
           buffer.add(FakeHandshake::ClientInit);
           return Api::IoCallUint64Result(FakeHandshake::ClientInit.size(), Api::IoError::none());
-        }))
-        .WillRepeatedly(Invoke([](Buffer::Instance&, std::optional<uint64_t>) {
+        })
+        .WillRepeatedly([](Buffer::Instance&, std::optional<uint64_t>) {
           return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
-        }));
+        });
     Buffer::OwnedImpl read_buffer;
     socket_->doRead(read_buffer);
   }
@@ -203,11 +202,11 @@ TEST_F(AltsHandshakerFactoryTest, DownstreamHandshakeUsesAsyncGrpcClient) {
   auto handshaker_client = std::make_shared<FakeAsyncHandshakerClient>();
   envoy::config::core::v3::GrpcService grpc_service;
   EXPECT_CALL(asyncClientManager(), getOrCreateRawAsyncClientWithHashKey(_, _, true))
-      .WillOnce(Invoke([&](const Grpc::GrpcServiceConfigWithHashKey& config, Stats::Scope&,
-                           bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
+      .WillOnce([&](const Grpc::GrpcServiceConfigWithHashKey& config, Stats::Scope&,
+                    bool) -> absl::StatusOr<Grpc::RawAsyncClientSharedPtr> {
         grpc_service = config.config();
         return handshaker_client;
-      }));
+      });
   startDownstreamHandshake("169.254.169.254:8080");
 
   // The handshake started on a stream of the async client, and is waiting for its response.
