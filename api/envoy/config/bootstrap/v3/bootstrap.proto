@@ -453,6 +453,15 @@ message Bootstrap {
   //
   // Defaults to ``false``.
   bool enable_worker_cpu_affinity = 43;
+
+  // When enabled, Envoy records observed breaking changes in the ``envoy.breaking_changes_tracker``
+  // filter state object, which can be logged via access logs using
+  // ``%FILTER_STATE(envoy.breaking_changes_tracker:PLAIN)%``.
+  // See :ref:`Enabling observability for breaking changes
+  // <arch_overview_runtime_breaking_changes_observability>`.
+  //
+  // Defaults to ``false``.
+  bool enable_breaking_changes_observability = 44;
 }
 
 // Administration interface :ref:`operations documentation
