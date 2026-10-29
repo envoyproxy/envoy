@@ -50,8 +50,8 @@ message ProxyProtocol {
 
       // The raw TLV value is read as an unsigned big-endian integer and stored as its decimal
       // string, for example the 8-byte value ``0x0000000000000102`` is stored as ``258``. The
-      // value must be 1 to 8 bytes long. A value of any other length is not stored, and it is
-      // counted in the ``tlv_invalid`` statistic.
+      // value must be 1 to 8 bytes long. A value of any other length is not stored anywhere, not
+      // even in the typed dynamic metadata, and it is counted in the ``tlv_invalid`` statistic.
       UNSIGNED_INTEGER_BIG_ENDIAN = 3;
     }
 
@@ -69,7 +69,9 @@ message ProxyProtocol {
     //
     //   This option only applies to the legacy untyped dynamic metadata and filter state.
     //   For the new typed dynamic metadata, the raw TLV value bytes are stored as is and
-    //   no encoding is applied.
+    //   no encoding is applied. The exception is a value that cannot be encoded, such as an
+    //   ``UNSIGNED_INTEGER_BIG_ENDIAN`` value of the wrong length: it is not stored anywhere,
+    //   including the typed dynamic metadata.
     ValueStringEncoding value_string_encoding = 3;
   }
 

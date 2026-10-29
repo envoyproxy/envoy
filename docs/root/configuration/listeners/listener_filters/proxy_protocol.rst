@@ -75,7 +75,8 @@ dynamic metadata or filter state: any invalid UTF-8 sequences are replaced with 
 :ref:`value_string_encoding <envoy_v3_api_field_extensions.filters.listener.proxy_protocol.v3.ProxyProtocol.KeyValuePair.value_string_encoding>`
 option can be set to ``BASE64`` to store the raw TLV value as a base64-encoded string instead.
 Note that this option only applies to the legacy untyped dynamic metadata and filter state;
-the typed dynamic metadata always stores the raw TLV value bytes as is:
+the typed dynamic metadata stores the raw TLV value bytes as is, unless the value cannot be encoded
+(see ``UNSIGNED_INTEGER_BIG_ENDIAN`` below), in which case it is not stored at all:
 
 .. code-block:: yaml
 
@@ -91,7 +92,8 @@ the typed dynamic metadata always stores the raw TLV value bytes as is:
 
 For TLV values that carry a binary unsigned integer, ``value_string_encoding`` can be set to
 ``UNSIGNED_INTEGER_BIG_ENDIAN`` to store the value as a decimal string. The value must be 1 to 8
-bytes long; a value of any other length is not stored and is counted in ``tlv_invalid``. For example,
+bytes long; a value of any other length is not stored anywhere, including the typed dynamic metadata,
+and is counted in ``tlv_invalid``. For example,
 Google Cloud Private Service Connect sends the PSC connection ID in TLV ``0xE0`` as an 8-byte
 big-endian integer, and identifies the connection by the decimal form of that number:
 
