@@ -22,7 +22,7 @@ void SessionIdleList::RemoveSession(IdleSessionInterface& session) {
   idle_sessions_.RemoveSessionFromList(session);
 }
 
-void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
+size_t SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
   const size_t max_sessions_to_terminate =
       std::min(MaxSessionsToTerminateInOneRound(is_saturated), idle_sessions_.size());
   size_t num_terminated;
@@ -39,6 +39,7 @@ void SessionIdleList::MaybeTerminateIdleSessions(bool is_saturated) {
     idle_sessions_.RemoveSessionFromList(next_session);
   }
   ENVOY_LOG(debug, "Terminated {} idle sessions.", num_terminated);
+  return num_terminated;
 };
 
 size_t SessionIdleList::MaxSessionsToTerminateInOneRound(bool is_saturated) const {

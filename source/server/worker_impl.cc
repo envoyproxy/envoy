@@ -53,7 +53,9 @@ WorkerImpl::WorkerImpl(ThreadLocal::Instance& tls, ListenerHooks& hooks,
                        WorkerStatNames& stat_names)
     : tls_(tls), hooks_(hooks), dispatcher_(std::move(dispatcher)), handler_(std::move(handler)),
       api_(api), reset_streams_counter_(
-                     api_.rootScope().counterFromStatName(stat_names.reset_high_memory_stream_)) {
+                     api_.rootScope().counterFromStatName(stat_names.reset_high_memory_stream_)),
+      close_idle_http_connections_counter_(
+          api_.rootScope().counterFromStatName(stat_names.close_idle_http_connections_)) {
   tls_.registerThread(*dispatcher_, false);
   overload_manager.registerForAction(
       OverloadActionNames::get().StopAcceptingConnections, *dispatcher_,
@@ -264,8 +266,9 @@ void WorkerImpl::maybeCloseIdleHttpConnections() {
     // If state is saturated, aggressive closure is triggered (ignoring the
     // idle timer threshold). Otherwise, it's a "scaled active" state which
     // respects it.
-    handler_->closeIdleHttpConnections(close_idle_http_connections_state_ ==
-                                       OverloadActionState::Phase::Saturated);
+    const uint64_t num_closed = handler_->closeIdleHttpConnections(
+        close_idle_http_connections_state_ == OverloadActionState::Phase::Saturated);
+    close_idle_http_connections_counter_.add(num_closed);
   }
 }
 

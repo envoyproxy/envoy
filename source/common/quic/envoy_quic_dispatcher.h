@@ -101,7 +101,7 @@ public:
                      const quic::QuicSocketAddress& peer_address,
                      const quic::QuicReceivedPacket& packet);
 
-  void closeIdleQuicConnections(bool is_saturated);
+  size_t closeIdleQuicConnections(bool is_saturated);
 
 protected:
   // quic::QuicDispatcher

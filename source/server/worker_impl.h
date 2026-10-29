@@ -20,10 +20,13 @@ namespace Server {
 struct WorkerStatNames {
   explicit WorkerStatNames(Stats::SymbolTable& symbol_table)
       : pool_(symbol_table),
-        reset_high_memory_stream_(pool_.add(OverloadActionStatsNames::get().ResetStreamsCount)) {}
+        reset_high_memory_stream_(pool_.add(OverloadActionStatsNames::get().ResetStreamsCount)),
+        close_idle_http_connections_(
+            pool_.add(OverloadActionStatsNames::get().CloseIdleHttpConnectionsCount)) {}
 
   Stats::StatNamePool pool_;
   Stats::StatName reset_high_memory_stream_;
+  Stats::StatName close_idle_http_connections_;
 };
 
 class ProdWorkerFactory : public WorkerFactory, Logger::Loggable<Logger::Id::main> {
@@ -94,6 +97,7 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Api::Api& api_;
   Stats::Counter& reset_streams_counter_;
+  Stats::Counter& close_idle_http_connections_counter_;
   Thread::ThreadPtr thread_;
   WatchDogSharedPtr watch_dog_;
   Event::TimerPtr close_idle_connection_timer_;
