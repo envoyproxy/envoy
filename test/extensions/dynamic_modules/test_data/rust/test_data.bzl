@@ -5,9 +5,16 @@ load("//source/extensions/dynamic_modules:dynamic_modules.bzl", "envoy_rust_stat
 _WINDOWS_X86_64 = Label("//bazel:windows_x86_64")
 
 # "-undefined dynamic_lookup" is only meaningful for ELF and Mach-O linkers. On Windows the
-# SDK imports the Envoy callbacks via raw-dylib instead.
+# SDK imports the Envoy callbacks from envoy.dll instead, which must be delay-loaded so that the
+# SDK can bind them to the host executable. delayimp.lib provides the delay-load helper, which the
+# linker requires with /DELAYLOAD even for modules that do not use the SDK.
 _RUSTC_FLAGS = select({
-    _WINDOWS_X86_64: [],
+    _WINDOWS_X86_64: [
+        "-C",
+        "link-arg=/DELAYLOAD:envoy.dll",
+        "-C",
+        "link-arg=delayimp.lib",
+    ],
     "//conditions:default": ["-C", "link-args=-Wl,-undefined,dynamic_lookup"],
 })
 
