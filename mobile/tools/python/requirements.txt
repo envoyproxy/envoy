@@ -495,9 +495,9 @@ pytest==9.0.3 \
     #   -r requirements.in
     #   pytest-asyncio
     #   pytest-benchmark
-pytest-asyncio==1.4.0 \
-    --hash=sha256:933ca923a23075a87fb7070c0ec272a6848489824d887c85c812670932835aa1 \
-    --hash=sha256:c6c0d2259945122819f171a32ecea2c349ead889ee28176caaf492143424be42
+pytest-asyncio==1.4.1 \
+    --hash=sha256:507afa78ec77c6661164ef1a2368bc7820383fd1a14b2a7f813de8b5a92949cc \
+    --hash=sha256:e8266eb094e5ee9ffdb2068c9836f33e209ea77a970eb846933d416b5602669b
     # via -r requirements.in
 pytest-benchmark==5.2.3 \
     --hash=sha256:bc839726ad20e99aaa0d11a127445457b4219bdb9e80a1afc4b51da7f96b0803 \
