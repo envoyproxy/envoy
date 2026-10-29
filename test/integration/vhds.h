@@ -398,15 +398,6 @@ public:
 
   void TearDown() override { cleanUpXdsConnection(); }
 
-  std::string virtualHostYaml(const std::string& name, const std::string& domain) {
-    return fmt::format(VhostTemplate, name, domain);
-  }
-
-  envoy::config::route::v3::VirtualHost buildVirtualHost() {
-    return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
-        virtualHostYaml("my_route/vhost_0", "sni.lyft.com"));
-  }
-
   void initialize() override {
     if (routeConfigType() == RouteConfigType::Static) {
       // Static route config - remove the "rds" configuration in the HCM, and
@@ -462,8 +453,6 @@ public:
                             TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
                                 fmt::format(VhostTemplate, "vhost_0", "sni.lyft.com"))}},
                           {}, "1");
-    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
     EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
 
