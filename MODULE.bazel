@@ -21,14 +21,13 @@ bazel_dep(name = "boringssl-source", version = "0.20260929.0.envoy")
 bazel_dep(name = "boost.headers", version = "1.89.0.envoy.1")
 bazel_dep(name = "brotli", version = "1.2.0-260930-42a2ed4.envoy")
 bazel_dep(name = "buildifier_prebuilt", version = "10.1.0", repo_name = "buildifier")
-bazel_dep(name = "c-ares", version = "1.34.6.bcr.1")
+bazel_dep(name = "c-ares", version = "1.34.6.bcr.3")
 bazel_dep(name = "cel-cpp", version = "0.16.1.envoy")
 bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.7.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.7.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.10.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.bcr.1")
 bazel_dep(name = "fmt", version = "12.2.0.bcr.1")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -79,7 +78,7 @@ bazel_dep(name = "proxy-wasm-rust-sdk", version = "0.2.5")
 bazel_dep(name = "qat-zstd", version = "1.0.0.envoy")
 bazel_dep(name = "qatlib", version = "26.02.0.envoy")
 bazel_dep(name = "qatzip", version = "2.0.0.envoy")
-bazel_dep(name = "quiche", version = "0.0.0-261019-67bce2e.envoy")
+bazel_dep(name = "quiche", version = "0.0.0-261027-f53fd81.envoy")
 bazel_dep(name = "ragel", version = "7.0.4-211228-d4577c9.envoy")
 bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
 bazel_dep(name = "rules_apple", version = "5.3.1")
@@ -164,13 +163,6 @@ single_version_override(
 #     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
 # )
-#
-# git_override(
-#     module_name = "envoy_toolshed_jq",
-#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
-#     remote = "https://github.com/envoyproxy/toolshed",
-#     strip_prefix = "jq",
-# )
 
 ####################################################################################
 # setup: Compilers
@@ -182,8 +174,12 @@ register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-to
 # LLVM toolchain configuration
 sysroot_ext = use_extension("@envoy_toolshed//sysroot:extensions.bzl", "sysroot_extension")
 sysroot_ext.setup()
+
 # TODO(phlax): remove once the hermetic gcc toolchain provides libstdc++ for //compat/openssl/prefixer
-sysroot_ext.setup(stdcc_version = "13", name_prefix = "libstdcxx")
+sysroot_ext.setup(
+    name_prefix = "libstdcxx",
+    stdcc_version = "13",
+)
 use_repo(
     sysroot_ext,
     "libstdcxx_sysroot_linux_amd64",
@@ -243,7 +239,10 @@ llvm.toolchain(
             "-lpthread",
             "-ldl",
         ]
-        for target in ["linux-aarch64", "linux-x86_64"]
+        for target in [
+            "linux-aarch64",
+            "linux-x86_64",
+        ]
     },
     llvm_version = "22.1.8",
 )
@@ -286,12 +285,14 @@ use_repo(libcxx_libs_ext, "libcxx_libs_aarch64", "libcxx_libs_x86_64")
 llvm_minimal_build_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_minimal_build_extension")
 use_repo(llvm_minimal_build_ext, "llvm_tarball_linux_arm64", "llvm_tarball_linux_x86_64", "llvm_tarball_macos_arm64")
 
-llvm_minimal_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_minimal_extension")
-llvm_minimal_ext.setup()
-use_repo(llvm_minimal_ext, "llvm_minimal_linux_arm64", "llvm_minimal_linux_x64", "llvm_minimal_macos_arm64")
-
-envoy_llvm_ext = use_extension("//bazel:extensions.bzl", "envoy_llvm_extension")
-use_repo(envoy_llvm_ext, "llvm_toolchain_llvm")
+llvm_toolchain_alias_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "llvm_toolchain_alias_extension")
+use_repo(
+    llvm_toolchain_alias_ext,
+    "llvm_minimal_linux_arm64",
+    "llvm_minimal_linux_x64",
+    "llvm_minimal_macos_arm64",
+    "llvm_toolchain_llvm",
+)
 
 cc_configure = use_extension("@rules_cc//cc:extensions.bzl", "cc_configure_extension")
 use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
@@ -543,8 +544,13 @@ libsxg.deps(crypto_lib = "@envoy//bazel:crypto")
 envoy_repo_ext = use_extension("//bazel:extensions.bzl", "envoy_repo_extension")
 use_repo(envoy_repo_ext, "envoy_repo")
 
-envoy_toolchains_ext = use_extension("//bazel:extensions.bzl", "envoy_toolchains_extension")
-use_repo(envoy_toolchains_ext, "clang_platform")
+arch_alias_ext = use_extension("@envoy_toolshed//repository:extensions.bzl", "arch_alias_extension")
+arch_alias_ext.alias(
+    name = "clang_platform",
+    aarch64 = "//bazel/platforms/rbe:linux_arm64",
+    amd64 = "//bazel/platforms/rbe:linux_x64",
+)
+use_repo(arch_alias_ext, "clang_platform")
 
 envoy_build_config_ext = use_extension("//bazel:extensions.bzl", "envoy_build_config_ext")
 use_repo(envoy_build_config_ext, "envoy_build_config")

@@ -43,7 +43,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -61,7 +60,7 @@ public:
     ON_CALL(server_context_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
 
     ON_CALL(*this, clusterFromProto_(_, _, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [&](const envoy::config::cluster::v3::Cluster& cluster,
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
@@ -74,7 +73,7 @@ public:
                 throw EnvoyException(std::string(result.status().message()));
               }
               return std::make_pair(result->first, result->second.release());
-            }));
+            });
   }
 
   ~TestClusterManagerFactory() override { server_context_.dispatcher_.to_delete_.clear(); }

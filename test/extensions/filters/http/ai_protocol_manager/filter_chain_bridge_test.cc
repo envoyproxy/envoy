@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -37,7 +36,7 @@ public:
   DecoderFilterChainBridgeTest() {
     EXPECT_CALL(callbacks_, bufferLimit()).WillOnce(Return(100));
     EXPECT_CALL(callbacks_, addUpstreamWatermarkCallbacks(_))
-        .WillOnce(Invoke([this](Http::UpstreamWatermarkCallbacks& cb) { subscriber_ = &cb; }));
+        .WillOnce([this](Http::UpstreamWatermarkCallbacks& cb) { subscriber_ = &cb; });
     bridge_ = std::make_unique<DecoderFilterChainBridge>(callbacks_, stats_);
   }
 
@@ -135,7 +134,7 @@ public:
   EncoderFilterChainBridgeTest() {
     EXPECT_CALL(encoder_callbacks_, bufferLimit()).WillOnce(Return(100));
     EXPECT_CALL(decoder_callbacks_, addDownstreamWatermarkCallbacks(_))
-        .WillOnce(Invoke([this](Http::DownstreamWatermarkCallbacks& cb) { subscriber_ = &cb; }));
+        .WillOnce([this](Http::DownstreamWatermarkCallbacks& cb) { subscriber_ = &cb; });
     bridge_ =
         std::make_unique<EncoderFilterChainBridge>(encoder_callbacks_, decoder_callbacks_, stats_);
   }
@@ -206,9 +205,9 @@ class EncoderFilterChainBridgeEchoTest : public EncoderFilterChainBridgeTest {
 public:
   EncoderFilterChainBridgeEchoTest() {
     ON_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark())
-        .WillByDefault(Invoke([this] { subscriber_->onAboveWriteBufferHighWatermark(); }));
+        .WillByDefault([this] { subscriber_->onAboveWriteBufferHighWatermark(); });
     ON_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark())
-        .WillByDefault(Invoke([this] { subscriber_->onBelowWriteBufferLowWatermark(); }));
+        .WillByDefault([this] { subscriber_->onBelowWriteBufferLowWatermark(); });
     bridge_->setReplayHandler(handler_);
   }
 };
@@ -248,11 +247,10 @@ TEST_F(EncoderFilterChainBridgeEchoTest, GenuineDownstreamWatermarkStillPausesRe
 // is never paused.
 TEST_F(EncoderFilterChainBridgeEchoTest, PauseNestedInResumeStaysBalanced) {
   bridge_->addUnacked(200);
-  ON_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark())
-      .WillByDefault(Invoke([this] {
-        bridge_->addUnacked(200);
-        subscriber_->onBelowWriteBufferLowWatermark();
-      }));
+  ON_CALL(encoder_callbacks_, onEncoderFilterBelowWriteBufferLowWatermark()).WillByDefault([this] {
+    bridge_->addUnacked(200);
+    subscriber_->onBelowWriteBufferLowWatermark();
+  });
 
   bridge_->releaseUnacked(200);
   EXPECT_TRUE(bridge_->ingestPaused());
@@ -262,11 +260,10 @@ TEST_F(EncoderFilterChainBridgeEchoTest, PauseNestedInResumeStaysBalanced) {
 
 // A genuine downstream high during our own pause still pauses replay.
 TEST_F(EncoderFilterChainBridgeEchoTest, GenuineWatermarkDuringOwnPauseCounts) {
-  ON_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark())
-      .WillByDefault(Invoke([this] {
-        subscriber_->onAboveWriteBufferHighWatermark();
-        subscriber_->onAboveWriteBufferHighWatermark();
-      }));
+  ON_CALL(encoder_callbacks_, onEncoderFilterAboveWriteBufferHighWatermark()).WillByDefault([this] {
+    subscriber_->onAboveWriteBufferHighWatermark();
+    subscriber_->onAboveWriteBufferHighWatermark();
+  });
 
   bridge_->addUnacked(200);
   EXPECT_TRUE(bridge_->replayPaused());

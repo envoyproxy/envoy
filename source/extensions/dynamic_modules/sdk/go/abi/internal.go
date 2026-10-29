@@ -1456,6 +1456,10 @@ func (h *dymHttpFilterHandle) SendGoAwayAndClose(graceful bool) {
 	)
 }
 
+func (h *dymHttpFilterHandle) DrainConnectionUponCompletion() {
+	C.envoy_dynamic_module_callback_http_drain_connection_upon_completion(h.hostPluginPtr)
+}
+
 func (h *dymHttpFilterHandle) RecreateStream(headers [][2]string) bool {
 	headerViews := headersToModuleHttpHeaderSlice(headers)
 	ret := C.envoy_dynamic_module_callback_http_filter_recreate_stream(

@@ -15,7 +15,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using ::testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -68,7 +67,7 @@ TEST(GolangFilterConfigTest, GolangFilterWithValidConfig) {
   NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
   ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
   EXPECT_CALL(filter_callback, addStreamFilter(_))
-      .WillOnce(Invoke([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); }));
+      .WillOnce([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); });
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();
   std::string str;
@@ -97,7 +96,7 @@ TEST(GolangFilterConfigTest, GolangFilterWithNilPluginConfig) {
   NiceMock<Event::MockDispatcher> dispatcher{"worker_0"};
   ON_CALL(filter_callback, dispatcher()).WillByDefault(ReturnRef(dispatcher));
   EXPECT_CALL(filter_callback, addStreamFilter(_))
-      .WillOnce(Invoke([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); }));
+      .WillOnce([](Http::StreamDecoderFilterSharedPtr filter) { filter->onDestroy(); });
   EXPECT_CALL(filter_callback, addAccessLogHandler(_));
   auto plugin_config = proto_config.plugin_config();
   std::string str;

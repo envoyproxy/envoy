@@ -125,9 +125,9 @@ public:
          "Signature=b7927f7ac39f5b2cc34d3adf38228fc665ebe2780f5c3a006e1ec0c87e45b07c"}};
 
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code, document = std::move(document)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!document.empty()) {
               receiver.onMetadataSuccess(std::move(document));
@@ -144,7 +144,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   Event::SimulatedTimeSystem time_system_;
@@ -655,7 +655,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
 
   // Use a custom expectation for this test to verify the DurationSeconds parameter.
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers_with_duration), _, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(R"EOF(
 {
@@ -670,7 +670,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   }
 }
 )EOF"));
-          }));
+          });
 
   // Setup provider with session duration
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -908,7 +908,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithExternalId) {
        "Signature=cc05851f97c3e6c1d8c28c205a1dcbb6248a944375f3e7b349800c2b3744fc48"}};
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers_with_external_id), _, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(R"EOF(
 {
@@ -923,7 +923,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithExternalId) {
   }
 }
 )EOF"));
-          }));
+          });
 
   // Setup provider with external ID.
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -980,10 +980,10 @@ TEST_F(AssumeRoleCredentialsProviderTest, DeferredCompletionCallbackSafeAfterDes
   std::function<void()> captured_callback;
 
   EXPECT_CALL(context_.thread_local_, runOnAllThreads(testing::_, testing::_))
-      .WillOnce(testing::Invoke([&captured_callback](const std::function<void()>&,
-                                                     const std::function<void()>& complete_cb) {
+      .WillOnce([&captured_callback](const std::function<void()>&,
+                                     const std::function<void()>& complete_cb) {
         captured_callback = complete_cb;
-      }));
+      });
 
   setupProvider();
 

@@ -1477,10 +1477,10 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/1000,
                                /*cumulative_start_time_ns=*/1000, _))
-      .WillOnce(Invoke([&](Stats::MetricSnapshot&, int64_t, int64_t,
-                           absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
+      .WillOnce([&](Stats::MetricSnapshot&, int64_t, int64_t,
+                    absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
         send_callback(std::move(request1));
-      }));
+      });
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 
@@ -1489,10 +1489,10 @@ TEST_F(OpenTelemetrySinkTests, BasicFlow) {
   MetricsExportRequestPtr request2 = std::make_unique<MetricsExportRequest>();
   EXPECT_CALL(*flusher_, flush(_, /*delta_start_time_ns=*/expected_time_ns_,
                                /*cumulative_start_time_ns=*/1000, _))
-      .WillOnce(Invoke([&](Stats::MetricSnapshot&, int64_t, int64_t,
-                           absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
+      .WillOnce([&](Stats::MetricSnapshot&, int64_t, int64_t,
+                    absl::AnyInvocable<void(MetricsExportRequestPtr)> send_callback) {
         send_callback(std::move(request2));
-      }));
+      });
   EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 }

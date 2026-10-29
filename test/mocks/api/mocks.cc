@@ -9,7 +9,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -40,7 +39,7 @@ Event::DispatcherPtr MockApi::allocateDispatcher(const std::string& name,
 }
 
 MockOsSysCalls::MockOsSysCalls() {
-  ON_CALL(*this, close(_)).WillByDefault(Invoke([](os_fd_t fd) {
+  ON_CALL(*this, close(_)).WillByDefault([](os_fd_t fd) {
 #ifdef WIN32
     int rc = ::closesocket(fd);
     int last_error = ::GetLastError();
@@ -55,7 +54,7 @@ MockOsSysCalls::MockOsSysCalls() {
     const int rc = ::close(fd);
     return SysCallIntResult{rc, errno};
 #endif
-  }));
+  });
 }
 
 MockOsSysCalls::~MockOsSysCalls() = default;

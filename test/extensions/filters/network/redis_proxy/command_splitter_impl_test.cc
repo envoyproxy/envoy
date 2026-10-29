@@ -881,9 +881,9 @@ TEST_F(RedisSingleServerRequestTest, HelloWithAuthOptionAllowedEmitsHelloMap) {
   makeBulkStringArray(*request, {"hello", "2", "AUTH", "user", "mypass"});
 
   Common::Redis::RespValuePtr captured;
-  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce(Invoke([&](Common::Redis::RespValuePtr& r) {
+  EXPECT_CALL(callbacks_, onResponse_(_)).WillOnce([&](Common::Redis::RespValuePtr& r) {
     captured = std::move(r);
-  }));
+  });
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle_);
   ASSERT_NE(nullptr, captured);
@@ -2408,10 +2408,10 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
 
   // As error faults have zero latency, recorded latency is equal to the delay.
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
     timer_cb_ = timer_cb;
     return timer_;
-  }));
+  });
 
   handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_NE(nullptr, handle_);
@@ -2454,10 +2454,10 @@ TEST_P(RedisSingleServerRequestWithDelayFaultTest, Fault) {
   makeBulkStringArray(*request, {GetParam(), "hello"});
 
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
     timer_cb_ = timer_cb;
     return timer_;
-  }));
+  });
   EXPECT_CALL(*conn_pool_, makeRequest_(hash_key, RespVariantEq(*request), _))
       .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
 

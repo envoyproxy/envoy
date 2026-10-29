@@ -4,6 +4,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
@@ -1038,6 +1039,37 @@ typed_config:
                           {"x-echo", "previous-route-metadata"}});
   EXPECT_EQ("200", response->headers().getStatusValue());
   EXPECT_EQ("absent", header(response->headers(), "x-echo-result"));
+
+  // The read finds no string under a key that holds a number, under a key that is missing, or in a
+  // namespace that is missing.
+  for (const auto& [name, value] : std::vector<std::pair<std::string, std::string>>{
+           {"x-metadata-key", "number"},
+           {"x-metadata-key", "missing"},
+           {"x-metadata-namespace", "envoy.test.missing"}}) {
+    response =
+        sendRequest({{"x-template", "full"}, {"x-echo", "previous-route-metadata"}, {name, value}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("absent", header(response->headers(), "x-echo-result")) << value;
+  }
+}
+
+// The route metadata getters read only a value of the kind they ask for, under a key and in a
+// namespace the route holds.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsRouteMetadataOfTheKindAskedFor) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  for (const auto& [echo, name, value] :
+       std::vector<std::tuple<std::string, std::string, std::string>>{
+           {"route-metadata", "x-metadata-key", "number"},
+           {"route-metadata", "x-metadata-key", "missing"},
+           {"route-metadata", "x-metadata-namespace", "envoy.test.missing"},
+           {"route-metadata-number", "x-metadata-key", "key"},
+           {"route-metadata-number", "x-metadata-key", "missing"},
+           {"route-metadata-number", "x-metadata-namespace", "envoy.test.missing"}}) {
+    auto response = sendRequest({{"x-template", "full"}, {"x-echo", echo}, {name, value}});
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ("absent", header(response->headers(), "x-echo-result")) << echo << " " << value;
+  }
 }
 
 // ReusePrevious without a previous route is rejected and the failure policy passes it through.
@@ -1081,6 +1113,49 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, RouteUserDataFiresDestroyHook
   EXPECT_EQ("200", response->headers().getStatusValue());
   test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.route_destroy",
                                testing::Ge(1));
+}
+
+// User data a decision builds no route for is handed back through the user data discard hook
+// instead of the route destroy hook.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, UnusedRouteUserDataFiresDiscardHook) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // The module counts the values it got back for the whole process, which outlives this server.
+  const auto discards = [this]() {
+    auto response = sendRequest({{"x-echo", "discard-count"}});
+    uint64_t count = 0;
+    EXPECT_TRUE(absl::SimpleAtoi(header(response->headers(), "x-echo-result"), &count));
+    return count;
+  };
+  const uint64_t discards_before = discards();
+
+  auto response = sendRequest({{"x-decision", "pass-through"}, {"x-user-data", "42"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(discards_before + 1, discards());
+  test_server_->waitForCounter("dynamicmodulescustom.route_specifier.test.user_data_discard",
+                               testing::Eq(1));
+  EXPECT_EQ(0, counterValue("dynamicmodulescustom.route_specifier.test.route_destroy"));
+}
+
+// A module reads whether its configuration caches built routes.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsWhetherTheConfigurationCachesBuiltRoutes) {
+  setupTest(R"EOF(
+built_route_cache:
+  max_entries_per_worker: 16
+)EOF");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequest({{"x-echo", "has-built-route-cache"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("true", header(response->headers(), "x-echo-result"));
+}
+
+// A module reads that a configuration without built_route_cache caches no built routes.
+TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsThatTheConfigurationCachesNoBuiltRoutes) {
+  setupTest();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequest({{"x-echo", "has-built-route-cache"}});
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("false", header(response->headers(), "x-echo-result"));
 }
 
 // A decision that stops the chain skips the specifiers configured after it, which the second

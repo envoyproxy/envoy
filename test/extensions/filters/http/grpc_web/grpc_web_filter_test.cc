@@ -21,7 +21,6 @@
 
 using testing::_;
 using testing::Combine;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::Values;
@@ -85,14 +84,14 @@ public:
 
   void expectErrorResponse(const Http::Code& expected_code, const std::string& expected_message) {
     EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _))
-        .WillOnce(Invoke([=](Http::ResponseHeaderMap& headers, bool) {
+        .WillOnce([=](Http::ResponseHeaderMap& headers, bool) {
           uint64_t code;
           ASSERT_TRUE(absl::SimpleAtoi(headers.getStatusValue(), &code));
           EXPECT_EQ(static_cast<uint64_t>(expected_code), code);
-        }));
-    EXPECT_CALL(decoder_callbacks_, encodeData(_, _))
-        .WillOnce(Invoke(
-            [=](Buffer::Instance& data, bool) { EXPECT_EQ(expected_message, data.toString()); }));
+        });
+    EXPECT_CALL(decoder_callbacks_, encodeData(_, _)).WillOnce([=](Buffer::Instance& data, bool) {
+      EXPECT_EQ(expected_message, data.toString());
+    });
   }
 
   void expectRequiredGrpcUpstreamHeaders(const Http::TestRequestHeaderMapImpl& request_headers) {
@@ -125,11 +124,11 @@ public:
       };
       if (last_data != nullptr) {
         EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-            .WillOnce(Invoke([&](Buffer::Instance& data, bool) { encoded_buffer->move(data); }));
+            .WillOnce([&](Buffer::Instance& data, bool) { encoded_buffer->move(data); });
       }
       EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(encoded_buffer));
       EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-          .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+          .WillRepeatedly(on_modify_encoding_buffer);
     }
     Buffer::OwnedImpl output;
     filter_.mergeAndLimitNonProtoEncodedResponseData(output, last_data);
@@ -323,11 +322,10 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForText) {
                                         buffer.get()](std::function<void(Buffer::Instance&)> cb) {
     cb(*encoded_buffer);
   };
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { buffer->move(data); }));
+      .WillOnce([&](Buffer::Instance& data, bool) { buffer->move(data); });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
@@ -358,8 +356,7 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithLargeEncodingBuffer)
     cb(encoded_buffer);
   };
   EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buffer));
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
             filter_.encodeData(encoded_buffer, false));
@@ -404,8 +401,7 @@ TEST_F(GrpcWebFilterTest, InvalidUpstreamResponseForTextWithTrailers) {
                                         buffer.get()](std::function<void(Buffer::Instance&)> cb) {
     cb(*encoded_buffer);
   };
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
 
@@ -613,7 +609,7 @@ TEST_P(GrpcWebFilterTest, Unary) {
   // Tests response trailers.
   Buffer::OwnedImpl trailers_buffer;
   EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) { trailers_buffer.move(data); }));
+      .WillOnce([&](Buffer::Instance& data, bool) { trailers_buffer.move(data); });
   Http::TestResponseTrailerMapImpl response_trailers;
   response_trailers.addCopy(Http::Headers::get().GrpcStatus, "0");
   response_trailers.addCopy(Http::Headers::get().GrpcMessage, "ok");

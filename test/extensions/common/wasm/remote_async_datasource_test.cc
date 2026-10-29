@@ -45,14 +45,14 @@ protected:
 
   void initialize(AsyncClientSendFunc func, int num_retries = 1) {
     retry_timer_ = new Event::MockTimer();
-    EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    EXPECT_CALL(init_manager_, add(_)).WillOnce([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
+    });
 
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
-    }));
+    });
 
     EXPECT_CALL(*retry_timer_, disableTimer());
     if (!func) {
@@ -66,11 +66,11 @@ protected:
     if (num_retries == 1) {
       EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(AtLeast(1))
-          .WillRepeatedly(Invoke(func));
+          .WillRepeatedly(func);
     } else {
       EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(num_retries)
-          .WillRepeatedly(Invoke(func));
+          .WillRepeatedly(func);
     }
   }
 };
@@ -104,8 +104,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceNoCluster) {
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+      .WillOnce(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); });
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, EMPTY_STRING);
@@ -145,8 +145,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceReturnFailure) {
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+      .WillOnce(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); });
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, EMPTY_STRING);
@@ -188,8 +188,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWith503) {
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+      .WillOnce(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); });
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, EMPTY_STRING);
@@ -231,8 +231,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessWithEmptyBody) {
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+      .WillOnce(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); });
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, EMPTY_STRING);
@@ -278,8 +278,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceSuccessIncorrectSha256) {
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+      .WillOnce(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); });
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, EMPTY_STRING);
@@ -359,8 +359,8 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceDoNotAllowEmpty) {
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillOnce(Invoke(
-          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); }));
+      .WillOnce(
+          [&](const std::chrono::milliseconds&, const ScopeTrackedObject*) { retry_timer_cb_(); });
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, "non-empty");
@@ -457,10 +457,10 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
   EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _))
-      .WillRepeatedly(Invoke([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
+      .WillRepeatedly([&](const std::chrono::milliseconds&, const ScopeTrackedObject*) {
         if (--num_retries == 0) {
           EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-              .WillOnce(Invoke(
+              .WillOnce(
                   [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
                     Http::ResponseMessagePtr response(
@@ -470,11 +470,11 @@ TEST_F(AsyncDataSourceTest, LoadRemoteDataSourceWithRetry) {
 
                     callbacks.onSuccess(request_, std::move(response));
                     return nullptr;
-                  }));
+                  });
         }
 
         retry_timer_cb_();
-      }));
+      });
   init_target_handle_->initialize(init_watcher_);
 
   EXPECT_EQ(async_data, body);

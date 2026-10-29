@@ -14,7 +14,6 @@
 #include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
@@ -32,14 +31,13 @@ MockUpstreamLocalAddressSelector::MockUpstreamLocalAddressSelector(
     Network::Address::InstanceConstSharedPtr& address)
     : address_(address) {
   ON_CALL(*this, getUpstreamLocalAddressImpl(_, _))
-      .WillByDefault(
-          Invoke([&](const Network::Address::InstanceConstSharedPtr&,
-                     OptRef<const Network::TransportSocketOptions>) -> UpstreamLocalAddress {
-            UpstreamLocalAddress ret;
-            ret.address_ = address_;
-            ret.socket_options_ = nullptr;
-            return ret;
-          }));
+      .WillByDefault([&](const Network::Address::InstanceConstSharedPtr&,
+                         OptRef<const Network::TransportSocketOptions>) -> UpstreamLocalAddress {
+        UpstreamLocalAddress ret;
+        ret.address_ = address_;
+        ret.socket_options_ = nullptr;
+        return ret;
+      });
 }
 
 MockClusterInfo::MockClusterInfo()
@@ -87,26 +85,25 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(Return(std::chrono::milliseconds(0)));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, observabilityName()).WillByDefault(ReturnRef(observability_name_));
-  ON_CALL(*this, edsServiceName()).WillByDefault(Invoke([this]() -> const std::string& {
+  ON_CALL(*this, edsServiceName()).WillByDefault([this]() -> const std::string& {
     return eds_service_name_.has_value() ? eds_service_name_.value() : Envoy::EMPTY_STRING;
-  }));
-  ON_CALL(*this, loadBalancerFactory()).WillByDefault(Invoke([this]() -> TypedLoadBalancerFactory& {
+  });
+  ON_CALL(*this, loadBalancerFactory()).WillByDefault([this]() -> TypedLoadBalancerFactory& {
     return *lb_factory_;
-  }));
-  ON_CALL(*this, loadBalancerConfig())
-      .WillByDefault(Invoke([this]() -> OptRef<const LoadBalancerConfig> {
-        return makeOptRefFromPtr<LoadBalancerConfig>(typed_lb_config_.get());
-      }));
+  });
+  ON_CALL(*this, loadBalancerConfig()).WillByDefault([this]() -> OptRef<const LoadBalancerConfig> {
+    return makeOptRefFromPtr<LoadBalancerConfig>(typed_lb_config_.get());
+  });
   ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxResponseHeadersCount())
       .WillByDefault(ReturnPointee(&max_response_headers_count_));
-  ON_CALL(*this, maxResponseHeadersKb()).WillByDefault(Invoke([this]() -> std::optional<uint16_t> {
+  ON_CALL(*this, maxResponseHeadersKb()).WillByDefault([this]() -> std::optional<uint16_t> {
     if (common_http_protocol_options_.has_max_response_headers_kb()) {
       return common_http_protocol_options_.max_response_headers_kb().value();
     } else {
       return std::nullopt;
     }
-  }));
+  });
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, trafficStats()).WillByDefault(ReturnRef(traffic_stats_));
@@ -117,9 +114,9 @@ MockClusterInfo::MockClusterInfo()
   // TODO(incfly): The following is a hack because it's not possible to directly embed
   // a mock transport socket factory matcher due to circular dependencies. Fix this up in a follow
   // up.
-  ON_CALL(*this, transportSocketMatcher())
-      .WillByDefault(
-          Invoke([this]() -> TransportSocketMatcher& { return *transport_socket_matcher_; }));
+  ON_CALL(*this, transportSocketMatcher()).WillByDefault([this]() -> TransportSocketMatcher& {
+    return *transport_socket_matcher_;
+  });
   ON_CALL(*this, loadReportStats()).WillByDefault(ReturnRef(load_report_stats_));
   ON_CALL(*this, requestResponseSizeStats())
       .WillByDefault(Return(ClusterRequestResponseSizeStatsOptRef(*request_response_size_stats_)));
@@ -128,51 +125,49 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, getUpstreamLocalAddressSelector())
       .WillByDefault(Return(upstream_local_address_selector_));
   ON_CALL(*this, resourceManager(_))
-      .WillByDefault(Invoke(
-          [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; }));
-  ON_CALL(*this, upstreamConfig())
       .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
-            return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
-                upstream_config_.get());
-          }));
+          [this](ResourcePriority) -> Upstream::ResourceManager& { return *resource_manager_; });
+  ON_CALL(*this, upstreamConfig())
+      .WillByDefault([this]() -> OptRef<const envoy::config::core::v3::TypedExtensionConfig> {
+        return makeOptRefFromPtr<const envoy::config::core::v3::TypedExtensionConfig>(
+            upstream_config_.get());
+      });
 
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   // Delayed construction of typed_metadata_, to allow for injection of metadata
-  ON_CALL(*this, typedMetadata())
-      .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {
-        if (typed_metadata_ == nullptr) {
-          typed_metadata_ =
-              std::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
-        }
-        return *typed_metadata_;
-      }));
+  ON_CALL(*this, typedMetadata()).WillByDefault([this]() -> const Envoy::Config::TypedMetadata& {
+    if (typed_metadata_ == nullptr) {
+      typed_metadata_ =
+          std::make_unique<Config::TypedMetadataImpl<ClusterTypedMetadataFactory>>(metadata_);
+    }
+    return *typed_metadata_;
+  });
   ON_CALL(*this, pendingRqQueuePolicy())
-      .WillByDefault(Invoke([this]() -> OptRef<const ClusterInfo::PendingRqQueuePolicy> {
+      .WillByDefault([this]() -> OptRef<const ClusterInfo::PendingRqQueuePolicy> {
         return makeOptRefFromPtr<const ClusterInfo::PendingRqQueuePolicy>(
             pending_rq_queue_policy_.get());
-      }));
+      });
   ON_CALL(*this, clusterType())
       .WillByDefault(
-          Invoke([this]() -> OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> {
+          [this]() -> OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> {
             return makeOptRefFromPtr<const envoy::config::cluster::v3::Cluster::CustomClusterType>(
                 cluster_type_.get());
-          }));
+          });
   ON_CALL(*this, upstreamHttpProtocol(_))
       .WillByDefault(Return(std::vector<Http::Protocol>{Http::Protocol::Http11}));
   ON_CALL(*this, createFilterChain(_))
-      .WillByDefault(Invoke([&](Http::FilterChainFactoryCallbacks&) -> bool { return false; }));
-  ON_CALL(*this, makeHeaderValidator(_)).WillByDefault(Invoke([&](Http::Protocol protocol) {
+      .WillByDefault([&](Http::FilterChainFactoryCallbacks&) -> bool { return false; });
+  ON_CALL(*this, makeHeaderValidator(_)).WillByDefault([&](Http::Protocol protocol) {
     return header_validator_factory_ ? header_validator_factory_->createClientHeaderValidator(
                                            protocol, codecStats(protocol))
                                      : nullptr;
-  }));
+  });
   ON_CALL(*this, lrsReportMetricNames())
-      .WillByDefault(Invoke([this]() -> OptRef<const Envoy::Orca::LrsReportMetricNames> {
+      .WillByDefault([this]() -> OptRef<const Envoy::Orca::LrsReportMetricNames> {
         return makeOptRefFromPtr<const Envoy::Orca::LrsReportMetricNames>(
             lrs_report_metric_names_.get());
-      }));
+      });
 }
 
 MockClusterInfo::~MockClusterInfo() = default;

@@ -62,13 +62,12 @@ public:
     EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"callout_cluster"}))
         .WillOnce(testing::Return(cluster.get()));
     EXPECT_CALL(cluster->async_client_, send_(testing::_, testing::_, testing::_))
-        .WillOnce(testing::Invoke(
-            [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
-              complete(callbacks, req);
-              return nullptr;
-            }));
+        .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+          complete(callbacks, req);
+          return nullptr;
+        });
 
     auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_or_status.value());
     filter->initializeReadFilterCallbacks(read_callbacks_);

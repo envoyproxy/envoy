@@ -424,6 +424,7 @@ TEST_P(DynamicModuleHttpLanguageTests, HeaderCallbacks) {
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   EXPECT_CALL(downstream_callbacks, clearRouteCache());
   EXPECT_CALL(downstream_callbacks, refreshRouteCluster());
+  EXPECT_CALL(stream_info, setShouldDrainConnectionUponCompletion(true));
   EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
       .WillRepeatedly(
           testing::Return(OptRef<DownstreamStreamFilterCallbacks>(downstream_callbacks)));
@@ -793,13 +794,13 @@ TEST_P(DynamicModuleHttpLanguageTests, RecreateStream) {
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   filter->setDecoderFilterCallbacks(callbacks);
   EXPECT_CALL(callbacks, recreateStream(NotNull()))
-      .WillOnce(testing::Invoke([](const Http::ResponseHeaderMap* headers) {
+      .WillOnce([](const Http::ResponseHeaderMap* headers) {
         EXPECT_EQ(headers->getStatusValue(), "302");
         const auto location = headers->get(Http::LowerCaseString("location"));
         EXPECT_FALSE(location.empty());
         EXPECT_EQ(location[0]->value().getStringView(), "/recreated");
         return true;
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl request_headers{{}};
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
@@ -1074,10 +1075,10 @@ TEST_P(DynamicModuleHttpLanguageTests, ClusterCallbacks) {
   std::string cluster_name = "fake_cluster";
   EXPECT_CALL(*callbacks.cluster_info_, name()).WillRepeatedly(testing::ReturnRef(cluster_name));
   EXPECT_CALL(callbacks, setUpstreamOverrideHost(_))
-      .WillOnce(testing::Invoke([](Upstream::LoadBalancerContext::OverrideHost override_host) {
+      .WillOnce([](Upstream::LoadBalancerContext::OverrideHost override_host) {
         EXPECT_EQ(override_host.host, "127.0.0.1:1");
         EXPECT_FALSE(override_host.strict);
-      }));
+      });
   Http::TestRequestHeaderMapImpl request_headers{{}};
   EXPECT_CALL(callbacks, requestHeaders())
       .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
@@ -1178,13 +1179,12 @@ TEST_P(DynamicModuleHttpLanguageTests, BodyCallbacks) {
   Buffer::OwnedImpl response_body;
   EXPECT_CALL(encoder_callbacks, encodingBuffer()).WillRepeatedly(testing::Return(&response_body));
   EXPECT_CALL(decoder_callbacks, modifyDecodingBuffer(_))
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
-        callback(request_body);
-      }));
+      .WillRepeatedly(
+          [&](std::function<void(Buffer::Instance&)> callback) -> void { callback(request_body); });
   EXPECT_CALL(encoder_callbacks, modifyEncodingBuffer(_))
-      .WillRepeatedly(Invoke([&](std::function<void(Buffer::Instance&)> callback) -> void {
+      .WillRepeatedly([&](std::function<void(Buffer::Instance&)> callback) -> void {
         callback(response_body);
-      }));
+      });
 
   request_body.add("nice");
   filter->decodeData(request_body, false);
@@ -1292,15 +1292,14 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_immediate_failing_c
       .WillOnce(testing::Return(cluster.get()));
 
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            testing::NiceMock<Http::MockAsyncClientRequest> req{
-                &cluster->async_client_}; // This is not used, just for making compiler happy.
-            // Simulate immediate failure where onFailure is called inline.
-            callbacks.onFailure(req, Http::AsyncClient::FailureReason::Reset);
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        testing::NiceMock<Http::MockAsyncClientRequest> req{
+            &cluster->async_client_}; // This is not used, just for making compiler happy.
+        // Simulate immediate failure where onFailure is called inline.
+        callbacks.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+        return nullptr;
+      });
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1353,7 +1352,7 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_success) {
   NiceMock<Http::MockAsyncClientRequest> request(&cluster->async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions& option) -> Http::AsyncClient::Request* {
             EXPECT_EQ(message->headers().Path()->value().getStringView(), "/");
@@ -1363,7 +1362,7 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_success) {
             EXPECT_EQ(option.timeout.value(), std::chrono::milliseconds(1000));
             callbacks_captured = &callbacks;
             return &request;
-          }));
+          });
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -1428,12 +1427,11 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterHttpCallout_resetting) {
   NiceMock<Http::MockAsyncClientRequest> request(&cluster->async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
                                                           stats_scope->symbolTable(), 0);
@@ -1482,7 +1480,7 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterConfigHttpCallout_success) {
   Http::AsyncClient::Callbacks* config_callbacks_captured = nullptr;
   NiceMock<Http::MockAsyncClientRequest> config_request(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
               const Http::AsyncClient::RequestOptions& option) -> Http::AsyncClient::Request* {
             EXPECT_EQ(message->headers().Path()->value().getStringView(), "/config-init");
@@ -1491,7 +1489,7 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterConfigHttpCallout_success) {
             EXPECT_EQ(option.timeout.value(), std::chrono::milliseconds(1000));
             config_callbacks_captured = &callbacks;
             return &config_request;
-          }));
+          });
 
   // Config creation triggers the callout.
   auto filter_config_or_status =
@@ -1551,12 +1549,11 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterConfigHttpCallout_failing) {
   Http::AsyncClient::Callbacks* config_callbacks_captured = nullptr;
   NiceMock<Http::MockAsyncClientRequest> config_request(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            config_callbacks_captured = &callbacks;
-            return &config_request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        config_callbacks_captured = &callbacks;
+        return &config_request;
+      });
 
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
@@ -1612,11 +1609,11 @@ TEST_P(DynamicModuleHttpLanguageTests, HttpFilterConfigHttpStream_success) {
   Http::AsyncClient::StreamCallbacks* stream_callbacks_captured = nullptr;
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         stream_callbacks_captured = &callbacks;
         return &stream;
-      }));
+      });
   // expect the initial headers to be sent on the stream
   EXPECT_CALL(stream, sendHeaders(_, true));
 
@@ -1696,12 +1693,11 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, SendHttpCalloutCannotCreateReques
   // send_ returns nullptr to simulate CannotCreateRequest.
   NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            cb.onFailure(req, Http::AsyncClient::FailureReason::Reset);
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        cb.onFailure(req, Http::AsyncClient::FailureReason::Reset);
+        return nullptr;
+      });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -1730,11 +1726,10 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, CancelPendingCallout) {
 
   NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            return &req;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks&,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        return &req;
+      });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -1770,12 +1765,11 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, HttpCalloutCallbackOnSuccessNoCal
   Http::AsyncClient::Callbacks* captured = nullptr;
   NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured = &cb;
-            return &req;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured = &cb;
+        return &req;
+      });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -1814,12 +1808,11 @@ TEST(DynamicModuleHttpFilterConfigCalloutTest, HttpCalloutCallbackOnFailureReset
   Http::AsyncClient::Callbacks* captured = nullptr;
   NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured = &cb;
-            return &req;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured = &cb;
+        return &req;
+      });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -1898,10 +1891,10 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamCannotCreateRequest
   EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
 
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([](Http::AsyncClient::StreamCallbacks&,
-                          const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([](Http::AsyncClient::StreamCallbacks&,
+                   const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         return nullptr;
-      }));
+      });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -1934,11 +1927,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamWithBody) {
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& cb,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &cb;
         return &stream;
-      }));
+      });
   EXPECT_CALL(stream, sendHeaders(_, false));
   EXPECT_CALL(stream, sendData(_, true));
 
@@ -1973,18 +1966,18 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineResetOnHeader
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &callbacks;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
 
-  EXPECT_CALL(stream, sendHeaders(_, true)).WillOnce(Invoke([&](Http::RequestHeaderMap&, bool) {
+  EXPECT_CALL(stream, sendHeaders(_, true)).WillOnce([&](Http::RequestHeaderMap&, bool) {
     captured_cb->onReset();
-  }));
+  });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -2014,19 +2007,19 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineResetOnData) 
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &callbacks;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
 
   EXPECT_CALL(stream, sendHeaders(_, false));
-  EXPECT_CALL(stream, sendData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+  EXPECT_CALL(stream, sendData(_, true)).WillOnce([&](Buffer::Instance&, bool) {
     captured_cb->onReset();
-  }));
+  });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -2057,24 +2050,24 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StartHttpStreamInlineComplete) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &callbacks;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
 
   EXPECT_CALL(stream, sendHeaders(_, false));
-  EXPECT_CALL(stream, sendData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+  EXPECT_CALL(stream, sendData(_, true)).WillOnce([&](Buffer::Instance&, bool) {
     captured_cb->onHeaders(Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl({})},
                            false);
     Buffer::OwnedImpl body("response body");
     captured_cb->onData(body, false);
     captured_cb->onTrailers(Http::ResponseTrailerMapPtr{new Http::TestResponseTrailerMapImpl({})});
     captured_cb->onComplete();
-  }));
+  });
 
   auto config_or = makeNoOpConfig(context, *stats_scope);
   ASSERT_OK(config_or);
@@ -2119,11 +2112,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamExisting) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &callbacks;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
@@ -2140,11 +2133,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, ResetHttpStreamExisting) {
   ASSERT_EQ(config->startHttpStream(&sid, "cluster", std::move(msg), false, 1000),
             envoy_dynamic_module_type_http_callout_init_result_Success);
 
-  EXPECT_CALL(stream, reset()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(stream, reset()).WillOnce([&]() {
     // Simulate the stream being reset, which should trigger the stream callbacks and clean up
     // stream state in the config.
     captured_cb->onReset();
-  }));
+  });
   config->resetHttpStream(sid);
 }
 
@@ -2162,11 +2155,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, CancelPendingStreamCallout) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &callbacks;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
@@ -2217,10 +2210,10 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamDataValid) {
 
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
@@ -2270,10 +2263,10 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, SendStreamTrailersValid) {
 
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
@@ -2309,11 +2302,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnHeadersNoCallback)
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& cb,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &cb;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
@@ -2351,11 +2344,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnDataNoCallbackAndE
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& cb,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &cb;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
@@ -2397,11 +2390,11 @@ TEST(DynamicModuleHttpFilterConfigStreamTest, StreamCallbackOnTrailersNoCallback
   Http::AsyncClient::StreamCallbacks* captured_cb = nullptr;
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& cb,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_cb = &cb;
         return &stream;
-      }));
+      });
 
   NiceMock<Event::MockDispatcher> dispatcher;
   EXPECT_CALL(context, mainThreadDispatcher()).WillRepeatedly(testing::ReturnRef(dispatcher));
@@ -2669,12 +2662,11 @@ TEST(DynamicModuleHttpCalloutTest, CancelPendingRequest) {
   Http::AsyncClient::Callbacks* captured = nullptr;
   NiceMock<Http::MockAsyncClientRequest> req(&cluster->async_client_);
   EXPECT_CALL(cluster->async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured = &cb;
-            return &req;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured = &cb;
+        return &req;
+      });
 
   uint64_t id = 0;
   auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(
@@ -2733,11 +2725,11 @@ TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnComplete) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_callbacks = &callbacks;
         return &stream;
-      }));
+      });
 
   // Start Stream
   uint64_t stream_id;
@@ -2786,16 +2778,15 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamDoesNotSetContentLength) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_callbacks = &callbacks;
         return &stream;
-      }));
+      });
 
-  EXPECT_CALL(stream, sendHeaders(_, false))
-      .WillOnce(Invoke([](Http::RequestHeaderMap& headers, bool) {
-        EXPECT_EQ(nullptr, headers.ContentLength());
-      }));
+  EXPECT_CALL(stream, sendHeaders(_, false)).WillOnce([](Http::RequestHeaderMap& headers, bool) {
+    EXPECT_EQ(nullptr, headers.ContentLength());
+  });
   EXPECT_CALL(stream, sendData(_, true));
 
   uint64_t stream_id = 0;
@@ -2929,16 +2920,16 @@ TEST(DynamicModuleHttpStreamTest, StartHttpStreamHandlesInlineResetDuringHeaders
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_callbacks = &callbacks;
         return &stream;
-      }));
+      });
 
-  EXPECT_CALL(stream, sendHeaders(_, false)).WillOnce(Invoke([&](Http::RequestHeaderMap&, bool) {
+  EXPECT_CALL(stream, sendHeaders(_, false)).WillOnce([&](Http::RequestHeaderMap&, bool) {
     ASSERT_NE(captured_callbacks, nullptr);
     captured_callbacks->onReset();
-  }));
+  });
   EXPECT_CALL(stream, sendData(_, _)).Times(0);
 
   uint64_t stream_id;
@@ -2985,11 +2976,11 @@ TEST(DynamicModuleHttpStreamTest, HttpFilterHttpStreamCalloutOnReset) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_callbacks = &callbacks;
         return &stream;
-      }));
+      });
 
   // Start Stream
   uint64_t stream_id;
@@ -3039,11 +3030,11 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& cb,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& cb,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_callbacks = &cb;
         return &stream;
-      }));
+      });
 
   // Start Stream
   uint64_t stream_id;
@@ -3056,11 +3047,11 @@ TEST(DynamicModulesTest, HttpFilterResetHttpStream) {
 
   // Expect reset to be called on the stream - once by resetHttpStream and possibly again by
   // onDestroy cleanup.
-  EXPECT_CALL(stream, reset()).WillOnce(testing::Invoke([&]() {
+  EXPECT_CALL(stream, reset()).WillOnce([&]() {
     // Simulate stream being reset and cleaned up. The async client stream may call onReset callback
     // inline during reset, so we need to make sure to handle that correctly.
     captured_callbacks->onReset();
-  }));
+  });
   filter->resetHttpStream(stream_id);
 
   // Resetting a non-existent stream should not crash.
@@ -3114,10 +3105,10 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamNoBodyEndStream) {
   // Mock AsyncClient
   NiceMock<Http::MockAsyncClientStream> stream;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         return &stream;
-      }));
+      });
 
   // Expect sendHeaders with end_stream=true (no body, so headers end the stream).
   EXPECT_CALL(stream, sendHeaders(_, true));
@@ -3170,17 +3161,17 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnHeaders) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_callbacks = &callbacks;
         return &stream;
-      }));
+      });
 
   // When sendHeaders is called with end_stream=true, simulate an inline reset.
-  EXPECT_CALL(stream, sendHeaders(_, true)).WillOnce(Invoke([&](Http::RequestHeaderMap&, bool) {
+  EXPECT_CALL(stream, sendHeaders(_, true)).WillOnce([&](Http::RequestHeaderMap&, bool) {
     // Simulate stream resetting inline.
     captured_callbacks->onReset();
-  }));
+  });
 
   // Start Stream with no body and end_stream=true.
   uint64_t stream_id;
@@ -3230,19 +3221,19 @@ TEST(DynamicModulesTest, HttpFilterStartHttpStreamInlineResetOnData) {
   NiceMock<Http::MockAsyncClientStream> stream;
   Http::AsyncClient::StreamCallbacks* captured_callbacks = nullptr;
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks& callbacks,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         captured_callbacks = &callbacks;
         return &stream;
-      }));
+      });
 
   // sendHeaders succeeds.
   EXPECT_CALL(stream, sendHeaders(_, false));
   // When sendData is called, simulate an inline reset.
-  EXPECT_CALL(stream, sendData(_, true)).WillOnce(Invoke([&](Buffer::Instance&, bool) {
+  EXPECT_CALL(stream, sendData(_, true)).WillOnce([&](Buffer::Instance&, bool) {
     // Simulate stream resetting inline.
     captured_callbacks->onReset();
-  }));
+  });
 
   // Start Stream with body and end_stream=true.
   uint64_t stream_id;
@@ -3291,10 +3282,10 @@ TEST(DynamicModulesTest, StartHttpStreamCannotCreateRequest) {
 
   // Mock AsyncClient to return nullptr when start() is called.
   EXPECT_CALL(cluster->async_client_, start(_, _))
-      .WillOnce(Invoke([&](Http::AsyncClient::StreamCallbacks&,
-                           const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
+      .WillOnce([&](Http::AsyncClient::StreamCallbacks&,
+                    const Http::AsyncClient::StreamOptions&) -> Http::AsyncClient::Stream* {
         return nullptr;
-      }));
+      });
 
   uint64_t stream_id = 0;
   auto headers = std::make_unique<Http::TestRequestHeaderMapImpl>(

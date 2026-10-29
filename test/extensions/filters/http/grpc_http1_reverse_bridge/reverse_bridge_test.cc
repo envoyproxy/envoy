@@ -67,13 +67,13 @@ TEST_F(ReverseBridgeTest, InvalidGrpcRequest) {
     Envoy::Buffer::OwnedImpl buffer;
     buffer.add("abc", 3);
     EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _));
-    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce(Invoke([](auto& headers, auto) {
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, _)).WillOnce([](auto& headers, auto) {
       EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Status, "200"));
       EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().GrpcStatus, "2"));
       EXPECT_THAT(headers,
                   ContainsHeader(Http::Headers::get().GrpcMessage,
                                  Http::Utility::PercentEncoding::encode("invalid request body")));
-    }));
+    });
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, false));
     EXPECT_EQ(decoder_callbacks_.details(), "grpc_bridge_data_too_small");
   }

@@ -30,46 +30,46 @@ public:
     switch (field_type) {
     case FieldType::Bool:
       return EXPECT_CALL(protocol_, readBool(Ref(buffer_), _))
-          .WillOnce(Invoke([](Buffer::Instance&, bool& value) -> bool {
+          .WillOnce([](Buffer::Instance&, bool& value) -> bool {
             value = true;
             return true;
-          }));
+          });
     case FieldType::Byte:
       return EXPECT_CALL(protocol_, readByte(Ref(buffer_), _))
-          .WillOnce(Invoke([](Buffer::Instance&, uint8_t& value) -> bool {
+          .WillOnce([](Buffer::Instance&, uint8_t& value) -> bool {
             value = 1;
             return true;
-          }));
+          });
     case FieldType::Double:
       return EXPECT_CALL(protocol_, readDouble(Ref(buffer_), _))
-          .WillOnce(Invoke([](Buffer::Instance&, double& value) -> bool {
+          .WillOnce([](Buffer::Instance&, double& value) -> bool {
             value = 2.0;
             return true;
-          }));
+          });
     case FieldType::I16:
       return EXPECT_CALL(protocol_, readInt16(Ref(buffer_), _))
-          .WillOnce(Invoke([](Buffer::Instance&, int16_t& value) -> bool {
+          .WillOnce([](Buffer::Instance&, int16_t& value) -> bool {
             value = 3;
             return true;
-          }));
+          });
     case FieldType::I32:
       return EXPECT_CALL(protocol_, readInt32(Ref(buffer_), _))
-          .WillOnce(Invoke([](Buffer::Instance&, int32_t& value) -> bool {
+          .WillOnce([](Buffer::Instance&, int32_t& value) -> bool {
             value = 4;
             return true;
-          }));
+          });
     case FieldType::I64:
       return EXPECT_CALL(protocol_, readInt64(Ref(buffer_), _))
-          .WillOnce(Invoke([](Buffer::Instance&, int64_t& value) -> bool {
+          .WillOnce([](Buffer::Instance&, int64_t& value) -> bool {
             value = 5;
             return true;
-          }));
+          });
     case FieldType::String:
       return EXPECT_CALL(protocol_, readString(Ref(buffer_), _))
-          .WillOnce(Invoke([](Buffer::Instance&, std::string& value) -> bool {
+          .WillOnce([](Buffer::Instance&, std::string& value) -> bool {
             value = "six";
             return true;
-          }));
+          });
     default:
       PANIC("reached unexpected code");
     }
@@ -77,12 +77,11 @@ public:
 
   Expectation expectFieldBegin(FieldType field_type, int16_t field_id) {
     return EXPECT_CALL(protocol_, readFieldBegin(Ref(buffer_), _, _, _))
-        .WillOnce(
-            Invoke([=](Buffer::Instance&, std::string&, FieldType& type, int16_t& id) -> bool {
-              type = field_type;
-              id = field_id;
-              return true;
-            }));
+        .WillOnce([=](Buffer::Instance&, std::string&, FieldType& type, int16_t& id) -> bool {
+          type = field_type;
+          id = field_id;
+          return true;
+        });
   }
 
   Expectation expectFieldEnd() {
@@ -237,11 +236,11 @@ TEST_P(ThriftObjectImplValueTest, ParseNestedListValue) {
   expectFieldBegin(FieldType::List, 1);
 
   EXPECT_CALL(protocol_, readListBegin(Ref(buffer_), _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& type, uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& type, uint32_t& size) -> bool {
         type = field_type;
         size = 2;
         return true;
-      }));
+      });
   expectValue(field_type);
   expectValue(field_type);
   EXPECT_CALL(protocol_, readListEnd(Ref(buffer_))).WillOnce(Return(true));
@@ -279,11 +278,11 @@ TEST_P(ThriftObjectImplValueTest, ParseNestedSetValue) {
   expectFieldBegin(FieldType::Set, 1);
 
   EXPECT_CALL(protocol_, readSetBegin(Ref(buffer_), _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& type, uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& type, uint32_t& size) -> bool {
         type = field_type;
         size = 2;
         return true;
-      }));
+      });
   expectValue(field_type);
   expectValue(field_type);
   EXPECT_CALL(protocol_, readSetEnd(Ref(buffer_))).WillOnce(Return(true));
@@ -321,13 +320,13 @@ TEST_P(ThriftObjectImplValueTest, ParseNestedMapValue) {
   expectFieldBegin(FieldType::Map, 1);
 
   EXPECT_CALL(protocol_, readMapBegin(Ref(buffer_), _, _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& key_type, FieldType& value_type,
-                           uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& key_type, FieldType& value_type,
+                    uint32_t& size) -> bool {
         key_type = field_type;
         value_type = FieldType::String;
         size = 2;
         return true;
-      }));
+      });
   expectValue(field_type);
   expectValue(FieldType::String);
   expectValue(field_type);
@@ -367,48 +366,48 @@ TEST_F(ThriftObjectImplTest, DeeplyNestedStruct) {
   expectFieldBegin(FieldType::Map, 1);
 
   EXPECT_CALL(protocol_, readMapBegin(Ref(buffer_), _, _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& key_type, FieldType& value_type,
-                           uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& key_type, FieldType& value_type,
+                    uint32_t& size) -> bool {
         key_type = FieldType::I32;
         value_type = FieldType::List;
         size = 1;
         return true;
-      }));
+      });
   expectValue(FieldType::I32);
   EXPECT_CALL(protocol_, readListBegin(Ref(buffer_), _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
         elem_type = FieldType::Set;
         size = 1;
         return true;
-      }));
+      });
   EXPECT_CALL(protocol_, readSetBegin(Ref(buffer_), _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
         elem_type = FieldType::Map;
         size = 1;
         return true;
-      }));
+      });
 
   EXPECT_CALL(protocol_, readMapBegin(Ref(buffer_), _, _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& key_type, FieldType& value_type,
-                           uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& key_type, FieldType& value_type,
+                    uint32_t& size) -> bool {
         key_type = FieldType::I32;
         value_type = FieldType::List;
         size = 1;
         return true;
-      }));
+      });
   expectValue(FieldType::I32);
   EXPECT_CALL(protocol_, readListBegin(Ref(buffer_), _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
         elem_type = FieldType::Set;
         size = 1;
         return true;
-      }));
+      });
   EXPECT_CALL(protocol_, readSetBegin(Ref(buffer_), _, _))
-      .WillOnce(Invoke([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
+      .WillOnce([&](Buffer::Instance&, FieldType& elem_type, uint32_t& size) -> bool {
         elem_type = FieldType::Struct;
         size = 1;
         return true;
-      }));
+      });
   EXPECT_CALL(protocol_, readStructBegin(Ref(buffer_), _)).WillOnce(Return(true));
   expectField(FieldType::I64, 100);
   expectStopField();

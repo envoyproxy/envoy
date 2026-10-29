@@ -91,9 +91,7 @@ public:
           membership_updated_.ready();
           return absl::OkStatus();
         });
-    ON_CALL(initialized_, ready()).WillByDefault(testing::Invoke([this] {
-      init_complete_ = true;
-    }));
+    ON_CALL(initialized_, ready()).WillByDefault([this] { init_complete_ = true; });
     cluster_->initialize([&]() {
       initialized_.ready();
       return absl::OkStatus();

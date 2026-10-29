@@ -13,26 +13,24 @@ public:
                                                   bool send_complete_request = true) {
     setup();
 
-    EXPECT_CALL(*codec_, dispatch(_))
-        .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-          decoder_ = &conn_manager_->newStream(response_encoder_);
+    EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly([&](Buffer::Instance& data) -> Http::Status {
+      decoder_ = &conn_manager_->newStream(response_encoder_);
 
-          // These request headers are missing the necessary ":host"
-          RequestHeaderMapPtr headers{
-              new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-          decoder_->decodeHeaders(std::move(headers), send_complete_request);
-          data.drain(0);
-          return Http::okStatus();
-        }));
+      // These request headers are missing the necessary ":host"
+      RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
+      decoder_->decodeHeaders(std::move(headers), send_complete_request);
+      data.drain(0);
+      return Http::okStatus();
+    });
 
     auto* filter = new MockStreamFilter();
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([&](FilterChainFactoryCallbacks& callbacks) -> bool {
+        .WillOnce([&](FilterChainFactoryCallbacks& callbacks) -> bool {
           auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
           callbacks.setFilterConfigName("");
           factory(callbacks);
           return true;
-        }));
+        });
     EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
     EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
@@ -56,7 +54,7 @@ public:
       }
     }
     EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-        .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
+        .WillOnce([&](const ResponseHeaderMap& headers, bool) -> void {
           EXPECT_EQ("400", headers.getStatusValue());
           EXPECT_EQ("missing_host_header",
                     filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
@@ -66,7 +64,7 @@ public:
           } else {
             EXPECT_EQ(nullptr, headers.Connection());
           }
-        }));
+        });
 
     EXPECT_CALL(*filter, onStreamComplete());
     EXPECT_CALL(*filter, onDestroy());
@@ -112,10 +110,10 @@ TEST_F(HttpConnectionManagerImplDeathTest, InvalidConnectionManagerConfig) {
   setup();
 
   Buffer::OwnedImpl fake_input("1234");
-  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> Http::Status {
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly([&](Buffer::Instance&) -> Http::Status {
     conn_manager_->newStream(response_encoder_);
     return Http::okStatus();
-  }));
+  });
   // Either RDS or SRDS should be set.
   EXPECT_DEBUG_DEATH(conn_manager_->onData(fake_input, false),
                      "Either routeConfigProvider or \\(scopedRouteConfigProvider and "

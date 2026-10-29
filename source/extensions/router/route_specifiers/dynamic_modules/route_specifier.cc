@@ -311,6 +311,7 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       runtime_fraction_(buildRuntimeFraction(proto_config)),
       max_rewritten_path_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_rewritten_path_bytes, 65536)),
+      has_built_route_cache_(proto_config.has_built_route_cache()),
       fail_closed_(proto_config.failure_policy() ==
                    envoy::extensions::router::route_specifiers::dynamic_modules::v3::NO_ROUTE),
       continue_matching_on_failure_(
@@ -402,10 +403,13 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
       "envoy_dynamic_module_on_route_specifier_on_route");
   RETURN_IF_NOT_OK_REF(on_route.status());
 
-  // The route destroy hook is optional, so a module built with an older SDK that does not export it
-  // is accepted and the hook is a no op.
+  // The route destroy and user data discard hooks are optional, so a module built with an older
+  // SDK that does not export them is accepted and each hook is a no op.
   auto on_route_destroy = dynamic_module->getFunctionPointer<OnRouteSpecifierRouteDestroyType>(
       "envoy_dynamic_module_on_route_specifier_route_destroy");
+  auto on_user_data_discard =
+      dynamic_module->getFunctionPointer<OnRouteSpecifierUserDataDiscardType>(
+          "envoy_dynamic_module_on_route_specifier_user_data_discard");
 
   // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
   std::string specifier_config;
@@ -430,6 +434,8 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_route_ = on_route.value();
   config->on_route_destroy_ = on_route_destroy.ok() ? on_route_destroy.value() : nullptr;
+  config->on_user_data_discard_ =
+      on_user_data_discard.ok() ? on_user_data_discard.value() : nullptr;
 
   const bool validate_clusters =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, validate_clusters, false);
@@ -922,22 +928,19 @@ DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
                                      const Http::RequestHeaderMap& headers,
                                      const StreamInfo::StreamInfo& stream_info, uint64_t random,
                                      Envoy::Router::OnRouteInputStatus) const {
-  const MonotonicTime start = config_->timeSource().monotonicTime();
-  const auto record_duration = [&](Stats::Histogram& histogram) {
-    histogram.recordValue(std::chrono::duration_cast<std::chrono::microseconds>(
-                              config_->timeSource().monotonicTime() - start)
-                              .count());
-  };
-
   const auto& runtime_fraction = config_->runtimeFraction();
   if (runtime_fraction.has_value() &&
       !config_->runtime().snapshot().featureEnabled(runtime_fraction->key,
                                                     runtime_fraction->default_value, random)) {
     config_->stats().runtime_skipped_.inc();
-    record_duration(config_->stats().specifier_duration_);
     return {std::move(route)};
   }
 
+  const MonotonicTime start = config_->timeSource().monotonicTime();
+  const auto record_duration = [start](Stats::Histogram& histogram, MonotonicTime end) {
+    histogram.recordValue(
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+  };
   RouteSpecifierContext context{*config_, route, headers, stream_info, random};
   context.built_route_cache_slot = built_route_cache_.get();
   // The module can return a status this build does not know, for example from a newer ABI, so it
@@ -945,16 +948,29 @@ DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
   const uint32_t on_route_status = static_cast<uint32_t>(
       config_->on_route_(config_->in_module_config_, static_cast<void*>(&context)));
   // Reading the clock is the most expensive thing this method does that is not the module itself,
-  // so the start of the specifier doubles as the start of the module. Only the runtime fraction
-  // check and the context construction sit between the two, which is why on_route_duration is
-  // measured from there rather than read again.
+  // so the start of the specifier doubles as the start of the module, with only the context
+  // construction between the two.
   const MonotonicTime module_end = config_->timeSource().monotonicTime();
-  config_->stats().on_route_duration_.recordValue(
-      std::chrono::duration_cast<std::chrono::microseconds>(module_end - start).count());
+  record_duration(config_->stats().on_route_duration_, module_end);
 
   Decision result = resolve(context, on_route_status);
+  // User data no route carries never reaches the route destroy hook, so it is handed back here.
+  const bool discard = context.user_data.has_value() && result.recorded == nullptr &&
+                       config_->onUserDataDiscard() != nullptr;
+  if (discard) {
+    config_->stats().user_data_discard_.inc();
+    config_->onUserDataDiscard()(config_->in_module_config_, *context.user_data);
+  }
 
-  record_duration(config_->stats().specifier_duration_);
+  // A decision reads the clock again when it builds a route, fails or hands its user data back, or
+  // when its lookup in the built route cache misses or is verified. Any other decision ends with
+  // the module, since only a few branches follow it.
+  const auto& lookup = context.built_route_lookup;
+  const bool ends_with_module =
+      !discard && result.recorded == nullptr && result.failure == Failure::None &&
+      (!lookup.has_value() || (lookup->hit.has_value() && !lookup->verify));
+  record_duration(config_->stats().specifier_duration_,
+                  ends_with_module ? module_end : config_->timeSource().monotonicTime());
   return {std::move(result.route), result.status};
 }
 
@@ -1031,7 +1047,6 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
     config_->stats().decision_error_.inc();
     return fail(Failure::ModuleError);
   case envoy_dynamic_module_type_route_specifier_decision_Unspecified: {
-    applySelectedRouteOverride(context);
     if (context.selected_template != nullptr) {
       // The two ways the default decision generates its route keep their own statistic, so
       // selecting a template stays distinguishable from refining the resolved route.
@@ -1043,13 +1058,15 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
       }
       BuiltRouteLookup* lookup =
           context.built_route_lookup.has_value() ? &*context.built_route_lookup : nullptr;
+      // A hit serves the cached route, so what the module recorded is not applied.
       if (lookup != nullptr && lookup->hit.has_value() && !lookup->verify) {
         return {std::move(lookup->hit->route), status};
       }
+      applySelectedRouteOverride(context);
       Decision wrapped = wrap(context.selected_route, context, status);
       if (lookup != nullptr && lookup->hit.has_value()) {
-        // A verified hit serves the route the module recorded, which keeps every user data the
-        // module records on a route of its own.
+        // A verified hit serves the route the module recorded, which keeps the user data the
+        // module records on a route of its own whenever the recording builds one.
         verifyCachedRoute(context, wrapped, *lookup);
       } else if (lookup != nullptr && recordsACacheableRoute(context, wrapped)) {
         // Even the template cached as it is spares the module its recording on a hit.
@@ -1068,6 +1085,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
       return fail(Failure::TemplateNotSelected);
     }
     config_->stats().decision_has_override_.inc();
+    applySelectedRouteOverride(context);
     if (context.input_route == nullptr) {
       // With nothing recorded the default decision passes the route through unchanged, which is
       // what makes it safe when the module records none: the run with no route stays a run with

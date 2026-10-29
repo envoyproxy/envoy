@@ -245,8 +245,8 @@ protected:
         .WillOnce(testing::DoAll(SaveArgAddress(&attempt->response_decoder),
                                  testing::ReturnRef(*attempt->request_encoder)));
     EXPECT_CALL(*attempt->request_encoder, encodeHeaders(_, false))
-        .WillOnce(testing::Invoke([captured_authority, captured_scheme](
-                                      const Http::RequestHeaderMap& h, bool) -> absl::Status {
+        .WillOnce([captured_authority, captured_scheme](const Http::RequestHeaderMap& h,
+                                                        bool) -> absl::Status {
           if (captured_authority != nullptr) {
             *captured_authority = std::string(h.getHostValue());
           }
@@ -254,7 +254,7 @@ protected:
             *captured_scheme = std::string(h.getSchemeValue());
           }
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(*attempt->request_encoder, encodeData(_, true));
     ON_CALL(*attempt->network_connection, close(_, _)).WillByDefault(testing::Return());
     ON_CALL(*attempt->network_connection, close(_)).WillByDefault(testing::Return());
@@ -267,12 +267,12 @@ protected:
     using Upstream::MockHostLight;
     host_description_for_codec_ = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
     EXPECT_CALL(static_cast<NiceMock<Upstream::MockHost>&>(*host), createConnection_(_, _))
-        .WillOnce(testing::InvokeWithoutArgs([this, &attempt]() {
+        .WillOnce([this, &attempt]() {
           MockHostLight::MockCreateConnectionData data;
           data.connection_ = attempt.network_connection;
           data.host_description_ = host_description_for_codec_;
           return data;
-        }));
+        });
   }
 
   Http::CodecClient* attachCodecClient(OobAttempt& attempt,
@@ -287,9 +287,9 @@ protected:
   // createCodecClient_, hand back a CodecClientForTest layered over the supplied attempt.
   void expectCreateCodecClient(TestOrcaOobManager& manager, OobAttempt& attempt) {
     EXPECT_CALL(manager, createCodecClient_(_))
-        .WillOnce(testing::Invoke([this, &attempt](Upstream::Host::CreateConnectionData& data) {
+        .WillOnce([this, &attempt](Upstream::Host::CreateConnectionData& data) {
           return attachCodecClient(attempt, data);
-        }));
+        });
   }
 
   void respondHeadersOk(OobAttempt& attempt) {
@@ -900,12 +900,12 @@ TEST_F(OrcaOobManagerWireTest, SyncLocalCloseDuringTearDownDoesNotDoubleCount) {
   // Override the fixture's no-op close() stubs so close() raises sync LocalClose, matching
   // production ConnectionImpl::close(Abort) semantics.
   auto* raw_conn = attempt->network_connection;
-  ON_CALL(*raw_conn, close(_, _)).WillByDefault(testing::InvokeWithoutArgs([raw_conn]() {
+  ON_CALL(*raw_conn, close(_, _)).WillByDefault([raw_conn]() {
     raw_conn->raiseEvent(Network::ConnectionEvent::LocalClose);
-  }));
-  ON_CALL(*raw_conn, close(_)).WillByDefault(testing::InvokeWithoutArgs([raw_conn]() {
+  });
+  ON_CALL(*raw_conn, close(_)).WillByDefault([raw_conn]() {
     raw_conn->raiseEvent(Network::ConnectionEvent::LocalClose);
-  }));
+  });
   wireConnectionFor(host, *attempt);
   expectCreateCodecClient(*manager, *attempt);
   EXPECT_CALL(dispatcher_, deferredDelete_(_)).Times(AtLeast(1));

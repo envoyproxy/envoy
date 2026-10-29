@@ -72,6 +72,8 @@ enum mode {
   HIT_THEN_PASS_THROUGH,
   HIT_THEN_ERROR,
   HIT_THEN_SKIP,
+  // Like CACHED, but rejects a configuration without the built route cache.
+  REQUIRES_CACHE,
   MODE_COUNT,
 };
 
@@ -104,6 +106,7 @@ static const char* const mode_names[MODE_COUNT] = {
     "hit-then-pass-through",
     "hit-then-error",
     "hit-then-skip",
+    "requires-cache",
 };
 
 // Distinct addresses used as the config handle that selects the mode.
@@ -112,19 +115,27 @@ static char modes[MODE_COUNT];
 static int last_cache_result = -1;
 static int route_destroy_count = 0;
 static int config_destroy_count = 0;
+static int config_has_built_route_cache = -1;
 
-// Let tests observe what the cache returned and which hooks Envoy invoked.
+// Let tests observe what the cache returned, which hooks Envoy invoked and what the last
+// configuration reported.
 int getLastCacheResult(void) { return last_cache_result; }
 int getRouteDestroyCount(void) { return route_destroy_count; }
 int getConfigDestroyCount(void) { return config_destroy_count; }
+int getConfigHasBuiltRouteCache(void) { return config_has_built_route_cache; }
 
 envoy_dynamic_module_type_route_specifier_config_module_ptr
 envoy_dynamic_module_on_route_specifier_config_new(
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name, envoy_dynamic_module_type_envoy_buffer config) {
+  config_has_built_route_cache =
+      envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(config_envoy_ptr);
   for (int i = 0; i < MODE_COUNT; i++) {
     const size_t length = strlen(mode_names[i]);
     if (config.length == length && memcmp(config.ptr, mode_names[i], length) == 0) {
+      if (i == REQUIRES_CACHE && !config_has_built_route_cache) {
+        return NULL;
+      }
       return &modes[i];
     }
   }

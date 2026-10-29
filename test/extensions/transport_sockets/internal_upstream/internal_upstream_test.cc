@@ -97,8 +97,8 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
   NiceMock<MockUserSpaceIoHandle> io_handle;
   EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
   EXPECT_CALL(*state, initialize(_, _))
-      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+      .WillOnce([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                    const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
         ASSERT_THAT(
             metadata->filter_metadata(),
             Contains(Pair("envoy.test", HasStructFields(Contains(IsStructString("key", "val"))))));
@@ -106,7 +106,7 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
         const auto& object = filter_state_objects.at(0);
         ASSERT_EQ("test.object", object.name_);
         ASSERT_EQ(filter_state_object.get(), object.data_.get());
-      }));
+      });
   initialize(io_handle);
 }
 
@@ -116,11 +116,11 @@ TEST_F(InternalSocketTest, EmptyPassthroughState) {
   NiceMock<MockUserSpaceIoHandle> io_handle;
   EXPECT_CALL(io_handle, passthroughState()).WillRepeatedly(testing::Return(state));
   EXPECT_CALL(*state, initialize(_, _))
-      .WillOnce(Invoke([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
-                           const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
+      .WillOnce([&](std::unique_ptr<envoy::config::core::v3::Metadata> metadata,
+                    const StreamInfo::FilterState::Objects& filter_state_objects) -> void {
         ASSERT_EQ(nullptr, metadata);
         ASSERT_EQ(0, filter_state_objects.size());
-      }));
+      });
   initialize(io_handle);
 }
 
