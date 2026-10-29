@@ -102,7 +102,6 @@ message GrpcJsonReverseTranscoder {
 
   // The maximum size of a request body to be transcoded, in bytes. A body exceeding this size will
   // provoke a ``gRPC status: ResourceExhausted`` response.
-  // Streamed ``HttpBody`` requests are exempt from this limit.
   //
   // Large values may cause envoy to use a lot of memory if there are many
   // concurrent requests.
@@ -112,7 +111,6 @@ message GrpcJsonReverseTranscoder {
 
   // The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
   // provoke a ``gRPC status: Internal`` response.
-  // Streamed ``HttpBody`` responses are exempt from this limit.
   //
   // Large values may cause envoy to use a lot of memory if there are many
   // concurrent requests.
