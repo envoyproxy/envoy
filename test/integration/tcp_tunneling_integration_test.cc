@@ -2655,6 +2655,90 @@ TEST_P(TcpTunnelingIntegrationTest, UpstreamRstAfterCompleteResponseNotPropagate
   tcp_client_->close();
 }
 
+// Regression test for a heap-use-after-free where upstream trailers trigger
+// Filter::onUpstreamData() with an empty buffer and end_stream=true while the
+// server is draining with check_drain_close enabled, synchronously closing the
+// downstream connection and destroying HttpUpstream/CombinedUpstream before
+// DecoderShim::decodeTrailers() finishes.
+TEST_P(TcpTunnelingIntegrationTest, DrainCloseOnUpstreamTrailers) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(100);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    proxy_config.mutable_check_drain_close()->set_value(true);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+  initialize();
+  startServerDrain();
+
+  setUpConnection(fake_upstream_connection_);
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  Http::TestResponseTrailerMapImpl response_trailers{{"test-trailer-name", "trailer-value"}};
+  upstream_request_->encodeTrailers(response_trailers);
+
+  test_server_->waitForCounter("tcp.tcp_stats.downstream_cx_drain_close", Ge(1));
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
+}
+
+// Same as DrainCloseOnUpstreamTrailers, but via the DecoderShim::decodeData()
+// path when an empty end_stream DATA frame arrives while draining.
+TEST_P(TcpTunnelingIntegrationTest, DrainCloseOnUpstreamEndStreamData) {
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    return;
+  }
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(100);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+    proxy_config.set_stat_prefix("tcp_stats");
+    proxy_config.set_cluster("cluster_0");
+    proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    proxy_config.mutable_check_drain_close()->set_value(true);
+
+    auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+    for (auto& listener : *listeners) {
+      if (listener.name() != "tcp_proxy") {
+        continue;
+      }
+      auto* filter_chain = listener.mutable_filter_chains(0);
+      auto* filter = filter_chain->mutable_filters(0);
+      std::ignore = filter->mutable_typed_config()->PackFrom(proxy_config);
+      break;
+    }
+  });
+  initialize();
+  startServerDrain();
+
+  setUpConnection(fake_upstream_connection_);
+  ASSERT_TRUE(tcp_client_->write("hello", false));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  upstream_request_->encodeData(0, true);
+
+  test_server_->waitForCounter("tcp.tcp_stats.downstream_cx_drain_close", Ge(1));
+  tcp_client_->waitForHalfClose();
+  tcp_client_->close();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     IpAndHttpVersions, TcpTunnelingIntegrationTest,
     testing::ValuesIn(BaseTcpTunnelingIntegrationTest::getProtocolTestParams(

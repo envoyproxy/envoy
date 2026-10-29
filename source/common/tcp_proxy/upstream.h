@@ -254,6 +254,7 @@ private:
   class DecoderShim : public Http::ResponseDecoderImplBase {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
+    ~DecoderShim() override { destroyed_ = true; }
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
       bool is_valid_response = parent_.isValidResponse(*headers);
@@ -276,7 +277,13 @@ private:
       }
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
+      // The call to onUpstreamData() below may synchronously result in the
+      // destruction of parent_ (and thereby *this) via re-entrancy through the
+      // downstream connection close path.
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
+      if (destroyed_) {
+        return;
+      }
       if (end_stream) {
         parent_.doneReading();
       }
@@ -284,8 +291,13 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
+      // Same re-entrancy hazard as decodeData(): onUpstreamData() may destroy
+      // parent_/this synchronously.
       Buffer::OwnedImpl data;
       parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      if (destroyed_) {
+        return;
+      }
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
@@ -295,6 +307,9 @@ private:
 
   private:
     HttpUpstream& parent_;
+    // Used to detect synchronous destruction of this object from within
+    // onUpstreamData().
+    bool destroyed_{false};
   };
   DecoderShim response_decoder_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
@@ -389,6 +404,7 @@ private:
   class DecoderShim : public Http::ResponseDecoderImplBase {
   public:
     DecoderShim(CombinedUpstream& parent) : parent_(parent) {}
+    ~DecoderShim() override { destroyed_ = true; }
     // Http::ResponseDecoder
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override {
@@ -412,7 +428,13 @@ private:
       }
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
+      // The call to onUpstreamData() below may synchronously result in the
+      // destruction of parent_ (and thereby *this) via re-entrancy through the
+      // downstream connection close path.
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
+      if (destroyed_) {
+        return;
+      }
       if (end_stream) {
         parent_.doneReading();
       }
@@ -420,8 +442,13 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
+      // Same re-entrancy hazard as decodeData(): onUpstreamData() may destroy
+      // parent_/this synchronously.
       Buffer::OwnedImpl data;
       parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
+      if (destroyed_) {
+        return;
+      }
       parent_.doneReading();
     }
     void decodeMetadata(Http::MetadataMapPtr&&) override {}
@@ -431,6 +458,9 @@ private:
 
   private:
     CombinedUpstream& parent_;
+    // Used to detect synchronous destruction of this object from within
+    // onUpstreamData().
+    bool destroyed_{false};
   };
   DecoderShim response_decoder_;
   Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks_;
