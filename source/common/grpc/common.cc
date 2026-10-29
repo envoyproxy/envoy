@@ -60,6 +60,13 @@ bool Common::isGrpcRequestHeaders(const Http::RequestHeaderMap& headers) {
   return hasGrpcContentType(headers);
 }
 
+bool Common::isGrpcPostRequestHeaders(const Http::RequestHeaderMap& headers) {
+  // The gRPC over HTTP/2 protocol requires ":method POST":
+  // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests
+  return isGrpcRequestHeaders(headers) &&
+         headers.getMethodValue() == Http::Headers::get().MethodValues.Post;
+}
+
 bool Common::isConnectRequestHeaders(const Http::RequestHeaderMap& headers) {
   if (!headers.Path()) {
     return false;

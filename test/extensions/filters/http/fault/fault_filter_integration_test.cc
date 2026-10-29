@@ -380,7 +380,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
@@ -409,7 +409,7 @@ TEST_P(FaultIntegrationTestAllProtocols, HeaderFaultAbortGrpcConfig0PercentageHe
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
@@ -432,7 +432,7 @@ TEST_P(FaultIntegrationTestAllProtocols, FaultAbortGrpcConfig) {
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
 
   auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                      {":path", "/test/long/url"},
                                      {":scheme", "http"},
                                      {":authority", "host"},

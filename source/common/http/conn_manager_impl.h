@@ -753,6 +753,10 @@ private:
 
   const bool allow_upstream_half_close_{};
 
+  // Whether a request must use the POST method to be treated as gRPC when formatting local
+  // replies. Latched here once per connection manager and passed to each stream's filter manager.
+  const bool grpc_local_reply_requires_post_{};
+
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};
 };
