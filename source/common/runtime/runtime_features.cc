@@ -36,6 +36,10 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_cares_dual_resolution_preserve_failure);
+// A SotW CDS update removes only the clusters received through that CDS subscription, so it no
+// longer removes the clusters added by ODCDS. Disable to remove every dynamic cluster not in the
+// update.
+RUNTIME_GUARD(envoy_reloadable_features_cds_sotw_track_resources);
 RUNTIME_GUARD(envoy_reloadable_features_cel_message_serialize_text_format);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_formatter_accept_empty_values);
 RUNTIME_GUARD(envoy_reloadable_features_coalesce_lb_rebuilds_on_batch_update);
