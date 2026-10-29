@@ -135,8 +135,8 @@
     "https://bcr.bazel.build/modules/curl/8.8.0/source.json": "d7d138b6878cf38891692fee0649ace35357fd549b425614d571786f054374d4",
     "https://bcr.bazel.build/modules/cython/3.0.11-1/MODULE.bazel": "868b3f5c956c3657420d2302004c6bb92606bfa47e314bab7f2ba0630c7c966c",
     "https://bcr.bazel.build/modules/cython/3.0.11-1/source.json": "da318be900b8ca9c3d1018839d3bebc5a8e1645620d0848fa2c696d4ecf7c296",
-    "https://bcr.bazel.build/modules/envoy_toolshed/0.5.10.envoy/MODULE.bazel": "not found",
-    "https://bcr.bazel.build/modules/envoy_toolshed_jq/0.5.10.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/envoy_toolshed/0.5.11.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/envoy_toolshed_jq/0.5.11.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.1/MODULE.bazel": "cdf8cbe5ee750db04b78878c9633cc76e80dcf4416cbe982ac3a9222f80713c8",
     "https://bcr.bazel.build/modules/gawk/5.3.2.bcr.1/source.json": "fa7b512dfcb5eafd90ce3959cf42a2a6fe96144ebbb4b3b3928054895f2afac2",
     "https://bcr.bazel.build/modules/gazelle/0.27.0/MODULE.bazel": "3446abd608295de6d90b4a8a118ed64a9ce11dcb3dda2dc3290a22056bd20996",
@@ -522,10 +522,10 @@
     "https://bcr.bazel.build/modules/zstd/1.5.7.bcr.3/MODULE.bazel": "031c2f61e3f30853704948e722b6c3c7f7989780ee37bc431747cf3dc6cbe0b3",
     "https://bcr.bazel.build/modules/zstd/1.5.7.bcr.3/source.json": "92e3cd6613957216e9954b59e7c944766cdd7e55e5684862a1434bd5132663de",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/bazel_registry.json": "51bd3a0b193753e419c5d3db38e92fbcb9f7f97fd992ef2e24a0addd7274b37a",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed/0.5.10.envoy/MODULE.bazel": "150435dc256da066aca20f313d079064a0c90cb601bdeb030eb9c64a16821fbb",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed/0.5.10.envoy/source.json": "d1f8f9aa4573e1f01134451bb973bb8bde01cb1e07bc97306fa96579dd7dbc82",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed_jq/0.5.10.envoy/MODULE.bazel": "0d3ebdaa443fe7134df20f907ee5531e13e09aa0de7139b45d32aba852d3d95c",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed_jq/0.5.10.envoy/source.json": "a319c2fdda25de64c01fa412599d7b8239231b1dbb488f14de997da2040fbc3a",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed/0.5.11.envoy/MODULE.bazel": "a324c02ca68dafc0c9f6621c5397d2cd0dc5c3d3982ab1e0ad12a075ac751959",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed/0.5.11.envoy/source.json": "5474a235a536d1fd117aa12d3526316b6433f02c1693539aa67be5f50c06975b",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed_jq/0.5.11.envoy/MODULE.bazel": "8e2e507cef60a3dd9e3f709276fa83932d08952a2c4481e3a40888f9e0ce471f",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/envoy_toolshed_jq/0.5.11.envoy/source.json": "f0f3e9ebc6e460465b1a10f02b12d1cfa6b5aac2bd318a068e5c922df7cc75b9",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/grpc/1.83.0.envoy/MODULE.bazel": "71ff92df79911a0975a09c1482791fd3983696383d4652277684e67884ac9d40",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/grpc/1.83.0.envoy/source.json": "39d70fd55602db781fc793f0417b7ecce8f2427e9fdaf6c18938e33acdc4d549",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683/modules/prometheus-metrics-model/0.6.2.envoy/MODULE.bazel": "40e1b9b9db52c3238fcc3e85c08ef35eb9157783e620009ed01eeed7631a9f67",
@@ -541,8 +541,8 @@
   "moduleExtensions": {
     "@@envoy_toolshed+//git:extensions.bzl%git_prebuilt_extension": {
       "general": {
-        "bzlTransitiveDigest": "OGtd0bKpdrXvzzq5hmy4NQTUWuuC0nq7AK6TEz4IvKQ=",
-        "usagesDigest": "WFGEniT/PUyD1PdwsRLuweDdmiUIDoSTteFFdKDolhc=",
+        "bzlTransitiveDigest": "KA+Fp40lwbTTLa6XiIhTDns1GRZznYcZNWP4FCrBWyU=",
+        "usagesDigest": "NNHZ2PqIh+merTVDvdyULOqz9+p6e1Z7YerHrsQTwvA=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "cacert": {
@@ -557,7 +557,7 @@
             "attributes": {
               "sha256": "a0618fbe88c742faa7954f72d5e630c9644fc4b1909614f9cd21353f194b116b",
               "strip_prefix": "git-2.55.0-linux-aarch64",
-              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.29/git-2.55.0-linux-aarch64.tar.zst"
+              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.30/git-2.55.0-linux-aarch64.tar.zst"
             }
           },
           "git_prebuilt_linux_x86_64": {
@@ -565,7 +565,7 @@
             "attributes": {
               "sha256": "e64a3bac2d21552076b7dfe6e09d08f873d9391f38818f9bf2f9ea1aa4b2ebb1",
               "strip_prefix": "git-2.55.0-linux-x86_64",
-              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.29/git-2.55.0-linux-x86_64.tar.zst"
+              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.30/git-2.55.0-linux-x86_64.tar.zst"
             }
           },
           "git_toolchains": {
@@ -582,8 +582,8 @@
     },
     "@@envoy_toolshed+//pgp:extensions.bzl%sq_prebuilt_extension": {
       "general": {
-        "bzlTransitiveDigest": "Wk0qV4ExfQKreJh0hH0p7QBdGUp3hfl+tV5qy6l35S0=",
-        "usagesDigest": "S5FCgeqUzrclgnnY5/ndbJwNFQn/ChDDFyTeR54L9RI=",
+        "bzlTransitiveDigest": "mS5VbZk2Lvfe7Huflg5LDR/lgfLZO1qVeUF9OsnDmGs=",
+        "usagesDigest": "voimi/WssTebUAnN8yt7XOANZQdti0KETGUjudof8/A=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "sq_prebuilt_linux_aarch64": {
@@ -591,7 +591,7 @@
             "attributes": {
               "sha256": "b0520af4b16d4ee5efaf4ecfbea2d60d6de11e29dcd003924d191a315cb211ae",
               "strip_prefix": "sq-1.4.0-Linux-ARM64",
-              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.29/sq-1.4.0-Linux-ARM64.tar.zst"
+              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.30/sq-1.4.0-Linux-ARM64.tar.zst"
             }
           },
           "sq_prebuilt_linux_x86_64": {
@@ -599,7 +599,7 @@
             "attributes": {
               "sha256": "82c13d003a924b5560822f363df1af7733839cd82546a3074b2a32de0c5e99fb",
               "strip_prefix": "sq-1.4.0-Linux-X64",
-              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.29/sq-1.4.0-Linux-X64.tar.zst"
+              "url": "https://github.com/envoyproxy/toolshed/releases/download/bins-v0.2.30/sq-1.4.0-Linux-X64.tar.zst"
             }
           },
           "sq_toolchains": {
@@ -3038,8 +3038,8 @@
             "https://files.pythonhosted.org/packages/fd/5a/eb5b62641df0459a3291fc206cf5bd669c0feed7814dded8edef4ade8512/libsass-0.23.0-cp38-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.whl": "sha256:4a218406d605f325d234e4678bd57126a66a88841cb95bee2caeafdc6f138306"
           },
           "markdown": {
-            "https://files.pythonhosted.org/packages/29/6f/da4c6aea59b3001f2e8c0ec7497475aadaf3b021c10cab5b2858f0f32b26/markdown-3.10.3.tar.gz": "sha256:3589362618f743188b4d955b874402bc814f4f83f544dc207719f4baa7d9c45f",
-            "https://files.pythonhosted.org/packages/64/69/4a5af2bc115a9a33fefe51709749de8262be3f9ba063d1753a837cdbc49c/markdown-3.10.3-py3-none-any.whl": "sha256:fa6c92a00a4a3c98b22728c64a935ae1928250ae65058a6ded814d2cc29a4cea"
+            "https://files.pythonhosted.org/packages/f4/32/0b4d0297064244f04af4331b65de16237cc3cce07474171ee14222a28981/markdown-3.11.2.tar.gz": "sha256:87bf5d90f2d2882e2c02fcda182c2800456b985bff38913867c49706481514b0",
+            "https://files.pythonhosted.org/packages/fe/66/bcab3b677b71ad286b4e607e3427499537c76e13ad2e22584ba7a7d9882c/markdown-3.11.2-py3-none-any.whl": "sha256:f80390747a2a0ff2ba54da074ce4f862f72a6685f608cd2637b646a6d83993f5"
           },
           "markdown-it-py": {
             "https://files.pythonhosted.org/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz": "sha256:04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49",
