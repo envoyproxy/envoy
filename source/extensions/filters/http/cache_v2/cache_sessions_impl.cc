@@ -836,7 +836,11 @@ void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStre
   ASSERT(upstream_request_);
   if (end_stream == EndStream::Reset) {
     upstream_request_ = nullptr;
-    state_ = State::Failed;
+    if (state_ != State::Validating) {
+      return onCacheError();
+    }
+    // A failed validation does not invalidate the cached response already being read.
+    state_ = State::Exists;
     for (LookupSubscriber& subscriber : lookup_subscribers_) {
       subscriber.dispatcher().post([callback = std::move(subscriber.callback_)]() mutable {
         auto result = std::make_unique<ActiveLookupResult>();

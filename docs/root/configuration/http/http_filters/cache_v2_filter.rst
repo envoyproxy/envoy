@@ -55,7 +55,9 @@ Built-in cache storage backends include :ref:`SimpleHttpCacheV2Config <envoy_v3_
 If an upstream response resets while it is being inserted into the cache, requests waiting for that insertion
 are reset. A subsequent request performs a new cache lookup and can start a new upstream fetch. Requests using
 the aborted response cannot continue by reading from the later fetch. Each lookup aborted without a response
-source increments the ``cache.event`` counter with ``event_type=upstream_reset``.
+source increments the ``cache.event`` counter with ``event_type=upstream_reset``. If an upstream cache validation
+resets, requests waiting for validation are reset. Existing readers continue using the cached response, and
+a subsequent request can retry validation.
 
 Architecture and extension points
 ---------------------------------

@@ -1095,6 +1095,7 @@ TEST_F(CacheSessionsTest, PassthroughWithUpstreamResetCallsGetHeadersCallbackWit
 TEST_F(CacheSessionsTest, UpstreamResetDuringCacheMissReportsUpstreamReset) {
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
   ActiveLookupResultPtr result;
   cache_sessions_->lookup(testLookupRequest("/a"),
                           [&result](ActiveLookupResultPtr r) { result = std::move(r); });
@@ -1107,6 +1108,86 @@ TEST_F(CacheSessionsTest, UpstreamResetDuringCacheMissReportsUpstreamReset) {
   pumpDispatcher();
   ASSERT_THAT(result, NotNull());
   EXPECT_THAT(result->status_, Eq(CacheEntryStatus::UpstreamReset));
+}
+
+TEST_F(CacheSessionsTest, ValidationResetPreservesHitWithCacheReadInFlight) {
+  auto reader_dispatcher = api_->allocateDispatcher("cache_reader");
+  EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+  EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(4);
+  EXPECT_CALL(*mock_http_cache_, evict).Times(0);
+  ActiveLookupResultPtr hit_result, validation_result;
+  cache_sessions_->lookup(testLookupRequest("/a", *reader_dispatcher),
+                          [&](ActiveLookupResultPtr r) { hit_result = std::move(r); });
+  reader_dispatcher->run(Event::Dispatcher::RunType::Block);
+  auto reader = std::make_unique<testing::StrictMock<MockCacheReader>>();
+  GetBodyCallback read_callback;
+  EXPECT_CALL(*reader, getBody(_, RangeIs(0, 5), _))
+      .WillOnce([&](Event::Dispatcher&, AdjustedByteRange, GetBodyCallback&& cb) {
+        read_callback = std::move(cb);
+      });
+  Http::TestResponseTrailerMapImpl trailers{{"x-test", "yes"}};
+  consumeCallback(captured_lookup_callbacks_[0])(
+      LookupResult{std::move(reader), cacheableResponseHeaders(5),
+                   Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers),
+                   ResponseMetadata{api_->timeSource().systemTime()}, 5});
+  reader_dispatcher->run(Event::Dispatcher::RunType::Block);
+  ASSERT_NE(hit_result, nullptr);
+  EXPECT_EQ(hit_result->status_, CacheEntryStatus::Hit);
+  testing::StrictMock<MockFunction<void(Buffer::InstancePtr, EndStream)>> body_cb;
+  uint64_t body_deliveries = 0;
+  EXPECT_CALL(body_cb, Call(Pointee(BufferString("abcde")), EndStream::More))
+      .WillOnce([&](Buffer::InstancePtr, EndStream) { ++body_deliveries; });
+  hit_result->http_source_->getBody(AdjustedByteRange(0, 5), body_cb.AsStdFunction());
+  reader_dispatcher->run(Event::Dispatcher::RunType::Block);
+  ASSERT_TRUE(read_callback);
+
+  // A no-cache request starts validation while the earlier hit is still reading its body.
+  cache_sessions_->lookup(testLookupRequestWithNoCache("/a"),
+                          [&](ActiveLookupResultPtr r) { validation_result = std::move(r); });
+  pumpDispatcher();
+  ASSERT_EQ(fake_upstream_get_headers_callbacks_.size(), 1);
+  auto subscribers = mock_factory_context_.server_factory_context_.store_.findGaugeByString(
+      "cache.cache_sessions_subscribers.cache_label.mock_cache");
+  ASSERT_TRUE(subscribers.has_value());
+  EXPECT_EQ(subscribers.value().get().value(), 2);
+  consumeCallback(fake_upstream_get_headers_callbacks_[0])(nullptr, EndStream::Reset);
+  EXPECT_EQ(subscribers.value().get().value(), 1);
+  EXPECT_EQ(validation_result, nullptr);
+  pumpDispatcher();
+  ASSERT_NE(validation_result, nullptr);
+  EXPECT_EQ(validation_result->status_, CacheEntryStatus::UpstreamReset);
+  EXPECT_EQ(validation_result->http_source_, nullptr);
+  reader_dispatcher->run(Event::Dispatcher::RunType::Block);
+  EXPECT_EQ(body_deliveries, 0);
+
+  // The independent hit must still receive its cached body and trailers after validation resets.
+  consumeCallback(read_callback)(std::make_unique<Buffer::OwnedImpl>("abcde"), EndStream::More);
+  reader_dispatcher->run(Event::Dispatcher::RunType::Block);
+  ASSERT_EQ(body_deliveries, 1);
+  EXPECT_EQ(subscribers.value().get().value(), 0);
+  testing::StrictMock<MockFunction<void(Http::ResponseTrailerMapPtr, EndStream)>> trailers_cb;
+  EXPECT_CALL(trailers_cb, Call(Pointee(IsSupersetOfHeaders(trailers)), EndStream::End));
+  hit_result->http_source_->getTrailers(trailers_cb.AsStdFunction());
+  reader_dispatcher->run(Event::Dispatcher::RunType::Block);
+
+  // The cached entry remains available to ordinary hits, and a later request can retry validation.
+  ActiveLookupResultPtr fresh_hit;
+  cache_sessions_->lookup(testLookupRequest("/a"),
+                          [&](ActiveLookupResultPtr r) { fresh_hit = std::move(r); });
+  pumpDispatcher();
+  ASSERT_NE(fresh_hit, nullptr);
+  EXPECT_EQ(fresh_hit->status_, CacheEntryStatus::Hit);
+  EXPECT_EQ(fake_upstreams_.size(), 1);
+  validation_result.reset();
+  cache_sessions_->lookup(testLookupRequestWithNoCache("/a"),
+                          [&](ActiveLookupResultPtr r) { validation_result = std::move(r); });
+  pumpDispatcher();
+  ASSERT_EQ(fake_upstream_get_headers_callbacks_.size(), 2);
+  consumeCallback(fake_upstream_get_headers_callbacks_[1])(nullptr, EndStream::Reset);
+  pumpDispatcher();
+  ASSERT_NE(validation_result, nullptr);
+  EXPECT_EQ(validation_result->status_, CacheEntryStatus::UpstreamReset);
+  EXPECT_EQ(subscribers.value().get().value(), 0);
 }
 
 TEST_F(CacheSessionsTest, ExpiredSMaxageRequiresValidationEvenWhenRequestAllowsMaxStale) {
