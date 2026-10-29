@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -80,10 +82,10 @@ using ResponseHandlerPtr = std::unique_ptr<ResponseHandler>;
 // oversized-event discarding, so a dropped event's later `data:` lines can
 // never be misread as a fresh event.
 //
-// Memory bound: retained state never exceeds max_event_size, regardless of
+// Memory bound: the event buffer never exceeds max_event_size, regardless of
 // individual frame size -- retention is gated before every copy, an over-cap
-// complete event is never buffered, and discarding retains nothing. Retained
-// bytes are charged to the stream's buffer memory account when present.
+// complete event is never buffered. Discarding retains only a fixed-size line
+// prefix. Buffered event bytes are charged to the stream's memory account when present.
 class SseResponseHandler : public ResponseHandler, public Logger::Loggable<Logger::Id::filter> {
 public:
   SseResponseHandler(LLMProtocol format, uint32_t max_event_size, uint32_t max_parsed_events,
@@ -113,23 +115,33 @@ private:
   // A complete raw event region: classified by its `event:` field before any
   // materialization, parsed only if it survives classification and budget.
   void handleCompleteEvent(absl::string_view region);
-  void enterDiscardMode(bool skippable);
+  void enterDiscardMode();
   void processSseEvent(absl::string_view event);
   void retainBytes(absl::string_view bytes);
-  // Classifies the oversized pending event by the `event:` name observed so
-  // far -- authoritative for the retained prefix (and for `tail` when nothing
-  // is retained), exactly the same name-trust the under-cap path applies. An
-  // event without a recognizable skippable name degrades as before.
-  bool pendingEventSkippable(absl::string_view tail);
+  // Tracks completed event fields even after the event buffer is discarded.
+  std::optional<uint64_t> scanEvent(absl::string_view view);
+  void resetEventType() {
+    line_prefix_size_ = 0;
+    line_truncated_ = false;
+    event_skippable_ = false;
+  }
 
   const uint32_t max_event_size_ = 0;
   // Remaining parse budget (max_parsed_events); exhaustion makes the handler
   // inert with the accumulated usage flagged partial.
   uint32_t parse_budget_ = 0;
   bool budget_exhausted_{false};
-  // Inside an over-cap unterminated event: nothing is retained, and the
-  // scanner's line state finds the real terminating blank line.
+  // Inside an over-cap unterminated event: no body bytes are retained, and
+  // framing and field state find the real terminating blank line and event type.
   bool discarding_{false};
+  // Discarding is conservatively degraded until the final event type is known.
+  bool degraded_before_discard_{false};
+  // A bounded line prefix covers known event names without retaining data lines.
+  // Longer event fields are conservatively treated as potentially carrying usage.
+  std::array<char, 64> line_prefix_;
+  size_t line_prefix_size_{0};
+  bool line_truncated_{false};
+  bool event_skippable_{false};
   // Line/boundary state. It, not any retained tail, is what carries the position within an
   // event across incoming frames.
   SseScanner scanner_;

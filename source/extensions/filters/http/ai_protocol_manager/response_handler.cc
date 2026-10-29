@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/response_handler.h"
 
+#include <algorithm>
 #include <string>
 
 #include "source/common/common/assert.h"
@@ -119,17 +120,47 @@ void SseResponseHandler::onData(const Buffer::Instance& data) {
 
 void SseResponseHandler::retainBytes(absl::string_view bytes) { buffer_.add(bytes); }
 
+std::optional<uint64_t> SseResponseHandler::scanEvent(absl::string_view view) {
+  uint64_t offset = 0;
+  while (offset < view.size()) {
+    const auto line = scanner_.scanLine(view.substr(offset));
+    offset += line.consumed;
+    const size_t copied = std::min(line.content.size(), line_prefix_.size() - line_prefix_size_);
+    if (copied > 0) {
+      std::copy_n(line.content.data(), copied, line_prefix_.data() + line_prefix_size_);
+    }
+    line_prefix_size_ += copied;
+    line_truncated_ |= copied != line.content.size();
+    if (!line.line_complete) {
+      continue;
+    }
+    if (line.blank) {
+      return offset;
+    }
+    absl::string_view prefix(line_prefix_.data(), line_prefix_size_);
+    if (absl::ConsumePrefix(&prefix, "event:")) {
+      absl::ConsumePrefix(&prefix, " ");
+      event_skippable_ = !line_truncated_ && skippableEventType(prefix);
+    }
+    line_prefix_size_ = 0;
+    line_truncated_ = false;
+  }
+  return std::nullopt;
+}
+
 void SseResponseHandler::processSlice(absl::string_view view) {
   while (!view.empty() && !parsing_complete_ && !budget_exhausted_) {
-    const auto boundary = scanner_.scanEvent(view);
+    const auto boundary = scanEvent(view);
     if (discarding_) {
-      // Nothing is retained while discarding; the scanner's line state (not
-      // raw tail bytes) carries the mid-event position across frames, so a
-      // split terminator cannot fabricate a boundary.
+      // Framing and bounded field state carry the mid-event position while
+      // discarding the body, so a split terminator cannot fabricate a boundary.
       if (!boundary.has_value()) {
         return; // The rest of the slice belongs to the discarded event.
       }
+      degraded_ = degraded_before_discard_ || !event_skippable_;
+      degraded_before_discard_ = false;
       discarding_ = false;
+      resetEventType();
       view.remove_prefix(boundary.value());
       continue;
     }
@@ -141,7 +172,7 @@ void SseResponseHandler::processSlice(absl::string_view view) {
       // The cap is enforced *before* copying: one oversized frame must not
       // become an over-cap side allocation.
       if (view.size() > allowance) {
-        enterDiscardMode(pendingEventSkippable(view));
+        enterDiscardMode();
       } else {
         retainBytes(view);
       }
@@ -155,7 +186,7 @@ void SseResponseHandler::processSlice(absl::string_view view) {
       ENVOY_LOG(debug, "ai_protocol_manager: SSE event exceeds max_event_size ({} > {}), skipped",
                 buffer_.length() + boundary.value(), max_event_size_);
       stats_.sse_event_too_large_.inc();
-      if (!pendingEventSkippable(view.substr(0, boundary.value()))) {
+      if (!event_skippable_) {
         degraded_ = true;
       }
       buffer_.drain(buffer_.length());
@@ -167,6 +198,7 @@ void SseResponseHandler::processSlice(absl::string_view view) {
       retainBytes(view.substr(0, boundary.value()));
       consumeEvent();
     }
+    resetEventType();
     view.remove_prefix(boundary.value());
   }
 }
@@ -196,38 +228,29 @@ void SseResponseHandler::handleCompleteEvent(absl::string_view region) {
   }
 }
 
-void SseResponseHandler::enterDiscardMode(bool skippable) {
+void SseResponseHandler::enterDiscardMode() {
   // The pending event exceeded the cap before terminating: drop its bytes,
-  // keep only the scanner's line state. Counted once per oversized event; a
-  // skippable named event could never have carried usage, so its loss does
-  // not degrade the record.
+  // keep only framing and bounded field state. The final event field may
+  // still arrive while discarding, so settle degradation at the event boundary.
   ENVOY_LOG(debug,
             "ai_protocol_manager: pending SSE data exceeds max_event_size ({}), "
             "discarding this event",
             max_event_size_);
   stats_.sse_event_too_large_.inc();
-  if (!skippable) {
-    degraded_ = true;
-  }
+  degraded_before_discard_ = degraded_;
+  degraded_ = true;
   discarding_ = true;
   buffer_.drain(buffer_.length());
 }
 
-bool SseResponseHandler::pendingEventSkippable(absl::string_view tail) {
-  // The event's opening lines are within the retained prefix, or within
-  // `tail` when nothing is retained yet. linearize() runs only on this rare
-  // oversize transition and is bounded by max_event_size_; the caller drains
-  // the buffer right after.
-  absl::string_view region = tail;
-  if (buffer_.length() > 0) {
-    region = absl::string_view(static_cast<const char*>(buffer_.linearize(buffer_.length())),
-                               buffer_.length());
-  }
-  const std::optional<absl::string_view> event_type = sseEventTypeView(region);
-  return event_type.has_value() && skippableEventType(event_type.value());
-}
-
 void SseResponseHandler::onEndStream() {
+  if (discarding_) {
+    scanner_.flushPendingBom();
+    const bool complete = scanner_.flushEndStream() == SseScanner::EndStreamState::BlankLine;
+    degraded_ = degraded_before_discard_ || !complete || !event_skippable_;
+    degraded_before_discard_ = false;
+    discarding_ = false;
+  }
   if (!parsing_complete_ && !budget_exhausted_ && !discarding_ && buffer_.length() > 0) {
     // Final pass with EOS semantics: a pending event whose terminator only
     // resolves at EOS (e.g. a trailing bare CR) completes here; genuinely
@@ -258,6 +281,8 @@ void SseResponseHandler::onEndStream() {
   }
   // All extraction state is released at EOS regardless of outcome.
   buffer_.drain(buffer_.length());
+  resetEventType();
+  scanner_.reset();
 }
 
 void SseResponseHandler::processSseEvent(absl::string_view event) {
