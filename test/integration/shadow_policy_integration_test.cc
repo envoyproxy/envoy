@@ -245,6 +245,35 @@ TEST_P(ShadowPolicyIntegrationTest, MirrorPolicyStats) {
   EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_cancelled")->value());
 }
 
+// A request with a body and trailers is mirrored with streamingShadow() rather than shadow().
+TEST_P(ShadowPolicyIntegrationTest, MirrorPolicyStatsWithBodyAndTrailers) {
+  if (!streaming_shadow_) {
+    GTEST_SKIP() << "Not applicable for non-streaming shadows.";
+  }
+  mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
+    policy.set_stat_prefix("test_mirror");
+  };
+  initialConfigSetup("cluster_1", "");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  codec_client_->sendData(encoder_decoder.first, 10, false);
+  codec_client_->sendTrailers(encoder_decoder.first,
+                              Http::TestRequestTrailerMapImpl{{"trailer", "value"}});
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  test_server_->waitForCounter("mirror.test_mirror.rq_success", Eq(1));
+  cleanupUpstreamAndDownstream();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_200")->value());
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_sampled")->value());
+  EXPECT_EQ(1, test_server_->counter("mirror.test_mirror.rq_started")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_failure")->value());
+  EXPECT_EQ(0, test_server_->counter("mirror.test_mirror.rq_cancelled")->value());
+}
+
 TEST_P(ShadowPolicyIntegrationTest, MirrorPolicyStatsNon2xxIsFailure) {
   mirror_policy_modifier_ = [](envoy::config::route::v3::RouteAction::RequestMirrorPolicy& policy) {
     policy.set_stat_prefix("test_mirror");
