@@ -485,7 +485,7 @@ TEST_F(DynamicModuleHttpNestedMetadataTest, Rust) {
     "claims": {
       "sub": "user-123", "exp": 123, "active": false,
       "a": {"b": {"c": {"role.name": "admin"}}},
-      "values": ["admin", 42, false]
+      "values": ["admin", 42, false, {"items": [["nested"]]}]
     }
   })EOF",
                             (*callbacks.stream_info_.metadata_

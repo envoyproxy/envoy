@@ -29,6 +29,36 @@ use std::num::NonZero;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::rc::Rc;
 
+/// A literal struct key or zero-based list index in a metadata path.
+#[derive(Clone, Copy, Debug)]
+pub enum MetadataPathComponent<'a> {
+  /// Select a struct field, including an empty key.
+  Key(&'a str),
+  /// Select a list element.
+  Index(usize),
+}
+
+fn metadata_path_to_abi(
+  path: &[MetadataPathComponent<'_>],
+) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_metadata_path; 4]> {
+  path
+    .iter()
+    .map(|component| match component {
+      MetadataPathComponent::Key(key) => abi::envoy_dynamic_module_type_module_metadata_path {
+        key: str_to_module_buffer(key),
+        index: 0,
+      },
+      MetadataPathComponent::Index(index) => abi::envoy_dynamic_module_type_module_metadata_path {
+        key: abi::envoy_dynamic_module_type_module_buffer {
+          ptr: std::ptr::null(),
+          length: 0,
+        },
+        index: *index,
+      },
+    })
+    .collect()
+}
+
 /// The trait that represents the configuration for an Envoy Http filter configuration.
 /// This has one to one mapping with the [`EnvoyHttpFilterConfig`] object.
 ///
@@ -1407,18 +1437,21 @@ pub trait EnvoyHttpFilter {
 
   /// Get the nested string metadata value.
   ///
-  /// Each path component is a literal struct key; dots and numeric strings are not interpreted.
+  /// Path components select literal struct keys or zero-based list indices.
+  /// The first component must be a key; dots and numeric strings in keys are not interpreted.
   /// For JWT claims, use namespace `envoy.filters.http.jwt_authn` and a path such as
-  /// `&["claims", "sub"]`, where `claims` is the configured `payload_in_metadata` key.
-  /// Returns `None` for an empty path, unavailable metadata, missing keys, non-struct intermediate
-  /// values, or a result of the wrong type. The source selects dynamic, route, cluster, host, or
+  /// `&[MetadataPathComponent::Key("claims"), MetadataPathComponent::Key("sub")]`,
+  /// where `claims` is the configured `payload_in_metadata` key.
+  /// Returns `None` for an empty path, unavailable metadata, missing keys, out-of-range indices,
+  /// incompatible intermediate types, or a result of the wrong type.
+  /// The source selects dynamic, route, cluster, host, or
   /// host locality metadata.
   /// The returned buffer is valid until the end of the current event hook unless metadata changes.
   fn get_metadata_nested_string<'a, 'b>(
     &'a self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&'b str],
+    path: &[MetadataPathComponent<'b>],
   ) -> Option<EnvoyBuffer<'a>>;
 
   /// Get the nested number metadata value.
@@ -1428,7 +1461,7 @@ pub trait EnvoyHttpFilter {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&'b str],
+    path: &[MetadataPathComponent<'b>],
   ) -> Option<f64>;
 
   /// Get the nested bool metadata value.
@@ -1438,7 +1471,7 @@ pub trait EnvoyHttpFilter {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&'b str],
+    path: &[MetadataPathComponent<'b>],
   ) -> Option<bool>;
 
   /// Get the number of elements in a nested metadata list.
@@ -1448,45 +1481,8 @@ pub trait EnvoyHttpFilter {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&'b str],
+    path: &[MetadataPathComponent<'b>],
   ) -> Option<usize>;
-
-  /// Get the string value at an index in a nested metadata list.
-  /// Path and source semantics are the same as [`Self::get_metadata_nested_string`].
-  /// Returns `None` for an empty or unresolved path or a result of the wrong type.
-  /// Also returns `None` if the list index is out of range or the element has the wrong type.
-  /// The returned buffer is valid until the end of the current event hook unless metadata changes.
-  fn get_metadata_nested_list_string<'a, 'b>(
-    &'a self,
-    source: abi::envoy_dynamic_module_type_metadata_source,
-    namespace: &str,
-    path: &[&'b str],
-    index: usize,
-  ) -> Option<EnvoyBuffer<'a>>;
-
-  /// Get the number value at an index in a nested metadata list.
-  /// Path and source semantics are the same as [`Self::get_metadata_nested_string`].
-  /// Returns `None` for an empty or unresolved path or a result of the wrong type.
-  /// Also returns `None` if the list index is out of range or the element has the wrong type.
-  fn get_metadata_nested_list_number<'b>(
-    &self,
-    source: abi::envoy_dynamic_module_type_metadata_source,
-    namespace: &str,
-    path: &[&'b str],
-    index: usize,
-  ) -> Option<f64>;
-
-  /// Get the bool value at an index in a nested metadata list.
-  /// Path and source semantics are the same as [`Self::get_metadata_nested_string`].
-  /// Returns `None` for an empty or unresolved path or a result of the wrong type.
-  /// Also returns `None` if the list index is out of range or the element has the wrong type.
-  fn get_metadata_nested_list_bool<'b>(
-    &self,
-    source: abi::envoy_dynamic_module_type_metadata_source,
-    namespace: &str,
-    path: &[&'b str],
-    index: usize,
-  ) -> Option<bool>;
 
   /// Get the bytes-typed filter state value with the given key.
   /// If the filter state is not found or is the wrong type, this returns `None`.
@@ -3387,9 +3383,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&str],
+    path: &[MetadataPathComponent<'_>],
   ) -> Option<EnvoyBuffer<'_>> {
-    let path = strs_to_module_buffers(path);
+    let path = metadata_path_to_abi(path);
     let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
       ptr: std::ptr::null(),
       length: 0,
@@ -3415,9 +3411,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&str],
+    path: &[MetadataPathComponent<'_>],
   ) -> Option<f64> {
-    let path = strs_to_module_buffers(path);
+    let path = metadata_path_to_abi(path);
     let mut result: f64 = 0.0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_nested_number(
@@ -3440,9 +3436,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&str],
+    path: &[MetadataPathComponent<'_>],
   ) -> Option<bool> {
-    let path = strs_to_module_buffers(path);
+    let path = metadata_path_to_abi(path);
     let mut result: bool = false;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_nested_bool(
@@ -3465,9 +3461,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     &self,
     source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
-    path: &[&str],
+    path: &[MetadataPathComponent<'_>],
   ) -> Option<usize> {
-    let path = strs_to_module_buffers(path);
+    let path = metadata_path_to_abi(path);
     let mut result: usize = 0;
     let success = unsafe {
       abi::envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
@@ -3476,90 +3472,6 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         str_to_module_buffer(namespace),
         path.as_ptr(),
         path.len(),
-        &mut result,
-      )
-    };
-    if success {
-      Some(result)
-    } else {
-      None
-    }
-  }
-
-  fn get_metadata_nested_list_string(
-    &self,
-    source: abi::envoy_dynamic_module_type_metadata_source,
-    namespace: &str,
-    path: &[&str],
-    index: usize,
-  ) -> Option<EnvoyBuffer<'_>> {
-    let path = strs_to_module_buffers(path);
-    let mut result = abi::envoy_dynamic_module_type_envoy_buffer {
-      ptr: std::ptr::null(),
-      length: 0,
-    };
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
-        self.raw_ptr,
-        source,
-        str_to_module_buffer(namespace),
-        path.as_ptr(),
-        path.len(),
-        index,
-        &mut result,
-      )
-    };
-    if success {
-      Some(unsafe { EnvoyBuffer::new_from_raw(result.ptr as *const _, result.length) })
-    } else {
-      None
-    }
-  }
-
-  fn get_metadata_nested_list_number(
-    &self,
-    source: abi::envoy_dynamic_module_type_metadata_source,
-    namespace: &str,
-    path: &[&str],
-    index: usize,
-  ) -> Option<f64> {
-    let path = strs_to_module_buffers(path);
-    let mut result: f64 = 0.0;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
-        self.raw_ptr,
-        source,
-        str_to_module_buffer(namespace),
-        path.as_ptr(),
-        path.len(),
-        index,
-        &mut result,
-      )
-    };
-    if success {
-      Some(result)
-    } else {
-      None
-    }
-  }
-
-  fn get_metadata_nested_list_bool(
-    &self,
-    source: abi::envoy_dynamic_module_type_metadata_source,
-    namespace: &str,
-    path: &[&str],
-    index: usize,
-  ) -> Option<bool> {
-    let path = strs_to_module_buffers(path);
-    let mut result: bool = false;
-    let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
-        self.raw_ptr,
-        source,
-        str_to_module_buffer(namespace),
-        path.as_ptr(),
-        path.len(),
-        index,
         &mut result,
       )
     };

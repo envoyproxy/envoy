@@ -1618,9 +1618,9 @@ TEST(ABIImpl, NestedMetadata) {
   const envoy_dynamic_module_type_module_buffer ns = {namespace_name.data(), namespace_name.size()};
   const auto source = envoy_dynamic_module_type_metadata_source_Dynamic;
   auto make_path = [](std::initializer_list<absl::string_view> keys) {
-    std::vector<envoy_dynamic_module_type_module_buffer> path;
+    std::vector<envoy_dynamic_module_type_module_metadata_path> path;
     for (auto key : keys) {
-      path.push_back({key.data(), key.size()});
+      path.push_back({{key.data(), key.size()}, 0});
     }
     return path;
   };
@@ -1630,26 +1630,21 @@ TEST(ABIImpl, NestedMetadata) {
   envoy_dynamic_module_type_envoy_buffer str = {"sentinel", 8};
 
   // Every failure must leave the output arguments untouched.
-  auto expect_failure = [&](const std::vector<envoy_dynamic_module_type_module_buffer>& path) {
-    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
-        &filter, source, ns, path.data(), path.size(), &str));
-    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
-        &filter, source, ns, path.data(), path.size(), &number));
-    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
-        &filter, source, ns, path.data(), path.size(), &boolean));
-    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
-        &filter, source, ns, path.data(), path.size(), &size));
-    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
-        &filter, source, ns, path.data(), path.size(), 0, &str));
-    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
-        &filter, source, ns, path.data(), path.size(), 0, &number));
-    EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
-        &filter, source, ns, path.data(), path.size(), 0, &boolean));
-    EXPECT_EQ(number, -1);
-    EXPECT_TRUE(boolean);
-    EXPECT_EQ(size, 99);
-    EXPECT_EQ(absl::string_view(str.ptr, str.length), "sentinel");
-  };
+  auto expect_failure =
+      [&](const std::vector<envoy_dynamic_module_type_module_metadata_path>& path) {
+        EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+            &filter, source, ns, path.data(), path.size(), &str));
+        EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+            &filter, source, ns, path.data(), path.size(), &number));
+        EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+            &filter, source, ns, path.data(), path.size(), &boolean));
+        EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+            &filter, source, ns, path.data(), path.size(), &size));
+        EXPECT_EQ(number, -1);
+        EXPECT_TRUE(boolean);
+        EXPECT_EQ(size, 99);
+        EXPECT_EQ(absl::string_view(str.ptr, str.length), "sentinel");
+      };
   expect_failure({});
   expect_failure(make_path({"claims", "sub"})); // No callbacks.
 
@@ -1665,8 +1660,8 @@ TEST(ABIImpl, NestedMetadata) {
   TestUtility::loadFromJson(R"EOF({
     "claims": {
       "sub": "user-123", "exp": 123, "active": false,
-      "profile": {"role.name": "admin", "": "empty-key"},
-      "values": ["admin", 42, false, {}, null, []],
+      "profile": {"role.name": "admin", "": "empty-key", "0": "numeric-key"},
+      "values": ["admin", 42, false, {"items": [["nested"]]}, null, []],
       "empty": [], "null": null
     },
     "claims.sub": "literal", "top": "top-level", "": "empty-key"
@@ -1692,8 +1687,6 @@ TEST(ABIImpl, NestedMetadata) {
       &filter, source, ns, path.data(), path.size(), &boolean));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
       &filter, source, ns, path.data(), path.size(), &size));
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
-      &filter, source, ns, path.data(), path.size(), 0, &str));
 
   path = make_path({"claims", "exp"});
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
@@ -1706,10 +1699,12 @@ TEST(ABIImpl, NestedMetadata) {
       &filter, source, ns, path.data(), path.size(), &boolean));
   EXPECT_FALSE(boolean);
 
-  for (const auto& entry : std::vector<
-           std::pair<std::vector<envoy_dynamic_module_type_module_buffer>, absl::string_view>>{
+  for (const auto& entry :
+       std::vector<std::pair<std::vector<envoy_dynamic_module_type_module_metadata_path>,
+                             absl::string_view>>{
            {make_path({"claims", "profile", "role.name"}), "admin"},
            {make_path({"claims", "profile", ""}), "empty-key"},
+           {make_path({"claims", "profile", "0"}), "numeric-key"},
            {make_path({"claims.sub"}), "literal"},
            {make_path({"top"}), "top-level"},
            {make_path({""}), "empty-key"}}) {
@@ -1722,38 +1717,71 @@ TEST(ABIImpl, NestedMetadata) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
       &filter, source, ns, path.data(), path.size(), &size));
   EXPECT_EQ(size, 6);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
-      &filter, source, ns, path.data(), path.size(), 0, &str));
+  path.push_back({{nullptr, 0}, 0});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
   EXPECT_EQ(absl::string_view(str.ptr, str.length), "admin");
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
-      &filter, source, ns, path.data(), path.size(), 1, &number));
+  path.back().index = 1;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+      &filter, source, ns, path.data(), path.size(), &number));
   EXPECT_EQ(number, 42);
-  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
-      &filter, source, ns, path.data(), path.size(), 2, &boolean));
+  path.back().index = 2;
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+      &filter, source, ns, path.data(), path.size(), &boolean));
   EXPECT_FALSE(boolean);
 
   for (size_t index : {size_t{0}, size_t{1}, size_t{2}, size_t{3}, size_t{4}, size_t{5}, size_t{6},
                        std::numeric_limits<size_t>::max()}) {
+    path.back().index = index;
     if (index != 0) {
-      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
-          &filter, source, ns, path.data(), path.size(), index, &str));
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+          &filter, source, ns, path.data(), path.size(), &str));
     }
     if (index != 1) {
-      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_number(
-          &filter, source, ns, path.data(), path.size(), index, &number));
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_number(
+          &filter, source, ns, path.data(), path.size(), &number));
     }
     if (index != 2) {
-      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_bool(
-          &filter, source, ns, path.data(), path.size(), index, &boolean));
+      EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+          &filter, source, ns, path.data(), path.size(), &boolean));
     }
   }
+
+  // Traverse a struct in a list, then a list in that struct, then another list.
+  path.back().index = 3;
+  path.push_back({{"items", 5}, 99}); // The index is ignored for key components.
+  path.push_back({{nullptr, 0}, 0});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+      &filter, source, ns, path.data(), path.size(), &size));
+  EXPECT_EQ(size, 1);
+  path.push_back({{nullptr, 0}, 0});
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_string(
+      &filter, source, ns, path.data(), path.size(), &str));
+  EXPECT_EQ(absl::string_view(str.ptr, str.length), "nested");
+
+  // Invalid traversal leaves every output unchanged.
+  number = -1;
+  boolean = true;
+  size = 99;
+  str = {"sentinel", 8};
+  expect_failure({{{nullptr, 0}, 0}}); // Namespace is a struct, not a list.
+  for (const auto& keys :
+       {make_path({"claims"}), make_path({"claims", "sub"}), make_path({"claims", "empty"})}) {
+    path = keys;
+    path.push_back({{nullptr, 0}, 0});
+    expect_failure(path);
+  }
+  path = make_path({"claims", "values"});
+  path.push_back({{nullptr, 0}, std::numeric_limits<size_t>::max()});
+  expect_failure(path);
+  path.back().index = 4; // A null value cannot be traversed.
+  path.push_back({{nullptr, 0}, 0});
+  expect_failure(path);
 
   path = make_path({"claims", "empty"});
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
       &filter, source, ns, path.data(), path.size(), &size));
   EXPECT_EQ(size, 0);
-  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_list_string(
-      &filter, source, ns, path.data(), path.size(), 0, &str));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_nested_string(&filter, source, ns,
                                                                              nullptr, 0, &str));
 
