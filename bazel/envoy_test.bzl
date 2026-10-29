@@ -179,7 +179,7 @@ def envoy_cc_fuzz_test(
             ],
         }) + deprecate_repository("envoy_cc_fuzz_test", repository),
         size = size,
-        tags = ["fuzz_target"] + tags  + ["skip_on_windows"],
+        tags = ["fuzz_target"] + tags + ["skip_on_windows"],
     )
 
     fuzzing_decoration(
