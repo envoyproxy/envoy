@@ -16,7 +16,8 @@ absl::StatusOr<Http::FilterFactoryCb> FaultFilterFactory::createHttpFilterFactor
     Server::Configuration::ServerFactoryContext& server_context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   FaultFilterConfigSharedPtr filter_config(std::make_shared<FaultFilterConfig>(
-      config, extra_context.stats_prefix, extra_context.scopeOr(server_context), server_context));
+      config, extra_context.statsPrefixOr(), extra_context.statsPrefixScopeOr(server_context),
+      server_context));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<FaultFilter>(filter_config));
   };
