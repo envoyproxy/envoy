@@ -5,7 +5,9 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/thread_local_store.h"
 
@@ -359,6 +361,47 @@ TEST_P(UdpProxyIntegrationTest, HelloWorldOnLoopback) {
   const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
   requestResponseWithListenerAddress(*listener_address);
+}
+
+TEST_P(UdpProxyIntegrationTest, GsoDatagramBoundaries) {
+#ifdef UDP_SEGMENT
+  if (!Api::OsSysCallsSingleton::get().supportsUdpGso() ||
+      !Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+    GTEST_SKIP();
+  }
+  setup(1, 1500);
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_),
+                  lookupPort("listener_0")));
+  Network::UdpListenSocket client(Network::Test::getCanonicalLoopbackAddress(version_), nullptr,
+                                  true);
+
+  // Exercise aggregates both below and above the configured receive limit. Each original
+  // datagram fits within the limit and must be forwarded separately.
+  for (const int segment_size : {600, 1000}) {
+    SCOPED_TRACE(segment_size);
+    ASSERT_EQ(0,
+              client.setSocketOption(IPPROTO_UDP, UDP_SEGMENT, &segment_size, sizeof(segment_size))
+                  .return_value_);
+    const std::string first(segment_size, 'a');
+    const std::string second(segment_size, 'b');
+    const auto result = Network::Utility::writeToSocket(
+        client.ioHandle(), Buffer::OwnedImpl(first + second), nullptr, *listener_address);
+    ASSERT_TRUE(result.ok());
+    ASSERT_EQ(first.size() + second.size(), result.return_value_);
+
+    Network::UdpRecvData datagram;
+    ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(datagram));
+    ASSERT_EQ(first, datagram.buffer_->toString());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(datagram));
+    ASSERT_EQ(second, datagram.buffer_->toString());
+  }
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_datagrams", Eq(4));
+  test_server_->waitForCounter("udp.foo.downstream_sess_rx_bytes", Eq(3200));
+  test_server_->waitForCounter("cluster.cluster_0.udp.sess_tx_datagrams", Eq(4));
+#else
+  GTEST_SKIP();
+#endif
 }
 
 TEST_P(UdpProxyIntegrationTest, DualStackListenerRepliesToIpv4Client) {

@@ -38,7 +38,6 @@ namespace {
 
 using ::testing::_;
 using ::testing::Eq;
-using ::testing::Invoke;
 using ::testing::Return;
 using ::testing::ReturnRef;
 
@@ -269,13 +268,13 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterSingleton) {
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce([] {
           return std::make_unique<Grpc::MockAsyncClient>();
-        }));
+        });
         return async_client_factory;
-      }));
+      });
   EXPECT_CALL(dispatcher_, createTimer_(_));
 
   subscriptionFromConfigSource(config);
@@ -347,13 +346,13 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
     EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
     EXPECT_CALL(cm_.async_client_manager_,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce([] {
             return std::make_unique<Grpc::MockAsyncClient>();
-          }));
+          });
           return async_client_factory;
-        }));
+        });
     EXPECT_CALL(dispatcher_, createTimer_(_));
 
     subscriptionFromConfigSource(config);
@@ -374,13 +373,13 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
     // failover source is only supported for ADS.
     EXPECT_CALL(cm_.async_client_manager_,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+          EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce([] {
             return std::make_unique<Grpc::MockAsyncClient>();
-          }));
+          });
           return async_client_factory;
-        }));
+        });
     EXPECT_CALL(dispatcher_, createTimer_(_));
 
     subscriptionFromConfigSource(config);
@@ -475,13 +474,13 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   EXPECT_CALL(cm_, getThreadLocalCluster("static_cluster"));
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke([this](Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks&,
-                              const Http::AsyncClient::RequestOptions&) {
+      .WillOnce([this](Http::RequestMessagePtr& request, Http::AsyncClient::Callbacks&,
+                       const Http::AsyncClient::RequestOptions&) {
         EXPECT_EQ("POST", request->headers().getMethodValue());
         EXPECT_EQ("static_cluster", request->headers().getHostValue());
         EXPECT_EQ("/v3/discovery:endpoints", request->headers().getPathValue());
         return &http_request_;
-      }));
+      });
   EXPECT_CALL(http_request_, cancel());
   subscriptionFromConfigSource(config)->start({"static_cluster"});
 }
@@ -544,13 +543,13 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcSubscription) {
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
-        }));
+        });
         return async_client_factory;
-      }));
+      });
   EXPECT_CALL(random_, random());
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
@@ -723,13 +722,13 @@ TEST_F(SubscriptionFactoryTest, AutoTransportIsAllowed) {
   EXPECT_CALL(cm_, grpcAsyncClientManager()).WillOnce(ReturnRef(cm_.async_client_manager_));
   EXPECT_CALL(cm_.async_client_manager_,
               factoryForGrpcService(ProtoEq(expected_grpc_service), _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         auto async_client_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
-        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce(Invoke([] {
+        EXPECT_CALL(*async_client_factory, createUncachedRawAsyncClient()).WillOnce([] {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
-        }));
+        });
         return async_client_factory;
-      }));
+      });
   EXPECT_CALL(random_, random());
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(3);
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure

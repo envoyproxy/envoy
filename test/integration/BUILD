@@ -400,7 +400,10 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:upstream_includes",
+        "//test/common/upstream:snapshot_host_set_lib",
         "//test/config:utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/test_common:network_utility_lib",
@@ -2767,6 +2770,7 @@ envoy_cc_test(
         "listener_lds_integration_test.cc",
     ],
     rbe_pool = "linux_x64_medium",
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -2803,6 +2807,7 @@ envoy_cc_test(
         "listener_fcds_integration_test.cc",
     ],
     rbe_pool = "linux_x64_medium",
+    shard_count = 4,
     tags = [
         "cpu:3",
     ],

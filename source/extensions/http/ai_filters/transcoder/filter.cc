@@ -35,6 +35,7 @@ using HttpFilters::AiProtocolManager::LlmBindingReadObject;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LocalReplier;
 using HttpFilters::AiProtocolManager::PayloadKind;
+using HttpFilters::AiProtocolManager::RequestLlmProtocol;
 using HttpFilters::AiProtocolManager::ResponseLlmProtocol;
 using HttpFilters::AiProtocolManager::SseEventPtr;
 using HttpFilters::AiProtocolManager::SseStreamPropagator;
@@ -276,6 +277,15 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
   const StreamInfo::FilterState& filter_state = *filter_state_;
   const LLMProtocol route_target_protocol = target_protocol_;
   target_protocol_ = ResponseLlmProtocol::resolve(filter_state, target_protocol_);
+  // If the client's schema is configured but the backend's is not, default the backend schema to
+  // the client's.
+  const bool backend_defaulted = target_protocol_ == LLMProtocol::Unspecified;
+  if (backend_defaulted) {
+    target_protocol_ = source_protocol_;
+    config_->stats().backend_defaulted_.inc();
+    ENVOY_LOG(debug, "transcoder: no backend API declared, assuming the client's {}",
+              RequestLlmProtocol(source_protocol_).serializeAsString().value_or("?"));
+  }
 
   Instructions instructions;
   // The two bindings, each read from its key into its slot.
@@ -292,11 +302,13 @@ absl::StatusOr<TranscoderFilter::Instructions> TranscoderFilter::readInstruction
     *into = *std::move(binding);
   }
   // The route's bindings stand in for keys left unset. The response one is how the route's backend
-  // carries its API, so it lapses when filter state names another.
+  // carries its API, so it lapses when filter state names another; a defaulted backend is still
+  // the route's.
   if (instructions.request_binding == nullptr) {
     instructions.request_binding = route_request_binding_;
   }
-  if (instructions.response_binding == nullptr && target_protocol_ == route_target_protocol) {
+  if (instructions.response_binding == nullptr &&
+      (backend_defaulted || target_protocol_ == route_target_protocol)) {
     instructions.response_binding = route_response_binding_;
   }
   if (const std::optional<absl::string_view> model =

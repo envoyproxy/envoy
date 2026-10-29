@@ -148,17 +148,19 @@ logs read it with
           text_format_source:
             inline_string: "%REQ(x-llm-api)%"
 
-The example reads a request header, which is only safe for a header the edge
-strips from client requests: a caller that can set it picks the API its own
-payload is read and validated as.
+Only read headers stripped at the edge, or clients can pick their own validation
+schema.
 
-The filter-level configuration decides what happens on every other route. By
-default those requests are passed through untouched -- not parsed, and not
-offloaded; setting
-:ref:`parse_unconfigured_routes
+Setting this filter state marks a request as an AI endpoint without per-route
+config (for a static default, use :ref:`RouteConfiguration.typed_per_filter_config
+<envoy_v3_api_field_config.route.v3.RouteConfiguration.typed_per_filter_config>`).
+Unlike per-route config, it only buffers non-streaming JSON requests so streams
+and upgrades never stall. Conversely, route-declared endpoints populate this
+object when unset so upstream filter chains can read the client's API.
+
+Other routes pass through untouched unless :ref:`parse_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.parse_unconfigured_routes>`
-offloads and parses them too, but never fails a request over it -- a payload that
-does not parse is forwarded unchanged.
+is set, which parses them best-effort and forwards unparseable payloads unchanged.
 
 .. code-block:: yaml
 
@@ -386,8 +388,12 @@ The client-boundary instance converts from and to the API the route declares for
 :ref:`request <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.request>`,
 and the backend-boundary instance to and from the one it declares for the
 :ref:`response <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute.response>`.
-A leg whose API the route does not declare cannot be transcoded, which is counted by
-``transcoder.unresolved``.
+A leg whose client API nobody declares cannot be transcoded, which is counted by
+``transcoder.unresolved``. A backend API nobody declares -- neither the route nor
+``envoy.ai.llm_protocol.response`` -- is taken to be the client's, so a route with no backend,
+such as one answered locally, leaves the request as it came; this is counted by
+``transcoder.backend_defaulted``, and a route that forwards to a backend of another API shows up
+there when its ``response`` declaration is missing.
 
 The rewritten request is validated against the target's schema before it is
 replayed, so a document the upstream would reject fails locally rather than over the
@@ -537,8 +543,9 @@ When :ref:`response_handling.token_usage
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.ResponseHandling.token_usage>`
 is configured, 2xx responses with a ``text/event-stream`` or
 ``application/json`` content type are observed as they stream through the
-filter. Inspection is scoped to routes carrying a per-route configuration;
-setting :ref:`include_unconfigured_routes
+filter. Inspection is scoped to routes carrying a per-route configuration and
+to requests whose ``envoy.ai.llm_protocol.request`` filter state object names
+an API; setting :ref:`include_unconfigured_routes
 <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.TokenUsageExtraction.include_unconfigured_routes>`
 widens it to every route, for response-only installations whose routes cannot
 be declared (for example a dynamic-forward-proxy cluster). The filter **never stops iteration or modifies the original
@@ -830,5 +837,6 @@ The filter outputs statistics in the ``ai_protocol_manager.`` namespace.
   request_info.partial, Counter, A published request info record ignored at least one value Envoy could not use.
   request_info.duplicate, Counter, Request info publication skipped because another installation of the filter had already published the namespace for this stream.
   transcoder.transcoded, Counter, "The transcoder AI filter converted a payload (a request, a unary response or an SSE event) into or out of the canonical IR."
-  transcoder.unresolved, Counter, "A payload could not be transcoded because the route declared no wire API for its leg. A request is rejected; a response is forwarded untranslated and counted once, however many SSE events it has."
+  transcoder.backend_defaulted, Counter, "Neither the route nor filter state named the backend's wire API, so the transcoder took it to be the client's and left the request as it came."
+  transcoder.unresolved, Counter, "A payload could not be transcoded because nothing declared the client's wire API, or an instruction in filter state could not be followed. A request is rejected; a response is forwarded untranslated and counted once, however many SSE events it has."
   transcoder.failed, Counter, "A payload could not be converted: its rules failed, or a converted request failed the target schema. A request is rejected; a response or SSE event is forwarded untranslated."

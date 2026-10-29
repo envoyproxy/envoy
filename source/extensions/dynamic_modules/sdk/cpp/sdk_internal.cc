@@ -874,6 +874,10 @@ public:
     envoy_dynamic_module_callback_http_filter_send_go_away_and_close(host_plugin_ptr_, graceful);
   }
 
+  void drainConnectionUponCompletion() override {
+    envoy_dynamic_module_callback_http_drain_connection_upon_completion(host_plugin_ptr_);
+  }
+
   bool recreateStream(std::span<const HeaderView> headers) override {
     return envoy_dynamic_module_callback_http_filter_recreate_stream(
         host_plugin_ptr_,

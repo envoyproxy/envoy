@@ -18,7 +18,6 @@
 using testing::_;
 using testing::ContainsRegex;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -286,16 +285,15 @@ public:
     EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                      .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
-        .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
-          upstream_callbacks_ = &cb;
-        }));
+        .WillOnce(
+            [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; });
 
     conn_state_.reset();
     EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                      .tcp_conn_pool_.connection_data_,
                 connectionState())
         .WillRepeatedly(
-            Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+            [&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); });
 
     EXPECT_CALL(callbacks_, continueDecoding());
     context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
@@ -314,9 +312,8 @@ public:
     EXPECT_CALL(*context_.server_factory_context_.cluster_manager_.thread_local_cluster_
                      .tcp_conn_pool_.connection_data_,
                 addUpstreamCallbacks(_))
-        .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
-          upstream_callbacks_ = &cb;
-        }));
+        .WillOnce(
+            [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; });
 
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_EQ(&connection_, router_->downstreamConnection());
@@ -333,14 +330,13 @@ public:
     EXPECT_CALL(
         context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
         newConnection(_))
-        .WillOnce(
-            Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                  .newConnectionImpl(cb);
-              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                  .poolReady(upstream_connection_);
-              return nullptr;
-            }));
+        .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+              .newConnectionImpl(cb);
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+              .poolReady(upstream_connection_);
+          return nullptr;
+        });
   }
 
   void returnResponse() {
@@ -407,12 +403,12 @@ TEST_F(DubboRouterTest, PoolRemoteConnectionFailure) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   startRequest(MessageType::Request);
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
@@ -427,12 +423,12 @@ TEST_F(DubboRouterTest, PoolLocalConnectionFailure) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   startRequest(MessageType::Request);
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
@@ -447,12 +443,12 @@ TEST_F(DubboRouterTest, PoolTimeout) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   startRequest(MessageType::Request);
 
   context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
@@ -463,12 +459,12 @@ TEST_F(DubboRouterTest, PoolOverflowFailure) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   startRequest(MessageType::Request);
 
   context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
@@ -488,12 +484,12 @@ TEST_F(DubboRouterTest, ClusterMaintenanceMode) {
       .WillOnce(Return(true));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
@@ -509,12 +505,12 @@ TEST_F(DubboRouterTest, NoHealthyHosts) {
       .WillOnce(Return(std::nullopt));
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
 
   EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
@@ -542,12 +538,12 @@ TEST_F(DubboRouterTest, NoRoute) {
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServiceNotFound, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
@@ -562,12 +558,12 @@ TEST_F(DubboRouterTest, NoCluster) {
               getThreadLocalCluster(Eq(cluster_name_)))
       .WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   EXPECT_EQ(FilterStatus::AbortIteration, router_->onMessageDecoded(metadata_, message_context_));
 }
 
@@ -656,12 +652,12 @@ TEST_F(DubboRouterTest, UpstreamRemoteCloseMidResponse) {
   initializeRouter();
 
   EXPECT_CALL(callbacks_, sendLocalReply(_, _))
-      .WillOnce(Invoke([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
+      .WillOnce([&](const DubboFilters::DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(ResponseStatus::ServerError, app_ex.status_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
         EXPECT_FALSE(end_stream);
-      }));
+      });
   startRequest(MessageType::Request);
   connectUpstream();
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
@@ -806,9 +802,9 @@ TEST_F(DubboRouterTest, DestroyWhileConnecting) {
   EXPECT_CALL(
       context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
       newConnection(_))
-      .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
         return &conn_pool_handle;
-      }));
+      });
 
   EXPECT_CALL(conn_pool_handle, cancel(Tcp::ConnectionPool::CancelPolicy::Default));
 

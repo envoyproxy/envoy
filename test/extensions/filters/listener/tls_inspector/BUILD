@@ -20,11 +20,13 @@ envoy_extension_cc_test(
     name = "ja4_fingerprint_test",
     srcs = ["ja4_fingerprint_test.cc"],
     extension_names = ["envoy.filters.listener.tls_inspector"],
+    external_deps = ["ssl"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":tls_utility_lib",
         "//source/common/common:hex_lib",
         "//source/extensions/filters/listener/tls_inspector:ja4_fingerprint_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 

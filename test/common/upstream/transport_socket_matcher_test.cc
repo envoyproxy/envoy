@@ -51,7 +51,7 @@ public:
   MOCK_METHOD(void, hashKey, (std::vector<uint8_t>&, Network::TransportSocketOptionsConstSharedPtr),
               (const));
   FakeTransportSocketFactory(std::string id, bool alpn) : supports_alpn_(alpn), id_(std::move(id)) {
-    ON_CALL(*this, supportsAlpn).WillByDefault(Invoke([this]() { return supports_alpn_; }));
+    ON_CALL(*this, supportsAlpn).WillByDefault([this]() { return supports_alpn_; });
   }
   std::string id() const { return id_; }
 

@@ -302,31 +302,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.on_demand_cluster_no_recreate_stream")) {
-    // Whether or not the cluster exists, we continue decoding. Filters further down the
-    // chain may want to weigh in on cluster selection, so we don't send a local reply
-    // here.
-    if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
-      callbacks_->downstreamCallbacks()->recreateClusterInfo();
-    }
-    callbacks_->continueDecoding();
-    return;
-  }
-
-  // Track end_stream state to support stream recreation with fully read bodies.
-  const bool can_recreate_stream = downstream_end_stream_;
-  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available && can_recreate_stream) {
-    // Redirects require fully read body.
-    const Http::ResponseHeaderMap* headers = nullptr;
-    if (callbacks_->recreateStream(headers)) {
-      callbacks_->downstreamCallbacks()->clearRouteCache();
-      return;
-    }
-  }
-
-  // Cluster still does not exist or we did not recreate the stream. Either way,
-  // continue with the filter chain.
+  // Whether or not the cluster exists, we continue decoding. Filters further down the
+  // chain may want to weigh in on cluster selection, so we don't send a local reply
+  // here.
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
     callbacks_->downstreamCallbacks()->recreateClusterInfo();
   }

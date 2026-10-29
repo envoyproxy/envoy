@@ -32,7 +32,6 @@ namespace XRay {
 
 namespace {
 using testing::_;
-using ::testing::Invoke;
 using ::testing::Return;
 using namespace source::extensions::tracers::xray;
 
@@ -120,7 +119,7 @@ TEST_F(XRayTracerTest, SerializeSpanTest) {
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
-  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(*broker_, send(_)).WillOnce(on_send);
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
@@ -171,7 +170,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestXForwardedForSet) {
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
-  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(*broker_, send(_)).WillOnce(on_send);
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
@@ -209,7 +208,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestServerError) {
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
-  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(*broker_, send(_)).WillOnce(on_send);
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
@@ -245,7 +244,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientError) {
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
-  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(*broker_, send(_)).WillOnce(on_send);
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
@@ -280,7 +279,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestClientErrorWithThrottle) {
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
-  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(*broker_, send(_)).WillOnce(on_send);
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
@@ -309,7 +308,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithEmptyValue) {
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
-  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(*broker_, send(_)).WillOnce(on_send);
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
@@ -343,7 +342,7 @@ TEST_F(XRayTracerTest, SerializeSpanTestWithStatusCodeNotANumber) {
   };
 
   ON_CALL(config_, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
-  EXPECT_CALL(*broker_, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(*broker_, send(_)).WillOnce(on_send);
   aws_metadata_.insert({"key", ValueUtil::stringValue(expected_->aws_key_value)});
   Tracer tracer{expected_->span_name, expected_->origin_name, aws_metadata_,
                 std::move(broker_),   server_.timeSource(),   server_.api().randomGenerator()};
@@ -426,7 +425,7 @@ TEST_F(XRayTracerTest, ChildSpanHasParentInfo) {
     EXPECT_STREQ("0000003d25bebe62", s.id().c_str());
   };
 
-  EXPECT_CALL(broker, send(_)).WillOnce(Invoke(on_send));
+  EXPECT_CALL(broker, send(_)).WillOnce(on_send);
 
   // Span id taken from random generator
   EXPECT_CALL(server_.api_.random_, random()).WillOnce(Return(262626262626));

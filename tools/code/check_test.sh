@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-set -e
+output="$("$@" 2>&1)"
+status=$?
 
-if [[ -s "$1" ]]; then
-    cat "$1"
+if [[ "$status" -ne 0 || -n "$output" ]]; then
+    echo "$output"
     exit 1
 fi

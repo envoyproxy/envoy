@@ -65,20 +65,24 @@ class TestCodecOverloadManagerProvider {
 public:
   TestCodecOverloadManagerProvider() {
     ON_CALL(overload_manager_, getLoadShedPoint(testing::_))
-        .WillByDefault(testing::Invoke([this](absl::string_view name) -> Server::LoadShedPoint* {
+        .WillByDefault([this](absl::string_view name) -> Server::LoadShedPoint* {
           if (name == Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch) {
             return &server_go_away_on_dispatch;
           }
           if (name == Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch) {
             return &server_go_away_and_close_on_dispatch;
           }
+          if (name == Server::LoadShedPointName::get().H2ServerResetStreamOnBeginHeaders) {
+            return &server_reset_stream_on_begin_headers;
+          }
           return nullptr;
-        }));
+        });
   }
 
   testing::NiceMock<Server::MockOverloadManager> overload_manager_;
   testing::NiceMock<Server::MockLoadShedPoint> server_go_away_on_dispatch;
   testing::NiceMock<Server::MockLoadShedPoint> server_go_away_and_close_on_dispatch;
+  testing::NiceMock<Server::MockLoadShedPoint> server_reset_stream_on_begin_headers;
 };
 
 class TestServerConnectionImpl : public TestCodecStatsProvider,

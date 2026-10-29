@@ -15,7 +15,6 @@
 
 using testing::_;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -79,12 +78,12 @@ TEST(IoSocketHandleImpl, CloseWithSendRstTrueSetsLingerZeroAndCloses) {
   IoSocketHandleImpl io_handle(test_fd);
 
   EXPECT_CALL(os_sys_calls, setsockopt_(test_fd, SOL_SOCKET, SO_LINGER, _, sizeof(struct linger)))
-      .WillOnce(Invoke([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
+      .WillOnce([](os_fd_t, int, int, const void* optval, socklen_t) -> int {
         const auto* l = static_cast<const struct linger*>(optval);
         EXPECT_EQ(1, l->l_onoff);
         EXPECT_EQ(0, l->l_linger);
         return 0;
-      }));
+      });
   EXPECT_CALL(os_sys_calls, close(test_fd)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
 
   io_handle.setAbortiveClose();
@@ -114,11 +113,10 @@ TEST(IoSocketHandleImpl, LastRoundTripTimeReturnsRttIfSuccessful) {
           &os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, socketTcpInfo(_, _))
-      .WillOnce(
-          Invoke([rtt](os_fd_t /*sockfd*/, Api::EnvoyTcpInfo* tcp_info) -> Api::SysCallBoolResult {
-            tcp_info->tcpi_rtt = rtt;
-            return {true, 0};
-          }));
+      .WillOnce([rtt](os_fd_t /*sockfd*/, Api::EnvoyTcpInfo* tcp_info) -> Api::SysCallBoolResult {
+        tcp_info->tcpi_rtt = rtt;
+        return {true, 0};
+      });
 
   IoSocketHandleImpl io_handle;
   EXPECT_THAT(io_handle.lastRoundTripTime(),
@@ -163,14 +161,12 @@ TEST(IoSocketHandleImpl, NullptrIfaddrs) {
 
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
-      .WillOnce(
-          Invoke([&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
-            os_syscalls_singleton.getsockname(sockfd, addr, addrlen);
-            return {0, 0};
-          }));
+      .WillOnce([&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+        os_syscalls_singleton.getsockname(sockfd, addr, addrlen);
+        return {0, 0};
+      });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
-      .WillOnce(
-          Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {0, 0}; }));
+      .WillOnce([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {0, 0}; });
 
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
   EXPECT_FALSE(maybe_interface_name.has_value());
@@ -186,15 +182,14 @@ TEST(IoSocketHandleImpl, ErrnoIfaddrs) {
 
   EXPECT_CALL(os_sys_calls, supportsGetifaddrs()).WillRepeatedly(Return(true));
   EXPECT_CALL(os_sys_calls, getsockname(_, _, _))
-      .WillOnce(
-          Invoke([&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
-            os_syscalls_singleton.getsockname(sockfd, addr, addrlen);
-            return {0, 0};
-          }));
+      .WillOnce([&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+        os_syscalls_singleton.getsockname(sockfd, addr, addrlen);
+        return {0, 0};
+      });
   EXPECT_CALL(os_sys_calls, getifaddrs(_))
-      .WillOnce(Invoke([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
+      .WillOnce([&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult {
         return {/*return_value=*/-1, /*errno=*/19};
-      }));
+      });
 
   const auto maybe_interface_name = socket->ioHandle().interfaceName();
   EXPECT_FALSE(maybe_interface_name.has_value());
@@ -209,7 +204,7 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
           &os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
-      .WillRepeatedly(Invoke([](int /*fd*/, msghdr* msg_hdr, int /*flags*/) {
+      .WillRepeatedly([](int /*fd*/, msghdr* msg_hdr, int /*flags*/) {
         msg_hdr->msg_iovlen = 1;
         msg_hdr->msg_flags = 0;
 
@@ -229,7 +224,7 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
         msg_hdr->msg_controllen = cmsg->cmsg_len;
 
         return Api::SysCallSizeResult{1, 0};
-      }));
+      });
 
   uint32_t dropped_packets = 0;
 
@@ -258,8 +253,8 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
           &os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _))
-      .WillRepeatedly(Invoke([](int /*fd*/, mmsghdr* mmsg_hdr, unsigned int /*num*/, int /*flags*/,
-                                timespec* /*tp*/) {
+      .WillRepeatedly([](int /*fd*/, mmsghdr* mmsg_hdr, unsigned int /*num*/, int /*flags*/,
+                         timespec* /*tp*/) {
         mmsg_hdr[0].msg_len = 100;
         mmsg_hdr[0].msg_hdr.msg_flags = 0;
 
@@ -279,7 +274,7 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
         mmsg_hdr[0].msg_hdr.msg_controllen = cmsg->cmsg_len;
 
         return Api::SysCallIntResult{1, 0};
-      }));
+      });
 
   uint32_t dropped_packets = 0;
 
@@ -312,10 +307,10 @@ TEST(IoSocketHandleImpl, SendEmptyPayloadCallsSend) {
 
   uint8_t empty_payload = 0;
   EXPECT_CALL(os_sys_calls, send(_, _, 0, 0))
-      .WillOnce(Invoke([&](os_fd_t, void* buffer, size_t, int) -> Api::SysCallSizeResult {
+      .WillOnce([&](os_fd_t, void* buffer, size_t, int) -> Api::SysCallSizeResult {
         EXPECT_EQ(&empty_payload, buffer);
         return {0, 0};
-      }));
+      });
 
   IoSocketHandleImpl io_handle;
   const Api::IoCallUint64Result result = io_handle.send(&empty_payload, 0);
@@ -328,7 +323,7 @@ TEST(IoSocketHandleImpl, SendmsgEmptyPayloadUsesDummyIovec) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   EXPECT_CALL(os_sys_calls, sendmsg(_, _, 0))
-      .WillOnce(Invoke([](os_fd_t, const msghdr* message, int) -> Api::SysCallSizeResult {
+      .WillOnce([](os_fd_t, const msghdr* message, int) -> Api::SysCallSizeResult {
         EXPECT_NE(nullptr, message->msg_name);
         EXPECT_EQ(1, message->msg_iovlen);
         EXPECT_NE(nullptr, message->msg_iov);
@@ -337,7 +332,7 @@ TEST(IoSocketHandleImpl, SendmsgEmptyPayloadUsesDummyIovec) {
           EXPECT_EQ(0, message->msg_iov[0].iov_len);
         }
         return {0, 0};
-      }));
+      });
 
   const Address::Ipv4Instance peer_address("127.0.0.1", 1234);
   IoSocketHandleImpl io_handle;
@@ -353,7 +348,7 @@ protected:
     testing::StrictMock<Api::MockOsSysCalls> syscalls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&syscalls);
     EXPECT_CALL(syscalls, sendmsg(_, _, 0))
-        .WillOnce(Invoke([&](os_fd_t, const msghdr* message, int) -> Api::SysCallSizeResult {
+        .WillOnce([&](os_fd_t, const msghdr* message, int) -> Api::SysCallSizeResult {
           const auto* destination = static_cast<const sockaddr*>(message->msg_name);
           EXPECT_EQ(mapped ? AF_INET6 : peer.sockAddr()->sa_family, destination->sa_family);
           if (mapped) {
@@ -404,7 +399,7 @@ protected:
             EXPECT_EQ(0, message->msg_controllen);
           }
           return {empty ? 0 : 1, 0};
-        }));
+        });
     IoSocketHandleImpl handle(INVALID_SOCKET, v6only, domain);
     char payload = 'x';
     Buffer::RawSlice slice{&payload, 1};

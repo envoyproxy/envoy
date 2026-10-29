@@ -26,8 +26,6 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -152,15 +150,14 @@ public:
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_conn.connection_));
     EXPECT_CALL(*test_conn.connection_, addReadFilter(_))
-        .WillOnce(Invoke(
-            [&](Network::ReadFilterSharedPtr filter) -> void { test_conn.filter_ = filter; }));
+        .WillOnce([&](Network::ReadFilterSharedPtr filter) -> void { test_conn.filter_ = filter; });
     EXPECT_CALL(*test_conn.connection_, connect());
     EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_, _));
 
     ON_CALL(*test_conn.connection_, close(Network::ConnectionCloseType::NoFlush, _))
-        .WillByDefault(InvokeWithoutArgs([test_conn]() -> void {
+        .WillByDefault([test_conn]() -> void {
           test_conn.connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
-        }));
+        });
   }
 
   void setupIdleTimers() { has_idle_timers_ = true; }
@@ -451,11 +448,11 @@ TEST_F(TcpConnPoolImplTest, IdleTimerCloseConnections) {
 
     auto connection = conn_pool_->test_conns_[0].connection_;
     EXPECT_CALL(*connection, close(Network::ConnectionCloseType::NoFlush, _))
-        .WillOnce(Invoke([&](Network::ConnectionCloseType, absl::string_view) -> void {
+        .WillOnce([&](Network::ConnectionCloseType, absl::string_view) -> void {
           connection->raiseEvent(Network::ConnectionEvent::LocalClose);
           // idle timer is disabled.
           EXPECT_FALSE(idle_timer->enabled());
-        }));
+        });
     idle_timer->invokeCallback();
     dispatcher_.clearDeferredDeleteList();
   }
@@ -485,10 +482,10 @@ TEST_F(TcpConnPoolImplTest, ConnectionRemoteCloseDisableIdleTimer) {
   // The connection is idle, which enables idle timer.
   EXPECT_TRUE(idle_timer->enabled());
   {
-    EXPECT_CALL(*conn_pool_, onConnDestroyedForTest()).WillOnce(Invoke([&]() -> void {
+    EXPECT_CALL(*conn_pool_, onConnDestroyedForTest()).WillOnce([&]() -> void {
       // idle timer is disabled by remote close.
       EXPECT_FALSE(idle_timer->enabled());
-    }));
+    });
     ;
 
     conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -518,10 +515,10 @@ TEST_F(TcpConnPoolImplTest, ConnectionLocalCloseDisableIdleTimer) {
   // The connection is idle, which enables idle timer.
   EXPECT_TRUE(idle_timer->enabled());
   {
-    EXPECT_CALL(*conn_pool_, onConnDestroyedForTest()).WillOnce(Invoke([&]() -> void {
+    EXPECT_CALL(*conn_pool_, onConnDestroyedForTest()).WillOnce([&]() -> void {
       // idle timer is disabled by local close.
       EXPECT_FALSE(idle_timer->enabled());
-    }));
+    });
     ;
 
     conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
@@ -1099,10 +1096,10 @@ TEST_F(TcpConnPoolImplTest, DrainOnClose) {
 
   EXPECT_CALL(drained, ready()).Times(AtLeast(1));
   EXPECT_CALL(c1.callbacks_.callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+      .WillOnce([&](Network::ConnectionEvent event) -> void {
         EXPECT_EQ(Network::ConnectionEvent::RemoteClose, event);
         c1.releaseConn();
-      }));
+      });
   conn_pool_->test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   EXPECT_CALL(*conn_pool_, onConnDestroyedForTest());

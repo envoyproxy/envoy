@@ -64,8 +64,6 @@ using testing::Assign;
 using testing::Eq;
 using testing::HasSubstr;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
@@ -94,7 +92,7 @@ TEST(ServerInstanceUtil, flushHelper) {
 
   Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
   sinks.emplace_back(sink);
-  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+  EXPECT_CALL(*sink, flush(_)).WillOnce([](Stats::MetricSnapshot& snapshot) {
     ASSERT_EQ(snapshot.counters().size(), 1);
     EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
     EXPECT_EQ(snapshot.counters()[0].delta_, 1);
@@ -106,7 +104,7 @@ TEST(ServerInstanceUtil, flushHelper) {
     ASSERT_EQ(snapshot.textReadouts().size(), 1);
     EXPECT_EQ(snapshot.textReadouts()[0].get().name(), "text");
     EXPECT_EQ(snapshot.textReadouts()[0].get().value(), "is important");
-  }));
+  });
   c.inc();
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 
@@ -124,12 +122,12 @@ TEST(ServerInstanceUtil, flushHelper) {
           f_stat(*histogram);
         }
       });
-  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+  EXPECT_CALL(*sink, flush(_)).WillOnce([](Stats::MetricSnapshot& snapshot) {
     EXPECT_TRUE(snapshot.counters().empty());
     EXPECT_TRUE(snapshot.gauges().empty());
     EXPECT_EQ(snapshot.histograms().size(), 1);
     EXPECT_TRUE(snapshot.textReadouts().empty());
-  }));
+  });
   InstanceUtil::flushMetricsToSinks(sinks, mock_store, cm, time_system);
 }
 
@@ -152,7 +150,7 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
 
   Stats::MockSink* sink = new StrictMock<Stats::MockSink>();
   sinks.emplace_back(sink);
-  EXPECT_CALL(*sink, flush(_)).WillOnce(Invoke([](Stats::MetricSnapshot& snapshot) {
+  EXPECT_CALL(*sink, flush(_)).WillOnce([](Stats::MetricSnapshot& snapshot) {
     ASSERT_EQ(snapshot.counters().size(), 1);
     EXPECT_EQ(snapshot.counters()[0].counter_.get().name(), "hello");
     EXPECT_EQ(snapshot.counters()[0].delta_, 1);
@@ -173,7 +171,7 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
     EXPECT_EQ(again_it->get().value(), 10);
 
     ASSERT_EQ(snapshot.textReadouts().size(), 0);
-  }));
+  });
   c.inc();
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
@@ -1043,6 +1041,56 @@ TEST_P(ServerInstanceImplTest, EvictStats) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, EvictStatsRuntimeKey) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_evict_runtime_bootstrap.yaml", true);
+  EXPECT_EQ(2, server_->statsConfig().evictOnFlush());
+  EXPECT_EQ("stats.eviction_interval_ms", server_->statsConfig().evictionIntervalRuntimeKey());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  // Runtime sets a 10s interval with a 5s flush: evict every second flush.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+  EXPECT_EQ(0, stats_store_.evictionCount());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(2L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  // A value that is not a multiple of the flush interval falls back to the 10s default.
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "7500"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(4L, counter->value());
+  EXPECT_EQ(2, stats_store_.evictionCount());
+
+  // A 5s interval evicts on every flush. Stop at 28s to avoid racing the flush at 30s.
+  {
+    absl::Notification updated;
+    server_->dispatcher().post([&] {
+      EXPECT_OK(server_->runtime().mergeValues({{"stats.eviction_interval_ms", "5000"}}));
+      updated.Notify();
+    });
+    updated.WaitForNotification();
+  }
+  time_system_.advanceTimeWait(std::chrono::seconds(4));
+  EXPECT_EQ(5L, counter->value());
+  EXPECT_EQ(3, stats_store_.evictionCount());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
@@ -1519,9 +1567,7 @@ TEST_P(ServerInstanceImplTest, ServerContextSingleton) {
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
 // This is a regression test for when we used to crash.
 TEST_P(ServerInstanceImplTest, StdExceptionThrowInConstructor) {
-  EXPECT_CALL(restart_, initialize(_, _)).WillOnce(InvokeWithoutArgs([] {
-    throw(std::runtime_error("foobar"));
-  }));
+  EXPECT_CALL(restart_, initialize(_, _)).WillOnce([] { throw(std::runtime_error("foobar")); });
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/test_data/server/node_bootstrap.yaml"),
                             std::runtime_error, "foobar");
 }
@@ -1538,9 +1584,7 @@ public:
 // Validate that when a totally unknown exception is unexpectedly thrown, we
 // exit safely. This is a regression test for when we used to crash.
 TEST_P(ServerInstanceImplTest, UnknownExceptionThrowInConstructor) {
-  EXPECT_CALL(restart_, initialize(_, _)).WillOnce(InvokeWithoutArgs([] {
-    throw(FakeException("foobar"));
-  }));
+  EXPECT_CALL(restart_, initialize(_, _)).WillOnce([] { throw(FakeException("foobar")); });
   EXPECT_THROW_WITH_MESSAGE(initialize("test/server/test_data/server/node_bootstrap.yaml"),
                             FakeException, "foobar");
 }
@@ -1600,26 +1644,25 @@ class FooBootstrapExtension : public BootstrapExtension {};
 
 TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
-  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<test::common::config::DummyConfig>();
-  }));
+  });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
 
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(
-          Invoke([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
-            const auto* proto =
-                Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
-            EXPECT_NE(nullptr, proto);
-            EXPECT_EQ(proto->a(), "foo");
-            auto mock_extension = std::make_unique<MockBootstrapExtension>();
-            EXPECT_CALL(*mock_extension, onServerInitialized(_)).WillOnce(Invoke([&ctx]() {
-              // call to cluster manager, to make sure it is not nullptr.
-              ctx.clusterManager().clusters();
-            }));
-            EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
-            return mock_extension;
-          }));
+      .WillOnce([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
+        const auto* proto =
+            Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
+        EXPECT_NE(nullptr, proto);
+        EXPECT_EQ(proto->a(), "foo");
+        auto mock_extension = std::make_unique<MockBootstrapExtension>();
+        EXPECT_CALL(*mock_extension, onServerInitialized(_)).WillOnce([&ctx]() {
+          // call to cluster manager, to make sure it is not nullptr.
+          ctx.clusterManager().clusters();
+        });
+        EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
+        return mock_extension;
+      });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -1629,15 +1672,15 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
 
 TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
   NiceMock<Configuration::MockBootstrapExtensionFactory> mock_factory;
-  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(mock_factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<test::common::config::DummyConfig>();
-  }));
+  });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
   EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
-      .WillOnce(Invoke([](const Protobuf::Message&,
-                          Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
+      .WillOnce([](const Protobuf::Message&,
+                   Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
         throw EnvoyException("Unable to initiate mock_bootstrap_extension.");
-      }));
+      });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
       mock_factory);
@@ -1676,9 +1719,9 @@ public:
 TEST_P(ServerInstanceImplTest, WithFatalActions) {
   // Inject Safe Factory.
   NiceMock<Configuration::MockFatalActionFactory> mock_safe_factory;
-  EXPECT_CALL(mock_safe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(mock_safe_factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<envoy::config::bootstrap::v3::FatalAction>();
-  }));
+  });
   EXPECT_CALL(mock_safe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.safe"));
 
   Registry::InjectFactory<Configuration::FatalActionFactory> registered_safe_factory(
@@ -1686,9 +1729,9 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
 
   // Inject Unsafe Factory
   NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
-  EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<Protobuf::Struct>();
-  }));
+  });
   EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
 
   Registry::InjectFactory<Configuration::FatalActionFactory> registered_unsafe_factory(
@@ -1697,13 +1740,11 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
   EXPECT_DEATH(
       {
         EXPECT_CALL(mock_safe_factory, createFatalActionFromProto(_, _))
-            .WillOnce(
-                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
-                          Instance* /*server*/) { return std::make_unique<SafeFatalAction>(); }));
+            .WillOnce([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                         Instance* /*server*/) { return std::make_unique<SafeFatalAction>(); });
         EXPECT_CALL(mock_unsafe_factory, createFatalActionFromProto(_, _))
-            .WillOnce(
-                Invoke([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
-                          Instance* /*server*/) { return std::make_unique<UnsafeFatalAction>(); }));
+            .WillOnce([](const envoy::config::bootstrap::v3::FatalAction& /*config*/,
+                         Instance* /*server*/) { return std::make_unique<UnsafeFatalAction>(); });
         absl::Notification abort_called;
         auto server_thread =
             startTestServer("test/server/test_data/server/fatal_actions.yaml", false);
@@ -1878,11 +1919,11 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
 
   Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto& log) {
     EXPECT_OK(Json::Factory::loadFromString(std::string(msg)).status());
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
-  }));
+  });
 
   ENVOY_LOG_MISC(info, "hello");
 }
@@ -1906,10 +1947,10 @@ TEST_P(ServerInstanceImplTest, TextApplicationLog) {
 
   Envoy::Logger::Registry::setLogLevel(Logger::Levels::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
-  EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
+  EXPECT_CALL(sink, log(_, _)).WillOnce([](auto msg, auto& log) {
     EXPECT_THAT(msg, HasSubstr("[lvl: info][msg: hello]"));
     EXPECT_EQ(log.logger_name, "misc");
-  }));
+  });
 
   ENVOY_LOG_MISC(info, "hello");
 }

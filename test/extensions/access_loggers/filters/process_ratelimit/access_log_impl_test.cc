@@ -38,7 +38,6 @@ namespace ProcessRateLimit {
 namespace {
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -72,7 +71,7 @@ public:
     ON_CALL(context_.server_factory_context_.xds_manager_,
             subscribeToSingletonResource(_, _, _, _, testing::An<Config::SubscriptionCallbacks&>(),
                                          _, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [this](absl::string_view resource_name,
                    OptRef<const envoy::config::core::v3::ConfigSource>, absl::string_view,
                    Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
@@ -82,20 +81,19 @@ public:
               subscriptions_[resource_name] = ret.get();
               callbackss_[resource_name] = &callbacks;
               return ret;
-            }));
+            });
 
-    ON_CALL(context_.init_manager_, add(_))
-        .WillByDefault(Invoke([this](const Init::Target& target) {
-          init_target_handles_.push_back(target.createHandle("test"));
-        }));
+    ON_CALL(context_.init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
+      init_target_handles_.push_back(target.createHandle("test"));
+    });
 
     ON_CALL(context_.init_manager_, initialize(_))
-        .WillByDefault(Invoke([this](const Init::Watcher& watcher) {
+        .WillByDefault([this](const Init::Watcher& watcher) {
           while (!init_target_handles_.empty()) {
             init_target_handles_.back()->initialize(watcher);
             init_target_handles_.pop_back();
           }
-        }));
+        });
   }
 
 protected:

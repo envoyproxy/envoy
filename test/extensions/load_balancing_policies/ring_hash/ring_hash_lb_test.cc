@@ -627,14 +627,13 @@ TEST_P(RingHashLoadBalancerTest, RingHashLbWithHashPolicy) {
     std::string new_cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(address_values));
 
     EXPECT_CALL(context, setHeadersModifier(_))
-        .WillRepeatedly(
-            testing::Invoke([&](std::function<void(Http::ResponseHeaderMap&)> modifier) {
-              Http::TestResponseHeaderMapImpl response;
-              modifier(response);
-              // Cookie is set.
-              EXPECT_TRUE(absl::StrContains(response.get_(Http::Headers::get().SetCookie),
-                                            new_cookie_value));
-            }));
+        .WillRepeatedly([&](std::function<void(Http::ResponseHeaderMap&)> modifier) {
+          Http::TestResponseHeaderMapImpl response;
+          modifier(response);
+          // Cookie is set.
+          EXPECT_TRUE(
+              absl::StrContains(response.get_(Http::Headers::get().SetCookie), new_cookie_value));
+        });
 
     // Hash is generated and random will not be used.
     EXPECT_CALL(context_.api_.random_, random()).Times(0);

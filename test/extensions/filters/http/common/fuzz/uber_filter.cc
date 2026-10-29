@@ -25,21 +25,21 @@ UberFilterFuzzer::UberFilterFuzzer()
       std::make_unique<Event::DispatcherImpl>("filter_fuzz_test", api_, api_.time_system_);
   // This is a decoder filter.
   ON_CALL(filter_callback_, addStreamDecoderFilter(_))
-      .WillByDefault(Invoke([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
+      .WillByDefault([&](Http::StreamDecoderFilterSharedPtr filter) -> void {
         decoder_filter_ = filter;
         decoder_filter_->setDecoderFilterCallbacks(decoder_callbacks_);
         destroy_filters_ = [&]() { decoder_filter_->onDestroy(); };
-      }));
+      });
   // This is an encoded filter.
   ON_CALL(filter_callback_, addStreamEncoderFilter(_))
-      .WillByDefault(Invoke([&](Http::StreamEncoderFilterSharedPtr filter) -> void {
+      .WillByDefault([&](Http::StreamEncoderFilterSharedPtr filter) -> void {
         encoder_filter_ = filter;
         encoder_filter_->setEncoderFilterCallbacks(encoder_callbacks_);
         destroy_filters_ = [&]() { encoder_filter_->onDestroy(); };
-      }));
+      });
   // This is a decoder and encoder filter.
   ON_CALL(filter_callback_, addStreamFilter(_))
-      .WillByDefault(Invoke([&](Http::StreamFilterSharedPtr filter) -> void {
+      .WillByDefault([&](Http::StreamFilterSharedPtr filter) -> void {
         decoder_filter_ = filter;
         decoder_filter_->setDecoderFilterCallbacks(decoder_callbacks_);
         encoder_filter_ = filter;
@@ -49,21 +49,20 @@ UberFilterFuzzer::UberFilterFuzzer()
           // Calling onDestroy on both results in double-calling of onDestroy.
           decoder_filter_->onDestroy();
         };
-      }));
+      });
   // This filter supports access logging.
   ON_CALL(filter_callback_, addAccessLogHandler(_))
       .WillByDefault(
-          Invoke([&](AccessLog::InstanceSharedPtr handler) -> void { access_logger_ = handler; }));
+          [&](AccessLog::InstanceSharedPtr handler) -> void { access_logger_ = handler; });
   // This handles stopping execution after a direct response is sent.
   ON_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillByDefault(
-          Invoke([this](Http::Code code, absl::string_view body,
-                        std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                        const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                        absl::string_view details) {
-            enabled_ = false;
-            decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, details);
-          }));
+      .WillByDefault([this](Http::Code code, absl::string_view body,
+                            std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                            const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                            absl::string_view details) {
+        enabled_ = false;
+        decoder_callbacks_.sendLocalReply_(code, body, modify_headers, grpc_status, details);
+      });
   ON_CALL(encoder_callbacks_, addEncodedTrailers()).WillByDefault(ReturnRef(encoded_trailers_));
   // Set expectations for particular filters that may get fuzzed.
   perFilterSetup();

@@ -14,7 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::AllOf;
-using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -206,12 +205,12 @@ public:
     EXPECT_CALL(server_factory_context_, api()).WillRepeatedly(ReturnRef(*api_));
     EXPECT_CALL(server_factory_context_, mainThreadDispatcher())
         .WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([&] {
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([&] {
       Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
           .WillRepeatedly(Return(absl::OkStatus()));
       return mock_watcher;
-    }));
+    });
   }
 
   Api::ApiPtr api_;
