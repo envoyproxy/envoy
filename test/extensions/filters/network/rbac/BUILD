@@ -55,6 +55,8 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/common:logger",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/filters/network/echo:config",
         "//source/extensions/filters/network/rbac:config",
         "//source/extensions/filters/network/set_filter_state:config",

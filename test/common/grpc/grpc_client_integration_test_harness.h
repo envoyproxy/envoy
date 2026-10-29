@@ -402,8 +402,8 @@ public:
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     router_config_ = std::make_shared<Router::FilterConfig>(
-        server_factory_context_, http_context_.asyncClientStatPrefix(), *stats_store_.rootScope(),
-        cm_, server_factory_context_.runtime(), api_->randomGenerator(),
+        server_factory_context_, *stats_store_.rootScope(), http_context_.asyncClientStatPrefix(),
+        *stats_store_.rootScope(), cm_, server_factory_context_.runtime(), api_->randomGenerator(),
         std::move(shadow_writer_ptr_), true, false, false, false, false, false, false,
         Protobuf::RepeatedPtrField<std::string>{}, dispatcher_->timeSource(), http_context_,
         router_context_);

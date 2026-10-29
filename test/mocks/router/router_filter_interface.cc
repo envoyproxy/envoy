@@ -7,10 +7,11 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Router {
 
-MockRouterFilterInterface::MockRouterFilterInterface()
-    : pool_(*symbol_table_),
-      config_(*FilterConfig::create(pool_.add("prefix"), context_,
-                                    ShadowWriterPtr(new MockShadowWriter()), router_proto)) {
+MockRouterFilterInterface::MockRouterFilterInterface() : pool_(*symbol_table_) {
+  const std::string stats_prefix = "prefix.";
+  auto extra_context = Server::Configuration::ExtraFactoryContext::create(context_, stats_prefix);
+  config_ = *FilterConfig::create(context_.server_factory_context_, extra_context,
+                                  ShadowWriterPtr(new MockShadowWriter()), router_proto);
   auto cluster_info = new NiceMock<Upstream::MockClusterInfo>();
   cluster_info->timeout_budget_stats_ = nullptr;
   ON_CALL(*cluster_info, timeoutBudgetStats()).WillByDefault(Return(std::nullopt));
