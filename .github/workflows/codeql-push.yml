@@ -99,7 +99,7 @@ jobs:
 
     # No-op analysis satisfies Scorecard SAST when no C++ changes are present.
     - name: Initialize CodeQL (noop)
-      uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463  # codeql-bundle-v4.36.1
+      uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee  # codeql-bundle-v4.39.0
       with:
         languages: javascript
         trap-caching: false
