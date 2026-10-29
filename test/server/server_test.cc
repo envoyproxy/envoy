@@ -1649,7 +1649,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
 
-  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
       .WillOnce([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
         const auto* proto =
             Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
@@ -1661,7 +1661,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
           ctx.clusterManager().clusters();
         });
         EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
-        return mock_extension;
+        return BootstrapExtensionPtr{std::move(mock_extension)};
       });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
