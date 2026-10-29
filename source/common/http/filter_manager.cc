@@ -818,9 +818,9 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
         // Body added by several filters during a single header-only pass is coalesced at the
         // first adding filter's position and replayed once from there, matching the shared
         // stream-level buffer behavior.
-        // TODO(wbpcode): this lets filters between the two adders see bytes that originated
-        // downstream of them, breaking the positional model; inherent to addDecodedData()'s
-        // non-positional semantics during header iteration.
+        // TODO(wbpcode): this lets filters between the two adders see bytes added by a later
+        // filter in the chain (upstream of them), breaking the positional model; inherent to
+        // addDecodedData()'s non-positional semantics during header iteration.
         (*continue_data_entry)->bufferedData()->move(*(*entry)->bufferedData());
       }
     }
@@ -1767,6 +1767,10 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_,
                                                  data_nonempty_before_callback)) {
       // Trailers added in this pass, by this or an earlier filter, park here with the data.
+      // TODO(wbpcode): trailers added by an earlier filter are never delivered to this filter,
+      // so a filter waiting for end of stream hangs unless it continues on its own. Deliver them
+      // like decodeData() does (break, then encodeTrailers() from the adder). Same as the shared
+      // buffer path.
       (*entry)->observed_trailers_ |= trailers_added_entry != encoder_filters_.end();
       return;
     }
@@ -1972,6 +1976,10 @@ void FilterManager::setBufferLimit(uint64_t new_limit) {
 void FilterManager::onRequestBufferAboveLimit() {
   ASSERT(per_filter_buffer_);
   ENVOY_STREAM_LOG(debug, "request data too large watermark exceeded", *this);
+  // TODO(wbpcode): the streaming flag is stream-level and the limit is latched like a single
+  // WatermarkBuffer, so once a streaming filter raises the watermark, a later buffering filter
+  // growing past the limit is never escalated to a local reply. Same as the shared buffer path;
+  // applies to the response direction too.
   if (state_.decoder_filters_streaming_) {
     filter_manager_callbacks_.onDecoderFilterAboveWriteBufferHighWatermark();
     return;
