@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/base_integration_test.h"
+#include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 
@@ -310,6 +311,127 @@ TEST_P(InternalListenerResetIntegrationTest, DownstreamHalfClosePreservesNormalC
 INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerResetIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
+
+// Real listener tcp_proxy into an internal listener tcp_proxy tunneling over HTTP/2 CONNECT.
+class InternalListenerTunnelingCloseIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  InternalListenerTunnelingCloseIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam(), ConfigHelper::tcpProxyConfig()) {
+    enableHalfClose(true);
+    setUpstreamProtocol(Http::CodecType::HTTP2);
+  }
+
+  void initialize() override {
+    real_access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+    config_helper_.renameListener("real_listener");
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
+      bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
+      envoy::extensions::bootstrap::internal_listener::v3::InternalListener
+          internal_listener_config;
+      std::ignore = bootstrap_extension->mutable_typed_config()->PackFrom(internal_listener_config);
+
+      auto* internal_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      internal_cluster->set_name("cluster_internal");
+      auto* load_assignment = internal_cluster->mutable_load_assignment();
+      load_assignment->set_cluster_name("cluster_internal");
+      load_assignment->add_endpoints()
+          ->add_lb_endpoints()
+          ->mutable_endpoint()
+          ->mutable_address()
+          ->mutable_envoy_internal_address()
+          ->set_server_listener_name("internal_listener");
+
+      auto* config_blob = bootstrap.mutable_static_resources()
+                              ->mutable_listeners(0)
+                              ->mutable_filter_chains(0)
+                              ->mutable_filters(0)
+                              ->mutable_typed_config();
+      auto tcp_proxy_config =
+          MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+              *config_blob);
+      tcp_proxy_config.set_cluster("cluster_internal");
+      tcp_proxy_config.set_stat_prefix("tcp_proxy_real");
+      auto* access_log = tcp_proxy_config.add_access_log();
+      access_log->set_name("accesslog_real");
+      envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+      access_log_config.set_path(real_access_log_path_);
+      access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+          "%UPSTREAM_DETECTED_CLOSE_TYPE% %RESPONSE_FLAGS%");
+      std::ignore = access_log->mutable_typed_config()->PackFrom(access_log_config);
+      std::ignore = config_blob->PackFrom(tcp_proxy_config);
+
+      auto* internal_listener = bootstrap.mutable_static_resources()->add_listeners();
+      internal_listener->set_name("internal_listener");
+      internal_listener->mutable_internal_listener();
+      auto* internal_filter = internal_listener->add_filter_chains()->add_filters();
+      internal_filter->set_name("tcp_proxy");
+      envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy internal_tcp_proxy;
+      internal_tcp_proxy.set_cluster("cluster_0");
+      internal_tcp_proxy.set_stat_prefix("tcp_proxy_internal");
+      internal_tcp_proxy.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+      std::ignore = internal_filter->mutable_typed_config()->PackFrom(internal_tcp_proxy);
+    });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Opens the client connection and the CONNECT stream and sends one request.
+  void setUpTunnel() {
+    tcp_client_ = makeTcpConnection(lookupPort("real_listener"));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+
+    ASSERT_TRUE(tcp_client_->write("hello"));
+    ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+  }
+
+  // Client gets the response and a FIN, real listener sees no reset.
+  void expectCleanClientClose() {
+    tcp_client_->waitForData("world");
+    tcp_client_->waitForHalfClose();
+    tcp_client_->close();
+    EXPECT_THAT(waitForAccessLog(real_access_log_path_), testing::Eq("Normal -"));
+  }
+
+  std::string real_access_log_path_;
+  IntegrationTcpClientPtr tcp_client_;
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, InternalListenerTunnelingCloseIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Upstream ends the CONNECT stream while the client is still open.
+TEST_P(InternalListenerTunnelingCloseIntegrationTest, UpstreamEndStreamClientOpen) {
+  initialize();
+  setUpTunnel();
+  upstream_request_->encodeData("world", true);
+  expectCleanClientClose();
+}
+
+// Same, followed by a stream reset, as an HCM-terminated CONNECT does.
+TEST_P(InternalListenerTunnelingCloseIntegrationTest, UpstreamEndStreamThenResetClientOpen) {
+  initialize();
+  setUpTunnel();
+  upstream_request_->encodeData("world", true);
+  upstream_request_->encodeResetStream();
+  expectCleanClientClose();
+}
+
+TEST_P(InternalListenerTunnelingCloseIntegrationTest,
+       UpstreamEndStreamThenResetClientOpenUserSpaceRstDisabled) {
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.enable_send_rst_on_user_space_socket", "false");
+  initialize();
+  setUpTunnel();
+  upstream_request_->encodeData("world", true);
+  upstream_request_->encodeResetStream();
+  expectCleanClientClose();
+}
 
 } // namespace
 } // namespace Envoy
