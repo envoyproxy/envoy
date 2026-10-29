@@ -1850,6 +1850,9 @@ TEST_P(LoadShedPointIntegrationTest, Http3ServerDispatchSendsGoAwayCompletingPen
   // so the second request should also complete.
   EXPECT_TRUE(second_request_decoder->waitForEndStream());
   EXPECT_TRUE(second_request_decoder->complete());
+  test_server_->waitForCounter("http3.goaway_sent", Eq(1));
+  test_server_->waitForCounter(
+      "overload.envoy.load_shed_points.http3_server_go_away_on_dispatch.shed_load_count", Eq(1));
 
   codec_client_->close();
   ASSERT_TRUE(codec_client_->waitForDisconnect());

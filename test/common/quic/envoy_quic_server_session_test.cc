@@ -1001,17 +1001,20 @@ TEST_F(EnvoyQuicServerSessionTest, CreateIncomingStreamGoAwayOnDispatch) {
   setupRequestDecoderMock(request_decoder);
   EXPECT_CALL(request_decoder, accessLogHandlers()).Times(2);
 
-  EXPECT_CALL(go_away_lsp, shouldShedLoad()).WillRepeatedly(Return(true));
+  EXPECT_CALL(go_away_lsp, shouldShedLoad()).WillOnce(Return(true));
   EXPECT_CALL(debug_visitor, OnGoAwayFrameSent(_));
+  EXPECT_EQ(0U, stats_.goaway_sent_.value());
 
   auto* stream1 = dynamic_cast<EnvoyQuicServerStream*>(
       createNewStreamWithId(4u, request_decoder, stream_callbacks1));
   ASSERT_NE(nullptr, stream1);
+  EXPECT_EQ(1U, stats_.goaway_sent_.value());
 
   // Subsequent stream creation should not send a duplicate GOAWAY frame.
   auto* stream2 = dynamic_cast<EnvoyQuicServerStream*>(
       createNewStreamWithId(8u, request_decoder, stream_callbacks2));
   ASSERT_NE(nullptr, stream2);
+  EXPECT_EQ(1U, stats_.goaway_sent_.value());
 
   EXPECT_CALL(stream_callbacks1, onResetStream(Http::StreamResetReason::LocalReset, _));
   stream1->resetStream(Http::StreamResetReason::LocalReset);
