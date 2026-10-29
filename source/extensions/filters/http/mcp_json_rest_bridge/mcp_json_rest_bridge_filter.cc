@@ -128,13 +128,6 @@ absl::StatusOr<json> getSessionId(const json& json_rpc) {
   return absl::InvalidArgumentError("JSON-RPC request (except notification) does not have an ID.");
 }
 
-bool isJsonRpcNotification(const json& json_rpc) {
-  return !json_rpc.contains(McpConstants::ID_FIELD) &&
-         absl::StartsWith(
-             json_rpc[McpConstants::METHOD_FIELD].get_ref<const nlohmann::json::string_t&>(),
-             McpConstants::Methods::NOTIFICATION_PREFIX);
-}
-
 json translateJsonRestResponseToJsonRpc(absl::string_view tool_call_response,
                                         const json& session_id, bool is_error,
                                         bool is_stateless_request) {
@@ -1085,7 +1078,6 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::decodeData(Buffer::Instance& dat
 
   if (mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
-      mcp_operation_ == McpOperation::NotificationIgnored ||
       mcp_operation_ == McpOperation::OperationFailed ||
       mcp_operation_ == McpOperation::ServerDiscover ||
       mcp_operation_ == McpOperation::ToolsListLocal) {
@@ -1105,8 +1097,6 @@ McpJsonRestBridgeFilter::encodeHeaders(Http::ResponseHeaderMap& response_headers
   // The response for InitializedNotification is empty body so we don't need
   // to modify the response headers.
   case McpOperation::InitializationAck:
-  // The same applies to the response for an ignored notification.
-  case McpOperation::NotificationIgnored:
   // ServerDiscover sends a local reply, so the headers are already correct.
   case McpOperation::ServerDiscover:
   // ToolsListLocal sends a local reply, so the headers are already correct.
@@ -1189,7 +1179,6 @@ Http::FilterDataStatus McpJsonRestBridgeFilter::encodeData(Buffer::Instance& dat
   if (mcp_operation_ == McpOperation::Unspecified || mcp_operation_ == McpOperation::Undecided ||
       mcp_operation_ == McpOperation::Initialization ||
       mcp_operation_ == McpOperation::InitializationAck ||
-      mcp_operation_ == McpOperation::NotificationIgnored ||
       mcp_operation_ == McpOperation::ServerDiscover ||
       mcp_operation_ == McpOperation::ToolsListLocal) {
     return Http::FilterDataStatus::Continue;
@@ -1558,11 +1547,6 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
 
-  if (is_notification_) {
-    handleMcpNotification(json_rpc, method, request_headers);
-    return;
-  }
-
   if (!validateMcpProtocolVersionHeader(json_rpc, method, request_headers).ok()) {
     return;
   }
@@ -1666,6 +1650,15 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
                                                       : json::object());
 
+  } else if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED && is_notification_ &&
+             !is_stateless_request_) {
+    mcp_operation_ = McpOperation::InitializationAck;
+    setParsingMetadata(method, json_rpc.contains(McpConstants::PARAMS_FIELD)
+                                   ? json_rpc[McpConstants::PARAMS_FIELD]
+                                   : json::object());
+    decoder_callbacks_->sendLocalReply(Http::Code::Accepted, "", nullptr,
+                                       Grpc::Status::WellKnownGrpcStatus::Ok,
+                                       "mcp_json_rest_bridge_filter_initialize_ack");
   } else if (method == McpConstants::Methods::TOOLS_CALL) {
     mcp_operation_ = McpOperation::ToolsCall;
     if (config_->traceContextExtraction() && request_headers.has_value()) {
@@ -1703,58 +1696,6 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
         json_rpc.contains(McpConstants::PARAMS_FIELD) ? json_rpc[McpConstants::PARAMS_FIELD]
                                                       : json::object());
     return;
-  }
-}
-
-void McpJsonRestBridgeFilter::handleMcpNotification(
-    const nlohmann::json& json_rpc, absl::string_view method,
-    Http::RequestHeaderMapOptConstRef request_headers) {
-  const nlohmann::json& params = json_rpc.contains(McpConstants::PARAMS_FIELD)
-                                     ? json_rpc[McpConstants::PARAMS_FIELD]
-                                     : json::object();
-
-  if (!is_stateless_request_ && absl::string_view(config_->maxSupportedProtocolVersion()) >=
-                                    McpConstants::MCP_VERSION_2026_07_28) {
-    const std::optional<absl::string_view> header_protocol_version =
-        getRequestMcpProtocolVersionHeader(request_headers);
-    is_stateless_request_ = header_protocol_version.has_value() &&
-                            isStatelessMcpProtocolVersionSupported(*header_protocol_version);
-  }
-
-  if (is_stateless_request_) {
-    sendErrorResponse(
-        Http::Code::NotFound, BridgeStatus::RequestMcpMethodNotSupported,
-        generateErrorJsonResponse(-32601, absl::StrCat("MCP method ", method, " is not supported"))
-            .dump(),
-        nullptr, method, params);
-    return;
-  }
-
-  if (!validateRequestMcpVersion(method, request_headers, config_->fallbackProtocolVersion())) {
-    sendErrorResponse(Http::Code::BadRequest, BridgeStatus::RequestUnsupportedMcpVersion,
-                      generateErrorJsonResponse(-32602, "Unsupported MCP version").dump(), nullptr,
-                      method, params);
-    return;
-  }
-
-  if (method == McpConstants::Methods::NOTIFICATION_INITIALIZED) {
-    mcp_operation_ = McpOperation::InitializationAck;
-    setParsingMetadata(method, params);
-    decoder_callbacks_->sendLocalReply(Http::Code::Accepted, "", nullptr,
-                                       Grpc::Status::WellKnownGrpcStatus::Ok,
-                                       "mcp_json_rest_bridge_filter_initialize_ack");
-  } else if (method == McpConstants::Methods::NOTIFICATION_CANCELLED) {
-    mcp_operation_ = McpOperation::NotificationIgnored;
-    setParsingMetadata(method, params);
-    decoder_callbacks_->sendLocalReply(
-        Http::Code::Accepted, "", nullptr, Grpc::Status::WellKnownGrpcStatus::Ok,
-        "mcp_json_rest_bridge_filter_cancelled_notification_ignored");
-  } else {
-    sendErrorResponse(
-        Http::Code::BadRequest, BridgeStatus::RequestMcpMethodNotSupported,
-        generateErrorJsonResponse(-32601, absl::StrCat("MCP method ", method, " is not supported"))
-            .dump(),
-        nullptr, method, params);
   }
 }
 
@@ -2018,6 +1959,9 @@ void McpJsonRestBridgeFilter::sendErrorResponse(
   }
   setParsingMetadata(method, params);
 
+  if (is_notification_ && response_code == Http::Code::OK) {
+    response_code = Http::Code::BadRequest;
+  }
   decoder_callbacks_->sendLocalReply(response_code, response_body, modify_headers, grpc_status,
                                      bridgeStatusToString(status));
 }
@@ -2174,7 +2118,12 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestMcpMethodMalformed,
                       generateErrorJsonResponse(-32600, "MCP method field is not a string").dump());
     return absl::InvalidArgumentError("MCP method field is not a string");
-  } else if (isJsonRpcNotification(json_rpc)) {
+  } else if (!json_rpc.contains(McpConstants::ID_FIELD) &&
+             absl::StartsWith(
+                 json_rpc[McpConstants::METHOD_FIELD].get_ref<const nlohmann::json::string_t&>(),
+                 McpConstants::Methods::NOTIFICATION_PREFIX)) {
+    // A notification, i.e. a message without an "id" member whose method is an MCP notification,
+    // is not required to have an ID field.
     is_notification_ = true;
   } else if (!session_id.ok()) {
     sendErrorResponse(Http::Code::OK, BridgeStatus::RequestIdNotFound,

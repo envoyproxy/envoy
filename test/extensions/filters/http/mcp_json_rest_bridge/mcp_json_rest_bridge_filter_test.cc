@@ -814,169 +814,69 @@ TEST_F(McpJsonRestBridgeFilterTest, IdFieldWithFloatReturnsError) {
           R"json({"error":{"code":-32600,"message":"Missing ID field"},"id":null,"jsonrpc":"2.0"})json"));
 }
 
-constexpr absl::string_view kMissingIdError =
-    R"json({"code":-32600,"message":"Missing ID field"})json";
-constexpr absl::string_view kNotificationsTestNotSupportedError =
-    R"json({"code":-32601,"message":"MCP method notifications/test is not supported"})json";
-constexpr absl::string_view kNotificationsInitializedNotSupportedError =
-    R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json";
-
-class McpJsonRestBridgeNotificationTest : public McpJsonRestBridgeFilterTest {
-protected:
-  void enableStatelessProtocol() {
-    proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
-        "2026-07-28");
-  }
-
-  void decodeLocallyHandledMessage(absl::string_view message) {
-    EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
-    EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
-              Http::FilterHeadersStatus::StopIteration);
-    Buffer::OwnedImpl body(message);
-    EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
-              Http::FilterDataStatus::StopIterationNoBuffer);
-    EXPECT_THAT(request_headers_.getMethodValue(), StrEq("POST"));
-    EXPECT_THAT(request_headers_.getPathValue(), StrEq("/mcp"));
-  }
-
-  void expectErrorReplyEncoded(absl::string_view status, absl::string_view error,
-                               const nlohmann::json& id = nullptr) {
-    response_headers_ = {{":status", std::string(status)}, {"content-type", "text/plain"}};
-    EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/false),
-              Http::FilterHeadersStatus::StopIteration);
-    Buffer::OwnedImpl response_body(error);
-    EXPECT_EQ(filter_->encodeData(response_body, /*end_stream=*/true),
-              Http::FilterDataStatus::Continue);
-    EXPECT_THAT(response_headers_.getStatusValue(), StrEq(status));
-    EXPECT_THAT(response_headers_.getContentTypeValue(), StrEq("application/json"));
-    EXPECT_EQ(
-        nlohmann::json::parse(response_body.toString()),
-        nlohmann::json({{"jsonrpc", "2.0"}, {"id", id}, {"error", nlohmann::json::parse(error)}}));
-  }
-};
-
-TEST_F(McpJsonRestBridgeNotificationTest, LegacyCancelledNotificationIsAcceptedAndIgnored) {
-  // A legacy MCP-Protocol-Version header keeps the notification legacy even when stateless
-  // requests are supported.
-  enableStatelessProtocol();
+TEST_F(McpJsonRestBridgeFilterTest, UnsupportedNotificationReturnsBadRequest) {
   ASSERT_OK(makeFilter());
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {":authority", "test-host"},
-                      {"mcp-protocol-version", "2025-11-25"}};
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::Accepted), StrEq(""), _, _,
-                             StrEq("mcp_json_rest_bridge_filter_cancelled_notification_ignored")));
-  Protobuf::Struct expected_metadata;
-  MessageUtil::loadFromJson(R"json({
-    "status": "mcp_json_rest_bridge_ok",
-    "method": "notifications/cancelled",
-    "params": {
-      "requestId": 123,
-      "reason": "User requested cancellation"
-    }
-  })json",
-                            expected_metadata);
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // A notification without an ID is rejected as an unsupported method rather than for the missing
+  // ID, and with an HTTP error status since it has no JSON-RPC response.
   EXPECT_CALL(
-      decoder_callbacks_.stream_info_,
-      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::BadRequest),
+          StrEq(
+              R"json({"code":-32601,"message":"MCP method notifications/cancelled is not supported"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
 
-  decodeLocallyHandledMessage(
-      R"json({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":123,"reason":"User requested cancellation"}})json");
-
-  // The local 202 Accepted reply passes through unmodified.
-  response_headers_ = {{":status", "202"}};
-  EXPECT_EQ(filter_->encodeHeaders(response_headers_, /*end_stream=*/true),
-            Http::FilterHeadersStatus::Continue);
-  EXPECT_THAT(response_headers_.getStatusValue(), StrEq("202"));
-  EXPECT_FALSE(response_headers_.has(Http::Headers::get().ContentType));
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
-TEST_F(McpJsonRestBridgeNotificationTest, LegacyUnsupportedNotificationReturnsBadRequest) {
+TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedWithIdReturnsUnsupportedMethodError) {
   ASSERT_OK(makeFilter());
-  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::BadRequest), StrEq(kNotificationsTestNotSupportedError),
-                             _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
-  Protobuf::Struct expected_metadata;
-  MessageUtil::loadFromJson(R"json({
-    "status": "mcp_json_rest_bridge_request_mcp_method_not_supported",
-    "method": "notifications/test"
-  })json",
-                            expected_metadata);
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // With an ID, the message is a request rather than a notification, so it does not get an empty
+  // 202 Accepted response.
   EXPECT_CALL(
-      decoder_callbacks_.stream_info_,
-      setDynamicMetadata("envoy.filters.http.mcp_json_rest_bridge", ProtoEq(expected_metadata)));
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
 
-  decodeLocallyHandledMessage(R"json({"jsonrpc":"2.0","method":"notifications/test"})json");
-  expectErrorReplyEncoded("400", kNotificationsTestNotSupportedError);
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":1,"method":"notifications/initialized"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
-TEST_F(McpJsonRestBridgeNotificationTest,
-       StatelessInitializedNotificationWithoutMetaIsRejectedAsUnsupportedMethod) {
-  enableStatelessProtocol();
+TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedWithNullIdReturnsError) {
   ASSERT_OK(makeFilter());
-  request_headers_ = {{":method", "POST"},
-                      {":path", "/mcp"},
-                      {":authority", "test-host"},
-                      {"mcp-protocol-version", "2026-07-28"}};
 
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::NotFound),
-                             StrEq(kNotificationsInitializedNotSupportedError), _, _,
-                             StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
-
-  decodeLocallyHandledMessage(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
-  expectErrorReplyEncoded("404", kNotificationsInitializedNotSupportedError);
-}
-
-TEST_F(McpJsonRestBridgeNotificationTest,
-       StatelessNotificationWithoutMetadataHeadersReturnsNotFound) {
-  enableStatelessProtocol();
-  ASSERT_OK(makeFilter());
-  // Without the MCP-Protocol-Version and Mcp-Method headers and without clientCapabilities, which
-  // would be rejected for a request with 400 Bad Request.
-  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
-
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::NotFound), StrEq(kNotificationsTestNotSupportedError),
-                             _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
-
-  decodeLocallyHandledMessage(
-      R"json({"jsonrpc":"2.0","method":"notifications/test","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}})json");
-  expectErrorReplyEncoded("404", kNotificationsTestNotSupportedError);
-}
-
-TEST_F(McpJsonRestBridgeNotificationTest, InitializedNotificationWithNullIdReturnsInvalidRequest) {
-  ASSERT_OK(makeFilter());
-  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
 
   // A message with an "id" member, even a null one, is not a notification, so its ID is validated.
   EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::OK), StrEq(kMissingIdError), _, _,
+              sendLocalReply(Eq(Http::Code::OK),
+                             StrEq(R"json({"code":-32600,"message":"Missing ID field"})json"), _, _,
                              StrEq("mcp_json_rest_bridge_request_id_not_found")));
 
-  decodeLocallyHandledMessage(
+  Buffer::OwnedImpl body(
       R"json({"jsonrpc":"2.0","id":null,"method":"notifications/initialized"})json");
-  expectErrorReplyEncoded("200", kMissingIdError);
-}
-
-TEST_F(McpJsonRestBridgeNotificationTest,
-       InitializedNotificationWithIdIsRejectedAsUnsupportedMethod) {
-  ASSERT_OK(makeFilter());
-  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}, {":authority", "test-host"}};
-
-  // With an ID, the message is a request rather than a notification, so it is not acknowledged
-  // with 202 Accepted.
-  EXPECT_CALL(decoder_callbacks_,
-              sendLocalReply(Eq(Http::Code::OK), StrEq(kNotificationsInitializedNotSupportedError),
-                             _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
-
-  decodeLocallyHandledMessage(
-      R"json({"jsonrpc":"2.0","id":1,"method":"notifications/initialized"})json");
-  expectErrorReplyEncoded("200", kNotificationsInitializedNotSupportedError, 1);
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
 TEST_F(McpJsonRestBridgeFilterTest, InvalidInputJsonReturnsError) {

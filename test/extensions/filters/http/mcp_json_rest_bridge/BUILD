@@ -69,7 +69,6 @@ envoy_extension_cc_test(
     srcs = ["mcp_json_rest_bridge_integration_test.cc"],
     extension_names = ["envoy.filters.http.mcp_json_rest_bridge"],
     deps = [
-        "//source/extensions/filters/http/mcp:config",
         "//source/extensions/filters/http/mcp_json_rest_bridge:config",
         "//test/integration:fake_access_log_lib",
         "//test/integration:http_integration_lib",
