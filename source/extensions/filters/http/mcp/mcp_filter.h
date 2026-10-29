@@ -125,14 +125,17 @@ public:
             proto_config.has_max_request_body_size()
                 ? std::optional<uint32_t>(proto_config.max_request_body_size().value())
                 : std::nullopt),
-        clear_route_cache_(PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config, clear_route_cache)),
+        clear_route_cache_(
+            boolOverride(PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config, clear_route_cache_override),
+                         proto_config.clear_route_cache())),
         parser_config_(
             proto_config.has_parser_config()
                 ? std::make_optional(McpParserConfig::fromProto(proto_config.parser_config()))
                 : std::nullopt),
         request_storage_mode_(proto_config.request_storage_mode()),
-        reject_duplicate_keys_(PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config, reject_duplicate_keys)) {
-  }
+        reject_duplicate_keys_(boolOverride(
+            PROTOBUF_GET_OPTIONAL_WRAPPED(proto_config, reject_duplicate_keys_override),
+            proto_config.reject_duplicate_keys())) {}
 
   envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode trafficMode() const {
     return traffic_mode_;
@@ -147,6 +150,15 @@ public:
   std::optional<bool> rejectDuplicateKeys() const { return reject_duplicate_keys_; }
 
 private:
+  // The deprecated bool fields cannot express "unset", so they only apply when true.
+  static std::optional<bool> boolOverride(std::optional<bool> override_value,
+                                          bool deprecated_value) {
+    if (override_value.has_value()) {
+      return override_value;
+    }
+    return deprecated_value ? std::make_optional(true) : std::nullopt;
+  }
+
   const envoy::extensions::filters::http::mcp::v3::Mcp::TrafficMode traffic_mode_;
   const std::optional<uint32_t> max_request_body_size_;
   const std::optional<bool> clear_route_cache_;
