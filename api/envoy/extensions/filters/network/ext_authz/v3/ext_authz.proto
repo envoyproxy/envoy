@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection, unless ``shadow_mode`` is
 // enabled.
-// [#next-free-field: 13]
+// [#next-free-field: 14]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
@@ -110,4 +110,22 @@ message ExtAuthz {
   //
   // Defaults to ``false``.
   bool shadow_mode = 12;
+
+  // When true, start authorization when the network filter receives a new connection,
+  // without waiting for downstream application data. Subsequent network filters do not
+  // receive their new connection callbacks until the check allows the connection to continue.
+  // This supports server-first protocols when this filter precedes a TCP proxy in IMMEDIATE mode.
+  //
+  // The check can run before the downstream TLS handshake completes. Client certificate
+  // attributes are therefore not guaranteed to be available. Only enable this option
+  // when authorization does not require attributes from the completed TLS handshake.
+  // Listener filter metadata is available, but metadata from subsequent network filters
+  // is not.
+  //
+  // To allow downstream reads, this option sets ``envoy.tcp_proxy.receive_before_connect``
+  // in filter state if absent. An existing boolean true value is preserved. An existing
+  // false value or an object of another type causes the connection to close.
+  //
+  // Defaults to false, which starts authorization when downstream data is received.
+  bool check_on_new_connection = 13;
 }
