@@ -10,12 +10,15 @@
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
 
-Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBootstrapExtension(
+Server::BootstrapExtensionCreationResult
+DynamicModuleBootstrapExtensionFactory::createBootstrapExtensionOrError(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
@@ -29,12 +32,13 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
   if (module_config.has_module() && module_config.module().has_remote()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, proto_config.extension_name(), Extensions::DynamicModules::RemoteFetchErrorStat);
-    throwEnvoyExceptionOrPanic("Bootstrap dynamic module does not support remote module sources");
+    return absl::InvalidArgumentError(
+        "Bootstrap dynamic module does not support remote module sources");
   }
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
       module_config, proto_config.extension_name(), context);
   if (!load_result.ok()) {
-    throwEnvoyExceptionOrPanic(std::string(load_result.status().message()));
+    return load_result.status();
   }
   auto dynamic_module = std::move(load_result->loaded);
 
@@ -44,8 +48,8 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
           context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-      throwEnvoyExceptionOrPanic("Failed to parse extension config: " +
-                                 std::string(config_or_error.status().message()));
+      return absl::InvalidArgumentError("Failed to parse extension config: " +
+                                        std::string(config_or_error.status().message()));
     }
     extension_config_str = std::move(config_or_error.value());
   }
@@ -63,8 +67,8 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
   if (!extension_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-    throwEnvoyExceptionOrPanic("Failed to create extension config: " +
-                               std::string(extension_config.status().message()));
+    return absl::InvalidArgumentError("Failed to create extension config: " +
+                                      std::string(extension_config.status().message()));
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.
@@ -81,9 +85,9 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
   if (!extension->initializeInModuleExtension()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-    throwEnvoyExceptionOrPanic("Failed to initialize dynamic module bootstrap extension");
+    return absl::InvalidArgumentError("Failed to initialize dynamic module bootstrap extension");
   }
-  return extension;
+  return Server::BootstrapExtensionPtr{std::move(extension)};
 }
 
 ProtobufTypes::MessagePtr DynamicModuleBootstrapExtensionFactory::createEmptyConfigProto() {
