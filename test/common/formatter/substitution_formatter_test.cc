@@ -3666,35 +3666,35 @@ TEST(SubstitutionFormatterTest, requestHeaderFormatter) {
       .setResponseTrailers(response_trailer);
 
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(), false);
     EXPECT_EQ("GET", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("GET")));
   }
 
   {
-    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":path", ":method", std::optional<size_t>(), false);
     EXPECT_EQ("/", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("/")));
   }
 
   {
-    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>());
+    RequestHeaderFormatter formatter(":TEST", ":METHOD", std::optional<size_t>(), false);
     EXPECT_EQ("GET", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("GET")));
   }
 
   {
-    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>());
+    RequestHeaderFormatter formatter("does_not_exist", "", std::optional<size_t>(), false);
     EXPECT_EQ(std::nullopt, formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
 
   {
-    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2));
+    RequestHeaderFormatter formatter(":Method", "", std::optional<size_t>(2), false);
     EXPECT_EQ("GE", formatForTest(formatter, formatter_context, stream_info));
     EXPECT_THAT(formatValueForTest(formatter, formatter_context, stream_info),
                 ProtoEq(ValueUtil::stringValue("GE")));
