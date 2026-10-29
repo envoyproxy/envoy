@@ -36,7 +36,9 @@ cc_binary(
         # libstdc++ itself lives in the libstdc++ sysroot, not the main one. Only add the gcc dir:
         # adding usr/lib/x86_64-linux-gnu would also pull in that sysroot's glibc libs/linker scripts.
         "-Lexternal/envoy_toolshed++sysroot_extension+libstdcxx_sysroot_linux_amd64/sysroot/usr/lib/gcc/x86_64-linux-gnu/13",
-        "-lstdc++",
+        # Link libstdc++ statically so the tool does not require the sysroot gcc's
+        # GLIBCXX versions from the host's libstdc++.so.6 at runtime.
+        "-l:libstdc++.a",
     ],
     visibility = ["//visibility:public"],
     deps = [
