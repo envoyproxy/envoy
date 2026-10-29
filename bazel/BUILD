@@ -183,10 +183,15 @@ selects.config_setting_group(
 # unwinders and broken Rust dynamic-module panics.
 # The toolshed build supports our sysroot's older glibc; LLVM's shipped .so requires newer glibc.
 # See https://github.com/envoyproxy/toolshed/blob/bazel-v0.5.6/bazel/compile/README.md#L88-L99
+# With -unwindlib=none clang has nothing to apply the toolchain's -static-libgcc to and warns
+# "argument unused during compilation" on every link, so that warning is silenced here.
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        ":linux_x86_64_shared_unwind": ["-unwindlib=none"],
+        ":linux_x86_64_shared_unwind": [
+            "-unwindlib=none",
+            "-Wno-unused-command-line-argument",
+        ],
         ":linux": ["-static-libgcc"],
         "//conditions:default": [],
     }),
