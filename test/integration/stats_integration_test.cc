@@ -426,6 +426,10 @@ public:
         // Request mirror policy scope, `source/common/router/config_impl.cc`.
         {"mirror.mirror_stats.rq_sampled", "mirror.rq_sampled", {{mirror_prefix, "mirror_stats"}}},
         {"mirror.mirror_stats.rq_started", "mirror.rq_started", {{mirror_prefix, "mirror_stats"}}},
+        // A stat prefix containing dots is a single tag value.
+        {"mirror.dotted.mirror_stats.rq_sampled",
+         "mirror.rq_sampled",
+         {{mirror_prefix, "dotted.mirror_stats"}}},
         // Per-thread scopes of the worker id migration: a worker thread's 'worker_<id>' segment
         // carries the envoy.worker_id tag and tag-extracts to a literal 'worker', while the main
         // thread's name stays a plain, untagged segment.
@@ -548,17 +552,16 @@ resources:
 #endif
   });
 
-  // A request mirror policy with a stat prefix, which creates the `mirror.<stat prefix>.` scope.
+  // Request mirror policies with a stat prefix, which create the `mirror.<stat prefix>.` scopes.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
-        auto* mirror_policy = hcm.mutable_route_config()
-                                  ->mutable_virtual_hosts(0)
-                                  ->mutable_routes(0)
-                                  ->mutable_route()
-                                  ->add_request_mirror_policies();
-        mirror_policy->set_cluster("cluster_0");
-        mirror_policy->set_stat_prefix("mirror_stats");
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        for (const std::string stat_prefix : {"mirror_stats", "dotted.mirror_stats"}) {
+          auto* mirror_policy = route->mutable_route()->add_request_mirror_policies();
+          mirror_policy->set_cluster("cluster_0");
+          mirror_policy->set_stat_prefix(stat_prefix);
+        }
       });
 
   initialize();
