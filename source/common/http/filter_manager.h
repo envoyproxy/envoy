@@ -143,6 +143,8 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // to this filter or parked at this position while iteration is stopped. Otherwise it is the
   // stream-level observed_[de|en]code_end_stream_ flag.
   bool observedEndStream() const;
+  // Whether the filter manager has observed the end of the stream in this direction, no matter
+  // which filter positions the end-of-stream marker has reached.
   virtual bool streamObservedEndStream() const PURE;
   virtual bool has1xxHeaders() PURE;
   virtual void do1xxHeaders() PURE;
