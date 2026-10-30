@@ -652,6 +652,7 @@ case $CI_TARGET in
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
+        hermetic_jq
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
         echo "Check bazel registry ..."
         registry_check
