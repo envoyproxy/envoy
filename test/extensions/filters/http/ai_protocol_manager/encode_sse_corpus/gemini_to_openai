@@ -1,0 +1,3 @@
+data: {"responseId":"gem-1","candidates":[{"content":{"role":"model","parts":[{"text":"Tool answer"}]},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":16,"toolUsePromptTokenCount":4,"candidatesTokenCount":8,"thoughtsTokenCount":2,"cachedContentTokenCount":3,"totalTokenCount":30},"modelVersion":"gemini-2.0-flash"}
+
+xV4ðÞ¼šÿ

@@ -1,0 +1,5 @@
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"First part"}]},"index":0}],"modelVersion":"gemini-1.5-pro"}
+
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":" second part"}]},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":14,"candidatesTokenCount":9,"thoughtsTokenCount":3,"cachedContentTokenCount":2,"totalTokenCount":26},"modelVersion":"gemini-1.5-pro"}
+
+2Tv˜ºÜþÿ
