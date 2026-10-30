@@ -187,8 +187,8 @@ TEST_P(BindingFactoryTest, BuildsFromAPatternOrJson) {
 
   // The value is kept as written, mutations and all.
   constexpr absl::string_view json =
-      R"({"uri_pattern": "/v1/models/{model}:rawPredict", "mutations": [{"body_field": "model"},)"
-      R"( {"body_field": "anthropic_version", "value": "v", "keep_existing": true}]})";
+      R"({"uri_pattern": "/v1/models/{model}:rawPredict", "body_mutations": [{"remove": "model"},)"
+      R"( {"append": {"record": {"key": "anthropic_version", "value": "v"}, "action": "ADD_IF_ABSENT"}}]})";
   object = build(json);
   binding = dynamic_cast<const LlmBindingObject*>(object.get());
   ASSERT_NE(binding, nullptr);
@@ -197,15 +197,32 @@ TEST_P(BindingFactoryTest, BuildsFromAPatternOrJson) {
   EXPECT_TRUE((*binding->binding())->removesModel());
   EXPECT_EQ(binding->asString(), json);
   EXPECT_EQ(object->serializeAsString(), json);
+
+  // A header mutation is a binding too.
+  constexpr absl::string_view header_json =
+      R"({"header_mutations": [{"append": {"header": {"key": "anthropic-version",)"
+      R"( "value": "2023-06-01"}, "append_action": "ADD_IF_ABSENT"}}]})";
+  object = build(header_json);
+  binding = dynamic_cast<const LlmBindingObject*>(object.get());
+  ASSERT_NE(binding, nullptr);
+  ASSERT_TRUE(binding->binding().ok()) << binding->binding().status();
+  ASSERT_EQ((*binding->binding())->mutations().size(), 1);
+  EXPECT_TRUE((*binding->binding())->mutations()[0].isHeader());
+  EXPECT_EQ((*binding->binding())->mutations()[0].header, "anthropic-version");
+  EXPECT_EQ(binding->asString(), header_json);
 }
 
 // Only an empty value leaves the key unset. Any other value sets it, so one that does not parse
 // fails the request where it is read instead of being dropped silently.
 TEST_P(BindingFactoryTest, KeepsTheErrorOfAValueThatDoesNotParse) {
   EXPECT_EQ(build(""), nullptr);
-  for (absl::string_view value :
-       {"gateway/{model}", "/v1/{model", R"({"uri_pattern": 1})", R"({"unknown": true})",
-        R"({"mutations": [{}]})", R"({"mutations": [{"header": "x-a", "value": "b"}]})"}) {
+  for (
+      absl::string_view value :
+      {"gateway/{model}", "/v1/{model", R"({"uri_pattern": 1})", R"({"unknown": true})",
+       R"({"header_mutations": [{}]})",
+       R"({"header_mutations": [{"append": {"header": {"key": "X-A", "value": "b"}, "append_action": "OVERWRITE_IF_EXISTS_OR_ADD"}}]})",
+       R"({"header_mutations": [{"append": {"header": {"key": "host", "value": "b"}, "append_action": "OVERWRITE_IF_EXISTS_OR_ADD"}}]})",
+       R"({"header_mutations": [{"append": {"header": {"key": "x-a", "value": 1}}}]})"}) {
     std::unique_ptr<StreamInfo::FilterState::Object> object = build(value);
     const auto* binding = dynamic_cast<const LlmBindingObject*>(object.get());
     ASSERT_NE(binding, nullptr) << value;
@@ -250,7 +267,7 @@ TEST_F(SetFilterStateBindingTest, BuildsATypedBindingFromEitherForm) {
             "{model}:{generateContent|streamGenerateContent?alt=sse}");
 
   set(FilterStateKeys::BindingRequest,
-      R"({"mutations": [{"body_field": "anthropic_version", "value": "vertex-2023-10-16"}]})");
+      R"({"body_mutations": [{"append": {"record": {"key": "anthropic_version", "value": "vertex-2023-10-16"}, "action": "OVERWRITE_IF_EXISTS_OR_ADD"}}]})");
   binding = read(FilterStateKeys::BindingRequest);
   ASSERT_TRUE(binding.ok()) << binding.status();
   EXPECT_FALSE((*binding)->pattern().has_value());

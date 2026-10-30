@@ -5,9 +5,8 @@ module(
 
 bazel_dep(name = "envoy", version = "1.41.0-dev")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy-examples", version = "0.2.9.envoy")
-bazel_dep(name = "envoy_toolshed", version = "0.5.9.envoy")
-bazel_dep(name = "envoy_toolshed_jq", version = "0.5.9.envoy")
+bazel_dep(name = "envoy-examples", version = "0.2.10.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.11.envoy")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy.1")
 bazel_dep(name = "grpc", version = "1.83.0.envoy")
@@ -61,5 +60,10 @@ use_repo(cc_configure, "local_config_cc", "local_config_cc_toolchains")
 compat = use_extension("@rules_cc//cc:extensions.bzl", "compatibility_proxy")
 use_repo(compat, "cc_compatibility_proxy")
 
-envoy_toolchains_ext = use_extension("@envoy//bazel:extensions.bzl", "envoy_toolchains_extension")
-use_repo(envoy_toolchains_ext, "clang_platform")
+arch_alias_ext = use_extension("@envoy_toolshed//repository:extensions.bzl", "arch_alias_extension")
+arch_alias_ext.alias(
+    name = "clang_platform",
+    aarch64 = "@envoy//bazel/platforms/rbe:linux_arm64",
+    amd64 = "@envoy//bazel/platforms/rbe:linux_x64",
+)
+use_repo(arch_alias_ext, "clang_platform")
