@@ -4,6 +4,7 @@
 
 #include "source/extensions/filters/http/body_size_limit/body_size_limit_filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gmock/gmock.h"
@@ -22,13 +23,18 @@ public:
   BodySizeLimitFilterConfigSharedPtr setupConfig(uint64_t max_request_bytes = 1024 * 1024) {
     envoy::extensions::filters::http::body_size_limit::v3::BodySizeLimit proto_config;
     proto_config.mutable_max_request_bytes()->set_value(max_request_bytes);
-    return std::make_shared<BodySizeLimitFilterConfig>(proto_config);
+    return std::make_shared<BodySizeLimitFilterConfig>(proto_config, *store_.rootScope(), "test.");
+  }
+
+  uint64_t counter(const std::string& name) {
+    return store_.counterFromString("test.body_size_limit." + name).value();
   }
 
   BodySizeLimitFilterTest() : config_(setupConfig()), filter_(config_) {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
+  Stats::TestUtil::TestStore store_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   BodySizeLimitFilterConfigSharedPtr config_;
   BodySizeLimitFilter filter_;
@@ -92,6 +98,8 @@ TEST_F(BodySizeLimitFilterTest, ContentLengthTooLarge) {
 
   Http::TestRequestHeaderMapImpl headers{{"content-length", "1233"}};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, small_filter.decodeHeaders(headers, false));
+  EXPECT_EQ(1, counter("rq_content_length_too_large"));
+  EXPECT_EQ(0, counter("rq_body_too_large"));
 }
 
 TEST_F(BodySizeLimitFilterTest, DataTooLong) {
@@ -105,6 +113,8 @@ TEST_F(BodySizeLimitFilterTest, DataTooLong) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, small_filter.decodeData(data1, false));
   Buffer::OwnedImpl data2(", world!");
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, small_filter.decodeData(data2, false));
+  EXPECT_EQ(0, counter("rq_content_length_too_large"));
+  EXPECT_EQ(1, counter("rq_body_too_large"));
 }
 
 TEST_F(BodySizeLimitFilterTest, Unlimited) {
@@ -116,6 +126,8 @@ TEST_F(BodySizeLimitFilterTest, Unlimited) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, zero_filter.decodeHeaders(headers, false));
   Buffer::OwnedImpl data1("Hello");
   EXPECT_EQ(Http::FilterDataStatus::Continue, zero_filter.decodeData(data1, false));
+  EXPECT_EQ(0, counter("rq_content_length_too_large"));
+  EXPECT_EQ(0, counter("rq_body_too_large"));
 }
 
 } // namespace BodySizeLimitFilter
