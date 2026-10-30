@@ -206,8 +206,8 @@
     "https://bcr.bazel.build/modules/elfutils/0.196.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/emsdk/4.0.23.envoy.1/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/emsdk/4.0.23.envoy/MODULE.bazel": "not found",
-    "https://bcr.bazel.build/modules/envoy_toolshed/0.5.11.envoy/MODULE.bazel": "not found",
-    "https://bcr.bazel.build/modules/envoy_toolshed_jq/0.5.11.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/envoy_toolshed/0.5.12.envoy/MODULE.bazel": "not found",
+    "https://bcr.bazel.build/modules/envoy_toolshed_jq/0.5.12.envoy/MODULE.bazel": "not found",
     "https://bcr.bazel.build/modules/fast_float/8.0.2/MODULE.bazel": "43504664efdfa4c6cf1349626c87135c9b87926325c720458f396eee25568eda",
     "https://bcr.bazel.build/modules/fast_float/8.2.4/MODULE.bazel": "38f33a09e0c1f4d91aa68f2434e13d1d1b3e4a1522078204a389bb264c781a73",
     "https://bcr.bazel.build/modules/fast_float/8.2.4/source.json": "ce06290cf97317011fe09366b7cfef8d9de3413cdf8f343d95a493865f62e6ec",
@@ -814,10 +814,10 @@
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/emsdk/4.0.23.envoy.1/MODULE.bazel": "0a01370e845a339ae254da4d6d133c216f6953788baf086f9b76d317c4d207f4",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/emsdk/4.0.23.envoy.1/source.json": "3881a352e67334f9a733ee07238ac00769e4c9657daa2ad561490770d7dae1fb",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/emsdk/4.0.23.envoy/MODULE.bazel": "f764bb57c935c9fb4dc72263dd92c48c50e21367983fb1edf402fb43717752b5",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed/0.5.11.envoy/MODULE.bazel": "a324c02ca68dafc0c9f6621c5397d2cd0dc5c3d3982ab1e0ad12a075ac751959",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed/0.5.11.envoy/source.json": "5474a235a536d1fd117aa12d3526316b6433f02c1693539aa67be5f50c06975b",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed_jq/0.5.11.envoy/MODULE.bazel": "8e2e507cef60a3dd9e3f709276fa83932d08952a2c4481e3a40888f9e0ce471f",
-    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed_jq/0.5.11.envoy/source.json": "f0f3e9ebc6e460465b1a10f02b12d1cfa6b5aac2bd318a068e5c922df7cc75b9",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed/0.5.12.envoy/MODULE.bazel": "994c30cf5ef7c0862790e150a69bcb5c0ca32e240d2c8e1bcb2bfc97a9e8f361",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed/0.5.12.envoy/source.json": "ec7884fd66a47ccd7ee8178226f1d695d7bd6be9caddbbdfa962fb316749fd0b",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed_jq/0.5.12.envoy/MODULE.bazel": "7bfea0d72084eca6cf989945a95a8382b7101854a120aef6df2b31e38efcc672",
+    "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/envoy_toolshed_jq/0.5.12.envoy/source.json": "e30ac9db017eca3f01a10b48304e9bb3e9fd985acb4df442cb1bbc3d7c84e3d0",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/fp16/0.0.0-260704-3d2de18.envoy/MODULE.bazel": "27e5020ea158fdc725eafed3443b6fa9a1555d52505dafcdc3e6ea74d9e112c1",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/fp16/0.0.0-260704-3d2de18.envoy/source.json": "ccc308b4d5afbba59ce93809243da68a5402414bb7f707d2b691df68ab896250",
     "https://raw.githubusercontent.com/envoyproxy/bazel-registry/bbfcbed26e8533743def7949a515bb44ae5b449d/modules/go-fips/1.27.1.envoy/MODULE.bazel": "fefcecbef619a02e09a78fa076a2c6433ac2a51b2dcaa8c66305b2c2382c2c45",
@@ -1475,7 +1475,7 @@
     "@@envoy_toolshed+//git:extensions.bzl%git_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "KA+Fp40lwbTTLa6XiIhTDns1GRZznYcZNWP4FCrBWyU=",
-        "usagesDigest": "NNHZ2PqIh+merTVDvdyULOqz9+p6e1Z7YerHrsQTwvA=",
+        "usagesDigest": "VgFs5zDrJb8tmFvJNc7Y5+6ulYEjrLKcynizTOoQAlA=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "cacert": {
@@ -1516,7 +1516,7 @@
     "@@envoy_toolshed+//pgp:extensions.bzl%sq_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "mS5VbZk2Lvfe7Huflg5LDR/lgfLZO1qVeUF9OsnDmGs=",
-        "usagesDigest": "voimi/WssTebUAnN8yt7XOANZQdti0KETGUjudof8/A=",
+        "usagesDigest": "x5seX6Bu5YI+RiuZjJrUQpjzIgYAmngq5+Q0twiyEts=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "sq_prebuilt_linux_aarch64": {
