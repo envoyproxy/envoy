@@ -10,6 +10,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/network/socket_interface/sockmap/io_handle.h"
 
+#include "absl/status/status.h"
+
 namespace Envoy {
 namespace Network {
 
@@ -27,7 +29,7 @@ IoHandlePtr SockmapSocketInterface::makeSocket(int socket_fd, bool socket_v6only
   return SocketInterfaceImpl::makeSocket(socket_fd, socket_v6only, socket_type, domain, options);
 }
 
-Server::BootstrapExtensionPtr SockmapSocketInterface::createBootstrapExtension(
+Server::BootstrapExtensionCreationResult SockmapSocketInterface::createBootstrapExtensionOrError(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::socket_interface::sockmap::v3::Sockmap&>(
@@ -41,7 +43,7 @@ Server::BootstrapExtensionPtr SockmapSocketInterface::createBootstrapExtension(
   datapath_config.accelerated_ports.reserve(message.accelerated_ports().size());
   for (const auto& range : message.accelerated_ports()) {
     if (range.start() < 1 || range.end() > 65536 || range.start() >= range.end()) {
-      throwEnvoyExceptionOrPanic(
+      return absl::InvalidArgumentError(
           fmt::format("sockmap accelerated_ports range [{}, {}) is invalid, expected "
                       "1 <= start < end <= 65536",
                       range.start(), range.end()));
@@ -53,8 +55,8 @@ Server::BootstrapExtensionPtr SockmapSocketInterface::createBootstrapExtension(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, register_user_space_sockets, true);
   BpfDatapathSharedPtr datapath = createDatapath(datapath_config);
 
-  return std::make_unique<SockmapSocketInterfaceExtension>(*this, std::move(datapath),
-                                                           register_user_space_sockets);
+  return Server::BootstrapExtensionPtr{std::make_unique<SockmapSocketInterfaceExtension>(
+      *this, std::move(datapath), register_user_space_sockets)};
 }
 
 BpfDatapathSharedPtr SockmapSocketInterface::createDatapath(const BpfDatapathConfig& config) {

@@ -467,13 +467,13 @@ TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionsCreatedDuringV
   EXPECT_CALL(*mock_extension, onServerInitialized(_)).Times(0);
   EXPECT_CALL(*mock_extension, onWorkerThreadInitialized()).Times(0);
 
-  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
       .WillOnce([&](const Protobuf::Message& config,
-                    Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
+                    Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
         const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
         EXPECT_NE(nullptr, proto);
         EXPECT_EQ(proto->a(), "foo");
-        return std::move(mock_extension);
+        return BootstrapExtensionPtr{std::move(mock_extension)};
       });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
@@ -496,10 +496,10 @@ TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionThrowingFailsVa
     return std::make_unique<test::common::config::DummyConfig>();
   });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
-  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
       .WillOnce([](const Protobuf::Message&,
-                   Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
-        throw EnvoyException("Unable to initiate mock_bootstrap_extension.");
+                   Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
+        return absl::InvalidArgumentError("Unable to initiate mock_bootstrap_extension.");
       });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(
@@ -545,10 +545,10 @@ TEST_P(BootstrapExtensionValidationServerTest, ValidateConfigReturnsTrueForValid
     return std::make_unique<test::common::config::DummyConfig>();
   });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
-  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
       .WillOnce([](const Protobuf::Message&,
-                   Configuration::ServerFactoryContext&) -> BootstrapExtensionPtr {
-        return std::make_unique<MockBootstrapExtension>();
+                   Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
+        return BootstrapExtensionPtr{std::make_unique<MockBootstrapExtension>()};
       });
 
   Registry::InjectFactory<Configuration::BootstrapExtensionFactory> registered_factory(

@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/socket_interface/sockmap:config",
         "//source/extensions/network/socket_interface/sockmap:io_handle_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:status_utility_lib",
         "@envoy_api//envoy/extensions/network/socket_interface/sockmap/v3:pkg_cc_proto",
     ],
 )

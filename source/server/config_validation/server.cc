@@ -142,8 +142,10 @@ void ValidationInstance::initialize(const Options& options,
     auto config = Config::Utility::translateAnyToFactoryConfig(
         bootstrap_extension.typed_config(), messageValidationContext().staticValidationVisitor(),
         factory);
-    bootstrap_extensions_.push_back(
-        factory.createBootstrapExtension(*config, serverFactoryContext()));
+    auto extension_or_error =
+        factory.createBootstrapExtensionOrError(*config, serverFactoryContext());
+    THROW_IF_NOT_OK_REF(extension_or_error.status());
+    bootstrap_extensions_.push_back(std::move(extension_or_error.value()));
   }
 
   runtime_ = component_factory.createRuntime(*this, initial_config);

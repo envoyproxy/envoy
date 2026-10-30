@@ -6,6 +6,7 @@
 #include "source/extensions/network/socket_interface/sockmap/socket_interface.h"
 
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -68,7 +69,9 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionAppliesDefaults) {
   SockmapSocketInterfacePeer interface;
 
   envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
-  Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
+  auto extension_or_error = interface.createBootstrapExtensionOrError(config, context);
+  ASSERT_OK(extension_or_error);
+  Server::BootstrapExtensionPtr extension = std::move(extension_or_error.value());
   ASSERT_NE(extension, nullptr);
   auto* sockmap_extension = dynamic_cast<SockmapSocketInterfaceExtension*>(extension.get());
   ASSERT_NE(sockmap_extension, nullptr);
@@ -97,7 +100,9 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionParsesExplicitValues) {
   range->set_start(6000);
   range->set_end(6010);
 
-  Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
+  auto extension_or_error = interface.createBootstrapExtensionOrError(config, context);
+  ASSERT_OK(extension_or_error);
+  Server::BootstrapExtensionPtr extension = std::move(extension_or_error.value());
   ASSERT_NE(extension, nullptr);
   auto* sockmap_extension = dynamic_cast<SockmapSocketInterfaceExtension*>(extension.get());
   ASSERT_NE(sockmap_extension, nullptr);
@@ -125,7 +130,7 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsZeroMaxEntries) {
   envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
   config.mutable_sockhash_max_entries()->set_value(0);
 
-  EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+  EXPECT_THROW((void)interface.createBootstrapExtensionOrError(config, context), EnvoyException);
 }
 
 TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsInvalidPortRange) {
@@ -138,7 +143,8 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsInvalidPortRange) {
     auto* range = config.add_accelerated_ports();
     range->set_start(0);
     range->set_end(10);
-    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+    EXPECT_EQ(interface.createBootstrapExtensionOrError(config, context).status().code(),
+              absl::StatusCode::kInvalidArgument);
   }
   // end above 65536.
   {
@@ -146,7 +152,8 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsInvalidPortRange) {
     auto* range = config.add_accelerated_ports();
     range->set_start(1);
     range->set_end(65537);
-    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+    EXPECT_EQ(interface.createBootstrapExtensionOrError(config, context).status().code(),
+              absl::StatusCode::kInvalidArgument);
   }
   // start not less than end.
   {
@@ -154,7 +161,8 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsInvalidPortRange) {
     auto* range = config.add_accelerated_ports();
     range->set_start(9211);
     range->set_end(9211);
-    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+    EXPECT_EQ(interface.createBootstrapExtensionOrError(config, context).status().code(),
+              absl::StatusCode::kInvalidArgument);
   }
   // Every range is validated, not just the first.
   {
@@ -165,7 +173,8 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsInvalidPortRange) {
     auto* invalid = config.add_accelerated_ports();
     invalid->set_start(5);
     invalid->set_end(5);
-    EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+    EXPECT_EQ(interface.createBootstrapExtensionOrError(config, context).status().code(),
+              absl::StatusCode::kInvalidArgument);
   }
 }
 
@@ -180,7 +189,7 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionRejectsTooManyRanges) {
     range->set_end(port + 1);
   }
 
-  EXPECT_THROW(interface.createBootstrapExtension(config, context), EnvoyException);
+  EXPECT_THROW((void)interface.createBootstrapExtensionOrError(config, context), EnvoyException);
 }
 
 TEST(SockmapSocketInterface, CreateBootstrapExtensionAcceptsFullPortRange) {
@@ -192,7 +201,9 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionAcceptsFullPortRange) {
   range->set_start(1);
   range->set_end(65536);
 
-  Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
+  auto extension_or_error = interface.createBootstrapExtensionOrError(config, context);
+  ASSERT_OK(extension_or_error);
+  Server::BootstrapExtensionPtr extension = std::move(extension_or_error.value());
   ASSERT_NE(extension, nullptr);
   ASSERT_EQ(interface.lastConfig().accelerated_ports.size(), 1U);
   EXPECT_EQ(interface.lastConfig().accelerated_ports[0].start, 1U);
@@ -207,7 +218,9 @@ TEST(SockmapSocketInterface, CreateBootstrapExtensionDisablesRegistration) {
   envoy::extensions::network::socket_interface::sockmap::v3::Sockmap config;
   config.mutable_register_user_space_sockets()->set_value(false);
 
-  Server::BootstrapExtensionPtr extension = interface.createBootstrapExtension(config, context);
+  auto extension_or_error = interface.createBootstrapExtensionOrError(config, context);
+  ASSERT_OK(extension_or_error);
+  Server::BootstrapExtensionPtr extension = std::move(extension_or_error.value());
   ASSERT_NE(extension, nullptr);
   auto* sockmap_extension = dynamic_cast<SockmapSocketInterfaceExtension*>(extension.get());
   ASSERT_NE(sockmap_extension, nullptr);
