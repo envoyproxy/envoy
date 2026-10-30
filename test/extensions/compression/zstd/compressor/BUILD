@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/compression/zstd/decompressor:decompressor_lib",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
