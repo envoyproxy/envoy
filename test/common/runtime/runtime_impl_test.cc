@@ -22,8 +22,10 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "absl/flags/declare.h"
 #include "gmock/gmock.h"
@@ -41,6 +43,41 @@ using testing::Return;
 namespace Envoy {
 namespace Runtime {
 namespace {
+
+// Setup test data files.
+void setupTestFilesystem() {
+  const std::string test_data = "test/common/runtime/test_data";
+  const std::string src_dir = TestEnvironment::runfilesPath(test_data);
+  const std::string temp_dir = TestEnvironment::temporaryPath(test_data);
+  TestEnvironment::removePath(temp_dir);
+
+  for (const std::string& src_file : TestUtility::listFiles(src_dir, true)) {
+    const std::string rel_path = src_file.substr(src_dir.length() + 1);
+    const std::string dst_file = absl::StrCat(temp_dir, "/", rel_path);
+    const Filesystem::PathSplitResult parent =
+        Filesystem::fileSystemForTest().splitPathFromFilename(dst_file).value();
+    TestEnvironment::createPath(std::string(parent.directory_));
+    TestEnvironment::writeStringToFileForTest(dst_file,
+                                              TestEnvironment::readFileToStringForTest(src_file),
+                                              /*fully_qualified_path=*/true);
+  }
+
+  // Verify text value is treated as a binary blob regardless of source line-ending settings.
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(test_data, "/root/envoy/file_lf"),
+                                            "hello\nworld");
+  TestEnvironment::writeStringToFileForTest(absl::StrCat(test_data, "/root/envoy/file_crlf"),
+                                            "hello\r\nworld");
+
+  // Deliberate symlink of doom.
+  const std::string loop_path = absl::StrCat(temp_dir, "/loop");
+  TestEnvironment::createPath(loop_path);
+
+  TestEnvironment::createSymlink(absl::StrCat(temp_dir, "/root"),
+                                 absl::StrCat(temp_dir, "/current"));
+  TestEnvironment::createSymlink(absl::StrCat(temp_dir, "/root/envoy/subdir"),
+                                 absl::StrCat(temp_dir, "/root/envoy/badlink"));
+  TestEnvironment::createSymlink(loop_path, absl::StrCat(loop_path, "/loop"));
+}
 
 class LoaderImplTest : public testing::Test {
 protected:
@@ -75,10 +112,7 @@ protected:
 
 class DiskLoaderImplTest : public LoaderImplTest {
 public:
-  void SetUp() override {
-    TestEnvironment::exec(
-        {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
-  }
+  void SetUp() override { setupTestFilesystem(); }
 
   void TearDown() override {
     TestEnvironment::removePath(TestEnvironment::temporaryPath("test/common/runtime/test_data"));
@@ -870,8 +904,7 @@ protected:
   DiskLayerTest() : api_(Api::createApiForTest()) {}
 
   static void SetUpTestSuite() { // NOLINT(readability-identifier-naming)
-    TestEnvironment::exec(
-        {TestEnvironment::runfilesPath("test/common/runtime/filesystem_setup.sh")});
+    setupTestFilesystem();
   }
 
   static void TearDownTestSuite() {
