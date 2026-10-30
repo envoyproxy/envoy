@@ -1107,7 +1107,7 @@ TEST_P(McpFilterIntegrationTest, PerRouteRejectDuplicateKeysOverride) {
         route->mutable_match()->set_path("/api/mcp");
 
         envoy::extensions::filters::http::mcp::v3::McpOverride mcp_override;
-        mcp_override.set_reject_duplicate_keys(true);
+        mcp_override.mutable_reject_duplicate_keys_override()->set_value(true);
         mcp_override.set_traffic_mode(
             envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
         std::ignore =
@@ -1518,6 +1518,78 @@ TEST_P(McpFilterIntegrationTest, PerRouteOverrideToNoop) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test that a per-route override which only sets traffic_mode keeps the global clear_route_cache,
+// so the request is re-routed based on the extracted MCP metadata.
+TEST_P(McpFilterIntegrationTest, PerRouteOverrideInheritsClearRouteCache) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+      clear_route_cache: true
+  )EOF");
+
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+        virtual_host->clear_routes();
+        TestUtility::loadFromYaml(R"EOF(
+          match:
+            prefix: "/"
+            dynamic_metadata:
+            - filter: envoy.filters.http.mcp
+              path:
+              - key: params
+              - key: name
+              value:
+                string_match:
+                  exact: probe_tool
+          direct_response:
+            status: 200
+            body:
+              inline_string: per-tool
+        )EOF",
+                                  *virtual_host->add_routes());
+        TestUtility::loadFromYaml(R"EOF(
+          match:
+            prefix: "/"
+          direct_response:
+            status: 200
+            body:
+              inline_string: catch-all
+          typed_per_filter_config:
+            envoy.filters.http.mcp:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.McpOverride
+              traffic_mode: REJECT_NO_MCP
+        )EOF",
+                                  *virtual_host->add_routes());
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                               {":path", "/mcp"},
+                                               {":scheme", "http"},
+                                               {":authority", "host"},
+                                               {"content-type", "application/json"},
+                                               {"accept", "application/json, text/event-stream"}};
+
+  auto response1 = codec_client_->makeRequestWithBody(
+      headers,
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "probe_tool"}, "id": 1})");
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ("200", response1->headers().getStatusValue());
+  EXPECT_EQ("per-tool", response1->body());
+
+  auto response2 = codec_client_->makeRequestWithBody(
+      headers,
+      R"({"jsonrpc": "2.0", "method": "tools/call", "params": {"name": "other_tool"}, "id": 2})");
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  EXPECT_EQ("catch-all", response2->body());
 }
 
 } // namespace

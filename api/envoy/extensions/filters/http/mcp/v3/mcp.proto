@@ -6,6 +6,7 @@ import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -232,7 +233,7 @@ message ParserConfig {
 }
 
 // Per-route override configuration for MCP filter
-// [#next-free-field: 7]
+// [#next-free-field: 9]
 message McpOverride {
   // Overrides the global traffic mode for this route.
   Mcp.TrafficMode traffic_mode = 1 [(validate.rules).enum = {defined_only: true}];
@@ -242,15 +243,36 @@ message McpOverride {
   // It defaults to 8KB (8192 bytes).
   google.protobuf.UInt32Value max_request_body_size = 2;
 
-  // Overrides the global clear_route_cache setting for this route.
-  bool clear_route_cache = 3;
+  // This field is deprecated; please use
+  // :ref:`clear_route_cache_override
+  // <envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.clear_route_cache_override>`
+  // as replacement. When true, clears the route cache for this route. When false, the global
+  // clear_route_cache setting is used.
+  bool clear_route_cache = 3
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // Overrides the global parser config for this route.
+  // Overrides the global parser config for this route. If not set, the global parser config is
+  // used.
   ParserConfig parser_config = 4;
 
-  // Overrides the global request storage mode for this route.
+  // Overrides the global request storage mode for this route. If ``MODE_UNSPECIFIED``, the global
+  // request storage mode is used.
   Mcp.RequestStorageMode request_storage_mode = 5 [(validate.rules).enum = {defined_only: true}];
 
-  // Overrides the global reject_duplicate_keys setting for this route.
-  bool reject_duplicate_keys = 6;
+  // This field is deprecated; please use
+  // :ref:`reject_duplicate_keys_override
+  // <envoy_v3_api_field_extensions.filters.http.mcp.v3.McpOverride.reject_duplicate_keys_override>`
+  // as replacement. When true, rejects duplicate keys for this route. When false, the global
+  // reject_duplicate_keys setting is used.
+  bool reject_duplicate_keys = 6
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // Overrides the global clear_route_cache setting for this route. If not set, the deprecated
+  // ``clear_route_cache`` field is used when true, otherwise the global setting is used.
+  google.protobuf.BoolValue clear_route_cache_override = 7;
+
+  // Overrides the global reject_duplicate_keys setting for this route. If not set, the
+  // deprecated ``reject_duplicate_keys`` field is used when true, otherwise the global setting is
+  // used.
+  google.protobuf.BoolValue reject_duplicate_keys_override = 8;
 }
