@@ -476,6 +476,125 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShare
   EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
 }
 
+// Verify that a request is admitted when the shared cost is larger than the bucket, and that the
+// request still consumes the full shared cost.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketPreservesRequestWithSmallShare) {
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.125; }));
+
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 4, 4, share_provider);
+
+  // Every request costs 1 / factor = 8 tokens. The request is admitted when the bucket holds
+  // max_tokens = 4 tokens. Each member admits one request every 400ms, so 8 members admit 4
+  // requests every 200ms, which is the configured rate.
+
+  // 4 -> -4 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // -4 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  // 0 -> 4 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 4 -> -4 tokens
+  EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketPreservesMultiTokenRequestWithSmallShare) {
+  RateLimitTokenBucket token_bucket(4, 4, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  // Every request costs 2 / factor = 16 tokens.
+
+  // 4 -> -12 tokens
+  EXPECT_TRUE(token_bucket.consume(0.125, 2));
+  EXPECT_FALSE(token_bucket.consume(0.125, 2));
+
+  // -12 -> 0 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(600));
+  EXPECT_FALSE(token_bucket.consume(0.125, 2));
+
+  // 0 -> 4 tokens
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  // 4 -> -12 tokens
+  EXPECT_TRUE(token_bucket.consume(0.125, 2));
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketRejectsRequestLargerThanUnsharedBucket) {
+  RateLimitTokenBucket token_bucket(4, 4, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  EXPECT_FALSE(token_bucket.consume(1.0, 5));
+  EXPECT_FALSE(token_bucket.consume(0.125, 5));
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketZeroMaxTokensRejectsWithSmallShare) {
+  RateLimitTokenBucket token_bucket(0, 1, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  EXPECT_FALSE(token_bucket.consume(0.125));
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
+  EXPECT_FALSE(token_bucket.consume(0.125));
+}
+
+// Verify that remaining tokens are reported as 0 when the bucket is below zero.
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketRemainingTokensBelowZero) {
+  RateLimitTokenBucket token_bucket(4, 4, std::chrono::milliseconds(200), dispatcher_.timeSource(),
+                                    false);
+
+  // 4 -> -4 tokens
+  EXPECT_TRUE(token_bucket.consume(0.125));
+  EXPECT_EQ(token_bucket.remainingTokens(), 0);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketRejectsSmallShareWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request", "false"}});
+  auto share_provider = std::make_shared<MockShareProvider>();
+  EXPECT_CALL(*share_provider, getTokensShareFactor())
+      .WillRepeatedly(testing::Invoke([]() -> double { return 0.125; }));
+
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 4, 4, share_provider);
+
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+
+  EXPECT_FALSE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
+}
+
+TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketCachesGuardAtConstruction) {
+  TestScopedRuntime scoped_runtime;
+  const std::string guard =
+      "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request";
+  scoped_runtime.mergeValues({{guard, "true"}});
+  RateLimitTokenBucket enabled_bucket(4, 4, std::chrono::milliseconds(200),
+                                      dispatcher_.timeSource(), false);
+
+  scoped_runtime.mergeValues({{guard, "false"}});
+  RateLimitTokenBucket disabled_bucket(4, 4, std::chrono::milliseconds(200),
+                                       dispatcher_.timeSource(), false);
+
+  EXPECT_TRUE(enabled_bucket.consume(0.125));
+  EXPECT_FALSE(enabled_bucket.consume(0.125));
+  EXPECT_FALSE(disabled_bucket.consume(0.125));
+
+  scoped_runtime.mergeValues({{guard, "true"}});
+  dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::milliseconds(400));
+
+  EXPECT_TRUE(enabled_bucket.consume(0.125));
+  EXPECT_FALSE(disabled_bucket.consume(0.125));
+}
+
 // Verify token bucket functionality with max tokens > tokens per fill.
 TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMaxTokensGreaterThanTokensPerFill) {
   initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 1, nullptr);
