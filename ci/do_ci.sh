@@ -99,11 +99,12 @@ function cp_binary_for_image_build() {
   fi
 
   # Tools for the tools image. Strip to save size.
-  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+  hermetic_strip
+  "${STRIP_BIN}" bazel-bin/test/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
-  strip bazel-bin/test/tools/router_check/router_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
-  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/config_load_check/config_load_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
@@ -111,7 +112,7 @@ function cp_binary_for_image_build() {
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
-  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
+  "${STRIP_BIN}" "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
   # only if BUILD_REASON exists (running in AZP)
   if [[ "${BUILD_REASON}" ]]; then
