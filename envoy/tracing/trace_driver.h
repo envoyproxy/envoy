@@ -2,11 +2,13 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/trace_config.h"
+#include "envoy/tracing/trace_context.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -208,6 +210,19 @@ public:
    * @return span ID as a hex string
    */
   virtual std::string getSpanId() const PURE;
+
+  /**
+   * Retrieve the span's tracestate. This may not have meaning for all
+   * implementors.
+   * @return span's tracestate
+   */
+  virtual std::string getTracestate() const { return ""; }
+
+  /**
+   * Reparent this span based on the given trace context.
+   */
+  virtual void updateParent([[maybe_unused]] const TraceContext& context,
+                            [[maybe_unused]] bool preserve_headers) {}
 };
 
 /**
