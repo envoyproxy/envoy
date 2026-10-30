@@ -92,12 +92,6 @@ private:
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
 
-struct UpdateOnDemandCallback {
-  const std::string alias_;
-  Event::Dispatcher& thread_local_dispatcher_;
-  std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
-};
-
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
  * the subscription.
@@ -125,11 +119,6 @@ private:
   Rds::RdsRouteConfigProviderImpl base_;
 
   RouteConfigUpdatePtr& config_update_info_;
-  Server::Configuration::ServerFactoryContext& factory_context_;
-  std::list<UpdateOnDemandCallback> config_update_callbacks_;
-  // A flag used to determine if this instance of RdsRouteConfigProviderImpl hasn't been
-  // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
-  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 };
 
 using RdsRouteConfigProviderImplSharedPtr = std::shared_ptr<RdsRouteConfigProviderImpl>;

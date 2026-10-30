@@ -197,6 +197,18 @@ message RouteConfiguration {
 message Vhds {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
 
+  // Configuration for allowing listener and route initialization to complete immediately while
+  // holding only requests that do not match any static virtual host until the initial VHDS
+  // response is received.
+  message WarmingBlocksUnmatchedRequests {
+  }
+
   // Configuration source specifier for VHDS.
   core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+
+  // If set, initial VHDS warming does not block listener or route configuration initialization;
+  // instead, only HTTP requests that do not match an existing virtual host are held until the
+  // initial VHDS update completes. When unset, initial VHDS warming blocks listener and route
+  // initialization (blocking all requests).
+  WarmingBlocksUnmatchedRequests warming_blocks_unmatched_requests = 2;
 }

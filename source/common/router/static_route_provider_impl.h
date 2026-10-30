@@ -74,10 +74,6 @@ private:
     // the workers and signals that this provider is ready.
     void onConfigWarmed() override;
 
-    void requestVirtualHostsUpdate(const std::string& for_domain,
-                                   Event::Dispatcher& thread_local_dispatcher,
-                                   std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
-
     // Keeps a thread local RDS config that is updated when a VHDS update
     // arrives.
     struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
@@ -86,26 +82,12 @@ private:
       Rds::ConfigConstSharedPtr config_;
     };
 
-    struct UpdateOnDemandCallback {
-      const std::string alias_;
-      Event::Dispatcher& thread_local_dispatcher_;
-      std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
-    };
-
     RouteConfigUpdatePtr config_update_info_;
     bool initialized_{false};
-    Server::Configuration::ServerFactoryContext& factory_context_;
-    // Name of the inline route configuration. Captured here because until the initial VHDS fetch
-    // has landed the receiver hasn't published anything to read it back off.
-    const std::string route_config_name_;
     ThreadLocal::TypedSlot<ThreadLocalConfig> tls_;
     // Only ready once a route configuration has been warmed up and published, so that whatever
     // warms up with this provider waits for the initial VHDS fetch.
     Init::TargetImpl local_init_target_;
-    std::list<UpdateOnDemandCallback> config_update_callbacks_;
-    // A flag used to determine if this instance of StaticRouteConfigProviderImpl hasn't been
-    // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
-    std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
   };
 
   Rds::StaticRouteConfigProviderImpl base_;

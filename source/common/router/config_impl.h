@@ -1370,6 +1370,7 @@ public:
                          const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
+  const VirtualHostImpl* findVirtualHost(absl::string_view host) const;
 
 private:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
@@ -1505,6 +1506,9 @@ public:
   bool virtualHostExists(const Http::RequestHeaderMap& headers) const {
     return route_matcher_->findVirtualHost(headers) != nullptr;
   }
+  bool virtualHostExists(absl::string_view domain) const {
+    return route_matcher_->findVirtualHost(domain) != nullptr;
+  }
 
   // Router::Config
   VirtualHostRoute route(const Http::RequestHeaderMap& headers,
@@ -1519,6 +1523,8 @@ public:
     return shared_config_->internalOnlyHeaders();
   }
   const std::string& name() const override { return shared_config_->name(); }
+  void setAwaitingInitialVhdsUpdate(bool awaiting) { awaiting_initial_vhds_update_ = awaiting; }
+  bool awaitingInitialVhdsUpdate() const override { return awaiting_initial_vhds_update_; }
   bool usesVhds() const override { return shared_config_->usesVhds(); }
   bool mostSpecificHeaderMutationsWins() const override {
     return shared_config_->mostSpecificHeaderMutationsWins();
@@ -1548,6 +1554,7 @@ protected:
 private:
   CommonConfigSharedPtr shared_config_;
   std::unique_ptr<RouteMatcher> route_matcher_;
+  bool awaiting_initial_vhds_update_{false};
 };
 
 /**

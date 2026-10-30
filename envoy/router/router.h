@@ -1125,6 +1125,11 @@ public:
   virtual bool usesVhds() const PURE;
 
   /**
+   * @return bool whether router configuration is awaiting initial wildcard VHDS update.
+   */
+  virtual bool awaitingInitialVhdsUpdate() const { return false; }
+
+  /**
    * @return bool whether most specific header mutations should take precedence. The default
    * evaluation order is route level, then virtual host level and finally global connection
    * manager level.
