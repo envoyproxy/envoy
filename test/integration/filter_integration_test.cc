@@ -1203,6 +1203,8 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeData) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("413", response->headers().getStatusValue());
+  // Close the open request while its response decoder can still handle reset callbacks.
+  cleanupUpstreamAndDownstream();
 }
 
 // Verify that when a filter decodeData callback overflows request buffer in filter manager the
@@ -1459,6 +1461,8 @@ TEST_P(FilterIntegrationTest, LocalReplyFromDecodeMetadata) {
   ASSERT_TRUE(decoder->waitForEndStream());
 
   EXPECT_EQ("400", decoder->headers().getStatusValue());
+  // Close the open request while its response decoder can still handle reset callbacks.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(FilterIntegrationTest, LocalReplyFromEncodeMetadata) {

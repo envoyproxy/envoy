@@ -3744,6 +3744,8 @@ TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTr
   codec_client_->sendData(*request_encoder_, 1024 * 65, false);
 
   ASSERT_TRUE(response->waitForEndStream());
+  // A stream callback can exit the shared dispatcher before the connection closes.
+  dispatcher_->post([this]() { dispatcher_->exit(); });
   // The delayed close timeout should trigger since client is not closing the connection.
   EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);

@@ -771,6 +771,8 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+  // Close the open request while its response decoder can still handle reset callbacks.
+  cleanupUpstreamAndDownstream();
 }
 
 // A live, non-serializable object stored in filter state at Request lifespan is carried across
