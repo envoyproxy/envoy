@@ -776,8 +776,9 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
 // A live, non-serializable object stored in filter state at Request lifespan is carried across
 // recreate_stream: the rebuilt filter recovers the same object and echoes its value.
 TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
-  if (GetParam() != "rust" && GetParam() != "rust_static") {
-    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  if (GetParam() != "rust" && GetParam() != "rust_static" && GetParam() != "go") {
+    GTEST_SKIP()
+        << "the filter_state_object_recreate filter is only in the rust and go test modules";
   }
   initializeFilter("filter_state_object_recreate");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));

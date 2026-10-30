@@ -808,6 +808,48 @@ TEST_P(DynamicModuleHttpLanguageTests, RecreateStream) {
   filter->onDestroy();
 }
 
+// Go filter state objects are destroyed exactly once, and a panic in a destroy hook is recovered.
+TEST_P(DynamicModuleHttpLanguageTests, FilterStateObjectCallbacks) {
+  if (GetParam() != "go") {
+    GTEST_SKIP() << "the filter_state_object_callbacks filter is only in the go test module";
+  }
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", GetParam()), false);
+  EXPECT_OK(dynamic_module);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = stats_store.createScope("");
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "filter_state_object_callbacks", "", DefaultMetricsNamespace, false,
+      std::move(dynamic_module.value()), *stats_scope, context);
+  EXPECT_OK(filter_config_or_status);
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope->symbolTable(), 0);
+  EXPECT_LOG_CONTAINS("info", "filter state object rejected destroyed",
+                      { filter->initializeInModuleFilter(); });
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(stream_info, filterState())
+      .WillRepeatedly(testing::ReturnRef(stream_info.filter_state_));
+  filter->setDecoderFilterCallbacks(callbacks);
+
+  Http::TestRequestHeaderMapImpl request_headers{};
+  EXPECT_LOG_CONTAINS("info", "filter state object first destroyed", {
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  });
+  EXPECT_NE(stream_info.filter_state_->getDataReadOnlyGeneric("go_object"), nullptr);
+  EXPECT_NE(stream_info.filter_state_->getDataReadOnlyGeneric("go_plain_object"), nullptr);
+
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"info", "filter state object second destroyed"},
+                                 {"error", "filter state object destructor panic"},
+                             }),
+                             { stream_info.filter_state_.reset(); });
+}
+
 // The "destroy_logging" filter of the Rust test module logs when it is dropped, which makes the
 // point at which Envoy destroys the in-module filter observable.
 class DynamicModuleHttpFilterDestroyTest : public testing::Test {
