@@ -1959,10 +1959,12 @@ void McpJsonRestBridgeFilter::sendErrorResponse(
   }
   setParsingMetadata(method, params);
 
-  if (is_notification_ && response_code == Http::Code::OK) {
-    response_code = Http::Code::BadRequest;
-  }
-  decoder_callbacks_->sendLocalReply(response_code, response_body, modify_headers, grpc_status,
+  // The Streamable HTTP transport requires an HTTP error status for a rejected notification:
+  // https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
+  const Http::Code code = (is_notification_ && response_code == Http::Code::OK)
+                              ? Http::Code::BadRequest
+                              : response_code;
+  decoder_callbacks_->sendLocalReply(code, response_body, modify_headers, grpc_status,
                                      bridgeStatusToString(status));
 }
 
@@ -2119,9 +2121,8 @@ absl::Status McpJsonRestBridgeFilter::validateJsonRpcIdAndMethod(const nlohmann:
                       generateErrorJsonResponse(-32600, "MCP method field is not a string").dump());
     return absl::InvalidArgumentError("MCP method field is not a string");
   } else if (!json_rpc.contains(McpConstants::ID_FIELD) &&
-             absl::StartsWith(
-                 json_rpc[McpConstants::METHOD_FIELD].get_ref<const nlohmann::json::string_t&>(),
-                 McpConstants::Methods::NOTIFICATION_PREFIX)) {
+             absl::StartsWith(json_rpc[McpConstants::METHOD_FIELD].get<absl::string_view>(),
+                              McpConstants::Methods::NOTIFICATION_PREFIX)) {
     // A notification, i.e. a message without an "id" member whose method is an MCP notification,
     // is not required to have an ID field.
     is_notification_ = true;
