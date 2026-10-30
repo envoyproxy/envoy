@@ -82,6 +82,9 @@ void ExtProcIntegrationTest::initializeConfig(
       [&total_cluster_endpoints](const auto& item) { total_cluster_endpoints += item.second; });
   ASSERT_EQ(total_cluster_endpoints, grpc_upstream_count_);
 
+  if (!proto_config_.has_message_timeout()) {
+    proto_config_.mutable_message_timeout()->set_seconds(5);
+  }
   config_helper_.addConfigModifier([this, cluster_endpoints, config_option](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC and for headers
@@ -240,6 +243,9 @@ void ExtProcIntegrationTest::initializeConfig(
 
 void ExtProcIntegrationTest::twoExtProcFiltersFullDuplexConfig() {
   two_ext_proc_filters_ = true;
+  if (!proto_config_.has_message_timeout()) {
+    proto_config_.mutable_message_timeout()->set_seconds(5);
+  }
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
     // Filter-1
     proto_config_1_.mutable_processing_mode()->Clear();
@@ -503,8 +509,8 @@ void ExtProcIntegrationTest::processRequestBodyMessage(
   if (check_downstream_flow_control) {
     // Check the flow control counter in downstream, which is triggered on the request
     // path to ext_proc server (i.e., from side stream).
-    test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
-                                 Ge(1));
+    test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+        "http.config_test.downstream_flow_control_paused_reading_total", 1);
   }
 
   // Send back the response from ext_proc server.
@@ -610,7 +616,12 @@ void ExtProcIntegrationTest::packTwoResponsesInOneMessage(
 
 // ext_proc server sends back a response to tell Envoy to stop the
 // original timer and start a new timer.
-void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
+void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms, bool expect_ignored) {
+  const std::string counter_name =
+      expect_ignored ? "http.config_test.ext_proc.override_message_timeout_ignored"
+                     : "http.config_test.ext_proc.override_message_timeout_received";
+  const auto counter = test_server_->counter(counter_name);
+  const uint64_t prev_count = counter != nullptr ? counter->value() : 0;
   ProcessingResponse response;
   if (timeout_ms < 1000) {
     response.mutable_override_message_timeout()->set_nanos(timeout_ms * 1000000);
@@ -618,6 +629,7 @@ void ExtProcIntegrationTest::serverSendNewTimeout(const uint64_t timeout_ms) {
     response.mutable_override_message_timeout()->set_seconds(timeout_ms / 1000);
   }
   processor_stream_->sendGrpcMessage(response);
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(counter_name, prev_count + 1);
 }
 
 void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms) {
@@ -637,7 +649,7 @@ void ExtProcIntegrationTest::newTimeoutWrongConfigTest(const uint64_t timeout_ms
 
   processRequestHeadersMessage(*grpc_upstreams_[0], true,
                                [&](const HttpHeaders&, HeadersResponse&) {
-                                 serverSendNewTimeout(timeout_ms);
+                                 serverSendNewTimeout(timeout_ms, /*expect_ignored=*/true);
                                  // ext_proc server stays idle for 300ms before sending back the
                                  // response.
                                  timeSystem().advanceTimeWaitImpl(300ms);
@@ -745,7 +757,8 @@ void ExtProcIntegrationTest::testGetAndCloseStream() {
   // observability mode, the main stream does not wait for the ext_proc stream, so wait until Envoy
   // has processed the close before allowing the main response to complete and consume its logging
   // info.
-  test_server_->waitForCounter("http.config_test.ext_proc.server_half_closed", Ge(1));
+  test_server_->notifyingStatsAllocator().waitForCounterFromStringGe(
+      "http.config_test.ext_proc.server_half_closed", 1);
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
@@ -875,10 +888,10 @@ ExtProcIntegrationTest::initAndSendDataDuplexStreamedMode(absl::string_view body
 void ExtProcIntegrationTest::serverReceiveHeaderReq(ProcessingRequest& header, bool first_message,
                                                     bool response) {
   if (first_message) {
-    EXPECT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
-    EXPECT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+    ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
+    ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
   }
-  EXPECT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, header));
   if (response) {
     EXPECT_TRUE(header.has_response_headers());
   } else {
@@ -889,10 +902,10 @@ void ExtProcIntegrationTest::serverReceiveHeaderReq(ProcessingRequest& header, b
 void ExtProcIntegrationTest::server1ReceiveHeaderReq(ProcessingRequest& header, bool first_message,
                                                      bool response) {
   if (first_message) {
-    EXPECT_TRUE(grpc_upstreams_[1]->waitForHttpConnection(*dispatcher_, processor_connection_1_));
-    EXPECT_TRUE(processor_connection_1_->waitForNewStream(*dispatcher_, processor_stream_1_));
+    ASSERT_TRUE(grpc_upstreams_[1]->waitForHttpConnection(*dispatcher_, processor_connection_1_));
+    ASSERT_TRUE(processor_connection_1_->waitForNewStream(*dispatcher_, processor_stream_1_));
   }
-  EXPECT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, header));
+  ASSERT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, header));
   if (response) {
     EXPECT_TRUE(header.has_response_headers());
   } else {
