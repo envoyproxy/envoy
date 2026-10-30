@@ -1,6 +1,7 @@
 #include "source/common/stats/histogram_impl.h"
 
 #include <algorithm>
+#include <limits>
 #include <string>
 
 #include "source/common/common/utility.h"
@@ -61,6 +62,15 @@ std::string HistogramStatisticsImpl::bucketSummary() const {
     bucket_summary.push_back(fmt::format("B{:g}: {}", supported_buckets[i], computed_buckets_[i]));
   }
   return absl::StrJoin(bucket_summary, ", ");
+}
+
+void HistogramStatisticsImpl::reset() {
+  std::fill(computed_quantiles_.begin(), computed_quantiles_.end(),
+            std::numeric_limits<double>::quiet_NaN());
+  computed_buckets_.assign(supported_buckets_.size(), 0);
+  sample_count_ = 0;
+  sample_sum_ = 0;
+  out_of_bound_count_ = 0;
 }
 
 /**

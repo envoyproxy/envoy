@@ -1371,8 +1371,11 @@ void ParentHistogramImpl::merge() {
       cumulative_statistics_.refresh(cumulative_histogram_);
     }
 
-    // Even if the interval had no data, the hist_clear needs to be reflected
-    interval_statistics_.refresh(interval_histogram_);
+    if (has_interval_data) {
+      interval_statistics_.refresh(interval_histogram_);
+    } else {
+      interval_statistics_.reset();
+    }
     merged_ = true;
   }
 }

@@ -55,6 +55,7 @@ public:
       ConstSupportedBuckets& supported_buckets = HistogramSettingsImpl::defaultBuckets());
 
   void refresh(const histogram_t* new_histogram_ptr);
+  void reset();
 
   // HistogramStatistics
   std::string quantileSummary() const override;
