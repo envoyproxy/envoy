@@ -8,6 +8,8 @@
 #include "source/extensions/health_checkers/common/health_checker_base_impl.h"
 #include "source/extensions/health_checkers/dynamic_modules/health_checker_config.h"
 
+#include "absl/container/flat_hash_map.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {
@@ -105,6 +107,9 @@ public:
 
     // Accessors used by the ABI callbacks.
     const Upstream::HostSharedPtr& host() const { return host_; }
+    void setHealthMetadata(absl::string_view key, absl::string_view value) {
+      staged_metadata_.insert_or_assign(std::string(key), std::string(value));
+    }
     const DynamicModuleHealthCheckSessionControlBlockSharedPtr& controlBlock() const {
       return control_block_;
     }
@@ -119,6 +124,9 @@ public:
     // True between onInterval() and a result/timeout. Guards against a late report being applied
     // after the check already resolved (e.g. a result arriving after a timeout).
     bool awaiting_result_{false};
+    // Metadata set by the module during the in-flight check. It is moved to the host once the check
+    // resolves so that HDS never reports a partially populated set.
+    absl::flat_hash_map<std::string, std::string> staged_metadata_;
   };
 
 protected:

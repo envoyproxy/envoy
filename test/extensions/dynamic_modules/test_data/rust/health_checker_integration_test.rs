@@ -21,6 +21,10 @@ enum Mode {
   Unhealthy,
   Timeout,
   Double,
+  // Sets metadata on the first interval only, then reports healthy.
+  Metadata,
+  // Sets metadata on every interval and never reports, so the timeout resolves the check.
+  MetadataTimeout,
 }
 
 fn parse_mode(config: &[u8]) -> Mode {
@@ -29,6 +33,8 @@ fn parse_mode(config: &[u8]) -> Mode {
     "unhealthy" => Mode::Unhealthy,
     "timeout" => Mode::Timeout,
     "double" => Mode::Double,
+    "metadata" => Mode::Metadata,
+    "metadata_timeout" => Mode::MetadataTimeout,
     _ => Mode::Healthy,
   }
 }
@@ -89,6 +95,19 @@ impl HealthCheckerSession for TestHealthCheckerSession {
     let _ = host.metadata_string("missing.ns", "k"); // missing namespace -> None
     let _ = host.health();
 
+    // Metadata is staged by Envoy and applied when the check resolves. The reserved key is
+    // rejected.
+    match self.mode {
+      Mode::Metadata if self.thread.is_none() => {
+        host.set_health_metadata("probe", "ok");
+        host.set_health_metadata("http_status_code", "200");
+      },
+      Mode::MetadataTimeout => {
+        host.set_health_metadata("probe", "timed_out");
+      },
+      _ => {},
+    }
+
     // Kick off the check once; the interval keeps firing but a single report is enough to drive the
     // test, and a single joinable thread keeps teardown deterministic.
     if self.thread.is_some() {
@@ -97,7 +116,7 @@ impl HealthCheckerSession for TestHealthCheckerSession {
     let mode = self.mode;
     match mode {
       // Never report; Envoy's timeout fires and records a failure.
-      Mode::Timeout => {},
+      Mode::Timeout | Mode::MetadataTimeout => {},
       // Report twice from another thread; the second result is ignored by Envoy.
       Mode::Double => {
         self.thread = Some(std::thread::spawn(move || {
