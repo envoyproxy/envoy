@@ -2143,12 +2143,21 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     host_header_value = headers.getHostValue();
   }
 
+  return findVirtualHost(host_header_value);
+}
+
+const VirtualHostImpl* RouteMatcher::findVirtualHost(absl::string_view host) const {
+  // Fast path the case where we only have a default virtual host.
+  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
+      wildcard_virtual_host_prefixes_.empty()) {
+    return default_virtual_host_.get();
+  }
+
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
   if (ignorePortInHostMatching()) {
-    if (const absl::string_view::size_type port_start =
-            Http::HeaderUtility::getPortStart(host_header_value);
+    if (const absl::string_view::size_type port_start = Http::HeaderUtility::getPortStart(host);
         port_start != absl::string_view::npos) {
-      host_header_value = host_header_value.substr(0, port_start);
+      host = host.substr(0, port_start);
     }
   }
   // TODO (@rshriram) Match Origin header in WebSocket
@@ -2157,11 +2166,10 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
   // so scan first and only build a lower-cased copy when an upper-case byte is present. This keeps
   // the common path allocation-free instead of always constructing a std::string.
-  absl::string_view host = host_header_value;
   std::string lowercase_host;
-  if (std::any_of(host_header_value.begin(), host_header_value.end(),
+  if (std::any_of(host.begin(), host.end(),
                   [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
-    lowercase_host = absl::AsciiStrToLower(host_header_value);
+    lowercase_host = absl::AsciiStrToLower(host);
     host = lowercase_host;
   }
   const auto iter = virtual_hosts_.find(host);
