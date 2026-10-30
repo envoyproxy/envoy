@@ -33,6 +33,9 @@ then
     exit 0
 fi
 
+# CI sets `GIT_BIN` to the hermetic git toolchain (see `hermetic_git` in `ci/bazel_fun.sh`).
+GIT="${GIT_BIN:-git}"
+
 if [[ -e ".BAZEL_FAKE_SCM_REVISION" ]]; then
     BAZEL_FAKE_SCM_REVISION="$(cat .BAZEL_FAKE_SCM_REVISION)"
     echo "BUILD_SCM_REVISION $BAZEL_FAKE_SCM_REVISION"
@@ -40,7 +43,7 @@ if [[ -e ".BAZEL_FAKE_SCM_REVISION" ]]; then
     echo "STABLE_BUILD_SCM_REVISION $BAZEL_FAKE_SCM_REVISION"
 else
     # The code below presents an implementation that works for git repository
-    git_rev=$(git rev-parse HEAD) || exit 1
+    git_rev=$("$GIT" rev-parse HEAD) || exit 1
     echo "BUILD_SCM_REVISION ${git_rev}"
     echo "ENVOY_BUILD_SCM_REVISION ${git_rev}"
     echo "STABLE_BUILD_SCM_REVISION ${git_rev}"
@@ -49,10 +52,10 @@ fi
 # If BAZEL_VOLATILE_DIRTY is set then stamped builds will rebuild uncached when
 # either a tracked file changes or an untracked file is added or removed.
 # Otherwise this just tracks changes to tracked files.
-tracked_hash="$(git ls-files -s | sha256sum | head -c 40)"
+tracked_hash="$("$GIT" ls-files -s | sha256sum | head -c 40)"
 if [[ -n "$BAZEL_VOLATILE_DIRTY" ]]; then
-    porcelain_status="$(git status --porcelain | sha256sum)"
-    diff_status="$(git --no-pager diff | sha256sum)"
+    porcelain_status="$("$GIT" status --porcelain | sha256sum)"
+    diff_status="$("$GIT" --no-pager diff | sha256sum)"
     tree_hash="$(echo "${tracked_hash}:${porcelain_status}:${diff_status}" | sha256sum | head -c 40)"
     echo "BUILD_SCM_HASH ${tree_hash}"
 else
@@ -61,17 +64,17 @@ fi
 
 # Check whether there are any uncommitted changes
 tree_status="Clean"
-git diff-index --quiet HEAD -- || {
+"$GIT" diff-index --quiet HEAD -- || {
     tree_status="Modified"
 }
 
 echo "BUILD_SCM_STATUS ${tree_status}"
 echo "STABLE_BUILD_SCM_STATUS ${tree_status}"
 
-git_branch=$(git rev-parse --abbrev-ref HEAD)
+git_branch=$("$GIT" rev-parse --abbrev-ref HEAD)
 echo "BUILD_SCM_BRANCH ${git_branch}"
 
-git_remote=$(git remote get-url origin)
+git_remote=$("$GIT" remote get-url origin)
 if [[ -n "$git_remote" ]]; then
     echo "BUILD_SCM_REMOTE ${git_remote}"
 fi
