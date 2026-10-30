@@ -241,6 +241,11 @@ The following core load shed points are supported:
       not yet started, Envoy will send a local reply. Envoy will then close the
       connection.
 
+  * - envoy.load_shed_points.http1_server_decode_headers
+    - Envoy will reject incoming HTTP/1.x requests on stream decode headers before filter chain
+      creation by sending a ``503`` local reply, closing the downstream connection if a request
+      body is pending and keeping it open for subsequent requests when the request has no body.
+
   * - envoy.load_shed_points.http2_server_go_away_on_dispatch
     - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
       level which will eventually drain the HTTP/2 connection.

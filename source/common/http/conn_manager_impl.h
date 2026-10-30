@@ -706,6 +706,7 @@ private:
   Server::OverloadManager& overload_manager_;
   Server::ThreadLocalOverloadState& overload_state_;
   Server::LoadShedPoint* accept_new_http_stream_{nullptr};
+  Server::LoadShedPoint* http1_decode_headers_{nullptr};
   Server::LoadShedPoint* hcm_ondata_creating_codec_{nullptr};
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
