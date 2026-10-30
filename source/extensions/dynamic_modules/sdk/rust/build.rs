@@ -67,14 +67,12 @@ fn bazel_clang_args() -> Vec<String> {
       continue;
     }
     if let Ok(sysroot_anchor) = env::var(env_var) {
-      if let Some(anchor) = resolve_bazel_location(&sysroot_anchor) {
-        // The anchor is `<sysroot>/usr/include/stdio.h`, so its parent is `usr/include`.
-        if let Some(include_dir) = anchor.parent() {
-          args.push("-isystem".to_string());
-          args.push(format!("{}", include_dir.display()));
-          args.push("-isystem".to_string());
-          args.push(format!("{}/{}", include_dir.display(), triple));
-        }
+      if let Some(sysroot_dir) = resolve_bazel_location(&sysroot_anchor) {
+        let include_dir = sysroot_dir.join("usr/include");
+        args.push("-isystem".to_string());
+        args.push(format!("{}", include_dir.display()));
+        args.push("-isystem".to_string());
+        args.push(format!("{}/{}", include_dir.display(), triple));
       }
     }
   }
@@ -117,6 +115,24 @@ fn main() {
 
   let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
+  // Bake the prefix into the exported macro: env! inside its body would read the
+  // consuming crate's environment instead of the SDK's environment.
+  println!("cargo:rerun-if-env-changed=ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX");
+  let prefix = env::var("ENVOY_DYNAMIC_MODULE_SYMBOL_PREFIX").unwrap_or_default();
+  std::fs::write(
+    out_path.join("export_name.rs"),
+    format!(
+      r#"
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __export_name_impl {{
+  ($name:expr) => {{ concat!({prefix:?}, $name) }};
+}}
+"#
+    ),
+  )
+  .expect("Couldn't write export naming macro");
+
   let bindings = bindgen::Builder::default()
     .header(abi_header.to_str().unwrap())
     .clang_args(bazel_clang_args())
@@ -128,8 +144,25 @@ fn main() {
     .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
     .parse_callbacks(Box::new(TrimEnumNameFromVariantName));
 
+  // Set when building the SDK for a dynamic module DLL on Windows. See src/windows_delay_load.rs.
+  println!("cargo:rustc-check-cfg=cfg(envoy_dynamic_module_dll)");
+
+  // A dynamic module DLL imports the Envoy callbacks from `envoy.dll`, which
+  // src/windows_delay_load.rs redirects to the host executable at runtime. This requires the DLL to
+  // be linked with `/DELAYLOAD:envoy.dll`. A static module (non-empty prefix) is linked into the
+  // Envoy binary itself, where the callbacks are defined directly, so the import stubs would
+  // collide with those definitions. Only the Envoy ABI items are generated, since every function
+  // declared in the system headers that abi.h includes, such as the CRT's __security_init_cookie,
+  // would otherwise be imported from `envoy.dll` too.
   #[cfg(target_os = "windows")]
-  let bindings = bindings.extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]");
+  let bindings = if prefix.is_empty() {
+    println!("cargo:rustc-cfg=envoy_dynamic_module_dll");
+    bindings
+      .allowlist_item("envoy_.*")
+      .extern_block_attrs("#[link(name = \"envoy\", kind = \"raw-dylib\")]")
+  } else {
+    bindings
+  };
 
   let bindings = bindings.generate().expect("Unable to generate bindings");
 

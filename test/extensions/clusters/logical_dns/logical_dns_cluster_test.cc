@@ -35,7 +35,6 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -132,11 +131,11 @@ protected:
   void expectResolve(Network::DnsLookupFamily dns_lookup_family,
                      const std::string& expected_address) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                             Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                      Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           dns_callback_ = cb;
           return &active_dns_query_;
-        }));
+        });
   }
 
   void testBasicSetup(const std::string& config, const std::string& expected_address,
@@ -373,13 +372,13 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+      .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
         cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
-      }));
+      });
   setupFromV3Yaml(yaml);
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());

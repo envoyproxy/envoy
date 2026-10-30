@@ -5,6 +5,7 @@ load(
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -32,6 +33,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/common/stream_info:filter_state_lib",
         "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dynamic_modules:cluster_lib",
+        "//source/extensions/clusters/dynamic_modules:persistent_host_set_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/least_request:config",
@@ -47,15 +49,32 @@ envoy_extension_cc_dyn_module_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:health_checker_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/mocks/upstream:priority_set_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "persistent_host_set_test",
+    srcs = ["persistent_host_set_test.cc"],
+    extension_names = ["envoy.clusters.dynamic_modules"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/clusters/dynamic_modules:persistent_host_set_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 

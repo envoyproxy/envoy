@@ -17,7 +17,6 @@
 
 using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using ::testing::Not;
 using testing::Return;
@@ -575,9 +574,9 @@ TEST_F(QuicClientTransportSocketFactoryTest, TlsCertificateSelector) {
     }
     absl::Status onConfigUpdate() override { return absl::OkStatus(); }
   } selector;
-  EXPECT_CALL(*context_config_, tlsCertificateSelectorFactory()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*context_config_, tlsCertificateSelectorFactory()).WillOnce([&]() {
     return makeOptRef(selector);
-  }));
+  });
   auto factory_or_error = Quic::QuicClientTransportSocketFactory::create(
       std::unique_ptr<Envoy::Ssl::ClientContextConfig>(context_config_), context_);
   EXPECT_THAT(factory_or_error, Not(IsOk()));
@@ -872,9 +871,9 @@ TEST_F(QuicServerTransportSocketFactoryConfigTest, RequireClientCertRejectsCaLes
   ON_CALL(config_ref, validationContextConfigured()).WillByDefault(Return(true));
   ON_CALL(config_ref, certificateValidationContext()).WillByDefault(Return(nullptr));
   ON_CALL(config_ref, setSecretUpdateCallback(_))
-      .WillByDefault(Invoke([&secret_update_callback](std::function<absl::Status()> callback) {
+      .WillByDefault([&secret_update_callback](std::function<absl::Status()> callback) {
         secret_update_callback = std::move(callback);
-      }));
+      });
 
   auto factory_or_error = QuicServerTransportSocketFactory::create(
       /*enable_early_data=*/false, /*enable_resumption=*/false, *server_stats_store_.rootScope(),

@@ -126,14 +126,14 @@ TEST_F(AsyncCredentialHandlingTest, ReceivePendingTrueWhenPending) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).WillRepeatedly(Invoke([&signer]() {
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _)).WillRepeatedly([&signer]() {
     // This will check that we see true from credentialsPending by the time we call fetch
     auto cb = Envoy::Extensions::Common::Aws::CredentialsPendingCallback{};
     Http::RequestMessagePtr message(new Http::RequestMessageImpl());
 
     auto result = signer->addCallbackIfCredentialsPending(std::move(cb));
     EXPECT_TRUE(result);
-  }));
+  });
 
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
@@ -198,10 +198,10 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
       .WillRepeatedly(
-          Invoke([&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
-                                                     MetadataFetcher::MetadataReceiver& receiver) {
+          [&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
+                                              MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(document));
-          }));
+          });
 
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
@@ -257,10 +257,10 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationWithGracePeriod) {
                               expiration_timestamp);
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(document));
-          }));
+          });
 
   // Expect timer to be set to less than 10 minutes due to grace period
   EXPECT_CALL(*timer_, enableTimer(testing::Lt(std::chrono::minutes(10)), nullptr))
@@ -317,10 +317,10 @@ TEST_F(AsyncCredentialHandlingTest, ExpirationTooCloseToGracePeriod) {
                               expiration_timestamp);
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(document));
-          }));
+          });
 
   // Expect timer to be set multiple times - first 1ms for initial trigger, then 1000ms for
   // immediate refresh
@@ -390,10 +390,10 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
 
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
       .WillRepeatedly(
-          Invoke([&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
-                                                     MetadataFetcher::MetadataReceiver& receiver) {
+          [&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
+                                              MetadataFetcher::MetadataReceiver& receiver) {
             receiver.onMetadataSuccess(std::move(document));
-          }));
+          });
 
   handle2.reset();
   chain2.reset();

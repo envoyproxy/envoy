@@ -84,6 +84,7 @@ envoy_cc_library(
     deps = [
         ":cds_api_lib",
         ":cluster_discovery_manager_lib",
+        ":cluster_dns_resolver_cache_lib",
         ":host_utility_lib",
         ":load_balancer_context_base_lib",
         ":load_stats_reporter_lib",
@@ -102,6 +103,7 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/config:custom_config_validators_lib",
+        "//source/common/config:dependent_type_urls_lib",
         "//source/common/config:null_grpc_mux_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
@@ -120,6 +122,8 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/common/shared_pool:shared_pool_lib",
+        "//source/common/stats:prefix_utility_lib",
+        "//source/common/stats:utility_lib",
         "//source/common/tcp:async_tcp_client_lib",
         "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:priority_conn_pool_map_impl_lib",
@@ -547,6 +551,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "cluster_dns_resolver_cache_lib",
+    srcs = ["cluster_dns_resolver_cache.cc"],
+    hdrs = ["cluster_dns_resolver_cache.h"],
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/common:exception_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:dns_resolver_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_factory_lib",
     srcs = ["cluster_factory_impl.cc"],
     deps = [
@@ -578,6 +599,7 @@ envoy_cc_library(
     name = "cluster_factory_includes",
     hdrs = ["cluster_factory_impl.h"],
     deps = [
+        ":cluster_dns_resolver_cache_lib",
         ":load_balancer_context_base_lib",
         ":outlier_detection_lib",
         ":resource_manager_lib",

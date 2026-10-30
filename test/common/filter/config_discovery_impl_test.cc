@@ -177,12 +177,12 @@ public:
         .WillByDefault(ReturnRef(validation_context_));
     ON_CALL(validation_context_, dynamicValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
-    ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
-    ON_CALL(init_manager_, initialize(_))
-        .WillByDefault(Invoke(
-            [this](const Init::Watcher& watcher) { init_target_handle_->initialize(watcher); }));
+    });
+    ON_CALL(init_manager_, initialize(_)).WillByDefault([this](const Init::Watcher& watcher) {
+      init_target_handle_->initialize(watcher);
+    });
   }
   virtual ~FilterConfigDiscoveryTestBase() {
     server_factory_context_.thread_local_.shutdownThread();
@@ -465,10 +465,9 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, Basic) {
     const auto decoded_resources =
         TestUtility::decodeResources<envoy::config::core::v3::TypedExtensionConfig>(response);
 
-    EXPECT_CALL(config_discovery_test.init_watcher_, ready())
-        .WillOnce(Invoke([&config_discovery_test]() {
-          EXPECT_TRUE(config_discovery_test.filter_factory_.created_);
-        }));
+    EXPECT_CALL(config_discovery_test.init_watcher_, ready()).WillOnce([&config_discovery_test]() {
+      EXPECT_TRUE(config_discovery_test.filter_factory_.created_);
+    });
     ASSERT_OK(config_discovery_test.callbacks_->onConfigUpdate(decoded_resources.refvec_,
                                                                response.version_info()));
     EXPECT_NE(std::nullopt, config_discovery_test.provider_->config());
@@ -746,9 +745,9 @@ TEST_F(FilterConfigDiscoveryShutdownTest, ShutdownDuringInFlightUpdate) {
   // Intercept runOnAllThreads and capture the main thread completion callback
   std::function<void()> pending_completion_callback;
   EXPECT_CALL(server_factory_context_.thread_local_, runOnAllThreads(_, _))
-      .WillOnce(Invoke([&](std::function<void()>, std::function<void()> completion_cb) {
+      .WillOnce([&](std::function<void()>, std::function<void()> completion_cb) {
         pending_completion_callback = completion_cb;
-      }))
+      })
       .WillRepeatedly(Invoke(&server_factory_context_.thread_local_,
                              &ThreadLocal::MockInstance::runOnAllThreads2));
 

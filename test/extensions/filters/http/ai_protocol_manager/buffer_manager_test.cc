@@ -10,11 +10,11 @@
 #include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/event/mocks.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -160,17 +160,17 @@ public:
   BufferManagerTest() {
     // The in-memory buffer delivers write completions via dispatcher.post().
     // Capture those callbacks so the test can run the event loop deterministically.
-    ON_CALL(dispatcher_, post(testing::_)).WillByDefault(Invoke([this](Event::PostCb cb) {
+    ON_CALL(dispatcher_, post(testing::_)).WillByDefault([this](Event::PostCb cb) {
       posted_.push_back(std::move(cb));
-    }));
+    });
     // The manager creates its replay callback on first replay, so the mock is manufactured on
     // demand: arming a one-shot expectation up front would leave it unmet in every test that
     // never replays.
     ON_CALL(dispatcher_, createSchedulableCallback_(testing::_))
-        .WillByDefault(Invoke([this](std::function<void()> cb) -> Event::SchedulableCallback* {
+        .WillByDefault([this](std::function<void()> cb) -> Event::SchedulableCallback* {
           replay_cb_ = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_, cb);
           return replay_cb_;
-        }));
+        });
     resetManager(factory_);
   }
 
@@ -598,6 +598,155 @@ TEST_F(BufferManagerTest, SerializesAndCoalescesQueuedWrites) {
   EXPECT_EQ(bridge_->injected_.toString(), chunk + chunk + chunk);
 }
 
+// The terminal write is the store's commit signal. When the last data write has
+// already drained the backlog before endStream() arrives, the manager still
+// issues one zero-length write carrying end_stream, and replay waits for it.
+TEST_F(BufferManagerTest, EndStreamAfterDrainedBacklogIssuesTerminalWrite) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+  drain();
+
+  manager_->endStream();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk);
+}
+
+// endStream() while a data write is in flight is carried by one zero-length
+// follow-up write.
+TEST_F(BufferManagerTest, EndStreamDuringInFlightWriteIssuesOneTerminalWrite) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  manager_->endStream();
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+  EXPECT_TRUE(replay_done_);
+}
+
+// A last frame passed with end_stream is written once, carrying end_stream.
+TEST_F(BufferManagerTest, FinalFrameWithEndStreamIsWrittenOnce) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame, /*end_stream=*/true);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  manager_->endStream();
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 1);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size()));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(true));
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk);
+}
+
+// A last frame passed with end_stream during an in-flight write goes down in the
+// follow-up write, which carries end_stream.
+TEST_F(BufferManagerTest, FinalFrameWithEndStreamDuringInFlightWriteFoldsIntoFollowUp) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  const std::string tail(16, 'y');
+  Buffer::OwnedImpl frame(chunk);
+  Buffer::OwnedImpl last_frame(tail);
+  manager_->onData(frame);
+  manager_->onData(last_frame, /*end_stream=*/true);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_EQ(buffer->write_calls_, 1);
+
+  replayAll();
+  drain();
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), tail.size()));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk + tail);
+}
+
+// An empty end_stream frame after the backlog has drained is a zero-length
+// terminal write.
+TEST_F(BufferManagerTest, EmptyFinalFrameAfterDrainedBacklogIssuesTerminalWrite) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+  drain();
+
+  Buffer::OwnedImpl empty;
+  manager_->onData(empty, /*end_stream=*/true);
+  EXPECT_EQ(buffer->write_calls_, 2);
+  EXPECT_THAT(buffer->write_sizes_, testing::ElementsAre(chunk.size(), 0));
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(false, true));
+
+  replayAll();
+  drain();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), chunk);
+}
+
+// A small body passed with end_stream stays in memory and creates no store.
+TEST_F(BufferManagerTest, FinalFrameWithEndStreamWithinInMemoryTierCreatesNoStore) {
+  manager_config_.max_in_memory_bytes = 1024;
+  resetManager(posting_factory_);
+
+  Buffer::OwnedImpl body("{}");
+  manager_->onData(body, /*end_stream=*/true);
+  manager_->endStream();
+  EXPECT_EQ(posting_factory_.create_calls_, 0);
+
+  replayAll();
+  ASSERT_NE(replay_cb_, nullptr);
+  replay_cb_->invokeCallback();
+  EXPECT_TRUE(replay_done_);
+  EXPECT_EQ(bridge_->injected_.toString(), "{}");
+}
+
+// Data after end of stream is reported and dropped.
+TEST_F(BufferManagerTest, DataAfterEndStreamIsReportedAndDropped) {
+  resetManager(posting_factory_);
+
+  const std::string chunk(64 * 1024, 'x');
+  Buffer::OwnedImpl frame(chunk);
+  manager_->onData(frame, /*end_stream=*/true);
+  PostingExternalBuffer* buffer = posting_factory_.last_;
+  ASSERT_NE(buffer, nullptr);
+
+  Buffer::OwnedImpl late("late");
+  EXPECT_ENVOY_BUG(manager_->onData(late), "data after end of stream");
+  drain();
+  EXPECT_THAT(buffer->write_end_streams_, testing::ElementsAre(true));
+}
+
 // When the chain we replay into is backed up before replay starts, no data is
 // injected until the back-pressure is released.
 TEST_F(BufferManagerTest, ReplayPausesUnderBackPressure) {
@@ -757,8 +906,10 @@ TEST_F(BufferManagerTest, ResumeSkipsReadWhileOneInFlight) {
   manager_->endStream();
   replayAll();
 
-  // Run just the write completion: replay starts and posts its first read (now in
+  // Run the data write completion, then the zero-length terminal write it
+  // triggers: replay starts after the second and posts its first read (now in
   // flight, not yet completed).
+  runOnePosted();
   runOnePosted();
 
   // A watermark cycle schedules a resume while the read is still in flight.
@@ -1121,9 +1272,9 @@ TEST_F(BufferManagerTest, OnReplayResumedWhileBudgetYieldedDoesNotScheduleCurren
 
   // Capture calls to scheduleCallbackCurrentIteration vs NextIteration during watermark lower.
   int current_iter_calls = 0;
-  ON_CALL(*replay_cb_, scheduleCallbackCurrentIteration()).WillByDefault(Invoke([&]() {
+  ON_CALL(*replay_cb_, scheduleCallbackCurrentIteration()).WillByDefault([&]() {
     ++current_iter_calls;
-  }));
+  });
 
   // First continuation consumes the 8-chunk budget and yields via scheduleCallbackNextIteration().
   replay_cb_->invokeCallback();

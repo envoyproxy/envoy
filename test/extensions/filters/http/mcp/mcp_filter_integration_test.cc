@@ -304,6 +304,43 @@ typed_config:
   EXPECT_EQ(nullptr, upstream_request_);
 }
 
+TEST_P(McpFilterIntegrationTest, RejectsMissingProtocolVersionMeta) {
+  initializeFilter(R"EOF(
+name: envoy.filters.http.mcp
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  traffic_mode: REJECT_NO_MCP
+  max_supported_protocol_version: "2026-07-28"
+)EOF");
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const std::string request_body =
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})";
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept", "application/json"},
+                                     {"accept", "text/event-stream"},
+                                     {"content-type", "application/json"},
+                                     {"mcp-protocol-version", "2026-07-28"},
+                                     {"mcp-method", "tasks/get"},
+                                     {"mcp-name", "task-123"}},
+      request_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_EQ("400", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("\"code\":-32602"));
+  EXPECT_THAT(response->body(), testing::HasSubstr("Missing or invalid params._meta field: "
+                                                   "io.modelcontextprotocol/protocolVersion"));
+
+  EXPECT_EQ(nullptr, upstream_request_);
+}
+
 TEST_P(McpFilterIntegrationTest, NewSpecRejectsMissingMethodHeader) {
   initializeFilter(R"EOF(
 name: envoy.filters.http.mcp

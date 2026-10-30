@@ -198,6 +198,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "cluster_manager_lifecycle_test",
     srcs = ["cluster_manager_lifecycle_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_manager_impl_test_common",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -676,6 +677,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//test/test_common:status_utility_lib",
+        ":snapshot_host_set_lib",
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -736,6 +738,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
+    name = "snapshot_host_set_lib",
+    hdrs = ["snapshot_host_set.h"],
+    deps = [
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     deps = [
@@ -789,6 +800,23 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "cluster_dns_resolver_cache_test",
+    srcs = ["cluster_dns_resolver_cache_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
+        "//source/common/upstream:cluster_dns_resolver_cache_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/cares/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",
     ],
 )
 

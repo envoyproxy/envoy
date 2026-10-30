@@ -449,8 +449,9 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFill) {
 // share provider is used.
 TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShareProvider) {
   auto share_provider = std::make_shared<MockShareProvider>();
-  EXPECT_CALL(*share_provider, getTokensShareFactor())
-      .WillRepeatedly(testing::Invoke([]() -> double { return 0.5; }));
+  EXPECT_CALL(*share_provider, getTokensShareFactor()).WillRepeatedly([]() -> double {
+    return 0.5;
+  });
 
   initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2, share_provider);
 

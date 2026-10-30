@@ -18,7 +18,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -60,6 +59,10 @@ public:
 };
 
 namespace {
+template <typename... Args> auto UnorderedElementsAreLowercase(Args... args) {
+  return testing::UnorderedElementsAre(Http::LowerCaseString(args)...);
+}
+
 const std::string default_city_db_path =
     "{{ test_rundir "
     "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb";
@@ -163,24 +166,23 @@ public:
   void initializeProvider(const std::string& yaml,
                           std::optional<ConditionalInitializer>& conditional) {
     EXPECT_CALL(server_factory_context_, scope()).WillRepeatedly(ReturnRef(*scope_));
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
-        .WillRepeatedly(Invoke([this, &conditional] {
-          Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
-          EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
-              .WillRepeatedly(Invoke([this, &conditional](absl::string_view, uint32_t,
-                                                          Filesystem::Watcher::OnChangedCb cb) {
-                {
-                  absl::WriterMutexLock lock(mutex_);
-                  on_changed_cbs_.reserve(1);
-                  on_changed_cbs_.emplace_back(std::move(cb));
-                }
-                if (conditional.has_value()) {
-                  conditional->setReady();
-                }
-                return absl::OkStatus();
-              }));
-          return mock_watcher;
-        }));
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([this, &conditional] {
+      Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+          .WillRepeatedly([this, &conditional](absl::string_view, uint32_t,
+                                               Filesystem::Watcher::OnChangedCb cb) {
+            {
+              absl::WriterMutexLock lock(mutex_);
+              on_changed_cbs_.reserve(1);
+              on_changed_cbs_.emplace_back(std::move(cb));
+            }
+            if (conditional.has_value()) {
+              conditional->setReady();
+            }
+            return absl::OkStatus();
+          });
+      return mock_watcher;
+    });
     EXPECT_CALL(server_factory_context_, mainThreadDispatcher())
         .WillRepeatedly(ReturnRef(dispatcher_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;
@@ -261,6 +263,42 @@ TEST_F(GeoipProviderTest, ValidConfigCityAndAsnDbsSuccessfulLookup) {
   EXPECT_EQ("29518", asn_it->second);
   expectStats("city_db");
   expectStats("asn_db");
+}
+
+// The provider reports every configured output key, so the HTTP filter can remove them from a
+// request before the lookup; a key that was not configured is not reported.
+TEST_F(GeoipProviderTest, GeoHeaderNamesListEveryConfiguredKey) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_field_keys:
+        country: "x-geo-country"
+        region: "x-geo-region"
+        city: "x-geo-city"
+        asn: "x-geo-asn"
+        anon_vpn: "x-geo-anon-vpn"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    asn_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-ASN-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  EXPECT_THAT(provider_->geoHeaderNames(),
+              UnorderedElementsAreLowercase("x-geo-country", "x-geo-region", "x-geo-city",
+                                            "x-geo-asn", "x-geo-anon-vpn"));
+}
+
+// The deprecated geo_headers_to_add form, including the is_anon fallback, reports its keys too.
+TEST_F(GeoipProviderTest, DEPRECATED_FEATURE_TEST(GeoHeaderNamesListDeprecatedGeoHeadersToAdd)) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+        is_anon: "x-geo-anon"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+    anon_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-Anonymous-IP-Test.mmdb"
+  )EOF";
+  initializeProvider(config_yaml, cb_added_nullopt);
+  EXPECT_THAT(provider_->geoHeaderNames(),
+              UnorderedElementsAreLowercase("x-geo-country", "x-geo-anon"));
 }
 
 TEST_F(GeoipProviderTest, ValidConfigAsnDbsSuccessfulLookup) {

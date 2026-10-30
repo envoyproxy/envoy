@@ -70,11 +70,19 @@ envoy_cc_test_library(
 envoy_wasm_cc_binary(
     name = "test_cpp.wasm",
     srcs = ["test_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
+)
+
+envoy_wasm_cc_binary(
+    name = "test_cpp_source.wasm",
+    srcs = ["test_cpp.cc"],
+    # Deliberately NOT precompiled: from-source V8 canary.
 )
 
 envoy_wasm_cc_binary(
     name = "test_context_cpp.wasm",
     srcs = ["test_context_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_lib",
     ],
@@ -83,6 +91,7 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "test_restriction_cpp.wasm",
     srcs = ["test_restriction_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_wasm_cc_binary(

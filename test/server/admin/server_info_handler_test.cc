@@ -167,13 +167,13 @@ TEST_P(AdminInstanceTest, GetReadyRequest) {
 TEST_P(AdminInstanceTest, GetRequest) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   EXPECT_CALL(server_, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([&local_info] {
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly([&local_info] {
     Server::CommandLineOptionsPtr command_line_options =
         std::make_unique<envoy::admin::v3::CommandLineOptions>();
     command_line_options->set_restart_epoch(2);
     command_line_options->set_service_cluster(local_info.clusterName());
     return command_line_options;
-  }));
+  });
   NiceMock<Init::MockManager> initManager;
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
   ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));
@@ -251,13 +251,13 @@ TEST_P(AdminInstanceTest, GetRequest) {
 TEST_P(AdminInstanceTest, ServerInfoHotRestartInitializing) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   EXPECT_CALL(server_, localInfo()).WillRepeatedly(ReturnRef(local_info));
-  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([&local_info] {
+  EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly([&local_info] {
     Server::CommandLineOptionsPtr command_line_options =
         std::make_unique<envoy::admin::v3::CommandLineOptions>();
     command_line_options->set_restart_epoch(2);
     command_line_options->set_service_cluster(local_info.clusterName());
     return command_line_options;
-  }));
+  });
   NiceMock<Init::MockManager> initManager;
   ON_CALL(server_, initManager()).WillByDefault(ReturnRef(initManager));
   ON_CALL(server_.hot_restart_, version()).WillByDefault(Return("foo_version"));

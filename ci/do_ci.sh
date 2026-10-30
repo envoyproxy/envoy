@@ -99,11 +99,12 @@ function cp_binary_for_image_build() {
   fi
 
   # Tools for the tools image. Strip to save size.
-  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+  hermetic_strip
+  "${STRIP_BIN}" bazel-bin/test/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
-  strip bazel-bin/test/tools/router_check/router_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
-  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/config_load_check/config_load_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
@@ -111,7 +112,7 @@ function cp_binary_for_image_build() {
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
-  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
+  "${STRIP_BIN}" "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
   # only if BUILD_REASON exists (running in AZP)
   if [[ "${BUILD_REASON}" ]]; then
@@ -518,18 +519,11 @@ case $CI_TARGET in
         bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
         ;;
 
-    compile_time_options)
+    compile_time_options|cto)
         # See `compile-time-options` in `.bazelrc`
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-
-        # Test execution_context build setting transition
-        echo "Building and testing execution_context_enabled tests..."
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -c fastbuild \
-            -- //test/common/common:execution_context_enabled_test
 
         if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
             echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
@@ -541,7 +535,7 @@ case $CI_TARGET in
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
-        if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
+        if [[ -n "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
         echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
@@ -659,6 +653,7 @@ case $CI_TARGET in
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
+        hermetic_jq
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
         echo "Check bazel registry ..."
         registry_check
@@ -832,6 +827,14 @@ case $CI_TARGET in
               @envoy//tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
         popd
+        ;;
+
+    execution_context)
+        # Test the execution_context build setting transition
+        # (see bazel/execution_context_transition.bzl)
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -- //test/common/common:execution_context_enabled_test
         ;;
 
     external)
@@ -1108,16 +1111,12 @@ case $CI_TARGET in
     verify_examples)
         pushd "$ENVOY_DOCS_PATH"
         DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
-        bazel run --config=ci \
-                  --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-                  --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-                  --action_env="CARGO_BAZEL_REPIN=true" \
-                  --host_action_env="CARGO_BAZEL_REPIN=true" \
-                  --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-                  --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-                  --sandbox_writable_path="${HOME}/.docker/" \
-                  --sandbox_writable_path="$HOME" \
-                  @envoy-examples//:verify_examples
+        bazel test \
+              --config=ci \
+              --config=examples \
+              --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+              --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+              @envoy-examples//:verify_examples
         popd
         ;;
 

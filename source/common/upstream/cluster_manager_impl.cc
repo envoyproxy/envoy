@@ -25,6 +25,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
+#include "source/common/config/dependent_type_urls.h"
 #include "source/common/config/null_grpc_mux_impl.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
@@ -38,6 +39,8 @@
 #include "source/common/router/router.h"
 #include "source/common/router/shadow_writer_impl.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
+#include "source/common/stats/utility.h"
 #include "source/common/tcp/conn_pool.h"
 #include "source/common/upstream/cds_api_impl.h"
 #include "source/common/upstream/cluster_factory_impl.h"
@@ -57,6 +60,13 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+
+// The factory a cluster's main-thread priority set creates host sets with, so its worker copies
+// create the same type. Null for clusters whose priority set is not a PrioritySetImpl.
+HostSetFactory hostSetFactoryOf(const Cluster& cluster) {
+  const auto* priority_set = dynamic_cast<const PrioritySetImpl*>(&cluster.prioritySet());
+  return priority_set != nullptr ? priority_set->hostSetFactory() : nullptr;
+}
 
 void addOptionsIfNotNull(Network::Socket::OptionsSharedPtr& options,
                          const Network::Socket::OptionsSharedPtr& to_add) {
@@ -226,14 +236,9 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
-      // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
-      // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
-      // avoid double pause ClusterLoadAssignment.
-      const std::vector<std::string> paused_xds_types{
-          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-          Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-      Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
+      // Secondary cluster initialization may create EDS, LEDS, and SDS subscriptions.
+      const auto cluster_type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
+      Config::ScopedResume resume = xds_manager_.pause(Config::dependentTypeUrls(cluster_type_url));
       initializeSecondaryClusters();
     }
     return;
@@ -316,6 +321,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
                        ? std::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : std::nullopt),
       local_info_(context.localInfo()), cm_stats_(generateStats(*stats_.rootScope())),
+      odcds_discovery_stats_(generateOdCdsDiscoveryStats(*stats_.rootScope())),
       init_helper_(xds_manager_,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
       time_source_(context.timeSource()), dispatcher_(context.mainThreadDispatcher()),
@@ -447,6 +453,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
     local_cluster_params.emplace();
     local_cluster_params->info_ = local_cluster->second->cluster().info();
     local_cluster_params->load_balancer_factory_ = local_cluster->second->loadBalancerFactory();
+    local_cluster_params->host_set_factory_ = hostSetFactoryOf(local_cluster->second->cluster());
     local_cluster->second->setAddedOrUpdated();
   }
 
@@ -550,11 +557,19 @@ ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
                                     POOL_GAUGE_PREFIX(scope, final_prefix))};
 }
 
+OdCdsDiscoveryStats ClusterManagerImpl::generateOdCdsDiscoveryStats(Stats::Scope& scope) {
+  return {ALL_ODCDS_DISCOVERY_STATS(POOL_COUNTER_PREFIX(scope, "cluster_manager.odcds."))};
+}
+
 ThreadLocalClusterManagerStats
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::generateStats(Stats::Scope& scope,
                                                                  const std::string& thread_name) {
-  const std::string final_prefix = absl::StrCat("thread_local_cluster_manager.", thread_name);
-  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE_PREFIX(scope, final_prefix))};
+  // thread_local_cluster_manager.(worker_<id>.)*: a worker thread contributes the
+  // envoy.worker_id tag; any other thread name (the main thread) stays a plain segment.
+  const auto prefix =
+      Stats::workerStatPrefix(scope.symbolTable(), "thread_local_cluster_manager.", thread_name);
+  Stats::LiteScopeHelper helper(scope, prefix.baseName(), prefix.tags(), prefix.name());
+  return {ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(POOL_GAUGE(helper))};
 }
 
 absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster) {
@@ -569,6 +584,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // cluster. So we must have this prevention logic here.
   if (cluster_data != warming_clusters_.end()) {
     clusterWarmingToActive(cluster.info()->name());
+    cds_pauses_.erase(cluster.info()->name());
     updateClusterCounts();
   }
   cluster_data = active_clusters_.find(cluster.info()->name());
@@ -868,8 +884,12 @@ void ClusterManagerImpl::clusterWarmingToActive(const std::string& cluster_name)
   // Otherwise, applyUpdates() will fire with a dangling cluster reference.
   updates_map_.erase(cluster_name);
 
-  active_clusters_[cluster_name] = std::move(warming_it->second);
+  // Move the new ClusterData into active and erase from warming before destroying the old
+  // active ClusterData.
+  ClusterDataPtr new_data = std::move(warming_it->second);
   warming_clusters_.erase(warming_it);
+  ClusterDataPtr old_active = std::exchange(active_clusters_[cluster_name], std::move(new_data));
+  // old_active is destroyed here, after both maps are consistent.
 }
 
 bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const bool remove_ignored) {
@@ -911,6 +931,7 @@ bool ClusterManagerImpl::removeCluster(absl::string_view cluster_name, const boo
     removed = true;
     init_helper_.removeCluster(*existing_warming_cluster->second);
     warming_clusters_.erase(existing_warming_cluster);
+    cds_pauses_.erase(cluster_name);
     ENVOY_LOG(info, "removing warming cluster {}", cluster_name);
   }
 
@@ -1013,32 +1034,38 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                                 cluster_reference.prioritySet(), runtime_, random_, time_source_);
   }
 
+  updateCdsPause(*cluster_entry_it->second);
   updateClusterCounts();
   return result;
 }
 
-void ClusterManagerImpl::updateClusterCounts() {
-  // This if/else block implements a control flow mechanism that can be used by an ADS
-  // implementation to properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can
-  // use it to detect when a previously sent cluster becomes warm before sending routes that depend
-  // on it. This can improve incidence of HTTP 503 responses from Envoy when a route is used before
-  // it's supporting cluster is ready.
-  //
-  // We achieve that by leaving CDS in the paused state as long as there is at least
-  // one cluster in the warming state. This prevents CDS ACK from being sent to ADS.
-  // Once cluster is warmed up, CDS is resumed, and ACK is sent to ADS, providing a
-  // signal to ADS to proceed with RDS updates.
-  // If we're in the middle of shutting down (ads_mux_ already gone) then this is irrelevant.
-  const bool all_clusters_initialized =
-      init_helper_.state() == ClusterManagerInitHelper::State::AllClustersInitialized;
-  if (all_clusters_initialized && xds_manager_.adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
-    if (resume_cds_ == nullptr && !warming_clusters_.empty()) {
-      resume_cds_ = xds_manager_.pause(type_url);
-    } else if (warming_clusters_.empty()) {
-      resume_cds_.reset();
-    }
+void ClusterManagerImpl::updateCdsPause(const ClusterData& cluster_data) {
+  if (init_helper_.state() != ClusterManagerInitHelper::State::AllClustersInitialized ||
+      shutdown_ || !xds_manager_.adsMux()) {
+    return;
   }
+  const auto& name = cluster_data.cluster_->info()->name();
+  if (!cluster_data.cluster_->info()->waitForWarmOnInit()) {
+    cds_pauses_.erase(name);
+  } else if (!cds_pauses_.contains(name)) {
+    cds_pauses_.emplace(
+        name, xds_manager_.pause(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()));
+  }
+}
+
+void ClusterManagerImpl::updateClusterCounts() {
+  // This implements a control flow mechanism that can be used by an ADS implementation to
+  // properly sequence CDS and RDS updates. It is not enforcing on ADS. ADS can use it to
+  // detect when a previously sent cluster becomes warm before sending routes that depend on it.
+  // This can improve incidence of HTTP 503 responses from Envoy when a route is used before
+  // its supporting cluster is ready.
+  //
+  // We achieve that by leaving CDS in the paused state as long as there is at least one
+  // warming cluster that has not opted out of CDS gating (wait_for_warm_on_init: true).
+  // CDS pause handles are acquired per-cluster via updateCdsPause(), called from loadCluster().
+  // Once all blocking clusters are warmed up, CDS is resumed and ACK is sent to ADS, providing
+  // a signal to ADS to proceed with RDS updates.
+  //
   cm_stats_.active_clusters_.set(active_clusters_.size());
   cm_stats_.warming_clusters_.set(warming_clusters_.size());
 }
@@ -1244,14 +1271,22 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   }
 
   LoadBalancerFactorySharedPtr load_balancer_factory;
+  HostSetFactory host_set_factory = nullptr;
   if (add_or_update_cluster) {
     load_balancer_factory = cm_cluster.loadBalancerFactory();
+    host_set_factory = hostSetFactoryOf(cm_cluster.cluster());
   }
 
   for (auto& per_priority : params.per_priority_update_params_) {
     const auto& host_set =
         cm_cluster.cluster().prioritySet().hostSetsPerPriority()[per_priority.priority_];
-    per_priority.update_hosts_params_ = HostSetImpl::updateHostsParams(*host_set);
+    // A persistent host set hands workers its partitions instead of building flat vectors.
+    if (auto snapshot = host_set->snapshot(); snapshot != nullptr) {
+      per_priority.update_hosts_params_ =
+          HostSetImpl::snapshotUpdateHostsParams(std::move(snapshot));
+    } else {
+      per_priority.update_hosts_params_ = HostSetImpl::updateHostsParams(*host_set);
+    }
     per_priority.locality_weights_ = host_set->localityWeights();
     per_priority.weighted_priority_health_ = host_set->weightedPriorityHealth();
     per_priority.overprovisioning_factor_ = host_set->overprovisioningFactor();
@@ -1266,18 +1301,21 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
   const bool enable_batch_aware_update =
       Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_batch_aware_update");
 
-  pending_cluster_creations_.erase(cm_cluster.cluster().info()->name());
+  if (pending_cluster_creations_.erase(cm_cluster.cluster().info()->name()) != 0) {
+    odcds_discovery_stats_.discovery_success_.inc();
+  }
 
   const UnitFloat drop_overload = cm_cluster.cluster().dropOverload();
   const std::string drop_category = cm_cluster.cluster().dropCategory();
   // Populate the cluster initialization object based on this update.
   ClusterInitializationObjectConstSharedPtr cluster_initialization_object =
-      addOrUpdateClusterInitializationObjectIfSupported(params, cm_cluster.cluster().info(),
-                                                        load_balancer_factory, host_map,
-                                                        drop_overload, drop_category);
+      addOrUpdateClusterInitializationObjectIfSupported(
+          params, cm_cluster.cluster().info(), load_balancer_factory,
+          hostSetFactoryOf(cm_cluster.cluster()), host_map, drop_overload, drop_category);
 
   tls_.runOnAllThreads([info = cm_cluster.cluster().info(), params = std::move(params),
-                        add_or_update_cluster, load_balancer_factory, map = std::move(host_map),
+                        add_or_update_cluster, load_balancer_factory, host_set_factory,
+                        map = std::move(host_map),
                         cluster_initialization_object = std::move(cluster_initialization_object),
                         drop_overload, drop_category = std::move(drop_category),
                         enable_batch_aware_update](
@@ -1330,8 +1368,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
           ENVOY_LOG(debug, "adding TLS cluster {}", info->name());
         }
 
-        new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(*cluster_manager, info,
-                                                                      load_balancer_factory);
+        new_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
+            *cluster_manager, info, load_balancer_factory, host_set_factory);
         cluster_manager->thread_local_clusters_[info->name()].reset(new_cluster);
         cluster_manager->local_stats_.clusters_inflated_.set(
             cluster_manager->thread_local_clusters_.size());
@@ -1388,8 +1426,8 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(ClusterManagerCluster& cm_
 ClusterManagerImpl::ClusterInitializationObjectConstSharedPtr
 ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
-    UnitFloat drop_overload, absl::string_view drop_category) {
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+    HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category) {
   if (!deferralIsSupportedForCluster(cluster_info)) {
     return nullptr;
   }
@@ -1420,13 +1458,14 @@ ClusterManagerImpl::addOrUpdateClusterInitializationObjectIfSupported(
         entry->second->per_priority_state_, params, std::move(cluster_info),
         load_balancer_factory == nullptr ? entry->second->load_balancer_factory_
                                          : load_balancer_factory,
-        map, drop_overload, drop_category);
+        host_set_factory, map, drop_overload, drop_category);
     cluster_initialization_map_[cluster_name] = new_initialization_object;
     return new_initialization_object;
   } else {
     // We need to create a fresh Cluster Initialization Object.
     auto new_initialization_object = std::make_shared<ClusterInitializationObject>(
-        params, std::move(cluster_info), load_balancer_factory, map, drop_overload, drop_category);
+        params, std::move(cluster_info), load_balancer_factory, host_set_factory, map,
+        drop_overload, drop_category);
     cluster_initialization_map_[cluster_name] = new_initialization_object;
     return new_initialization_object;
   }
@@ -1444,8 +1483,9 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
   // Create the cluster inline.
   const ClusterInitializationObjectConstSharedPtr& initialization_object = entry->second;
   ENVOY_LOG(debug, "initializing TLS cluster {} inline", cluster);
-  auto cluster_entry = std::make_unique<ClusterEntry>(
-      *this, initialization_object->cluster_info_, initialization_object->load_balancer_factory_);
+  auto cluster_entry = std::make_unique<ClusterEntry>(*this, initialization_object->cluster_info_,
+                                                      initialization_object->load_balancer_factory_,
+                                                      initialization_object->host_set_factory_);
   ClusterEntry* cluster_entry_ptr = cluster_entry.get();
 
   thread_local_clusters_[cluster] = std::move(cluster_entry);
@@ -1481,10 +1521,11 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::initializeClusterInlineIfExis
 
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
-    UnitFloat drop_overload, absl::string_view drop_category)
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+    HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category)
     : cluster_info_(std::move(cluster_info)), load_balancer_factory_(load_balancer_factory),
-      cross_priority_host_map_(map), drop_overload_(drop_overload), drop_category_(drop_category) {
+      host_set_factory_(host_set_factory), cross_priority_host_map_(map),
+      drop_overload_(drop_overload), drop_category_(drop_category) {
   // Copy the update since the map is empty.
   for (const auto& update : params.per_priority_update_params_) {
     per_priority_state_.emplace(update.priority_, update);
@@ -1494,11 +1535,11 @@ ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
 ClusterManagerImpl::ClusterInitializationObject::ClusterInitializationObject(
     const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>& per_priority_state,
     const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-    LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
-    UnitFloat drop_overload, absl::string_view drop_category)
+    LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+    HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category)
     : per_priority_state_(per_priority_state), cluster_info_(std::move(cluster_info)),
-      load_balancer_factory_(load_balancer_factory), cross_priority_host_map_(map),
-      drop_overload_(drop_overload), drop_category_(drop_category) {
+      load_balancer_factory_(load_balancer_factory), host_set_factory_(host_set_factory),
+      cross_priority_host_map_(map), drop_overload_(drop_overload), drop_category_(drop_category) {
 
   // Because EDS Clusters receive the entire ClusterLoadAssignment but only
   // provides the delta we must process the hosts_added and hosts_removed and
@@ -1788,6 +1829,7 @@ ClusterManagerImpl::requestOnDemandClusterDiscovery(uint64_t config_source_key, 
     }
     // Start the discovery. If the cluster gets discovered, cluster manager will warm it up and
     // invoke the cluster lifecycle callbacks, that will in turn invoke our callback.
+    odcds_discovery_stats_.discovery_attempt_.inc();
     odcds->updateOnDemand(name);
     // Setup the discovery timeout timer to avoid keeping callbacks indefinitely.
     auto timer = dispatcher_.createTimer([this, name] { notifyExpiredDiscovery(name); });
@@ -1823,7 +1865,17 @@ void ClusterManagerImpl::notifyClusterDiscoveryStatus(absl::string_view name,
     // notifies the cluster manager about it.
     return;
   }
-  // Let all the worker threads know that the discovery timed out.
+  switch (status) {
+  case ClusterDiscoveryStatus::Available:
+    break;
+  case ClusterDiscoveryStatus::Missing:
+    odcds_discovery_stats_.discovery_missing_.inc();
+    break;
+  case ClusterDiscoveryStatus::Timeout:
+    odcds_discovery_stats_.discovery_timeout_.inc();
+    break;
+  }
+  // Let all worker threads know how the discovery completed.
   tls_.runOnAllThreads(
       [name = std::string(name), status](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
         ENVOY_LOG(
@@ -1913,7 +1965,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     const auto& local_cluster_name = local_cluster_params->info_->name();
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name);
     thread_local_clusters_[local_cluster_name] = std::make_unique<ClusterEntry>(
-        *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_);
+        *this, local_cluster_params->info_, local_cluster_params->load_balancer_factory_,
+        local_cluster_params->host_set_factory_);
     local_priority_set_ = &thread_local_clusters_[local_cluster_name]->prioritySet();
     local_stats_.clusters_inflated_.set(thread_local_clusters_.size());
   }
@@ -2046,9 +2099,12 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::addClusterUpdateCallbacks(
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-    const LoadBalancerFactorySharedPtr& lb_factory)
+    const LoadBalancerFactorySharedPtr& lb_factory, HostSetFactory host_set_factory)
     : parent_(parent), cluster_info_(cluster), lb_factory_(lb_factory),
       override_host_statuses_(HostUtility::createOverrideHostStatus(cluster_info_->lbConfig())) {
+  if (host_set_factory != nullptr) {
+    priority_set_.setHostSetFactory(host_set_factory);
+  }
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
@@ -2447,7 +2503,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
-        quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry,
+        quic_stat_names_, *stats_.rootScope(), quic_info, network_observer_registry,
         context_.overloadManager());
 #else
     (void)quic_info;
@@ -2485,7 +2541,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     }
     return Http::Http3::allocateConnPool(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info,
+        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, quic_info,
         network_observer_registry, context_.overloadManager(), false);
 #else
     UNREFERENCED_PARAMETER(source);
@@ -2516,7 +2572,7 @@ ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cl
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
                                             bool added_via_api) {
   return ClusterFactoryImplBase::create(cluster, context_, dns_resolver_fn_, outlier_event_logger,
-                                        added_via_api);
+                                        added_via_api, makeOptRef(dns_resolver_cache_));
 }
 
 absl::StatusOr<CdsApiPtr>

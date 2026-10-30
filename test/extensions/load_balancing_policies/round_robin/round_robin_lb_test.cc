@@ -577,10 +577,9 @@ TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
   init(false);
 
   // return a predicate that only accepts the first host
-  EXPECT_CALL(context, shouldSelectAnotherHost(_))
-      .WillRepeatedly(Invoke([&](const Host& host) -> bool {
-        return host.address()->asString() != hostSet().hosts_[0]->address()->asString();
-      }));
+  EXPECT_CALL(context, shouldSelectAnotherHost(_)).WillRepeatedly([&](const Host& host) -> bool {
+    return host.address()->asString() != hostSet().hosts_[0]->address()->asString();
+  });
   HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({0, 0}),
                                        Upstream::DegradedLoad({0, 0})};
 

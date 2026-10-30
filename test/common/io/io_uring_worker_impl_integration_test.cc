@@ -222,6 +222,29 @@ protected:
   std::unique_ptr<IoUringWorkerTestImpl> io_uring_worker_;
 };
 
+TEST_F(IoUringWorkerIntegrationTest, WorkerShutdownWithBlockedWrite) {
+  initialize();
+  createListenerAndConnectedSocketPair();
+  const int buffer_size = 4096;
+  ASSERT_EQ(setsockopt(server_socket_, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size)),
+            0);
+  ASSERT_EQ(setsockopt(client_socket_, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size)),
+            0);
+  auto& socket = io_uring_worker_->addServerSocket(
+      server_socket_, [](uint32_t) { return absl::OkStatus(); }, false);
+  Buffer::OwnedImpl data(std::string(1024 * 1024, 'a'));
+  socket.write(data);
+  socket.shutdown(SHUT_WR);
+
+  // The peer never reads. Destruction must cancel outstanding operations and discard queued data
+  // without running the dispatcher's write timeout timer.
+  io_uring_worker_.reset();
+  EXPECT_EQ(fcntl(server_socket_, F_GETFD), -1);
+  EXPECT_EQ(errno, EBADF);
+  server_socket_ = INVALID_SOCKET;
+  cleanup();
+}
+
 TEST_F(IoUringWorkerIntegrationTest, Injection) {
   initialize();
   createListenerAndConnectedSocketPair();

@@ -10,7 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::NotNull;
 using testing::SizeIs;
@@ -169,9 +168,9 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
   Driver* expected_driver = new NiceMock<MockDriver>();
 
   // Expect HttpTracerManager to create a new Tracer.
-  EXPECT_CALL(tracer_factory_, createTracerDriver(_, _))
-      .WillOnce(InvokeWithoutArgs(
-          [expected_driver] { return std::shared_ptr<Driver>(expected_driver); }));
+  EXPECT_CALL(tracer_factory_, createTracerDriver(_, _)).WillOnce([expected_driver] {
+    return std::shared_ptr<Driver>(expected_driver);
+  });
 
   auto actual_tracer_one = tracer_manager_.getOrCreateTracer(&tracing_config_one_);
 
@@ -203,9 +202,9 @@ TEST_F(TracerManagerImplCacheTest, ShouldCacheHttpTracersUsingWeakReferences) {
   Driver* expected_other_driver = new NiceMock<MockDriver>();
 
   // Expect HttpTracerManager to create a new Tracer once again.
-  EXPECT_CALL(tracer_factory_, createTracerDriver(_, _))
-      .WillOnce(InvokeWithoutArgs(
-          [expected_other_driver] { return std::shared_ptr<Driver>(expected_other_driver); }));
+  EXPECT_CALL(tracer_factory_, createTracerDriver(_, _)).WillOnce([expected_other_driver] {
+    return std::shared_ptr<Driver>(expected_other_driver);
+  });
 
   // Use a different config to guarantee that a new cache entry will be added anyway.
   auto actual_tracer_three = tracer_manager_.getOrCreateTracer(&tracing_config_two_);

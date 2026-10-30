@@ -362,7 +362,8 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
 }
 
 const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
-const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
+const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_3_VERSION;
+const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION_LEGACY = TLS1_2_VERSION;
 
 const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
@@ -404,7 +405,11 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     absl::Status& creation_status)
     : ContextConfigImpl(
           config.common_tls_context(), config.auto_sni_san_validation(), DEFAULT_MIN_VERSION,
-          DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
+          Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.default_client_tls_max_version_is_1_3")
+              ? DEFAULT_MAX_VERSION
+              : DEFAULT_MAX_VERSION_LEGACY,
+          FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
           Runtime::runtimeFeatureEnabled("envoy.reloadable_features.pqc_default_ecdh_curves")
               ? (FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES)
               : (FIPS_mode() ? DEFAULT_CURVES_FIPS_NO_PQC : DEFAULT_CURVES_NO_PQC),
@@ -412,6 +417,7 @@ ClientContextConfigImpl::ClientContextConfigImpl(
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
       max_session_keys_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_session_keys, 1)) {
+  SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
 
   // BoringSSL treats this as a C string, so embedded NULL characters will not
   // be handled correctly.

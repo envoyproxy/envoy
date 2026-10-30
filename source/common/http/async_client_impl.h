@@ -143,7 +143,7 @@ public:
     }
 
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_side_stream_flow_control_3")) {
+            "envoy.reloadable_features.async_client_downstream_flow_control2")) {
       if (downstream_watermark_callbacks_ != nullptr) {
         watermark_callbacks_->removeDownstreamWatermarkCallbacks(*downstream_watermark_callbacks_);
       }
@@ -244,7 +244,7 @@ private:
   }
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_side_stream_flow_control_3")) {
+            "envoy.reloadable_features.async_client_downstream_flow_control2")) {
       if (watermark_callbacks_.has_value()) {
         downstream_watermark_callbacks_ = &callbacks;
         watermark_callbacks_->addDownstreamWatermarkCallbacks(callbacks);
@@ -253,13 +253,14 @@ private:
   }
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {
     if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_side_stream_flow_control_3")) {
+            "envoy.reloadable_features.async_client_downstream_flow_control2")) {
       if (watermark_callbacks_.has_value()) {
         watermark_callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
         downstream_watermark_callbacks_ = nullptr;
       }
     }
   }
+
   void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks&) override {}
   void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks&) override {}
   void sendGoAwayAndClose(bool graceful [[maybe_unused]] = false) override {}

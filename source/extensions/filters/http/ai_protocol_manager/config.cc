@@ -73,7 +73,11 @@ AiProtocolManagerFilterConfigFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute&
         proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const RouteConfig>(proto_config);
+  absl::StatusOr<std::unique_ptr<RouteConfig>> route_config = RouteConfig::create(proto_config);
+  if (!route_config.ok()) {
+    return route_config.status();
+  }
+  return Router::RouteSpecificFilterConfigConstSharedPtr(*std::move(route_config));
 }
 
 /**

@@ -59,6 +59,7 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() {
       return false;
     }
     // Add all entries from the list into the map.
+    lazy_map_.reserve(headers_.size());
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
       HeaderNodeVector& v = lazy_map_[node->key().getStringView()];
       v.push_back(node);

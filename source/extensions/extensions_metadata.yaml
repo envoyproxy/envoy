@@ -732,6 +732,13 @@ envoy.filters.http.original_src:
   status: alpha
   type_urls:
   - envoy.extensions.filters.http.original_src.v3.OriginalSrc
+envoy.filters.http.priority_load_shed:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.priority_load_shed.v3.PriorityLoadShed
 envoy.filters.http.proto_message_extraction:
   categories:
   - envoy.filters.http
@@ -1454,6 +1461,13 @@ envoy.udp_packet_writer.gso:
   status: stable
   type_urls:
   - envoy.extensions.udp_packet_writer.v3.UdpGsoBatchWriterFactory
+envoy.queue_policy.adaptive_lifo:
+  categories:
+  - envoy.queue_policy
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.queue_policy.adaptive_lifo.v3.AdaptiveLifoQueuePolicyConfig
 envoy.queue_policy.fifo:
   categories:
   - envoy.queue_policy
@@ -2335,6 +2349,13 @@ envoy.load_balancing_policies.override_host:
   status: alpha
   type_urls:
   - envoy.extensions.load_balancing_policies.override_host.v3.OverrideHost
+envoy.load_balancing_policies.host_allowlist:
+  categories:
+  - envoy.load_balancing_policies
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.load_balancing_policies.host_allowlist.v3.HostAllowlist
 envoy.load_balancing_policies.wrr_locality:
   categories:
   - envoy.load_balancing_policies
@@ -2496,8 +2517,10 @@ envoy.config_mux.sotw_grpc_mux_factory:
 envoy.filters.http.set_filter_state:
   categories:
   - envoy.filters.http
+  - envoy.filters.http.upstream
   security_posture: unknown
   status: alpha
+  status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.set_filter_state.v3.Config
 envoy.filters.network.set_filter_state:
@@ -2579,6 +2602,14 @@ envoy.filters.http.dynamic_modules:
   status_upstream: stable
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+envoy.tls.certificate_selectors.dynamic_modules:
+  categories:
+  - envoy.tls.certificate_selectors
+  - envoy.tls.upstream_certificate_selectors
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3.DynamicModuleTlsCertificateSelector
 envoy.tls.certificate_selectors.on_demand_secret:
   categories:
   - envoy.tls.certificate_selectors

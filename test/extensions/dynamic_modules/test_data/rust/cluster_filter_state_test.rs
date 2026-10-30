@@ -3,8 +3,8 @@
 //! Exposes both an HTTP filter and clusters from the same shared library:
 //! - The HTTP filter writes two filter state entries (bytes + typed) during ``on_request_headers``.
 //! - The ``filter_state_reader`` cluster reads those entries in ``choose_host`` and returns its
-//!   pre-registered upstream only when both values match the expected payload, otherwise it
-//!   returns ``NoHost`` so the request fails with a 503.
+//!   pre-registered upstream only when both values match the expected payload, otherwise it returns
+//!   ``NoHost`` so the request fails with a 503.
 //! - The ``filter_state_writer`` cluster writes two filter state entries (bytes + typed) in
 //!   ``choose_host`` before selecting its upstream, so the access log can read them back on the
 //!   same request.
@@ -153,8 +153,8 @@ impl ClusterLb for FilterStateReaderLb {
     };
     let bytes = ctx.get_filter_state_bytes(BYTES_KEY);
     let typed = ctx.get_filter_state_typed(TYPED_KEY);
-    let bytes_match = bytes.as_ref().map(|b| b.as_slice()) == Some(BYTES_VALUE);
-    let typed_match = typed.as_ref().map(|b| b.as_slice()) == Some(TYPED_VALUE);
+    let bytes_match = bytes.as_deref() == Some(BYTES_VALUE);
+    let typed_match = typed.as_deref() == Some(TYPED_VALUE);
     if !bytes_match || !typed_match {
       envoy_log_info!(
         "filter_state_reader: mismatch — bytes_match={} typed_match={}",

@@ -338,6 +338,9 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     } else {
       stats_.named_.downstream_cx_http1_active_.dec();
     }
+    if (streams_.empty()) {
+      decIdleConnectionsStat();
+    }
   }
 
   if (soft_drain_http1_) {
@@ -457,6 +460,11 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
 
   stream.completeRequest();
   stream.filter_manager_.onStreamComplete();
+  if (stream.active_span_) {
+    Tracing::HttpTracerUtility::finalizeDownstreamSpan(
+        *stream.active_span_, stream.request_headers_.get(), stream.response_headers_.get(),
+        stream.response_trailers_.get(), stream.filter_manager_.streamInfo(), stream);
+  }
 
   // For HTTP/3, skip access logging here and add deferred logging info
   // to stream info for QuicStatsGatherer to use later.
@@ -474,6 +482,9 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
   stream.filter_manager_.destroyFilters();
 
   dispatcher_->deferredDelete(stream.removeFromList(streams_));
+  if (streams_.empty()) {
+    incIdleConnectionsStat();
+  }
 
   // The response_encoder should never be dangling (unless we're destroying a
   // stream we are recreating) as the codec level stream will either outlive the
@@ -553,6 +564,9 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->filter_manager_.aboveHighWatermark());
+  if (streams_.empty()) {
+    decIdleConnectionsStat();
+  }
   LinkedList::moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
@@ -586,16 +600,40 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   case Protocol::Http3:
     stats_.named_.downstream_cx_http3_total_.inc();
     stats_.named_.downstream_cx_http3_active_.inc();
+    stats_.named_.downstream_cx_http3_idle_.inc();
     break;
   case Protocol::Http2:
     stats_.named_.downstream_cx_http2_total_.inc();
     stats_.named_.downstream_cx_http2_active_.inc();
+    stats_.named_.downstream_cx_http2_idle_.inc();
     break;
   case Protocol::Http11:
   case Protocol::Http10:
     stats_.named_.downstream_cx_http1_total_.inc();
     stats_.named_.downstream_cx_http1_active_.inc();
     break;
+  }
+}
+
+void ConnectionManagerImpl::incIdleConnectionsStat() {
+  if (!codec_) {
+    return;
+  }
+  if (codec_->protocol() == Protocol::Http2) {
+    stats_.named_.downstream_cx_http2_idle_.inc();
+  } else if (codec_->protocol() == Protocol::Http3) {
+    stats_.named_.downstream_cx_http3_idle_.inc();
+  }
+}
+
+void ConnectionManagerImpl::decIdleConnectionsStat() {
+  if (!codec_) {
+    return;
+  }
+  if (codec_->protocol() == Protocol::Http2) {
+    stats_.named_.downstream_cx_http2_idle_.dec();
+  } else if (codec_->protocol() == Protocol::Http3) {
+    stats_.named_.downstream_cx_http3_idle_.dec();
   }
 }
 
@@ -1240,11 +1278,6 @@ void ConnectionManagerImpl::ActiveStream::completeRequest() {
     connection_manager_.config_->tracingStats().health_check_.inc();
   }
 
-  if (active_span_) {
-    Tracing::HttpTracerUtility::finalizeDownstreamSpan(
-        *active_span_, request_headers_.get(), response_headers_.get(), response_trailers_.get(),
-        filter_manager_.streamInfo(), *this);
-  }
   if (state_.successful_upgrade_) {
     connection_manager_.stats_.named_.downstream_cx_upgrades_active_.dec();
   }
@@ -2757,12 +2790,8 @@ void ConnectionManagerImpl::ActiveStream::recreateStream(
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   ResponseEncoder* response_encoder = response_encoder_;
 
-  Buffer::InstancePtr request_data = std::make_unique<Buffer::OwnedImpl>();
-  const auto& buffered_request_data = filter_manager_.bufferedRequestData();
-  const bool proxy_body = buffered_request_data != nullptr && buffered_request_data->length() > 0;
-  if (proxy_body) {
-    request_data->move(*buffered_request_data);
-  }
+  Buffer::InstancePtr request_data = filter_manager_.takeBufferedRequestData();
+  const bool proxy_body = request_data != nullptr && request_data->length() > 0;
 
   // Null after move(): draining the WatermarkBuffer may synchronously fire
   // onDecoderFilterBelowWriteBufferLowWatermark which needs a valid encoder.
