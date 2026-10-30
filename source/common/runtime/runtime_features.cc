@@ -119,6 +119,10 @@ RUNTIME_GUARD(envoy_reloadable_features_http_preserve_rst_no_error);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_incremental_health_transition);
+// When an internal listener closes a connection, record its local close reason and upstream
+// transport failure reason so that the client side connection reports them as its transport
+// failure reason.
+RUNTIME_GUARD(envoy_reloadable_features_internal_listener_propagate_close_details);
 RUNTIME_GUARD(envoy_reloadable_features_ja4_alpn_hex_conversion_fix);
 RUNTIME_GUARD(envoy_reloadable_features_ja4_filter_grease_signature_algorithms);
 RUNTIME_GUARD(envoy_reloadable_features_json_formatter_omit_empty_values);
@@ -173,6 +177,10 @@ RUNTIME_GUARD(envoy_reloadable_features_rbac_respect_ignore_path_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_re2_use_latin1_mode);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_for_non_zero_stats);
 RUNTIME_GUARD(envoy_reloadable_features_response_headers_to_remove_on_1xx);
+// When an upstream HTTP stream is reset because its connection to an internal listener failed or
+// closed, report the connection's transport failure reason in the reset details and the upstream
+// transport failure reason.
+RUNTIME_GUARD(envoy_reloadable_features_router_reset_with_connection_failure_reason);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_html_stats_names);
 RUNTIME_GUARD(envoy_reloadable_features_sanitize_upstream_stream_duration_header);
 RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni);

@@ -5,6 +5,7 @@
 
 #include "source/common/listener_manager/active_stream_listener_base.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/extensions/io_socket/user_space/io_handle.h"
 
@@ -12,6 +13,54 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace InternalListener {
+
+namespace {
+
+// Returns the state shared with the client side of the connection, if the connection's socket is a
+// user space socket and propagating close details is enabled. Otherwise returns nullptr.
+IoSocket::UserSpace::PassthroughStateSharedPtr
+closeDetailsPassthroughState(const Network::Connection& connection) {
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.internal_listener_propagate_close_details")) {
+    return nullptr;
+  }
+  auto* io_handle =
+      dynamic_cast<IoSocket::UserSpace::IoHandle*>(&connection.getSocket()->ioHandle());
+  return io_handle != nullptr ? io_handle->passthroughState() : nullptr;
+}
+
+} // namespace
+
+ActiveInternalConnection::ActiveInternalConnection(
+    Server::ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
+    TimeSource& time_system, std::unique_ptr<StreamInfo::StreamInfo>&& stream_info,
+    IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state)
+    : Server::ActiveTcpConnection(active_connections, std::move(new_connection), time_system,
+                                  std::move(stream_info)),
+      passthrough_state_(std::move(passthrough_state)) {}
+
+void ActiveInternalConnection::recordCloseDetails() {
+  if (passthrough_state_ == nullptr) {
+    return;
+  }
+  const StreamInfo::StreamInfo& stream_info = connection_->streamInfo();
+  absl::string_view upstream_transport_failure_reason;
+  if (stream_info.upstreamInfo().has_value()) {
+    upstream_transport_failure_reason =
+        stream_info.upstreamInfo()->upstreamTransportFailureReason();
+  }
+  passthrough_state_->setCloseDetails(connection_->localCloseReason(),
+                                      upstream_transport_failure_reason);
+}
+
+void ActiveInternalConnection::onEvent(Network::ConnectionEvent event) {
+  // Record why this side closed the connection. A close initiated by the client side is not
+  // recorded, as the client side already knows why it closed.
+  if (event == Network::ConnectionEvent::LocalClose) {
+    recordCloseDetails();
+  }
+  Server::ActiveTcpConnection::onEvent(event);
+}
 
 ActiveInternalListener::ActiveInternalListener(Network::ConnectionHandler& conn_handler,
                                                Event::Dispatcher& dispatcher,
@@ -73,16 +122,23 @@ void ActiveInternalListener::newActiveConnection(
     const Network::FilterChain& filter_chain, Network::ServerConnectionPtr server_conn_ptr,
     std::unique_ptr<StreamInfo::StreamInfo> stream_info) {
   auto& active_connections = getOrCreateActiveConnections(filter_chain);
-  auto active_connection = std::make_unique<Server::ActiveTcpConnection>(
+  IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state =
+      closeDetailsPassthroughState(*server_conn_ptr);
+  auto active_connection = std::make_unique<ActiveInternalConnection>(
       active_connections, std::move(server_conn_ptr), dispatcher().timeSource(),
-      std::move(stream_info));
+      std::move(stream_info), std::move(passthrough_state));
   // If the connection is already closed, we can just let this connection immediately die.
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(
         debug, "new connection from {}", *active_connection->connection_,
         active_connection->connection_->connectionInfoProvider().remoteAddress()->asString());
     active_connection->connection_->addConnectionCallbacks(*active_connection);
-    LinkedList::moveIntoList(std::move(active_connection), active_connections.connections_);
+    LinkedList::moveIntoList(Server::ActiveConnectionPtr{std::move(active_connection)},
+                             active_connections.connections_);
+  } else {
+    // This side closed the connection while setting it up, e.g. a network filter closed it when it
+    // was created, before the connection callbacks were added.
+    active_connection->recordCloseDetails();
   }
 }
 } // namespace InternalListener

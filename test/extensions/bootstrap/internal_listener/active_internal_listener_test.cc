@@ -4,6 +4,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/stream_info.h"
 
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/address_impl.h"
@@ -11,6 +12,7 @@
 #include "source/common/network/raw_buffer_socket.h"
 #include "source/extensions/bootstrap/internal_listener/active_internal_listener.h"
 #include "source/extensions/bootstrap/internal_listener/thread_local_registry.h"
+#include "source/extensions/io_socket/user_space/io_handle_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/common.h"
@@ -18,6 +20,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/test_runtime.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -77,6 +80,9 @@ public:
   std::shared_ptr<Network::MockFilterChain> filter_chain_;
   std::shared_ptr<NiceMock<Network::MockListenerFilterMatcher>> listener_filter_matcher_;
   std::shared_ptr<ActiveInternalListener> internal_listener_;
+  // The socket of the server connections created by the listener.
+  Network::ConnectionSocketPtr server_socket_{
+      std::make_unique<NiceMock<Network::MockConnectionSocket>>()};
 };
 
 TEST_F(ActiveInternalListenerTest, BasicInternalListener) {
@@ -171,6 +177,7 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(*connection, getSocket()).WillRepeatedly(ReturnRef(server_socket_));
   EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
@@ -220,6 +227,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
   EXPECT_CALL(*filter_chain_, networkFilterFactories).WillOnce(ReturnRef(*filter_factory_callback));
   auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(*connection, getSocket()).WillRepeatedly(ReturnRef(server_socket_));
   EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
   EXPECT_CALL(conn_handler_, incNumConnections());
   EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
@@ -234,6 +242,130 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
         connection->raiseEvent(Network::ConnectionEvent::LocalClose);
       });
   internal_listener_.reset();
+}
+
+class ActiveInternalConnectionTest : public ActiveInternalListenerTest {
+public:
+  // Accept a connection and return the server connection created for it. If user_space_socket is
+  // true, the connection's socket is backed by a user space IO handle whose peer is
+  // client_io_handle_. Otherwise it is backed by the default IO handle of MockConnectionSocket.
+  //
+  // If close_during_setup is true, the network filter chain closes the connection when it is
+  // created, and the returned connection is already destroyed.
+  NiceMock<Network::MockServerConnection>* acceptConnection(bool user_space_socket = true,
+                                                            bool close_during_setup = false) {
+    std::tie(client_io_handle_, server_io_handle_) =
+        IoSocket::UserSpace::IoHandleFactory::createIoHandlePair();
+    auto* socket = new NiceMock<Network::MockConnectionSocket>();
+    if (user_space_socket) {
+      ON_CALL(*socket, ioHandle()).WillByDefault(ReturnRef(*server_io_handle_));
+      ON_CALL(testing::Const(*socket), ioHandle()).WillByDefault(ReturnRef(*server_io_handle_));
+    }
+    server_socket_.reset(socket);
+
+    addListenerWithRealNetworkListener();
+    expectFilterChainFactory();
+    filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
+    EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_)).WillOnce(Return(true));
+    EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
+    EXPECT_CALL(*filter_chain_, transportSocketFactory)
+        .WillOnce(testing::ReturnRef(*transport_socket_factory_));
+    EXPECT_CALL(*filter_chain_, networkFilterFactories)
+        .WillOnce(ReturnRef(*filter_factory_callback_));
+    auto* connection = new NiceMock<Network::MockServerConnection>();
+    EXPECT_CALL(*connection, getSocket()).WillRepeatedly(ReturnRef(server_socket_));
+    EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
+    EXPECT_CALL(conn_handler_, incNumConnections());
+    EXPECT_CALL(filter_chain_factory_, createNetworkFilterChain(_, _))
+        .WillOnce([connection, close_during_setup](Network::Connection&,
+                                                   const Filter::NetworkFilterFactoriesList&) {
+          if (close_during_setup) {
+            connection->local_close_reason_ = absl::StrCat(
+                StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure, "1");
+            connection->state_ = Network::Connection::State::Closed;
+          }
+          return true;
+        });
+    EXPECT_CALL(listener_config_, perConnectionBufferLimitBytes());
+    EXPECT_CALL(listener_config_, perConnectionBufferHighWatermarkTimeout());
+    EXPECT_CALL(conn_handler_, decNumConnections());
+    internal_listener_->onAccept(
+        Network::ConnectionSocketPtr{new NiceMock<Network::MockConnectionSocket>()});
+    return close_during_setup ? nullptr : connection;
+  }
+
+  void closeConnection(NiceMock<Network::MockServerConnection>& connection,
+                       Network::ConnectionEvent event) {
+    connection.local_close_reason_ =
+        absl::StrCat(StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure, "0");
+    connection.stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
+    connection.stream_info_.upstreamInfo()->setUpstreamTransportFailureReason(
+        "tunnel_response:403");
+    connection.raiseEvent(event);
+    dispatcher_.clearDeferredDeleteList();
+  }
+
+  std::unique_ptr<IoSocket::UserSpace::IoHandleImpl> client_io_handle_;
+  std::unique_ptr<IoSocket::UserSpace::IoHandleImpl> server_io_handle_;
+  Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_{
+      Network::Test::createRawBufferDownstreamSocketFactory()};
+  std::shared_ptr<Filter::NetworkFilterFactoriesList> filter_factory_callback_{
+      std::make_shared<Filter::NetworkFilterFactoriesList>()};
+};
+
+// A local close records the close details in the passthrough state shared with the client side.
+TEST_F(ActiveInternalConnectionTest, LocalCloseRecordsCloseDetails) {
+  auto* connection = acceptConnection();
+  closeConnection(*connection, Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ(absl::StrCat("internal_listener_close:",
+                         StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure,
+                         "0|internal_listener_upstream_failure:tunnel_response:403"),
+            client_io_handle_->passthroughState()->closeDetails());
+}
+
+// A local close without upstream info records only the local close reason.
+TEST_F(ActiveInternalConnectionTest, LocalCloseWithoutUpstreamInfo) {
+  auto* connection = acceptConnection();
+  connection->local_close_reason_ = StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout;
+  connection->stream_info_.upstream_info_ = nullptr;
+  connection->raiseEvent(Network::ConnectionEvent::LocalClose);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(absl::StrCat("internal_listener_close:",
+                         StreamInfo::LocalCloseReasons::get().TcpSessionIdleTimeout),
+            client_io_handle_->passthroughState()->closeDetails());
+}
+
+// A connection that this side closes while setting it up, before its connection callbacks are
+// added, also records the close details.
+TEST_F(ActiveInternalConnectionTest, CloseDuringSetupRecordsCloseDetails) {
+  acceptConnection(/*user_space_socket=*/true, /*close_during_setup=*/true);
+  dispatcher_.clearDeferredDeleteList();
+  EXPECT_EQ(absl::StrCat("internal_listener_close:",
+                         StreamInfo::LocalCloseReasons::get().TcpProxyInitializationFailure, "1"),
+            client_io_handle_->passthroughState()->closeDetails());
+}
+
+// A close initiated by the client side records nothing.
+TEST_F(ActiveInternalConnectionTest, RemoteCloseDoesNotRecordCloseDetails) {
+  auto* connection = acceptConnection();
+  closeConnection(*connection, Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ("", client_io_handle_->passthroughState()->closeDetails());
+}
+
+TEST_F(ActiveInternalConnectionTest, RuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.internal_listener_propagate_close_details", "false"}});
+  auto* connection = acceptConnection();
+  closeConnection(*connection, Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ("", client_io_handle_->passthroughState()->closeDetails());
+}
+
+// A connection whose socket is not a user space socket has no passthrough state to record into.
+TEST_F(ActiveInternalConnectionTest, NonUserSpaceSocket) {
+  auto* connection = acceptConnection(/*user_space_socket=*/false);
+  closeConnection(*connection, Network::ConnectionEvent::LocalClose);
+  EXPECT_EQ("", client_io_handle_->passthroughState()->closeDetails());
 }
 
 class ConnectionHandlerTest : public testing::Test, protected Logger::Loggable<Logger::Id::main> {
@@ -401,6 +533,9 @@ public:
   TestScopedRuntime scoped_runtime_;
   Runtime::Loader& runtime_{scoped_runtime_.loader()};
   testing::NiceMock<Random::MockRandomGenerator> random_;
+  // The socket of the server connections created by the listener.
+  Network::ConnectionSocketPtr server_socket_{
+      std::make_unique<NiceMock<Network::MockConnectionSocket>>()};
 };
 
 TEST_F(ConnectionHandlerTest, DisableInternalListener) {
@@ -490,6 +625,7 @@ TEST_F(ConnectionHandlerTest, FindByAddressWhileDestroyingHandler) {
 
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   auto* connection = new NiceMock<Network::MockServerConnection>();
+  EXPECT_CALL(*connection, getSocket()).WillRepeatedly(ReturnRef(server_socket_));
   EXPECT_CALL(dispatcher_, createServerConnection_(_)).WillOnce(Return(connection));
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).WillOnce(Return(true));
   internal_listener_cb.value().get().onAccept(
