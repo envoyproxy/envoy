@@ -324,6 +324,46 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
+// A stream limit of zero resumed from cached transport parameters arrives after ConnectedZeroRtt,
+// leaving the client Busy before its handshake completes. A limit raised before the handshake
+// completes must serve pending early data streams rather than be treated as a MAX_STREAMS frame on
+// a connected client.
+TEST_F(Http3ConnPoolImplTest, ZeroRttClientAcceptsRaisedStreamLimitBeforeHandshake) {
+  initialize();
+  // With no request capacity, attaching the stream fails it with Overflow before the codec is
+  // used, which shows the attach happened.
+  mockHost().cluster_.resetResourceManager(1024, 1024, 0, 1024, 1024);
+
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  ASSERT_NE(nullptr, pool_->newStream(decoder, callbacks,
+                                      {/*can_send_early_data_=*/true,
+                                       /*can_use_http3_=*/true}));
+  async_connect_callback->invokeCallback();
+
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  ASSERT_EQ(1u, clients.size());
+  auto& client = dynamic_cast<ActiveClient&>(*clients.front());
+
+  pool_->onConnectionEvent(client, "", Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData, client.state());
+  client.onMaxStreamsChanged(0);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Busy, client.state());
+
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  client.onMaxStreamsChanged(1);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData, client.state());
+  EXPECT_EQ(ConnectionPool::PoolFailureReason::Overflow, callbacks.reason_);
+  EXPECT_EQ(1u, mockHost().cluster_.trafficStats()->upstream_rq_0rtt_.value());
+
+  EXPECT_CALL(connect_result_callback_, onHandshakeComplete());
+  pool_->onConnectionEvent(client, "", Network::ConnectionEvent::Connected);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Ready, client.state());
+}
+
 TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
   quic_info_->migration_config_.migrate_session_on_network_change = true;
   createNewStream();
