@@ -2733,6 +2733,116 @@ bool envoy_dynamic_module_callback_http_get_metadata_list_bool(
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     size_t index, bool* result);
 
+/**
+ * A component of a metadata path: a literal struct key or a zero-based list index.
+ * When key.ptr is non-null, key selects a struct field and index is ignored. A non-null
+ * pointer with zero length selects an empty key. When key.ptr is null, key.length must be
+ * zero and index selects a list element.
+ */
+typedef struct {
+  envoy_dynamic_module_type_module_buffer key;
+  size_t index;
+} envoy_dynamic_module_type_module_metadata_path;
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_string gets the
+ * nested string metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * The returned buffer is owned by Envoy and valid until the end of the current event hook
+ * unless a metadata setter is called.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_string(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length,
+    envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_number gets the
+ * nested number metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_number(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length, double* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_bool gets the
+ * nested bool metadata value.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length, bool* result);
+
+/**
+ * envoy_dynamic_module_callback_http_get_metadata_nested_list_size gets the
+ * number of elements in a nested metadata list.
+ *
+ * The path contains struct keys and list indices relative to the namespace, starting with a key.
+ * Keys are literal: dots and numeric strings are not interpreted. An empty path, unavailable
+ * metadata, missing key, out-of-range index, incompatible intermediate type, or wrong result type
+ * returns false.
+ *
+ * @param filter_envoy_ptr is the pointer to the corresponding HTTP filter.
+ * @param metadata_source is the source of the metadata.
+ * @param ns is the metadata namespace.
+ * @param path is an array of path components, borrowed for this call. May be null only when
+ * path_length is zero.
+ * @param path_length is the number of path components.
+ * @param result receives the value on success and is unchanged on failure.
+ * @return true on success, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
+    envoy_dynamic_module_type_module_buffer ns,
+    const envoy_dynamic_module_type_module_metadata_path* path, size_t path_length, size_t* result);
+
 // -------------------------- Filter State Callbacks ---------------------------
 
 /**

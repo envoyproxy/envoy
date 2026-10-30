@@ -1760,6 +1760,22 @@ WEAK_STUB(HttpGetMetadataListBool, envoy_dynamic_module_callback_http_get_metada
                                        nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                        {nullptr, 0}, {nullptr, 0}, 0, nullptr))
 
+WEAK_STUB(HttpGetMetadataNestedString,
+          envoy_dynamic_module_callback_http_get_metadata_nested_string(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
+WEAK_STUB(HttpGetMetadataNestedNumber,
+          envoy_dynamic_module_callback_http_get_metadata_nested_number(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
+WEAK_STUB(HttpGetMetadataNestedBool, envoy_dynamic_module_callback_http_get_metadata_nested_bool(
+                                         nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                         {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(HttpGetMetadataNestedListSize,
+          envoy_dynamic_module_callback_http_get_metadata_nested_list_size(
+              nullptr, envoy_dynamic_module_type_metadata_source_Dynamic, {nullptr, 0}, nullptr, 0,
+              nullptr))
+
 WEAK_STUB(TracerGetTraceContextValue,
           envoy_dynamic_module_callback_tracer_get_trace_context_value(nullptr, {nullptr, 0},
                                                                        nullptr))
