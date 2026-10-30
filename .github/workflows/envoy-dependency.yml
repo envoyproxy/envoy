@@ -21,11 +21,14 @@ on:
         - registry
         - report
       dependency:
-        description: Dependency to update (bazel task)
+        description: >-
+          Dependencies to update, space separated `name` or `name=1.2.3` (bazel task). For the
+          registry task these are applied after the bump, and `*` bumps every module with a newer
+          version in the registry.
       version:
         description: >-
-          Version to set (optional). bazel = module version, registry = bazel-registry commit
-          (default: tip of main)
+          Version to set (optional). bazel = module version (single dependency only),
+          registry = bazel-registry commit (default: tip of main)
       pr:
         type: boolean
         default: true
@@ -59,7 +62,7 @@ jobs:
       /${{ inputs.task == 'bazel' && inputs.dependency
            || inputs.task == 'registry' && 'bazel-registry'
            || 'lockfiles' }}
-      /${{ inputs.version || 'latest' }})
+      /${{ inputs.version || 'latest' }}${{ inputs.task == 'registry' && inputs.dependency && format(' +{0}', inputs.dependency) || '' }})
     runs-on: ubuntu-24.04
     steps:
     - id: appauth
@@ -95,6 +98,18 @@ jobs:
         ENVOY_REGISTRY_HASH: ${{ inputs.task == 'registry' && inputs.version || '' }}
         ENVOY_REGISTRY_ALLOW_UNSAFE: ${{ inputs.task == 'registry' && inputs.wip && '1' || '' }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - id: result
+      name: Update result
+      run: |
+        for key in name output title summary; do
+            {
+                echo "${key}<<EOF"
+                jq -r ".${key}" <<< "$RESULT"
+                echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+        done
+      env:
+        RESULT: ${{ steps.update.outputs.output }}
 
     - id: changes
       name: Check for changes
@@ -108,11 +123,7 @@ jobs:
       name: Upload diff
       if: ${{ steps.changes.outputs.changes == 'true' }}
       with:
-        name: >-
-          ${{ (inputs.task == 'bazel' && inputs.dependency
-               || inputs.task == 'registry' && 'bazel-registry'
-               || 'lockfiles')
-              }}-${{ steps.update.outputs.output }}
+        name: ${{ steps.result.outputs.name }}-${{ steps.result.outputs.output }}
     - id: pr
       name: Create a PR
       if: ${{ inputs.pr && steps.changes.outputs.changes == 'true' }}
@@ -122,6 +133,7 @@ jobs:
         body: |
           Created by Envoy dependency bot for @${{ github.actor }}
 
+          ${{ steps.result.outputs.summary }}
           ${{ inputs.pr-message }}
           ${{ inputs.wip && (
               inputs.task == 'registry'
@@ -131,31 +143,15 @@ jobs:
               || '> ⚠️ **WIP**: this PR was opened in draft mode for testing. Do not merge as-is.')
               || '' }}
         branch: >-
-          dependency/${{ inputs.task }}${{ inputs.wip && '/wip' || '' }}/${{ inputs.task == 'bazel' && inputs.dependency
-              || inputs.task == 'registry' && 'bazel-registry'
-              || 'lockfiles' }}/${{ steps.update.outputs.output }}
+          dependency/${{ inputs.task }}${{ inputs.wip && '/wip' || '' }}/${{ steps.result.outputs.name }}/${{ steps.result.outputs.output }}
         commit-message: |
-          ${{ inputs.task == 'lockfiles'
-              && 'deps: Regenerate bazel lockfiles'
-              || format(
-                'deps: Bump `{0}` -> {1}',
-                inputs.task == 'bazel' && inputs.dependency
-                || inputs.task == 'registry' && 'bazel-registry'
-                || 'lockfiles',
-                steps.update.outputs.output) }}
+          ${{ steps.result.outputs.title }}
 
+          ${{ steps.result.outputs.summary }}
           Signed-off-by: ${{ env.COMMITTER_NAME }} <${{ env.COMMITTER_EMAIL }}>
         committer-name: ${{ env.COMMITTER_NAME }}
         committer-email: ${{ env.COMMITTER_EMAIL }}
-        title: >-
-          ${{ inputs.task == 'lockfiles'
-              && 'deps: Regenerate bazel lockfiles'
-              || format(
-                'deps: Bump `{0}` -> {1}',
-                inputs.task == 'bazel' && inputs.dependency
-                || inputs.task == 'registry' && 'bazel-registry'
-                || 'lockfiles',
-                steps.update.outputs.output) }}
+        title: ${{ steps.result.outputs.title }}
         GITHUB_TOKEN: ${{ steps.appauth.outputs.token }}
     - name: Mark PR as WIP (draft)
       if: ${{ inputs.pr && inputs.wip && steps.changes.outputs.changes == 'true' }}
@@ -169,9 +165,7 @@ jobs:
       env:
         GH_TOKEN: ${{ steps.appauth.outputs.token }}
         PR_BRANCH: >-
-          dependency/${{ inputs.task }}${{ inputs.wip && '/wip' || '' }}/${{ inputs.task == 'bazel' && inputs.dependency
-              || inputs.task == 'registry' && 'bazel-registry'
-              || 'lockfiles' }}/${{ steps.update.outputs.output }}
+          dependency/${{ inputs.task }}${{ inputs.wip && '/wip' || '' }}/${{ steps.result.outputs.name }}/${{ steps.result.outputs.output }}
 
   report:
     if: >-
