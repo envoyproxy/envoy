@@ -1,0 +1,7 @@
+script: HTTP_CALL
+request {
+  headers {
+    headers { key: "x-fuzz-async" value: "true" }
+    headers { key: "x-fuzz-timeout" value: "0" }
+  }
+}

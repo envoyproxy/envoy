@@ -1,0 +1,15 @@
+script: STREAM_INFO
+request {
+  headers {
+    headers { key: "x-fuzz-name" value: "envoy.lua" }
+    headers { key: "x-fuzz-value" value: "aGVsbG8=" }
+    headers { key: "x-fuzz-index" value: "1" }
+    headers { key: "x-fuzz-length" value: "2" }
+  }
+}
+response {
+  headers {
+    headers { key: ":status" value: "200" }
+    headers { key: "x-fuzz-name" value: "envoy.lua" }
+  }
+}

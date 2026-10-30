@@ -1,0 +1,8 @@
+script: RESPOND
+request {
+  headers {
+    headers { key: "x-fuzz-status" value: "1e2" }
+    headers { key: "x-fuzz-name" value: ":status" }
+    headers { key: "x-fuzz-value" value: "200" }
+  }
+}

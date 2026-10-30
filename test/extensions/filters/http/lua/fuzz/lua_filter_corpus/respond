@@ -1,0 +1,9 @@
+script: RESPOND
+request {
+  headers {
+    headers { key: "x-fuzz-status" value: "503" }
+    headers { key: "x-fuzz-name" value: "retry-after" }
+    headers { key: "x-fuzz-value" value: "1" }
+    headers { key: "x-fuzz-body" value: "down" }
+  }
+}
