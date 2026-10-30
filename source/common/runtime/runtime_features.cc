@@ -293,6 +293,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_ma
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
 // TODO(yanjunxiang-google): flip to true after canarying the feature internally.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_async_client_downstream_flow_control2);
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control_3);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.

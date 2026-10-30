@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 
 #include "gmock/gmock.h"
@@ -90,6 +91,16 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
   ON_CALL(*this, removeDownstreamWatermarkCallbacks(_))
       .WillByDefault([this](DownstreamWatermarkCallbacks& callbacks) -> void {
         callbacks_.remove(&callbacks);
+      });
+
+  ON_CALL(*this, addEncoderFilterWatermarkCallbacks(_))
+      .WillByDefault([this](EncoderFilterWatermarkCallbacks& callbacks) -> void {
+        encoder_filter_callbacks_.push_back(&callbacks);
+      });
+
+  ON_CALL(*this, removeEncoderFilterWatermarkCallbacks(_))
+      .WillByDefault([this](EncoderFilterWatermarkCallbacks& callbacks) -> void {
+        encoder_filter_callbacks_.remove(&callbacks);
       });
 
   ON_CALL(*this, activeSpan()).WillByDefault(ReturnRef(active_span_));

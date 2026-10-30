@@ -745,6 +745,35 @@ public:
 };
 
 /**
+ * Callbacks for encoder filter watermark limits, originating from encoder filters
+ * buffering response data from upstream.
+ *
+ * Unlike DownstreamWatermarkCallbacks (which fire when the downstream connection/stream write
+ * buffer backs up), these fire when an encoder filter calls
+ * onEncoderFilterAboveWriteBufferHighWatermark() or when the FilterManager's response buffer
+ * exceeds its limit during streaming iteration.
+ *
+ * Separating the two allows upstream requests to subscribe to both (pausing upstream reads when
+ * either the downstream client or an encoder filter buffer backs up), while
+ * side-streams (e.g. ext_proc) subscribe only to DownstreamWatermarkCallbacks
+ * so encoder filter buffering does not disable read from the side-stream.
+ */
+class EncoderFilterWatermarkCallbacks {
+public:
+  virtual ~EncoderFilterWatermarkCallbacks() = default;
+
+  /**
+   * Called when an encoder filter goes over its high watermark buffering upstream response data.
+   */
+  virtual void onAboveWriteBufferHighWatermark() PURE;
+
+  /**
+   * Called when an encoder filter goes from over its high watermark to under its low watermark.
+   */
+  virtual void onBelowWriteBufferLowWatermark() PURE;
+};
+
+/**
  * Callbacks for server connections.
  */
 class ServerConnectionCallbacks : public virtual ConnectionCallbacks {

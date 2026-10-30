@@ -2,6 +2,7 @@
 // generally should not change or remove existing tests.
 
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -6074,6 +6075,153 @@ TEST_P(ExtProcIntegrationTest, PackRequestTrailersWithResponseTrailersFailOpen) 
   packTwoResponsesInOneMessage(*grpc_upstreams_[0], false, std::nullopt);
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
+}
+
+// Downstream push back sidestream and upstream
+TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstream) {
+  if (!IsEnvoyGrpc()) {
+    return;
+  }
+  initializeDownstreamPushbackConfig(ProcessingMode::STREAMED);
+
+  auto response = sendDownstreamRequestWithBody("hello world", std::nullopt);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-upstream-header", "test-value"}},
+      false);
+  constexpr size_t kLargeDataSize = 128 * 1024;
+  upstream_request_->encodeData(kLargeDataSize, /*end_stream=*/true);
+
+  const std::string mutated_body(kLargeDataSize, 'a');
+  std::string expected_body;
+  bool end_stream = false;
+  int count = 0;
+  while (!end_stream) {
+    processResponseBodyMessage(
+        *grpc_upstreams_[0], count == 0,
+        [&end_stream, &mutated_body](const HttpBody& body, BodyResponse& body_resp) {
+          end_stream = body.end_of_stream();
+          body_resp.mutable_response()->mutable_body_mutation()->set_body(mutated_body);
+          return true;
+        });
+    expected_body.append(mutated_body);
+    count++;
+  }
+
+  verifyUpstreamAndSidestreamFlowControlPaused(/*expect_sidestream_paused=*/true);
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-upstream-header", "test-value"));
+  EXPECT_EQ(response->body(), expected_body);
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstreamWhenNoBody) {
+  if (!IsEnvoyGrpc()) {
+    return;
+  }
+  initializeDownstreamPushbackConfig(ProcessingMode::NONE);
+
+  auto response = sendDownstreamRequestWithBody("hello world", std::nullopt);
+  waitForNextUpstreamRequest();
+
+  // Disable downstream reading so data backs up in socket.
+  codec_client_->connection()->readDisable(true);
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-upstream-header", "test-value"}},
+      false);
+  constexpr size_t kLargeDataSize = 64 * 1024;
+  const std::string response_body(kLargeDataSize, 'x');
+  upstream_request_->encodeData(response_body, /*end_stream=*/true);
+
+  verifyUpstreamAndSidestreamFlowControlPaused(/*expect_sidestream_paused=*/false);
+
+  codec_client_->connection()->readDisable(false);
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-upstream-header", "test-value"));
+  EXPECT_EQ(response->body(), response_body);
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstreamWithHeadersTrailers) {
+  if (!IsEnvoyGrpc()) {
+    return;
+  }
+  initializeDownstreamPushbackConfig(ProcessingMode::NONE, /*send_headers=*/true,
+                                     /*send_trailers=*/true);
+
+  auto response = sendDownstreamRequestWithBody("hello world", std::nullopt);
+  waitForNextUpstreamRequest();
+
+  // Disable downstream reading so data backs up in socket.
+  codec_client_->connection()->readDisable(true);
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-upstream-header", "test-value"}},
+      false);
+
+  constexpr size_t kLargeDataSize = 96 * 1024;
+  const std::string response_body(kLargeDataSize, 'x');
+  upstream_request_->encodeData(response_body, /*end_stream=*/false);
+  // The response data buffered above won't block the header response.
+  timeSystem().advanceTimeWaitImpl(20ms);
+  processResponseHeadersMessage(*grpc_upstreams_[0], /*first_message=*/true, std::nullopt);
+
+  upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"x-test-trailers", "Yes"}});
+  processResponseTrailersMessage(*grpc_upstreams_[0], /*first_message=*/false, std::nullopt);
+
+  verifyUpstreamAndSidestreamFlowControlPaused(/*expect_sidestream_paused=*/true);
+
+  codec_client_->connection()->readDisable(false);
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-upstream-header", "test-value"));
+  EXPECT_EQ(response->body(), response_body);
+  ASSERT_TRUE(response->trailers());
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-test-trailers", "Yes"));
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, DownstreamPushbackUpstreamWithBodyAndHeaders) {
+  if (!IsEnvoyGrpc()) {
+    return;
+  }
+  initializeDownstreamPushbackConfig(ProcessingMode::STREAMED, /*send_headers=*/true,
+                                     /*send_trailers=*/false);
+
+  auto response = sendDownstreamRequestWithBody("hello world", std::nullopt);
+  waitForNextUpstreamRequest();
+
+  // Disable downstream reading so data backs up in socket.
+  codec_client_->connection()->readDisable(true);
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-upstream-header", "test-value"}},
+      false);
+
+  constexpr size_t kLargeDataSize = 80 * 1024;
+  const std::string response_body(kLargeDataSize, 'x');
+  upstream_request_->encodeData(response_body, /*end_stream=*/true);
+  timeSystem().advanceTimeWaitImpl(20ms);
+  processResponseHeadersMessage(*grpc_upstreams_[0], /*first_message=*/true, std::nullopt);
+  verifyUpstreamAndSidestreamFlowControlPaused(/*expect_sidestream_paused=*/false);
+
+  bool end_stream = false;
+  while (!end_stream) {
+    processResponseBodyMessage(*grpc_upstreams_[0], /*first_message=*/false,
+                               [&end_stream](const HttpBody& body, BodyResponse&) {
+                                 end_stream = body.end_of_stream();
+                                 return true;
+                               });
+  }
+  verifyUpstreamAndSidestreamFlowControlPaused(/*expect_sidestream_paused=*/true);
+
+  codec_client_->connection()->readDisable(false);
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-upstream-header", "test-value"));
+  EXPECT_EQ(response->body(), response_body);
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace ExternalProcessing

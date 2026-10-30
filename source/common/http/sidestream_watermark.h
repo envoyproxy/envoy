@@ -1,6 +1,9 @@
 #pragma once
 
 #include "envoy/http/async_client.h"
+#include "envoy/http/codec.h"
+
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -33,9 +36,23 @@ public:
     }
   }
 
-  void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) final {}
+  void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.grpc_side_stream_flow_control_3")) {
+      if (decode_callback_ != nullptr) {
+        decode_callback_->addDownstreamWatermarkCallbacks(callbacks);
+      }
+    }
+  }
 
-  void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) final {}
+  void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.grpc_side_stream_flow_control_3")) {
+      if (decode_callback_ != nullptr) {
+        decode_callback_->removeDownstreamWatermarkCallbacks(callbacks);
+      }
+    }
+  }
 
   /**
    * The set function needs to be called by stream decoder filter before side stream connection is

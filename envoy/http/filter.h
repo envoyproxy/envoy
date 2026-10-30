@@ -890,6 +890,35 @@ public:
   virtual void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks& callbacks) PURE;
 
   /**
+   * This routine can be called by a filter to subscribe to watermark events originating from
+   * encoder filters buffering response data from upstream.
+   *
+   * Immediately after subscribing, the filter will get a high watermark callback for each
+   * outstanding high watermark.
+   *
+   * Note: This method is part of StreamDecoderFilterCallbacks so that upstream request handlers
+   * can subscribe to encoder filter back-pressure and pause upstream response reads. However, it
+   * only needs to be implemented by FilterManager, where an HTTP encoder filter chain exists.
+   * Other StreamDecoderFilterCallbacks implementations can safely rely on this default no-op
+   * implementation because they either do not have an HTTP encoder filter chain, do not propagate
+   * encoder filter watermarks to side-streams, or only serve filters that never subscribe to
+   * EncoderFilterWatermarkCallbacks.
+   */
+  virtual void addEncoderFilterWatermarkCallbacks(EncoderFilterWatermarkCallbacks& callbacks) {
+    UNREFERENCED_PARAMETER(callbacks);
+  }
+
+  /**
+   * This routine can be called by a filter to stop subscribing to encoder filter watermark events.
+   *
+   * It is not safe to call this from under the stack of an EncoderFilterWatermarkCallbacks
+   * callback.
+   */
+  virtual void removeEncoderFilterWatermarkCallbacks(EncoderFilterWatermarkCallbacks& callbacks) {
+    UNREFERENCED_PARAMETER(callbacks);
+  }
+
+  /**
    * @return the account, if any, used by this stream.
    */
   virtual Buffer::BufferMemoryAccountSharedPtr account() const PURE;

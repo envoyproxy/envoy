@@ -2,6 +2,7 @@
 // generally should not change or remove existing tests.
 
 #include <algorithm>
+#include <cstddef>
 #include <iostream>
 
 #include "envoy/config/core/v3/base.pb.h"
@@ -1213,6 +1214,58 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideEmptyBodyBeforeHeadersResponse) {
 
   handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
+}
+
+// Downstream push back sidestream and upstream with response_body_mode FULL_DUPLEX_STREAMED.
+TEST_P(ExtProcIntegrationTest, DownstreamPushbackSidestreamAndUpstreamFullDuplex) {
+  if (!IsEnvoyGrpc()) {
+    return;
+  }
+  initializeDownstreamPushbackConfig(ProcessingMode::FULL_DUPLEX_STREAMED, /*send_headers=*/true,
+                                     /*send_trailers=*/true);
+
+  auto response = sendDownstreamRequestWithBody("hello world", std::nullopt);
+  waitForNextUpstreamRequest();
+
+  // Disable downstream reading so data backs up in the downstream connection buffer.
+  codec_client_->connection()->readDisable(true);
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-upstream-header", "test-value"}},
+      false);
+  constexpr size_t kLargeDataSize = 64 * 1024;
+  const std::string response_body(kLargeDataSize, 'x');
+  upstream_request_->encodeData(response_body, /*end_stream=*/false);
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], /*first_message=*/true, std::nullopt);
+
+  ProcessingRequest body_request;
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, body_request));
+  ASSERT_TRUE(body_request.has_response_body());
+
+  const std::string mutated_body(kLargeDataSize, 'a');
+  serverSendBodyRespDuplexStreamed(/*total_resp_body_msg=*/1, processor_stream_,
+                                   /*end_of_stream=*/false, /*response=*/true, mutated_body);
+
+  verifyUpstreamAndSidestreamFlowControlPaused(/*expect_sidestream_paused=*/true);
+
+  codec_client_->connection()->readDisable(false);
+  upstream_request_->encodeTrailers(Http::TestResponseTrailerMapImpl{{"x-test-trailers", "Yes"}});
+  const uint32_t remaining_resp_body_msg = serverReceiveBodyDuplexStreamed(
+      response_body.substr(body_request.response_body().body().size()), processor_stream_,
+      /*response=*/true, /*compare_body=*/true);
+  serverSendBodyRespDuplexStreamed(remaining_resp_body_msg, processor_stream_,
+                                   /*end_of_stream=*/false, /*response=*/true);
+  serverSendTrailerRespDuplexStreamed(processor_stream_, /*response=*/true);
+
+  verifyDownstreamResponse(*response, 200);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-upstream-header", "test-value"));
+  EXPECT_EQ(response->body(),
+            absl::StrCat(mutated_body, std::string(remaining_resp_body_msg, 'r')));
+  ASSERT_TRUE(response->trailers());
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-test-trailers", "Yes"));
+  EXPECT_THAT(*(response->trailers()), ContainsHeader("x-new-trailer", "new"));
+  cleanupUpstreamAndDownstream();
 }
 
 } // namespace ExternalProcessing
