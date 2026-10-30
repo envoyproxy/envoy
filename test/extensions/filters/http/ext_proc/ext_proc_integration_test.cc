@@ -6076,6 +6076,94 @@ TEST_P(ExtProcIntegrationTest, PackRequestTrailersWithResponseTrailersFailOpen) 
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, ThreeExtProcFiltersInRequestProcessingStreamed) {
+  two_ext_proc_filters_ = true;
+  grpc_upstream_count_ = 3;
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap&) {
+    // Filter-2: only processes the request headers.
+    proto_config_2_.mutable_processing_mode()->Clear();
+    auto* processing_mode_2 = proto_config_2_.mutable_processing_mode();
+    processing_mode_2->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_2->set_response_header_mode(ProcessingMode::SKIP);
+    addDownstreamExtProcFilter("ext_proc_server_2", grpc_upstreams_[2], proto_config_2_,
+                               "envoy.filters.http.ext_proc_2");
+    // Filter-1: streams the request body.
+    proto_config_1_.mutable_processing_mode()->Clear();
+    auto* processing_mode_1 = proto_config_1_.mutable_processing_mode();
+    processing_mode_1->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode_1->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode_1->set_request_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_1", grpc_upstreams_[1], proto_config_1_,
+                               "envoy.filters.http.ext_proc_1");
+    // Filter-0: streams the request body.
+    proto_config_.mutable_processing_mode()->Clear();
+    auto* processing_mode = proto_config_.mutable_processing_mode();
+    processing_mode->set_request_header_mode(ProcessingMode::SEND);
+    processing_mode->set_response_header_mode(ProcessingMode::SKIP);
+    processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+    addDownstreamExtProcFilter("ext_proc_server_0", grpc_upstreams_[0], proto_config_,
+                               "envoy.filters.http.ext_proc");
+  });
+
+  initializeConfig({}, {{0, 1}, {1, 1}, {2, 1}});
+  HttpIntegrationTest::initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl default_headers;
+  HttpTestUtility::addDefaultHeaders(default_headers);
+
+  std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+      codec_client_->startRequest(default_headers);
+  request_encoder_ = &encoder_decoder.first;
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+
+  ProcessingResponse body_response;
+  body_response.mutable_request_body();
+
+  // The headers pass filter-0 and filter-1 and stop at filter-2.
+  ProcessingRequest header_request;
+  serverReceiveHeaderReq(header_request);
+  serverSendHeaderResp();
+  server1ReceiveHeaderReq(header_request);
+  server1SendHeaderResp();
+  ASSERT_TRUE(grpc_upstreams_[2]->waitForHttpConnection(*dispatcher_, processor_connection_2_));
+  ASSERT_TRUE(processor_connection_2_->waitForNewStream(*dispatcher_, processor_stream_2_));
+  ASSERT_TRUE(processor_stream_2_->waitForGrpcMessage(*dispatcher_, header_request));
+  ASSERT_TRUE(header_request.has_request_headers());
+
+  // "sss" goes through filter-0 and filter-1 and is held by filter-2.
+  codec_client_->sendData(*request_encoder_, "sss", false);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+  ProcessingRequest body_request;
+  ASSERT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, body_request));
+  ASSERT_TRUE(body_request.has_request_body());
+  EXPECT_FALSE(body_request.request_body().end_of_stream());
+  processor_stream_1_->sendGrpcMessage(body_response);
+  timeSystem().advanceTimeWaitImpl(50ms);
+
+  // "xxx" with end_stream goes through filter-0 and is held by filter-1.
+  codec_client_->sendData(*request_encoder_, "xxx", true);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, std::nullopt);
+  ASSERT_TRUE(processor_stream_1_->waitForGrpcMessage(*dispatcher_, body_request));
+  ASSERT_TRUE(body_request.has_request_body());
+  EXPECT_TRUE(body_request.request_body().end_of_stream());
+
+  // Filter-2 resumes while filter-1 still holds "xxx", so "sss" must not end the stream.
+  processor_stream_2_->startGrpcStream();
+  ProcessingResponse header_response;
+  header_response.mutable_request_headers();
+  processor_stream_2_->sendGrpcMessage(header_response);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 3));
+
+  // Filter-1 releases "xxx", which ends the stream.
+  processor_stream_1_->sendGrpcMessage(body_response);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(upstream_request_->body().toString(), "sssxxx");
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  verifyDownstreamResponse(*response, 200);
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions
