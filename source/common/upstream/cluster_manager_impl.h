@@ -38,6 +38,7 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
+#include "source/common/upstream/cluster_dns_resolver_cache.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -92,6 +93,9 @@ protected:
   Server::Configuration::ServerFactoryContext& context_;
   Stats::Store& stats_;
   LazyCreateDnsResolver dns_resolver_fn_;
+  // Lets clusters configured with an identical DNS resolver configuration share a resolver. Owned
+  // here so that the sharing is scoped to this server's clusters and to the main thread.
+  ClusterDnsResolverCache dns_resolver_cache_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
 };
