@@ -107,11 +107,22 @@ for how to update or override dependencies.
     Envoy supports the following compiler toolchains:
 
     - No config flag (recommended): Uses the hermetic `clang` compiler with `libc++` (LLVM standard library)
-    - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
+    - `--config=gcc`: Uses toolshed's hermetic GCC 13.4.0 with static `libstdc++` (GNU standard
+      library). No host GCC or binutils installation is needed. It builds Linux x86_64 targets on
+      Linux x86_64 only; on other platforms `--config=gcc` fails rather than falling back to Clang.
+      With remote execution from an aarch64 host, also pass
+      `--host_platform=//bazel/platforms/rbe:linux_x64` so GCC actions run on x86_64 workers.
+
+    GCC links with the same hermetic LLD as Clang: its archive contains no gold, and BFD runs out of
+    memory on Envoy's large static links. GCC uses the same toolshed sysroot as Clang, standardising
+    the headers and libraries we build against and constraining both compilers to Envoy's intended
+    libc environment. The archive's bundled sysroot is removed; GCC retains only its own compiler
+    headers, libstdc++ headers and static `libstdc++.a`.
 
     Note: The C++ standard library is derived from the compiler: clang (the default) and Apple builds use `libc++`, `--config=gcc` uses `libstdc++`. Other combinations such as clang with `libstdc++` are not supported or tested; if you need one, you will need to set up your own `cc_toolchain`.
 
-    The `--config=libc++` and `--config=libstdc++` configs are used internally (e.g. by `--config=gcc` and `bazel/setup_local_tsan.sh`) and are not intended for direct use.
+    The `--config=libc++` config is used internally (e.g. by `bazel/setup_local_tsan.sh`) and is
+    not intended for direct use.
 
 
     ### macOS
@@ -233,6 +244,34 @@ The `llvm_toolchain_alias_extension.host(path = ...)` tag detects the installed 
 `bin/clang --version`. Its optional `llvm_version` attribute can be set to cross-check the detected
 major version. This mechanism supports host LLVM versions other than 22; the separate
 `toolchains_llvm` toolchain's `llvm_version` must also match the installed host version.
+
+Envoy's GCC toolchain comes from toolshed's `gcc_extension`, registered as a dev dependency.
+Downstream root modules that want GCC must declare it with the shared sysroot and hermetic lld,
+and register a toolchain for it (see `//bazel/gcc:linux_x86_64_toolchain`). For host GCC, add the
+extension's `host` tag:
+
+```starlark
+gcc = use_extension("@envoy_toolshed//toolchains/gcc:extensions.bzl", "gcc_extension")
+gcc.toolchain(
+    name = "gcc_linux_x86_64",
+    arch = "x86_64",
+    dwp = "@llvm_minimal_linux_x64//:bin/llvm-dwp",
+    lld = "@llvm_minimal_linux_x64//:bin/lld",
+    sysroot = "@sysroot_linux_amd64//sysroot",
+)
+gcc.host(path = "/usr", toolchains = ["gcc_linux_x86_64"])  # Optional
+use_repo(gcc, "gcc_linux_x86_64")
+```
+
+The prefix must contain `bin/gcc`, `bin/g++`, binutils, C/C++ headers and a static `libstdc++`.
+The optional `gcc_version = "13"` cross-checks the installed major version. With `--config=gcc`
+(or, outside this workspace,
+`--@envoy//bazel:use_gcc=true --cxxopt=-std=c++20 --host_cxxopt=-std=c++20`), the host compiler
+replaces the prebuilt GCC. Without that flag, Clang remains the default. Host GCC uses host libc/headers and is
+not a hermetic or remote-execution configuration. Without the `host` tag nothing falls back to
+host tools, headers or libraries. `toolchains = ["gcc_linux_x86_64"]` keeps Envoy's separate
+`gcc_runtime_linux_x86_64` repository, which supplies libstdc++ to the OpenSSL prefixer, hermetic.
+
 
 ### Migrating from `envoy_llvm_extension`
 

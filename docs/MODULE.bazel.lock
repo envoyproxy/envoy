@@ -1241,7 +1241,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_build_config_ext": {
       "general": {
-        "bzlTransitiveDigest": "EPNsl8R8ZRZM8nHn4kfnziWNbdgbaHV8uStJsxvuTuM=",
+        "bzlTransitiveDigest": "N2qj0w5+6hCGMUCvAl3wqQHaQgBPktJbDqeuH6+y2ss=",
         "usagesDigest": "iA1seCCxL1JoTeQEGHUPSEc93vO3JA4pM8sK4sMMan4=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1261,7 +1261,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_module_graph_extension": {
       "general": {
-        "bzlTransitiveDigest": "EPNsl8R8ZRZM8nHn4kfnziWNbdgbaHV8uStJsxvuTuM=",
+        "bzlTransitiveDigest": "N2qj0w5+6hCGMUCvAl3wqQHaQgBPktJbDqeuH6+y2ss=",
         "usagesDigest": "ymD/bnZhvue8QBxkA+Ac/m/a7viCmw83gRqefjG+JBc=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1283,7 +1283,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_repo_extension": {
       "general": {
-        "bzlTransitiveDigest": "EPNsl8R8ZRZM8nHn4kfnziWNbdgbaHV8uStJsxvuTuM=",
+        "bzlTransitiveDigest": "N2qj0w5+6hCGMUCvAl3wqQHaQgBPktJbDqeuH6+y2ss=",
         "usagesDigest": "FAw8Y3mQshR9sd1RHlAiDwpIEJGM2+PMZQFujBl5IUQ=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1303,7 +1303,7 @@
     },
     "@@envoy+//bazel:extensions.bzl%envoy_toolchains_extension": {
       "general": {
-        "bzlTransitiveDigest": "EPNsl8R8ZRZM8nHn4kfnziWNbdgbaHV8uStJsxvuTuM=",
+        "bzlTransitiveDigest": "N2qj0w5+6hCGMUCvAl3wqQHaQgBPktJbDqeuH6+y2ss=",
         "usagesDigest": "PAKPVvO8cX+q6rOc94CBj2PuUR0CHcNuCfqfSSrj7Vs=",
         "recordedInputs": [
           "REPO_MAPPING:envoy+,bazel_skylib bazel_skylib+",
@@ -1606,7 +1606,7 @@
     "@@envoy_toolshed+//sysroot:extensions.bzl%sysroot_extension": {
       "general": {
         "bzlTransitiveDigest": "V8Sy13a9vZsI1Abquy8bSu0tr21Pz53Qm6WS0opvc84=",
-        "usagesDigest": "o7Jd24Fo1AmaMYiuvVwmrQ6ELT7/pU6taNYIuYq45lw=",
+        "usagesDigest": "q12fKq3w2L/i5ShWeLYjmi7BA+pxzNXn0Y+34gN8GHc=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "sysroot_linux_amd64": {
@@ -1625,26 +1625,6 @@
               "sha256": "ab81edf74e3293827eb6eba5885a3ccc6c592b5d14b5322f2afcf25941f25ea8",
               "arch": "arm64",
               "glibc_version": "2.31"
-            }
-          },
-          "libstdcxx_sysroot_linux_amd64": {
-            "repoRuleId": "@@envoy_toolshed+//sysroot:sysroot.bzl%sysroot",
-            "attributes": {
-              "version": "0.2.30",
-              "sha256": "9c9f98e44d1e3a6223324f36344e3449a0ff60ea9e44fbfa8c0e5015dea922a3",
-              "arch": "amd64",
-              "glibc_version": "2.31",
-              "stdcc_version": "13"
-            }
-          },
-          "libstdcxx_sysroot_linux_arm64": {
-            "repoRuleId": "@@envoy_toolshed+//sysroot:sysroot.bzl%sysroot",
-            "attributes": {
-              "version": "0.2.30",
-              "sha256": "8bcef528464e1a58d72faee1e2824ed8d3c4896ab36d493a95cebe7f98314257",
-              "arch": "arm64",
-              "glibc_version": "2.31",
-              "stdcc_version": "13"
             }
           }
         }
