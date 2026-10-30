@@ -518,18 +518,11 @@ case $CI_TARGET in
         bazel clean "${BAZEL_GLOBAL_OPTIONS[@]}" "${CLEAN_ARGS[@]}"
         ;;
 
-    compile_time_options)
+    compile_time_options|cto)
         # See `compile-time-options` in `.bazelrc`
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-
-        # Test execution_context build setting transition
-        echo "Building and testing execution_context_enabled tests..."
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -c fastbuild \
-            -- //test/common/common:execution_context_enabled_test
 
         if [[ -z "$ENVOY_SKIP_CTO_WAMR" ]]; then
             echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
@@ -541,7 +534,7 @@ case $CI_TARGET in
                 -c fastbuild \
                 "${TEST_TARGETS[@]}"
         fi
-        if [[ -z "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
+        if [[ -n "$ENVOY_SKIP_CTO_WASMTIME" ]]; then
             exit 0
         fi
         echo "Building and testing with wasm=wasmtime and jemalloc: and admin_functionality and admin_html disabled ${TEST_TARGETS[*]}"
@@ -834,6 +827,14 @@ case $CI_TARGET in
         popd
         ;;
 
+    execution_context)
+        # Test the execution_context build setting transition
+        # (see bazel/execution_context_transition.bzl)
+        bazel_with_collection \
+            test "${BAZEL_BUILD_OPTIONS[@]}" \
+            -- //test/common/common:execution_context_enabled_test
+        ;;
+
     external)
         echo "Testing external workspace build..."
         pushd "${ENVOY_SRCDIR}/bazel/tests/external"
@@ -1108,16 +1109,18 @@ case $CI_TARGET in
     verify_examples)
         pushd "$ENVOY_DOCS_PATH"
         DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
-        bazel run --config=ci \
-                  --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-                  --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-                  --action_env="CARGO_BAZEL_REPIN=true" \
-                  --host_action_env="CARGO_BAZEL_REPIN=true" \
-                  --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-                  --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-                  --sandbox_writable_path="${HOME}/.docker/" \
-                  --sandbox_writable_path="$HOME" \
-                  @envoy-examples//:verify_examples
+        bazel test \
+              --config=ci \
+              --keep_going \
+              --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+              --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
+              --action_env="CARGO_BAZEL_REPIN=true" \
+              --host_action_env="CARGO_BAZEL_REPIN=true" \
+              --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
+              --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
+              --sandbox_writable_path="${HOME}/.docker/" \
+              --sandbox_writable_path="$HOME" \
+              @envoy-examples//:verify_examples
         popd
         ;;
 

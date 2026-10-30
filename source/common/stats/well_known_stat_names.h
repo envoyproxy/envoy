@@ -20,6 +20,7 @@ namespace Stats {
   TOKEN(http)                                                                                      \
   TOKEN(listener)                                                                                  \
   TOKEN(listener_manager)                                                                          \
+  TOKEN(mongo)                                                                                     \
   TOKEN(route)                                                                                     \
   TOKEN(runtime)                                                                                   \
   TOKEN(server)                                                                                    \
@@ -37,6 +38,7 @@ namespace Stats {
   TAG(health_check_name)                                                                           \
   TAG(http_conn_manager_prefix)                                                                    \
   TAG(listener_address)                                                                            \
+  TAG(mongo_prefix)                                                                                \
   TAG(rds_route_config)                                                                            \
   TAG(response_code)                                                                               \
   TAG(response_code_class)                                                                         \

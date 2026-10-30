@@ -699,16 +699,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     const auto parsed_authority = Http::Utility::parseAuthority(header_value);
 
     if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options->auto_sni() &&
-        !filter_state->hasDataWithName(Network::UpstreamServerName::key())) {
-      filter_state->setData(Network::UpstreamServerName::key(),
-                            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_));
+        !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamServerName)) {
+      filter_state->setIndexedData(
+          StreamInfo::FilterStateIndex::UpstreamServerName,
+          std::make_shared<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
 
     if (upstream_http_protocol_options->auto_san_validation() &&
-        !filter_state->hasDataWithName(Network::UpstreamSubjectAltNames::key())) {
-      filter_state->setData(Network::UpstreamSubjectAltNames::key(),
-                            std::make_unique<Network::UpstreamSubjectAltNames>(
-                                std::vector<std::string>{std::string(parsed_authority.host_)}));
+        !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamSubjectAltNames)) {
+      filter_state->setIndexedData(
+          StreamInfo::FilterStateIndex::UpstreamSubjectAltNames,
+          std::make_shared<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(parsed_authority.host_)}),
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
   }
 
@@ -2748,8 +2752,9 @@ RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Server::Configuration::CommonFactoryContext& context,
                                            Event::Dispatcher& dispatcher,
                                            Upstream::ResourcePriority priority) {
-  std::unique_ptr<RetryStateImpl> retry_state =
-      RetryStateImpl::create(policy, request_headers, cluster, context, dispatcher, priority);
+  RetryStatePtr retry_state = policy.createRetryState(
+      request_headers, cluster, context, dispatcher, priority,
+      makeOptRefFromPtr(callbacks() ? &callbacks()->streamInfo() : nullptr));
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the buffer limit to 0 so that we don't retry or

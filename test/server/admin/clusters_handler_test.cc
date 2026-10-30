@@ -76,8 +76,8 @@ TEST_P(AdminInstanceTest, ClustersJsonAndText) {
       {"atest_gauge", atest_gauge},
       {"test_gauge", test_gauge},
   };
-  ON_CALL(*host, counters()).WillByDefault(Invoke([&counters]() { return counters; }));
-  ON_CALL(*host, gauges()).WillByDefault(Invoke([&gauges]() { return gauges; }));
+  ON_CALL(*host, counters()).WillByDefault([&counters]() { return counters; });
+  ON_CALL(*host, gauges()).WillByDefault([&gauges]() { return gauges; });
 
   ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
       .WillByDefault(Return(true));

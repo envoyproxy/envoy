@@ -255,6 +255,8 @@ private:
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
 
+  void startRequestCompression(Http::RequestHeaderMap& headers);
+  void startResponseCompression(Http::ResponseHeaderMap& headers);
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
   void weakenEtagHeader(Http::ResponseHeaderMap& headers);
   std::string createEnvoyCompressionStatusHeaderValue(
@@ -299,6 +301,9 @@ private:
 
   Envoy::Compression::Compressor::CompressorPtr response_compressor_;
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;
+  // Hold headers without a content length until body data arrives or the stream ends.
+  Http::RequestHeaderMap* pending_request_headers_{};
+  Http::ResponseHeaderMap* pending_response_headers_{};
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
   // Cached per-route configuration pointer, initialized once per stream.

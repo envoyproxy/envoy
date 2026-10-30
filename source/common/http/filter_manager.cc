@@ -441,7 +441,7 @@ void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
 }
 
 void ActiveStreamDecoderFilter::doData(bool end_stream) {
-  parent_.decodeData(this, *parent_.buffered_request_data_, end_stream,
+  parent_.decodeData(this, *bufferedData(), end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 
@@ -516,16 +516,14 @@ OptRef<WebTransportSession> ActiveStreamDecoderFilter::webTransportSession() {
 }
 
 void ActiveStreamDecoderFilter::continueDecoding() { commonContinue(); }
-const Buffer::Instance* ActiveStreamDecoderFilter::decodingBuffer() {
-  return parent_.buffered_request_data_.get();
-}
+const Buffer::Instance* ActiveStreamDecoderFilter::decodingBuffer() { return bufferedData().get(); }
 
 bool ActiveStreamDecoderFilter::shouldLoadShed() const { return parent_.shouldLoadShed(); }
 
 void ActiveStreamDecoderFilter::modifyDecodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
   ASSERT(parent_.state_.latest_data_decoding_filter_ == this);
-  callback(*parent_.buffered_request_data_.get());
+  callback(*bufferedData());
 }
 
 void ActiveStreamDecoderFilter::sendLocalReply(
@@ -604,7 +602,7 @@ void FilterManager::maybeContinueDecoding(StreamDecoderFilters::Iterator continu
     // We use the continueDecoding() code since it will correctly handle not calling
     // decodeHeaders() again. Fake setting StopSingleIteration since the continueDecoding() code
     // expects it.
-    ASSERT(buffered_request_data_);
+    ASSERT((*continue_data_entry)->bufferedData() != nullptr);
     (*continue_data_entry)->iteration_state_ =
         ActiveStreamFilterBase::IterationState::StopSingleIteration;
     (*continue_data_entry)->continueDecoding();
@@ -677,7 +675,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
     // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
     // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
     // after the new metadata.
-    if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
+    if ((*entry)->end_stream_ && new_metadata_added && !(*entry)->bufferedData()) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(
           trace, "inserting an empty data frame for end_stream due metadata being added.", *this);
@@ -696,7 +694,7 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
 
     // Here we handle the case where we have a header only request, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if (end_stream && buffered_request_data_ && continue_data_entry == decoder_filters_.end()) {
+    if (end_stream && (*entry)->bufferedData() && continue_data_entry == decoder_filters_.end()) {
       continue_data_entry = entry;
     }
     // The decoder filter chain is finished here if the following is true:
@@ -1330,7 +1328,7 @@ void FilterManager::maybeContinueEncoding(StreamEncoderFilters::Iterator continu
     // We use the continueEncoding() code since it will correctly handle not calling
     // encodeHeaders() again. Fake setting StopSingleIteration since the continueEncoding() code
     // expects it.
-    ASSERT(buffered_response_data_);
+    ASSERT((*continue_data_entry)->bufferedData() != nullptr);
     (*continue_data_entry)->iteration_state_ =
         ActiveStreamFilterBase::IterationState::StopSingleIteration;
     (*continue_data_entry)->continueEncoding();
@@ -1395,7 +1393,7 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
 
     // Here we handle the case where we have a header only response, but a filter adds a body
     // to it. We need to not raise end_stream = true to further filters during inline iteration.
-    if (end_stream && buffered_response_data_ && continue_data_entry == encoder_filters_.end()) {
+    if (end_stream && (*entry)->bufferedData() && continue_data_entry == encoder_filters_.end()) {
       continue_data_entry = entry;
     }
   }
@@ -1800,6 +1798,15 @@ void FilterManager::setBufferLimit(uint64_t new_limit) {
   }
 }
 
+Buffer::InstancePtr FilterManager::takeBufferedRequestData() {
+  Buffer::InstancePtr data;
+  if (buffered_request_data_ != nullptr && buffered_request_data_->length() > 0) {
+    data = std::make_unique<Buffer::OwnedImpl>();
+    data->move(*buffered_request_data_);
+  }
+  return data;
+}
+
 void FilterManager::contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) {
   if (connection_.has_value()) {
     tracked_object_stack.add(*connection_);
@@ -1996,7 +2003,7 @@ void ActiveStreamEncoderFilter::doHeaders(bool end_stream) {
   parent_.encodeHeaders(this, *parent_.filter_manager_callbacks_.responseHeaders(), end_stream);
 }
 void ActiveStreamEncoderFilter::doData(bool end_stream) {
-  parent_.encodeData(this, *parent_.buffered_response_data_, end_stream,
+  parent_.encodeData(this, *bufferedData(), end_stream,
                      FilterManager::FilterIterationStartState::CanStartFromCurrent);
 }
 void ActiveStreamEncoderFilter::drainSavedResponseMetadata() {
@@ -2084,14 +2091,12 @@ void ActiveStreamEncoderFilter::onEncoderFilterBelowWriteBufferLowWatermark() {
 
 void ActiveStreamEncoderFilter::continueEncoding() { commonContinue(); }
 
-const Buffer::Instance* ActiveStreamEncoderFilter::encodingBuffer() {
-  return parent_.buffered_response_data_.get();
-}
+const Buffer::Instance* ActiveStreamEncoderFilter::encodingBuffer() { return bufferedData().get(); }
 
 void ActiveStreamEncoderFilter::modifyEncodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
   ASSERT(parent_.state_.latest_data_encoding_filter_ == this);
-  callback(*parent_.buffered_response_data_.get());
+  callback(*bufferedData());
 }
 
 void ActiveStreamEncoderFilter::sendLocalReply(

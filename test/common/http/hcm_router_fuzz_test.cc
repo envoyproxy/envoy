@@ -22,7 +22,6 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
-using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -111,9 +110,9 @@ public:
   FuzzDownstream(ConnectionManagerImpl& conn_manager) : conn_manager_(conn_manager) {
     // If sendLocalReply is called:
     ON_CALL(encoder_, encodeHeaders(_, true))
-        .WillByDefault(Invoke([this](const ResponseHeaderMap&, bool end_stream) -> void {
+        .WillByDefault([this](const ResponseHeaderMap&, bool end_stream) -> void {
           request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
-        }));
+        });
   }
 
   void sendHeaders(const test::fuzz::Headers& request_headers, bool end_stream,
@@ -160,10 +159,10 @@ class FuzzUpstream {
 public:
   FuzzUpstream(Http::ResponseDecoder& decoder) : decoder_(decoder) {
     ON_CALL(mock_request_encoder_, encodeHeaders(_, _))
-        .WillByDefault(Invoke([](const Http::RequestHeaderMap&, bool) { return okStatus(); }));
-    ON_CALL(mock_request_encoder_.stream_, resetStream(_))
-        .WillByDefault(
-            Invoke([this](StreamResetReason) { response_state_ = StreamState::Closed; }));
+        .WillByDefault([](const Http::RequestHeaderMap&, bool) { return okStatus(); });
+    ON_CALL(mock_request_encoder_.stream_, resetStream(_)).WillByDefault([this](StreamResetReason) {
+      response_state_ = StreamState::Closed;
+    });
   }
 
   void sendHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) {
@@ -206,8 +205,7 @@ public:
     ON_CALL(mock_route_->route_entry_.internal_redirect_policy_, enabled())
         .WillByDefault(Return(internal_redirect_policy_enabled_));
     ON_CALL(mock_route_->route_entry_.internal_redirect_policy_, shouldRedirectForResponseCode(_))
-        .WillByDefault(
-            Invoke([](const Http::Code& code) { return code == Http::Code::MovedPermanently; }));
+        .WillByDefault([](const Http::Code& code) { return code == Http::Code::MovedPermanently; });
     ON_CALL(mock_route_->route_entry_.internal_redirect_policy_, maxInternalRedirects())
         .WillByDefault(Return(10));
     ON_CALL(mock_route_->route_entry_.internal_redirect_policy_, isCrossSchemeRedirectAllowed())
@@ -219,9 +217,9 @@ public:
 
     ON_CALL(*tlc_.cluster_.info_, maintenanceMode()).WillByDefault(Return(maintenance_));
     mock_host_ = std::make_shared<NiceMock<Envoy::Upstream::MockHost>>();
-    ON_CALL(tlc_, chooseHost(_)).WillByDefault(Invoke([this](Upstream::LoadBalancerContext*) {
+    ON_CALL(tlc_, chooseHost(_)).WillByDefault([this](Upstream::LoadBalancerContext*) {
       return Upstream::HostSelectionResponse{mock_host_, "foo"};
-    }));
+    });
   }
 
   void newUpstream(Router::GenericConnectionPoolCallbacks* request,
@@ -424,9 +422,9 @@ public:
     }
     auto conn_pool = std::make_unique<Router::MockGenericConnPool>();
     ON_CALL(*conn_pool, newStream(_))
-        .WillByDefault(Invoke([cluster, protocol](Router::GenericConnectionPoolCallbacks* request) {
+        .WillByDefault([cluster, protocol](Router::GenericConnectionPoolCallbacks* request) {
           cluster->newUpstream(request, protocol);
-        }));
+        });
     return conn_pool;
   }
 
@@ -457,19 +455,19 @@ public:
     cluster_manager_.createDefaultClusters(*this);
     // Install the `RouterFuzzFilter` here
     ON_CALL(filter_factory_, createFilterChain(_))
-        .WillByDefault(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+        .WillByDefault([this](FilterChainFactoryCallbacks& callbacks) -> bool {
           callbacks.setFilterConfigName("");
           callbacks.addStreamDecoderFilter(RouterFuzzFilter::create(filter_config_));
           return true;
-        }));
+        });
     ON_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-        .WillByDefault(
-            Invoke([this](const Router::RouteCallback&, const Http::RequestHeaderMap& request_map,
-                          const Envoy::StreamInfo::StreamInfo&,
-                          uint64_t) { return cluster_manager_.route(request_map); }));
-    ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault(Invoke([this](absl::string_view cluster) {
+        .WillByDefault([this](const Router::RouteCallback&,
+                              const Http::RequestHeaderMap& request_map,
+                              const Envoy::StreamInfo::StreamInfo&,
+                              uint64_t) { return cluster_manager_.route(request_map); });
+    ON_CALL(cm_, getThreadLocalCluster(_)).WillByDefault([this](absl::string_view cluster) {
       return cluster_manager_.getThreadLocalCluster(cluster);
-    }));
+    });
   }
 
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
@@ -504,9 +502,7 @@ private:
 class Harness {
 public:
   Harness() : hcm_config_(std::make_shared<FuzzConfig>(Protobuf::RepeatedPtrField<std::string>{})) {
-    ON_CALL(filter_callbacks_.connection_, close(_, _)).WillByDefault(InvokeWithoutArgs([this]() {
-      closed_ = true;
-    }));
+    ON_CALL(filter_callbacks_.connection_, close(_, _)).WillByDefault([this]() { closed_ = true; });
   }
 
   void fuzz(const FuzzCase& input) {

@@ -444,6 +444,65 @@ TEST_P(StatsUtilityTest, LiteScopeHelperStatNamePrefixOnly) {
   EXPECT_EQ(&c, &scope_->counterFromString("prefix.requests"));
 }
 
+TEST_P(StatsUtilityTest, TaggedStatNames) {
+  StatNameDynamicPool dynamic_pool(*symbol_table_);
+  const StatName prefix = pool_.add("prefix");
+  const StatName total = pool_.add("total");
+  // The tag value is interleaved into the flat name as a dynamic StatName.
+  const StatName value = dynamic_pool.add("value1");
+  const StatNameTagVec tags{{pool_.add("tag1"), value}};
+
+  Counter& c =
+      Utility::counterFromTaggedStatNames(*scope_, {prefix, total}, tags, {prefix, value, total});
+  EXPECT_EQ("scope.prefix.value1.total", c.name());
+
+  Histogram& h = Utility::histogramFromTaggedStatNames(
+      *scope_, {prefix, total}, tags, {prefix, value, total}, Histogram::Unit::Milliseconds);
+  EXPECT_EQ("scope.prefix.value1.total", h.name());
+  EXPECT_EQ(Histogram::Unit::Milliseconds, h.unit());
+
+  // The isolated store always honors explicit tags.
+  if (GetParam() == StoreType::Isolated) {
+    EXPECT_EQ("scope.prefix.total", c.tagExtractedName());
+    EXPECT_THAT(c.tags(), testing::ElementsAre(Tag{"tag1", "value1"}));
+    EXPECT_EQ("scope.prefix.total", h.tagExtractedName());
+    EXPECT_THAT(h.tags(), testing::ElementsAre(Tag{"tag1", "value1"}));
+  }
+
+  // With empty tags, the base names alone name the stat and the tagged names are ignored.
+  Counter& c2 = Utility::counterFromTaggedStatNames(*scope_, {prefix, total}, {}, {});
+  EXPECT_EQ("scope.prefix.total", c2.name());
+}
+
+// The names and tags are sanitized by default; sanitize=false keeps them verbatim to match
+// legacy stat creation paths that never sanitized (e.g. POOL_COUNTER_PREFIX).
+TEST_P(StatsUtilityTest, TaggedStatNameSanitization) {
+  const std::vector<TagStringView> tag_views{{"tag", "db:27017"}};
+  TaggedStatName sanitized(*symbol_table_, "base:name", tag_views, "base:name.db:27017");
+  EXPECT_EQ("base_name", symbol_table_->toString(sanitized.baseName()));
+  EXPECT_EQ("base_name.db_27017", symbol_table_->toString(sanitized.name()));
+  ASSERT_EQ(1, sanitized.tags().size());
+  EXPECT_EQ("db_27017", symbol_table_->toString(sanitized.tags()[0].second));
+
+  TaggedStatName verbatim(*symbol_table_, "base:name", tag_views, "base:name.db:27017",
+                          /*sanitize=*/false);
+  EXPECT_EQ("base:name", symbol_table_->toString(verbatim.baseName()));
+  EXPECT_EQ("base:name.db:27017", symbol_table_->toString(verbatim.name()));
+  ASSERT_EQ(1, verbatim.tags().size());
+  EXPECT_EQ("db:27017", symbol_table_->toString(verbatim.tags()[0].second));
+}
+
+// sanitize=false passes through the helper's string constructor, so a ':' in the prefix
+// reaches the flat stat name unchanged.
+TEST_P(StatsUtilityTest, LiteScopeHelperVerbatimNames) {
+  LiteScopeHelper helper(*scope_, "prefix", {{"tag", "db:27017"}}, "prefix.db:27017",
+                         /*sanitize=*/false);
+  EXPECT_EQ("prefix.db:27017", symbol_table_->toString(helper.prefix()));
+
+  Counter& c = helper.counterFromString("requests");
+  EXPECT_EQ("scope.prefix.db:27017.requests", c.name());
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy

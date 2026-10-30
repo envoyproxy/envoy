@@ -5,7 +5,6 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -58,7 +57,7 @@ TEST_F(ResponseCodecUnitTest, ShouldDoNothingIfParserReturnsWaiting) {
   putGarbageIntoBuffer();
 
   MockParserSharedPtr parser = std::make_shared<MockParser>();
-  EXPECT_CALL(*parser, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
+  EXPECT_CALL(*parser, parse(_)).Times(AnyNumber()).WillRepeatedly(consumeOneByte);
 
   EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
@@ -84,7 +83,7 @@ TEST_F(ResponseCodecUnitTest, ShouldUseNewParserAsResponse) {
   MockParserSharedPtr parser3 = std::make_shared<MockParser>();
   EXPECT_CALL(*parser1, parse(_)).WillOnce(Return(ResponseParseResponse::nextParser(parser2)));
   EXPECT_CALL(*parser2, parse(_)).WillOnce(Return(ResponseParseResponse::nextParser(parser3)));
-  EXPECT_CALL(*parser3, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
+  EXPECT_CALL(*parser3, parse(_)).Times(AnyNumber()).WillRepeatedly(consumeOneByte);
 
   EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser1));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
@@ -114,7 +113,7 @@ TEST_F(ResponseCodecUnitTest, ShouldPassParsedMessageToCallback) {
     data = {data.data() + data.size(), 0};
     return ResponseParseResponse::parsedMessage(parsed_message);
   };
-  EXPECT_CALL(*all_consuming_parser, parse(_)).WillOnce(Invoke(consume_and_return));
+  EXPECT_CALL(*all_consuming_parser, parse(_)).WillOnce(consume_and_return);
 
   EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(all_consuming_parser));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);
@@ -144,7 +143,7 @@ TEST_F(ResponseCodecUnitTest, ShouldPassParsedMessageToCallbackAndInitializeNext
       .WillOnce(Return(ResponseParseResponse::parsedMessage(parsed_message)));
 
   MockParserSharedPtr parser2 = std::make_shared<MockParser>();
-  EXPECT_CALL(*parser2, parse(_)).Times(AnyNumber()).WillRepeatedly(Invoke(consumeOneByte));
+  EXPECT_CALL(*parser2, parse(_)).Times(AnyNumber()).WillRepeatedly(consumeOneByte);
 
   EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser1)).WillOnce(Return(parser2));
 
@@ -172,7 +171,7 @@ TEST_F(ResponseCodecUnitTest, ShouldPassParseFailureDataToCallback) {
     data = {data.data() + data.size(), 0};
     return ResponseParseResponse::parseFailure(failure_data);
   };
-  EXPECT_CALL(*parser, parse(_)).WillOnce(Invoke(consume_and_return));
+  EXPECT_CALL(*parser, parse(_)).WillOnce(consume_and_return);
 
   EXPECT_CALL(factory_, create(_, _)).WillOnce(Return(parser));
   EXPECT_CALL(parser_resolver_, createParser(_)).Times(0);

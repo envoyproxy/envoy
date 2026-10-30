@@ -59,7 +59,7 @@ public:
         factory()->createFilterFactoryFromProto(proto_config, "stats", context).value();
     Http::MockFilterChainFactoryCallbacks filter_callback;
     std::shared_ptr<FileSystemBufferFilterConfig> config;
-    EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(Invoke(captureConfig(&config)));
+    EXPECT_CALL(filter_callback, addStreamFilter(_)).WillOnce(captureConfig(&config));
     cb(filter_callback);
     return config;
   }

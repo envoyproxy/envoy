@@ -451,14 +451,11 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryFetchesClusterInfo) {
 }
 
 // tests a scenario when:
-//  - on_demand_cluster_no_recreate_stream is true
 //  - making a request to an unknown cluster
 //  - odcds initiates a connection with a request for the cluster
 //  - a response contains the cluster
 //  - request is resumed via continueDecoding()
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithNoRecreateStream) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "true");
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
                         OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
                     "integration", {});
@@ -496,57 +493,6 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithNoRecreateStream) 
   verifyResponse(std::move(response), "200", {}, {});
   // non-idempotent add-header-filter is run once because stream is not recreated.
   EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).size(), 1);
-  cleanUpXdsConnection();
-  cleanupUpstreamAndDownstream();
-}
-
-// tests a scenario when:
-//  - on_demand_cluster_no_recreate_stream is false
-//  - making a request to an unknown cluster
-//  - odcds initiates a connection with a request for the cluster
-//  - a response contains the cluster
-//  - request is resumed via recreateStream()
-TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryWorksWithRecreateStream) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false");
-  addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
-                        OdCdsIntegrationHelper::createOdCdsConfigSource("odcds_cluster"), 2500),
-                    "integration", {});
-  config_helper_.prependFilter(R"EOF(
-    name: add-header-filter
-    typed_config:
-      "@type": type.googleapis.com/test.integration.filters.AddHeaderEmptyFilterConfig
-  )EOF");
-  initialize();
-  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
-                                                 {":path", "/"},
-                                                 {":scheme", "http"},
-                                                 {":authority", "vhost.first"},
-                                                 {"Pick-This-Cluster", "new_cluster"}};
-  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
-
-  createXdsConnection();
-  auto result = xds_connection_->waitForNewStream(*dispatcher_, odcds_stream_);
-  RELEASE_ASSERT(result, result.message());
-  odcds_stream_->startGrpcStream();
-
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {"new_cluster"}, {},
-                                           odcds_stream_.get()));
-  sendDeltaDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TestTypeUrl::get().Cluster, {new_cluster_}, {}, "1", odcds_stream_.get());
-  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().Cluster, {}, {},
-                                           odcds_stream_.get()));
-
-  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
-  // Send response headers, and end_stream if there is no response body.
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  verifyResponse(std::move(response), "200", {}, {});
-  // non-idempotent add-header-filter is run twice because stream is recreated.
-  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-header-to-add")).size(), 2);
-
   cleanUpXdsConnection();
   cleanupUpstreamAndDownstream();
 }
@@ -605,7 +551,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoveryRemembersDiscoveredCluster)
 //  - a request to unknown cluster "new_cluster" triggers on-demand discovery (the initial
 //    subscription, via start()), which is resolved and the request succeeds;
 //  - a request to a different unknown cluster "new_cluster_2" triggers a SECOND on-demand
-//    discovery, which goes through requestOnDemandUpdate()/append() on the already-started
+//    discovery, which goes through requestOnDemandUpdate()/update() on the already-started
 //    subscription.
 TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoverySecondClusterRoutesResponse) {
   addPerRouteConfig(OdCdsIntegrationHelper::createPerRouteConfig(
@@ -654,7 +600,7 @@ TEST_P(OdCdsIntegrationTest, OnDemandClusterDiscoverySecondClusterRoutesResponse
   ASSERT_TRUE(codec_client_->waitForDisconnect());
 
   // Second request -> a DIFFERENT on-demand cluster ("new_cluster_2"). This is the second on-demand
-  // request on the same subscription, so it flows through requestOnDemandUpdate()/append(). The
+  // request on the same subscription, so it flows through requestOnDemandUpdate()/update(). The
   // response must be routed to the ODCDS callbacks so the cluster is added and the request succeeds
   // (before the fix this timed out with a 503).
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));

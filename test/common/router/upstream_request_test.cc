@@ -145,13 +145,13 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
       new NiceMock<Http::MockStreamDecoderFilter>());
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
-      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+      .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         auto factory = createDecoderFilterFactoryCb(filter);
         callbacks.setFilterConfigName("");
         callbacks.addStreamDecoderFilter(filter);
         callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
         return true;
-      }));
+      });
 
   initialize();
   ASSERT_TRUE(filter->callbacks_ != nullptr);
@@ -166,16 +166,15 @@ TEST_F(UpstreamRequestTest, AcceptRouterHeaders) {
   EXPECT_EQ(&filter->callbacks_->activeSpan(), &router_filter_interface_.callbacks_.activeSpan());
   EXPECT_EQ(&filter->callbacks_->streamInfo(), &router_filter_interface_.callbacks_.streamInfo());
 
-  EXPECT_CALL(*conn_pool_, newStream(_))
-      .WillOnce(Invoke([&](GenericConnectionPoolCallbacks* callbacks) {
-        std::stringstream out;
-        callbacks->upstreamToDownstream().dumpState(out, 0);
-        std::string state = out.str();
-        EXPECT_THAT(state, testing::HasSubstr("UpstreamRequest"));
-        EXPECT_EQ(callbacks->upstreamToDownstream().connection().ptr(),
-                  router_filter_interface_.callbacks_.connection().ptr());
-        return nullptr;
-      }));
+  EXPECT_CALL(*conn_pool_, newStream(_)).WillOnce([&](GenericConnectionPoolCallbacks* callbacks) {
+    std::stringstream out;
+    callbacks->upstreamToDownstream().dumpState(out, 0);
+    std::string state = out.str();
+    EXPECT_THAT(state, testing::HasSubstr("UpstreamRequest"));
+    EXPECT_EQ(callbacks->upstreamToDownstream().connection().ptr(),
+              router_filter_interface_.callbacks_.connection().ptr());
+    return nullptr;
+  });
 
   EXPECT_CALL(*filter, decodeHeaders(_, false));
   upstream_request_->acceptHeadersFromRouter(false);
@@ -189,15 +188,14 @@ TEST_F(UpstreamRequestTest, ConnectionPoolLatencyTime) {
 
   const auto latency_to_add = std::chrono::microseconds(10);
 
-  EXPECT_CALL(*conn_pool_, newStream(_))
-      .WillOnce(Invoke([&](GenericConnectionPoolCallbacks* callbacks) {
-        router_filter_interface_.callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
-            latency_to_add);
+  EXPECT_CALL(*conn_pool_, newStream(_)).WillOnce([&](GenericConnectionPoolCallbacks* callbacks) {
+    router_filter_interface_.callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
+        latency_to_add);
 
-        callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                 "Some Failure", nullptr);
-        return nullptr;
-      }));
+    callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                             "Some Failure", nullptr);
+    return nullptr;
+  });
 
   upstream_request_->acceptHeadersFromRouter(false);
   const StreamInfo::UpstreamTiming& timing =
@@ -282,11 +280,11 @@ TEST_F(UpstreamRequestTest, OnHostSelectedCallbackInvoked) {
   auto filter = std::make_shared<TestUpstreamFilter>();
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
-      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+      .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         callbacks.addStreamDecoderFilter(filter);
         callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
         return true;
-      }));
+      });
 
   initialize();
 
@@ -302,11 +300,11 @@ TEST_F(UpstreamRequestTest, OnHostSelectedRejectionViaSendLocalReply) {
   filter->reject_connection_ = true;
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
-      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+      .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         callbacks.addStreamDecoderFilter(filter);
         callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
         return true;
-      }));
+      });
 
   initialize();
 
@@ -325,12 +323,12 @@ TEST_F(UpstreamRequestTest, OnHostSelectedMultipleCallbacksStopsAfterSendLocalRe
   auto filter2 = std::make_shared<TestUpstreamFilter>();
 
   EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
-      .WillOnce(Invoke([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+      .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         callbacks.addStreamDecoderFilter(filter1);
         callbacks.addStreamDecoderFilter(filter2);
         callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
         return true;
-      }));
+      });
 
   initialize();
 

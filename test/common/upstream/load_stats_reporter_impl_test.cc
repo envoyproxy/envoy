@@ -21,7 +21,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -51,14 +50,14 @@ public:
 
   void createLoadStatsReporter() {
     InSequence s;
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
-    }));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    });
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       response_timer_cb_ = timer_cb;
       return response_timer_;
-    }));
+    });
     load_stats_reporter_ = std::make_unique<LoadStatsReporterImpl>(
         local_info_, cm_, *stats_store_.rootScope(), Grpc::RawAsyncClientPtr(async_client_),
         dispatcher_);

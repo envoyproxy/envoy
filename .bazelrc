@@ -26,7 +26,7 @@ common --noincompatible_disallow_ctx_resolve_tools
 common --legacy_external_runfiles
 
 common --registry=https://bcr.bazel.build/
-common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/aabc9d88be5fc79db006d80437b9dadbb2b4bf84
+common --registry=https://raw.githubusercontent.com/envoyproxy/bazel-registry/d7cbc8859e4063ed9fe10e49f1892c8093fc9683
 # common --registry=file:///bazel-registry
 # this can be useful for dev
 # common --lockfile_mode=off
@@ -40,7 +40,6 @@ build --copt=-DABSL_MIN_LOG_LEVEL=4
 build --experimental_repository_downloader_retries=2
 build --experimental_cc_static_library
 build --enable_platform_specific_config
-build --incompatible_merge_fixed_and_default_shell_env
 # A workaround for slow ICU download.
 build --http_timeout_scaling=6.0
 
@@ -58,8 +57,9 @@ common --repo_env=ANDROID_HOME=
 build --incompatible_config_setting_private_default_visibility
 build --incompatible_enforce_config_setting_visibility
 
+# dont suppress logs by default
+common --experimental_ui_max_stdouterr_bytes=-1
 test --test_verbose_timeout_warnings
-test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 
 # Allow tags to influence execution requirements
 common --incompatible_allow_tags_propagation
@@ -81,9 +81,13 @@ common --@envoy//bazel:deprecated_repo_arg_allowed=false
 build --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-deprecated-declarations
 build --per_file_copt=external/c-ares.*@-Wno-unused-function
 build --per_file_copt=external/google_benchmark.*@-Wno-thread-safety-analysis
+build --per_file_copt=external/highway.*@-Wno-ignored-attributes
+build --host_per_file_copt=external/highway.*@-Wno-ignored-attributes
 build --per_file_copt=external/libprotobuf-mutator.*@-Wno-unused-result
 build --per_file_copt=external/librdkafka.*@-Wno-unused-variable,-Wno-unused-but-set-variable,-Wno-sometimes-uninitialized,-Wno-uninitialized,-Wno-implicit-enum-enum-cast
 build --per_file_copt=external/re2.*@-Wno-deprecated-declarations
+
+build --features=system_include_paths --host_features=system_include_paths
 
 
 #############################################################################
@@ -98,12 +102,14 @@ build --incompatible_default_to_explicit_init_py
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 common --@rules_rust//rust/settings:skip_fission_for_rust=true
+# rustc links with -nodefaultlibs; cc_toolchain unwinder/rtlib flags are inert for Rust
+build --@rules_rust//rust/settings:extra_rustc_flag=-Alinker_messages
+build --@rules_rust//rust/settings:extra_exec_rustc_flag=-Alinker_messages
 
 # kafka
 build --@librdkafka//:with_ssl=false
 build --@librdkafka//:with_zlib=false
 build --per_file_copt=contrib/kafka/.*\.cc@-Wno-old-style-cast
-
 common --incompatible_enable_proto_toolchain_resolution
 
 # these are here to detect if the toolchain attempts to compile protoc
@@ -169,6 +175,24 @@ common:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libstdc++ --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:libstdc++ --repo_env=BAZEL_USE_LIBSTDCPP=True
 
+build:gcc --per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --host_per_file_copt=external/abseil-cpp.*/absl/log/die_if_null\.cc@-w
+build:gcc --per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --host_per_file_copt=.*\.pb\.cc@-Wno-deprecated-declarations
+build:gcc --per_file_copt=external/antlr4-cpp-runtime.*@-Wno-overloaded-virtual
+build:gcc --per_file_copt=external/cel-cpp.*@-Wno-sign-compare,-Wno-return-type,-Wno-unused-function,-Wno-unused-but-set-variable
+
+# TODO(phlax): patch in registry
+build:gcc --per_file_copt=external/proto-processing.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/grpc\+.*@-Wno-attributes,-Wno-return-type,-Wno-sign-compare,-Wno-unused-function
+build:gcc --per_file_copt=external/grpc\+.*\.cc@-Wno-redundant-move,-Wno-pessimizing-move,-Wno-class-memaccess
+build:gcc --per_file_copt=external/grpc-httpjson-transcoding.*@-Wno-range-loop-construct
+build:gcc --per_file_copt=external/protobuf.*/upb/.*@-Wno-maybe-uninitialized
+build:gcc --host_per_file_copt=external/protobuf.*/upb/.*@-Wno-maybe-uninitialized
+build:gcc --per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --host_per_file_copt=external/protobuf.*/src/google/protobuf/(port|message_lite|generated_message_tctable_lite)\.cc@-w
+build:gcc --per_file_copt=external/tcmalloc.*@-Wno-sign-compare
+build:gcc --per_file_copt=external/v8.*@-Wno-dangling-else
 
 #############################################################################
 # tests
@@ -185,7 +209,7 @@ build:coverage --cxxopt="-DENVOY_CONFIG_COVERAGE=1"
 build:coverage --test_env=HEAPCHECK=
 build:coverage --combined_report=lcov
 build:coverage --strategy=TestRunner=remote,sandboxed,local
-build:coverage --strategy=CoverageReport=sandboxed,local
+build:coverage --strategy=CoverageReport=local
 build:coverage --experimental_use_llvm_covmap
 build:coverage --experimental_generate_llvm_lcov
 build:coverage --experimental_split_coverage_postprocessing
@@ -200,7 +224,7 @@ build:coverage --linkopt=-Wl,-s,--no-relax
 build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:coverage --define=dynamic_link_tests=false
 # Use custom report generator that also generates HTML
-build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generator
+build:coverage --coverage_report_generator=@envoy//tools/coverage:report
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
@@ -271,14 +295,13 @@ test:sanitizer --build_tests_only
 
 # ASAN config with clang runtime
 build:asan --config=asan-common
-build:asan --linkopt --rtlib=compiler-rt
-build:asan --linkopt --unwindlib=libgcc
+build:asan --@envoy//bazel:shared_unwind=true
+# Clang adds the hermetic resource directory's per-target runtime library search path.
 build:asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 build:asan --action_env=ENVOY_UBSAN_VPTR=1
 build:asan --copt=-fsanitize=vptr,function
 build:asan --linkopt=-fsanitize=vptr,function
-build:asan --linkopt='-L/opt/llvm/lib/clang/22/lib/x86_64-unknown-linux-gnu'
 
 # Basic ASAN/UBSAN that works for gcc or llvm
 build:asan-common --config=sanitizer

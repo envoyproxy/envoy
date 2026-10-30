@@ -79,6 +79,8 @@ envoy_cc_library(
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:custom_tag_lib",
@@ -200,6 +202,8 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/stats:stats_macros",
         "//source/common/config:utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
@@ -375,6 +379,7 @@ envoy_cc_library(
         "//envoy/event:timer_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/router:retry_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -571,7 +576,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common:time_interface",
         "//envoy/http:header_map_interface",
-        "//envoy/router:router_interface",
+        "//envoy/router:retry_interface",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -613,7 +618,7 @@ envoy_cc_library(
     deps = [
         ":reset_header_parser_lib",
         ":retry_state_lib",
-        "//envoy/router:router_interface",
+        "//envoy/router:retry_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/config:utility_lib",
         "//source/common/upstream:retry_factory_lib",

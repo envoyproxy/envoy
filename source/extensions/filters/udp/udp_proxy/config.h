@@ -185,7 +185,7 @@ private:
     Stats::LiteScopeHelper helper(scope, "udp",
                                   stat_prefix.empty() ? Stats::TagStringViewSpan()
                                                       : Stats::TagStringViewSpan{tag},
-                                  absl::StrCat("udp.", stat_prefix));
+                                  absl::StrCat("udp.", stat_prefix), /*sanitize=*/false);
     return {ALL_UDP_PROXY_DOWNSTREAM_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
   }
 

@@ -42,4 +42,26 @@ message ClusterConfig {
   // knowledge of protobuf encoding. Otherwise, the serialized bytes of the type are passed.
   // If not specified, an empty configuration is passed.
   google.protobuf.Any cluster_config = 3;
+
+  // If true, the cluster patches its host partitions by each added, removed or health-changed host
+  // instead of rebuilding them from every host, and hands workers a snapshot, so a host update
+  // costs O(changed hosts) instead of O(N) on the main thread. Defaults to false.
+  //
+  // It helps a module whose load balancer patches its own state from the membership callbacks,
+  // including the health-changed hosts read through
+  // ``envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count`` and
+  // ``envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host``, which list
+  // every health change since the previous update a worker applied, merged over the
+  // cluster's ``update_merge_window``. Pair it with
+  // ``envoy_dynamic_module_callback_cluster_use_persistent_host_map``, since adds and removes
+  // otherwise still copy the whole cross-priority host map.
+  //
+  // Costs: it requires ``lb_policy: CLUSTER_PROVIDED``, since native policies read the host lists
+  // on every update. It uses about 3x the per-host memory on the main thread, and any thread that
+  // reads a host list by index builds a flat copy of that list after each update. Host lists are no
+  // longer in insertion order, so an index, such as the one
+  // ``envoy_dynamic_module_callback_cluster_lb_set_host_data`` takes, can refer to a different host
+  // after an add. Bulk adds are slower than with the default storage. An aggregate cluster that lists
+  // this cluster rebuilds all of its host lists on every worker after each update.
+  bool use_persistent_host_partitions = 4;
 }

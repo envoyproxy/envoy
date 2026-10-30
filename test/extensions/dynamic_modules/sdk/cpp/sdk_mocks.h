@@ -200,6 +200,7 @@ public:
   MOCK_METHOD(void, resetStream, (HttpFilterStreamResetReason reason, std::string_view details),
               (override));
   MOCK_METHOD(void, sendGoAwayAndClose, (bool graceful), (override));
+  MOCK_METHOD(void, drainConnectionUponCompletion, (), (override));
   MOCK_METHOD(bool, recreateStream, (std::span<const HeaderView> headers), (override));
   MOCK_METHOD(HeaderMap&, requestHeaders, (), (override));
   MOCK_METHOD(BodyBuffer&, bufferedRequestBody, (), (override));

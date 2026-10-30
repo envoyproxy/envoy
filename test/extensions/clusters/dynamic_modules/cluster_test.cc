@@ -1,4 +1,7 @@
 #include <atomic>
+#include <map>
+#include <random>
+#include <set>
 #include <thread>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -11,6 +14,7 @@
 #include "source/common/stream_info/filter_state_impl.h"
 #include "source/common/upstream/host_lookup_map.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
+#include "source/extensions/clusters/dynamic_modules/persistent_host_set.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "test/common/upstream/utility.h"
@@ -20,12 +24,14 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/mocks/upstream/health_checker.h"
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/struct_matchers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
@@ -92,6 +98,15 @@ public:
                                    const Upstream::HostVector* removed) {
     lb.hosts_added_ = added;
     lb.hosts_removed_ = removed;
+  }
+
+  // Sets the priorities the current membership update touched, which the priority update callback
+  // records during a real update, and drops the health-changed hosts built for an earlier one.
+  static void setUpdatedPriorities(DynamicModuleLoadBalancer& lb,
+                                   std::vector<uint32_t> priorities) {
+    lb.updated_priorities_ = std::move(priorities);
+    lb.health_changed_hosts_.reset();
+    lb.health_changed_hosts_known_ = false;
   }
 };
 
@@ -1534,13 +1549,12 @@ TEST_F(DynamicModuleClusterTest, SchedulerCommit) {
   // Capture the posted callback from commit.
   Event::PostCb captured_cb;
   bool first_captured = false;
-  ON_CALL(server_context_.dispatcher_, post(_))
-      .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
-        if (!first_captured) {
-          captured_cb = std::move(cb);
-          first_captured = true;
-        }
-      }));
+  ON_CALL(server_context_.dispatcher_, post(_)).WillByDefault([&](Event::PostCb cb) {
+    if (!first_captured) {
+      captured_cb = std::move(cb);
+      first_captured = true;
+    }
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 42);
@@ -1572,13 +1586,12 @@ TEST_F(DynamicModuleClusterTest, OnScheduledCallback) {
   // Capture the posted callback from commit.
   Event::PostCb captured_cb;
   bool first_captured = false;
-  ON_CALL(server_context_.dispatcher_, post(_))
-      .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
-        if (!first_captured) {
-          captured_cb = std::move(cb);
-          first_captured = true;
-        }
-      }));
+  ON_CALL(server_context_.dispatcher_, post(_)).WillByDefault([&](Event::PostCb cb) {
+    if (!first_captured) {
+      captured_cb = std::move(cb);
+      first_captured = true;
+    }
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 123);
@@ -1634,13 +1647,12 @@ TEST_F(DynamicModuleClusterTest, OnScheduledAfterClusterDestroyed) {
     EXPECT_NE(scheduler_ptr, nullptr);
 
     // Capture the posted callback from commit.
-    ON_CALL(server_context_.dispatcher_, post(_))
-        .WillByDefault(testing::Invoke([&](Event::PostCb cb) {
-          if (!first_captured) {
-            captured_cb = std::move(cb);
-            first_captured = true;
-          }
-        }));
+    ON_CALL(server_context_.dispatcher_, post(_)).WillByDefault([&](Event::PostCb cb) {
+      if (!first_captured) {
+        captured_cb = std::move(cb);
+        first_captured = true;
+      }
+    });
 
     // Commit an event via the ABI callback.
     envoy_dynamic_module_callback_cluster_scheduler_commit(scheduler_ptr, 456);
@@ -1829,12 +1841,11 @@ TEST_F(DynamicModuleClusterTest, HandleDestructorFromWorkerThreadDefersAllTeardo
   // destruction when `result` is torn down, so allow repeated posts and capture the first one
   // from the worker-thread handle destruction.
   Event::PostCb captured_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_))
-      .WillRepeatedly(testing::Invoke([&](Event::PostCb cb) {
-        if (!captured_cb) {
-          captured_cb = std::move(cb);
-        }
-      }));
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
+    if (!captured_cb) {
+      captured_cb = std::move(cb);
+    }
+  });
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
   auto& thread_factory = Thread::threadFactoryForTest();
@@ -3313,9 +3324,9 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataNumber) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+      .WillByDefault([&](const std::string& name, const Protobuf::Struct& value) {
         (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
-      }));
+      });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string ns = "dynamic_modules.test";
@@ -3360,9 +3371,9 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataString) {
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+      .WillByDefault([&](const std::string& name, const Protobuf::Struct& value) {
         (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
-      }));
+      });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
   std::string ns = "dynamic_modules.test";
@@ -3383,10 +3394,10 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringBatch) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   size_t set_calls = 0;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(testing::Invoke([&](const std::string& name, const Protobuf::Struct& value) {
+      .WillByDefault([&](const std::string& name, const Protobuf::Struct& value) {
         set_calls++;
         (*stream_info.metadata_.mutable_filter_metadata())[name].MergeFrom(value);
-      }));
+      });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -3431,8 +3442,7 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringBatchEdgeCases
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   size_t set_calls = 0;
   ON_CALL(stream_info, setDynamicMetadata(_, _))
-      .WillByDefault(
-          testing::Invoke([&](const std::string&, const Protobuf::Struct&) { set_calls++; }));
+      .WillByDefault([&](const std::string&, const Protobuf::Struct&) { set_calls++; });
   ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
   auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
 
@@ -3830,12 +3840,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutSuccess) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -3875,12 +3884,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureReset) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -3915,12 +3923,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureExceedBufferLimit) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -3986,14 +3993,13 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutWithBody) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            // Verify the body was attached.
-            EXPECT_EQ(message->body().toString(), "request_body");
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        // Verify the body was attached.
+        EXPECT_EQ(message->body().toString(), "request_body");
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -4031,12 +4037,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutSuccessAfterInModuleClusterCleared) 
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -4077,12 +4082,11 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureAfterInModuleClusterCleared) 
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   uint64_t callout_id = 0;
   envoy_dynamic_module_type_module_buffer cluster_name = {"test_cluster", 12};
@@ -5270,6 +5274,451 @@ TEST_F(DynamicModuleClusterTest, DestructorCancelsPendingHttpCallouts) {
   // The thread-aware LB inside `result` still holds an internal handle to the cluster; reset it so
   // the cluster is actually destroyed inside this test body, where the EXPECT_CALL is in scope.
   result = absl::InternalError("cleanup");
+}
+
+std::string localityKey(const Upstream::Host& host) {
+  return absl::StrCat(host.locality().region(), "/", host.locality().zone(), "/",
+                      host.locality().sub_zone());
+}
+
+std::set<std::string> addressesOf(const Upstream::HostVector& hosts) {
+  std::set<std::string> addresses;
+  for (const auto& host : hosts) {
+    addresses.insert(host->address()->asString());
+  }
+  return addresses;
+}
+
+// Addresses per locality across the buckets of a HostsPerLocality, plus its bucket count.
+std::pair<size_t, std::map<std::string, std::set<std::string>>>
+bucketsOf(const Upstream::HostsPerLocality& hosts_per_locality) {
+  std::map<std::string, std::set<std::string>> buckets;
+  for (const auto& bucket : hosts_per_locality.get()) {
+    for (const auto& host : bucket) {
+      buckets[localityKey(*host)].insert(host->address()->asString());
+    }
+  }
+  return {hosts_per_locality.get().size(), std::move(buckets)};
+}
+
+// Persistent partitions keep a different host order than a rebuild, so the comparison is by
+// address.
+void expectSamePartitions(const Upstream::HostSet& flat, const Upstream::HostSet& persistent) {
+  EXPECT_EQ(addressesOf(flat.hosts()), addressesOf(persistent.hosts()));
+  EXPECT_EQ(addressesOf(flat.healthyHosts()), addressesOf(persistent.healthyHosts()));
+  EXPECT_EQ(addressesOf(flat.degradedHosts()), addressesOf(persistent.degradedHosts()));
+  EXPECT_EQ(addressesOf(flat.excludedHosts()), addressesOf(persistent.excludedHosts()));
+  EXPECT_EQ(flat.hostCounts().hosts, persistent.hostCounts().hosts);
+  EXPECT_EQ(flat.hostCounts().healthy, persistent.hostCounts().healthy);
+  EXPECT_EQ(flat.hostCounts().degraded, persistent.hostCounts().degraded);
+  EXPECT_EQ(flat.hostCounts().excluded, persistent.hostCounts().excluded);
+  EXPECT_EQ(bucketsOf(flat.hostsPerLocality()), bucketsOf(persistent.hostsPerLocality()));
+  EXPECT_EQ(bucketsOf(flat.healthyHostsPerLocality()),
+            bucketsOf(persistent.healthyHostsPerLocality()));
+  EXPECT_EQ(bucketsOf(flat.degradedHostsPerLocality()),
+            bucketsOf(persistent.degradedHostsPerLocality()));
+  EXPECT_EQ(bucketsOf(flat.excludedHostsPerLocality()),
+            bucketsOf(persistent.excludedHostsPerLocality()));
+  EXPECT_FALSE(persistent.hostsPerLocality().hasLocalLocality());
+}
+
+class DynamicModuleClusterPersistentPartitionsTest : public DynamicModuleClusterTest {
+public:
+  std::shared_ptr<DynamicModuleCluster> createDecCluster() {
+    std::string yaml = makeYamlConfig("cluster_no_op");
+    if (use_persistent_host_partitions_) {
+      yaml += "    use_persistent_host_partitions: true\n";
+    }
+    auto result = createCluster(yaml);
+    EXPECT_TRUE(result.ok()) << result.status().message();
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+    clusters_.push_back(std::move(*result));
+    return cluster;
+  }
+
+  void enablePersistentPartitions() { use_persistent_host_partitions_ = true; }
+
+  static bool isPersistent(const Upstream::HostSet& host_set) {
+    return dynamic_cast<const PersistentHostSet*>(&host_set) != nullptr;
+  }
+
+  bool use_persistent_host_partitions_{};
+  std::vector<std::pair<Upstream::ClusterSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+      clusters_;
+};
+
+// The cluster opts in only when its config sets use_persistent_host_partitions.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, OptInFollowsConfig) {
+  auto flat = createDecCluster();
+  enablePersistentPartitions();
+  auto persistent = createDecCluster();
+
+  EXPECT_FALSE(isPersistent(*flat->prioritySet().hostSetsPerPriority()[0]));
+  EXPECT_TRUE(isPersistent(*persistent->prioritySet().hostSetsPerPriority()[0]));
+
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*persistent, {"127.0.0.1:10001"}, {1}, hosts, 1));
+  EXPECT_TRUE(isPersistent(*persistent->prioritySet().hostSetsPerPriority()[1]));
+  EXPECT_NE(nullptr, persistent->prioritySet().hostSetsPerPriority()[1]->snapshot());
+  EXPECT_EQ(nullptr, flat->prioritySet().hostSetsPerPriority()[0]->snapshot());
+}
+
+// Membership callbacks carry the same delta as the rebuild path, and a health change reports an
+// empty delta.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, CallbacksCarryTheDelta) {
+  enablePersistentPartitions();
+  auto cluster = createDecCluster();
+
+  std::vector<std::pair<std::set<std::string>, std::set<std::string>>> member_updates;
+  auto member_cb = cluster->prioritySet().addMemberUpdateCb(
+      [&](const Upstream::HostVector& added, const Upstream::HostVector& removed) {
+        member_updates.emplace_back(addressesOf(added), addressesOf(removed));
+      });
+  std::vector<uint32_t> priority_updates;
+  auto priority_cb = cluster->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const Upstream::HostVector&, const Upstream::HostVector&) {
+        priority_updates.push_back(priority);
+      });
+
+  std::vector<Upstream::HostSharedPtr> p0_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, p0_hosts, 0));
+  std::vector<Upstream::HostSharedPtr> p1_hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10003"}, {1}, p1_hosts, 1));
+  EXPECT_TRUE(
+      cluster->updateHostHealth(p0_hosts[0], envoy_dynamic_module_type_host_health_Unhealthy));
+  EXPECT_EQ(2, cluster->removeHosts({p0_hosts[1], p1_hosts[0]}));
+
+  const std::vector<std::pair<std::set<std::string>, std::set<std::string>>> expected_members = {
+      {{"127.0.0.1:10001", "127.0.0.1:10002"}, {}},
+      {{"127.0.0.1:10003"}, {}},
+      {{}, {}},
+      {{}, {"127.0.0.1:10002"}},
+      {{}, {"127.0.0.1:10003"}},
+  };
+  EXPECT_EQ(expected_members, member_updates);
+  EXPECT_EQ((std::vector<uint32_t>{0, 1, 0, 0, 1}), priority_updates);
+
+  EXPECT_EQ(nullptr, cluster->findHostByAddress("127.0.0.1:10002"));
+  EXPECT_EQ(nullptr, cluster->findHostByAddress("127.0.0.1:10003"));
+  EXPECT_EQ(p0_hosts[0], cluster->findHostByAddress("127.0.0.1:10001"));
+  EXPECT_EQ(1, DynamicModuleClusterTestPeer::getHostMapSize(*cluster));
+}
+
+// A change at one priority leaves the other priority's flat views untouched, and the load balancer
+// callbacks read the patched partitions.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, OtherPrioritiesAreNotRebuilt) {
+  enablePersistentPartitions();
+  auto cluster = createDecCluster();
+
+  std::vector<Upstream::HostSharedPtr> p0_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, p0_hosts, 0));
+  std::vector<Upstream::HostSharedPtr> p1_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10003", "127.0.0.1:10004"}, {1, 1}, p1_hosts, 1));
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  auto* lb_ptr = static_cast<void*>(lb_instance.get());
+  const auto* p0_hosts_ptr = cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get();
+
+  EXPECT_TRUE(
+      cluster->updateHostHealth(p1_hosts[0], envoy_dynamic_module_type_host_health_Unhealthy));
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(lb_ptr, 1));
+  EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_lb_get_hosts_count(lb_ptr, 1));
+
+  EXPECT_TRUE(
+      cluster->updateHostHealth(p1_hosts[1], envoy_dynamic_module_type_host_health_Degraded));
+  EXPECT_EQ(0, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(lb_ptr, 1));
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[1]->hostCounts().degraded);
+
+  EXPECT_EQ(1, cluster->removeHosts({p1_hosts[0]}));
+  EXPECT_EQ(1, envoy_dynamic_module_callback_cluster_lb_get_hosts_count(lb_ptr, 1));
+  EXPECT_EQ(p0_hosts_ptr, cluster->prioritySet().hostSetsPerPriority()[0]->hostsPtr().get());
+  EXPECT_EQ(2, envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(lb_ptr, 0));
+}
+
+// Callers resolve a health update's host through the cluster, so a host outside it is a bug. The
+// update fails without scanning the host sets.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthUpdateForForeignHost) {
+  enablePersistentPartitions();
+  auto cluster = createDecCluster();
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts));
+
+  auto foreign_host = Upstream::makeTestHost(cluster->info(), "tcp://127.0.0.1:55555");
+  EXPECT_ENVOY_BUG(EXPECT_FALSE(cluster->updateHostHealth(
+                       foreign_host, envoy_dynamic_module_type_host_health_Unhealthy)),
+                   "health update for a host the persistent host set does not hold");
+  EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[0]->hostCounts().healthy);
+}
+
+// Native load balancing policies read the flat host vectors on every update, so the option is
+// rejected for them.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, RequiresClusterProvidedLbPolicy) {
+  for (const std::string policy :
+       {"ROUND_ROBIN", "LEAST_REQUEST", "RANDOM", "RING_HASH", "MAGLEV"}) {
+    SCOPED_TRACE(policy);
+    const std::string yaml = fmt::format(R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: {}
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: test
+    use_persistent_host_partitions: true
+)EOF",
+                                         policy);
+    EXPECT_THAT(
+        createCluster(yaml),
+        HasStatusMessage(HasSubstr(
+            "use_persistent_host_partitions requires LB policy CLUSTER_PROVIDED, got " + policy)));
+  }
+}
+
+// With a health checker, initialization and health check results re-partition inside the
+// persistent host sets, so every priority keeps handing workers snapshots.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthCheckerKeepsPersistentPartitions) {
+  enablePersistentPartitions();
+  auto cluster = createDecCluster();
+  auto health_checker = std::make_shared<NiceMock<Upstream::MockHealthChecker>>();
+  cluster->setHealthChecker(health_checker);
+  std::vector<Upstream::HostSharedPtr> p0_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, p0_hosts, 0));
+  std::vector<Upstream::HostSharedPtr> p1_hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10003"}, {1}, p1_hosts, 1));
+  const auto& host_sets = cluster->prioritySet().hostSetsPerPriority();
+  const auto expect_snapshots = [&]() {
+    for (const auto& host_set : host_sets) {
+      EXPECT_TRUE(isPersistent(*host_set));
+      EXPECT_NE(nullptr, host_set->snapshot());
+    }
+  };
+
+  // Initialization waits for the first check of every host, then reloads every priority.
+  bool initialized = false;
+  cluster->initialize([&initialized] {
+    initialized = true;
+    return absl::OkStatus();
+  });
+  envoy_dynamic_module_callback_cluster_pre_init_complete(cluster.get());
+  p0_hosts[0]->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  for (const auto& host : {p0_hosts[0], p0_hosts[1], p1_hosts[0]}) {
+    health_checker->runCallbacks(host, Upstream::HealthTransition::Unchanged,
+                                 Upstream::HealthState::Healthy);
+  }
+  ASSERT_TRUE(initialized);
+  expect_snapshots();
+  EXPECT_EQ(1, host_sets[0]->hostCounts().healthy);
+  EXPECT_EQ(1, host_sets[1]->hostCounts().healthy);
+
+  // A changed result for a member re-partitions that host.
+  p0_hosts[0]->healthFlagClear(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(p0_hosts[0], Upstream::HealthTransition::Changed,
+                               Upstream::HealthState::Healthy);
+  expect_snapshots();
+  EXPECT_EQ(2, host_sets[0]->hostCounts().healthy);
+
+  // A changed result for a host the cluster no longer holds changes nothing.
+  auto foreign_host = Upstream::makeTestHost(cluster->info(), "tcp://127.0.0.1:55555");
+  foreign_host->healthFlagSet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker->runCallbacks(foreign_host, Upstream::HealthTransition::Changed,
+                               Upstream::HealthState::Unhealthy);
+  expect_snapshots();
+  EXPECT_EQ(2, host_sets[0]->hostCounts().healthy);
+}
+
+// During a membership update the load balancer reports the hosts whose health changed, with their
+// priority and current health, when every updated priority keeps persistent partitions.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthChangedHostsDuringMemberUpdate) {
+  enablePersistentPartitions();
+  auto cluster = createDecCluster();
+  std::vector<Upstream::HostSharedPtr> p0_hosts;
+  ASSERT_TRUE(
+      addSimpleHosts(*cluster, {"127.0.0.1:10001", "127.0.0.1:10002"}, {1, 1}, p0_hosts, 0));
+  std::vector<Upstream::HostSharedPtr> p1_hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10003"}, {1}, p1_hosts, 1));
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  auto* lb_ptr = static_cast<void*>(lb_instance.get());
+  const Upstream::HostVector none;
+  size_t count = 0;
+  uint32_t priority = 0;
+  envoy_dynamic_module_type_host_health health = envoy_dynamic_module_type_host_health_Healthy;
+
+  // Outside the callback nothing is reported.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, &count));
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                         lb_ptr, 0, &priority, &health));
+
+  EXPECT_TRUE(
+      cluster->updateHostHealth(p0_hosts[0], envoy_dynamic_module_type_host_health_Degraded));
+  EXPECT_TRUE(
+      cluster->updateHostHealth(p1_hosts[0], envoy_dynamic_module_type_host_health_Unhealthy));
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &none, &none);
+  DynamicModuleClusterTestPeer::setUpdatedPriorities(*lb_instance, {0, 1});
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, &count));
+  EXPECT_EQ(2, count);
+  EXPECT_EQ(p0_hosts[0].get(),
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                lb_ptr, 0, &priority, &health));
+  EXPECT_EQ(0, priority);
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Degraded, health);
+  EXPECT_EQ(p1_hosts[0].get(),
+            envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                lb_ptr, 1, &priority, &health));
+  EXPECT_EQ(1, priority);
+  EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy, health);
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                         lb_ptr, 2, &priority, &health));
+
+  // Null arguments are rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      nullptr, &count));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, nullptr));
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                         nullptr, 0, &priority, &health));
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                         lb_ptr, 0, nullptr, &health));
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                         lb_ptr, 0, &priority, nullptr));
+
+  // Until the cluster manager hands the snapshot out, a membership update still reports the health
+  // changes before it. The real membership callback it fires ends the simulated one, so start
+  // another.
+  EXPECT_EQ(1, cluster->removeHosts({p0_hosts[1]}));
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &none, &none);
+  DynamicModuleClusterTestPeer::setUpdatedPriorities(*lb_instance, {0});
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, &count));
+  EXPECT_EQ(1, count);
+
+  // After a hand-out, a membership-only update reports no health changes.
+  cluster->prioritySet().hostSetsPerPriority()[0]->snapshot();
+  std::vector<Upstream::HostSharedPtr> more_hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10004"}, {1}, more_hosts, 0));
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &none, &none);
+  DynamicModuleClusterTestPeer::setUpdatedPriorities(*lb_instance, {0});
+  ASSERT_TRUE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, &count));
+  EXPECT_EQ(0, count);
+
+  // A priority that does not exist makes the answer unknown.
+  DynamicModuleClusterTestPeer::setUpdatedPriorities(*lb_instance, {5});
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, &count));
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, nullptr, nullptr);
+}
+
+// A cluster without persistent partitions cannot say which hosts changed health.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthChangedHostsUnknownWithoutOptIn) {
+  auto cluster = createDecCluster();
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts));
+  EXPECT_TRUE(cluster->updateHostHealth(hosts[0], envoy_dynamic_module_type_host_health_Degraded));
+
+  auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
+  auto lb_instance = std::make_unique<DynamicModuleLoadBalancer>(handle, cluster->prioritySet());
+  auto* lb_ptr = static_cast<void*>(lb_instance.get());
+  const Upstream::HostVector none;
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, &none, &none);
+  DynamicModuleClusterTestPeer::setUpdatedPriorities(*lb_instance, {0});
+  size_t count = 0;
+  uint32_t priority = 0;
+  envoy_dynamic_module_type_host_health health = envoy_dynamic_module_type_host_health_Healthy;
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+      lb_ptr, &count));
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+                         lb_ptr, 0, &priority, &health));
+  DynamicModuleClusterTestPeer::setMemberUpdateHosts(*lb_instance, nullptr, nullptr);
+}
+
+// Random adds, removals and health changes across priorities and localities leave a persistent
+// cluster with the same partitions as a cluster that rebuilds them.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, RandomUpdatesMatchRebuild) {
+  auto flat = createDecCluster();
+  enablePersistentPartitions();
+  auto persistent = createDecCluster();
+  ASSERT_TRUE(isPersistent(*persistent->prioritySet().hostSetsPerPriority()[0]));
+
+  std::vector<std::pair<std::set<std::string>, std::set<std::string>>> flat_updates;
+  std::vector<std::pair<std::set<std::string>, std::set<std::string>>> persistent_updates;
+  auto flat_cb = flat->prioritySet().addMemberUpdateCb(
+      [&](const Upstream::HostVector& added, const Upstream::HostVector& removed) {
+        flat_updates.emplace_back(addressesOf(added), addressesOf(removed));
+      });
+  auto persistent_cb = persistent->prioritySet().addMemberUpdateCb(
+      [&](const Upstream::HostVector& added, const Upstream::HostVector& removed) {
+        persistent_updates.emplace_back(addressesOf(added), addressesOf(removed));
+      });
+
+  const std::vector<std::string> zones = {"zone-a", "zone-b", "zone-c"};
+  const std::vector<envoy_dynamic_module_type_host_health> health_states = {
+      envoy_dynamic_module_type_host_health_Healthy, envoy_dynamic_module_type_host_health_Degraded,
+      envoy_dynamic_module_type_host_health_Unhealthy};
+  std::mt19937 rng(42);
+  auto address = [](size_t i) { return absl::StrCat("127.0.0.1:", 20000 + i); };
+
+  for (int step = 0; step < 300; ++step) {
+    const uint32_t op = rng() % 3;
+    if (op == 0) {
+      std::vector<std::string> addresses, regions, zone_names, sub_zones;
+      std::vector<uint32_t> weights;
+      const size_t count = 1 + rng() % 4;
+      for (size_t i = 0; i < count; ++i) {
+        addresses.push_back(address(rng() % 60));
+        weights.push_back(1 + rng() % 3);
+        regions.push_back("us-east-1");
+        zone_names.push_back(zones[rng() % zones.size()]);
+        sub_zones.push_back("");
+      }
+      const uint32_t priority = rng() % 2;
+      std::vector<Upstream::HostSharedPtr> flat_added, persistent_added;
+      ASSERT_TRUE(flat->addHosts(addresses, weights, regions, zone_names, sub_zones, {}, flat_added,
+                                 priority));
+      ASSERT_TRUE(persistent->addHosts(addresses, weights, regions, zone_names, sub_zones, {},
+                                       persistent_added, priority));
+      ASSERT_EQ(flat_added.size(), persistent_added.size());
+    } else if (op == 1) {
+      std::vector<Upstream::HostSharedPtr> flat_removed, persistent_removed;
+      const size_t count = 1 + rng() % 3;
+      for (size_t i = 0; i < count; ++i) {
+        const std::string target = address(rng() % 60);
+        flat_removed.push_back(flat->findHostByAddress(target));
+        persistent_removed.push_back(persistent->findHostByAddress(target));
+      }
+      ASSERT_EQ(flat->removeHosts(flat_removed), persistent->removeHosts(persistent_removed));
+    } else {
+      const std::string target = address(rng() % 60);
+      const auto health = health_states[rng() % health_states.size()];
+      auto flat_host = flat->findHostByAddress(target);
+      auto persistent_host = persistent->findHostByAddress(target);
+      ASSERT_EQ(flat_host == nullptr, persistent_host == nullptr);
+      if (flat_host != nullptr) {
+        ASSERT_TRUE(flat->updateHostHealth(flat_host, health));
+        ASSERT_TRUE(persistent->updateHostHealth(persistent_host, health));
+      }
+    }
+
+    const auto& flat_sets = flat->prioritySet().hostSetsPerPriority();
+    const auto& persistent_sets = persistent->prioritySet().hostSetsPerPriority();
+    ASSERT_EQ(flat_sets.size(), persistent_sets.size());
+    for (size_t p = 0; p < flat_sets.size(); ++p) {
+      SCOPED_TRACE(absl::StrCat("step ", step, " priority ", p));
+      expectSamePartitions(*flat_sets[p], *persistent_sets[p]);
+    }
+    ASSERT_EQ(flat_updates, persistent_updates) << "step " << step;
+  }
 }
 
 } // namespace

@@ -173,9 +173,8 @@ TEST_P(LoadBalancerBaseTest, PrioritySelectionFuzz) {
   }
 
   EXPECT_CALL(context, determinePriorityLoad(_, _, _))
-      .WillRepeatedly(
-          Invoke([](const auto&, const auto& original_load,
-                    const auto&) -> const HealthyAndDegradedLoad& { return original_load; }));
+      .WillRepeatedly([](const auto&, const auto& original_load,
+                         const auto&) -> const HealthyAndDegradedLoad& { return original_load; });
 
   for (uint64_t i = 0; i < total_hosts; ++i) {
     const auto hs = lb_.chooseHostSet(&context, 0);
