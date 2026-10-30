@@ -377,7 +377,7 @@ TEST_P(HttpUpstreamTest, UpstreamTrailersPropagateFinDownstream) {
 
 // Regression test for a heap-use-after-free where onUpstreamData()
 // synchronously destroyed the HttpUpstream (via downstream drain-close
-// re-entrancy) and DecoderShim::decodeTrailers() then dereferenced parent_.
+// reentrancy) and DecoderShim::decodeTrailers() then dereferenced parent_.
 TEST_P(HttpUpstreamTest, UpstreamDestroyedDuringDecodeTrailers) {
   setupUpstream();
   Http::ResponseDecoder& decoder = upstream_->responseDecoder();
@@ -980,7 +980,7 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
 
 // Regression test for a heap-use-after-free where onUpstreamData()
 // synchronously destroyed the CombinedUpstream (via downstream drain-close
-// re-entrancy) and DecoderShim::decodeTrailers() then dereferenced parent_.
+// reentrancy) and DecoderShim::decodeTrailers() then dereferenced parent_.
 TEST_F(CombinedUpstreamTest, 1) {
   this->setup();
   Http::ResponseDecoder& decoder = this->upstream_->responseDecoder();

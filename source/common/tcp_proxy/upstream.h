@@ -278,7 +278,7 @@ private:
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
       // The call to onUpstreamData() below may synchronously result in the
-      // destruction of parent_ (and thereby *this) via re-entrancy through the
+      // destruction of parent_ (and thereby *this) via reentrancy through the
       // downstream connection close path.
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
       if (destroyed_) {
@@ -291,7 +291,7 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
-      // Same re-entrancy hazard as decodeData(): onUpstreamData() may destroy
+      // Same reentrancy hazard as decodeData(): onUpstreamData() may destroy
       // parent_/this synchronously.
       Buffer::OwnedImpl data;
       parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
@@ -429,7 +429,7 @@ private:
     }
     void decodeData(Buffer::Instance& data, bool end_stream) override {
       // The call to onUpstreamData() below may synchronously result in the
-      // destruction of parent_ (and thereby *this) via re-entrancy through the
+      // destruction of parent_ (and thereby *this) via reentrancy through the
       // downstream connection close path.
       parent_.upstream_callbacks_.onUpstreamData(data, end_stream);
       if (destroyed_) {
@@ -442,7 +442,7 @@ private:
     void decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) override {
       parent_.config_.propagateResponseTrailers(std::move(trailers),
                                                 parent_.downstream_info_.filterState());
-      // Same re-entrancy hazard as decodeData(): onUpstreamData() may destroy
+      // Same reentrancy hazard as decodeData(): onUpstreamData() may destroy
       // parent_/this synchronously.
       Buffer::OwnedImpl data;
       parent_.upstream_callbacks_.onUpstreamData(data, /* end_stream = */ true);
