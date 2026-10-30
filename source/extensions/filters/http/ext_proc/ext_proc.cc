@@ -712,14 +712,24 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   filter_callbacks_ = &callbacks;
   watermark_callbacks_.setDecoderFilterCallbacks(&callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
+  //Create logging info only if key is free
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
-  if (!filter_state->hasData<ExtProcLoggingInfo>(callbacks.filterConfigName())) {
-    filter_state->setData(callbacks.filterConfigName(),
-                          std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  const absl::string_view key = callbacks.filterConfigName();
+  if (filter_state->hasDataWithName(key)) {
+    //The key is already in use, e.g. by another filter with the same name, Sharing or
+    //overwriting that entry would mix up callout stats, so record no logging info here.
+
+    ENVOY_STREAM_LOG(debug,
+                     "Filter state key '{}' already exists; ext_proc logging info not recorded.",
+                      callbacks, key);
+
+    return;                    
   }
-  logging_info_ = filter_state->getDataMutable<ExtProcLoggingInfo>(callbacks.filterConfigName());
+  //Retain shared ownership so the object stays valid for the lifetime of this filter even if
+  //another filter later replaces the FilterState entry at the same key.
+  logging_info_ = std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata());
+  filter_state->setData(key, logging_info_, Envoy::StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
@@ -751,7 +761,9 @@ void Filter::onComplete(ProcessingResponse& response) {
 
 void Filter::logFailOpen() {
   stats_.failure_mode_allowed_.inc();
-  logging_info_->setFailedOpen();
+  if (logging_info_ != nullptr) {
+    logging_info_->setFailedOpen();
+  }
 }
 
 void Filter::onError() {
@@ -1965,7 +1977,9 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
     processing_status = handleStreamingImmediateResponse(response->streamed_immediate_response());
     break;
   case ProcessingResponse::ResponseCase::kImmediateResponse:
-    logging_info_->setReceivedImmediateResponse();
+    if (logging_info_ != nullptr) {
+      logging_info_->setReceivedImmediateResponse();
+    }
     if (config_->disableImmediateResponse()) {
       ENVOY_STREAM_LOG(debug, "Filter has disable_immediate_response configured. ",
                        *decoder_callbacks_,
