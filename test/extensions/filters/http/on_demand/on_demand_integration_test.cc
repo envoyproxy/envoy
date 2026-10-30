@@ -1,8 +1,11 @@
+#include <tuple>
+
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
@@ -24,7 +27,30 @@ namespace Envoy {
 namespace {
 
 using OnDemandScopedRdsIntegrationTest = ScopedRdsIntegrationTest;
+using testing::ContainsRegex;
 using testing::Ge;
+
+// Adds a file access log that prints the on-demand discovery filter state. useAccessLog() can't be
+// used: it expects the HCM to already have an access log entry, which these test configs do not.
+void addDiscoveryAccessLog(ConfigHelper& config_helper, const std::string& path) {
+  config_helper.addConfigModifier(
+      [path](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        envoy::extensions::access_loggers::file::v3::FileAccessLog file_log;
+        file_log.set_path(path);
+        file_log.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "route=%FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:route_status)% "
+            "host=%FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:host)% "
+            "vhost=%FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:vhost)% "
+            "cluster=%FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:cluster)% "
+            "route_us=%FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:route_discovery_"
+            "duration_us)%\n");
+        auto* access_log = hcm.add_access_log();
+        access_log->set_name("envoy.access_loggers.file");
+        std::ignore = access_log->mutable_typed_config()->PackFrom(file_log);
+      });
+}
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandScopedRdsIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
@@ -494,6 +520,8 @@ TEST_P(OnDemandVhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateR
 //  a Resource received in a DeltaDiscoveryResponse has name that matches the value used in the
 //  on-demand request
 TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
+  access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  addDiscoveryAccessLog(config_helper_, access_log_name_);
   // RDS exchange with a non-empty virtual_hosts field
   useRdsWithVhosts();
 
@@ -529,7 +557,22 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
   response->waitForHeaders();
   EXPECT_EQ("200", response->headers().getStatusValue());
 
+  // The unknown host triggered an on-demand route discovery that found the virtual host.
+  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_requested", Ge(1));
+  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_found", Ge(1));
+  EXPECT_EQ(0,
+            test_server_->counter("http.config_test.on_demand.route_discovery_not_found")->value());
+  EXPECT_EQ(0, test_server_->gauge("http.config_test.on_demand.route_discovery_pending")->value());
+
   cleanupUpstreamAndDownstream();
+
+  // The two requests to known hosts waited for nothing, so they log "-" for every field. The third
+  // one waited for the virtual host, and the log shows what was discovered and how long it took.
+  const std::vector<std::string> entries = waitForAccessLogEntries(access_log_name_, nullptr, 3);
+  EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[0]);
+  EXPECT_EQ("route=- host=- vhost=- cluster=- route_us=-", entries[1]);
+  EXPECT_THAT(entries[2], ContainsRegex("^route=found host=vhost_1 vhost=my_route/vhost_1 "
+                                        "cluster=- route_us=[0-9]+$"));
 }
 
 // tests a scenario when:
@@ -570,6 +613,11 @@ TEST_P(OnDemandVhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 
   response->waitForHeaders();
   EXPECT_EQ("404", response->headers().getStatusValue());
+
+  // The discovery completed, but the virtual host did not become available.
+  test_server_->waitForCounter("http.config_test.on_demand.route_discovery_not_found", Ge(1));
+  EXPECT_EQ(0, test_server_->counter("http.config_test.on_demand.route_discovery_found")->value());
+  EXPECT_EQ(0, test_server_->gauge("http.config_test.on_demand.route_discovery_pending")->value());
 
   // Consume the ack of the resolution failure, so that the wire is known to be empty afterwards.
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},

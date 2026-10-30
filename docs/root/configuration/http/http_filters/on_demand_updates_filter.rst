@@ -40,6 +40,70 @@ Statistics
 The on-demand CDS config sources emit statistics rooted at *cluster_manager.odcds.*, documented in
 the :ref:`cluster manager statistics <config_cluster_manager_odcds_stats>`.
 
+The filter also emits statistics under the HTTP connection manager's stat prefix, as
+``http.<stat_prefix>.on_demand.``. They only account for requests that actually had to wait for a
+discovery; a request whose route and cluster are already known does not touch them. Route discovery
+covers on-demand VHDS and on-demand S/RDS, which the filter cannot tell apart. A route discovery
+counts as found when the virtual host (or scoped route configuration) was delivered.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  route_discovery_requested, Counter, Total on-demand route discoveries started.
+  route_discovery_found, Counter, Route discoveries that completed with the route configuration available.
+  route_discovery_not_found, Counter, Route discoveries that completed without the route configuration becoming available.
+  route_discovery_cancelled, Counter, Route discoveries abandoned because the stream was destroyed before they completed.
+  route_discovery_pending, Gauge, Route discoveries currently in flight.
+  route_discovery_duration, Histogram, Time from request to completion of successful (found) route discoveries in milliseconds.
+  cluster_discovery_requested, Counter, Total on-demand cluster discoveries started.
+  cluster_discovery_available, Counter, Cluster discoveries that completed with the cluster available.
+  cluster_discovery_missing, Counter, Cluster discoveries where on-demand CDS reported that the cluster does not exist.
+  cluster_discovery_timeout, Counter, Cluster discoveries that timed out before any reply.
+  cluster_discovery_cancelled, Counter, Cluster discoveries abandoned because the stream was destroyed before they completed.
+  cluster_discovery_pending, Gauge, Cluster discoveries currently in flight.
+  cluster_discovery_duration, Histogram, Time from request to completion of successful (available) cluster discoveries in milliseconds.
+
+The duration histograms only record successful discoveries. A timed out cluster discovery always lasts
+about the configured timeout, so including it would make the high percentiles meaningless; use the
+``timeout`` and ``missing`` counters, for example ``cluster_discovery_timeout`` over
+``cluster_discovery_requested``, to track failures. Route discovery has no timeout, so while the control
+plane is not answering, requests keep waiting and are not recorded in the histogram until the route is
+found; ``route_discovery_pending`` and ``route_discovery_cancelled`` are the signals to watch then.
+
+.. _config_http_filters_on_demand_filter_state:
+
+Filter state
+------------
+
+When a request has to wait for a discovery, the filter stores what happened in the request's filter state
+under ``envoy.filters.http.on_demand.discovery``, so that an access log can show which host, virtual host
+and cluster were involved and how long each discovery took. The object has
+``Request`` life span, so it is carried over to a stream that is recreated after the discovery. It does not
+exist for requests that did not wait, and the access log prints ``-`` for them.
+
+.. csv-table::
+  :header: Field, Description
+  :widths: 1, 3
+
+  host, "The ``:authority`` of the request that waited for route discovery."
+  vhost, "The name of the virtual host that was discovered. Only set once a route of the request resolved. For VHDS it has the form ``<route configuration name>/<domain>``, so it also identifies the route configuration."
+  cluster, "The cluster that on-demand CDS was asked for."
+  route_status, "``pending``, ``found``, ``not_found`` or ``cancelled``."
+  cluster_status, "``pending``, ``available``, ``missing``, ``timeout`` or ``cancelled``."
+  route_discovery_duration_us, "Microseconds the route discovery took. Set once it finished, whatever the outcome."
+  cluster_discovery_duration_us, "Microseconds the cluster discovery took. Set once it finished, whatever the outcome."
+
+Unlike the duration histograms, the durations are set for every outcome, so a timed out discovery shows how
+long the request waited. For example, to log which cluster the request waited for and for how long:
+
+.. code-block:: none
+
+  %FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:cluster)% %FILTER_STATE(envoy.filters.http.on_demand.discovery:FIELD:cluster_discovery_duration_us)%
+
+The cluster name and the host are only available in the filter state and in access logs, not in stat names,
+which keeps the number of stats independent of the number of clusters and hosts.
+
 Configuration
 -------------
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand``.
