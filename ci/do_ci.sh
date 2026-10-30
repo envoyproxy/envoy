@@ -385,7 +385,7 @@ if [[ "$CI_TARGET" =~ bazel.* ]]; then
     echo "Using \`${ORIG_CI_TARGET}\` is deprecated, please use \`${CI_TARGET}\`"
 fi
 
-if [[ "${CI_TARGET}" == "deps.update" ]]; then
+if [[ "${CI_TARGET}" == "deps.update" || "${CI_TARGET}" == "registry" ]]; then
     DEPENDENCY_ARGS=("$@")
     set --
 fi
@@ -936,7 +936,7 @@ case $CI_TARGET in
             registry_check
             exit 0
         fi
-        registry_update
+        registry_update "${DEPENDENCY_ARGS[@]}"
         ;;
 
     release|release.server_only|release.test_only)
