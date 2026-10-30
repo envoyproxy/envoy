@@ -1147,7 +1147,8 @@ void ExtProcIntegrationTest::initializeDownstreamPushbackConfig(
     envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode body_mode,
     bool send_headers, bool send_trailers) {
   scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+      {{"envoy.reloadable_features.async_client_downstream_flow_control2", "true"},
+       {"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
 
   config_helper_.setBufferLimits(1024, 1024);
   auto* processing_mode = proto_config_.mutable_processing_mode();
