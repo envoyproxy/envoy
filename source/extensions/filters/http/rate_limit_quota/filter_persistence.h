@@ -3,6 +3,7 @@
 #ifndef THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_FILTERS_HTTP_RATE_LIMIT_QUOTA_FILTER_PERSISTENCE_H_
 #define THIRD_PARTY_ENVOY_SRC_SOURCE_EXTENSIONS_FILTERS_HTTP_RATE_LIMIT_QUOTA_FILTER_PERSISTENCE_H_
 
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <string>
@@ -65,11 +66,15 @@ public:
     Envoy::Event::Dispatcher& main_dispatcher_;
   };
 
-  // Get an existing TLS store by index, or create one if not found.
+  // Get an existing TLS store by index, or create one if not found. The
+  // reporting_interval is only applied when a new store (and its RLQS client) is
+  // created; if a store already exists for the index, the existing client's
+  // interval is retained.
   static absl::StatusOr<std::shared_ptr<TlsStore>>
   getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
               Server::Configuration::ServerFactoryContext& context,
-              absl::string_view target_address, absl::string_view domain);
+              absl::string_view target_address, absl::string_view domain,
+              std::chrono::milliseconds reporting_interval);
 
   // Register a callback to be called when the last TLS store index is cleared.
   // This is intended primarily for test synchronization after filter deletion.
