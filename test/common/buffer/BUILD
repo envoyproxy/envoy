@@ -32,6 +32,7 @@ envoy_cc_test_library(
     srcs = ["buffer_fuzz.cc"],
     hdrs = ["buffer_fuzz.h"],
     rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
     deps = [
         ":buffer_fuzz_proto_cc_proto",
         "//source/common/buffer:buffer_lib",
