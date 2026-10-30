@@ -1,9 +1,11 @@
 #pragma once
 
+#include <list>
 #include <string>
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/http/filter.h"
 #include "envoy/rds/config_traits.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_update_receiver.h"
@@ -33,6 +35,12 @@ public:
 
 private:
   ProtobufMessage::ValidationVisitor& validator_;
+};
+
+struct UpdateOnDemandCallback {
+  const std::string alias_;
+  Event::Dispatcher& thread_local_dispatcher_;
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
 };
 
 class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver,
@@ -96,8 +104,16 @@ public:
     const auto it = requested_vhds_resource_ids_.find(resource_id);
     return it != requested_vhds_resource_ids_.end() ? it->second : false;
   }
+  void requestVirtualHostsUpdate(
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
+  void onVhdsConfigPublished() override;
 
 private:
+  static void notifyCallback(const ConfigImpl& config, const std::string& alias,
+                             Event::Dispatcher& thread_local_dispatcher,
+                             std::weak_ptr<Http::RouteConfigUpdatedCallback> cb);
+
   const Protobuf::Any& latestRouteConfigurationAny() const {
     return base_.warming_state_.route_config_any_.has_value()
                ? *base_.warming_state_.route_config_any_
@@ -131,6 +147,10 @@ private:
   // The resource IDs explicitly requested on demand from the current subscription, and whether
   // the server has answered each of them in a published update.
   absl::flat_hash_map<std::string, bool> requested_vhds_resource_ids_;
+  std::list<UpdateOnDemandCallback> config_update_callbacks_;
+  // A flag used to determine if this instance of RouteConfigUpdateReceiverImpl hasn't been
+  // deallocated. Please also see a comment in requestVirtualHostsUpdate() method implementation.
+  std::shared_ptr<bool> still_alive_{std::make_shared<bool>(true)};
 };
 
 } // namespace Router
