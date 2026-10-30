@@ -835,7 +835,7 @@ INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionZeroStreamLimitTests,
                          testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
                                           testing::Bool()));
 
-// A peer limit of zero does not raise QUICHE's outgoing stream limit, so QUICHE never calls
+// A peer limit of zero does not raise the outgoing stream limit in QUICHE, so it never calls
 // OnCanCreateNewOutgoingStream(). The pool must still learn the limit, because during 0-RTT it
 // would otherwise keep its optimistic capacity and attach a stream QUICHE has no ID for.
 TEST_P(EnvoyQuicClientSessionZeroStreamLimitTest, ReportsZeroStreamLimitOnConfigNegotiated) {
