@@ -1,12 +1,16 @@
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "envoy/data/ai/v3/request_info.pb.h"
 #include "envoy/extensions/http/ai_filters/request_info/v3/request_info.pb.h"
 #include "envoy/router/string_accessor.h"
 
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
@@ -277,6 +281,138 @@ TEST_F(RequestInfoFilterTest, FirstWriterOwnsTheNamespace) {
   run(R"({"model":"second"})", LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(published()->model(), "first");
   EXPECT_EQ(counterValue("published"), 0);
+  EXPECT_EQ(counterValue("duplicate"), 1);
+}
+
+// Configured extraction.
+
+class RequestInfoExtractionTest : public RequestInfoFilterTest {
+public:
+  using RuleSpec = std::pair<std::vector<std::string>, std::string>;
+
+  RequestInfoFilterConfigSharedPtr makeExtractionConfig(
+      const std::vector<RuleSpec>& rules, const std::string& extraction_ns = "",
+      std::function<void(
+          envoy::extensions::http::ai_filters::request_info::v3::RequestInfo::ExtractionLimits&)>
+          limits = nullptr) {
+    envoy::extensions::http::ai_filters::request_info::v3::RequestInfo proto;
+    auto& extraction = *proto.mutable_extraction();
+    extraction.set_metadata_namespace(extraction_ns);
+    for (const auto& [path, key] : rules) {
+      auto& rule = *extraction.add_rules();
+      for (const std::string& segment : path) {
+        rule.add_path(segment);
+      }
+      rule.set_key(key);
+    }
+    if (limits != nullptr) {
+      limits(*extraction.mutable_limits());
+    }
+    return std::make_shared<const RequestInfoFilterConfig>(proto, *stats_store_.rootScope());
+  }
+
+  std::optional<nlohmann::json> extracted(absl::string_view metadata_namespace = DefaultNamespace) {
+    const auto& untyped = stream_info_.dynamicMetadata().filter_metadata();
+    const auto it = untyped.find(std::string(metadata_namespace));
+    if (it == untyped.end()) {
+      return std::nullopt;
+    }
+    return nlohmann::json::parse(MessageUtil::getJsonStringFromMessageOrError(it->second));
+  }
+};
+
+const std::string GmrPayload =
+    R"({"model":"auto","contents":[{"parts":[{"text":"hi"}]}],
+        "settings":[{"cost":"low","quality":"high"}],
+        "model_list":["model_a","model_b"]})";
+
+TEST_F(RequestInfoExtractionTest, PublishesConfiguredValuesNextToTypedRecord) {
+  const std::string replayed =
+      run(GmrPayload, LLMProtocol::Unspecified, "/v1/chat/completions",
+          makeExtractionConfig({{{"settings"}, ""}, {{"model_list"}, ""}}));
+  EXPECT_EQ(nlohmann::json::parse(replayed), nlohmann::json::parse(GmrPayload));
+
+  ASSERT_TRUE(published().has_value());
+  EXPECT_EQ(published()->model(), "auto");
+  ASSERT_TRUE(extracted().has_value());
+  EXPECT_EQ(*extracted(), nlohmann::json::parse(R"({"settings":[{"cost":"low","quality":"high"}],
+                                                     "model_list":["model_a","model_b"]})"));
+  EXPECT_EQ(counterValue("published"), 1);
+  EXPECT_EQ(counterValue("partial"), 0);
+  EXPECT_EQ(counterValue("extraction_dropped"), 0);
+  EXPECT_EQ(counterValue("extraction_unusable"), 0);
+}
+
+TEST_F(RequestInfoExtractionTest, NothingExtractedWithoutConfiguration) {
+  run(GmrPayload, LLMProtocol::Unspecified);
+  EXPECT_TRUE(stream_info_.dynamicMetadata().filter_metadata().empty());
+}
+
+TEST_F(RequestInfoExtractionTest, NothingWrittenWhenNoRuleMatches) {
+  run(R"({"model":"auto"})", LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeExtractionConfig({{{"settings"}, ""}}));
+  EXPECT_TRUE(stream_info_.dynamicMetadata().filter_metadata().empty());
+  EXPECT_EQ(counterValue("partial"), 0);
+}
+
+TEST_F(RequestInfoExtractionTest, PublishesUnderConfiguredExtractionNamespace) {
+  run(GmrPayload, LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeExtractionConfig({{{"model_list"}, "models"}}, "custom.policy"));
+  EXPECT_FALSE(extracted().has_value());
+  ASSERT_TRUE(extracted("custom.policy").has_value());
+  EXPECT_EQ(*extracted("custom.policy"),
+            nlohmann::json::parse(R"({"models":["model_a","model_b"]})"));
+  // The typed record keeps its own namespace.
+  EXPECT_TRUE(published().has_value());
+}
+
+TEST_F(RequestInfoExtractionTest, LeavesKeysAnEarlierWriterSet) {
+  Protobuf::Struct earlier;
+  (*earlier.mutable_fields())["settings"].set_string_value("mine");
+  stream_info_.setDynamicMetadata(std::string(DefaultNamespace), earlier);
+
+  run(GmrPayload, LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeExtractionConfig({{{"settings"}, ""}, {{"model_list"}, ""}}));
+  EXPECT_EQ(*extracted(),
+            nlohmann::json::parse(R"({"settings":"mine","model_list":["model_a","model_b"]})"));
+}
+
+TEST_F(RequestInfoExtractionTest, DropsOversizedValuesAndCounts) {
+  run(GmrPayload, LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeExtractionConfig({{{"settings"}, ""}, {{"model_list"}, ""}}, "",
+                           [](auto& limits) { limits.mutable_max_value_bytes()->set_value(64); }));
+  // settings costs 50 bytes, model_list 38: both fit in 64, only model_list fits in 40.
+  EXPECT_EQ(counterValue("extraction_dropped"), 0);
+
+  stream_info_.dynamicMetadata().Clear();
+  run(GmrPayload, LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeExtractionConfig({{{"settings"}, ""}, {{"model_list"}, ""}}, "",
+                           [](auto& limits) { limits.mutable_max_value_bytes()->set_value(40); }));
+  EXPECT_EQ(*extracted(), nlohmann::json::parse(R"({"model_list":["model_a","model_b"]})"));
+  EXPECT_EQ(counterValue("extraction_dropped"), 1);
+  EXPECT_EQ(counterValue("partial"), 1);
+}
+
+TEST_F(RequestInfoExtractionTest, UnusableValuesCountSeparately) {
+  run(R"({"model":"auto","budget":18446744073709551615,"model_list":["m"]})",
+      LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeExtractionConfig({{{"budget"}, ""}, {{"model_list"}, ""}}));
+  EXPECT_EQ(*extracted(), nlohmann::json::parse(R"({"model_list":["m"]})"));
+  EXPECT_EQ(counterValue("extraction_unusable"), 1);
+  EXPECT_EQ(counterValue("extraction_dropped"), 0);
+  EXPECT_EQ(counterValue("partial"), 1);
+}
+
+TEST_F(RequestInfoExtractionTest, SkippedWithTypedRecordWhenNamespaceAlreadyPublished) {
+  envoy::data::ai::v3::RequestInfo existing;
+  existing.set_model("first");
+  Protobuf::Any existing_any;
+  ASSERT_TRUE(existing_any.PackFrom(existing));
+  stream_info_.setDynamicTypedMetadata(std::string(DefaultNamespace), existing_any);
+
+  run(GmrPayload, LLMProtocol::Unspecified, "/v1/chat/completions",
+      makeExtractionConfig({{{"settings"}, ""}}));
+  EXPECT_FALSE(extracted().has_value());
   EXPECT_EQ(counterValue("duplicate"), 1);
 }
 
