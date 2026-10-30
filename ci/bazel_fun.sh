@@ -168,10 +168,43 @@ registry_current_hash() {
     echo "${current_hash}"
 }
 
+# Print the absolute path of a hermetic, Bazel-provided executable (eg `@jq//:jq`), so CI
+# scripts outside Bazel do not depend on tools installed in the build image.
+bazel_tool_path() {
+    local target="$1"
+    local path
+    local root
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
+        --remote_download_toplevel "$target" >&2
+    path="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" cquery "${BAZEL_BUILD_OPTIONS[@]}" \
+        --output=files "$target" 2>/dev/null)"
+    if [[ -z "$path" || "$path" == *$'\n'* ]]; then
+        echo "FAIL: Unable to resolve a single executable for ${target}" >&2
+        return 1
+    fi
+    # Source files of external repos live under the output base. The execroot only gets
+    # `external/<repo>` symlinks planted when a local action consumes them, which never
+    # happens with remote execution. Generated files are under the execution root.
+    if [[ "$path" == external/* ]]; then
+        root="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    else
+        root="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" execution_root)"
+    fi
+    echo "${root}/${path}"
+}
+
+hermetic_jq() {
+    if [[ -z "${JQ_BIN:-}" ]]; then
+        JQ_BIN="$(bazel_tool_path @jq//:jq)"
+        export JQ_BIN
+    fi
+}
+
 registry_check() {
     local version
     local registry_hash=""
 
+    hermetic_jq
     version="$(cat VERSION.txt)"
     if [[ -n "${ENVOY_REGISTRY_ALLOW_UNSAFE:-}" ]]; then
         run_in_registry_mods _registry_check_mod \
@@ -207,7 +240,7 @@ _registry_check_mod() {
     }
 
     sha="$(cat "${sha_path}")"
-    tags="$(jq -r '.tags | join(" ")' "${status_path}")"
+    tags="$("${JQ_BIN}" -r '.tags | join(" ")' "${status_path}")"
     if [[ -z "${sha}" || "${sha}" == "null" ]]; then
         echo "FAIL: Failed to determine registry hash for ${workspace}" >&2
         return 1
