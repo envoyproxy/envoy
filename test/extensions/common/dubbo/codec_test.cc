@@ -360,8 +360,7 @@ TEST(DubboCodecTest, EncodeTest) {
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _))
-        .WillOnce(testing::Invoke(
-            [](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); }));
+        .WillOnce([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); });
 
     codec.encode(buffer, metadata);
 
@@ -396,8 +395,7 @@ TEST(DubboCodecTest, EncodeTest) {
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _))
-        .WillOnce(testing::Invoke(
-            [](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); }));
+        .WillOnce([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); });
 
     codec.encode(buffer, metadata);
 
@@ -431,8 +429,7 @@ TEST(DubboCodecTest, EncodeTest) {
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, serializeRpcRequest(_, _))
-        .WillOnce(
-            testing::Invoke([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("N"); }));
+        .WillOnce([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("N"); });
 
     codec.encode(buffer, metadata);
 
@@ -467,8 +464,7 @@ TEST(DubboCodecTest, EncodeTest) {
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _))
-        .WillOnce(testing::Invoke(
-            [](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); }));
+        .WillOnce([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); });
 
     codec.encode(buffer, metadata);
 
@@ -503,8 +499,7 @@ TEST(DubboCodecTest, EncodeTest) {
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _))
-        .WillOnce(testing::Invoke(
-            [](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); }));
+        .WillOnce([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); });
 
     codec.encode(buffer, metadata);
 
@@ -539,8 +534,7 @@ TEST(DubboCodecTest, EncodeTest) {
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _))
-        .WillOnce(testing::Invoke(
-            [](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); }));
+        .WillOnce([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("anything"); });
 
     codec.encode(buffer, metadata);
 
@@ -575,8 +569,7 @@ TEST(DubboCodecTest, EncodeTest) {
     metadata.setContext(std::move(context));
 
     EXPECT_CALL(*raw_serializer, serializeRpcResponse(_, _))
-        .WillOnce(
-            testing::Invoke([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("N"); }));
+        .WillOnce([](Buffer::Instance& buffer, MessageMetadata&) { buffer.add("N"); });
 
     codec.encode(buffer, metadata);
 

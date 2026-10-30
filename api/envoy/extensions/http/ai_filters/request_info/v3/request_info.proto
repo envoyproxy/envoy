@@ -5,6 +5,7 @@ package envoy.extensions.http.ai_filters.request_info.v3;
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.ai_filters.request_info.v3";
 option java_outer_classname = "RequestInfoProto";
@@ -22,6 +23,18 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // dynamic metadata. On a declared endpoint with a body, it is written before the
 // request headers continue, so later HTTP filters see it from their first callback.
 message RequestInfo {
+  // Estimates the input tokens from the size of the request payload, for consumers that must
+  // budget before the provider reports what it actually charged.
+  message TokenEstimation {
+    // Estimated input tokens, as ``ceil(tokens_per_byte * request payload bytes)``. No token
+    // spans fewer than one byte, so the ratio cannot exceed 1.0; ``0.5`` is a rough fit for
+    // JSON chat payloads.
+    double tokens_per_byte = 1 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
+  }
+
   // Metadata namespace. Defaults to ``envoy.ai.request_info``.
   string metadata_namespace = 1;
+
+  // When unset, no estimate is published.
+  TokenEstimation token_estimation = 2;
 }

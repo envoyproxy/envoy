@@ -188,14 +188,17 @@ envoy_cc_test(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:xds_resource_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:od_cds_api_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
 envoy_cc_test(
     name = "cluster_manager_lifecycle_test",
     srcs = ["cluster_manager_lifecycle_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_manager_impl_test_common",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -318,6 +321,23 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "multi_health_checker_test",
+    srcs = ["multi_health_checker_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:multi_health_checker_lib",
+        "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/health_checkers/tcp:health_checker_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "health_checker_impl_test",
     srcs = [
         "health_checker_impl_test.cc",
@@ -347,6 +367,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
@@ -656,6 +677,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//test/test_common:status_utility_lib",
+        ":snapshot_host_set_lib",
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -669,6 +691,7 @@ envoy_cc_test(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
+        "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
@@ -712,6 +735,15 @@ envoy_cc_test(
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",
     ]),
+)
+
+envoy_cc_test_library(
+    name = "snapshot_host_set_lib",
+    hdrs = ["snapshot_host_set.h"],
+    deps = [
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -855,7 +887,10 @@ envoy_cc_benchmark_binary(
 envoy_cc_benchmark_binary(
     name = "metadata_comparison_benchmark",
     srcs = ["metadata_comparison_benchmark.cc"],
-    deps = ["//source/common/protobuf:utility_lib"],
+    deps = [
+        "//source/common/protobuf:utility_lib",
+        "@benchmark",
+    ],
 )
 
 envoy_benchmark_test(
@@ -876,6 +911,19 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/upstream:default_local_address_selector_factory",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "udp_source_address_policy_test",
+    size = "small",
+    srcs = ["udp_source_address_policy_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/upstream:udp_source_address_policy_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/network:socket_mocks",
     ],
 )
 

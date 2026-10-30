@@ -214,6 +214,19 @@ struct ClusterManagerStats {
 };
 
 /**
+ * On-demand cluster discovery outcome stats. @see stats_macros.h
+ */
+#define ALL_ODCDS_DISCOVERY_STATS(COUNTER)                                                         \
+  COUNTER(discovery_attempt)                                                                       \
+  COUNTER(discovery_missing)                                                                       \
+  COUNTER(discovery_success)                                                                       \
+  COUNTER(discovery_timeout)
+
+struct OdCdsDiscoveryStats {
+  ALL_ODCDS_DISCOVERY_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * All thread local cluster manager stats. @see stats_macros.h
  */
 #define ALL_THREAD_LOCAL_CLUSTER_MANAGER_STATS(GAUGE) GAUGE(clusters_inflated, NeverImport)
@@ -315,9 +328,12 @@ public:
   bool removeCluster(absl::string_view cluster, const bool remove_ignored = false) override;
   void shutdown() override {
     shutdown_ = true;
-    if (resume_cds_ != nullptr) {
-      resume_cds_->cancel();
+    for (auto& [name, handle] : cds_pauses_) {
+      if (handle) {
+        handle->cancel();
+      }
     }
+    cds_pauses_.clear();
     // Make sure we destroy all potential outgoing connections before this returns.
     cds_api_.reset();
     xds_manager_.shutdown();
@@ -454,20 +470,21 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostMapConstSharedPtr map, UnitFloat drop_overload,
-                                absl::string_view drop_category);
+                                HostSetFactory host_set_factory, HostLookupMapConstSharedPtr map,
+                                UnitFloat drop_overload, absl::string_view drop_category);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-        LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-        UnitFloat drop_overload, absl::string_view drop_category);
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+        HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
-    const HostMapConstSharedPtr cross_priority_host_map_;
+    const HostSetFactory host_set_factory_;
+    const HostLookupMapConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
     const std::string drop_category_;
   };
@@ -599,8 +616,9 @@ private:
 
     class ClusterEntry : public ThreadLocalCluster {
     public:
+      // `host_set_factory` is the main-thread cluster's, so worker host sets have its type.
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-                   const LoadBalancerFactorySharedPtr& lb_factory);
+                   const LoadBalancerFactorySharedPtr& lb_factory, HostSetFactory host_set_factory);
       ~ClusterEntry() override;
 
       // Upstream::ThreadLocalCluster
@@ -628,7 +646,7 @@ private:
                        const HostVector& hosts_added, const HostVector& hosts_removed,
                        std::optional<bool> weighted_priority_health,
                        std::optional<uint32_t> overprovisioning_factor,
-                       HostMapConstSharedPtr cross_priority_host_map);
+                       HostLookupMapConstSharedPtr cross_priority_host_map);
 
       // Applies a set of per-priority host updates to the priority set as a single batch (see
       // PrioritySetImpl::batchHostUpdate()). Unlike calling updateHosts() once per priority, the
@@ -639,7 +657,7 @@ private:
       void updateHosts(
           const std::vector<
               std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
-          HostMapConstSharedPtr cross_priority_host_map);
+          HostLookupMapConstSharedPtr cross_priority_host_map);
 
       // Drains any connection pools associated with the removed hosts. All connections will be
       // closed gracefully and no new connections will be created.
@@ -665,7 +683,7 @@ private:
         BatchUpdateHelper(
             const std::vector<
                 std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates,
-            HostMapConstSharedPtr cross_priority_host_map)
+            HostLookupMapConstSharedPtr cross_priority_host_map)
             : updates_(updates), cross_priority_host_map_(std::move(cross_priority_host_map)) {}
 
         // PrioritySet::BatchUpdateCb
@@ -686,7 +704,7 @@ private:
       private:
         const std::vector<
             std::reference_wrapper<const ThreadLocalClusterUpdateParams::PerPriority>>& updates_;
-        const HostMapConstSharedPtr cross_priority_host_map_;
+        const HostLookupMapConstSharedPtr cross_priority_host_map_;
       };
 
       Http::ConnectionPool::Instance*
@@ -738,6 +756,7 @@ private:
     struct LocalClusterParams {
       LoadBalancerFactorySharedPtr load_balancer_factory_;
       ClusterInfoConstSharedPtr info_;
+      HostSetFactory host_set_factory_{};
     };
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
@@ -762,7 +781,7 @@ private:
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed,
                                  bool weighted_priority_health, uint64_t overprovisioning_factor,
-                                 HostMapConstSharedPtr cross_priority_host_map);
+                                 HostLookupMapConstSharedPtr cross_priority_host_map);
     void onHostHealthFailure(const HostSharedPtr& host);
 
     ConnPoolsContainer* getHttpConnPoolsContainer(const HostConstSharedPtr& host,
@@ -934,6 +953,7 @@ private:
                       const uint64_t timeout);
   ProtobufTypes::MessagePtr dumpClusterConfigs(const Matchers::StringMatcher& name_matcher);
   static ClusterManagerStats generateStats(Stats::Scope& scope);
+  static OdCdsDiscoveryStats generateOdCdsDiscoveryStats(Stats::Scope& scope);
 
   /**
    * @return ClusterDataPtr contains the previous cluster in the cluster_map, or
@@ -948,6 +968,9 @@ private:
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
+  // Acquire or release the CDS pause handle for a single cluster based on its
+  // waitForWarmOnInit() flag.
+  void updateCdsPause(const ClusterData& cluster_data);
   void clusterWarmingToActive(const std::string& cluster_name);
   static void maybePreconnect(ThreadLocalClusterManagerImpl::ClusterEntry& cluster_entry,
                               const ClusterConnectivityState& cluster_manager_state,
@@ -976,8 +999,8 @@ private:
    */
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-      LoadBalancerFactorySharedPtr load_balancer_factory, HostMapConstSharedPtr map,
-      UnitFloat drop_overload, absl::string_view drop_category);
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+      HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
@@ -996,9 +1019,12 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
   ClusterManagerStats cm_stats_;
+  OdCdsDiscoveryStats odcds_discovery_stats_;
   ClusterManagerInitHelper init_helper_;
-  // Temporarily saved resume cds callback from updateClusterCounts invocation.
-  Config::ScopedResume resume_cds_;
+  // Per-cluster CDS pause handles. Each warming cluster that has not opted out of CDS gating
+  // holds one handle here. CDS stays paused as long as any handle is live. Clusters with
+  // wait_for_warm_on_init: false do not acquire a handle.
+  absl::flat_hash_map<std::string, Config::ScopedResume> cds_pauses_;
   LoadStatsReporterPtr load_stats_reporter_;
   // The name of the local cluster of this Envoy instance if defined.
   std::optional<std::string> local_cluster_name_;

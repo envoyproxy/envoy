@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/http/mcp_json_rest_bridge/v3/mcp_json_rest_bridge.pb.h"
@@ -14,6 +15,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/common/mcp/constants.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/bridge_status.h"
 #include "source/extensions/filters/http/mcp_json_rest_bridge/sse_response_extractor.h"
@@ -43,6 +45,19 @@ struct EndpointKey {
   }
 };
 
+struct McpParamHeaderMapping {
+  Http::LowerCaseString header_name;
+  std::vector<std::string> property_path;
+  envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpParamHeader::Type type;
+};
+
+// Cache hints returned in locally served tools/list responses.
+struct ToolListCacheConfig {
+  uint64_t ttl_ms = 0;
+  absl::string_view scope =
+      Envoy::Extensions::Filters::Common::Mcp::McpConstants::CACHE_SCOPE_PUBLIC;
+};
+
 /**
  * Configuration for the MCP JSON REST Bridge filter.
  */
@@ -63,6 +78,9 @@ public:
   uint32_t maxRequestBodySize() const { return max_request_body_size_; }
   uint32_t maxResponseBodySize() const { return max_response_body_size_; }
 
+  uint64_t serverDiscoveryCacheTtlMs() const { return server_discovery_cache_ttl_ms_; }
+  absl::string_view serverDiscoveryCacheScope() const { return server_discovery_cache_scope_; }
+
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge::RequestStorageMode
   requestStorageMode() const {
     return proto_config_.request_storage_mode();
@@ -75,11 +93,23 @@ public:
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
 
+  // Returns the endpoint-level tools/list cache config for the complete merged response by
+  // selecting the first matching tool_list_local tier (in (host, path) > (host, "") > ("", path) >
+  // ("", "") precedence order) that explicitly sets cache_config. Tiers with tool_list_local that
+  // omit cache_config inherit from the next matching tier; returns defaults if no matching tier
+  // sets cache_config.
+  ToolListCacheConfig toolListLocalCacheConfig(absl::string_view host,
+                                               absl::string_view path) const;
+
   // Returns whether there is a configured endpoint matching the host and path.
   bool hasEndpoint(absl::string_view host, absl::string_view path) const;
 
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
                                    absl::string_view path) const;
+
+  const std::vector<McpParamHeaderMapping>& mcpParamHeaders(absl::string_view tool_name,
+                                                            absl::string_view host,
+                                                            absl::string_view path) const;
 
   bool shouldStoreToDynamicMetadata() const {
     return proto_config_.request_storage_mode() ==
@@ -108,6 +138,7 @@ private:
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
+    std::vector<McpParamHeaderMapping> mcp_param_headers;
   };
   struct EndpointConfig {
     absl::flat_hash_map<std::string, ToolEntry> tool_entries;
@@ -116,6 +147,7 @@ private:
     std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
+    std::optional<ToolListCacheConfig> tool_list_cache_config;
   };
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridge proto_config_;
@@ -123,6 +155,9 @@ private:
   std::string max_supported_protocol_version_;
   uint32_t max_request_body_size_;
   uint32_t max_response_body_size_;
+  uint64_t server_discovery_cache_ttl_ms_;
+
+  absl::string_view server_discovery_cache_scope_;
   bool clear_route_cache_;
 };
 
@@ -145,11 +180,23 @@ public:
   // Returns whether local serving of tools/list is configured for the matching endpoint.
   bool toolListLocal(absl::string_view host, absl::string_view path) const;
 
+  // Returns the endpoint-level tools/list cache config for the complete merged response by
+  // selecting the first matching tool_list_local tier (in (host, path) > (host, "") > ("", path) >
+  // ("", "") precedence order) that explicitly sets cache_config. Tiers with tool_list_local that
+  // omit cache_config inherit from the next matching tier; returns defaults if no matching tier
+  // sets cache_config.
+  ToolListCacheConfig toolListLocalCacheConfig(absl::string_view host,
+                                               absl::string_view path) const;
+
   // Returns whether there is a configured endpoint matching the host and path.
   bool hasEndpoint(absl::string_view host, absl::string_view path) const;
 
   bool textContentStreamingEnabled(absl::string_view tool_name, absl::string_view host,
                                    absl::string_view path) const;
+
+  const std::vector<McpParamHeaderMapping>& mcpParamHeaders(absl::string_view tool_name,
+                                                            absl::string_view host,
+                                                            absl::string_view path) const;
 
 private:
   explicit McpJsonRestBridgePerRouteConfig(
@@ -162,6 +209,7 @@ private:
     envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule http_rule;
     bool text_content_streaming_enabled;
     const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig* tool_proto;
+    std::vector<McpParamHeaderMapping> mcp_param_headers;
   };
   struct EndpointConfig {
     absl::flat_hash_map<std::string, ToolEntry> tool_entries;
@@ -170,6 +218,7 @@ private:
     std::optional<envoy::extensions::filters::http::mcp_json_rest_bridge::v3::HttpRule>
         tool_list_http_rule;
     bool tool_list_local = false;
+    std::optional<ToolListCacheConfig> tool_list_cache_config;
   };
   absl::flat_hash_map<EndpointKey, EndpointConfig> endpoint_configs_;
   envoy::extensions::filters::http::mcp_json_rest_bridge::v3::McpJsonRestBridgePerRoute
@@ -202,11 +251,44 @@ private:
   void handleMcpMethod(const nlohmann::json& json_rpc, Http::RequestHeaderMapOptRef request_headers,
                        const McpJsonRestBridgePerRouteConfig* per_route_config);
 
+  // Validates the "MCP-Protocol-Version" request header against the JSON-RPC request body.
+  // Sends a local error response and returns an error status if validation fails.
+  absl::Status validateMcpProtocolVersionHeader(const nlohmann::json& json_rpc,
+                                                absl::string_view method,
+                                                Http::RequestHeaderMapOptConstRef request_headers);
+
+  // Validates that a stateless (2026-07-28) request carries the required
+  // params._meta["io.modelcontextprotocol/clientCapabilities"] field and that it is a JSON object.
+  // Individual capability contents are not validated. Must only be called for stateless requests,
+  // whose params._meta is guaranteed to be an object. Returns true when the field is valid.
+  // Otherwise sends a local error response and returns false.
+  bool validateClientCapabilitiesMeta(const nlohmann::json& json_rpc, absl::string_view method);
+
+  // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
+  // field. Returns true when the header is valid. Otherwise sends a local error response and
+  // returns false.
+  bool validateMcpMethodHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                               Http::RequestHeaderMapOptRef request_headers);
+
+  // Validates that the "Mcp-Name" request header is present and matches the JSON-RPC
+  // "params.name" field for a tools/call request.
+  bool validateMcpNameHeader(const nlohmann::json& json_rpc, absl::string_view method,
+                             Http::RequestHeaderMapOptRef request_headers);
+
+  // Validates the configured "Mcp-Param-{name}" request headers of a resolved tool against the
+  // tools/call "arguments". Request headers without a configured mapping are not inspected.
+  // Returns true when every mapping is valid. Otherwise sends a local HeaderMismatch error response
+  // and returns false.
+  bool validateMcpParamHeaders(const std::vector<McpParamHeaderMapping>& mappings,
+                               const nlohmann::json& arguments, const nlohmann::json& params,
+                               Http::RequestHeaderMapOptRef request_headers);
+
   // Serves a local tools/list response using tools' ToolsListSpecificConfig.
   void serveToolsListLocal(
       const nlohmann::json& json_rpc,
       const std::vector<
-          const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools);
+          const envoy::extensions::filters::http::mcp_json_rest_bridge::v3::ToolConfig*>& tools,
+      const ToolListCacheConfig& cache_config);
 
   // Modifies the response from upstream into JSON-RPC response.
   void encodeJsonRpcData(Http::ResponseHeaderMapOptRef response_headers);
@@ -217,15 +299,22 @@ private:
 
   // Handles decoding errors: sets dynamic metadata and sends a local reply.
   // IMPORTANT PROTOCOL RULE:
-  // 1. For JSON-RPC application/protocol errors (-32600, -32601, -32602), MUST use Http::Code::OK
-  //    (200). Many MCP SDK clients inspect HTTP status before JSON-RPC decoding and will fail with
-  //    a transport exception on non-200 responses, discarding the structured JSON-RPC error
-  //    code/message.
-  // 2. Only use non-200 HTTP codes (400, 401, 403, 405, 413) in the following cases:
+  // 1. For JSON-RPC application/protocol errors in the request payload (-32600, -32601, -32602),
+  //    MUST use Http::Code::OK (200). Many MCP SDK clients inspect HTTP status before JSON-RPC
+  //    decoding and will fail with a transport exception on non-200 responses, discarding the
+  //    structured JSON-RPC error code/message. The only exception is -32601 for stateless MCP
+  //    2026-07-28 requests, which MUST use 404 Not Found (see below).
+  // 2. Only use non-200 HTTP codes (400, 401, 403, 404, 405, 413) in the following cases:
   //    - Transport-level or framing syntax failures (generated locally by this filter):
   //      * 405 Method Not Allowed (non-POST request)
   //      * 413 Payload Too Large (exceeding maxRequestBodySize)
   //      * 400 Bad Request for malformed JSON syntax (-32700 parse error)
+  //      * 400 Bad Request when an MCP standard request header fails validation (-32020 header
+  //        mismatch), which is an HTTP-level error rather than a JSON-RPC payload error
+  //    - Unsupported methods in stateless MCP 2026-07-28 requests (generated by this filter):
+  //      * 404 Not Found with -32601 (Method not found), as required by the Streamable HTTP
+  //        transport:
+  //        https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http
   //    - Authorization errors preserved from upstream (401 Unauthorized, 403 Forbidden):
   //      * 401 and 403 from upstream are preserved as non-200 HTTP responses as required by the MCP
   //        authorization spec:
@@ -281,9 +370,12 @@ private:
     ToolsCall = 6,
     // MCP operation failed.
     OperationFailed = 7,
+    // Clients send a server/discover request that is handled locally.
+    ServerDiscover = 8,
   };
   McpOperation mcp_operation_ = McpOperation::Unspecified;
   std::optional<nlohmann::json> session_id_;
+  bool is_stateless_request_{false};
   std::string server_name_;
   std::string path_;
   Buffer::OwnedImpl request_body_;

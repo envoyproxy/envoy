@@ -40,7 +40,6 @@ using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::DoAll;
 using testing::Eq;
-using testing::Invoke;
 using ::testing::Not;
 using testing::Return;
 using testing::ReturnRef;
@@ -59,10 +58,10 @@ TEST(NetworkUtility, WriteEmptyDatagramConnected) {
 
   EXPECT_CALL(io_handle, wasConnected()).WillOnce(Return(true));
   EXPECT_CALL(io_handle, send(_, 0))
-      .WillOnce(Invoke([](const void* buffer, size_t) -> Api::IoCallUint64Result {
+      .WillOnce([](const void* buffer, size_t) -> Api::IoCallUint64Result {
         EXPECT_NE(nullptr, buffer);
         return Api::ioCallUint64ResultNoError();
-      }));
+      });
   EXPECT_CALL(io_handle, writev(_, _)).Times(0);
   EXPECT_CALL(io_handle, sendmsg(_, _, _, _, _)).Times(0);
 
@@ -378,6 +377,18 @@ TEST(NetworkUtility, GetAddressWithPort) {
   EXPECT_FALSE(addr_v6only_false->ip()->ipv6()->v6only());
   auto addr_v6only_false_new_port = Utility::getAddressWithPort(*addr_v6only_false, 8080);
   EXPECT_FALSE(addr_v6only_false_new_port->ip()->ipv6()->v6only());
+
+  // Verify custom SocketInterface is preserved for IPv4 and IPv6.
+  MockSocketInterface custom_socket_interface({Address::IpVersion::v4, Address::IpVersion::v6});
+  auto addr_v4_custom_sock =
+      std::make_shared<Address::Ipv4Instance>("1.2.3.4", 80, &custom_socket_interface);
+  auto addr_v4_custom_sock_new_port = Utility::getAddressWithPort(*addr_v4_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v4_custom_sock_new_port->socketInterface());
+
+  auto addr_v6_custom_sock =
+      std::make_shared<Address::Ipv6Instance>("::1", 80, &custom_socket_interface);
+  auto addr_v6_custom_sock_new_port = Utility::getAddressWithPort(*addr_v6_custom_sock, 8080);
+  EXPECT_EQ(&custom_socket_interface, &addr_v6_custom_sock_new_port->socketInterface());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
@@ -934,11 +945,11 @@ TEST_F(ExecInNetnsTest, Basic) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
 
-  EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([this](int fd) -> Api::SysCallIntResult {
+  EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly([this](int fd) -> Api::SysCallIntResult {
     EXPECT_THAT(fake_fd_map_, Contains(Key(fd)));
     fake_fd_map_.erase(fd);
     return {0, 0};
-  }));
+  });
 
   EXPECT_CALL(linux_os_syscalls, setns(_, Eq(CLONE_NEWNET)))
       .WillRepeatedly(([this](int fd, int) -> Api::SysCallIntResult {
@@ -950,11 +961,11 @@ TEST_F(ExecInNetnsTest, Basic) {
   // Every time open() is called, we want to make up some fd and associate it with the "path" that
   // was provided.
   EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
-      .WillRepeatedly(Invoke([this](const char* pathname, int) -> Api::SysCallIntResult {
+      .WillRepeatedly([this](const char* pathname, int) -> Api::SysCallIntResult {
         int fd = this->next_fd_++;
         fake_fd_map_[fd] = pathname;
         return {fd, 0};
-      }));
+      });
 
   // We expect no calls to "setns" at this point, so the string should be empty.
   EXPECT_EQ(getCurrentNetns(), "");
@@ -965,16 +976,42 @@ TEST_F(ExecInNetnsTest, Basic) {
   EXPECT_THAT(result, IsOkAndHolds("ns1"));
 
   // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
-  // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
-  // and that is what would show up for the test.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  // from. When the netns was noted before making the jump, it used the fd of the calling thread's
+  // own namespace, "/proc/thread-self/ns/net" (not "/proc/self/ns/net", which is the main
+  // thread's), and that is what would show up for the test.
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
 
   // Try another netns.
   result = Utility::execInNetworkNamespace(func, "ns2");
   EXPECT_THAT(result, IsOkAndHolds("ns2"));
 
   // Make sure the netns reverted back.
-  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+  EXPECT_EQ(getCurrentNetns(), "/proc/thread-self/ns/net");
+}
+
+TEST_F(ExecInNetnsTest, RestoresOriginalNetnsWhenCallbackThrows) {
+  // Make the tests use mock syscalls.
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
+
+  testing::InSequence s;
+  EXPECT_CALL(os_syscalls, open(testing::StrEq("/proc/thread-self/ns/net"), O_RDONLY))
+      .WillOnce(Return(Api::SysCallIntResult{1337, 0}));
+  EXPECT_CALL(os_syscalls, open(testing::StrEq("ns1"), O_RDONLY))
+      .WillOnce(Return(Api::SysCallIntResult{1338, 0}));
+  EXPECT_CALL(linux_os_syscalls, setns(1338, CLONE_NEWNET))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  // The original netns is restored before its fd is closed.
+  EXPECT_CALL(linux_os_syscalls, setns(1337, CLONE_NEWNET))
+      .WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_syscalls, close(1338)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_syscalls, close(1337)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  EXPECT_THROW_WITH_MESSAGE(std::ignore = Utility::execInNetworkNamespace(
+                                []() -> int { throw EnvoyException("callback failed"); }, "ns1"),
+                            EnvoyException, "callback failed");
 }
 
 TEST_F(ExecInNetnsTest, OpenFail) {
@@ -986,13 +1023,35 @@ TEST_F(ExecInNetnsTest, OpenFail) {
 
   // Open will always fail.
   EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
-      .WillRepeatedly(Invoke([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+      .WillRepeatedly([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; });
 
   // No other syscalls are expected.
 
   // Expecting failure.
   auto result = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
   EXPECT_THAT(result, HasStatusMessage(testing::StartsWith("failed to open netns file")));
+}
+
+TEST_F(ExecInNetnsTest, SetnsFail) {
+  // Make the tests use mock syscalls.
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
+
+  testing::InSequence s;
+  EXPECT_CALL(os_syscalls, open(testing::StrEq("/proc/thread-self/ns/net"), O_RDONLY))
+      .WillOnce(Return(Api::SysCallIntResult{1337, 0}));
+  EXPECT_CALL(os_syscalls, open(testing::StrEq("ns1"), O_RDONLY))
+      .WillOnce(Return(Api::SysCallIntResult{1338, 0}));
+  // The thread never left its netns, so there is nothing to restore.
+  EXPECT_CALL(linux_os_syscalls, setns(1338, CLONE_NEWNET))
+      .WillOnce(Return(Api::SysCallIntResult{-1, EPERM}));
+  EXPECT_CALL(os_syscalls, close(1338)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_syscalls, close(1337)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  auto result = Utility::execInNetworkNamespace([]() -> int { return 0; }, "ns1");
+  EXPECT_THAT(result, HasStatusMessage(testing::StartsWith("failed to set netns to ns1")));
 }
 
 TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
@@ -1006,18 +1065,17 @@ TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
             &linux_os_syscalls);
 
         EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
-            .WillRepeatedly(
-                Invoke([](const char*, int) -> Api::SysCallIntResult { return {1337, 0}; }));
-        EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([](int) -> Api::SysCallIntResult {
+            .WillRepeatedly([](const char*, int) -> Api::SysCallIntResult { return {1337, 0}; });
+        EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly([](int) -> Api::SysCallIntResult {
           return {0, 0};
-        }));
+        });
 
         // Succeed on the first network namespace syscall, which would jump to a different netns.
         // The second call, which would jump back to the original netns, should fail. This is an
         // unrecoverable error, so it should result in process death.
         EXPECT_CALL(linux_os_syscalls, setns(_, _))
-            .WillOnce(Invoke([](int, int) -> Api::SysCallIntResult { return {0, 0}; }))
-            .WillOnce(Invoke([](int, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+            .WillOnce([](int, int) -> Api::SysCallIntResult { return {0, 0}; })
+            .WillOnce([](int, int) -> Api::SysCallIntResult { return {-1, -1}; });
 
         auto _ = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
       },
@@ -1029,10 +1087,8 @@ TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceSuccess) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
 
   EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
-      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {42, 0}; }));
-  EXPECT_CALL(os_syscalls, close(42)).WillOnce(Invoke([](int) -> Api::SysCallIntResult {
-    return {0, 0};
-  }));
+      .WillOnce([](const char*, int) -> Api::SysCallIntResult { return {42, 0}; });
+  EXPECT_CALL(os_syscalls, close(42)).WillOnce([](int) -> Api::SysCallIntResult { return {0, 0}; });
 
   EXPECT_TRUE(Utility::validateNetworkNamespace("/var/run/netns/ns1").ok());
 }
@@ -1043,7 +1099,7 @@ TEST_F(ExecInNetnsTest, ValidateNetworkNamespaceOpenFail) {
 
   // open() fails (e.g. the namespace does not exist). No close() is expected.
   EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
-      .WillOnce(Invoke([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+      .WillOnce([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; });
 
   auto status = Utility::validateNetworkNamespace("/var/run/netns/does_not_exist");
   EXPECT_FALSE(status.ok());

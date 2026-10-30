@@ -935,17 +935,17 @@ public:
       if (getifaddrs_supported) {
         if (getifaddrs_success) {
           EXPECT_CALL(os_sys_calls, getifaddrs(_))
-              .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+              .WillOnce([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
                 for (uint32_t i = 0; i < ifaddrs.size(); i++) {
                   auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
                   vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
                 }
                 return {0, 0};
-              }));
+              });
         } else {
           EXPECT_CALL(os_sys_calls, getifaddrs(_))
-              .WillOnce(Invoke(
-                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+              .WillOnce(
+                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; });
         }
       }
     } else {
@@ -955,33 +955,31 @@ public:
 
     // These passthrough calls are needed to let the resolver communicate with the DNS server
     EXPECT_CALL(os_sys_calls, accept(_, _, _))
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
               return real_syscall.accept(sockfd, addr, addrlen);
-            }));
+            });
     EXPECT_CALL(os_sys_calls, readv(_, _, _))
-        .WillRepeatedly(
-            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
-              return real_syscall.readv(fd, iov, num_iov);
-            }));
+        .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+          return real_syscall.readv(fd, iov, num_iov);
+        });
     EXPECT_CALL(os_sys_calls, writev(_, _, _))
-        .WillRepeatedly(
-            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
-              return real_syscall.writev(fd, iov, num_iov);
-            }));
+        .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+          return real_syscall.writev(fd, iov, num_iov);
+        });
     EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [&](os_fd_t socket, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
               return real_syscall.send(socket, buffer, length, flags);
-            }));
+            });
     EXPECT_CALL(os_sys_calls, close(_))
-        .WillRepeatedly(Invoke(
-            [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); }));
+        .WillRepeatedly(
+            [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); });
     EXPECT_CALL(os_sys_calls, getaddrinfo(_, _, _, _))
-        .WillRepeatedly(Invoke([&](const char* node, const char* service,
-                                   const struct addrinfo* hints, struct addrinfo** res) {
+        .WillRepeatedly([&](const char* node, const char* service, const struct addrinfo* hints,
+                            struct addrinfo** res) {
           return real_syscall.getaddrinfo(node, service, hints, res);
-        }));
+        });
 
     resolveWithExpectations("some.good.domain", lookup_family, resolution_status,
                             expected_addresses, {}, std::nullopt);
@@ -1734,7 +1732,7 @@ TEST_P(DnsImplTest, WithBothAAndAAAARecord) {
              0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
-TEST_P(DnsImplTest, FallbackToNodataWithErrorOnA) {
+TEST_P(DnsImplTest, NoRecordsDoNotMaskErrorOnA) {
   server_->setErrorOnQtypeA(true);
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Only,
@@ -1748,13 +1746,16 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnA) {
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::Auto));
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
              2 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
   EXPECT_NE(nullptr,
-            resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(6 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              3 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
@@ -1765,7 +1766,7 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnA) {
              3 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
-TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
+TEST_P(DnsImplTest, NoRecordsDoNotMaskErrorOnAAAA) {
   server_->setErrorOnQtypeAAAA(true);
   EXPECT_NE(nullptr,
             resolveWithExpectations("some.good.domain", DnsLookupFamily::V6Only,
@@ -1779,13 +1780,16 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
-  EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::Auto));
+  EXPECT_NE(nullptr,
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::Auto,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(4 /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
              2 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
   EXPECT_NE(nullptr,
-            resolveWithNoRecordsExpectation("some.good.domain", DnsLookupFamily::V4Preferred));
+            resolveWithExpectations("some.good.domain", DnsLookupFamily::V4Preferred,
+                                    DnsResolver::ResolutionStatus::Failure, {}, {}, std::nullopt));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(6 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              3 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
@@ -1799,6 +1803,39 @@ TEST_P(DnsImplTest, FallbackToNodataWithErrorOnAAAA) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(7 /*resolve_total*/, 0 /*pending_resolutions*/, 3 /*not_found*/,
              4 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+}
+
+TEST_P(DnsImplTest, SuccessfulFallbackAfterError) {
+  server_->addHosts("some.good.domain", {"201.134.56.7"}, RecordType::A);
+  server_->addHosts("some.good.domain", {"1::2"}, RecordType::AAAA);
+
+  for (const auto family : {DnsLookupFamily::Auto, DnsLookupFamily::V4Preferred}) {
+    SCOPED_TRACE(static_cast<int>(family));
+    server_->setErrorOnQtypeA(family == DnsLookupFamily::V4Preferred);
+    server_->setErrorOnQtypeAAAA(family == DnsLookupFamily::Auto);
+    EXPECT_NE(nullptr,
+              resolveWithExpectations(
+                  "some.good.domain", family, DnsResolver::ResolutionStatus::Completed,
+                  family == DnsLookupFamily::Auto ? IpList{"201.134.56.7"} : IpList{"1::2"}, {},
+                  std::nullopt));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
+}
+
+// With the runtime guard disabled, a no-records response from one family masks a failure from
+// the other family and the resolution completes with an empty result.
+TEST_P(DnsImplTest, NoRecordsMaskErrorWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.cares_dual_resolution_preserve_failure", "false"}});
+  server_->setErrorOnQtypeA(true);
+
+  // Auto sees no records on AAAA before the A error, while V4Preferred sees the A error first.
+  for (const auto family : {DnsLookupFamily::Auto, DnsLookupFamily::V4Preferred}) {
+    SCOPED_TRACE(static_cast<int>(family));
+    EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("some.good.domain", family));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+  }
 }
 
 TEST_P(DnsImplTest, ErrorWithAcceptNodataEnabled) {

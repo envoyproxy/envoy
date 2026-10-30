@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -40,15 +39,17 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "cx_limit_overload_integration_test",
     size = "large",
     srcs = ["cx_limit_overload_integration_test.cc"],
+    extension_names = ["envoy.resource_monitors.global_downstream_max_connections"],
     rbe_pool = "linux_x64_small",
     tags = [
         "cpu:3",
     ],
     deps = [
+        "//envoy/network:connection_balancer_interface",
         "//envoy/network:filter_interface",
         "//envoy/registry",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -56,6 +57,7 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",

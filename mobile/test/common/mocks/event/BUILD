@@ -12,7 +12,6 @@ envoy_cc_mock(
     name = "event_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
-    repository = "@envoy",
     deps = [
         "//library/common/event:provisional_dispatcher_lib",
         "@envoy//envoy/event:deferred_deletable",

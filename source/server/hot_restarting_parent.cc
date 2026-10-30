@@ -66,10 +66,15 @@ void HotRestartingParent::sendHotRestartMessage(envoy::HotRestartMessage&& msg) 
 
 // Network::NonDispatchedUdpPacketHandler
 void HotRestartingParent::Internal::handle(uint32_t worker_index,
+                                           const Network::Address::Instance& listener_address,
                                            const Network::UdpRecvData& packet) {
   envoy::HotRestartMessage msg;
   auto* packet_msg = msg.mutable_request()->mutable_forwarded_udp_packet();
   packet_msg->set_local_addr(Network::Utility::urlFromDatagramAddress(*packet.addresses_.local_));
+  packet_msg->set_listener_addr(Network::Utility::urlFromDatagramAddress(listener_address));
+  if (listener_address.networkNamespace().has_value()) {
+    packet_msg->set_network_namespace(*listener_address.networkNamespace());
+  }
   packet_msg->set_peer_addr(Network::Utility::urlFromDatagramAddress(*packet.addresses_.peer_));
   packet_msg->set_receive_time_epoch_microseconds(
       std::chrono::duration_cast<std::chrono::microseconds>(packet.receive_time_.time_since_epoch())

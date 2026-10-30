@@ -573,7 +573,7 @@ TEST_P(AltsIntegrationTestServerInvalidPeer, ServerValidationFail) {
   client_conn->connect();
 
   EXPECT_CALL(client_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 

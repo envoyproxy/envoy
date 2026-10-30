@@ -179,7 +179,48 @@ for if and how it is utilized for every filter.
 Route based filter chain
 ------------------------
 
-There is support for having different filter chains for different routes. There are two different modes for this:
+There is support for having different filter chains for different routes. There are currently two
+different ways to achieve this:
+
+* Configuring complete route level filter chains by using the
+  :ref:`filter chain filter <config_http_filters_filter_chain>`.
+* Simulating route level filter chains by disabling filters in the ``http_filters`` chain for
+  specific routes, or enabling filters that are disabled by default for specific routes.
+
+.. _arch_overview_http_filters_filter_chain_filter:
+
+Filter chain filter based route filter chain
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The :ref:`filter chain filter <config_http_filters_filter_chain>` is a general solution for route
+level filter chains. It inserts a placeholder entry in ``http_filters`` and then lets every route
+configure a complete filter chain of its own through the per filter config map.
+
+The filter chain filter:
+
+* does not require the filters used in the route level chain to provide any route level
+  configuration support — any HTTP filter can be used as is, and different routes can use
+  different configurations of the same filter naturally.
+* can compose global filters and route level filter chains easily: the route level chain runs
+  exactly where the ``filter_chain`` filter sits in the ``http_filters`` list, so global filters
+  before and after it keep their positions.
+* supports multiple route level chains by configuring multiple ``filter_chain`` filter entries in
+  ``http_filters``, for example one before the global authentication filter and another one after
+  it.
+* allows adding a new filter to the chain for a specific route by only updating the route
+  configuration, without touching ``http_filters`` and draining downstream connections.
+
+See the :ref:`filter chain filter <config_http_filters_filter_chain>` documentation for more
+details and example configurations.
+
+.. _arch_overview_http_filters_disabled_flag_based_filter_chain:
+
+Disabled flag based route filter chain
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Before the filter chain filter was introduced, route based filter chains could be simulated by
+disabling or enabling filters in the ``http_filters`` chain for specific routes. This still works
+and is fine if it meets your requirements. There are two different modes for this:
 
 * Disabling a filter in the filter chain for specific routes.
 * Overriding a filter in the filter chain that is disabled by default and enabling it for specific
@@ -240,3 +281,13 @@ for a specific route, we can set per filter config map in the route configuratio
 
 Legitimate route-specific configuration for filter (like the above ``lua`` filter) is valid way to
 enable the filter for the route.
+
+Note that this approach has the following limitations:
+
+* It requires the filters to support route level filter configuration to override the filter
+  configuration in ``http_filters``, or all routes will share the same configuration.
+* If we want to add a new filter to the chain for a specific route, we still need to update
+  ``http_filters`` and drain downstream connections.
+
+The :ref:`filter chain filter <config_http_filters_filter_chain>` has no such limitations and is
+the suggested way to configure route based filter chains.

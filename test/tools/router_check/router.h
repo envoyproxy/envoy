@@ -157,6 +157,9 @@ private:
   bool compareTimeout(ToolConfig& tool_config,
                       const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                       envoy::RouterCheckToolSchema::ValidationFailure& failure);
+  bool compareRouteMetadata(ToolConfig& tool_config,
+                            const envoy::RouterCheckToolSchema::ValidationAssert& expected,
+                            envoy::RouterCheckToolSchema::ValidationFailure& failure);
   bool compareRequestHeaderFields(ToolConfig& tool_config,
                                   const envoy::RouterCheckToolSchema::ValidationAssert& expected,
                                   envoy::RouterCheckToolSchema::ValidationFailure& failure);

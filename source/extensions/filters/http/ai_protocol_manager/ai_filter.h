@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -17,6 +18,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/coroutine/task.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_request.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_response.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/filters/http/ai_protocol_manager/token_usage.h"
 
 #include "absl/functional/any_invocable.h"
@@ -84,15 +87,55 @@ private:
 using LocalReplier = absl::AnyInvocable<void(Http::Code code, std::string details) &&>;
 
 // Abstract interface implemented by AI filter instances.
+//
+// A filter defines two independent logical flows, mirroring the HTTP filter model: decode on the
+// request path and encode on the response path. Each runs as its own coroutine for the lifetime
+// of its flow.
+//
+// The response path has one coroutine per response shape: encodeSSE() and encodeUnary(). SSE
+// frames are small in practice, so a filter is given a whole frame at a time. Large frames that
+// do not fit the HTTP stream window are offloaded to the external buffer.
+// The stream's bindings an AI filter applies.
+struct BindingUse {
+  // The client's: the filter reads the request's path under it.
+  bool request{false};
+  // The backend's: the filter renders the request's path and body under it.
+  bool response{false};
+};
+
 class AiFilter {
 public:
   virtual ~AiFilter() = default;
+
+  // The bindings the filter applies. A binding the route declares that no filter of the chain
+  // applies is counted, since nothing else shows it is ignored.
+  virtual BindingUse bindingUse() const { return {}; }
 
   // Invoked when an AI request arrives.
   // Returns absl::OkStatus() on normal completion, or an error status on failure.
   virtual Coroutine::Task<absl::Status> decode(AiRequestReceiver receive_request,
                                                AiRequestPropagator propagate_request,
                                                LocalReplier reply_locally) = 0;
+
+  // Invoked for Server-Sent Events (SSE) streaming responses. The coroutine runs for the entire
+  // lifetime of the response stream, receiving and propagating discrete frames.
+  //
+  // Frames in and frames out need not correspond: a filter may merge several into one, split one
+  // into several, or drop one outright. Returning early is one more form of that choice -- what
+  // it holds at that point is not forwarded, and later frames pass through it untouched.
+  virtual Coroutine::Task<absl::Status> encodeSSE(SseStreamReceiver, SseStreamPropagator) {
+    co_return absl::OkStatus();
+  }
+
+  // Invoked for unary JSON HTTP responses. The coroutine runs for the lifetime of the response,
+  // receiving and propagating batches of flattened leaf JSON fields in a streaming fashion.
+  //
+  // Returning early splices the filter out of the pipeline so subsequent field batches flow past
+  // it untouched.
+  virtual Coroutine::Task<absl::Status> encodeUnary(AiResponseStreamReceiver,
+                                                    AiResponseStreamPropagator) {
+    co_return absl::OkStatus();
+  }
 };
 
 using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
@@ -101,9 +144,20 @@ using AiFilterSharedPtr = std::shared_ptr<AiFilter>;
 // must not use them after propagating the request, replying locally, or an await failing.
 struct AiFilterContext {
   StreamInfo::StreamInfo& stream_info;
-  const Http::RequestHeaderMap& request_headers;
-  // Route-declared request wire API; Unspecified when the route named none.
-  ApiProtocol request_protocol;
+  // Held back until the chain finishes, so a rewrite made before propagating reaches the upstream.
+  Http::RequestHeaderMap& request_headers;
+  // Declared request wire API: the envoy.ai.llm_protocol.request filter state object, else the
+  // route; Unspecified when neither names one.
+  LLMProtocol request_protocol;
+  // Bytes of the buffered request payload, captured before replay drains it.
+  uint64_t request_payload_bytes{0};
+  // Route-declared response/backend wire API; Unspecified when the route named none.
+  LLMProtocol response_protocol = LLMProtocol::Unspecified;
+  // How the route's clients and its backend carry their APIs on HTTP; null when the route names
+  // none, and the request's when filter state names an API other than the route's. The
+  // envoy.ai.binding.request and envoy.ai.binding.response filter state objects replace them.
+  LlmBindingConstSharedPtr request_binding{};
+  LlmBindingConstSharedPtr response_binding{};
 };
 
 // Creates one AiFilter per stream, or nullptr to skip the stream; built once at config load.

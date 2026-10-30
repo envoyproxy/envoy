@@ -103,9 +103,8 @@ public:
   }
 
   ABSL_MUST_USE_RESULT
-  AssertionResult waitForMetricsStream() {
-    return fake_metrics_service_connection_->waitForNewStream(*dispatcher_,
-                                                              otlp_collector_request_);
+  AssertionResult waitForMetricsStream(FakeStreamPtr& otlp_collector_request) {
+    return fake_metrics_service_connection_->waitForNewStream(*dispatcher_, otlp_collector_request);
   }
 
   ABSL_MUST_USE_RESULT
@@ -117,10 +116,11 @@ public:
     VERIFY_ASSERTION(waitForMetricsServiceConnection());
 
     while (!known_counter_exists || !known_gauge_exists || !known_histogram_exists) {
-      VERIFY_ASSERTION(waitForMetricsStream());
+      FakeStreamPtr& otlp_collector_request = otlp_collector_requests_.emplace_back();
+      VERIFY_ASSERTION(waitForMetricsStream(otlp_collector_request));
       opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest export_request;
       VERIFY_ASSERTION(
-          driver_.waitForRequest(otlp_collector_request_, *dispatcher_, export_request));
+          driver_.waitForRequest(otlp_collector_request, *dispatcher_, export_request));
 
       EXPECT_EQ(1, export_request.resource_metrics().size());
       EXPECT_EQ(1, export_request.resource_metrics()[0].scope_metrics().size());
@@ -130,7 +130,7 @@ public:
 
       checker(metrics, known_counter_exists, known_gauge_exists, known_histogram_exists);
 
-      driver_.sendResponse(otlp_collector_request_);
+      driver_.sendResponse(otlp_collector_request);
     }
 
     // Drain any metrics-export streams that piled up on the connection while we were
@@ -144,7 +144,9 @@ public:
                                                               std::chrono::milliseconds(10))) {
         break;
       }
+      VERIFY_ASSERTION(pending->waitForEndStream(*dispatcher_));
       driver_.sendResponse(pending);
+      otlp_collector_requests_.push_back(std::move(pending));
     }
 
     EXPECT_TRUE(known_counter_exists);
@@ -263,7 +265,7 @@ private:
   }
 
   FakeHttpConnectionPtr fake_metrics_service_connection_;
-  FakeStreamPtr otlp_collector_request_;
+  std::vector<FakeStreamPtr> otlp_collector_requests_;
   std::string stat_prefix_;
 };
 

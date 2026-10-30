@@ -15,6 +15,7 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -22,7 +23,6 @@
 
 using testing::_;
 using testing::DoAll;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -86,18 +86,17 @@ public:
 
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
                 send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-        .WillOnce(
-            Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              callback = &callbacks;
+        .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callback = &callbacks;
 
-              const std::string& expected_hostname = !hostname.empty() ? hostname : "fake_cluster";
-              EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-              EXPECT_EQ(expected_hostname, message->headers().getHostValue());
-              EXPECT_EQ(content_type, message->headers().getContentTypeValue());
+          const std::string& expected_hostname = !hostname.empty() ? hostname : "fake_cluster";
+          EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+          EXPECT_EQ(expected_hostname, message->headers().getHostValue());
+          EXPECT_EQ(content_type, message->headers().getContentTypeValue());
 
-              return &request;
-            }));
+          return &request;
+        });
 
     EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
         .Times(2)
@@ -371,17 +370,16 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
-            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+        EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+        EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+        EXPECT_EQ("application/json", message->headers().getContentTypeValue());
 
-            return &request;
-          }));
+        return &request;
+      });
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
@@ -1100,31 +1098,30 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersVerifyHeaders) {
   // Set up expectations for the HTTP request with custom headers
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            // Verify standard headers are present
-            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-            EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
-            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+        // Verify standard headers are present
+        EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+        EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
+        EXPECT_EQ("application/json", message->headers().getContentTypeValue());
 
-            // Verify custom headers are present
-            auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
-            EXPECT_FALSE(auth_header.empty());
-            EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
+        // Verify custom headers are present
+        auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
+        EXPECT_FALSE(auth_header.empty());
+        EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
 
-            auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
-            EXPECT_FALSE(custom_header.empty());
-            EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
+        auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
+        EXPECT_FALSE(custom_header.empty());
+        EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
 
-            auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
-            EXPECT_FALSE(api_key_header.empty());
-            EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
+        auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
+        EXPECT_FALSE(api_key_header.empty());
+        EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
 
-            return &request;
-          }));
+        return &request;
+      });
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
       .WillOnce(Return(1));
@@ -1213,6 +1210,96 @@ TEST_F(ZipkinDriverTest, DriverMissingCollectorConfiguration) {
   EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing, false), EnvoyException,
                             "collector_cluster and collector_endpoint must be specified when not "
                             "using collector_service");
+}
+
+TEST_F(ZipkinDriverTest, PropagateB3SingleHeaderWhenDownstreamUsesB3SingleHeader) {
+  setupValidDriver("HTTP_JSON");
+
+  request_headers_.set(ZipkinCoreConstants::get().B3.key(),
+                       "463ac35c9f6413ad48485a3953bb6124-a2fb4a1d1a96d312-1-0000000000000002");
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, false});
+  Tracing::SpanPtr child_span = span->spawnChild(config_, "child", time_source_.systemTime());
+
+  Tracing::TestTraceContextImpl outgoing_headers{{}};
+  child_span->injectContext(outgoing_headers, Tracing::UpstreamContext());
+
+  auto* zipkin_child = dynamic_cast<Zipkin::Span*>(child_span.get());
+  ASSERT_NE(nullptr, zipkin_child);
+  EXPECT_TRUE(zipkin_child->useB3SingleFormat());
+  ASSERT_TRUE(zipkin_child->isSetParentId());
+  EXPECT_EQ(absl::StrCat("463ac35c9f6413ad48485a3953bb6124-", zipkin_child->idAsHexString(), "-1-",
+                         zipkin_child->parentIdAsHexString()),
+            outgoing_headers.get(ZipkinCoreConstants::get().B3.key()).value());
+  EXPECT_FALSE(outgoing_headers.get(ZipkinCoreConstants::get().X_B3_TRACE_ID.key()).has_value());
+  EXPECT_FALSE(outgoing_headers.get(ZipkinCoreConstants::get().X_B3_SPAN_ID.key()).has_value());
+  EXPECT_FALSE(
+      outgoing_headers.get(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.key()).has_value());
+  EXPECT_FALSE(outgoing_headers.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key()).has_value());
+}
+
+TEST_F(ZipkinDriverTest, PropagateB3SingleHeaderWithOnlySamplingState) {
+  setupValidDriver("HTTP_JSON");
+
+  // The downstream only sent the sampling state, so a new root span is created.
+  request_headers_.set(ZipkinCoreConstants::get().B3.key(), NOT_SAMPLED);
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+
+  Tracing::TestTraceContextImpl outgoing_headers{{}};
+  span->injectContext(outgoing_headers, Tracing::UpstreamContext());
+
+  auto* zipkin_span = dynamic_cast<Zipkin::Span*>(span.get());
+  ASSERT_NE(nullptr, zipkin_span);
+  EXPECT_FALSE(zipkin_span->isSetParentId());
+  EXPECT_EQ(
+      absl::StrCat(zipkin_span->traceIdAsHexString(), "-", zipkin_span->idAsHexString(), "-0"),
+      outgoing_headers.get(ZipkinCoreConstants::get().B3.key()).value());
+  EXPECT_FALSE(outgoing_headers.get(ZipkinCoreConstants::get().X_B3_TRACE_ID.key()).has_value());
+}
+
+TEST_F(ZipkinDriverTest, PropagateMultipleB3HeadersWhenDownstreamUsesMultipleB3Headers) {
+  setupValidDriver("HTTP_JSON");
+
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID.key(),
+                       "463ac35c9f6413ad48485a3953bb6124");
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SPAN_ID.key(), "a2fb4a1d1a96d312");
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED.key(), SAMPLED);
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, false});
+  Tracing::SpanPtr child_span = span->spawnChild(config_, "child", time_source_.systemTime());
+
+  Tracing::TestTraceContextImpl outgoing_headers{{}};
+  child_span->injectContext(outgoing_headers, Tracing::UpstreamContext());
+
+  EXPECT_FALSE(outgoing_headers.get(ZipkinCoreConstants::get().B3.key()).has_value());
+  EXPECT_EQ("463ac35c9f6413ad48485a3953bb6124",
+            outgoing_headers.get(ZipkinCoreConstants::get().X_B3_TRACE_ID.key()).value());
+  EXPECT_EQ(SAMPLED, outgoing_headers.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key()).value());
+}
+
+TEST_F(ZipkinDriverTest, PropagateMultipleB3HeadersForB3SingleHeaderWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.zipkin_preserve_b3_single_header_format", "false"}});
+  setupValidDriver("HTTP_JSON");
+
+  request_headers_.set(ZipkinCoreConstants::get().B3.key(),
+                       "463ac35c9f6413ad48485a3953bb6124-a2fb4a1d1a96d312-1");
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, false});
+
+  Tracing::TestTraceContextImpl outgoing_headers{{}};
+  span->injectContext(outgoing_headers, Tracing::UpstreamContext());
+
+  EXPECT_FALSE(outgoing_headers.get(ZipkinCoreConstants::get().B3.key()).has_value());
+  EXPECT_EQ("463ac35c9f6413ad48485a3953bb6124",
+            outgoing_headers.get(ZipkinCoreConstants::get().X_B3_TRACE_ID.key()).value());
+  EXPECT_EQ(SAMPLED, outgoing_headers.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key()).value());
 }
 
 } // namespace

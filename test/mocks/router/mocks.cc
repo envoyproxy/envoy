@@ -2,12 +2,13 @@
 
 #include <chrono>
 
+#include "source/common/router/retry_state_impl.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::DoAll;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -25,19 +26,27 @@ TestRetryPolicy::TestRetryPolicy() { num_retries_ = 1; }
 
 TestRetryPolicy::~TestRetryPolicy() = default;
 
+RetryStatePtr TestRetryPolicy::createRetryState(
+    Http::RequestHeaderMap& request_headers, const Upstream::ClusterInfo& cluster,
+    Server::Configuration::CommonFactoryContext& context, Event::Dispatcher& dispatcher,
+    Upstream::ResourcePriority priority, OptRef<StreamInfo::StreamInfo>) const {
+  return RetryStateImpl::create(*this, request_headers, cluster, context, dispatcher, priority);
+}
+
 MockInternalRedirectPolicy::MockInternalRedirectPolicy() {
   ON_CALL(*this, enabled()).WillByDefault(Return(false));
+  ON_CALL(*this, responseHeadersToCopy()).WillByDefault(ReturnRef(response_headers_to_copy_));
 }
 
 MockRetryState::MockRetryState() = default;
 
 void MockRetryState::expectHeadersRetry() {
   EXPECT_CALL(*this, shouldRetryHeaders(_, _, _))
-      .WillOnce(Invoke([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&,
-                              DoRetryHeaderCallback callback) {
+      .WillOnce([this](const Http::ResponseHeaderMap&, const Http::RequestHeaderMap&,
+                       DoRetryHeaderCallback callback) {
         callback_ = [callback]() { callback(false); };
         return RetryStatus::Yes;
-      }));
+      });
 }
 
 void MockRetryState::expectHedgedPerTryTimeoutRetry() {
@@ -47,11 +56,11 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
 
 void MockRetryState::expectResetRetry() {
   EXPECT_CALL(*this, shouldRetryReset(_, _, _, _))
-      .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used,
-                              DoRetryResetCallback callback, bool) {
+      .WillOnce([this](const Http::StreamResetReason, RetryState::Http3Used,
+                       DoRetryResetCallback callback, bool) {
         callback_ = [callback]() { callback(false); };
         return RetryStatus::Yes;
-      }));
+      });
 }
 
 MockRetryState::~MockRetryState() = default;
@@ -113,9 +122,9 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(hedge_policy_));
-  ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
+  ON_CALL(*this, connectConfig()).WillByDefault([this]() {
     return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : std::nullopt;
-  }));
+  });
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(path_rewriter_));
@@ -152,12 +161,12 @@ MockRouteTracing::MockRouteTracing() {
   ON_CALL(*this, getClientSampling()).WillByDefault(ReturnRef(client_sampling_));
   ON_CALL(*this, getRandomSampling()).WillByDefault(ReturnRef(random_sampling_));
   ON_CALL(*this, getOverallSampling()).WillByDefault(ReturnRef(overall_sampling_));
-  ON_CALL(*this, operation()).WillByDefault(Invoke([this]() {
+  ON_CALL(*this, operation()).WillByDefault([this]() {
     return makeOptRefFromPtr(operation_.get());
-  }));
-  ON_CALL(*this, upstreamOperation()).WillByDefault(Invoke([this]() {
+  });
+  ON_CALL(*this, upstreamOperation()).WillByDefault([this]() {
     return makeOptRefFromPtr(upstream_operation_.get());
-  }));
+  });
 }
 MockRouteTracing::~MockRouteTracing() = default;
 
@@ -186,11 +195,11 @@ MockRoute::MockRoute() {
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(route_entry_.path_match_criterion_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(route_entry_.upgrade_map_));
   ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(route_entry_.hedge_policy_));
-  ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
+  ON_CALL(*this, connectConfig()).WillByDefault([this]() {
     return route_entry_.connect_config_.has_value()
                ? makeOptRef(route_entry_.connect_config_.value())
                : std::nullopt;
-  }));
+  });
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(route_entry_.early_data_policy_));
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(route_entry_.path_matcher_));
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(route_entry_.path_rewriter_));
@@ -203,10 +212,10 @@ MockRoute::~MockRoute() = default;
 MockRouteSpecifier::MockRouteSpecifier() {
   // By default a specifier is transparent: it hands back exactly what it was given and lets the
   // rest of the chain run. Tests override this when they want the specifier to do something.
-  ON_CALL(*this, onRoute(_, _, _, _))
-      .WillByDefault(Invoke([](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
-                               const StreamInfo::StreamInfo&,
-                               uint64_t) -> OnRouteResult { return {std::move(route)}; }));
+  ON_CALL(*this, onRoute(_, _, _, _, _))
+      .WillByDefault([](RouteConstSharedPtr route, const Http::RequestHeaderMap&,
+                        const StreamInfo::StreamInfo&, uint64_t,
+                        OnRouteInputStatus) -> OnRouteResult { return {std::move(route)}; });
 }
 MockRouteSpecifier::~MockRouteSpecifier() = default;
 
@@ -235,8 +244,9 @@ MockScopedRouteConfigProvider::MockScopedRouteConfigProvider()
 MockScopedRouteConfigProvider::~MockScopedRouteConfigProvider() = default;
 
 MockScopeKeyBuilder::MockScopeKeyBuilder() {
-  ON_CALL(*this, computeScopeKey(_))
-      .WillByDefault(Invoke([](const Http::HeaderMap&) -> ScopeKeyPtr { return nullptr; }));
+  ON_CALL(*this, computeScopeKey(_)).WillByDefault([](const Http::HeaderMap&) -> ScopeKeyPtr {
+    return nullptr;
+  });
 }
 MockScopeKeyBuilder::~MockScopeKeyBuilder() = default;
 

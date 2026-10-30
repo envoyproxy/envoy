@@ -611,6 +611,7 @@ envoy_cc_library(
         "//source/common/tls:server_ssl_socket_lib",
         "@quiche//:quic_core_crypto_crypto_handshake_lib",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ]),
     alwayslink = LEGACY_ALWAYSLINK,
 )
@@ -688,6 +689,7 @@ envoy_cc_library(
         ":envoy_quic_utils_lib",
         "//envoy/network:udp_packet_writer_handler_interface",
         "//source/common/network:io_socket_error_lib",
+        "//source/common/network:udp_packet_writer_handler_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_features_lib",
         "//source/common/runtime:runtime_lib",

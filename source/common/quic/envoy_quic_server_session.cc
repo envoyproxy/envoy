@@ -124,6 +124,19 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
                   this->id(), id));
     return nullptr;
   }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      connection()->CloseConnection(quic::QUIC_PEER_GOING_AWAY, "Server overloaded",
+                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+      return nullptr;
+    } else if (should_send_go_away_on_dispatch_ != nullptr && !h3_go_away_sent_ &&
+               should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+      h3_go_away_sent_ = true;
+      codec_stats_->goaway_sent_.inc();
+    }
+  }
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, codec_stats_.value(),
                                           http3_options_.value(), headers_with_underscores_action_);
   ActivateStream(absl::WrapUnique(stream));
@@ -312,18 +325,21 @@ void EnvoyQuicServerSession::ProcessUdpPacket(const quic::QuicSocketAddress& sel
   // is the time to actually close the connection.
   maybeHandleCloseDuringInitialize();
 
-  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
-      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
-                                "sending GOAWAY and close on dispatch");
-    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
-    closeConnectionImmediately();
-  } else if (should_send_go_away_on_dispatch_ != nullptr &&
-             should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
-    ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
-                                "sending GOAWAY on dispatch");
-    SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
-    h3_go_away_sent_ = true;
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http3_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
+                                  "sending GOAWAY and close on dispatch");
+      SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+      closeConnectionImmediately();
+    } else if (should_send_go_away_on_dispatch_ != nullptr &&
+               should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
+      ENVOY_LOG_EVERY_POW_2(info, "EnvoyQuicServerSession::ProcessUdpPacket: "
+                                  "sending GOAWAY on dispatch");
+      SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+      h3_go_away_sent_ = true;
+    }
   }
 
   quic::QuicServerSessionBase::ProcessUdpPacket(self_address, peer_address, packet);

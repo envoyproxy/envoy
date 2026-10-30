@@ -41,6 +41,7 @@
 #include "source/common/upstream/host_utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/numbers.h"
 
 namespace Envoy {
 namespace Router {
@@ -260,7 +261,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
   const absl::string_view per_try_timeout_entry =
       request_headers.getEnvoyUpstreamRequestPerTryTimeoutMsValue();
   if (!per_try_timeout_entry.empty()) {
-    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout)) {
+    if (absl::SimpleAtoi(per_try_timeout_entry, &header_timeout) &&
+        header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
     }
     request_headers.removeEnvoyUpstreamRequestPerTryTimeoutMs();
@@ -323,7 +325,8 @@ void FilterUtility::setTimeoutHeaders(uint64_t elapsed_time, const TimeoutData& 
 std::optional<std::chrono::milliseconds>
 FilterUtility::tryParseHeaderTimeout(const Http::HeaderEntry& header_timeout_entry) {
   uint64_t header_timeout;
-  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout)) {
+  if (absl::SimpleAtoi(header_timeout_entry.value().getStringView(), &header_timeout) &&
+      header_timeout <= static_cast<uint64_t>(std::chrono::milliseconds::max().count())) {
     return std::chrono::milliseconds(header_timeout);
   }
   return std::nullopt;
@@ -696,16 +699,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     const auto parsed_authority = Http::Utility::parseAuthority(header_value);
 
     if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options->auto_sni() &&
-        !filter_state->hasDataWithName(Network::UpstreamServerName::key())) {
-      filter_state->setData(Network::UpstreamServerName::key(),
-                            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_));
+        !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamServerName)) {
+      filter_state->setIndexedData(
+          StreamInfo::FilterStateIndex::UpstreamServerName,
+          std::make_shared<Network::UpstreamServerName>(parsed_authority.host_),
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
 
     if (upstream_http_protocol_options->auto_san_validation() &&
-        !filter_state->hasDataWithName(Network::UpstreamSubjectAltNames::key())) {
-      filter_state->setData(Network::UpstreamSubjectAltNames::key(),
-                            std::make_unique<Network::UpstreamSubjectAltNames>(
-                                std::vector<std::string>{std::string(parsed_authority.host_)}));
+        !filter_state->hasIndexedData(StreamInfo::FilterStateIndex::UpstreamSubjectAltNames)) {
+      filter_state->setIndexedData(
+          StreamInfo::FilterStateIndex::UpstreamSubjectAltNames,
+          std::make_shared<Network::UpstreamSubjectAltNames>(
+              std::vector<std::string>{std::string(parsed_authority.host_)}),
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
   }
 
@@ -1593,7 +1600,7 @@ void Filter::onUpstreamTimeoutAbort(StreamInfo::CoreResponseFlag response_flags,
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -1865,6 +1872,17 @@ void Filter::onUpstream1xxHeaders(Http::ResponseHeaderMapPtr&& headers,
   // but it's sketchy (as the subsequent upstream might not send a 100-Continue) and not worth
   // the complexity until someone asks for it.
   retry_state_.reset();
+
+  // Apply response_headers_to_remove to informational (1xx) responses so
+  // upstream-internal headers are stripped before forwarding downstream.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.response_headers_to_remove_on_1xx")) {
+    for (const Http::LowerCaseString& header :
+         route_entry_->responseHeaderTransforms(callbacks_->streamInfo(), false)
+             .headers_to_remove) {
+      headers->remove(header);
+    }
+  }
 
   callbacks_->encode1xxHeaders(std::move(headers));
 }
@@ -2174,7 +2192,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
 
   Upstream::ClusterTimeoutBudgetStatsOptRef tb_stats = cluster()->timeoutBudgetStats();
   if (tb_stats.has_value()) {
-    tb_stats->get().upstream_rq_timeout_budget_percent_used_.recordValue(
+    tb_stats->upstream_rq_timeout_budget_percent_used_.recordValue(
         FilterUtility::percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
@@ -2734,8 +2752,9 @@ RetryStatePtr ProdFilter::createRetryState(const RetryPolicy& policy,
                                            Server::Configuration::CommonFactoryContext& context,
                                            Event::Dispatcher& dispatcher,
                                            Upstream::ResourcePriority priority) {
-  std::unique_ptr<RetryStateImpl> retry_state =
-      RetryStateImpl::create(policy, request_headers, cluster, context, dispatcher, priority);
+  RetryStatePtr retry_state = policy.createRetryState(
+      request_headers, cluster, context, dispatcher, priority,
+      makeOptRefFromPtr(callbacks() ? &callbacks()->streamInfo() : nullptr));
   if (retry_state != nullptr && retry_state->isAutomaticallyConfiguredForHttp3()) {
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the buffer limit to 0 so that we don't retry or

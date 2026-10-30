@@ -34,6 +34,37 @@ public:
         std::filesystem::path(shared_object_path).parent_path().string();
     TestEnvironment::setEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH", shared_object_dir, 1);
   }
+
+  // Runs the matcher_error module, which reports an evaluation it could not complete, and returns
+  // the result the matcher produces under the given on_error policy.
+  MatchResult runErrorProbe(MatchResult on_error_result) {
+    auto module_or_error =
+        Extensions::DynamicModules::newDynamicModuleByName("matcher_error", true, false);
+    EXPECT_OK(module_or_error);
+    auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
+        std::move(module_or_error.value()));
+
+    auto on_config_new = module->getFunctionPointer<OnMatcherConfigNewType>(
+        "envoy_dynamic_module_on_matcher_config_new");
+    auto on_config_destroy = module->getFunctionPointer<OnMatcherConfigDestroyType>(
+        "envoy_dynamic_module_on_matcher_config_destroy");
+    auto on_match =
+        module->getFunctionPointer<OnMatcherMatchType>("envoy_dynamic_module_on_matcher_match");
+
+    envoy_dynamic_module_type_envoy_buffer name_buf = {"test", 4};
+    envoy_dynamic_module_type_envoy_buffer config_buf = {"", 0};
+    auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
+
+    auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+        module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+        on_error_result);
+
+    auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();
+    ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"x-test", "value"}};
+    match_data->request_headers_ = &request_headers;
+    auto input = DataInputGetResult::CreateCustom(std::move(match_data));
+    return matcher->match(input);
+  }
 };
 
 TEST_F(DynamicModuleMatcherTest, AlwaysMatchModule) {
@@ -62,7 +93,8 @@ TEST_F(DynamicModuleMatcherTest, AlwaysMatchModule) {
   ASSERT_NE(nullptr, in_module_config);
 
   auto matcher = std::make_unique<DynamicModuleInputMatcher>(
-      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+      MatchResult::NoMatch);
 
   // Create matching data with DynamicModuleMatchData.
   auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();
@@ -102,7 +134,8 @@ TEST_F(DynamicModuleMatcherTest, HeaderCheckModule) {
   ASSERT_NE(nullptr, in_module_config);
 
   auto matcher = std::make_unique<DynamicModuleInputMatcher>(
-      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+      MatchResult::NoMatch);
 
   // Test with matching header.
   {
@@ -158,7 +191,8 @@ TEST_F(DynamicModuleMatcherTest, SupportedDataInputTypes) {
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
   auto matcher = std::make_unique<DynamicModuleInputMatcher>(
-      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+      MatchResult::NoMatch);
 
   EXPECT_TRUE(matcher->supportsDataInputType("dynamic_module_data_input"));
   EXPECT_FALSE(matcher->supportsDataInputType("string"));
@@ -187,7 +221,8 @@ TEST_F(DynamicModuleMatcherTest, NonDynamicModuleCustomMatchDataReturnsFalse) {
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
   auto matcher = std::make_unique<DynamicModuleInputMatcher>(
-      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+      MatchResult::NoMatch);
 
   // Pass a CustomMatchData that is not DynamicModuleMatchData.
   auto other_data = std::make_shared<OtherCustomMatchData>();
@@ -216,7 +251,8 @@ TEST_F(DynamicModuleMatcherTest, NonCustomMatchDataReturnsFalse) {
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
   auto matcher = std::make_unique<DynamicModuleInputMatcher>(
-      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+      MatchResult::NoMatch);
 
   // Pass a string variant instead of CustomMatchData.
   auto input = DataInputGetResult::CreateString("not_custom_data");
@@ -243,11 +279,59 @@ TEST_F(DynamicModuleMatcherTest, NullRequestHeaders) {
   auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
 
   auto matcher = std::make_unique<DynamicModuleInputMatcher>(
-      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()));
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+      MatchResult::NoMatch);
 
   // Create match data with no headers set.
   auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();
 
+  auto input = DataInputGetResult::CreateCustom(std::move(match_data));
+
+  EXPECT_EQ(matcher->match(input), MatchResult::NoMatch);
+}
+
+// An evaluation the module could not complete is a no match under the default NO_MATCH policy,
+// which is the safe result for an allow-on-match tree.
+TEST_F(DynamicModuleMatcherTest, ModuleErrorWithNoMatchPolicyIsNoMatch) {
+  EXPECT_EQ(runErrorProbe(MatchResult::NoMatch), MatchResult::NoMatch);
+}
+
+// An evaluation the module could not complete is a match under the MATCH policy, which is the safe
+// result for a deny-on-match tree where a missed match would let a request bypass the rule.
+TEST_F(DynamicModuleMatcherTest, ModuleErrorWithMatchPolicyIsMatch) {
+  EXPECT_EQ(runErrorProbe(MatchResult::Matched), MatchResult::Matched);
+}
+
+// on_error must not leak into a normal evaluation. A module that completes normally and does not
+// match returns NoMatch even when the on_error policy is MATCH.
+TEST_F(DynamicModuleMatcherTest, OnErrorDoesNotAffectNormalNoMatch) {
+  auto module_or_error =
+      Extensions::DynamicModules::newDynamicModuleByName("matcher_check_headers", true, false);
+  ASSERT_OK(module_or_error);
+
+  auto module = std::shared_ptr<Extensions::DynamicModules::DynamicModule>(
+      std::move(module_or_error.value()));
+
+  auto on_config_new = module->getFunctionPointer<OnMatcherConfigNewType>(
+      "envoy_dynamic_module_on_matcher_config_new");
+  auto on_config_destroy = module->getFunctionPointer<OnMatcherConfigDestroyType>(
+      "envoy_dynamic_module_on_matcher_config_destroy");
+  auto on_match =
+      module->getFunctionPointer<OnMatcherMatchType>("envoy_dynamic_module_on_matcher_match");
+
+  envoy_dynamic_module_type_envoy_buffer name_buf = {"header_check", 12};
+  envoy_dynamic_module_type_envoy_buffer config_buf = {"x-test-header", 13};
+  auto in_module_config = (*on_config_new.value())(nullptr, name_buf, config_buf);
+
+  auto matcher = std::make_unique<DynamicModuleInputMatcher>(
+      module, on_match.value(), makeConfigHolder(in_module_config, on_config_destroy.value()),
+      MatchResult::Matched);
+
+  // The request lacks the configured header, so the module returns a normal no match. on_error is
+  // MATCH but must not be applied because the evaluation completed.
+  auto match_data = std::make_shared<Http::DynamicModules::DynamicModuleMatchData>();
+  ::Envoy::Http::TestRequestHeaderMapImpl request_headers{{"other-header", "value"}};
+  match_data->request_headers_ = &request_headers;
   auto input = DataInputGetResult::CreateCustom(std::move(match_data));
 
   EXPECT_EQ(matcher->match(input), MatchResult::NoMatch);

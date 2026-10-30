@@ -7,6 +7,7 @@
 #include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
 
 #include "test/extensions/common/aws/mocks.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 
 #include "gmock/gmock.h"
@@ -23,7 +24,6 @@ using Common::Aws::MockSigner;
 using ::testing::An;
 using ::testing::ElementsAre;
 using ::testing::InSequence;
-using ::testing::Invoke;
 using ::testing::Pair;
 using ::testing::Return;
 using ::testing::ReturnRef;
@@ -100,9 +100,9 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersPassthrough) {
       setupDownstreamFilter(InvocationMode::Synchronous, true /*passthrough*/, "");
   EXPECT_CALL(*(filter_settings_->signer_),
               signEmptyPayload(An<Http::RequestHeaderMap&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
+      .WillOnce([](Http::HeaderMap&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
-      }));
+      });
 
   Http::TestRequestHeaderMapImpl input_headers;
   const auto result = filter_->decodeHeaders(input_headers, true /*end_stream*/);
@@ -117,10 +117,9 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeHeadersNoPassthrough) {
       setupDownstreamFilter(InvocationMode::Synchronous, false /*passthrough*/, "");
   EXPECT_CALL(*(filter_settings_->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                  An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
-                          const absl::string_view) -> absl::Status {
+      .WillOnce([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
-      }));
+      });
   Http::TestRequestHeaderMapImpl headers;
   headers.setHost("any_host");
   headers.setPath("/");
@@ -144,10 +143,9 @@ TEST_F(AwsLambdaFilterTest, SigningFailureDecodeData) {
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillOnce(Return(&buffer));
   EXPECT_CALL(*(filter_settings->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                 An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
-                          const absl::string_view) -> absl::Status {
+      .WillOnce([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
         return absl::Status{absl::StatusCode::kInvalidArgument, "Message is missing :path header"};
-      }));
+      });
 
   const auto data_result = filter_->decodeData(buffer, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, data_result);
@@ -383,7 +381,7 @@ TEST_F(AwsLambdaFilterTest, DecodeHeadersOnlyRequestWithJsonOn) {
 
   Buffer::OwnedImpl json_buf;
   auto on_add_decoded_data = [&json_buf](Buffer::Instance& buf, bool) { json_buf.move(buf); };
-  ON_CALL(decoder_callbacks_, addDecodedData(_, _)).WillByDefault(Invoke(on_add_decoded_data));
+  ON_CALL(decoder_callbacks_, addDecodedData(_, _)).WillByDefault(on_add_decoded_data);
   Http::TestRequestHeaderMapImpl headers;
   headers.setContentLength(0);
   headers.setPath("/resource?proxy=envoy");
@@ -438,8 +436,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithTextualBodyWithJsonOn) {
     cb(decoded_buf);
   };
   EXPECT_CALL(decoder_callbacks_, decodingBuffer).WillRepeatedly(Return(&decoded_buf));
-  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_decoding_buffer));
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer).WillRepeatedly(on_modify_decoding_buffer);
 
   std::array<const char*, 4> textual_mime_types = {"application/json", "application/javascript",
                                                    "application/xml", "text/plain"};
@@ -506,8 +503,7 @@ TEST_F(AwsLambdaFilterTest, DecodeDataWithBinaryBodyWithJsonOn) {
   auto on_modify_decoding_buffer = [&decoded_buf](std::function<void(Buffer::Instance&)> cb) {
     cb(decoded_buf);
   };
-  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_decoding_buffer));
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer).WillRepeatedly(on_modify_decoding_buffer);
   std::array<absl::string_view, 3> binary_mime_types = {"", "application/pdf", "gzipped"};
   for (auto mime_type : binary_mime_types) {
     Http::TestRequestHeaderMapImpl headers;
@@ -673,8 +669,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeTransformToHttp) {
     cb(encoded_buf);
   };
   EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buf));
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   auto result = filter_->encodeData(encoded_buf, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
@@ -719,8 +714,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeContentTypeHeader) {
     cb(encoded_buf);
   };
   EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buf));
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   auto result = filter_->encodeData(encoded_buf, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
@@ -763,8 +757,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeBase64EncodedBody) {
     cb(encoded_buf);
   };
   EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buf));
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   auto result = filter_->encodeData(encoded_buf, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
@@ -802,8 +795,7 @@ TEST_F(AwsLambdaFilterTest, EncodeDataJsonModeInvalidJson) {
     cb(encoded_buf);
   };
   EXPECT_CALL(encoder_callbacks_, encodingBuffer).WillRepeatedly(Return(&encoded_buf));
-  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-      .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+  EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
   auto result = filter_->encodeData(encoded_buf, true /*end_stream*/);
   EXPECT_EQ(Http::FilterDataStatus::Continue, result);
@@ -888,13 +880,68 @@ TEST_F(AwsLambdaFilterTest, DecodeDataCredentialsPending) {
 
   EXPECT_CALL(*(filter_settings->signer_), sign(An<Http::RequestHeaderMap&>(),
                                                 An<const std::string&>(), An<absl::string_view>()))
-      .WillOnce(Invoke([](Http::HeaderMap&, const std::string&,
-                          const absl::string_view) -> absl::Status { return absl::OkStatus(); }));
+      .WillOnce([](Http::HeaderMap&, const std::string&, const absl::string_view) -> absl::Status {
+        return absl::OkStatus();
+      });
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, true));
   // We should see continueDecoding called when the captured callback is triggered
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   capture();
+}
+
+// A signer that records its own destruction, so that tests can observe exactly when the
+// credentials provider chain owned by a route level configuration is released.
+class DestructionTrackingSigner : public MockSigner {
+public:
+  explicit DestructionTrackingSigner(bool& destroyed) : destroyed_(destroyed) {}
+  ~DestructionTrackingSigner() override { destroyed_ = true; }
+
+private:
+  bool& destroyed_;
+};
+
+// A configuration released off the main thread hands its signer, and therefore its credentials
+// provider chain, to the main dispatcher rather than destroying it in place.
+TEST_F(AwsLambdaFilterTest, SettingsReleasedOffMainThreadArePostedToMainDispatcher) {
+  NiceMock<Event::MockDispatcher> main_dispatcher;
+  ON_CALL(main_dispatcher, isThreadSafe()).WillByDefault(Return(false));
+
+  bool signer_destroyed = false;
+  auto settings = std::make_unique<FilterSettingsImpl>(
+      parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value(), InvocationMode::Synchronous,
+      true /*payload_passthrough*/, "",
+      std::make_unique<DestructionTrackingSigner>(signer_destroyed), main_dispatcher);
+
+  Event::PostCb posted;
+  EXPECT_CALL(main_dispatcher, post(_)).WillOnce([&posted](Event::PostCb callback) {
+    posted = std::move(callback);
+  });
+  settings.reset();
+  ASSERT_TRUE(posted != nullptr);
+
+  // The signer outlives the configuration, and is released only once the main thread runs the
+  // posted callback.
+  EXPECT_FALSE(signer_destroyed);
+  posted();
+  EXPECT_TRUE(signer_destroyed);
+}
+
+// A configuration released on the main thread is destroyed in place, with nothing posted to the
+// dispatcher.
+TEST_F(AwsLambdaFilterTest, SettingsReleasedOnMainThreadAreDestroyedInPlace) {
+  NiceMock<Event::MockDispatcher> main_dispatcher;
+  ON_CALL(main_dispatcher, isThreadSafe()).WillByDefault(Return(true));
+
+  bool signer_destroyed = false;
+  auto settings = std::make_unique<FilterSettingsImpl>(
+      parseArn("arn:aws:lambda:us-west-2:1337:function:fun").value(), InvocationMode::Synchronous,
+      true /*payload_passthrough*/, "",
+      std::make_unique<DestructionTrackingSigner>(signer_destroyed), main_dispatcher);
+
+  EXPECT_CALL(main_dispatcher, post(_)).Times(0);
+  settings.reset();
+  EXPECT_TRUE(signer_destroyed);
 }
 
 } // namespace

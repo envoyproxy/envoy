@@ -11,13 +11,13 @@ JQ_BIN="${JQ_BIN:-jq}"
 if [[ -n "${BAZEL_BUILD_OPTION_LIST:-}" ]]; then
   read -r -a BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST}"
 else
-  BAZEL_BUILD_OPTIONS=(--config=clang)
+  BAZEL_BUILD_OPTIONS=()
 fi
 
 if [[ -n "${BAZEL_QUERY_OPTION_LIST:-}" ]]; then
   read -r -a BAZEL_QUERY_OPTIONS <<< "${BAZEL_QUERY_OPTION_LIST}"
 else
-  BAZEL_QUERY_OPTIONS=(--config=clang)
+  BAZEL_QUERY_OPTIONS=()
 fi
 
 tmpdir="$(mktemp -d)"

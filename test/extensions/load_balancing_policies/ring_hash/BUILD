@@ -1,11 +1,11 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_benchmark_test",
-    "envoy_cc_benchmark_binary",
     "envoy_package",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
 )
 
@@ -70,19 +70,22 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary(
+envoy_extension_cc_benchmark_binary(
     name = "ring_hash_lb_benchmark",
     srcs = ["ring_hash_lb_benchmark.cc"],
+    extension_names = ["envoy.load_balancing_policies.ring_hash"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/extensions/load_balancing_policies/ring_hash:ring_hash_lb_lib",
         "//test/extensions/load_balancing_policies/common:benchmark_base_tester_lib",
         "//test/test_common:status_utility_lib",
+        "@benchmark",
     ],
 )
 
-envoy_benchmark_test(
+envoy_extension_benchmark_test(
     name = "ring_hash_lb_benchmark_test",
     timeout = "long",
     benchmark_binary = "ring_hash_lb_benchmark",
+    extension_names = ["envoy.load_balancing_policies.ring_hash"],
 )

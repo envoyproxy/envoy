@@ -33,15 +33,14 @@ public:
   void expectCallSend(envoy::service::redis_auth::v3::RedisProxyExternalAuthRequest& request) {
     EXPECT_CALL(*async_client_,
                 sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-        .WillOnce(
-            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
-                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-              EXPECT_EQ("envoy.service.redis_auth.v3.RedisProxyExternalAuth", service_full_name);
-              EXPECT_EQ("Authenticate", method_name);
-              EXPECT_EQ(timeout_->count(), options.timeout->count());
-              return &async_request_;
-            }));
+        .WillOnce([this](absl::string_view service_full_name, absl::string_view method_name,
+                         Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                         const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+          EXPECT_EQ("envoy.service.redis_auth.v3.RedisProxyExternalAuth", service_full_name);
+          EXPECT_EQ("Authenticate", method_name);
+          EXPECT_EQ(timeout_->count(), options.timeout->count());
+          return &async_request_;
+        });
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -226,12 +225,12 @@ TEST_F(GrpcExternalAuthClientTest, CallbackCanReenterAuthenticateExternal) {
 
   EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_ok")));
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(_, _))
-      .WillOnce(Invoke([this](CommandSplitter::SplitCallbacks&, AuthenticateResponsePtr&) {
+      .WillOnce([this](CommandSplitter::SplitCallbacks&, AuthenticateResponsePtr&) {
         // Re-entry while the callback is still on the stack — pre-fix this hits the
         // ASSERT(callback_ == nullptr) inside authenticateExternal. Post-fix it succeeds.
         client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "bob",
                                       "secret2");
-      }));
+      });
 
   auto response =
       std::make_unique<envoy::service::redis_auth::v3::RedisProxyExternalAuthResponse>();
@@ -269,22 +268,22 @@ TEST_F(GrpcExternalAuthClientTest, InlineSendFailureReentryPreservesSecondReques
   first.set_password("secret");
   EXPECT_CALL(*async_client_,
               sendRaw(_, _, Grpc::ProtoBufferEq(first), Ref(*(client_.get())), _, _))
-      .WillOnce(Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-                              Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                              const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+      .WillOnce([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                       Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                       const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
         client_->onFailure(Grpc::Status::WellKnownGrpcStatus::Unavailable, "cluster gone", span_);
         return nullptr;
-      }));
+      });
   EXPECT_CALL(span_, setTag(Eq("redis_auth_status"), Eq("redis_auth_error")));
 
   // The inline failure's callback re-enters authenticateExternal for the held request.
   EXPECT_CALL(request_callback_, onAuthenticateExternal_(Ref(pending_request_), _))
-      .WillOnce(Invoke([this, &second_pending_request](CommandSplitter::SplitCallbacks&,
-                                                       AuthenticateResponsePtr& response) {
+      .WillOnce([this, &second_pending_request](CommandSplitter::SplitCallbacks&,
+                                                AuthenticateResponsePtr& response) {
         EXPECT_EQ(AuthenticationRequestStatus::Error, response->status);
         client_->authenticateExternal(request_callback_, second_pending_request, stream_info_,
                                       "bob", "secret2");
-      }));
+      });
 
   client_->authenticateExternal(request_callback_, pending_request_, stream_info_, "alice",
                                 "secret");

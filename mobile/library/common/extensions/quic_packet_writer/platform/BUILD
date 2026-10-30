@@ -19,7 +19,6 @@ envoy_cc_library(
     name = "platform_packet_writer_factory",
     srcs = ["platform_packet_writer_factory.cc"],
     hdrs = ["platform_packet_writer_factory.h"],
-    repository = "@envoy",
     deps = [
         "//library/common/system:system_helper_lib",
         "@envoy//envoy/network:listen_socket_interface",
@@ -34,7 +33,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    repository = "@envoy",
     deps = [
         ":platform_packet_writer_factory",
         ":platform_packet_writer_proto_cc_proto",

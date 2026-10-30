@@ -113,7 +113,7 @@ public:
 
     if (!trust_bundle_file.empty()) {
       EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
-          .WillRepeatedly(testing::Invoke([trust_bundle_file] {
+          .WillRepeatedly([trust_bundle_file] {
             Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
             EXPECT_CALL(*mock_watcher, addWatch(TestEnvironment::substitute(
                                                     "{{ test_rundir }}/test/common/tls/test_data/" +
@@ -121,7 +121,7 @@ public:
                                                 _, _))
                 .WillRepeatedly(testing::Return(absl::OkStatus()));
             return mock_watcher;
-          }));
+          });
     }
 
     absl::Status creation_status = absl::OkStatus();
@@ -972,8 +972,8 @@ typed_config:
 TEST_F(TestSPIFFEValidator, TestGetCaCertInformation) {
   ASSERT_OK(initialize());
 
-  // No cert is set so this should be nullptr.
-  EXPECT_FALSE(validator().getCaCertInformation());
+  // No cert is set so this should be empty.
+  EXPECT_TRUE(validator().getCaCertInformation().empty());
 
   ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
@@ -989,7 +989,7 @@ typed_config:
   )EOF")));
 
   auto actual = validator().getCaCertInformation();
-  EXPECT_TRUE(actual);
+  EXPECT_FALSE(actual.empty());
 }
 
 TEST_F(TestSPIFFEValidator, TestDaysUntilFirstCertExpires) {
@@ -1534,7 +1534,7 @@ typed_config:
 
   auto gauge_opt = store().findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
-  EXPECT_EQ(gauge_opt->get().value(), expected_expiry);
+  EXPECT_EQ(gauge_opt->value(), expected_expiry);
 }
 
 // Verify that a URI SAN matcher with an unregistered custom string matcher extension

@@ -24,10 +24,10 @@ namespace {
 class TraceSegmentReporterTest : public testing::Test {
 public:
   void setupTraceSegmentReporter(const std::string& yaml_string) {
-    EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
-    }));
+    });
     timer_ = new NiceMock<Event::MockTimer>();
 
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();

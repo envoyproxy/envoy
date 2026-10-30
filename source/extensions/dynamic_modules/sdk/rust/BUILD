@@ -1,12 +1,14 @@
-load("@envoy_repo//:compiler.bzl", "LLVM_PATH")
-load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@envoy_rust_crate_index//:defs.bzl", "all_crate_deps", "crate_deps")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_static_library", "rust_test")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_extension_package",
 )
 load("//bazel:toolchains.bzl", "LLVM_MAJOR")
+load(":symbol_prefix.bzl", "symbol_prefix_env")
 
 licenses(["notice"])  # Apache 2
 
@@ -14,45 +16,76 @@ envoy_extension_package()
 
 exports_files(["Cargo.toml"])
 
+# Provides the Rust allocator shim (__rust_alloc etc) and std runtime exactly
+# once in the final C++ link. All other in-binary Rust code must be rlibs
+# (see envoy_rust_static_module in dynamic_modules.bzl).
+rust_static_library(
+    name = "rust_runtime",
+    srcs = ["runtime.rs"],
+    edition = "2021",
+    visibility = ["//visibility:public"],
+)
+
+# System libraries that the Rust std library needs in the final C++ link, in addition to the ones
+# rules_rust already adds. rules_rust's default MSVC list lacks ntdll, which std uses for file I/O.
+cc_library(
+    name = "rust_runtime_system_libs",
+    linkopts = select({
+        "@platforms//os:windows": ["ntdll.lib"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "symbol_prefix",
+    build_setting_default = "",
+)
+
+config_setting(
+    name = "unprefixed",
+    flag_values = {":symbol_prefix": ""},
+)
+
+symbol_prefix_env(
+    name = "symbol_prefix_env",
+    prefix = ":symbol_prefix",
+)
+
+# abi/abi.h is a symlink, which git may check out as a plain text file on Windows.
+# Point the build script at the original header instead.
+_WINDOWS_ENV = {
+    "ENVOY_ABI_HEADER": "$(location //source/extensions/dynamic_modules/abi:abi.h)",
+}
+
+_WINDOWS_DATA = ["//source/extensions/dynamic_modules/abi:abi.h"]
+
 cargo_build_script(
     name = "build_script",
     srcs = ["build.rs"],
     build_script_env = select({
-        "@envoy_repo//:use_local_llvm": {
-            "LIBCLANG_PATH": "%s/lib/libclang.so" % LLVM_PATH,
-            "BINDGEN_EXTRA_CLANG_ARGS": " ".join([
-                "-resource-dir %s/lib/clang/%s" % (LLVM_PATH, LLVM_MAJOR),
-                "-isystem %s/lib/clang/%s/include" % (LLVM_PATH, LLVM_MAJOR),
-                "-isystem %s/include/x86_64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-                "-isystem %s/include/aarch64-unknown-linux-gnu/c++/v1/" % LLVM_PATH,
-            ]),
-        },
         "@platforms//os:linux": {
             "LIBCLANG_PATH": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
             "ENVOY_LLVM_ANCHOR": "$(location @llvm_toolchain_llvm//:lib/libclang.so)",
             "ENVOY_LLVM_MAJOR": LLVM_MAJOR,
-            # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
-            "ENVOY_SYSROOT_AMD64_ANCHOR": "$(location @sysroot_linux_amd64//:usr/include/stdio.h)",
-            "ENVOY_SYSROOT_ARM64_ANCHOR": "$(location @sysroot_linux_arm64//:usr/include/stdio.h)",
+            "ENVOY_SYSROOT_AMD64_ANCHOR": "$(location @sysroot_linux_amd64//sysroot)",
+            "ENVOY_SYSROOT_ARM64_ANCHOR": "$(location @sysroot_linux_arm64//sysroot)",
         },
+        "@platforms//os:windows": _WINDOWS_ENV,
         "//conditions:default": {},
     }),
+    build_script_env_files = [":symbol_prefix_env"],
     data = [
         ":abi/abi.h",
     ] + select({
-        "@envoy_repo//:use_local_llvm": [],
         "@platforms//os:linux": [
             "@llvm_toolchain_llvm//:include",
             "@llvm_toolchain_llvm//:lib/libclang.so",
             "@llvm_toolchain_llvm//:lib_legacy",
-            "@sysroot_linux_amd64//:usr/include/stdio.h",
-            "@sysroot_linux_arm64//:usr/include/stdio.h",
+            "@sysroot_linux_amd64//sysroot",
+            "@sysroot_linux_arm64//sysroot",
         ],
-        "//conditions:default": [],
-    }) + select({
-        # This allows the cross-compilation of the SDK to succeed by providing the necessary system headers for the target platform.
-        "@platforms//cpu:x86_64": ["@sysroot_linux_amd64//:headers"],
-        "@platforms//cpu:aarch64": ["@sysroot_linux_arm64//:headers"],
+        "@platforms//os:windows": _WINDOWS_DATA,
         "//conditions:default": [],
     }),
     edition = "2021",
@@ -62,11 +95,45 @@ cargo_build_script(
     ),
 )
 
+# Production target for dynamic modules. Production code must depend on this target.
+# It excludes test-only dependencies such as mockall to avoid bloating production binaries.
 rust_library(
     name = "envoy_proxy_dynamic_modules_rust_sdk",
     srcs = glob(["src/**/*.rs"]),
+    # Generated compile data makes rules_rust rebase the crate root into the
+    # configuration's output directory. Its crate hash must differ per prefix,
+    # isolating Rust-mangled factory state as well as the exported C hooks.
+    compile_data = [":symbol_prefix_env"],
+    edition = "2021",
+    deps = crate_deps(["smallvec"]) + [":build_script"],
+    alwayslink = select({
+        ":unprefixed": False,
+        "//conditions:default": True,
+    }),
+)
+
+# Test-only target with mock support enabled via the `mock` feature.
+# Unit tests and test dynamic modules that require mocked Envoy traits (e.g. `MockEnvoyHttpFilter`)
+# must depend on this target instead of the production SDK target.
+rust_library(
+    name = "envoy_proxy_dynamic_modules_rust_sdk_mock",
+    testonly = True,
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = ["mock"],
+    crate_name = "envoy_proxy_dynamic_modules_rust_sdk",
     edition = "2021",
     deps = all_crate_deps(
         normal = True,
+        normal_dev = True,
+    ) + [":build_script"],
+)
+
+rust_test(
+    name = "envoy_proxy_dynamic_modules_rust_sdk_test",
+    crate = ":envoy_proxy_dynamic_modules_rust_sdk_mock",
+    edition = "2021",
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
     ) + [":build_script"],
 )

@@ -36,6 +36,8 @@ namespace Extensions {
 namespace Clusters {
 namespace DynamicModules {
 
+class PersistentHostSet;
+
 class DynamicModuleCluster;
 class DynamicModuleClusterScheduler;
 class DynamicModuleClusterTestPeer;
@@ -107,6 +109,9 @@ public:
 
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
+
+  // Whether the cluster's host sets are PersistentHostSet. From ClusterConfig.
+  bool use_persistent_host_partitions_ = false;
 
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
@@ -188,6 +193,7 @@ public:
   Upstream::HostSharedPtr findHost(void* raw_host_ptr);
   Upstream::HostSharedPtr findHostByAddress(const std::string& address);
   void preInitComplete();
+  void usePersistentHostMap();
 
   /**
    * Called when an event is scheduled via DynamicModuleClusterScheduler::commit.
@@ -242,12 +248,23 @@ protected:
 
   // Upstream::ClusterImplBase.
   void startPreInit() override;
+  void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
 private:
   /**
    * Registers server lifecycle callbacks (server_initialized, drain, shutdown).
    */
   void registerLifecycleCallbacks();
+
+  // The PersistentHostSet at `priority`, created if missing. Only valid with persistent partitions.
+  PersistentHostSet& persistentHostSet(uint32_t priority);
+  // Hands `snapshot`, returned by a PersistentHostSet change, to the priority set with its delta.
+  void updateHostsFromSnapshot(uint32_t priority, Upstream::HostSetSnapshotConstSharedPtr snapshot,
+                               const Upstream::HostVector& hosts_added,
+                               const Upstream::HostVector& hosts_removed);
+  // Re-partitions `host` in its persistent host set. Returns false, changing nothing, if the
+  // cluster has no persistent host sets or the set does not hold `host`.
+  bool applyPersistentHealthChange(const Upstream::HostSharedPtr& host);
 
   friend class DynamicModuleClusterFactory;
   friend class DynamicModuleClusterScheduler;
@@ -481,6 +498,23 @@ private:
 };
 
 /**
+ * Bounds the lifetime of the filter state views returned by the cluster load balancer callbacks.
+ * The serialized values are cleared when the outermost host selection callback returns so a module
+ * can hold several views during a single callback. The backing storage lives in abi_impl.cc.
+ */
+class ClusterLbFilterStateScratchGuard {
+public:
+  ClusterLbFilterStateScratchGuard();
+  ~ClusterLbFilterStateScratchGuard();
+  ClusterLbFilterStateScratchGuard(const ClusterLbFilterStateScratchGuard&) = delete;
+  ClusterLbFilterStateScratchGuard& operator=(const ClusterLbFilterStateScratchGuard&) = delete;
+};
+
+// Returns the number of retained cluster load balancer filter state values on this thread. Test
+// only.
+size_t clusterLbFilterStateScratchSizeForTest();
+
+/**
  * Load balancer that delegates to the dynamic module.
  */
 class DynamicModuleLoadBalancer : public Upstream::LoadBalancer {
@@ -546,6 +580,10 @@ public:
   const Upstream::HostVector* hostsAdded() const { return hosts_added_; }
   const Upstream::HostVector* hostsRemoved() const { return hosts_removed_; }
 
+  // Hosts whose health changed since the previous update this worker applied, or nullptr outside
+  // the callback or when unknown (a priority without persistent partitions, or a health refresh).
+  const Upstream::HostVector* healthChangedHosts();
+
   // Returns the priority set that this load balancer subscribes to for host membership updates.
   const Upstream::PrioritySet& memberUpdatePrioritySet() const { return priority_set_; }
 
@@ -584,6 +622,12 @@ private:
 
   // Membership update callback handle.
   Envoy::Common::CallbackHandlePtr member_update_cb_;
+  // Records the priorities each membership update touched, which fire before the member callback.
+  Envoy::Common::CallbackHandlePtr priority_update_cb_;
+  std::vector<uint32_t> updated_priorities_;
+  // Built on the first healthChangedHosts() call of a membership update callback.
+  std::optional<Upstream::HostVector> health_changed_hosts_;
+  bool health_changed_hosts_known_{false};
 
   friend class DynamicModuleClusterTestPeer;
 };

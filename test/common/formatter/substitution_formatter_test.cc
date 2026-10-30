@@ -21,6 +21,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_id_provider_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/version/version.h"
 
 #include "test/common/formatter/command_extension.h"
 #include "test/common/formatter/formatter_test_utility.h"
@@ -55,7 +56,6 @@ using testing::AnyOf;
 using testing::Const;
 using testing::ContainsRegex;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Not;
 using testing::Return;
@@ -318,6 +318,37 @@ TEST(SubstitutionFormatterTest, inFlightDuration) {
     time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(300)));
     EXPECT_THAT(formatValueForTest(duration_format, {}, stream_info),
                 ProtoEq(ValueUtil::numberValue(300.0)));
+  }
+}
+
+TEST(SubstitutionFormatterTest, routeResolutionFormatters) {
+  Event::SimulatedTimeSystem time_system;
+  StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, time_system, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+
+  // A stream that never resolved a route reports no time and a zero count.
+  {
+    StreamInfoFormatter time_format("ROUTE_RESOLUTION_TIME_US");
+    StreamInfoFormatter count_format("ROUTE_RESOLUTION_COUNT");
+    EXPECT_EQ(std::nullopt, formatForTest(time_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(time_format, {}, stream_info), ProtoEq(ValueUtil::nullValue()));
+    EXPECT_EQ("0", formatForTest(count_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(count_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(0.0)));
+  }
+
+  // Two resolutions accumulate the total time in microseconds and the count.
+  {
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(30));
+    stream_info.addRouteResolutionTime(std::chrono::microseconds(70));
+    StreamInfoFormatter time_format("ROUTE_RESOLUTION_TIME_US");
+    StreamInfoFormatter count_format("ROUTE_RESOLUTION_COUNT");
+    EXPECT_EQ("100", formatForTest(time_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(time_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(100.0)));
+    EXPECT_EQ("2", formatForTest(count_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(count_format, {}, stream_info),
+                ProtoEq(ValueUtil::numberValue(2.0)));
   }
 }
 
@@ -1242,8 +1273,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
-        .WillOnce(
-            Invoke([](char*, size_t) -> Api::SysCallIntResult { return {-1, ENAMETOOLONG}; }));
+        .WillOnce([](char*, size_t) -> Api::SysCallIntResult { return {-1, ENAMETOOLONG}; });
 
     StreamInfoFormatter upstream_format("HOSTNAME");
     EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
@@ -1255,10 +1285,10 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
-        .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+        .WillOnce([](char* name, size_t) -> Api::SysCallIntResult {
           StringUtil::strlcpy(name, "myhostname", 11);
           return {0, 0};
-        }));
+        });
 
     StreamInfoFormatter upstream_format("HOSTNAME");
     EXPECT_EQ("myhostname", formatForTest(upstream_format, {}, stream_info));
@@ -2937,6 +2967,38 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
+    EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_CHAIN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_cert_chain = "<some cert chain>";
+    EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
+        .WillRepeatedly(ReturnRef(expected_cert_chain));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(expected_cert_chain, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::stringValue(expected_cert_chain)));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_CHAIN");
+    auto connection_info = std::make_shared<Ssl::MockConnectionInfo>();
+    std::string expected_cert_chain = "";
+    EXPECT_CALL(*connection_info, urlEncodedPemEncodedPeerCertificateChain())
+        .WillRepeatedly(ReturnRef(expected_cert_chain));
+    stream_info.downstream_connection_info_provider_->setSslConnection(connection_info);
+    EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
+    EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setSslConnection(nullptr);
+    StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_CHAIN");
     EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
     EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
@@ -6318,10 +6380,10 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, gethostname(_, _))
-      .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+      .WillOnce([](char* name, size_t) -> Api::SysCallIntResult {
         StringUtil::strlcpy(name, "myhostname", 11);
         return {0, 0};
-      }));
+      });
   std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
@@ -6968,6 +7030,14 @@ TEST(SubstitutionFormatterTest, CoalesceFormatterWithOtherCommands) {
 
   std::string result = formatter.format({&request_headers}, stream_info);
   EXPECT_EQ("protocol=HTTP/1.1 host=sni.example.com", result);
+}
+
+TEST(SubstitutionFormatterTest, EnvoyVersionFormatter) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  StreamInfoFormatter version_format("ENVOY_VERSION");
+  EXPECT_EQ(VersionInfo::version(), formatForTest(version_format, {}, stream_info));
+  EXPECT_THAT(formatValueForTest(version_format, {}, stream_info),
+              ProtoEq(ValueUtil::stringValue(VersionInfo::version())));
 }
 } // namespace
 } // namespace Formatter

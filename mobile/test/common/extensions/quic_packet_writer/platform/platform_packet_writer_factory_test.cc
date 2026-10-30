@@ -20,7 +20,6 @@
 #include "library/common/extensions/quic_packet_writer/platform/platform_packet_writer_factory.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -106,19 +105,19 @@ TEST_F(QuicPlatformPacketWriterFactoryTest,
 
   // Simulate timer firing to allow retry up to 12 times.
   for (size_t retry_count = 1; retry_count < 12; ++retry_count) {
-    EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke([&]() {
+    EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce([&]() {
       std::cerr << "activate write event for retry count " << retry_count << "\n";
       EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1 << retry_count), _));
       packet_writer_->SetWritable();
       writePacketAndVerifyResult(quic::WRITE_STATUS_BLOCKED);
-    }));
+    });
     timer->invokeCallback();
   }
   // On 12th retry, expect WRITE_STATUS_ERROR to be propagated.
-  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce([&]() {
     packet_writer_->SetWritable();
     writePacketAndVerifyResult(quic::WRITE_STATUS_ERROR, SOCKET_ERROR_NOBUFS);
-  }));
+  });
   timer->invokeCallback();
 }
 
@@ -132,14 +131,14 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, RetryCountResetUponSuccessfulWrite) 
   writePacketAndVerifyResult(quic::WRITE_STATUS_BLOCKED);
 
   // Simulate timer firing to allow retry with successful write.
-  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce([&]() {
     packet_writer_->SetWritable();
     // Simulate successful write after retries.
     EXPECT_CALL(os_sys_calls_, send(socket_fd_, _, _, _))
         .WillOnce(Return(Api::SysCallSizeResult{static_cast<ssize_t>(packet_data_.length()), 0}));
     packet_writer_->SetWritable();
     writePacketAndVerifyResult(quic::WRITE_STATUS_OK);
-  }));
+  });
   timer->invokeCallback();
 
   // Retry count should be reset after the last successful write. Following SOCKET_ERROR_NOBUFS
@@ -151,17 +150,17 @@ TEST_F(QuicPlatformPacketWriterFactoryTest, RetryCountResetUponSuccessfulWrite) 
   // Following 11 retries would also fail with SOCKET_ERROR_NOBUFS, but they all should be retried.
   for (size_t retry_count = 1; retry_count < 12; ++retry_count) {
     EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(1 << retry_count), _));
-    EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke([&]() {
+    EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce([&]() {
       packet_writer_->SetWritable();
       writePacketAndVerifyResult(quic::WRITE_STATUS_BLOCKED);
-    }));
+    });
     timer->invokeCallback();
   }
   // On 12th retry, expect WRITE_STATUS_ERROR to be propagated.
-  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce(Invoke([&]() {
+  EXPECT_CALL(*file_event_, activate(Event::FileReadyType::Write)).WillOnce([&]() {
     packet_writer_->SetWritable();
     writePacketAndVerifyResult(quic::WRITE_STATUS_ERROR, SOCKET_ERROR_NOBUFS);
-  }));
+  });
   timer->invokeCallback();
 }
 

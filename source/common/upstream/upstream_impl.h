@@ -60,6 +60,7 @@
 #include "source/common/orca/orca_load_metrics.h"
 #include "source/common/shared_pool/shared_pool.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/upstream/host_lookup_map.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/locality_pool.h"
 #include "source/common/upstream/resource_manager_impl.h"
@@ -71,6 +72,7 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/functional/function_ref.h"
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
@@ -705,11 +707,18 @@ public:
   static PrioritySet::UpdateHostsParams
   partitionHosts(HostVectorConstSharedPtr hosts, HostsPerLocalityConstSharedPtr hosts_per_locality);
 
-  void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
-                   LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed,
-                   std::optional<bool> weighted_priority_health = std::nullopt,
-                   std::optional<uint32_t> overprovisioning_factor = std::nullopt);
+  virtual void updateHosts(PrioritySet::UpdateHostsParams&& update_hosts_params,
+                           LocalityWeightsConstSharedPtr locality_weights,
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           std::optional<bool> weighted_priority_health = std::nullopt,
+                           std::optional<uint32_t> overprovisioning_factor = std::nullopt);
+
+  // Returns update params that carry only `snapshot`, for a host set to adopt.
+  static PrioritySet::UpdateHostsParams
+  snapshotUpdateHostsParams(HostSetSnapshotConstSharedPtr snapshot);
+
+  // Whether `host`'s health flags place it in the excluded view, as partitionHosts() decides.
+  static bool excludedByHealthFlags(const Host& host);
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -736,6 +745,20 @@ private:
 };
 
 using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
+// Creates a host set of a cluster-specific type.
+using HostSetFactory = HostSetImplPtr (*)(uint32_t priority,
+                                          std::optional<bool> weighted_priority_health,
+                                          std::optional<uint32_t> overprovisioning_factor);
+
+/**
+ * A host set's hosts in a form other than flat vectors, produced by a host set created through a
+ * HostSetFactory and adopted by the host sets the same factory creates on workers. It is published
+ * once on the main thread and read concurrently on every worker, so it must be immutable.
+ */
+class HostSetSnapshot {
+public:
+  virtual ~HostSetSnapshot() = default;
+};
 
 /**
  * A class for management of the set of hosts in a given cluster.
@@ -765,24 +788,26 @@ public:
                    const HostVector& hosts_removed,
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt,
-                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
+                   HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
   void batchHostUpdate(BatchUpdateCb& callback) override;
 
   bool batchUpdateActive() const override { return batch_update_; }
 
-  HostMapConstSharedPtr crossPriorityHostMap() const override {
-    return const_cross_priority_host_map_;
+  HostLookupMapConstSharedPtr crossPriorityHostMap() const override {
+    return cross_priority_host_map_;
   }
+
+  // Creates every host set with `factory`. Must be called before any host set exists, since other
+  // components may hold references to host sets.
+  void setHostSetFactory(HostSetFactory factory);
+  HostSetFactory hostSetFactory() const { return host_set_factory_; }
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
                                        std::optional<bool> weighted_priority_health,
-                                       std::optional<uint32_t> overprovisioning_factor) {
-    return std::make_unique<HostSetImpl>(priority, weighted_priority_health,
-                                         overprovisioning_factor);
-  }
+                                       std::optional<uint32_t> overprovisioning_factor);
 
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
@@ -797,7 +822,8 @@ protected:
   std::vector<std::unique_ptr<HostSet>> host_sets_;
 
   // Read only all host map for fast host searching. This will never be null.
-  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
+  mutable HostLookupMapConstSharedPtr cross_priority_host_map_{
+      std::make_shared<FlatHostLookupMap>(std::make_shared<HostMap>())};
 
 private:
   // This is a matching vector to store the callback handles for host_sets_. It is kept separately
@@ -808,6 +834,7 @@ private:
       member_update_cb_helper_;
   mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
+  HostSetFactory host_set_factory_{};
   bool batch_update_ : 1 = false;
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
@@ -825,7 +852,7 @@ private:
                      LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
                      const HostVector& hosts_removed, std::optional<bool> weighted_priority_health,
                      std::optional<uint32_t> overprovisioning_factor,
-                     HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
+                     HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) override;
 
     absl::node_hash_set<HostSharedPtr> all_hosts_added_;
     absl::node_hash_set<HostSharedPtr> all_hosts_removed_;
@@ -848,14 +875,30 @@ public:
                    const HostVector& hosts_removed,
                    std::optional<bool> weighted_priority_health = std::nullopt,
                    std::optional<uint32_t> overprovisioning_factor = std::nullopt,
-                   HostMapConstSharedPtr cross_priority_host_map = nullptr) override;
-  HostMapConstSharedPtr crossPriorityHostMap() const override;
+                   HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) override;
+  HostLookupMapConstSharedPtr crossPriorityHostMap() const override;
+
+  /**
+   * Backs the cross priority host map with a PersistentHostMap instead of the default flat HostMap,
+   * so that a host update costs O(log N) rather than an O(N) copy of the map. Hosts are not carried
+   * over from the flat map, so this is only honored before any host has been added.
+   */
+  void usePersistentCrossPriorityHostMap();
 
 protected:
   void updateCrossPriorityHostMap(uint32_t priority, const HostVector& hosts_added,
                                   const HostVector& hosts_removed);
 
+  // Flat backing of the cross priority host map. The read only map will never be null and is
+  // published through cross_priority_host_map_ when it is next read.
+  mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
   mutable HostMapSharedPtr mutable_cross_priority_host_map_;
+
+private:
+  // Persistent backing of the cross priority host map, used after
+  // usePersistentCrossPriorityHostMap() is called. A snapshot is published on every update.
+  PersistentHostMap persistent_cross_priority_host_map_;
+  bool use_persistent_cross_priority_host_map_{false};
 };
 
 /**
@@ -994,7 +1037,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->request_response_size_stats_));
+    return *optional_cluster_stats_->request_response_size_stats_;
   }
 
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
@@ -1005,7 +1048,7 @@ public:
       return std::nullopt;
     }
 
-    return std::ref(*(optional_cluster_stats_->timeout_budget_stats_));
+    return *optional_cluster_stats_->timeout_budget_stats_;
   }
 
   bool perEndpointStatsEnabled() const override { return per_endpoint_stats_; }
@@ -1040,6 +1083,7 @@ public:
     return connection_pool_per_downstream_connection_;
   }
   bool warmHosts() const override { return warm_hosts_; }
+  bool waitForWarmOnInit() const override { return wait_for_warm_on_init_; }
   bool setLocalInterfaceNameOnUpstreamConnections() const override {
     return set_local_interface_name_on_upstream_connections_;
   }
@@ -1208,6 +1252,7 @@ private:
   const bool drain_connections_on_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
   const bool warm_hosts_ : 1;
+  const bool wait_for_warm_on_init_ : 1;
   const bool set_local_interface_name_on_upstream_connections_ : 1;
   const bool added_via_api_ : 1;
   const bool per_endpoint_stats_ : 1;
@@ -1285,8 +1330,10 @@ public:
   void setDropCategory(absl::string_view drop_category) override { drop_category_ = drop_category; }
 
 protected:
+  // `host_set_factory`, if set, creates every host set of this cluster and of its worker copies.
   ClusterImplBase(const envoy::config::cluster::v3::Cluster& cluster,
-                  ClusterFactoryContext& cluster_context, absl::Status& creation_status);
+                  ClusterFactoryContext& cluster_context, absl::Status& creation_status,
+                  HostSetFactory host_set_factory = nullptr);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed.
@@ -1327,7 +1374,6 @@ protected:
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
-  const bool wait_for_warm_on_init_;
 
   Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
 
@@ -1346,15 +1392,15 @@ private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
 
-  bool initialization_started_{};
   std::function<absl::Status()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
-  const bool local_cluster_;
   Config::ConstMetadataSharedPoolSharedPtr const_metadata_shared_pool_;
   ConstLocalitySharedPoolSharedPtr const_locality_shared_pool_;
   Common::CallbackHandlePtr priority_update_cb_;
-  UnitFloat drop_overload_{0};
   std::string drop_category_;
+  UnitFloat drop_overload_{0};
+  bool initialization_started_{};
+  const bool local_cluster_;
   static constexpr int kDropOverloadSize = 1;
 };
 
@@ -1425,14 +1471,15 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param all_hosts all known hosts prior to this host update across all priorities.
+   * @param host_lookup returns the known host for a host address string across all priorities
+   * prior to this host update, or nullptr if there is none.
    * @param all_new_hosts addresses of all hosts in the new configuration across all priorities.
    * @return whether the hosts for the priority changed.
    */
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
                              HostVector& hosts_added_to_current_priority,
                              HostVector& hosts_removed_from_current_priority,
-                             const HostMap& all_hosts,
+                             absl::FunctionRef<HostSharedPtr(const std::string&)> host_lookup,
                              const absl::flat_hash_set<std::string>& all_new_hosts);
 };
 

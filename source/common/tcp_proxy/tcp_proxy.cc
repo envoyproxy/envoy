@@ -109,10 +109,8 @@ OnDemandConfig::OnDemandConfig(
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand& on_demand_message,
     Server::Configuration::FactoryContext& context, Stats::Scope& scope)
     : odcds_([&]() -> Upstream::OdCdsApiHandlePtr {
-        if (Runtime::runtimeFeatureEnabled(
-                "envoy.reloadable_features.tcp_proxy_odcds_over_ads_fix") &&
-            on_demand_message.odcds_config().config_source_specifier_case() ==
-                envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+        if (on_demand_message.odcds_config().config_source_specifier_case() ==
+            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
           return THROW_OR_RETURN_VALUE(
               context.serverFactoryContext().clusterManager().allocateOdCdsApi(
                   &Upstream::XdstpOdCdsApiImpl::create, on_demand_message.odcds_config(),

@@ -545,6 +545,15 @@ public:
 
   void setUseLocalDecision(bool use_local_decision) { use_local_decision_ = use_local_decision; }
 
+  /**
+   * Sets whether the span context should be injected as the B3 single header ("b3") instead of
+   * the multiple "x-b3-*" headers.
+   */
+  void setUseB3SingleFormat(bool use_b3_single_format) {
+    use_b3_single_format_ = use_b3_single_format;
+  }
+  bool useB3SingleFormat() const { return use_b3_single_format_; }
+
   // Tracing::Span
 
   /**
@@ -594,6 +603,7 @@ private:
   TimeSource& time_source_;
   TracerInterface& tracer_;
   bool use_local_decision_{false};
+  bool use_b3_single_format_{false};
 };
 
 using SpanPtr = std::unique_ptr<Span>;

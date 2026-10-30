@@ -31,11 +31,11 @@ jobs:
         DAY=$(date +%u)
         if [[ "$DAY" == 7 && "${{ inputs.scheduled }}" == "true" ]]; then
             echo "weekly_run=true" >> $GITHUB_OUTPUT
-            export OVERWRITE_ALL_CVE_DATA=1
+            echo "OVERWRITE_ALL_CVE_DATA=1" >> "$GITHUB_ENV"
         else
             echo "weekly_run=false" >> $GITHUB_OUTPUT
         fi
-    - uses: envoyproxy/toolshed/actions/gcp/setup@829e692b7d80ad81378e01f737299ba785a1d14a  # actions-v0.4.25
+    - uses: envoyproxy/toolshed/actions/gcp/setup@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cve-key }}
@@ -49,7 +49,9 @@ jobs:
           "${{ steps.vars.outputs.cve-data-path }}"
     - name: Run CVE fetcher
       run: |
-        bazel run --config=ci //tools/dependency:cve_update
+        bazel run --config=ci --config=cves //tools/dependency:cves.update \
+          --action_env=CVE_UPDATE_NONCE="$(date +%s%N)" \
+          ${OVERWRITE_ALL_CVE_DATA:+--action_env=OVERWRITE_ALL_CVE_DATA=1}
     - name: Upload (sync) to GCS bucket
       run: |
         gsutil \

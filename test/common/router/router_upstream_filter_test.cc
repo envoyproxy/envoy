@@ -18,7 +18,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -48,6 +47,38 @@ public:
 
   NiceMock<Network::MockConnection> downstream_connection_;
   MockRetryState* retry_state_{};
+};
+
+// An upstream HTTP filter that tracks its own lifecycle. It is used to detect the router
+// driving decode callbacks on a filter that has already been destroyed.
+class LifecycleTrackingFilter : public Http::StreamDecoderFilter {
+public:
+  // Http::StreamDecoderFilter
+  Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
+    ++decode_headers_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    ++decode_data_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    ++decode_trailers_;
+    EXPECT_FALSE(destroyed_);
+    return Http::FilterTrailersStatus::Continue;
+  }
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    callbacks_ = &callbacks;
+  }
+  void onDestroy() override { destroyed_ = true; }
+
+  Http::StreamDecoderFilterCallbacks* callbacks_{};
+  bool destroyed_{false};
+  int decode_headers_{0};
+  int decode_data_{0};
+  int decode_trailers_{0};
 };
 
 class RouterUpstreamFilterTest : public testing::Test {
@@ -85,10 +116,10 @@ public:
         locality())
         .WillByDefault(ReturnRef(upstream_locality_));
     ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
-        .WillByDefault(Invoke([this] {
+        .WillByDefault([this] {
           return Upstream::HostSelectionResponse{
               context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
-        }));
+        });
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
@@ -101,19 +132,18 @@ public:
 
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
                 newStream(_, _, _))
-        .WillOnce(
-            Invoke([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
-                       const Http::ConnectionPool::Instance::StreamOptions&)
-                       -> Http::ConnectionPool::Cancellable* {
-              response_decoder = &decoder;
-              EXPECT_CALL(encoder.stream_, connectionInfoProvider())
-                  .WillRepeatedly(ReturnRef(connection_info1_));
-              callbacks.onPoolReady(encoder,
-                                    context_.server_factory_context_.cluster_manager_
-                                        .thread_local_cluster_.conn_pool_.host_,
-                                    stream_info_, Http::Protocol::Http10);
-              return nullptr;
-            }));
+        .WillOnce([&](Http::ResponseDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks,
+                      const Http::ConnectionPool::Instance::StreamOptions&)
+                      -> Http::ConnectionPool::Cancellable* {
+          response_decoder = &decoder;
+          EXPECT_CALL(encoder.stream_, connectionInfoProvider())
+              .WillRepeatedly(ReturnRef(connection_info1_));
+          callbacks.onPoolReady(encoder,
+                                context_.server_factory_context_.cluster_manager_
+                                    .thread_local_cluster_.conn_pool_.host_,
+                                stream_info_, Http::Protocol::Http10);
+          return nullptr;
+        });
 
     Http::TestRequestHeaderMapImpl headers;
     HttpTestUtility::addDefaultHeaders(headers);
@@ -164,6 +194,75 @@ TEST_F(RouterUpstreamFilterTest, UpstreamFilter) {
   init({add_header_filter, codec_filter});
   auto headers = run();
   EXPECT_FALSE(headers.get(Http::LowerCaseString("x-header-to-add")).empty());
+}
+
+// Regression test for decode-after-destroy of the upstream HTTP filter chain.
+//
+// A circuit breaker overflow surfacing synchronously inside
+// ConnPoolImplBase::newStream() (pending requests overflow, connection limit
+// load shedding, or max requests overflow when a ready client exists) resets
+// the upstream request and deferred-deletes it before newStream() returns.
+// Deferred deletion runs UpstreamRequest::deleteIsPending() -> cleanUp() ->
+// destroyFilters() synchronously, so every upstream HTTP filter has already
+// seen onDestroy() when UpstreamRequest::acceptHeadersFromRouter() resumes and
+// drives decodeHeaders() on the destroyed filter chain. Native C++ filters
+// tolerate decode-after-destroy; the dynamic modules HTTP filter does not: it
+// releases its in-module filter in onDestroy() and dereferences stale state
+// when decode headers run afterwards. acceptHeadersFromRouter() must not
+// continue filter chain processing when the request was reset inside
+// newStream().
+TEST_F(RouterUpstreamFilterTest, SyncPoolFailureDoesNotDecodeAfterDestroy) {
+  auto filter = std::make_shared<LifecycleTrackingFilter>();
+
+  HttpFilter codec_filter;
+  codec_filter.set_name("envoy.filters.http.upstream_codec");
+  envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+  std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+  init({codec_filter});
+
+  // The upstream request resolves the cluster through the thread-local cluster, so point its
+  // cluster info at our instrumented mock.
+  ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, info())
+      .WillByDefault(Return(cluster_info_));
+
+  // Install the tracking filter ahead of the codec filter via the cluster's filter chain
+  // factory, which takes precedence over the router-specified chain.
+  EXPECT_CALL(*cluster_info_, createFilterChain(_))
+      .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+        callbacks.addStreamDecoderFilter(filter);
+        // Fall through to the router-specified chain, which provides the codec filter.
+        return false;
+      });
+
+  // Fail the pool synchronously inside newStream(), the way pending requests circuit
+  // breaker overflow does in ConnPoolImplBase::newStreamImpl().
+  EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_,
+              newStream(_, _, _))
+      .WillOnce([&](Http::ResponseDecoder&, Http::ConnectionPool::Callbacks& callbacks,
+                    const Http::ConnectionPool::Instance::StreamOptions&)
+                    -> Http::ConnectionPool::Cancellable* {
+        callbacks.onPoolFailure(Http::ConnectionPool::PoolFailureReason::Overflow,
+                                "max pending streams overflow",
+                                context_.server_factory_context_.cluster_manager_
+                                    .thread_local_cluster_.conn_pool_.host_);
+        return nullptr;
+      });
+
+  // The request should shed cleanly with a 503.
+  EXPECT_CALL(callbacks_, sendLocalReply(Http::Code::ServiceUnavailable, _, _, _, _));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // The synchronous overflow reset the upstream request, which ran cleanUp() and
+  // onDestroy() on the upstream HTTP filters before newStream() returned.
+  EXPECT_TRUE(filter->destroyed_);
+  // The destroyed filter chain must not be driven any further.
+  EXPECT_EQ(0, filter->decode_headers_);
+  EXPECT_EQ(0, filter->decode_data_);
+  EXPECT_EQ(0, filter->decode_trailers_);
 }
 
 // Regression test for a use-after-free at teardown. A dynamic (ECDS) upstream HTTP filter causes

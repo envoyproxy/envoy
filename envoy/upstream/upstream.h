@@ -29,6 +29,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
 
@@ -375,6 +376,42 @@ using ExcludedHostVector = Phantom<HostVector, Excluded>;
 using HostMap = absl::flat_hash_map<std::string, Upstream::HostSharedPtr>;
 using HostMapSharedPtr = std::shared_ptr<HostMap>;
 using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
+
+/**
+ * Read only host map indexed by host address string. The map is created in the main thread and
+ * shared by all the worker threads.
+ */
+class HostLookupMap {
+public:
+  virtual ~HostLookupMap() = default;
+
+  /**
+   * @param address the host address string to look up.
+   * @return const HostSharedPtr& the host for the address, or a null host if absent. The reference
+   *         is only valid while the map is alive.
+   */
+  virtual const HostSharedPtr& findHost(absl::string_view address) const PURE;
+
+  /**
+   * @return size_t the number of hosts in the map.
+   */
+  virtual size_t size() const PURE;
+
+  /**
+   * @return bool true if the map holds no hosts.
+   */
+  virtual bool empty() const PURE;
+
+  /**
+   * Invokes a callback for each (address, host) entry. Iteration order is unspecified.
+   *
+   * @param cb the callback to invoke for each entry.
+   */
+  virtual void
+  forEach(absl::FunctionRef<void(absl::string_view, const HostSharedPtr&)> cb) const PURE;
+};
+using HostLookupMapConstSharedPtr = std::shared_ptr<const HostLookupMap>;
+
 using HostVectorSharedPtr = std::shared_ptr<HostVector>;
 using HostVectorConstSharedPtr = std::shared_ptr<const HostVector>;
 
@@ -437,6 +474,20 @@ using LocalityWeights = std::vector<uint32_t>;
 using LocalityWeightsSharedPtr = std::shared_ptr<LocalityWeights>;
 using LocalityWeightsConstSharedPtr = std::shared_ptr<const LocalityWeights>;
 
+// A host set's hosts in a form other than flat vectors. Defined in upstream_impl.h.
+class HostSetSnapshot;
+using HostSetSnapshotConstSharedPtr = std::shared_ptr<const HostSetSnapshot>;
+
+/**
+ * Sizes of a host set's hosts(), healthyHosts(), degradedHosts() and excludedHosts().
+ */
+struct HostCounts {
+  size_t hosts{};
+  size_t healthy{};
+  size_t degraded{};
+  size_t excluded{};
+};
+
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
@@ -468,6 +519,20 @@ public:
    * @return a shared ptr to the vector returned by healthyHosts().
    */
   virtual HealthyHostVectorConstSharedPtr healthyHostsPtr() const PURE;
+
+  /**
+   * @return the host counts. An implementation that keeps its hosts in another form can answer
+   *         without building the vectors.
+   */
+  virtual HostCounts hostCounts() const {
+    return {hosts().size(), healthyHosts().size(), degradedHosts().size(), excludedHosts().size()};
+  }
+
+  /**
+   * @return a snapshot of this set's hosts for workers to adopt, or nullptr when the flat vectors
+   *         are the current representation.
+   */
+  virtual HostSetSnapshotConstSharedPtr snapshot() const { return nullptr; }
 
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
@@ -603,10 +668,10 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
-   * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
+   * @return HostLookupMapConstSharedPtr read only cross priority host map indexed by host address
    * string.
    */
-  virtual HostMapConstSharedPtr crossPriorityHostMap() const PURE;
+  virtual HostLookupMapConstSharedPtr crossPriorityHostMap() const PURE;
 
   /**
    * Parameter class for updateHosts.
@@ -620,6 +685,9 @@ public:
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality;
+    // When set, a snapshot for the host set to adopt in place of the flat views above, which are
+    // then null.
+    HostSetSnapshotConstSharedPtr snapshot;
   };
 
   /**
@@ -640,7 +708,7 @@ public:
                            const HostVector& hosts_added, const HostVector& hosts_removed,
                            std::optional<bool> weighted_priority_health,
                            std::optional<uint32_t> overprovisioning_factor,
-                           HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
+                           HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
   /**
    * Callback provided during batch updates that can be used to update hosts.
@@ -668,7 +736,7 @@ public:
                              const HostVector& hosts_added, const HostVector& hosts_removed,
                              std::optional<bool> weighted_priority_health,
                              std::optional<uint32_t> overprovisioning_factor,
-                             HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
+                             HostLookupMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
   };
 
   /**
@@ -928,12 +996,10 @@ struct ClusterCircuitBreakersStats {
 };
 
 using ClusterRequestResponseSizeStatsPtr = std::unique_ptr<ClusterRequestResponseSizeStats>;
-using ClusterRequestResponseSizeStatsOptRef =
-    std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>>;
+using ClusterRequestResponseSizeStatsOptRef = OptRef<ClusterRequestResponseSizeStats>;
 
 using ClusterTimeoutBudgetStatsPtr = std::unique_ptr<ClusterTimeoutBudgetStats>;
-using ClusterTimeoutBudgetStatsOptRef =
-    std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>>;
+using ClusterTimeoutBudgetStatsOptRef = OptRef<ClusterTimeoutBudgetStats>;
 
 /**
  * All extension protocol specific options returned by the method at
@@ -1275,14 +1341,13 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return std::optional<std::reference_wrapper<ClusterRequestResponseSizeStats>> stats to track
-   * headers/body sizes of request/response for this cluster.
+   * @return ClusterRequestResponseSizeStatsOptRef stats to track headers/body sizes of
+   * request/response for this cluster.
    */
   virtual ClusterRequestResponseSizeStatsOptRef requestResponseSizeStats() const PURE;
 
   /**
-   * @return std::optional<std::reference_wrapper<ClusterTimeoutBudgetStats>> stats on timeout
-   * budgets for this cluster.
+   * @return ClusterTimeoutBudgetStatsOptRef stats on timeout budgets for this cluster.
    */
   virtual ClusterTimeoutBudgetStatsOptRef timeoutBudgetStats() const PURE;
 
@@ -1344,6 +1409,15 @@ public:
    * computations until they have been health checked for the first time.
    */
   virtual bool warmHosts() const PURE;
+
+  /**
+   * @return false if this cluster has opted out of gating the CDS ACK during warming
+   * (wait_for_warm_on_init: false in the cluster proto). When false, the cluster does not hold
+   * a CDS pause handle at any point during warming, including during initial health checks.
+   * For DNS and Redis cluster types, false additionally causes the cluster to complete
+   * initialization immediately without waiting for DNS resolution.
+   */
+  virtual bool waitForWarmOnInit() const PURE;
 
   /**
    * @return true if this cluster is configured to set local interface name on upstream connections.
@@ -1499,7 +1573,7 @@ public:
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
-using ClusterConstOptRef = std::optional<std::reference_wrapper<const Cluster>>;
+using ClusterConstOptRef = OptRef<const Cluster>;
 
 } // namespace Upstream
 } // namespace Envoy

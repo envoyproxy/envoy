@@ -50,6 +50,7 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",
+        "//source/common/stats:utility_lib",
         "//source/extensions/geoip_providers/maxmind:config",
         "//source/extensions/geoip_providers/maxmind:provider_impl",
         "//test/mocks/server:factory_context_mocks",

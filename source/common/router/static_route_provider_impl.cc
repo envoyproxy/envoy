@@ -5,6 +5,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
 #include "source/common/router/vhds.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -112,9 +113,17 @@ void StaticRouteConfigProviderImpl::VhdsContext::onConfigWarmed() {
   // VHDS fetch.
   local_init_target_.ready();
 
-  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
-  // Regular (non-VHDS) updates don't populate aliases fields in resources.
-  if (aliases.empty()) {
+  // Only queued on-demand callbacks are interested in a publish.
+  if (config_update_callbacks_.empty()) {
+    return;
+  }
+
+  const bool check_answered_ids =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache");
+  const auto& aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
+  // Regular (non-VHDS) updates don't populate aliases fields in resources, but any publish can
+  // resolve a queued callback whose alias an earlier update already answered.
+  if (aliases.empty() && !check_answered_ids) {
     return;
   }
 
@@ -123,8 +132,14 @@ void StaticRouteConfigProviderImpl::VhdsContext::onConfigWarmed() {
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
   for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
-    auto found = aliases.find(it->alias_);
-    if (found != aliases.end()) {
+    // A callback is answered by this update if the update carries its alias, or by any earlier
+    // published update that did: the callback was then queued while that update was still
+    // warming, or the update that carried the alias was superseded before it was published and
+    // this update is the one delivering its merged result.
+    const bool answered =
+        aliases.contains(it->alias_) ||
+        (check_answered_ids && config_update_info_->vhdsResourceIdAnswered(it->alias_));
+    if (answered) {
       auto host_header = Http::RequestHeaderMapImpl::create();
       host_header->setHost(VhdsSubscription::aliasToDomainName(it->alias_));
       const bool host_exists = config->virtualHostExists(*host_header);
@@ -154,11 +169,30 @@ void StaticRouteConfigProviderImpl::VhdsContext::requestVirtualHostsUpdate(
   factory_context_.mainThreadDispatcher().post(
       [this, maybe_still_alive = std::weak_ptr<bool>(still_alive_), alias, &thread_local_dispatcher,
        route_config_updated_cb]() -> void {
-        if (maybe_still_alive.lock()) {
-          config_update_info_->updateOnDemand(alias);
-          config_update_callbacks_.push_back(
-              {alias, thread_local_dispatcher, route_config_updated_cb});
+        if (!maybe_still_alive.lock()) {
+          return;
         }
+        if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.vhds_answered_alias_cache") &&
+            config_update_info_->vhdsResourceIdAnswered(alias)) {
+          // The server has already answered for this alias and the published route configuration
+          // reflects that answer, so the request can be answered locally. The delta subscription
+          // to the alias is persistent: if the virtual host appears or changes later, the server
+          // pushes an update on its own.
+          const auto config = std::static_pointer_cast<const ConfigImpl>(
+              config_update_info_->parsedConfiguration());
+          auto host_header = Http::RequestHeaderMapImpl::create();
+          host_header->setHost(VhdsSubscription::aliasToDomainName(alias));
+          const bool host_exists = config->virtualHostExists(*host_header);
+          thread_local_dispatcher.post([route_config_updated_cb, host_exists] {
+            if (auto cb = route_config_updated_cb.lock()) {
+              (*cb)(host_exists);
+            }
+          });
+          return;
+        }
+        config_update_info_->updateOnDemand(alias);
+        config_update_callbacks_.push_back(
+            {alias, thread_local_dispatcher, route_config_updated_cb});
       });
 }
 

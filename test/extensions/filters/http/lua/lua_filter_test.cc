@@ -6,6 +6,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/singleton/manager_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/lua/lua_filter.h"
 
@@ -35,7 +36,6 @@ using testing::Eq;
 using testing::Field;
 using testing::HasSubstr;
 using testing::InSequence;
-using testing::Invoke;
 using testing::IsSupersetOf;
 using testing::Return;
 using testing::ReturnRef;
@@ -56,12 +56,12 @@ public:
     // Avoid strict mock failures for the following calls. We want strict for other calls.
     EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
         .Times(AtLeast(0))
-        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
+        .WillRepeatedly([this](Buffer::Instance& data, bool) {
           if (decoder_callbacks_.buffer_ == nullptr) {
             decoder_callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
           }
           decoder_callbacks_.buffer_->move(data);
-        }));
+        });
 
     EXPECT_CALL(decoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, decodingBuffer()).Times(AtLeast(0));
@@ -76,12 +76,12 @@ public:
 
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
         .Times(AtLeast(0))
-        .WillRepeatedly(Invoke([this](Buffer::Instance& data, bool) {
+        .WillRepeatedly([this](Buffer::Instance& data, bool) {
           if (encoder_callbacks_.buffer_ == nullptr) {
             encoder_callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>();
           }
           encoder_callbacks_.buffer_->move(data);
-        }));
+        });
     EXPECT_CALL(encoder_callbacks_, activeSpan()).Times(AtLeast(0));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
     EXPECT_CALL(decoder_callbacks_, streamInfo()).Times(testing::AnyNumber());
@@ -106,7 +106,8 @@ public:
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(
         proto_config, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
-        server_factory_context_.options().concurrency(), creation_status);
+        server_factory_context_.options().concurrency(), server_factory_context_.singletonManager(),
+        creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     // Setup per route config for Lua filter.
     per_route_config_ = std::make_shared<FilterConfigPerRoute>(
@@ -309,13 +310,14 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Api::MockApi> api;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  Singleton::ManagerImpl singleton_manager;
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(SCRIPT);
 
   absl::Status creation_status = absl::OkStatus();
   FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1,
-               creation_status);
+               singleton_manager, creation_status);
   EXPECT_THAT(creation_status, StatusHelpers::HasStatusMessage(
                                    "script load error: [string \"...\"]:3: '=' expected near "
                                    "'<eof>'"));
@@ -1019,7 +1021,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             const Http::TestRequestHeaderMapImpl expected_headers{
@@ -1036,7 +1038,7 @@ TEST_F(LuaHttpFilterTest, HttpCall) {
 
             callbacks = &cb;
             return &request;
-          }));
+          });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1095,12 +1097,11 @@ TEST_F(LuaHttpFilterTest, HttpCallMultiSliceBody) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1160,12 +1161,11 @@ TEST_F(LuaHttpFilterTest, HttpCallWithRepeatedHeaders) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1220,20 +1220,19 @@ TEST_F(LuaHttpFilterTest, HttpCallAsyncFalse) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"},
+            {":method", "POST"},
+            {":authority", "foo"},
+            {"set-cookie", "flavor=chocolate; Path=/"},
+            {"set-cookie", "variant=chewy; Path=/"},
+            {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1284,20 +1283,19 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronous) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"},
+            {":method", "POST"},
+            {":authority", "foo"},
+            {"set-cookie", "flavor=chocolate; Path=/"},
+            {"set-cookie", "variant=chewy; Path=/"},
+            {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
@@ -1338,20 +1336,19 @@ TEST_F(LuaHttpFilterTest, HttpCallAsynchronousInOptions) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/"},
-                {":method", "POST"},
-                {":authority", "foo"},
-                {"set-cookie", "flavor=chocolate; Path=/"},
-                {"set-cookie", "variant=chewy; Path=/"},
-                {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"},
+            {":method", "POST"},
+            {":authority", "foo"},
+            {"set-cookie", "flavor=chocolate; Path=/"},
+            {"set-cookie", "variant=chewy; Path=/"},
+            {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
 
@@ -1410,17 +1407,14 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{{":path", "/"},
-                                                                  {":method", "POST"},
-                                                                  {":authority", "foo"},
-                                                                  {"content-length", "11"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/"}, {":method", "POST"}, {":authority", "foo"}, {"content-length", "11"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1431,15 +1425,14 @@ TEST_F(LuaHttpFilterTest, DoubleHttpCall) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster2")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const Http::TestRequestHeaderMapImpl expected_headers{
-                {":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}};
-            EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        const Http::TestRequestHeaderMapImpl expected_headers{
+            {":path", "/bar"}, {":method", "GET"}, {":authority", "foo"}};
+        EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
+        callbacks = &cb;
+        return &request;
+      });
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", ":status 200"},
                                  {"trace", "response"},
@@ -1499,7 +1492,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& cb,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             // We are actively deferring to the parent span's sampled state.
@@ -1509,7 +1502,7 @@ TEST_F(LuaHttpFilterTest, HttpCallNoBody) {
             EXPECT_THAT(&message->headers(), HeaderMapEqualIgnoreOrder(&expected_headers));
             callbacks = &cb;
             return &request;
-          }));
+          });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -1596,12 +1589,11 @@ TEST_F(LuaHttpFilterTest, HttpCallErrorAfterResumeSuccess) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1646,12 +1638,11 @@ TEST_F(LuaHttpFilterTest, HttpCallFailure) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1693,12 +1684,11 @@ TEST_F(LuaHttpFilterTest, HttpCallReset) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks = &cb;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks = &cb;
+        return &request;
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, true));
@@ -1738,14 +1728,13 @@ TEST_F(LuaHttpFilterTest, HttpCallImmediateFailure) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
-            // Intentionally return nullptr (instead of request handle) to trigger a particular
-            // code path.
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        cb.onFailure(request, Http::AsyncClient::FailureReason::Reset);
+        // Intentionally return nullptr (instead of request handle) to trigger a particular
+        // code path.
+        return nullptr;
+      });
 
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", ":status 503"},
@@ -1862,7 +1851,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(Eq("cluster")));
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
               const Http::AsyncClient::RequestOptions& options) -> Http::AsyncClient::Request* {
             EXPECT_EQ(options.timeout->count(), 5000);
@@ -1870,7 +1859,7 @@ TEST_F(LuaHttpFilterTest, HttpCallWithTimeoutAndSampledInOptions) {
             EXPECT_EQ(options.send_xff, false);
             callbacks = &cb;
             return &request;
-          }));
+          });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
@@ -2018,17 +2007,17 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
     Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     Http::TestResponseHeaderMapImpl immediate_response_headers;
     EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
-        .WillOnce(Invoke([&immediate_response_headers](
-                             Http::Code code, absl::string_view body,
-                             std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                             const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                             absl::string_view details) {
+        .WillOnce([&immediate_response_headers](
+                      Http::Code code, absl::string_view body,
+                      std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                      const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) {
           EXPECT_EQ(Http::Code::ServiceUnavailable, code);
           EXPECT_EQ("nope", body);
           EXPECT_EQ(grpc_status, std::nullopt);
           EXPECT_EQ(details, "lua_response");
           modify_headers(immediate_response_headers);
-        }));
+        });
     EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
               filter_->decodeHeaders(request_headers, false));
     filter_->onDestroy();
@@ -2067,17 +2056,17 @@ TEST_F(LuaHttpFilterTest, ImmediateResponseWithSendLocalReply) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Http::Code code, absl::string_view body,
-                           std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
-                           const std::optional<Grpc::Status::GrpcStatus> grpc_status,
-                           absl::string_view details) {
+      .WillOnce([&immediate_response_headers](
+                    Http::Code code, absl::string_view body,
+                    std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                    const std::optional<Grpc::Status::GrpcStatus> grpc_status,
+                    absl::string_view details) {
         EXPECT_EQ(Http::Code::ServiceUnavailable, code);
         EXPECT_EQ("nope", body);
         EXPECT_EQ(grpc_status, std::nullopt);
         EXPECT_EQ(details, "lua_response");
         modify_headers(immediate_response_headers);
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers, false));
   EXPECT_TRUE(immediate_response_headers.has("fake"));
@@ -2598,6 +2587,33 @@ TEST_F(LuaHttpFilterTest, GetConnectionDynamicMetadata) {
                                EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                                          filter_->decodeHeaders(request_headers, true));
                              });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// Verify that connectionStreamInfo() returns nil (rather than crashing) when the downstream
+// connection is not available.
+TEST_F(LuaHttpFilterTest, GetConnectionStreamInfoWithoutConnection) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:connectionStreamInfo() == nil then
+        request_handle:logTrace("Connection stream info is nil")
+      else
+        request_handle:logTrace("Connection stream info is present")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  // Return an empty OptRef to simulate a context without a downstream connection.
+  EXPECT_CALL(decoder_callbacks_, connection())
+      .WillOnce(Return(OptRef<const Network::Connection>{}));
+  EXPECT_LOG_CONTAINS("trace", "Connection stream info is nil", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
@@ -3597,13 +3613,14 @@ TEST(LuaHttpFilterConfigTest, PackagePathsAbsentIsAConfigError) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Api::MockApi> api;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store;
+  Singleton::ManagerImpl singleton_manager;
 
   envoy::extensions::filters::http::lua::v3::Lua proto_config;
   proto_config.mutable_default_source_code()->set_inline_string(REQUIRE_MODULE_SCRIPT);
 
   absl::Status creation_status = absl::OkStatus();
   FilterConfig(proto_config, tls, cluster_manager, api, *stats_store.rootScope(), "lua", 1,
-               creation_status);
+               singleton_manager, creation_status);
   EXPECT_THAT(creation_status,
               StatusHelpers::HasStatusMessage(
                   testing::AllOf(testing::HasSubstr("script load error"),
@@ -4204,7 +4221,8 @@ TEST_F(LuaHttpFilterTest, LuaVmCountGaugeDecrementOnDestroy) {
     absl::Status creation_status = absl::OkStatus();
     auto extra_config = std::make_shared<FilterConfig>(
         extra_proto, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
-        server_factory_context_.options().concurrency(), creation_status);
+        server_factory_context_.options().concurrency(), server_factory_context_.singletonManager(),
+        creation_status);
     THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_EQ(2 * per_setup_vm_count,
               stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value());
@@ -5071,11 +5089,11 @@ TEST_F(LuaHttpFilterTest, StatsApi) {
 
   auto gauge = stats_store_.findGaugeByString("test.lua.my_gauge");
   ASSERT_TRUE(gauge.has_value());
-  EXPECT_EQ(105, gauge->get().value());
+  EXPECT_EQ(105, gauge->value());
 
   auto histogram = stats_store_.findHistogramByString("test.lua.my_histogram");
   ASSERT_TRUE(histogram.has_value());
-  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, histogram->get().unit());
+  EXPECT_EQ(Stats::Histogram::Unit::Milliseconds, histogram->unit());
 }
 
 // Test stats() API with custom stat_prefix.
@@ -5101,6 +5119,307 @@ TEST_F(LuaHttpFilterTest, StatsApiWithPrefix) {
 
   // Verify the counter was created with the custom prefix.
   EXPECT_EQ(1, stats_store_.counter("test.lua.custom_prefix.requests").value());
+}
+
+class LuaSharedVmTest : public testing::Test {
+public:
+  LuaSharedVmTest() {
+    ON_CALL(api_, rootScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
+    ON_CALL(server_factory_context_.api_, rootScope())
+        .WillByDefault(ReturnRef(*stats_store_.rootScope()));
+  }
+
+  envoy::extensions::filters::http::lua::v3::Lua luaConfig(const std::string& shared_vm_id,
+                                                           const std::string& code) {
+    envoy::extensions::filters::http::lua::v3::Lua proto_config;
+    proto_config.set_shared_vm_id(shared_vm_id);
+    proto_config.mutable_default_source_code()->set_inline_string(code);
+    return proto_config;
+  }
+
+  std::shared_ptr<FilterConfig>
+  makeFilterConfig(const envoy::extensions::filters::http::lua::v3::Lua& proto_config) {
+    absl::Status creation_status = absl::OkStatus();
+    auto config = std::make_shared<FilterConfig>(
+        proto_config, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
+        concurrency_, server_factory_context_.singletonManager(), creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
+    return config;
+  }
+
+  std::shared_ptr<FilterConfigPerRoute>
+  makeRouteConfig(const envoy::extensions::filters::http::lua::v3::LuaPerRoute& proto_config) {
+    absl::Status creation_status = absl::OkStatus();
+    auto config = std::make_shared<FilterConfigPerRoute>(proto_config, server_factory_context_,
+                                                         creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
+    return config;
+  }
+
+  uint64_t vmCount() {
+    return stats_store_.gauge("lua.lua_vm_count", Stats::Gauge::ImportMode::Accumulate).value();
+  }
+
+  Stats::TestUtil::TestStore stats_store_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Api::MockApi> api_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  // One PerLuaCodeSetup accounts for this many VMs: one per worker thread plus main.
+  const uint32_t per_setup_vm_count_{server_factory_context_.options().concurrency() + 1};
+  const uint32_t concurrency_{server_factory_context_.options().concurrency()};
+
+  const std::string SCRIPT_A{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("x-script", "a")
+    end
+  )EOF"};
+  const std::string SCRIPT_B{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:headers():add("x-script", "b")
+    end
+  )EOF"};
+};
+
+// With no `shared_vm_id`, each configuration builds its own VM even when the script is identical.
+// This is the pre-existing behavior and the default.
+TEST_F(LuaSharedVmTest, NoSharedVmIdKeepsVmsPerConfig) {
+  auto first = makeFilterConfig(luaConfig("", SCRIPT_A));
+  auto second = makeFilterConfig(luaConfig("", SCRIPT_A));
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// Two configurations agreeing on both the id and the script get one VM between them.
+TEST_F(LuaSharedVmTest, SameIdAndCodeShareOneVm) {
+  auto first = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+
+  auto second = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  EXPECT_EQ(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  // No second set of VMs was built.
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+}
+
+// The id alone does not make two configurations share: the script has to match as well.
+TEST_F(LuaSharedVmTest, SameIdDifferentCodeDoNotShare) {
+  auto first = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  auto second = makeFilterConfig(luaConfig("shared", SCRIPT_B));
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// The id namespaces the cache, so the same script under two ids stays in two VMs.
+TEST_F(LuaSharedVmTest, DifferentIdSameCodeDoNotShare) {
+  auto first = makeFilterConfig(luaConfig("one", SCRIPT_A));
+  auto second = makeFilterConfig(luaConfig("two", SCRIPT_A));
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// A script whose `require` resolves against different search paths does not describe the same VM,
+// so configurations that disagree on the package paths must not share one.
+TEST_F(LuaSharedVmTest, SameIdDifferentPackagePathsDoNotShare) {
+  auto proto_one = luaConfig("shared", SCRIPT_A);
+  proto_one.add_package_paths("/etc/envoy/lua/?.lua");
+  auto proto_two = luaConfig("shared", SCRIPT_A);
+  proto_two.add_package_paths("/opt/lua/?.lua");
+  auto proto_three = luaConfig("shared", SCRIPT_A);
+  proto_three.add_package_cpaths("/opt/lua/?.so");
+
+  auto first = makeFilterConfig(proto_one);
+  auto second = makeFilterConfig(proto_two);
+  auto third = makeFilterConfig(proto_three);
+
+  EXPECT_NE(first->perLuaCodeSetup(), second->perLuaCodeSetup());
+  EXPECT_NE(first->perLuaCodeSetup(), third->perLuaCodeSetup());
+  EXPECT_EQ(3 * per_setup_vm_count_, vmCount());
+}
+
+// Sharing is decided per script, so the entries of `source_codes` are matched one by one, both
+// against each other and against the default script.
+TEST_F(LuaSharedVmTest, SourceCodesEntriesShareIndividually) {
+  envoy::config::core::v3::DataSource src_a, src_b;
+  src_a.set_inline_string(SCRIPT_A);
+  src_b.set_inline_string(SCRIPT_B);
+
+  auto proto_one = luaConfig("shared", SCRIPT_A);
+  proto_one.mutable_source_codes()->insert({"a.lua", src_a});
+  proto_one.mutable_source_codes()->insert({"b.lua", src_b});
+  auto first = makeFilterConfig(proto_one);
+
+  // `a.lua` is the same script as the default one, so the two names resolve to one VM. Together
+  // with `b.lua` that is two VM setups for three configured scripts.
+  EXPECT_EQ(first->perLuaCodeSetup(), first->perLuaCodeSetup("a.lua"));
+  EXPECT_NE(first->perLuaCodeSetup(), first->perLuaCodeSetup("b.lua"));
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+
+  // A second configuration naming the same scripts differently still reuses both VMs.
+  auto proto_two = luaConfig("shared", SCRIPT_B);
+  proto_two.mutable_source_codes()->insert({"other.lua", src_a});
+  auto second = makeFilterConfig(proto_two);
+
+  EXPECT_EQ(first->perLuaCodeSetup("b.lua"), second->perLuaCodeSetup());
+  EXPECT_EQ(first->perLuaCodeSetup(), second->perLuaCodeSetup("other.lua"));
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// Routes and filter configurations draw from the same pool, so a route's inline script reuses the
+// VM a filter configuration already built for it.
+TEST_F(LuaSharedVmTest, RouteAndFilterConfigShareOneVm) {
+  auto filter_config = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute route_proto;
+  route_proto.set_shared_vm_id("shared");
+  route_proto.mutable_source_code()->set_inline_string(SCRIPT_A);
+  auto route_config = makeRouteConfig(route_proto);
+
+  EXPECT_EQ(filter_config->perLuaCodeSetup(), route_config->perLuaCodeSetup());
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+}
+
+// A route that sets no id keeps its own VM, as before.
+TEST_F(LuaSharedVmTest, RouteWithoutIdKeepsItsOwnVm) {
+  auto filter_config = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+
+  envoy::extensions::filters::http::lua::v3::LuaPerRoute route_proto;
+  route_proto.mutable_source_code()->set_inline_string(SCRIPT_A);
+  auto route_config = makeRouteConfig(route_proto);
+
+  EXPECT_NE(filter_config->perLuaCodeSetup(), route_config->perLuaCodeSetup());
+  EXPECT_EQ(2 * per_setup_vm_count_, vmCount());
+}
+
+// A shared VM is torn down once the last configuration using it is gone, and the next
+// configuration asking for it builds a fresh one rather than getting a dangling entry.
+TEST_F(LuaSharedVmTest, SharedVmIsReleasedWithItsLastUser) {
+  {
+    auto first = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+    auto second = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+    EXPECT_EQ(per_setup_vm_count_, vmCount());
+    // Dropping one of the two users is not enough.
+    first.reset();
+    EXPECT_EQ(per_setup_vm_count_, vmCount());
+  }
+  EXPECT_EQ(0, vmCount());
+
+  auto third = makeFilterConfig(luaConfig("shared", SCRIPT_A));
+  EXPECT_EQ(per_setup_vm_count_, vmCount());
+}
+
+// A script that does not parse is rejected and not registered, so the next configuration asking
+// for the same id and script is rejected in the same way instead of being handed nothing.
+TEST_F(LuaSharedVmTest, InvalidCodeIsNotRegistered) {
+  const auto proto_config = luaConfig("shared", R"EOF(
+    bad
+  )EOF");
+
+  for (int i = 0; i < 2; i++) {
+    absl::Status creation_status = absl::OkStatus();
+    FilterConfig(proto_config, tls_, cluster_manager_, api_, *stats_store_.rootScope(), "test.",
+                 concurrency_, server_factory_context_.singletonManager(), creation_status);
+    EXPECT_THAT(creation_status,
+                StatusHelpers::HasStatusMessage(
+                    "script load error: [string \"...\"]:3: '=' expected near '<eof>'"));
+  }
+  EXPECT_EQ(0, vmCount());
+}
+
+// Test that handle:metadata() returns metadata under the namespace that is specified by the
+// script rather than the filter config name.
+TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithNamespace) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:metadata("custom.namespace"):get("foo.bar")["name"])
+      -- The default namespace is still the filter config name.
+      request_handle:logTrace(request_handle:metadata():get("foo.bar")["name"])
+      request_handle:logTrace(request_handle:metadata(nil):get("foo.bar")["prop"])
+      -- The wrappers of different namespaces could be used at the same time.
+      local custom = request_handle:metadata("custom.namespace")
+      local default = request_handle:metadata()
+      request_handle:logTrace(custom:get("foo.bar")["prop"])
+      request_handle:logTrace(default:get("baz.bat")["name"])
+      -- The canonical name is not used as the fallback when the namespace is specified.
+      for _, _ in pairs(request_handle:metadata("unknown.namespace")) do
+        return
+      end
+      request_handle:logTrace("No metadata found")
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+      custom.namespace:
+        foo.bar:
+          name: custom-foo
+          prop: custom-bar
+      envoy.filters.http.lua:
+        foo.bar:
+          name: foo-xxx
+          prop: bar-xxx
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupMetadata(METADATA);
+
+  ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return("lua-filter-config-name"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "custom-foo"},
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                                 {"trace", "custom-bar"},
+                                 {"trace", "baz"},
+                                 {"trace", "No metadata found"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
+}
+
+// Test that handle:metadata() returns metadata under the specified namespace in the response path.
+TEST_F(LuaHttpFilterTest, GetMetadataFromHandleWithNamespaceInResponse) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_response(response_handle)
+      response_handle:logTrace(response_handle:metadata("custom.namespace"):get("foo.bar")["name"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      custom.namespace:
+        foo.bar:
+          name: custom-foo
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  TestUtility::loadFromYaml(METADATA, metadata_);
+  ON_CALL(*encoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "custom-foo", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  EXPECT_EQ(1, stats_store_.counter("test.lua.executions").value());
 }
 
 } // namespace

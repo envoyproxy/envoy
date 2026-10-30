@@ -4,6 +4,8 @@
 
 #include <chrono>
 #include <cstring>
+#include <deque>
+#include <string>
 
 #include "envoy/registry/registry.h"
 
@@ -14,9 +16,11 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/clusters/dynamic_modules/cluster.h"
+#include "source/extensions/clusters/dynamic_modules/persistent_host_set.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/abi_context_accessors.h"
 
+using Envoy::Extensions::Clusters::DynamicModules::PersistentHostSet;
 using Envoy::Extensions::DynamicModules::ContextAccessor;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
@@ -204,7 +208,34 @@ bool addHosts(envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr, uin
   return true;
 }
 
+// Host selection runs serially per worker thread, so a thread local deque gives each serialized
+// filter state value a stable address for the duration of the host selection callback. A deque is
+// used because it never relocates existing elements. The depth counter clears the storage when the
+// outermost callback is entered and again when it returns.
+thread_local std::deque<std::string> cluster_lb_filter_state_scratch;
+thread_local uint32_t cluster_lb_hook_depth = 0;
+
 } // namespace
+
+namespace Envoy {
+namespace Extensions {
+namespace Clusters {
+namespace DynamicModules {
+ClusterLbFilterStateScratchGuard::ClusterLbFilterStateScratchGuard() {
+  if (++cluster_lb_hook_depth == 1) {
+    cluster_lb_filter_state_scratch.clear();
+  }
+}
+ClusterLbFilterStateScratchGuard::~ClusterLbFilterStateScratchGuard() {
+  if (--cluster_lb_hook_depth == 0) {
+    cluster_lb_filter_state_scratch.clear();
+  }
+}
+size_t clusterLbFilterStateScratchSizeForTest() { return cluster_lb_filter_state_scratch.size(); }
+} // namespace DynamicModules
+} // namespace Clusters
+} // namespace Extensions
+} // namespace Envoy
 
 extern "C" {
 
@@ -308,6 +339,16 @@ void envoy_dynamic_module_callback_cluster_pre_init_complete(
   getCluster(cluster_envoy_ptr)->preInitComplete();
 }
 
+void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
+    envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_use_persistent_host_map must be called on "
+                 "the main thread");
+    return;
+  }
+  getCluster(cluster_envoy_ptr)->usePersistentHostMap();
+}
+
 size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
   if (lb_envoy_ptr == nullptr) {
@@ -317,7 +358,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->healthyHosts().size();
+  return host_sets[priority]->hostCounts().healthy;
 }
 
 envoy_dynamic_module_type_cluster_host_envoy_ptr
@@ -352,16 +393,27 @@ bool envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts(
   if (priority >= host_sets.size()) {
     return false;
   }
-  const auto& healthy_hosts = host_sets[priority]->healthyHosts();
-  *hosts_size_out = healthy_hosts.size();
+  const auto& host_set = *host_sets[priority];
+  const size_t healthy_count = host_set.hostCounts().healthy;
+  *hosts_size_out = healthy_count;
   // Write nothing when the buffer is too small so a caller cannot act on a partial healthy set.
-  if (healthy_hosts.size() > hosts_capacity) {
+  if (healthy_count > hosts_capacity) {
     return false;
   }
   // The fill loop writes through hosts_out, so reject a null buffer that claims nonzero capacity.
-  if (hosts_out == nullptr && !healthy_hosts.empty()) {
+  if (hosts_out == nullptr && healthy_count != 0) {
     return false;
   }
+  // A persistent host set is walked directly, so this does not build its flat healthy view.
+  if (const auto* persistent = dynamic_cast<const PersistentHostSet*>(&host_set);
+      persistent != nullptr) {
+    size_t i = 0;
+    persistent->forEachHealthyHost([&](const Envoy::Upstream::HostSharedPtr& host) {
+      hosts_out[i++] = const_cast<Envoy::Upstream::Host*>(host.get());
+    });
+    return true;
+  }
+  const auto& healthy_hosts = host_set.healthyHosts();
   for (size_t i = 0; i < healthy_hosts.size(); i++) {
     hosts_out[i] = const_cast<Envoy::Upstream::Host*>(healthy_hosts[i].get());
   }
@@ -396,7 +448,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_hosts_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->hosts().size();
+  return host_sets[priority]->hostCounts().hosts;
 }
 
 size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
@@ -408,7 +460,7 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_degraded_hosts_count(
   if (priority >= host_sets.size()) {
     return 0;
   }
-  return host_sets[priority]->degradedHosts().size();
+  return host_sets[priority]->hostCounts().degraded;
 }
 
 size_t envoy_dynamic_module_callback_cluster_lb_get_priority_set_size(
@@ -503,12 +555,11 @@ bool envoy_dynamic_module_callback_cluster_lb_get_host_health_by_address(
   if (host_map == nullptr) {
     return false;
   }
-  std::string address_str(address.ptr, address.length);
-  const auto it = host_map->find(address_str);
-  if (it == host_map->end()) {
+  const auto& host = host_map->findHost(absl::string_view(address.ptr, address.length));
+  if (host == nullptr) {
     return false;
   }
-  switch (it->second->coarseHealth()) {
+  switch (host->coarseHealth()) {
   case Envoy::Upstream::Host::Health::Unhealthy:
     *result = envoy_dynamic_module_type_host_health_Unhealthy;
     break;
@@ -533,12 +584,11 @@ envoy_dynamic_module_callback_cluster_lb_find_host_by_address(
   if (host_map == nullptr) {
     return nullptr;
   }
-  std::string address_str(address.ptr, address.length);
-  const auto it = host_map->find(address_str);
-  if (it == host_map->end()) {
+  const auto& host = host_map->findHost(absl::string_view(address.ptr, address.length));
+  if (host == nullptr) {
     return nullptr;
   }
-  return const_cast<Envoy::Upstream::Host*>(it->second.get());
+  return const_cast<Envoy::Upstream::Host*>(host.get());
 }
 
 envoy_dynamic_module_type_cluster_host_envoy_ptr envoy_dynamic_module_callback_cluster_lb_get_host(
@@ -1005,13 +1055,12 @@ bool envoy_dynamic_module_callback_cluster_lb_context_get_filter_state_typed(
     return false;
   }
 
-  // Cluster host selection runs on a worker thread serially per request. We stash the
-  // serialized buffer on a thread-local so its address survives until the next call to
-  // this function on the same thread (matching the documented lifetime in abi.h).
-  thread_local std::string last_serialized_filter_state;
-  last_serialized_filter_state = std::move(serialized.value());
-  result->ptr = const_cast<char*>(last_serialized_filter_state.data());
-  result->length = last_serialized_filter_state.size();
+  // Stash the serialized value so its address stays valid for the whole host selection callback.
+  // ClusterLbFilterStateScratchGuard clears the storage when the callback returns.
+  const std::string& stored =
+      cluster_lb_filter_state_scratch.emplace_back(std::move(serialized.value()));
+  result->ptr = const_cast<char*>(stored.data());
+  result->length = stored.size();
   return true;
 }
 
@@ -1791,6 +1840,46 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
   }
   result->port = static_cast<uint16_t>(ip->port());
   return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t* result) {
+  if (lb_envoy_ptr == nullptr || result == nullptr) {
+    return false;
+  }
+  const auto* hosts = getLb(lb_envoy_ptr)->healthChangedHosts();
+  if (hosts == nullptr) {
+    return false;
+  }
+  *result = hosts->size();
+  return true;
+}
+
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, uint32_t* priority,
+    envoy_dynamic_module_type_host_health* health) {
+  if (lb_envoy_ptr == nullptr || priority == nullptr || health == nullptr) {
+    return nullptr;
+  }
+  const auto* hosts = getLb(lb_envoy_ptr)->healthChangedHosts();
+  if (hosts == nullptr || index >= hosts->size()) {
+    return nullptr;
+  }
+  const auto& host = (*hosts)[index];
+  *priority = host->priority();
+  switch (host->coarseHealth()) {
+  case Envoy::Upstream::Host::Health::Unhealthy:
+    *health = envoy_dynamic_module_type_host_health_Unhealthy;
+    break;
+  case Envoy::Upstream::Host::Health::Degraded:
+    *health = envoy_dynamic_module_type_host_health_Degraded;
+    break;
+  case Envoy::Upstream::Host::Health::Healthy:
+    *health = envoy_dynamic_module_type_host_health_Healthy;
+    break;
+  }
+  return const_cast<Envoy::Upstream::Host*>(host.get());
 }
 
 } // extern "C"

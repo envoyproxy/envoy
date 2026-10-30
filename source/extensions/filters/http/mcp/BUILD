@@ -37,6 +37,7 @@ envoy_cc_library(
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//envoy/stream_info:filter_state_interface",
+        "//source/common/common:base64_lib",
         "//source/common/common:logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",

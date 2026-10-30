@@ -130,7 +130,7 @@ public:
     ON_CALL(context_, serverScope()).WillByDefault(testing::ReturnRef(store_.mockScope()));
 
     EXPECT_CALL(store_.mockScope(), createScope_(_, _))
-        .WillRepeatedly(Invoke([this](const std::string& name, const std::string&) {
+        .WillRepeatedly([this](const std::string& name, const std::string&) {
           // The prefix must be encoded in the same symbol table the scope resolves names
           // with (store_), since MockScope now joins prefix() into the flat stat name.
           auto scope_name_storage =
@@ -138,29 +138,29 @@ public:
           auto scope = std::make_shared<NiceMock<MockScopeWithGauge>>(
               scope_name_storage->statName(), store_);
           ON_CALL(*scope, gaugeFromTaggedName(_, _, _, _))
-              .WillByDefault(Invoke(
+              .WillByDefault(
                   [scope_ptr = scope.get()](Stats::StatName name,
                                             std::optional<Stats::StatNameTagSpan> name_tags,
                                             Stats::StatName tagged_name,
                                             Stats::Gauge::ImportMode import_mode) -> Stats::Gauge& {
                     return scope_ptr->Stats::MockScope::gaugeFromTaggedName(
                         name, name_tags, tagged_name, import_mode);
-                  }));
+                  });
 
           ON_CALL(*scope, histogramFromTaggedName(_, _, _, _))
-              .WillByDefault(Invoke(
+              .WillByDefault(
                   [scope_ptr = scope.get()](Stats::StatName name,
                                             std::optional<Stats::StatNameTagSpan> name_tags,
                                             Stats::StatName tagged_name,
                                             Stats::Histogram::Unit unit) -> Stats::Histogram& {
                     return scope_ptr->Stats::MockScope::histogramFromTaggedName(name, name_tags,
                                                                                 tagged_name, unit);
-                  }));
+                  });
 
           scope_ = scope;
           name_storages_.push_back(std::move(scope_name_storage));
           return scope;
-        }));
+        });
 
     logger_ = std::make_shared<StatsAccessLog>(config, context_, std::move(filter_),
                                                std::vector<Formatter::CommandParserPtr>{});
@@ -397,17 +397,16 @@ TEST_F(StatsAccessLoggerTest, HistogramPercent) {
   std::optional<std::string> a_number{"0.1"};
   EXPECT_CALL(stream_info_, responseCodeDetails()).WillRepeatedly(testing::ReturnRef(a_number));
   EXPECT_CALL(store_, histogram(_, Stats::Histogram::Unit::Percent))
-      .WillOnce(
-          Invoke([&](const std::string& name, Stats::Histogram::Unit unit) -> Stats::Histogram& {
-            auto* histogram = new NiceMock<Stats::MockHistogram>(); // symbol_table_);
-            histogram->name_ = name;
-            histogram->unit_ = unit;
-            histogram->store_ = &store_;
-            store_.histograms_.emplace_back(histogram);
+      .WillOnce([&](const std::string& name, Stats::Histogram::Unit unit) -> Stats::Histogram& {
+        auto* histogram = new NiceMock<Stats::MockHistogram>(); // symbol_table_);
+        histogram->name_ = name;
+        histogram->unit_ = unit;
+        histogram->store_ = &store_;
+        store_.histograms_.emplace_back(histogram);
 
-            EXPECT_CALL(*histogram, recordValue(Stats::Histogram::PercentScale / 10));
-            return *histogram;
-          }));
+        EXPECT_CALL(*histogram, recordValue(Stats::Histogram::PercentScale / 10));
+        return *histogram;
+      });
 
   logger_->log(formatter_context_, stream_info_);
 }
@@ -433,15 +432,14 @@ TEST_F(StatsAccessLoggerTest, EmptyTagFormatter) {
   EXPECT_CALL(stream_info_, responseCode())
       .WillRepeatedly(testing::Return(std::optional<uint32_t>{200}));
   EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
-      .WillOnce(testing::Invoke([this](Stats::StatName name,
-                                       std::optional<Stats::StatNameTagSpan> name_tags,
-                                       Stats::StatName) -> Stats::Counter& {
+      .WillOnce([this](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                       Stats::StatName) -> Stats::Counter& {
         EXPECT_EQ("counter", scope_->symbolTable().toString(name));
         EXPECT_EQ(1, name_tags->size());
         EXPECT_EQ(":200", scope_->symbolTable().toString(name_tags->front().second));
 
         return store_.counter_;
-      }));
+      });
   EXPECT_CALL(store_.counter_, add(1));
   logger_->log(formatter_context_, stream_info_);
 }
@@ -853,9 +851,8 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
 
   // Initial lookup and add
   EXPECT_CALL(*mock_scope, gaugeFromTaggedName(_, _, _, Stats::Gauge::ImportMode::Accumulate))
-      .WillRepeatedly(Invoke([&](Stats::StatName name,
-                                 std::optional<Stats::StatNameTagSpan> name_tags, Stats::StatName,
-                                 Stats::Gauge::ImportMode) -> Stats::Gauge& {
+      .WillRepeatedly([&](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                          Stats::StatName, Stats::Gauge::ImportMode) -> Stats::Gauge& {
         saved_name = name;
         if (name_tags.has_value() && !name_tags->empty()) {
           for (const auto& tag : *name_tags) {
@@ -869,7 +866,7 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateDestructorSubtractsFromSavedGauge) {
                                    store_.symbolTable());
         }
         return *gauge_;
-      }));
+      });
 
   EXPECT_CALL(*gauge_, add(10));
   logger_->log(formatter_context_, local_stream_info);
@@ -1130,15 +1127,14 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTag) {
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
   EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
-      .WillOnce(testing::Invoke([this](Stats::StatName name,
-                                       std::optional<Stats::StatNameTagSpan> name_tags,
-                                       Stats::StatName tagged_name) -> Stats::Counter& {
+      .WillOnce([this](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                       Stats::StatName tagged_name) -> Stats::Counter& {
         EXPECT_EQ("counter", scope_->symbolTable().toString(name));
         EXPECT_EQ(1, name_tags->size());
         EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
         EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
         return scope_->counterFromTaggedName_(name, name_tags, tagged_name);
-      }));
+      });
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -1173,13 +1169,12 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterDropTag) {
 
   // Case 1: Filter matches (tag foo=bar), so drop tag action is executed.
   EXPECT_CALL(*scope_, counterFromTaggedName(_, _, _))
-      .WillOnce(testing::Invoke([this](Stats::StatName name,
-                                       std::optional<Stats::StatNameTagSpan> name_tags,
-                                       Stats::StatName tagged_name) -> Stats::Counter& {
+      .WillOnce([this](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                       Stats::StatName tagged_name) -> Stats::Counter& {
         EXPECT_EQ("counter", scope_->symbolTable().toString(name));
         EXPECT_EQ(0, name_tags->size());
         return scope_->counterFromTaggedName_(name, name_tags, tagged_name);
-      }));
+      });
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -1293,14 +1288,14 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnGauge) {
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
   EXPECT_CALL(*mock_scope, gaugeFromTaggedName(_, _, _, _))
-      .WillOnce(Invoke([&](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
-                           Stats::StatName, Stats::Gauge::ImportMode) -> Stats::Gauge& {
+      .WillOnce([&](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                    Stats::StatName, Stats::Gauge::ImportMode) -> Stats::Gauge& {
         EXPECT_EQ("gauge", scope_->symbolTable().toString(name));
         EXPECT_EQ(1, name_tags->size());
         EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
         EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
         return *gauge_;
-      }));
+      });
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -1340,16 +1335,15 @@ TEST_F(StatsAccessLoggerTest, StatTagFilterUpdateTagOnHistogram) {
 
   // Case 1: Filter matches (tag foo=bar), so update tag action is executed.
   EXPECT_CALL(*mock_scope, histogramFromTaggedName(_, _, _, _))
-      .WillOnce(
-          Invoke([&](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
-                     Stats::StatName tagged_name, Stats::Histogram::Unit) -> Stats::Histogram& {
-            EXPECT_EQ("histogram", scope_->symbolTable().toString(name));
-            EXPECT_EQ(1, name_tags->size());
-            EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
-            EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
-            return store_.mockScope().histogramFromTaggedName(name, name_tags, tagged_name,
-                                                              Stats::Histogram::Unit::Bytes);
-          }));
+      .WillOnce([&](Stats::StatName name, std::optional<Stats::StatNameTagSpan> name_tags,
+                    Stats::StatName tagged_name, Stats::Histogram::Unit) -> Stats::Histogram& {
+        EXPECT_EQ("histogram", scope_->symbolTable().toString(name));
+        EXPECT_EQ(1, name_tags->size());
+        EXPECT_EQ("foo", scope_->symbolTable().toString((*name_tags)[0].first));
+        EXPECT_EQ("baz", scope_->symbolTable().toString((*name_tags)[0].second));
+        return store_.mockScope().histogramFromTaggedName(name, name_tags, tagged_name,
+                                                          Stats::Histogram::Unit::Bytes);
+      });
   logger_->log(formatter_context_, stream_info_);
 }
 
@@ -1382,9 +1376,9 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   Stats::StatNameTagVector tags1 = {{tag_n1, tag_v1}};
   Stats::StatNameTagVector tags2 = {{tag_n1, tag_v2}};
 
-  GaugeKey key_tags1(name1, std::cref(tags1));
-  GaugeKey key_tags2(name1, std::cref(tags1));
-  GaugeKey key_tags3(name1, std::cref(tags2));
+  GaugeKey key_tags1(name1, tags1);
+  GaugeKey key_tags2(name1, tags1);
+  GaugeKey key_tags3(name1, tags2);
 
   EXPECT_EQ(key_tags1, key_tags2);
   EXPECT_NE(key_tags1, key_tags3);
@@ -1394,7 +1388,7 @@ TEST(GaugeKeyTest, EqualityAndHashing) {
   EXPECT_NE(absl::Hash<GaugeKey>{}(key_tags1), absl::Hash<GaugeKey>{}(key_tags3));
 
   // Borrowed vs Owned
-  GaugeKey key_owned(name1, std::cref(tags1));
+  GaugeKey key_owned(name1, tags1);
   key_owned.makeOwned();
 
   EXPECT_EQ(key_tags1, key_owned); // Borrowed vs Owned should be equal if content is same //
@@ -1419,11 +1413,11 @@ TEST(GaugeKeyTest, VerifyAbslHashCorrectness) {
   GaugeKey key_empty1(name1, std::nullopt);
   GaugeKey key_empty2(name2, std::nullopt);
 
-  GaugeKey key_borrowed(name1, std::cref(tags1));
-  GaugeKey key_owned(name1, std::cref(tags1));
+  GaugeKey key_borrowed(name1, tags1);
+  GaugeKey key_owned(name1, tags1);
   key_owned.makeOwned();
 
-  GaugeKey key_tags2(name1, std::cref(tags2));
+  GaugeKey key_tags2(name1, tags2);
 
   EXPECT_TRUE(absl::VerifyTypeImplementsAbslHashCorrectly(
       std::make_tuple(std::move(key_empty1), std::move(key_empty2), std::move(key_borrowed),
@@ -1456,14 +1450,14 @@ TEST(GaugeKeyTest, ExactMemoryFootprint) {
   // 2. Check memory usage of Borrowed tags GaugeKey.
   {
     Memory::TestUtil::MemoryTest memory_test;
-    GaugeKey key(name, std::cref(tags));
+    GaugeKey key(name, tags);
     // Borrowed tags should NOT cause heap allocation by GaugeKey itself.
     EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 0);
   }
 
   // 3. Check memory usage after making it owned.
   {
-    GaugeKey key(name, std::cref(tags));
+    GaugeKey key(name, tags);
 
     Memory::TestUtil::MemoryTest memory_test;
     key.makeOwned();
@@ -1507,8 +1501,8 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
 
     // 1. Add multiple items
     for (int i = 0; i < NUM_ITEMS; ++i) {
-      access_log_state->addInflightGauge(names[i], std::cref(tags),
-                                         Stats::Gauge::ImportMode::Accumulate, 1, {});
+      access_log_state->addInflightGauge(names[i], tags, Stats::Gauge::ImportMode::Accumulate, 1,
+                                         {});
     }
 
     // Verify it is within bounds (e.g., less than 384 bytes per entry including map overhead).
@@ -1523,8 +1517,8 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
 
     // 2. Remove all items
     for (int i = 0; i < NUM_ITEMS; ++i) {
-      access_log_state->removeInflightGauge(names[i], std::cref(tags),
-                                            Stats::Gauge::ImportMode::Accumulate, 1);
+      access_log_state->removeInflightGauge(names[i], tags, Stats::Gauge::ImportMode::Accumulate,
+                                            1);
     }
 
     // absl::flat_hash_map is designed to not release its slots after removing entries,
@@ -1538,7 +1532,11 @@ TEST_F(StatsAccessLoggerTest, AccessLogStateMemoryFootprint) {
 
     // After destruction, there should be no leaks. We allow 4096 bytes for allocator caches.
     // We use EXPECT_LE directly here to bypass the strict EXPECT_GT constraint of EXPECT_MEMORY_LE.
-    EXPECT_LE(memory_test.consumedBytes(), 4096);
+    // Cast to signed: consumedBytes() is unsigned and can underflow. Under jemalloc, bytes freed
+    // into thread caches before MemoryTest was constructed still count in stats.allocated until
+    // the `tcache` is flushed; flushes during the churn above can push the post-destruction value
+    // below the baseline, giving a legitimately negative delta.
+    EXPECT_LE(static_cast<int64_t>(memory_test.consumedBytes()), 4096);
   }
 }
 

@@ -150,10 +150,10 @@ protected:
         failover_stream_owner_(std::make_unique<MockGrpcStream<RequestType, ResponseType>>()),
         primary_stream_(*primary_stream_owner_), failover_stream_(*failover_stream_owner_) {
     // Overwrite the timer and keep the callback to emulate its invocations later.
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
-    }));
+    });
     grpc_mux_failover_ = std::make_unique<GrpcMuxFailover<RequestType, ResponseType>>(
         /*primary_stream_creator=*/
         [this](GrpcStreamCallbacks<ResponseType>* callbacks)

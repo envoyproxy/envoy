@@ -24,11 +24,11 @@ envoy_cc_library(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "@cel-cpp//eval/public:value_export_util",
     ] + select(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
-                "@cel-cpp//eval/public:value_export_util",
                 "@cel-cpp//parser",
             ],
         },

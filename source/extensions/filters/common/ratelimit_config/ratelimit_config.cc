@@ -188,6 +188,7 @@ RateLimitPolicy::RateLimitPolicy(const ProtoRateLimit& config,
 }
 
 void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
+                                          const Http::ResponseHeaderMap* response_headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
                                           RateLimitDescriptors& descriptors) const {
@@ -205,7 +206,7 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
   // Populate hits_addend if set.
   if (hits_addend_provider_ != nullptr) {
     const Protobuf::Value hits_addend_value =
-        hits_addend_provider_->formatValue({&headers}, stream_info);
+        hits_addend_provider_->formatValue({&headers, response_headers}, stream_info);
 
     double hits_addend = 0;
     bool success = true;
@@ -260,6 +261,7 @@ RateLimitConfig::RateLimitConfig(const Protobuf::RepeatedPtrField<ProtoRateLimit
 }
 
 void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
+                                          const Http::ResponseHeaderMap* response_headers,
                                           const StreamInfo::StreamInfo& stream_info,
                                           const std::string& local_service_cluster,
                                           RateLimitDescriptors& descriptors,
@@ -268,7 +270,8 @@ void RateLimitConfig::populateDescriptors(const Http::RequestHeaderMap& headers,
     if (generator.applyOnStreamDone() != on_stream_done) {
       continue;
     }
-    generator.populateDescriptors(headers, stream_info, local_service_cluster, descriptors);
+    generator.populateDescriptors(headers, response_headers, stream_info, local_service_cluster,
+                                  descriptors);
   }
 }
 

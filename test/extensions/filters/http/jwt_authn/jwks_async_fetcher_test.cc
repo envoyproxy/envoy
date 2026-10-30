@@ -51,10 +51,9 @@ public:
     }
 
     if (initManagerUsed()) {
-      EXPECT_CALL(context_.init_manager_, add(_))
-          .WillOnce(Invoke([this](const Init::Target& target) {
-            init_target_handle_ = target.createHandle("test");
-          }));
+      EXPECT_CALL(context_.init_manager_, add(_)).WillOnce([this](const Init::Target& target) {
+        init_target_handle_ = target.createHandle("test");
+      });
     } else {
       EXPECT_CALL(context_.init_manager_, add(_)).Times(0);
     }

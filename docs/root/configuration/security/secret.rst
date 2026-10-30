@@ -185,6 +185,19 @@ In contrast, :ref:`sds_server_example` requires a restart to reload xDS certific
                 path_config_source:
                   path: /etc/envoy/validation_context_sds_secret.yaml
 
+When filesystem notifications are unreliable or a custom deployment model does not generate
+the move or modification events handled by watching the path or directory, configure :ref:`poll_interval
+<envoy_v3_api_field_config.core.v3.PathConfigSource.poll_interval>` on each
+``path_config_source``. Envoy will poll both the SDS configuration file and the same secret files
+that are watched in event-based mode:
+
+.. code-block:: yaml
+
+    sds_config:
+      path_config_source:
+        path: /etc/envoy/tls_certificate_sds_secret.yaml
+        poll_interval: 5s
+
 Paths to client certificate, including client's certificate chain and private key are given in SDS config file ``/etc/envoy/tls_certificate_sds_secret.yaml``:
 
 .. code-block:: yaml
@@ -415,4 +428,3 @@ the downstream filter chain, e.g. using the following filter configuration:
         text_format_source:
           inline_string: my_secret_name
       shared_with_upstream: ONCE
-

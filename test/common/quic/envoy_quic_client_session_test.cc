@@ -35,7 +35,6 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -279,9 +278,9 @@ TEST_P(EnvoyQuicClientSessionTest, NewStream) {
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/true))
-      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+      .WillOnce([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());
-      }));
+      });
   stream.OnStreamHeaderList(/*fin=*/true, headers.uncompressed_header_bytes(), headers);
 }
 
@@ -312,9 +311,9 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
   headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
   // Response headers should be propagated to decoder.
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+      .WillOnce([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());
-      }));
+      });
   stream.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
   // With one stream, still read 16 packets.
   EXPECT_EQ(1, envoy_quic_session_->GetNumActiveStreams());
@@ -322,9 +321,9 @@ TEST_P(EnvoyQuicClientSessionTest, PacketLimits) {
 
   EnvoyQuicClientStream& stream2 = sendGetRequest(response_decoder, stream_callbacks);
   EXPECT_CALL(response_decoder, decodeHeaders_(_, /*end_stream=*/false))
-      .WillOnce(Invoke([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
+      .WillOnce([](const Http::ResponseHeaderMapPtr& decoded_headers, bool) {
         EXPECT_EQ("200", decoded_headers->getStatusValue());
-      }));
+      });
   stream2.OnStreamHeaderList(/*fin=*/false, headers.uncompressed_header_bytes(), headers);
   // With 2 streams, read 32 packets.
   EXPECT_EQ(2, envoy_quic_session_->GetNumActiveStreams());
@@ -577,13 +576,9 @@ TEST_P(EnvoyQuicClientSessionTest, StatelessResetOnProbingSocket) {
   EXPECT_NE(new_self_address->asString(), self_addr_->asString());
 
   // Send a STATELESS_RESET packet to the probing socket.
-  quic::StatelessResetToken reset_token =
-      GetQuicReloadableFlag(quic_check_alternate_reset_token)
-          ? frame.stateless_reset_token
-          : quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId());
   std::unique_ptr<quic::QuicEncryptedPacket> stateless_reset_packet =
-      quic::QuicFramer::BuildIetfStatelessResetPacket(frame.connection_id,
-                                                      /*received_packet_length*/ 1200, reset_token);
+      quic::QuicFramer::BuildIetfStatelessResetPacket(
+          frame.connection_id, /*received_packet_length*/ 1200, frame.stateless_reset_token);
   Buffer::RawSlice slice;
   slice.mem_ = const_cast<char*>(stateless_reset_packet->data());
   slice.len_ = stateless_reset_packet->length();
@@ -794,14 +789,13 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
   EXPECT_CALL(os_sys_calls, supportsUdpGro()).WillRepeatedly(Return(true));
   EXPECT_CALL(os_sys_calls, recvmmsg(_, _, _, _, _)).Times(0);
   EXPECT_CALL(os_sys_calls, recvmsg(_, _, _))
-      .WillOnce(
-          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
-            dispatcher_->exit();
-            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
-            // use the msghdr that would normally have been populated by recvmsg but is not
-            // populated by this mock.
-            return {-1, SOCKET_ERROR_AGAIN};
-          }));
+      .WillOnce([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+        dispatcher_->exit();
+        // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+        // use the msghdr that would normally have been populated by recvmsg but is not
+        // populated by this mock.
+        return {-1, SOCKET_ERROR_AGAIN};
+      });
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
@@ -867,14 +861,13 @@ TEST_P(EnvoyQuicClientSessionDisallowMmsgTest, UsesRecvMsgWhenNoGro) {
   // Uses `recvmsg`, not `recvmmsg`.
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _)).Times(0);
   EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _))
-      .WillOnce(
-          Invoke([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
-            dispatcher_->exit();
-            // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
-            // use the msghdr that would normally have been populated by recvmsg but is not
-            // populated by this mock.
-            return {-1, SOCKET_ERROR_AGAIN};
-          }));
+      .WillOnce([&](os_fd_t /*socket*/, msghdr* /*msg*/, int /*flags*/) -> Api::SysCallSizeResult {
+        dispatcher_->exit();
+        // Return an error so IoSocketHandleImpl::recvmsg() exits early, instead of trying to
+        // use the msghdr that would normally have been populated by recvmsg but is not
+        // populated by this mock.
+        return {-1, SOCKET_ERROR_AGAIN};
+      });
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 
@@ -921,12 +914,12 @@ TEST_P(EnvoyQuicClientSessionAllowMmsgTest, UsesRecvMmsgWhenNoGroAndMmsgAllowed)
   EXPECT_CALL(os_sys_calls_, supportsUdpGro()).WillRepeatedly(Return(false));
   EXPECT_CALL(os_sys_calls_, recvmsg(_, _, _)).Times(0);
   EXPECT_CALL(os_sys_calls_, recvmmsg(_, _, _, _, _))
-      .WillRepeatedly(Invoke([&](os_fd_t, struct mmsghdr*, unsigned int, int,
-                                 struct timespec*) -> Api::SysCallIntResult {
+      .WillRepeatedly([&](os_fd_t, struct mmsghdr*, unsigned int, int,
+                          struct timespec*) -> Api::SysCallIntResult {
         dispatcher_->exit();
         // EAGAIN should be returned with -1 but returning 0 here shouldn't cause busy looping.
         return {0, SOCKET_ERROR_AGAIN};
-      }));
+      });
 
   peer_socket_->ioHandle().sendmsg(&slice, 1, 0, peer_addr_->ip(), *self_addr_);
 

@@ -23,9 +23,9 @@ public:
   ~DynamicModuleBootstrapExtension() override;
 
   /**
-   * Initializes the in-module extension.
+   * Initializes the in-module extension. Returns false when the module returns a null extension.
    */
-  void initializeInModuleExtension();
+  bool initializeInModuleExtension();
 
   // Server::BootstrapExtension
   void onServerInitialized(Server::Instance&) override;

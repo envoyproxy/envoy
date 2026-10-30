@@ -57,6 +57,9 @@ public:
   certificateValidationContext() const override {
     return validation_context_config_.get();
   }
+  bool validationContextConfigured() const override {
+    return certificate_validation_context_provider_.provider_ != nullptr;
+  }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
   const Network::Address::IpList& tlsKeyLogLocal() const override { return *tls_keylog_local_; };
@@ -174,6 +177,7 @@ private:
 
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
+  static const unsigned DEFAULT_MAX_VERSION_LEGACY;
 
   const std::string server_name_indication_;
   const bool auto_host_sni_ : 1;

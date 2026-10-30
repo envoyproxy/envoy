@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -12,10 +11,11 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "injected_resource_monitor_integration_test",
     size = "large",
     srcs = ["injected_resource_monitor_integration_test.cc"],
+    extension_names = ["envoy.resource_monitors.injected_resource"],
     rbe_pool = "linux_x64_small",
     # Broken until bazel 5.0.0 fix to shorten resulting paths for SymInitialize() failure
     tags = ["skip_on_windows"],
@@ -30,9 +30,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "injected_resource_monitor_test",
     srcs = ["injected_resource_monitor_test.cc"],
+    extension_names = ["envoy.resource_monitors.injected_resource"],
     rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/event:dispatcher_lib",

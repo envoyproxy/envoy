@@ -1,10 +1,22 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, bytes_to_module_buffer, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer,
-  strs_to_module_buffers, wrap_into_c_void_ptr, CompletionCallback, EnvoyCounterId,
-  EnvoyCounterVecId, EnvoyGaugeId, EnvoyGaugeVecId, EnvoyHistogramId, EnvoyHistogramVecId,
+  abi,
+  bytes_to_module_buffer,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  strs_to_module_buffers,
+  wrap_into_c_void_ptr,
+  CompletionCallback,
+  EnvoyCounterId,
+  EnvoyCounterVecId,
+  EnvoyGaugeId,
+  EnvoyGaugeVecId,
+  EnvoyHistogramId,
+  EnvoyHistogramVecId,
   NEW_CLUSTER_CONFIG_FUNCTION,
 };
+#[cfg(any(test, feature = "mock"))]
 use mockall::*;
 use std::any::Any;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -71,8 +83,7 @@ pub trait Cluster: Send + Sync {
   /// default implementation is a no-op.
   ///
   /// * `envoy_cluster` provides access to the underlying Envoy cluster object.
-  /// * `event_id` is the module-defined identifier supplied at the main-thread fan-out call
-  ///   site.
+  /// * `event_id` is the module-defined identifier supplied at the main-thread fan-out call site.
   fn on_worker_event(&self, _envoy_cluster: &dyn EnvoyCluster, _event_id: u64) {}
 
   /// Called when the server initialization is complete (PostInit lifecycle stage).
@@ -163,7 +174,7 @@ pub trait AsyncHostSelectionHandle: Send {
 /// This is passed to [`ClusterLb::choose_host`] and must be stored by the module when returning
 /// [`HostSelectionResult::AsyncPending`]. The module calls
 /// [`EnvoyAsyncHostSelectionComplete::complete`] to deliver the async result.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyAsyncHostSelectionComplete: Send {
   /// Delivers the async host selection result and consumes the completion. `host` is the selected
   /// host, or `None` on failure; `details` describes the outcome. Taking `self` by value means the
@@ -238,7 +249,7 @@ pub trait ClusterLb: Send {
 ///
 /// This provides access to downstream request information for making load balancing decisions
 /// such as header-based routing, consistent hashing, and retry-aware host selection.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait ClusterLbContext {
   /// Compute a hash key from the request context for consistent hashing.
   ///
@@ -305,8 +316,7 @@ pub trait ClusterLbContext {
   ///
   /// Returns `None` if the request has no stream info, the key is not present, or the object
   /// does not support serialization. The returned buffer borrows from Envoy and is valid until
-  /// the next call to `get_filter_state_typed` on the same worker thread, or until the end of
-  /// the current host-selection callback, whichever comes first.
+  /// the end of the current host-selection callback.
   fn get_filter_state_typed<'a>(&'a self, key: &[u8]) -> Option<EnvoyBuffer<'a>>;
 
   /// Stores a `Router::StringAccessor` filter state on the request under `key`, so a later filter,
@@ -375,7 +385,7 @@ pub trait ClusterLbContext {
 }
 
 /// Envoy-side cluster operations available to the module.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyCluster: Send + Sync {
   /// Add multiple hosts to the cluster in a single batch operation.
   ///
@@ -423,6 +433,14 @@ pub trait EnvoyCluster: Send + Sync {
   /// This must be called during or after [`Cluster::on_init`] to allow Envoy to start
   /// routing traffic to this cluster.
   fn pre_init_complete(&self);
+
+  /// Back the cluster's cross-priority host map with a persistent map instead of the default
+  /// flat map, so that each host update costs O(log N) instead of a full copy of the map. In
+  /// exchange a lookup by address costs O(log N) rather than O(1).
+  ///
+  /// This is optional and must be called during [`Cluster::on_init`] before any host is added.
+  /// A call made after a host has been added has no effect and is reported as a bug.
+  fn use_persistent_host_map(&self);
 
   /// Add multiple hosts to the cluster with per-host locality and metadata.
   ///
@@ -514,7 +532,9 @@ pub trait EnvoyCluster: Send + Sync {
 
   /// Look up a host by its address string across all priorities and return the host pointer.
   ///
-  /// This provides O(1) lookup by address using the cross-priority host map.
+  /// This uses the cross-priority host map internally, so the lookup is O(1) with the default flat
+  /// host map, or O(log N) if the cluster selected the persistent host map via
+  /// [`EnvoyCluster::use_persistent_host_map`].
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   ///
   /// Returns the host pointer if found, or `None` if the address is not in the cluster.
@@ -612,7 +632,7 @@ impl<C: EnvoyCluster + ?Sized> EnvoyClusterWorkerSlotExt for C {
 /// This trait provides access to the cluster's host set for load balancing decisions.
 /// It mirrors the standalone load balancer's [`EnvoyLoadBalancer`] trait, operating on the
 /// cluster's priority set.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyClusterLoadBalancer: Send {
   /// Get the number of healthy hosts at the given priority level.
   fn get_healthy_host_count(&self, priority: u32) -> usize;
@@ -657,8 +677,10 @@ pub trait EnvoyClusterLoadBalancer: Send {
 
   /// Look up a host by its address string across all priorities in the cluster's priority set.
   ///
-  /// This uses the cross-priority host map internally, providing O(1) lookup by address. The
-  /// address must match the format "ip:port" (e.g., "10.0.0.1:8080").
+  /// This uses the cross-priority host map internally, so the lookup is O(1) with the default flat
+  /// host map, or O(log N) if the cluster selected the persistent host map via
+  /// [`EnvoyCluster::use_persistent_host_map`]. The address must match the format
+  /// "ip:port" (e.g., "10.0.0.1:8080").
   ///
   /// Unlike [`EnvoyCluster::find_host_by_address`] which operates on the main thread, this is
   /// safe to call from worker threads during load balancing decisions.
@@ -696,7 +718,9 @@ pub trait EnvoyClusterLoadBalancer: Send {
   ) -> abi::envoy_dynamic_module_type_host_health;
 
   /// Looks up a host by its address string across all priorities and returns its health status.
-  /// This provides O(1) lookup by address using the cross-priority host map.
+  /// This uses the cross-priority host map internally, so the lookup is O(1) with the default flat
+  /// host map, or O(log N) if the cluster selected the persistent host map via
+  /// [`EnvoyCluster::use_persistent_host_map`].
   ///
   /// The address must match the format "ip:port" (e.g., "10.0.0.1:8080").
   fn get_host_health_by_address(
@@ -825,6 +849,37 @@ pub trait EnvoyClusterLoadBalancer: Send {
     index: usize,
     is_added: bool,
   ) -> Option<PackedAddress>;
+
+  /// Returns how many hosts changed health since the previous update this worker applied, so the
+  /// module can patch its healthy set from the current [`ClusterLb::on_host_membership_update`]
+  /// call instead of rereading every host. Envoy merges updates within the cluster's
+  /// `update_merge_window`, so one call can carry several health changes. Each host is listed
+  /// once, and hosts removed since the previous update are reported only by
+  /// [`EnvoyClusterLoadBalancer::get_member_update_host`]. It is only valid during the
+  /// `on_host_membership_update` callback.
+  ///
+  /// Returns `None` outside the callback, or when Envoy does not know which hosts changed health:
+  /// the cluster does not keep persistent host partitions, or a health refresh happened since the
+  /// previous update. A refresh covers every host, and with an active health checker it precedes a
+  /// worker's first update. The module must then reread the hosts it tracks.
+  fn get_member_update_health_changed_host_count(&self) -> Option<usize>;
+
+  /// Returns a host whose health changed since the previous update this worker applied, with its
+  /// priority and current health. The health is read when this is called, so it can be newer than
+  /// the host lists of the same update. The host pointer stays valid while the host is in the
+  /// cluster's host set. Valid indexes are below
+  /// [`EnvoyClusterLoadBalancer::get_member_update_health_changed_host_count`]. It is only valid
+  /// during the `on_host_membership_update` callback.
+  ///
+  /// Returns `None` when the index is out of bounds or the count is unknown.
+  fn get_member_update_health_changed_host(
+    &self,
+    index: usize,
+  ) -> Option<(
+    abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    u32,
+    abi::envoy_dynamic_module_type_host_health,
+  )>;
 }
 
 /// A per-worker timer handle, created via [`EnvoyClusterLoadBalancer::worker_timer_new`].
@@ -837,7 +892,7 @@ pub trait EnvoyClusterLoadBalancer: Send {
 /// The owning handle returned by `worker_timer_new` automatically destroys the underlying Envoy
 /// timer when dropped. The non-owning reference passed to [`ClusterLb::on_worker_timer_fired`] does
 /// not. Each timer has a unique [`id`](EnvoyClusterWorkerTimer::id) stable for its lifetime.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyClusterWorkerTimer: Send {
   /// Returns a unique opaque identifier for this timer, stable for its lifetime. Lets a module with
   /// multiple timers identify which one fired in [`ClusterLb::on_worker_timer_fired`].
@@ -858,7 +913,7 @@ pub trait EnvoyClusterWorkerTimer: Send {
 /// The scheduler can be used from any thread. When [`EnvoyClusterScheduler::commit`] is called,
 /// the event is posted to the main thread dispatcher and [`Cluster::on_scheduled`] will be
 /// invoked on the main thread with the corresponding `event_id`.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 pub trait EnvoyClusterScheduler: Send + Sync {
   /// Commit the scheduled event to the main thread.
   fn commit(&self, event_id: u64);
@@ -937,7 +992,7 @@ impl EnvoyResolvedHistogram {
 /// config creation and can be recorded at any point during the cluster lifecycle.
 ///
 /// Implementations must be `Send + Sync` since they may be accessed from multiple threads.
-#[automock]
+#[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyClusterMetrics: Send + Sync {
   // -------------------------------------------------------------------------
@@ -1153,8 +1208,8 @@ impl EnvoyClusterImpl {
     metadata: &[Vec<(String, String, String)>],
   ) -> Option<Vec<abi::envoy_dynamic_module_type_cluster_host_envoy_ptr>> {
     let count = addresses.len();
-    // The host reads weights and localities up to count and expects a rectangular metadata block, so
-    // reject any inconsistent length before crossing the ABI to avoid an out of bounds read.
+    // The host reads weights and localities up to count and expects a rectangular metadata block,
+    // so reject any inconsistent length before crossing the ABI to avoid an out of bounds read.
     if hostnames.is_some_and(|hostnames| hostnames.len() != count) {
       return None;
     }
@@ -1369,6 +1424,12 @@ impl EnvoyCluster for EnvoyClusterImpl {
   fn pre_init_complete(&self) {
     unsafe {
       abi::envoy_dynamic_module_callback_cluster_pre_init_complete(self.raw);
+    }
+  }
+
+  fn use_persistent_host_map(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_use_persistent_host_map(self.raw);
     }
   }
 
@@ -1950,11 +2011,46 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
     match result.family {
       4 => {
         let mut v4 = [0u8; 4];
-        v4.copy_from_slice(&result.address_bytes[..4]);
+        v4.copy_from_slice(&result.address_bytes[.. 4]);
         Some(PackedAddress::V4(v4, result.port))
       },
       6 => Some(PackedAddress::V6(result.address_bytes, result.port)),
       _ => None,
+    }
+  }
+
+  fn get_member_update_health_changed_host_count(&self) -> Option<usize> {
+    let mut count = 0usize;
+    let known = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+        self.raw, &mut count,
+      )
+    };
+    known.then_some(count)
+  }
+
+  fn get_member_update_health_changed_host(
+    &self,
+    index: usize,
+  ) -> Option<(
+    abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    u32,
+    abi::envoy_dynamic_module_type_host_health,
+  )> {
+    let mut priority = 0u32;
+    let mut health = abi::envoy_dynamic_module_type_host_health::Unhealthy;
+    let host = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+        self.raw,
+        index,
+        &mut priority,
+        &mut health,
+      )
+    };
+    if host.is_null() {
+      None
+    } else {
+      Some((host, priority, health))
     }
   }
 }
@@ -2507,24 +2603,15 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
   }
 
   fn get_downstream_headers(&self) -> Vec<(EnvoyBuffer<'_>, EnvoyBuffer<'_>)> {
-    let size = self.get_downstream_headers_size();
-    if size == 0 {
-      return Vec::default();
-    }
-    let mut headers: Vec<(EnvoyBuffer, EnvoyBuffer)> = Vec::with_capacity(size);
-    let ok = unsafe {
-      abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
-        self.raw_context,
-        headers.as_mut_ptr() as *mut abi::envoy_dynamic_module_type_envoy_http_header,
-      )
-    };
-    if !ok {
-      return Vec::default();
-    }
-    unsafe {
-      headers.set_len(size);
-    }
-    headers
+    crate::utility::collect_headers(
+      || self.get_downstream_headers_size(),
+      |headers| unsafe {
+        abi::envoy_dynamic_module_callback_cluster_lb_context_get_downstream_headers(
+          self.raw_context,
+          headers,
+        )
+      },
+    )
   }
 
   fn get_downstream_header(&self, key: &str, index: usize) -> Option<(EnvoyBuffer<'_>, usize)> {
@@ -2889,7 +2976,7 @@ ffi_export! {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_lb_choose_host")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -3280,7 +3367,7 @@ mod tests {
     let weights = vec![1, 2];
 
     assert!(cluster
-      .add_hosts_with_hostnames(&addresses, &hostnames[..1], &weights)
+      .add_hosts_with_hostnames(&addresses, &hostnames[.. 1], &weights)
       .is_none());
     assert!(crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_WITH_HOSTNAMES_CALLS
       .lock()
@@ -3348,9 +3435,9 @@ mod tests {
         "sub-zone".to_owned(),
       ),
     ];
-    assert!(cluster.add_hosts(&addresses, &weights[..1]).is_none());
+    assert!(cluster.add_hosts(&addresses, &weights[.. 1]).is_none());
     assert!(cluster
-      .add_hosts_with_locality(&addresses, &weights, &localities[..1], &[])
+      .add_hosts_with_locality(&addresses, &weights, &localities[.. 1], &[])
       .is_none());
     let metadata_short = vec![vec![("f".to_owned(), "k".to_owned(), "v".to_owned())]];
     assert!(cluster
@@ -3383,6 +3470,28 @@ mod tests {
       crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
       2
     );
+  }
+
+  // The stubs in `lib_test.rs` report two health-changed hosts for a null load balancer and an
+  // unknown count for any other.
+  #[test]
+  fn get_member_update_health_changed_hosts_reads_count_and_hosts() {
+    let lb = EnvoyClusterLoadBalancerImpl::new(std::ptr::null_mut());
+    assert_eq!(lb.get_member_update_health_changed_host_count(), Some(2));
+
+    let (host, priority, health) = lb.get_member_update_health_changed_host(0).unwrap();
+    assert_eq!(host as usize, 0xAB);
+    assert_eq!(priority, 1);
+    assert_eq!(health, abi::envoy_dynamic_module_type_host_health::Degraded);
+    let (host, priority, health) = lb.get_member_update_health_changed_host(1).unwrap();
+    assert_eq!(host as usize, 0xCD);
+    assert_eq!(priority, 0);
+    assert_eq!(health, abi::envoy_dynamic_module_type_host_health::Healthy);
+    assert!(lb.get_member_update_health_changed_host(2).is_none());
+
+    let unknown =
+      EnvoyClusterLoadBalancerImpl::new(0x1 as abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr);
+    assert_eq!(unknown.get_member_update_health_changed_host_count(), None);
   }
 
   // The per-request accessor callbacks are satisfied by the link-time stubs in lib_test.rs.

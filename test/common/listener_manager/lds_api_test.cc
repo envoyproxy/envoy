@@ -21,7 +21,6 @@
 
 using ::testing::_;
 using ::testing::InSequence;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::Throw;
@@ -33,17 +32,17 @@ namespace {
 class LdsApiTest : public testing::Test {
 public:
   LdsApiTest() {
-    ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
+    });
   }
 
   void setup() {
     envoy::config::core::v3::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
-    lds_ = std::make_unique<LdsApiImpl>(lds_config, nullptr, xds_manager_, cluster_manager_,
-                                        init_manager_, *store_.rootScope(), listener_manager_,
-                                        validation_visitor_);
+    lds_ =
+        std::make_unique<LdsApiImpl>(lds_config, nullptr, cluster_manager_, init_manager_,
+                                     *store_.rootScope(), listener_manager_, validation_visitor_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
     init_target_handle_->initialize(init_watcher_);
     lds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
@@ -53,20 +52,18 @@ public:
                  bool updated) {
     if (!version) {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
-          .WillOnce(
-              Invoke([listener_name, updated](const envoy::config::listener::v3::Listener& config,
-                                              const std::string&, bool) -> bool {
-                EXPECT_EQ(listener_name, config.name());
-                return updated;
-              }));
+          .WillOnce([listener_name, updated](const envoy::config::listener::v3::Listener& config,
+                                             const std::string&, bool) -> bool {
+            EXPECT_EQ(listener_name, config.name());
+            return updated;
+          });
     } else {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, version.value(), true))
-          .WillOnce(
-              Invoke([listener_name, updated](const envoy::config::listener::v3::Listener& config,
-                                              const std::string&, bool) -> bool {
-                EXPECT_EQ(listener_name, config.name());
-                return updated;
-              }));
+          .WillOnce([listener_name, updated](const envoy::config::listener::v3::Listener& config,
+                                             const std::string&, bool) -> bool {
+            EXPECT_EQ(listener_name, config.name());
+            return updated;
+          });
     }
   }
 
@@ -149,7 +146,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
       .WillOnce(Return(existing_listeners));
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, endListenerUpdate(_))
-      .WillOnce(Invoke([](ListenerManager::FailureStates&& state) { EXPECT_EQ(0, state.size()); }));
+      .WillOnce([](ListenerManager::FailureStates&& state) { EXPECT_EQ(0, state.size()); });
   ;
   EXPECT_CALL(init_watcher_, ready());
 

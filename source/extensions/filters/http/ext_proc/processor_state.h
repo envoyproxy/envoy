@@ -234,6 +234,7 @@ public:
   virtual void addBufferedData(Buffer::Instance& data) const PURE;
   virtual void modifyBufferedData(std::function<void(Buffer::Instance&)> cb) const PURE;
   virtual void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+  virtual void injectHeadersToFilterChain(bool end_stream) PURE;
   virtual uint32_t bufferLimit() const PURE;
 
   ChunkQueue& chunkQueue() { return chunk_queue_; }
@@ -582,6 +583,10 @@ public:
     decoder_callbacks_->injectDecodedDataToFilterChain(data, end_stream);
   }
 
+  void injectHeadersToFilterChain(bool end_stream) override {
+    decoder_callbacks_->injectDecodedHeadersToFilterChain(end_stream);
+  }
+
   uint32_t bufferLimit() const override { return decoder_callbacks_->bufferLimit(); }
 
   Http::HeaderMap* addTrailers() override {
@@ -738,6 +743,10 @@ public:
 
   void injectDataToFilterChain(Buffer::Instance& data, bool end_stream) override {
     encoder_callbacks_->injectEncodedDataToFilterChain(data, end_stream);
+  }
+
+  void injectHeadersToFilterChain(bool end_stream) override {
+    encoder_callbacks_->injectEncodedHeadersToFilterChain(end_stream);
   }
 
   uint32_t bufferLimit() const override { return encoder_callbacks_->bufferLimit(); }

@@ -99,14 +99,9 @@ typed_config:
 
     if (prepend_custom_filter_config_yaml.has_value()) {
       // Prepend DFP filter.
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
-          use_dfp_even_when_cluster_resolves_hosts) {
+      if (use_sub_cluster || use_dfp_even_when_cluster_resolves_hosts) {
         config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
                                                      : filter_use_dns_cache);
-      } else if (use_sub_cluster) {
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
-                                          "false");
-        config_helper_.prependFilter(filter_use_sub_cluster);
       }
 
       // Prepend the custom_filter from the parameter.
@@ -115,14 +110,9 @@ typed_config:
       // Prepend stream_info_filter.
       config_helper_.prependFilter(stream_info_filter_config_str);
     } else {
-      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
-          use_dfp_even_when_cluster_resolves_hosts) {
+      if (use_sub_cluster || use_dfp_even_when_cluster_resolves_hosts) {
         config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
                                                      : filter_use_dns_cache);
-      } else if (use_sub_cluster) {
-        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
-                                          "false");
-        config_helper_.prependFilter(filter_use_sub_cluster);
       }
 
       config_helper_.prependFilter(stream_info_filter_config_str);
@@ -654,21 +644,11 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost
   EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
 
   // This should result in a cache hit because the previous DNS query succeeded.
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-    EXPECT_LOG_CONTAINS("debug", "cache hit for host 'localhost", {
-      auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-      ASSERT_TRUE(response2->waitForEndStream());
-      EXPECT_EQ("200", response2->headers().getStatusValue());
-      // No new query attempt.
-      EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-    });
-  } else {
-    auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    ASSERT_TRUE(response2->waitForEndStream());
-    EXPECT_EQ("200", response2->headers().getStatusValue());
-    // No new query attempt.
-    EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
-  }
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("200", response2->headers().getStatusValue());
+  // No new query attempt.
+  EXPECT_EQ(1, test_server_->counter("dns_cache.foo.dns_query_attempt")->value());
 }
 
 // TODO(yanavlasov) Enable per #26642
@@ -688,6 +668,7 @@ TEST_P(ProxyFilterIntegrationTest, FailOnEmptyHostHeader) {
 #endif
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
+  useAccessLog("%RESPONSE_CODE_DETAILS% %RESPONSE_FLAGS% %UPSTREAM_HOST%");
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
@@ -708,7 +689,7 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
   ASSERT_TRUE(response1->waitForEndStream());
   ASSERT_TRUE(response2->waitForEndStream());
   EXPECT_EQ("200", response1->headers().getStatusValue());
-  EXPECT_EQ("200", response2->headers().getStatusValue());
+  EXPECT_EQ("200", response2->headers().getStatusValue()) << waitForAccessLog(access_log_name_, 1);
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
@@ -798,13 +779,8 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   ASSERT_TRUE(response->waitForEndStream());
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-    // The suspicious host will be set to an empty host resulting in host not found (503)
-    EXPECT_EQ("503", response->headers().getStatusValue());
-  } else {
-    // The suspicious host will be set to an empty host resulting in a bad request (400)
-    EXPECT_EQ("400", response->headers().getStatusValue());
-  }
+  // The suspicious host will be set to an empty host resulting in host not found (503)
+  EXPECT_EQ("503", response->headers().getStatusValue());
   std::string access_log = waitForAccessLog(access_log_name_);
   EXPECT_THAT(access_log, HasSubstr("empty_host_header"));
   EXPECT_FALSE(StringUtil::hasEmptySpace(access_log));
@@ -1187,11 +1163,15 @@ const BaseIntegrationTest::InstanceConstSharedPtrFn alternateLoopbackFunction() 
   return [](int) { return Network::Utility::parseInternetAddressNoThrow("127.0.0.2", 0); };
 }
 
-// Make sure that even with a resolution success we won't drain the connection.
+// Make sure that with the legacy in-place address update behavior
+// (envoy.reloadable_features.dfp_cluster_replace_host_on_address_change disabled), even with a
+// resolution success we won't drain the connection.
 TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResSuccess) {
   if (version_ != Network::Address::IpVersion::v4) {
     return;
   }
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.dfp_cluster_replace_host_on_address_change", "false");
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
 
@@ -1213,10 +1193,10 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResSuccess) {
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
   waitForNextUpstreamRequest();
 
-  // When the TTL is hit, the host will be removed from the DNS cache. This
-  // won't break the outstanding connection.
-  // test_server_->waitForCounter("dns.cares.resolve_total", Ge(1));
-  test_server_->waitForCounter("dns_cache.foo.dns_query_success", Ge(1));
+  // Wait for the re-resolution to swap the host address in place. This won't break the
+  // outstanding connection. Note that the counter is already at 1 because loading the cache file
+  // counts as an address change (empty -> cached address), so wait for the second change.
+  test_server_->waitForCounter("dns_cache.foo.host_address_changed", Ge(2));
 
   // Kick off a new request before the first is served.
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -1692,14 +1672,10 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
 
 // This test validates that processing of DNS resolutions on worker threads is handled correctly.
 // The test uses specific scenario where DFP filter AND async resolution in DFP cluster are enabled.
-// Normally DFP filter is not needed, however this configuration can occur as the
-// envoy.reloadable_features.dfp_cluster_resolves_hosts flag is now enabled by default. The test
-// also requires the Host header to be modified between DFP and Router filters to trigger abnormal
-// behavior in the DNS resolution processing loop.
+// Normally DFP filter is not needed because the DFP cluster resolves hosts itself, however this
+// configuration can still occur. The test also requires the Host header to be modified between DFP
+// and Router filters to trigger abnormal behavior in the DNS resolution processing loop.
 TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts", "true");
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "true");
   upstream_tls_ = false;
   autonomous_upstream_ = true;
   // Add DFP filter even if async DNS resolution is enabled.
@@ -1718,6 +1694,68 @@ TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
   ASSERT_TRUE(response->waitForEndStream());
   // The host modification filter sets a non-existing host which should result in a 503.
   EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
+TEST_P(ProxyFilterIntegrationTest, HostReplacementAcrossShortTtlResSuccess) {
+  if (version_ != Network::Address::IpVersion::v4) {
+    return;
+  }
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  host_ttl_ = 8000;
+  upstream_tls_ = false; // avoid cert errors for unknown hostname
+  use_cache_file_ = true;
+  dns_cache_ttl_ = 2;
+  // The test will start with the fake upstream latched to 127.0.0.2. Re-resolve will point the
+  // host at 127.0.0.1, where nothing is listening.
+  upstream_address_fn_ = alternateLoopbackFunction();
+
+  initializeWithArgs();
+  std::string host =
+      fmt::format("{}:{}", dns_hostname_, fake_upstreams_[0]->localAddress()->ip()->port());
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", host}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Wait for the re-resolution to change the host address, which replaces the host and publishes
+  // the old instance as removed. This won't break the outstanding stream. Note that the counter
+  // is already at 1 because loading the cache file counts as an address change (empty -> cached
+  // address), so wait for the second change.
+  test_server_->waitForCounter("dns_cache.foo.host_address_changed", Ge(2));
+
+  // Kick off a new request before the first is served. It must not reuse the connection to the
+  // old address: it attempts a new connection to the new address, where no upstream is listening,
+  // and therefore fails.
+  auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ("503", response2->headers().getStatusValue());
+  test_server_->waitForCounter("cluster.cluster_0.upstream_cx_total", Ge(2));
+
+  // The in-flight stream on the replaced host is still served.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Once the in-flight stream completes, the drained connection to the old address is closed
+  // even though the downstream connection stays open.
+  test_server_->waitForGauge("cluster.cluster_0.upstream_cx_active", Eq(0));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  fake_upstream_connection_.reset();
+
+  // Start an upstream at the new address (127.0.0.1, same port). A third request connects to the
+  // new address and succeeds, showing the replaced host serves traffic at its new address.
+  createUpstream(Network::Utility::parseInternetAddressNoThrow(
+                     "127.0.0.1", fake_upstreams_[0]->localAddress()->ip()->port()),
+                 upstreamConfig());
+  auto response3 = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response3->waitForEndStream());
+  EXPECT_EQ("200", response3->headers().getStatusValue());
 }
 
 } // namespace

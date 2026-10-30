@@ -705,6 +705,57 @@ WEAK_STUB(CertValidatorGetFilterState,
           envoy_dynamic_module_callback_cert_validator_get_filter_state(nullptr, {nullptr, 0},
                                                                         nullptr))
 
+WEAK_STUB(TlsCertificateSelectorGetRequestedServerName,
+          envoy_dynamic_module_callback_tls_certificate_selector_get_requested_server_name(nullptr,
+                                                                                           nullptr))
+WEAK_STUB(TlsCertificateSelectorGetClientHelloExtension,
+          envoy_dynamic_module_callback_tls_certificate_selector_get_client_hello_extension(
+              nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorGetFilterState,
+          envoy_dynamic_module_callback_tls_certificate_selector_get_filter_state(nullptr,
+                                                                                  {nullptr, 0},
+                                                                                  nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigSetCertificate,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate(
+              nullptr, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(TlsCertificateSelectorConfigRemoveCertificate,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(nullptr,
+                                                                                           {nullptr,
+                                                                                            0}))
+WEAK_STUB(TlsCertificateSelectorConfigDefineCounter,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigIncrementCounter,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_increment_counter(
+              nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TlsCertificateSelectorConfigDefineGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_gauge(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigSetGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_set_gauge(nullptr, 0,
+                                                                                  nullptr, 0, 0))
+WEAK_STUB(TlsCertificateSelectorConfigIncrementGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_increment_gauge(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        0))
+WEAK_STUB(TlsCertificateSelectorConfigDecrementGauge,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_decrement_gauge(nullptr, 0,
+                                                                                        nullptr, 0,
+                                                                                        0))
+WEAK_STUB(TlsCertificateSelectorConfigDefineHistogram,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_define_histogram(
+              nullptr, {nullptr, 0}, nullptr, 0, nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigRecordHistogramValue,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_record_histogram_value(
+              nullptr, 0, nullptr, 0, 0))
+WEAK_STUB(TlsCertificateSelectorConfigSchedulerNew,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(nullptr))
+WEAK_STUB(TlsCertificateSelectorConfigSchedulerCommit,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit(nullptr,
+                                                                                         0))
+WEAK_STUB(TlsCertificateSelectorConfigSchedulerDelete,
+          envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete(nullptr))
+
 WEAK_STUB(ConfigValidatorSetRejectionMessage,
           envoy_dynamic_module_callback_config_validator_set_rejection_message(nullptr,
                                                                                {nullptr, 0}))
@@ -722,6 +773,8 @@ WEAK_STUB(ClusterAddHostsWithHostnames,
 WEAK_STUB(ClusterRemoveHosts,
           envoy_dynamic_module_callback_cluster_remove_hosts(nullptr, nullptr, 0))
 WEAK_STUB(ClusterPreInitComplete, envoy_dynamic_module_callback_cluster_pre_init_complete(nullptr))
+WEAK_STUB(ClusterUsePersistentHostMap,
+          envoy_dynamic_module_callback_cluster_use_persistent_host_map(nullptr))
 WEAK_STUB(ClusterLbGetHealthyHostCount,
           envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(nullptr, 0))
 WEAK_STUB(ClusterLbGetHealthyHost,
@@ -841,6 +894,13 @@ WEAK_STUB(ClusterLbGetMemberUpdateHost,
 WEAK_STUB(ClusterLbGetMemberUpdateHostPackedAddress,
           envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(nullptr, 0,
                                                                                          true,
+                                                                                         nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHealthChangedHostCount,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+              nullptr, nullptr))
+WEAK_STUB(ClusterLbGetMemberUpdateHealthChangedHost,
+          envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(nullptr, 0,
+                                                                                         nullptr,
                                                                                          nullptr))
 WEAK_STUB(ClusterUpdateHostHealth,
           envoy_dynamic_module_callback_cluster_update_host_health(
@@ -1000,6 +1060,7 @@ WEAK_STUB(MatcherGetHeaderValue,
           envoy_dynamic_module_callback_matcher_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
               nullptr, 0, nullptr))
+WEAK_STUB(MatcherSetError, envoy_dynamic_module_callback_matcher_set_error(nullptr))
 WEAK_STUB(MatcherDataInputGetHeaderValue,
           envoy_dynamic_module_callback_matcher_data_input_get_header_value(
               nullptr, envoy_dynamic_module_type_http_header_type_RequestHeader, {nullptr, 0},
@@ -1063,8 +1124,12 @@ WEAK_STUB(ListenerFilterConfigSchedulerCommit,
           envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(nullptr, 0))
 WEAK_STUB(AccessLoggerGetBytesInfo,
           envoy_dynamic_module_callback_access_logger_get_bytes_info(nullptr, nullptr))
+WEAK_STUB(AccessLoggerGetDownstreamWireBytes,
+          envoy_dynamic_module_callback_access_logger_get_downstream_wire_bytes(nullptr, nullptr))
 WEAK_STUB(AccessLoggerGetTimingInfo,
           envoy_dynamic_module_callback_access_logger_get_timing_info(nullptr, nullptr))
+WEAK_STUB(AccessLoggerGetTimingInfoV2,
+          envoy_dynamic_module_callback_access_logger_get_timing_info_v2(nullptr, nullptr))
 WEAK_STUB(ListenerFilterCloseSocket,
           envoy_dynamic_module_callback_listener_filter_close_socket(nullptr, {nullptr, 0}))
 WEAK_STUB(ListenerFilterSetDownstreamTransportFailureReason,
@@ -1758,6 +1823,12 @@ WEAK_STUB(TransportSocketIoRead,
           envoy_dynamic_module_callback_transport_socket_io_read(nullptr, nullptr, 0, nullptr))
 WEAK_STUB(TransportSocketIoWrite,
           envoy_dynamic_module_callback_transport_socket_io_write(nullptr, nullptr, 0, nullptr))
+WEAK_STUB(TransportSocketIoReadToReadBuffer,
+          envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(nullptr, 0,
+                                                                                nullptr))
+WEAK_STUB(TransportSocketIoWriteFromWriteBuffer,
+          envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(nullptr,
+                                                                                    nullptr))
 WEAK_STUB(TransportSocketIoShutdownWrite,
           envoy_dynamic_module_callback_transport_socket_io_shutdown_write(nullptr))
 WEAK_STUB(TransportSocketGetFd, envoy_dynamic_module_callback_transport_socket_get_fd(nullptr))
@@ -1779,6 +1850,8 @@ WEAK_STUB(TransportSocketSetIsReadable,
           envoy_dynamic_module_callback_transport_socket_set_is_readable(nullptr))
 WEAK_STUB(TransportSocketSetIsWritable,
           envoy_dynamic_module_callback_transport_socket_set_is_writable(nullptr))
+WEAK_STUB(TransportSocketStartSplice,
+          envoy_dynamic_module_callback_transport_socket_start_splice(nullptr, nullptr))
 WEAK_STUB(TransportSocketFlushWriteBuffer,
           envoy_dynamic_module_callback_transport_socket_flush_write_buffer(nullptr))
 WEAK_STUB(TransportSocketGetRemoteAddress,
@@ -1787,6 +1860,13 @@ WEAK_STUB(TransportSocketGetRemoteAddress,
 WEAK_STUB(TransportSocketGetLocalAddress,
           envoy_dynamic_module_callback_transport_socket_get_local_address(nullptr, nullptr,
                                                                            nullptr))
+WEAK_STUB(TransportSocketGetConnectionId,
+          envoy_dynamic_module_callback_transport_socket_get_connection_id(nullptr, nullptr))
+WEAK_STUB(TransportSocketGetUpstreamConnectionId,
+          envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(nullptr,
+                                                                                    nullptr))
+WEAK_STUB(TransportSocketAddWireBytes,
+          envoy_dynamic_module_callback_transport_socket_add_wire_bytes(nullptr, 0, 0))
 
 WEAK_STUB(StatSinkSnapshotGetCounterCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(nullptr))
@@ -1817,6 +1897,16 @@ WEAK_STUB(StatSinkSnapshotGetTextReadout,
 WEAK_STUB(StatSinkSnapshotGetCounterTagExtractedName,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
               nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagExtractedName,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
+              nullptr, 0, nullptr, 0, nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTagCount,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_count(nullptr, 0,
+                                                                                   nullptr))
+WEAK_STUB(StatSinkSnapshotGetHistogramTag,
+          envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag(nullptr, 0, 0, nullptr,
+                                                                             0, nullptr, nullptr, 0,
+                                                                             nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounterTagCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_count(nullptr, 0,
                                                                                  nullptr))
@@ -1957,6 +2047,9 @@ WEAK_STUB(HttpSetDynamicMetadataStruct,
 WEAK_STUB(HttpSetDynamicTypedMetadata,
           envoy_dynamic_module_callback_http_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
                                                                         {nullptr, 0}))
+WEAK_STUB(HttpGetTypedMetadata, envoy_dynamic_module_callback_http_get_typed_metadata(
+                                    nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
+                                    {nullptr, 0}, nullptr, nullptr))
 WEAK_STUB(HttpGetMetadataString, envoy_dynamic_module_callback_http_get_metadata_string(
                                      nullptr, envoy_dynamic_module_type_metadata_source_Dynamic,
                                      {nullptr, 0}, {nullptr, 0}, nullptr))
@@ -1981,6 +2074,10 @@ WEAK_STUB(HttpGetMetadataNamespaces,
 WEAK_STUB(HttpSetFilterStateBytes,
           envoy_dynamic_module_callback_http_set_filter_state_bytes(nullptr, {nullptr, 0},
                                                                     {nullptr, 0}))
+WEAK_STUB(HttpSetFilterStateValue, envoy_dynamic_module_callback_http_set_filter_state_value(
+                                       nullptr, {nullptr, 0}, {nullptr, 0},
+                                       envoy_dynamic_module_type_filter_state_life_span_FilterChain,
+                                       envoy_dynamic_module_type_filter_state_stream_sharing_None))
 WEAK_STUB(HttpGetFilterStateBytes,
           envoy_dynamic_module_callback_http_get_filter_state_bytes(nullptr, {nullptr, 0}, nullptr))
 WEAK_STUB(HttpSetFilterStateTyped,
@@ -2017,6 +2114,7 @@ WEAK_STUB(HttpFilterGetAttributeInt,
 WEAK_STUB(HttpFilterGetAttributeBool,
           envoy_dynamic_module_callback_http_filter_get_attribute_bool(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
+WEAK_STUB(HttpGetTimingInfo, envoy_dynamic_module_callback_http_get_timing_info(nullptr, nullptr))
 WEAK_STUB(NetworkFilterGetAttributeString,
           envoy_dynamic_module_callback_network_filter_get_attribute_string(
               nullptr, envoy_dynamic_module_type_attribute_id_RequestPath, nullptr))
@@ -2119,6 +2217,19 @@ WEAK_STUB(HttpSetUpstreamOverrideHost,
                                                                         false))
 WEAK_STUB(HttpGetUpstreamConnectionId,
           envoy_dynamic_module_callback_http_get_upstream_connection_id(nullptr))
+WEAK_STUB(HttpGetUpstreamRemoteAddress,
+          envoy_dynamic_module_callback_http_get_upstream_remote_address(nullptr, nullptr))
+WEAK_STUB(HttpGetDownstreamDirectRemoteAddress,
+          envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(nullptr, nullptr))
+WEAK_STUB(HttpGetUpstreamHostsAttemptedSize,
+          envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(nullptr))
+WEAK_STUB(HttpGetUpstreamHostsAttempted,
+          envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(nullptr, nullptr))
+WEAK_STUB(HttpGetUpstreamConnectionIdsAttemptedSize,
+          envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(nullptr))
+WEAK_STUB(HttpGetUpstreamConnectionIdsAttempted,
+          envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(nullptr,
+                                                                                   nullptr))
 WEAK_STUB(HttpFilterResetStream,
           envoy_dynamic_module_callback_http_filter_reset_stream(
               nullptr, envoy_dynamic_module_type_http_filter_stream_reset_reason_LocalReset,
@@ -2129,6 +2240,8 @@ WEAK_STUB(HttpFilterRecreateStream,
           envoy_dynamic_module_callback_http_filter_recreate_stream(nullptr, nullptr, 0))
 WEAK_STUB(HttpClearRouteClusterCache,
           envoy_dynamic_module_callback_http_clear_route_cluster_cache(nullptr))
+WEAK_STUB(HttpDrainConnectionUponCompletion,
+          envoy_dynamic_module_callback_http_drain_connection_upon_completion(nullptr))
 WEAK_STUB(ListenerFilterSetDetectedTransportProtocol,
           envoy_dynamic_module_callback_listener_filter_set_detected_transport_protocol(nullptr,
                                                                                         {nullptr,
@@ -2345,6 +2458,14 @@ WEAK_STUB(HealthCheckerGetHostMetadataBool,
                                                                               nullptr))
 WEAK_STUB(HealthCheckerGetHostHealth,
           envoy_dynamic_module_callback_health_checker_get_host_health(nullptr))
+WEAK_STUB(RouteSpecifierSetPrefixRewriteRule,
+          envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+              nullptr, envoy_dynamic_module_type_route_specifier_rewrite_span_Literal, {nullptr, 0},
+              {nullptr, 0}))
+WEAK_STUB(RouteSpecifierLookupBuiltRoute,
+          envoy_dynamic_module_callback_route_specifier_lookup_built_route(nullptr, 1))
+WEAK_STUB(RouteSpecifierConfigHasBuiltRouteCache,
+          envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(nullptr))
 
 } // namespace
 } // namespace DynamicModules

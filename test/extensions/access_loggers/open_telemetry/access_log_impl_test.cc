@@ -34,7 +34,6 @@ using opentelemetry::proto::logs::v1::LogRecord;
 using testing::_;
 using testing::An;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -89,10 +88,9 @@ public:
   void expectLog(const std::string& expected_log_entry_yaml) {
     LogRecord expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
-    EXPECT_CALL(*logger_, log(An<LogRecord&&>()))
-        .WillOnce(Invoke([expected_log_entry](LogRecord&& entry) {
-          EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
-        }));
+    EXPECT_CALL(*logger_, log(An<LogRecord&&>())).WillOnce([expected_log_entry](LogRecord&& entry) {
+      EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
+    });
   }
 
   MockFilter* filter_{new NiceMock<MockFilter>()};

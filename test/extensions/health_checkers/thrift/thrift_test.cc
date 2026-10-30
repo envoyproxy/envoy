@@ -44,7 +44,8 @@ public:
 
     health_checker_ = std::make_shared<ThriftHealthChecker>(
         *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,
-        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this);
+        Upstream::HealthCheckEventLoggerPtr(event_logger_), *api_, *this,
+        Upstream::DefaultHealthFlagCallbacks::instance());
   }
 
   void setup() {
@@ -175,11 +176,11 @@ public:
   }
 
   void expectClientAndPingRequestCreate() {
-    EXPECT_CALL(*this, create_(_)).WillOnce(testing::Invoke([&](ClientCallback& callback) {
+    EXPECT_CALL(*this, create_(_)).WillOnce([&](ClientCallback& callback) {
       client_ = new NiceMock<MockClient>(callback);
       expectPingRequestCreate();
       return client_;
-    }));
+    });
   }
 
   void expectPingRequestCreate() {
@@ -255,11 +256,11 @@ TEST_F(ThriftHealthCheckerTest, ConnectionCreateFailure) {
   setup();
 
   expectSessionCreate();
-  EXPECT_CALL(*this, create_(_)).WillOnce(testing::Invoke([&](ClientCallback& callback) {
+  EXPECT_CALL(*this, create_(_)).WillOnce([&](ClientCallback& callback) {
     client_ = new NiceMock<MockClient>(callback);
     EXPECT_CALL(*client_, start()).WillOnce(Return(false));
     return client_;
-  }));
+  });
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, _, _)).Times(testing::AtLeast(1));
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*timeout_timer_, disableTimer()).Times(testing::AnyNumber());

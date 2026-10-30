@@ -1,4 +1,9 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test_library", "envoy_package")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_benchmark_binary",
+    "envoy_cc_test_library",
+    "envoy_package",
+)
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_test",
@@ -8,6 +13,16 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+envoy_cc_benchmark_binary(
+    name = "cache_headers_utils_benchmark",
+    srcs = ["cache_headers_utils_benchmark.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "@abseil-cpp//absl/strings",
+        "@benchmark",
+    ],
+)
 
 envoy_cc_test_library(
     name = "mocks",
