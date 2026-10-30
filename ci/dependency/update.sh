@@ -5,6 +5,7 @@ set -e -o pipefail
 task="${1:-}"
 dependency="${2:-}"
 version="${3:-}"
+update="${4:-}"
 
 version_short="$version"
 if [[ "$version" =~ ^[0-9a-fA-F]{40}$ ]]; then
@@ -25,16 +26,34 @@ case "$task" in
     registry)
         dependency_name=bazel-registry
         command='./ci/do_ci.sh registry'
+        if [[ -n "$update" ]]; then
+            read -r -a update_specs <<< "$update"
+            if [[ " ${update_specs[*]} " == *" * "* && ${#update_specs[@]} -gt 1 ]]; then
+                echo '::error::`*` cannot be combined with other update specs' >&2
+                exit 1
+            fi
+            for spec in "${update_specs[@]}"; do
+                # The container shell would glob-expand a bare `*`, so pass it as `all`.
+                [[ "$spec" == "*" ]] && spec=all
+                printf -v spec '%q' "$spec"
+                command+=" ${spec}"
+            done
+        fi
         ;;
     lockfiles)
         dependency_name=lockfiles
         command='./ci/do_ci.sh lockfiles'
         ;;
     *)
-        echo "Usage: $0 <bazel|registry|lockfiles> [dependency] [version]" >&2
+        echo "Usage: $0 <bazel|registry|lockfiles> [dependency] [version] [update]" >&2
         exit 1
         ;;
 esac
+
+if [[ -n "$update" && "$task" != registry ]]; then
+    echo '::error::update is only supported by the registry task' >&2
+    exit 1
+fi
 
 echo "Updating(${task}): ${dependency_name} -> ${target}" >&2
 ./ci/run_envoy_docker.sh "$command" >&2

@@ -26,6 +26,11 @@ on:
         description: >-
           Version to set (optional). bazel = module version, registry = bazel-registry commit
           (default: tip of main)
+      update:
+        description: >-
+          Module updates to apply after the registry bump (registry task only). `*` bumps every
+          module with a newer version in the registry, otherwise space-separated `name` or
+          `name=1.2.3` specs. `*` cannot be combined with other specs.
       pr:
         type: boolean
         default: true
@@ -59,7 +64,7 @@ jobs:
       /${{ inputs.task == 'bazel' && inputs.dependency
            || inputs.task == 'registry' && 'bazel-registry'
            || 'lockfiles' }}
-      /${{ inputs.version || 'latest' }})
+      /${{ inputs.version || 'latest' }}${{ inputs.update && format(' +{0}', inputs.update) || '' }})
     runs-on: ubuntu-24.04
     steps:
     - id: appauth
@@ -78,6 +83,11 @@ jobs:
       run: |
         echo "::error::\`dependency\` is required for the \`bazel\` task"
         exit 1
+    - if: ${{ inputs.update && inputs.task != 'registry' }}
+      name: Validate inputs
+      run: |
+        echo "::error::\`update\` is only supported by the \`registry\` task"
+        exit 1
     - uses: envoyproxy/toolshed/actions/bson@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       id: update
       name: Update (${{ inputs.task }})
@@ -86,9 +96,10 @@ jobs:
           dependency: ${{ inputs.dependency }}
           task: ${{ inputs.task }}
           version: "${{ inputs.version }}"
+          update: "${{ inputs.update }}"
         input-format: yaml
         filter: |
-          "OUTPUT=$(./ci/dependency/update.sh \(.task | @sh) \(.dependency // "" | @sh) \(.version // "" | @sh))"
+          "OUTPUT=$(./ci/dependency/update.sh \(.task | @sh) \(.dependency // "" | @sh) \(.version // "" | @sh) \(.update // "" | @sh))"
           | bash::output
       env:
         ENVOY_DOCKER_CI: 1

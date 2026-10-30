@@ -317,8 +317,20 @@ _deps_update_mod() {
     return "${status}"
 }
 
+# Bump the bazel-registry pin, then optionally apply module updates: `registry_update [all|*]`
+# bumps every module with a newer version in the envoy registry, `registry_update name[=version]...`
+# applies each spec (see deps_update). `all`/`*` cannot be combined with other specs.
 registry_update() {
     local -a registry_args=()
+    local -a updates=("$@")
+    local update
+
+    for update in "${updates[@]}"; do
+        if [[ ("$update" == "all" || "$update" == "*") && ${#updates[@]} -gt 1 ]]; then
+            echo "FAIL: \`${update}\` cannot be combined with other update specs" >&2
+            return 1
+        fi
+    done
 
     if [[ -n "${ENVOY_REGISTRY_HASH:-}" ]]; then
         registry_args+=("--@envoy_toolshed//dependency:registry_sha=${ENVOY_REGISTRY_HASH}")
@@ -329,7 +341,55 @@ registry_update() {
 
     run_in_registry_mods _registry_update_mod "${registry_args[@]}"
     registry_current_hash > /dev/null
+    if (( ${#updates[@]} )); then
+        registry_modules_update "${updates[@]}"
+    fi
     lockfiles_generate
+}
+
+registry_modules_update() {
+    local update
+
+    if [[ "$1" == "all" || "$1" == "*" ]]; then
+        # Resolve jq from the root workspace before descending into the nested modules.
+        hermetic_jq
+        run_in_nested_mods _registry_modules_update_all_mod
+        return
+    fi
+    for update in "$@"; do
+        run_in_nested_mods _deps_update_mod "$update"
+    done
+}
+
+# Bump every module in this workspace that has a newer version in the envoy registry, as
+# reported by the module updater (`update_available` on the module's current registry).
+_registry_modules_update_all_mod() {
+    local module_dir="$1"
+    local dep
+    local report_path
+    local -a deps=()
+
+    report_path="$(mktemp)"
+    # shellcheck disable=SC2064
+    trap "rm -f '${report_path}'" RETURN
+
+    workspace_bazel_run "$module_dir" update_module -- --report "--json-out=${report_path}" \
+        > /dev/null || return
+    while read -r dep; do
+        [[ -n "$dep" ]] && deps+=("$dep")
+    done < <("${JQ_BIN}" -r \
+        'to_entries[]
+         | select(.value.update_available == true
+                  and ((.value.current_registry // "") | test("envoyproxy/bazel-registry")))
+         | .key' \
+        "$report_path")
+    if (( ${#deps[@]} == 0 )); then
+        echo "$(workspace_name "$module_dir"): no registry updates available"
+        return
+    fi
+    for dep in "${deps[@]}"; do
+        _deps_update_mod "$module_dir" "$dep" || return
+    done
 }
 
 _registry_update_mod() {
