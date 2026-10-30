@@ -234,6 +234,8 @@ public:
   const LowerCaseString Range{"range"};
   const LowerCaseString RequestId{"x-request-id"};
   const LowerCaseString Scheme{":scheme"};
+  const LowerCaseString SecWebSocketAccept{"sec-websocket-accept"};
+  const LowerCaseString SecWebSocketKey{"sec-websocket-key"};
   const LowerCaseString Server{"server"};
   const LowerCaseString SetCookie{"set-cookie"};
   const LowerCaseString Status{":status"};
