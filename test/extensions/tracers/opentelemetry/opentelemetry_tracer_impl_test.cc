@@ -703,6 +703,24 @@ TEST_F(OpenTelemetryDriverTest, GenerateSpanContextWithoutHeadersTest) {
   EXPECT_EQ(sampled_entry.value(), "00-00000000000000010000000000000002-0000000000000003-01");
 }
 
+TEST_F(OpenTelemetryDriverTest, UpdateParentMergesTracestate) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+  request_headers.set(OpenTelemetryConstants::get().TRACE_PARENT.key(),
+                      "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01");
+  request_headers.set(OpenTelemetryConstants::get().TRACE_STATE.key(), "foobar=123");
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_EQ(span->getTracestate(), "foobar=123");
+
+  request_headers.remove(OpenTelemetryConstants::get().TRACE_STATE.key());
+  request_headers.set(OpenTelemetryConstants::get().TRACE_STATE.key(), "baz=456");
+  span->updateParent(request_headers, /*preserve_headers=*/false);
+  EXPECT_EQ(span->getTracestate(), "baz=456,foobar=123");
+}
+
 // Verifies a span it not created when an invalid traceparent header is received
 TEST_F(OpenTelemetryDriverTest, NullSpanWithPropagationHeaderError) {
   setupValidDriver();

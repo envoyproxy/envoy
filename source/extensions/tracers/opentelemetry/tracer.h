@@ -101,6 +101,7 @@ public:
                      const Tracing::UpstreamContext&) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
+  void updateParent(const Tracing::TraceContext& trace_context, bool preserve_headers) override;
 
   /**
    * Set the span's sampled flag.
@@ -178,6 +179,8 @@ public:
     span_.set_trace_state(std::string{tracestate});
   }
 
+  std::string getTracestate() const override { return span_.trace_state(); }
+
   /**
    * Sets a span attribute.
    */
@@ -196,6 +199,7 @@ private:
   bool sampled_;
   bool use_local_decision_{false};
   bool parent_context_is_remote_{false};
+  bool preserve_headers_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

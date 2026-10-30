@@ -13,6 +13,7 @@
 #include "source/common/tracing/trace_context_impl.h"
 #include "source/common/version/version.h"
 #include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 #include "absl/strings/numbers.h"
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
@@ -86,6 +87,32 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
                                   ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT);
 }
 
+void Span::updateParent(const Tracing::TraceContext& trace_context, bool preserve_headers) {
+  preserve_headers_ = preserve_headers;
+
+  SpanContextExtractor extractor(trace_context);
+  absl::StatusOr<SpanContext> context = extractor.extractSpanContext();
+  if (!context.ok()) {
+    return;
+  }
+  setParentContextIsRemote(context->isRemote());
+  setTraceId(context->traceId());
+  setParentId(context->spanId());
+
+  // Merge tracestates, with new components added on the left.
+  // https://www.w3.org/TR/trace-context/#mutating-the-tracestate-field
+  absl::InlinedVector<absl::string_view, 2> tracestate_pieces;
+  if (!context->tracestate().empty()) {
+    tracestate_pieces.push_back(context->tracestate());
+  }
+  const std::string tracestate = getTracestate();
+  if (!tracestate.empty() &&
+      absl::c_find(tracestate_pieces, tracestate) == tracestate_pieces.end()) {
+    tracestate_pieces.push_back(tracestate);
+  }
+  setTracestate(absl::StrJoin(tracestate_pieces, ","));
+}
+
 void Span::finishSpan() {
   // Call into the parent tracer so we can access the shared exporter.
   span_.set_end_time_unix_nano(
@@ -111,6 +138,9 @@ void Span::finishSpan() {
 void Span::setOperation(absl::string_view operation) { span_.set_name(operation); };
 
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
+  if (preserve_headers_) {
+    return;
+  }
   std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
   std::string span_id_hex = absl::BytesToHexString(span_.span_id());
   std::vector<uint8_t> trace_flags_vec{sampled()};
