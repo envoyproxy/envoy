@@ -478,6 +478,43 @@ statistics:
    they are counted in ``cluster.<name>.retry.upstream_rq_<*>`` instead. See
    :ref:`cluster retry statistics <config_cluster_manager_cluster_stats_retry>` for details.
 
+.. _config_http_filters_router_mirror_stats:
+
+Mirror policies
+^^^^^^^^^^^^^^^
+
+A :ref:`request mirror policy <envoy_v3_api_msg_config.route.v3.RouteAction.RequestMirrorPolicy>`
+with a :ref:`stat_prefix
+<envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.stat_prefix>` outputs
+statistics in the ``mirror.<stat_prefix>.`` namespace:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  rq_sampled, Counter, Total requests selected for mirroring by the policy runtime fraction
+  rq_no_cluster, Counter, Total selected requests not mirrored because the mirror cluster did not exist or the cluster header was missing
+  rq_started, Counter, Total mirror requests started
+  rq_success, Counter, Total mirror requests that received a 2xx response
+  rq_failure, Counter, Total mirror requests that received a non-2xx response or failed without a response
+  rq_cancelled, Counter, Total mirror requests cancelled because the primary request was destroyed before the request was fully sent
+
+The statistics are emitted in the server's root scope and tagged with the policy ``stat_prefix``.
+Policies that use the same ``stat_prefix`` share the same counters, including policies of different
+routes, virtual hosts or route configurations. Cluster-level :ref:`request_mirror_policies
+<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.request_mirror_policies>`
+emit the same statistics. When a cluster has mirror policies, they replace the route-level
+policies, so only the statistics of the cluster-level policies are updated.
+
+Mirror policies are evaluated once the router has selected an upstream host for the primary
+request. Requests answered locally before that point, for example because the cluster has no
+healthy upstream or because the request is load shed, are not counted in ``rq_sampled``, and
+neither are CONNECT requests, which are never mirrored. ``rq_sampled`` minus ``rq_no_cluster``
+minus ``rq_started`` counts the selected requests that were not mirrored because an upstream HTTP
+filter answered the primary request locally after the policies were evaluated.
+``rq_started`` minus ``rq_success``, ``rq_failure`` and ``rq_cancelled`` counts the mirror requests
+still in flight.
+
 Runtime
 -------
 
