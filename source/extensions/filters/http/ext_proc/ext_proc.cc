@@ -1913,6 +1913,7 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
       ENVOY_STREAM_LOG(debug, "Processing mode overridden by server for this request",
                        *decoder_callbacks_);
       const auto old_decoding_body_mode = decoding_state_.bodyMode();
+      const auto old_encoding_body_mode = encoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
 
@@ -1921,8 +1922,15 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
       if (response->response_case() == ProcessingResponse::ResponseCase::RESPONSE_NOT_SET) {
         // If this function call returns false, it's a spurious response, and is handled
         // by the default case of the switch statement below.
-        if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
-          return;
+        if (decoding_state_.callbackState() == ProcessorState::CallbackState::HeadersCallback) {
+          if (decoding_state_.handleStandaloneModeOverride(old_decoding_body_mode)) {
+            return;
+          }
+        } else if (encoding_state_.callbackState() ==
+                   ProcessorState::CallbackState::HeadersCallback) {
+          if (encoding_state_.handleStandaloneModeOverride(old_encoding_body_mode)) {
+            return;
+          }
         }
       }
     } else {

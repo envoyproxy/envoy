@@ -824,7 +824,7 @@ bool DecodingProcessorState::isValidTrailersCallbackState() const {
   return false;
 }
 
-bool DecodingProcessorState::handleStandaloneModeOverride(
+bool ProcessorState::handleStandaloneModeOverride(
     const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode_BodySendMode
         old_body_mode) {
   if (callbackState() == ProcessorState::CallbackState::HeadersCallback &&
@@ -852,7 +852,7 @@ bool DecodingProcessorState::handleStandaloneModeOverride(
   }
 
   ENVOY_STREAM_LOG(debug, "Invalid standalone mode_override message received on gRPC stream",
-                   *decoder_callbacks_);
+                   *filterCallbacks());
   return false;
 }
 
