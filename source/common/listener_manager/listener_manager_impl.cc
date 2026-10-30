@@ -679,9 +679,11 @@ absl::Status ListenerManagerImpl::setupSocketFactoryForListener(
   if (new_listener.inPlaceAddressUpdate()) {
     RETURN_IF_NOT_OK(validateNoDuplicatedAddress(new_listener.name(), new_listener));
     std::vector<Network::ListenSocketFactory*> kept_socket_factories;
+    kept_socket_factories.reserve(new_listener.addresses().size());
     // An added address clones the open sockets of a listener that an earlier in place update
     // replaced, like a full update does, since new sockets would compete with them for the address.
     std::vector<Network::ListenSocketFactory*> cloned_socket_factories;
+    cloned_socket_factories.reserve(new_listener.addresses().size());
     for (uint32_t i = 0; i < new_listener.addresses().size(); i++) {
       Network::ListenSocketFactory* kept_socket_factory =
           existing_listener.listenSocketFactory(*new_listener.addresses()[i]);
