@@ -89,12 +89,8 @@ bool isLegacyMcpProtocolVersionSupported(absl::string_view protocol_version) {
   return supported_legacy_mcp_versions->contains(protocol_version);
 }
 
-bool isStatelessProtocolRequest(const json& json_rpc,
-                                absl::string_view max_supported_protocol_version) {
-  if (max_supported_protocol_version < McpConstants::MCP_VERSION_2026_07_28) {
-    return false;
-  }
-
+// Returns whether params._meta carries a string protocol version.
+bool hasProtocolVersionMeta(const json& json_rpc) {
   if (!json_rpc.contains(McpConstants::PARAMS_FIELD) ||
       !json_rpc[McpConstants::PARAMS_FIELD].is_object()) {
     return false;
@@ -108,6 +104,20 @@ bool isStatelessProtocolRequest(const json& json_rpc,
   const auto& meta = params[McpConstants::META_FIELD];
   return meta.contains(McpConstants::MCP_META_PROTOCOL_VERSION_FIELD) &&
          meta[McpConstants::MCP_META_PROTOCOL_VERSION_FIELD].is_string();
+}
+
+// A request with a stateless MCP-Protocol-Version header is stateless even if its protocol version
+// metadata is missing or invalid, so that it is rejected rather than handled as a legacy request.
+bool isStatelessProtocolRequest(const json& json_rpc,
+                                std::optional<absl::string_view> header_protocol_version,
+                                absl::string_view max_supported_protocol_version) {
+  if (max_supported_protocol_version < McpConstants::MCP_VERSION_2026_07_28) {
+    return false;
+  }
+
+  return hasProtocolVersionMeta(json_rpc) ||
+         (header_protocol_version.has_value() &&
+          isStatelessMcpProtocolVersionSupported(*header_protocol_version));
 }
 
 void addCompleteResultTypeIfStateless(json& response, bool is_stateless_request) {
@@ -1401,6 +1411,17 @@ absl::Status McpJsonRestBridgeFilter::validateMcpProtocolVersionHeader(
     return absl::OkStatus();
   }
 
+  if (!hasProtocolVersionMeta(json_rpc)) {
+    sendErrorResponse(
+        Http::Code::BadRequest, BridgeStatus::RequestMcpProtocolVersionMetaInvalid,
+        generateErrorJsonResponse(McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE,
+                                  absl::StrCat("Missing or invalid params._meta field: ",
+                                               McpConstants::MCP_META_PROTOCOL_VERSION_FIELD))
+            .dump(),
+        nullptr, method, params);
+    return absl::InvalidArgumentError("Missing or invalid protocol version metadata");
+  }
+
   const std::optional<absl::string_view> header_protocol_version =
       getRequestMcpProtocolVersionHeader(request_headers);
   const absl::string_view body_protocol_version =
@@ -1543,7 +1564,8 @@ void McpJsonRestBridgeFilter::handleMcpMethod(
   }
 
   is_stateless_request_ =
-      isStatelessProtocolRequest(json_rpc, config_->maxSupportedProtocolVersion());
+      isStatelessProtocolRequest(json_rpc, getRequestMcpProtocolVersionHeader(request_headers),
+                                 config_->maxSupportedProtocolVersion());
 
   std::string method = json_rpc[McpConstants::METHOD_FIELD];
 

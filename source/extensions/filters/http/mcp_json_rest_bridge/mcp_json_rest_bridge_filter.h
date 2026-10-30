@@ -259,9 +259,10 @@ private:
 
   // Validates that a stateless (2026-07-28) request carries the required
   // params._meta["io.modelcontextprotocol/clientCapabilities"] field and that it is a JSON object.
-  // Individual capability contents are not validated. Must only be called for stateless requests,
-  // whose params._meta is guaranteed to be an object. Returns true when the field is valid.
-  // Otherwise sends a local error response and returns false.
+  // Individual capability contents are not validated. Must only be called for stateless requests
+  // after validateMcpProtocolVersionHeader() succeeds, which guarantees that params._meta is an
+  // object. Returns true when the field is valid. Otherwise sends a local error response and
+  // returns false.
   bool validateClientCapabilitiesMeta(const nlohmann::json& json_rpc, absl::string_view method);
 
   // Validates that the "Mcp-Method" request header is present and matches the JSON-RPC "method"
@@ -302,8 +303,9 @@ private:
   // 1. For JSON-RPC application/protocol errors in the request payload (-32600, -32601, -32602),
   //    MUST use Http::Code::OK (200). Many MCP SDK clients inspect HTTP status before JSON-RPC
   //    decoding and will fail with a transport exception on non-200 responses, discarding the
-  //    structured JSON-RPC error code/message. The only exception is -32601 for stateless MCP
-  //    2026-07-28 requests, which MUST use 404 Not Found (see below).
+  //    structured JSON-RPC error code/message. The only exceptions are stateless MCP 2026-07-28
+  //    requests, which MUST use 404 Not Found for -32601 (see below) and 400 Bad Request for
+  //    -32602 when required params._meta fields are missing or invalid.
   // 2. Only use non-200 HTTP codes (400, 401, 403, 404, 405, 413) in the following cases:
   //    - Transport-level or framing syntax failures (generated locally by this filter):
   //      * 405 Method Not Allowed (non-POST request)
