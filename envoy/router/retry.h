@@ -10,14 +10,17 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
+#include "envoy/protobuf/message_validator.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 #include "envoy/upstream/upstream.h"
 
+#include "absl/status/statusor.h"
 #include "absl/types/span.h"
 
 namespace Envoy {
@@ -357,6 +360,29 @@ public:
 };
 
 using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
+
+/**
+ * Factory for creating a RetryPolicy from a proto configuration.
+ */
+class RetryPolicyFactory : public Envoy::Config::TypedFactory {
+public:
+  ~RetryPolicyFactory() override = default;
+
+  /**
+   * Creates a RetryPolicy from the provided proto configuration.
+   * @param config the typed configuration for the retry policy.
+   * @param validation_visitor message validation visitor instance.
+   * @param context the common factory context.
+   * @return the RetryPolicy, or an error status if the configuration is invalid.
+   */
+  virtual absl::StatusOr<RetryPolicyConstSharedPtr>
+  createRetryPolicy(const Protobuf::Message& config,
+                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                    Server::Configuration::CommonFactoryContext& context) PURE;
+
+  // Config::UntypedFactory
+  std::string category() const override { return "envoy.retry_policy"; }
+};
 
 } // namespace Router
 } // namespace Envoy

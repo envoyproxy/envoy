@@ -618,10 +618,12 @@ envoy_cc_library(
     deps = [
         ":reset_header_parser_lib",
         ":retry_state_lib",
+        "//envoy/registry",
         "//envoy/router:retry_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/config:utility_lib",
         "//source/common/upstream:retry_factory_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )
