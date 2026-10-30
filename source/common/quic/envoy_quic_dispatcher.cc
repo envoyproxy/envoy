@@ -285,11 +285,11 @@ void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_list
 }
 
 // Close all connections currently in the idle list.
-void EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
+size_t EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
   // This method is called from the worker thread, triggered by the
   // Overload Manager.
   ASSERT(session_idle_list_ != nullptr);
-  session_idle_list_->MaybeTerminateIdleSessions(is_saturated);
+  return session_idle_list_->MaybeTerminateIdleSessions(is_saturated);
 }
 
 } // namespace Quic

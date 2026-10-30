@@ -40,7 +40,7 @@ public:
   // Terminates idle sessions if they are eligible for termination. This is
   // called by the worker thread when the system is overloaded.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  void MaybeTerminateIdleSessions(bool is_saturated) override;
+  size_t MaybeTerminateIdleSessions(bool is_saturated) override;
 
   // Sets the minimum time before a session can be terminated.
   // NOLINTNEXTLINE(readability-identifier-naming)
