@@ -27,6 +27,7 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::EndsWith;
+using testing::Invoke;
 using testing::Return;
 
 namespace Envoy {
@@ -372,6 +373,30 @@ TEST_P(HttpUpstreamTest, UpstreamTrailersPropagateFinDownstream) {
   EXPECT_CALL(callbacks_, onUpstreamData(BufferString(""), true));
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
+// Regression test for a heap-use-after-free where onUpstreamData()
+// synchronously destroyed the HttpUpstream (via downstream drain-close
+// reentrancy) and DecoderShim::decodeTrailers() then dereferenced parent_.
+TEST_P(HttpUpstreamTest, UpstreamDestroyedDuringDecodeTrailers) {
+  setupUpstream();
+  Http::ResponseDecoder& decoder = upstream_->responseDecoder();
+  EXPECT_CALL(callbacks_, onUpstreamData(_, true)).WillOnce(Invoke([this](Buffer::Instance&, bool) {
+    upstream_.reset();
+  }));
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  decoder.decodeTrailers(std::move(trailers));
+}
+
+// Same as above via the decodeData(end_stream=true) path.
+TEST_P(HttpUpstreamTest, UpstreamDestroyedDuringDecodeData) {
+  setupUpstream();
+  Http::ResponseDecoder& decoder = upstream_->responseDecoder();
+  EXPECT_CALL(callbacks_, onUpstreamData(_, true)).WillOnce(Invoke([this](Buffer::Instance&, bool) {
+    upstream_.reset();
+  }));
+  Buffer::OwnedImpl buffer;
+  decoder.decodeData(buffer, /*end_stream=*/true);
 }
 
 class HttpUpstreamRequestEncoderTest : public testing::TestWithParam<Http::CodecType> {
@@ -951,6 +976,28 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->upstream_->doneWriting();
   Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
+}
+
+// Regression test for a heap-use-after-free where onUpstreamData()
+// synchronously destroyed the CombinedUpstream (via downstream drain-close
+// reentrancy) and DecoderShim::decodeTrailers() then dereferenced parent_.
+TEST_F(CombinedUpstreamTest, 1) {
+  this->setup();
+  Http::ResponseDecoder& decoder = this->upstream_->responseDecoder();
+  EXPECT_CALL(this->callbacks_, onUpstreamData(_, true))
+      .WillOnce(Invoke([this](Buffer::Instance&, bool) { this->upstream_.reset(); }));
+  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
+  decoder.decodeTrailers(std::move(trailers));
+}
+
+// Same as above via the decodeData(end_stream=true) path.
+TEST_F(CombinedUpstreamTest, UpstreamDestroyedDuringDecodeData) {
+  this->setup();
+  Http::ResponseDecoder& decoder = this->upstream_->responseDecoder();
+  EXPECT_CALL(this->callbacks_, onUpstreamData(_, true))
+      .WillOnce(Invoke([this](Buffer::Instance&, bool) { this->upstream_.reset(); }));
+  Buffer::OwnedImpl buffer;
+  decoder.decodeData(buffer, /*end_stream=*/true);
 }
 
 } // namespace
