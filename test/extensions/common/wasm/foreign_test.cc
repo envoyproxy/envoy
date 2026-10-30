@@ -13,6 +13,7 @@
 #include "test/test_common/utility.h"
 #include "test/test_common/wasm_base.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -112,6 +113,61 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   EXPECT_EQ(result, WasmResult::Ok);
   EXPECT_TRUE(stream_info->filterState()->hasData<Network::AddressObject>(
       Upstream::OriginalDstClusterFilterStateKey));
+  EXPECT_TRUE(stream_info->filterState()->objectsSharedWithUpstreamConnection()->empty());
+}
+
+TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterSharedWithUpstreamTest) {
+  initializeFilterCallbacks(); // so that we can test setting filter state
+  Stats::IsolatedStoreImpl stats_store;
+  Api::ApiPtr api = Api::createApiForTest(stats_store);
+  Upstream::MockClusterManager cluster_manager;
+  Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
+  auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
+  testing::NiceMock<LocalInfo::MockLocalInfo> local_info;
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(plugin_config, local_info);
+  Wasm wasm(plugin->wasmConfig(), "", scope, *api, cluster_manager, *dispatcher);
+  proxy_wasm::current_context_ = &ctx_;
+
+  auto function = proxy_wasm::getForeignFunction("set_envoy_filter_state");
+  ASSERT_NE(function, nullptr);
+
+  auto* stream_info = ctx_.getRequestStreamInfo();
+  ASSERT_NE(stream_info, nullptr);
+
+  envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
+  std::string in;
+
+  args.set_path(TcpProxy::PerConnectionCluster::key());
+  args.set_value("unicorns");
+  args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection);
+  args.set_shared_with_upstream(
+      envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments::ONCE);
+  std::ignore = args.SerializeToString(&in);
+  auto result = function(wasm, in, [](size_t size) { return malloc(size); });
+  EXPECT_EQ(result, WasmResult::Ok);
+
+  args.set_path(Upstream::OriginalDstClusterFilterStateKey);
+  args.set_value("1.2.3.4:80");
+  args.set_span(envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection);
+  args.set_shared_with_upstream(
+      envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments::TRANSITIVE);
+  std::ignore = args.SerializeToString(&in);
+  result = function(wasm, in, [](size_t size) { return malloc(size); });
+  EXPECT_EQ(result, WasmResult::Ok);
+
+  auto shared = stream_info->filterState()->objectsSharedWithUpstreamConnection();
+  ASSERT_EQ(shared->size(), 2U);
+  absl::flat_hash_map<std::string, StreamInfo::StreamSharingMayImpactPooling> sharing;
+  for (const auto& object : *shared) {
+    sharing[object.name_] = object.stream_sharing_;
+  }
+  // An object shared once is not shared any further by the upstream connection.
+  EXPECT_EQ(sharing[std::string(TcpProxy::PerConnectionCluster::key())],
+            StreamInfo::StreamSharingMayImpactPooling::None);
+  EXPECT_EQ(sharing[std::string(Upstream::OriginalDstClusterFilterStateKey)],
+            StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection);
 }
 
 class StreamForeignTest : public WasmPluginConfigTestBase<
