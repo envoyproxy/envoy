@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package envoy.type.ai.v3;
+
+import "envoy/type/ai/v3/llm_binding.proto";
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.type.ai.v3";
+option java_outer_classname = "RoutesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/ai/v3;aiv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: LLM routes]
+
+// Describes an upstream routing destination and execution context for an AI/LLM request.
+//
+// An ``LlmRoute`` represents one candidate target for an LLM request, specifying the wire protocol,
+// backend model identifier, upstream host and port, HTTP URI and body transformations, and
+// authentication credentials needed to dispatch the request to an upstream provider.
+//
+// Candidate routes are typically produced by the
+// :ref:`Model Router AI filter
+// <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.ModelRouter>`, stored as an ordered
+// list in :ref:`LlmRoutes <envoy_v3_api_msg_type.ai.v3.LlmRoutes>` in filter state
+// (``envoy.ai.routes``), and consumed across request attempts and retries by the
+// :ref:`Route Selector AI filter
+// <envoy_v3_api_msg_extensions.http.ai_filters.route_selector.v3.RouteSelector>`.
+// [#next-free-field: 6]
+message LlmRoute {
+  // The wire API spoken by this upstream LLM endpoint.
+  //
+  // When this route is selected by the :ref:`Route Selector AI filter
+  // <envoy_v3_api_msg_extensions.http.ai_filters.route_selector.v3.RouteSelector>`, this
+  // protocol is published to the ``envoy.ai.llm_protocol.response`` filter state object.
+  // The :ref:`transcoder AI filter
+  // <envoy_v3_api_msg_extensions.http.ai_filters.transcoder.v3.Transcoder>` uses it to translate
+  // the client request payload into the schema expected by this backend, and to transcode the
+  // upstream response back into the client's wire API.
+  LLMProtocol llm_protocol = 1;
+
+  // The model identifier expected by the upstream provider (e.g., ``gpt-4o``,
+  // ``claude-3-5-sonnet-20241022``, or ``gemini-1.5-pro``).
+  //
+  // This may differ from the model name requested by the client in the incoming payload (for
+  // example, when an alias or virtual model like ``fast-chat`` maps to a concrete upstream model).
+  // When this route is selected, the resolved model is published to the ``envoy.ai.model.resolved``
+  // filter state object, and any downstream transformations update the model in the request body
+  // and URI path before forwarding.
+  string model = 2;
+
+  // The upstream host and optional port for this endpoint (e.g., ``api.openai.com`` or
+  // ``primary.llm.example.com:8443``).
+  //
+  // Used to identify the destination provider and update the request's HTTP authority
+  // (``:authority`` / ``Host`` header) when forwarding upstream, such as when paired with dynamic
+  // forward proxy or custom clusters.
+  string host_and_port = 3;
+
+  // How the provider carries the :ref:`llm_protocol
+  // <envoy_v3_api_field_type.ai.v3.LlmRoute.llm_protocol>` on HTTP: describes the request URI
+  // pattern and request body mutations.
+  //
+  // When this route is selected, the binding is published to the ``envoy.ai.binding.response``
+  // filter state object. The :ref:`transcoder AI filter
+  // <envoy_v3_api_msg_extensions.http.ai_filters.transcoder.v3.Transcoder>` uses it to render the
+  // outgoing request path (substituting path variables such as ``{model}`` and streaming options)
+  // and apply mutations to the request body. When unset, the API's own standard path and default
+  // mutations are used.
+  LLMBinding binding = 4;
+
+  // The authorization credential or token used to authenticate with this upstream provider.
+  //
+  // When this route is selected and ``api_key`` is non-empty, Envoy sets this value as the HTTP
+  // ``Authorization`` header on the outgoing upstream request (e.g., ``Bearer sk-...``).
+  // When empty, the existing ``Authorization`` header is left untouched.
+  string api_key = 5;
+}
+
+// An ordered collection of candidate :ref:`LlmRoute <envoy_v3_api_msg_type.ai.v3.LlmRoute>`
+// targets for an AI request.
+//
+// Stored in the ``envoy.ai.routes`` filter state object by the
+// :ref:`Model Router AI filter
+// <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.ModelRouter>`. The
+// :ref:`Route Selector AI filter
+// <envoy_v3_api_msg_extensions.http.ai_filters.route_selector.v3.RouteSelector>`
+// selects candidate routes from this list based on the request attempt count, providing automatic
+// fallback and retry across different models or providers.
+message LlmRoutes {
+  // An ordered list of candidate routes to attempt.
+  //
+  // The first route is used on the initial request attempt (attempt 1). Subsequent routes are
+  // attempted on retries (e.g., attempt 2 selects the second route), enabling multi-provider
+  // fallback when an upstream fails.
+  repeated LlmRoute routes = 1;
+}

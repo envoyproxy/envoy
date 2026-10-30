@@ -650,7 +650,7 @@ alls
 alphanumerics
 amongst
 anno
-Anthropic
+anthropic
 anonymization
 anonymizing
 anys
