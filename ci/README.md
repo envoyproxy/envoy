@@ -63,6 +63,22 @@ The standard library is derived from the compiler toolchain:
 These are the only supported configurations. Other combinations, such as Clang with libstdc++, are not supported or tested;
 if you need one, you will need to set up your own `cc_toolchain`.
 
+# Hermetic git
+
+CI does not use a `git` installed in the build image. `ci/do_ci.sh` resolves toolshed's prebuilt
+git toolchain (`//tools/git:bin`) once and exports it as `GIT_BIN`, which the CI scripts and
+`bazel/get_workspace_status` use. On macOS, where no prebuilt is published, it uses the host's
+`git` from `PATH`.
+
+To use your own git instead, set `GIT_BIN` before running `ci/do_ci.sh` (inside the container
+when using `ci/run_envoy_docker.sh`, eg `./ci/run_envoy_docker.sh 'GIT_BIN=/usr/bin/git ./ci/do_ci.sh format-api'`).
+Outside `ci/do_ci.sh`, `bazel/get_workspace_status` and `tools/git/*` fall back to `git` on `PATH`
+when `GIT_BIN` is unset.
+
+Bazel actions that need git (eg the `proto_format` genrules) use the git toolchain
+(`@envoy_toolshed//git:toolchain_type`), not `GIT_BIN`. To use a different git there, register
+your own `git_toolchain` (from `@envoy_toolshed//git:defs.bzl`) with `--extra_toolchains`.
+
 # Building and running tests as a developer
 
 The `./ci/run_envoy_docker.sh` script can be used to set up a Docker container on Linux and Windows

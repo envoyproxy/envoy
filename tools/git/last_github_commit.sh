@@ -5,4 +5,4 @@
 # heuristic, e.g. when patches are manually merged for security fixes on main, but this is very
 # rare.
 
-git rev-list --no-merges --committer="GitHub <noreply@github.com>" --max-count=1 HEAD
+"${GIT_BIN:-git}" rev-list --no-merges --committer="GitHub <noreply@github.com>" --max-count=1 HEAD

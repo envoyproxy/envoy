@@ -94,13 +94,13 @@ workspace_bazel_run() {
 
 lockfiles_check() {
     lockfiles_generate
-    if [[ -z "$(git status --porcelain -- "${LOCKFILE_PATHSPECS[@]}")" ]]; then
+    if [[ -z "$("${GIT_BIN}" status --porcelain -- "${LOCKFILE_PATHSPECS[@]}")" ]]; then
         return 0
     fi
-    git --no-pager diff --stat -- "${LOCKFILE_PATHSPECS[@]}"
+    "${GIT_BIN}" --no-pager diff --stat -- "${LOCKFILE_PATHSPECS[@]}"
     echo >&2
     echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
-    if { git --no-pager diff -- "${LOCKFILE_PATHSPECS[@]}" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
+    if { "${GIT_BIN}" --no-pager diff -- "${LOCKFILE_PATHSPECS[@]}" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
         echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT}" >&2
     fi
     echo >&2
@@ -139,10 +139,10 @@ module_versions_update() {
             -e "/^module\($/,/^\)$/ s/^(    version = )\"[^\"]*\"/\1\"${version}\"/" \
             -e "s/^(bazel_dep\(name = \"(${modules})\", version = )\"[^\"]*\"/\1\"${version}\"/" \
             "$module_file"
-        if ! git diff --quiet -- "$module_file"; then
+        if ! "${GIT_BIN}" diff --quiet -- "$module_file"; then
             echo "${module_file}: ${version}"
         fi
-    done < <(git ls-files ':(glob)**/MODULE.bazel')
+    done < <("${GIT_BIN}" ls-files ':(glob)**/MODULE.bazel')
 }
 
 registry_current_hash() {
@@ -175,9 +175,11 @@ bazel_tool_path() {
     local path
     local root
     # Leave the `bazel-bin` etc convenience symlinks pointing at the caller's build, which may
-    # use different options (eg `-c opt`).
+    # use different options (eg `-c opt`), and skip workspace status: it needs git, which may be
+    # the tool being resolved.
     bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
-        --remote_download_toplevel --experimental_convenience_symlinks=ignore "$target" >&2
+        --remote_download_toplevel --experimental_convenience_symlinks=ignore \
+        --workspace_status_command=/bin/true "$target" >&2
     path="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" cquery "${BAZEL_BUILD_OPTIONS[@]}" \
         --output=files "$target" 2>/dev/null)"
     if [[ -z "$path" || "$path" == *$'\n'* ]]; then
@@ -202,6 +204,25 @@ hermetic_strip() {
         STRIP_BIN="$(bazel_tool_path @llvm_toolchain_llvm//:strip)"
         export STRIP_BIN
     fi
+}
+
+# Resolve the hermetic git toolchain as `GIT_BIN`, for CI scripts and Bazel's workspace status.
+# CI must not depend on a `git` installed in the build image. There is no prebuilt git for macOS,
+# where `do_ci.sh` only runs locally (CI uses `ci/mac_ci_steps.sh`), so use the host's git there
+# rather than resolving through Bazel.
+hermetic_git() {
+    if [[ -n "${GIT_BIN:-}" ]]; then
+        return
+    fi
+    if [[ "${OSTYPE}" == darwin* ]]; then
+        GIT_BIN="$(command -v git)" || {
+            echo "FAIL: git not found on PATH" >&2
+            return 1
+        }
+    else
+        GIT_BIN="$(bazel_tool_path //tools/git:bin)"
+    fi
+    export GIT_BIN
 }
 
 hermetic_jq() {
