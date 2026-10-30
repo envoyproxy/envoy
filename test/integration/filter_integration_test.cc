@@ -1,3 +1,5 @@
+#include "source/common/runtime/runtime_features.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/logging.h"
 
@@ -337,9 +339,17 @@ TEST_P(FilterIntegrationTest, MissingHeadersLocalReplyWithBodyBytesCount) {
   if (testing_downstream_filter_) {
     // When testing an upstream HTTP filters, we may receive body bytes before we
     // process headers, so don't set expectations.
-    expectDownstreamBytesSentAndReceived(BytesCountExpectation(109, 1152, 90, 81),
-                                         BytesCountExpectation(0, 58, 0, 58),
-                                         BytesCountExpectation(7, 10, 7, 8));
+    // Waiting for codec completion logs the empty response's headers after they are encoded.
+    // The byte-count helper checks only whether each count is zero.
+    const int h2_sent_bytes =
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.http2_defer_reset_until_response_complete")
+            ? 1
+            : 0;
+    expectDownstreamBytesSentAndReceived(
+        BytesCountExpectation(109, 1152, 90, 81),
+        BytesCountExpectation(h2_sent_bytes, 58, h2_sent_bytes, 58),
+        BytesCountExpectation(7, 10, 7, 8));
   }
 }
 

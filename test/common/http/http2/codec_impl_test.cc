@@ -1986,8 +1986,9 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+    // Encoding END_STREAM disarms the flush timer before the deferred reset closes the stream.
     EXPECT_CALL(*flush_timer, disableTimer());
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
   });
   EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));

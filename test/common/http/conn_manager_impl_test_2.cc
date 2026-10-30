@@ -680,7 +680,7 @@ public:
           EXPECT_EQ("uhv.unexpected_underscore", info.responseCodeDetails().value());
         }));
     EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(Protocol::Http2, _))
-        .WillOnce(InvokeWithoutArgs([]() {
+        .WillOnce([]() {
           auto validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
           EXPECT_CALL(*validator, validateRequestHeaders(_))
               .WillOnce(Return(HeaderValidator::ValidationResult::success()));
@@ -694,7 +694,7 @@ public:
               .WillOnce(Return(HeaderValidator::ValidationResult(
                   HeaderValidator::ValidationResult::Action::Reject, "uhv.unexpected_underscore")));
           return validator;
-        }));
+        });
   }
 
   void rejectedRequestTrailers() {
