@@ -301,11 +301,11 @@ private:
       return makeOptRefFromPtr(response_trailers_.get());
     }
 
-    void endStream() override {
-      ASSERT(!state_.codec_saw_local_complete_);
-      state_.codec_saw_local_complete_ = true;
-      connection_manager_.doEndStream(*this);
-    }
+    void endStream() override;
+    void disarmStreamTimers();
+    void cancelResponseCompletionReset();
+    void finishResponseCompletionReset();
+    bool handleRequestDuringResponseFlush();
     void onDecoderFilterBelowWriteBufferLowWatermark() override;
     void onDecoderFilterAboveWriteBufferHighWatermark() override;
     void disarmRequestTimeout() override;
@@ -380,9 +380,11 @@ private:
                                                   // response has made its way to the codec.
       bool codec_encode_complete_ : 1 = false;    // This indicates that the codec has
                                                   // completed encoding the response.
-      bool on_reset_stream_called_ : 1 = false;   // Whether the stream has been reset.
-      bool is_zombie_stream_ : 1 = false;         // Whether stream is waiting for signal
-                                                  // the underlying codec to be destroyed.
+      // A complete response is queued, but the codec must finish before resetting an open request.
+      bool pending_response_completion_reset_ : 1 = false;
+      bool on_reset_stream_called_ : 1 = false; // Whether the stream has been reset.
+      bool is_zombie_stream_ : 1 = false;       // Whether stream is waiting for signal
+                                                // the underlying codec to be destroyed.
       bool successful_upgrade_ : 1 = false;
 
       // True if this stream was the original externally created stream, but was
@@ -509,6 +511,8 @@ private:
     // Per-stream access log flush duration. This timer is enabled once when the stream is created
     // and will log to all access logs once per trigger.
     Event::TimerPtr access_log_flush_timer_;
+    // Leave the codec's Send stack before resetting; cancel on EOF, abort or connection close.
+    Event::SchedulableCallbackPtr response_completion_reset_callback_;
 
     std::chrono::milliseconds idle_timeout_ms_{};
     // If an explicit global flush timeout is set, never override it with the route entry idle

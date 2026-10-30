@@ -35,6 +35,8 @@
 
 #include "absl/synchronization/mutex.h"
 #include "gtest/gtest.h"
+#include "quiche/http2/core/recording_headers_handler.h"
+#include "quiche/http2/hpack/hpack_decoder_adapter.h"
 
 using ::testing::Eq;
 using ::testing::Ge;
@@ -100,6 +102,16 @@ public:
   Http2FrameIntegrationTest() : Http2RawFrameIntegrationTest(GetParam().ip_version) {
     setupHttp2ImplOverrides(GetParam().http2_implementation);
   }
+
+  enum class UpstreamReset { None, NoError, DetachedError };
+  static std::string makeFlushResponse(uint32_t stream_id, absl::string_view body,
+                                       UpstreamReset upstream_reset, bool data_end_stream);
+  static void expectFlushResponseHeaders(spdy::HpackDecoderAdapter& header_decoder,
+                                         const Http2Frame& frame, bool trailers);
+  void sendDetachedUpstreamErrorAndExpectNoResponse(FakeRawConnection& upstream,
+                                                    uint32_t stream_id);
+  void responseFlushPreservesOpenRequestLargeResponse(UpstreamReset upstream_reset,
+                                                      bool data_end_stream = false);
 
   static std::vector<FrameIntegrationTestParam> testParams() {
     std::vector<FrameIntegrationTestParam> v;
@@ -1613,6 +1625,251 @@ TEST_P(Http2FrameIntegrationTest, HostExceedsHeaderMapCountLimit) {
   EXPECT_EQ(Http2Frame::Type::RstStream, frame.type());
   tcp_client_->close();
   test_server_->waitForCounter("http2.header_overflow", testing::Ge(1));
+}
+
+// Build wire bytes only; response timing and downstream window control stay in the scenario.
+std::string Http2FrameIntegrationTest::makeFlushResponse(uint32_t stream_id, absl::string_view body,
+                                                         UpstreamReset upstream_reset,
+                                                         bool data_end_stream) {
+  std::string wire = std::string(Http2Frame::makeEmptySettingsFrame());
+  wire += std::string(Http2Frame::makeHeadersFrameWithStatus("200", stream_id,
+                                                             Http2Frame::HeadersFlags::EndHeaders));
+  // The no-reset variants isolate HCM completion from any server-originated RST.
+  // DATA END_STREAM also proves that neither gRPC status nor trailers trigger the bug.
+  for (size_t offset = 0; offset < body.size(); offset += 16384) {
+    const bool last_data = offset + 16384 >= body.size();
+    wire += std::string(
+        Http2Frame::makeDataFrame(stream_id, absl::string_view(body).substr(offset, 16384),
+                                  data_end_stream && last_data ? Http2Frame::DataFlags::EndStream
+                                                               : Http2Frame::DataFlags::None));
+  }
+  if (!data_end_stream) {
+    auto trailers = Http2Frame::makeEmptyHeadersFrame(
+        stream_id, static_cast<Http2Frame::HeadersFlags>(Http::Http2::orFlags(
+                       Http2Frame::HeadersFlags::EndStream, Http2Frame::HeadersFlags::EndHeaders)));
+    trailers.appendHeaderWithoutIndexing({"grpc-status", "0"});
+    trailers.appendHeaderWithoutIndexing({"x-response-result", "complete"});
+    trailers.adjustPayloadSize();
+    wire += std::string(trailers);
+  }
+  if (upstream_reset == UpstreamReset::NoError) {
+    wire +=
+        std::string(Http2Frame::makeResetStreamFrame(stream_id, Http2Frame::ErrorCode::NoError));
+  }
+  return wire;
+}
+
+// Reuse the caller's decoder so initial headers and trailers share HPACK state.
+void Http2FrameIntegrationTest::expectFlushResponseHeaders(
+    spdy::HpackDecoderAdapter& header_decoder, const Http2Frame& frame, bool trailers) {
+  ASSERT_EQ(Http2Frame::Type::Headers, frame.type());
+  // This fixture has small, unpadded header blocks, without priority information.
+  ASSERT_EQ(0, frame.data()[4] & (0x08 | 0x20));
+  ASSERT_NE(0, frame.data()[4] & 0x04); // END_HEADERS
+  spdy::RecordingHeadersHandler handler;
+  header_decoder.HandleControlFrameHeadersStart(&handler);
+  ASSERT_TRUE(header_decoder.HandleControlFrameHeadersData(
+      reinterpret_cast<const char*>(frame.data() + Http2Frame::HeaderSize), frame.payloadSize()));
+  ASSERT_TRUE(header_decoder.HandleControlFrameHeadersComplete());
+  const auto& fields = handler.decoded_block();
+  if (trailers) {
+    const auto status = fields.find("grpc-status");
+    ASSERT_NE(fields.end(), status);
+    EXPECT_EQ("0", status->second);
+    const auto result = fields.find("x-response-result");
+    ASSERT_NE(fields.end(), result);
+    EXPECT_EQ("complete", result->second);
+  } else {
+    const auto status = fields.find(":status");
+    ASSERT_NE(fields.end(), status);
+    EXPECT_EQ("200", status->second);
+  }
+}
+
+// This optional branch verifies an actual wire error after the router detached its request.
+void Http2FrameIntegrationTest::sendDetachedUpstreamErrorAndExpectNoResponse(
+    FakeRawConnection& upstream, uint32_t stream_id) {
+  // The router has already removed its upstream request. Confirm real processing of the
+  // later wire error, rather than injecting a local HCM abort callback.
+  ASSERT_TRUE(upstream.write(std::string(Http2Frame::makeResetStreamFrame(
+                                 stream_id, Http2Frame::ErrorCode::InternalError)) +
+                             std::string(Http2Frame::makePingFrame("upstrbar"))));
+  ASSERT_TRUE(upstream.waitForData([](const std::string& bytes) {
+    size_t offset = 0;
+    const std::string preamble(Http2Frame::Preamble);
+    if (bytes.compare(0, preamble.size(), preamble) == 0) {
+      offset = preamble.size();
+    }
+    while (offset + Http2Frame::HeaderSize <= bytes.size()) {
+      const auto* p = reinterpret_cast<const uint8_t*>(bytes.data() + offset);
+      const size_t payload = (size_t{p[0]} << 16) | (size_t{p[1]} << 8) | p[2];
+      const size_t length = Http2Frame::HeaderSize + payload;
+      if (offset + length > bytes.size()) {
+        return false;
+      }
+      if (p[3] == static_cast<uint8_t>(Http2Frame::Type::Ping) && p[4] == 1 && payload == 8 &&
+          absl::string_view(bytes).substr(offset + Http2Frame::HeaderSize, 8) == "upstrbar") {
+        return true;
+      }
+      offset += length;
+    }
+    return false;
+  }));
+  sendFrame(Http2Frame::makePingFrame("afterrst"));
+  bool post_error_ack = false;
+  for (size_t frames = 0; frames < 64 && !post_error_ack; ++frames) {
+    const auto frame = readFrame();
+    ASSERT_NE(Http2Frame::Type::RstStream, frame.type());
+    if (frame.streamId() == stream_id) {
+      EXPECT_NE(Http2Frame::Type::Data, frame.type());
+      if (frame.type() == Http2Frame::Type::Headers) {
+        EXPECT_FALSE(frame.endStream());
+      }
+    }
+    if (frame.type() == Http2Frame::Type::Ping && frame.data()[4] == 1 &&
+        frame.payloadSize() == 8) {
+      post_error_ack =
+          absl::string_view(reinterpret_cast<const char*>(frame.data() + Http2Frame::HeaderSize),
+                            8) == "afterrst";
+    }
+  }
+  ASSERT_TRUE(post_error_ack);
+}
+
+// Reproduce #48192 with a complete upstream response and an open request. A PING ACK
+// supplies a protocol barrier after upstream completion while the response window is
+// exhausted: a normal-completion reset must not cancel the still-buffered response.
+void Http2FrameIntegrationTest::responseFlushPreservesOpenRequestLargeResponse(
+    UpstreamReset upstream_reset, bool data_end_stream) {
+  constexpr uint32_t stream_id = 1;
+  constexpr uint32_t window = 65536;
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false");
+  config_helper_.setBufferLimits(32768, 32768);
+  config_helper_.setUpstreamHttp2WindowSize(1024 * 1024, 1024 * 1024);
+  beginSession(Http2Frame::makeSettingsFrame(Http2Frame::SettingsFlags::None,
+                                             {{NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE, window}}));
+  sendFrame(Http2Frame::makeWindowUpdateFrame(0, 1024 * 1024 - 65535));
+  // Send request headers without END_STREAM; the request direction deliberately remains open.
+  sendFrame(Http2Frame::makePostRequest(stream_id, "host", "/response-flush"));
+
+  FakeRawConnectionPtr upstream;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream));
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(1));
+  std::string body(100 * 1024, 'a');
+  for (size_t i = 0; i < body.size(); ++i) {
+    body[i] = static_cast<char>('a' + i % 23);
+  }
+  const std::string wire = makeFlushResponse(stream_id, body, upstream_reset, data_end_stream);
+  ASSERT_TRUE(upstream->write(wire));
+  // Router releases its request before forwarding the final response DATA or trailers.
+  // A subsequent downstream PING cannot run until that worker callback has returned.
+  test_server_->waitForGauge("cluster.cluster_0.upstream_rq_active", Eq(0));
+  sendFrame(Http2Frame::makePingFrame("flushbar"));
+
+  // Keep one decoder across both header blocks: the encoder can use dynamic-table entries.
+  spdy::HpackDecoderAdapter header_decoder;
+
+  std::string received;
+  bool ping_ack = false;
+  for (size_t frames = 0; frames < 64 && !ping_ack; ++frames) {
+    const auto frame = readFrame();
+    ASSERT_NE(Http2Frame::Type::RstStream, frame.type())
+        << "Response reset while waiting for downstream window; received " << received.size()
+        << " of " << body.size() << " bytes";
+    if (frame.type() == Http2Frame::Type::Data && frame.streamId() == stream_id) {
+      received.append(reinterpret_cast<const char*>(frame.data() + Http2Frame::HeaderSize),
+                      frame.payloadSize());
+      EXPECT_FALSE(frame.endStream());
+    } else if (frame.type() == Http2Frame::Type::Headers) {
+      ASSERT_NO_FATAL_FAILURE(expectFlushResponseHeaders(header_decoder, frame, false));
+      EXPECT_FALSE(frame.endStream());
+    } else if (frame.type() == Http2Frame::Type::Ping && frame.data()[4] == 1 &&
+               frame.payloadSize() == 8) {
+      ping_ack =
+          absl::string_view(reinterpret_cast<const char*>(frame.data() + Http2Frame::HeaderSize),
+                            8) == "flushbar";
+    }
+  }
+  ASSERT_TRUE(ping_ack);
+  ASSERT_EQ(window, received.size());
+
+  if (upstream_reset == UpstreamReset::DetachedError) {
+    ASSERT_NO_FATAL_FAILURE(sendDetachedUpstreamErrorAndExpectNoResponse(*upstream, stream_id));
+    EXPECT_EQ(window, received.size());
+  }
+  sendFrame(Http2Frame::makeWindowUpdateFrame(stream_id, body.size()));
+
+  bool response_end = false;
+  bool reset = false;
+  for (size_t frames = 0; frames < 64 && !reset; ++frames) {
+    const auto frame = readFrame();
+    if (frame.streamId() != stream_id) {
+      continue;
+    }
+    if (frame.type() == Http2Frame::Type::Data) {
+      ASSERT_FALSE(response_end);
+      received.append(reinterpret_cast<const char*>(frame.data() + Http2Frame::HeaderSize),
+                      frame.payloadSize());
+      if (frame.endStream()) {
+        EXPECT_TRUE(data_end_stream);
+        EXPECT_EQ(body, received);
+        response_end = true;
+      }
+    } else if (frame.type() == Http2Frame::Type::Headers) {
+      ASSERT_TRUE(frame.endStream());
+      ASSERT_FALSE(response_end);
+      EXPECT_FALSE(data_end_stream);
+      ASSERT_NO_FATAL_FAILURE(expectFlushResponseHeaders(header_decoder, frame, true));
+      EXPECT_EQ(body, received);
+      response_end = true;
+    } else if (frame.type() == Http2Frame::Type::RstStream) {
+      EXPECT_TRUE(response_end) << "RST must follow the complete response END_STREAM";
+      EXPECT_EQ(0, rstStreamErrorCode(frame));
+      reset = true;
+    }
+  }
+  EXPECT_TRUE(response_end);
+  EXPECT_TRUE(reset);
+  EXPECT_EQ(body, received);
+  // The barrier proves that a second reset or more response bytes are not queued behind RST.
+  sendFrame(Http2Frame::makePingFrame("finished"));
+  bool finished = false;
+  for (size_t frames = 0; frames < 64 && !finished; ++frames) {
+    const auto frame = readFrame();
+    if (frame.streamId() == stream_id) {
+      EXPECT_NE(Http2Frame::Type::RstStream, frame.type());
+      EXPECT_NE(Http2Frame::Type::Data, frame.type());
+      EXPECT_NE(Http2Frame::Type::Headers, frame.type());
+    }
+    if (frame.type() == Http2Frame::Type::Ping && frame.data()[4] == 1 &&
+        frame.payloadSize() == 8) {
+      finished =
+          absl::string_view(reinterpret_cast<const char*>(frame.data() + Http2Frame::HeaderSize),
+                            8) == "finished";
+    }
+  }
+  ASSERT_TRUE(finished);
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", Eq(0));
+  test_server_->waitForGauge("http2.streams_active", Eq(0));
+  test_server_->waitForGauge("http2.pending_send_bytes", Eq(0));
+  tcp_client_->close();
+}
+
+TEST_P(Http2FrameIntegrationTest, ResponseFlushPreservesOpenRequestLargeResponse) {
+  responseFlushPreservesOpenRequestLargeResponse(UpstreamReset::NoError);
+}
+
+TEST_P(Http2FrameIntegrationTest, ResponseFlushPreservesResponseAfterDetachedUpstreamError) {
+  responseFlushPreservesOpenRequestLargeResponse(UpstreamReset::DetachedError);
+}
+
+TEST_P(Http2FrameIntegrationTest, ResponseFlushWithoutUpstreamResetTrailersEndStream) {
+  responseFlushPreservesOpenRequestLargeResponse(UpstreamReset::None);
+}
+
+TEST_P(Http2FrameIntegrationTest, ResponseFlushWithoutUpstreamResetDataEndStream) {
+  responseFlushPreservesOpenRequestLargeResponse(UpstreamReset::None, true);
 }
 
 // RFC 9113 Section 8.1: When the upstream sends a complete gRPC response (HEADERS + DATA +

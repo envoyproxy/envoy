@@ -1415,6 +1415,11 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
       const bool end_stream_sent = flags & FLAG_END_STREAM;
       stream->local_end_stream_sent_ = end_stream_sent;
       if (end_stream_sent) {
+        if (adapter_->IsServerSession()) {
+          // Completion can retain HCM state until the next dispatcher iteration. A fully
+          // encoded response no longer needs the pending-data flush timeout.
+          stream->disarmStreamFlushTimer();
+        }
         stream->onEndStreamEncoded();
       }
     }

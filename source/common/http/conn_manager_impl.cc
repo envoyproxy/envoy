@@ -427,23 +427,7 @@ void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
       ++number_premature_stream_resets_;
     }
   }
-  if (stream.max_stream_duration_timer_ != nullptr) {
-    stream.max_stream_duration_timer_->disableTimer();
-    stream.max_stream_duration_timer_ = nullptr;
-  }
-  if (stream.stream_idle_timer_ != nullptr) {
-    stream.stream_idle_timer_->disableTimer();
-    stream.stream_idle_timer_ = nullptr;
-  }
-  stream.filter_manager_.disarmRequestTimeout();
-  if (stream.request_header_timer_ != nullptr) {
-    stream.request_header_timer_->disableTimer();
-    stream.request_header_timer_ = nullptr;
-  }
-  if (stream.access_log_flush_timer_ != nullptr) {
-    stream.access_log_flush_timer_->disableTimer();
-    stream.access_log_flush_timer_ = nullptr;
-  }
+  stream.disarmStreamTimers();
 
   // Only destroy the active stream if the underlying codec has notified us of
   // completion or we've internal redirect the stream.
@@ -1881,6 +1865,9 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
   ENVOY_EXECUTION_SCOPE(trackedStream(), active_span_.get());
   maybeRecordLastByteReceived(end_stream);
   filter_manager_.streamInfo().addBytesReceived(data.length());
+  if (handleRequestDuringResponseFlush()) {
+    return;
+  }
   if (!state_.deferred_to_next_io_iteration_) {
     filter_manager_.decodeData(data, end_stream);
   } else {
@@ -1905,6 +1892,9 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(RequestTrailerMapPtr&& 
     return;
   }
   maybeRecordLastByteReceived(true);
+  if (handleRequestDuringResponseFlush()) {
+    return;
+  }
   if (!state_.deferred_to_next_io_iteration_) {
     request_trailers_ = std::move(trailers);
     filter_manager_.decodeTrailers(*request_trailers_);
@@ -2356,6 +2346,7 @@ void ConnectionManagerImpl::ActiveStream::onResetStream(StreamResetReason reset_
   //       3) The codec RX a reset
   //       4) The overload manager reset the stream
   //       If we need to differentiate we need to do it inside the codec. Can start with this.
+  cancelResponseCompletionReset();
   const absl::string_view encoder_details = response_encoder_->getStream().responseDetails();
   ENVOY_STREAM_LOG(debug, "stream reset: reset reason: {}, response details: {}", *this,
                    Http::Utility::resetReasonToString(reset_reason),
@@ -2415,6 +2406,78 @@ bool ConnectionManagerImpl::ActiveStream::shouldSkipDeferredCloseDelay() const {
   return connection_close && (request_complete || http_10_sans_cl);
 }
 
+// Normal completion must preserve a response that
+// HTTP/2 flow control still holds in the codec. Explicit aborts retain reset semantics.
+void ConnectionManagerImpl::ActiveStream::endStream() {
+  ASSERT(!state_.codec_saw_local_complete_);
+  state_.codec_saw_local_complete_ = true;
+  if (!connection_manager_.allow_upstream_half_close_ &&
+      connection_manager_.codec_->protocol() == Protocol::Http2 && response_encoder_ != nullptr &&
+      !state_.codec_encode_complete_ && !state_.on_reset_stream_called_ &&
+      !filter_manager_.hasLastDownstreamByteReceived() && !state_.is_tunneling_ &&
+      !requestWasConnect(request_headers_, Protocol::Http2) &&
+      !streamInfo().hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError) &&
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_defer_reset_until_response_complete")) {
+    state_.pending_response_completion_reset_ = true;
+    state_.is_zombie_stream_ = true;
+    filter_manager_.setLocalComplete();
+    // Keep only the codec flush timer. Do not charge stream destruction until the final exit.
+    disarmStreamTimers();
+    return;
+  }
+  connection_manager_.doEndStream(*this);
+}
+
+void ConnectionManagerImpl::ActiveStream::disarmStreamTimers() {
+  if (max_stream_duration_timer_ != nullptr) {
+    max_stream_duration_timer_->disableTimer();
+    max_stream_duration_timer_ = nullptr;
+  }
+  if (stream_idle_timer_ != nullptr) {
+    stream_idle_timer_->disableTimer();
+    stream_idle_timer_ = nullptr;
+  }
+  filter_manager_.disarmRequestTimeout();
+  if (request_header_timer_ != nullptr) {
+    request_header_timer_->disableTimer();
+    request_header_timer_ = nullptr;
+  }
+  if (access_log_flush_timer_ != nullptr) {
+    access_log_flush_timer_->disableTimer();
+    access_log_flush_timer_ = nullptr;
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::cancelResponseCompletionReset() {
+  if (!state_.pending_response_completion_reset_) {
+    return;
+  }
+  state_.pending_response_completion_reset_ = false;
+  if (response_completion_reset_callback_ != nullptr) {
+    response_completion_reset_callback_->cancel();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::finishResponseCompletionReset() {
+  ASSERT(state_.pending_response_completion_reset_);
+  ASSERT(state_.codec_encode_complete_);
+  cancelResponseCompletionReset();
+  // resetStream callbacks can destroy the stream. Do not access members after this call.
+  connection_manager_.doEndStream(*this);
+}
+
+bool ConnectionManagerImpl::ActiveStream::handleRequestDuringResponseFlush() {
+  if (!state_.pending_response_completion_reset_) {
+    return false;
+  }
+  if (filter_manager_.hasLastDownstreamByteReceived() && state_.codec_encode_complete_) {
+    // Unregister HCM callbacks before returning to a codec that can now close both directions.
+    finishResponseCompletionReset();
+  }
+  return true;
+}
+
 void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
   ASSERT(!state_.codec_encode_complete_);
   ENVOY_STREAM_LOG(debug, "Codec completed encoding stream.", *this);
@@ -2424,6 +2487,20 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
   filter_manager_.streamInfo().downstreamTiming().onLastDownstreamTxByteSent(
       connection_manager_.time_source_);
   request_response_timespan_->complete();
+
+  if (state_.pending_response_completion_reset_) {
+    if (filter_manager_.hasLastDownstreamByteReceived()) {
+      finishResponseCompletionReset();
+    } else {
+      // onCodecEncodeComplete runs inside adapter Send. Defer the normal request reset to
+      // avoid recursively entering Send, and retain the stream until then.
+      response_completion_reset_callback_ =
+          connection_manager_.dispatcher_->createSchedulableCallback(
+              [this]() { finishResponseCompletionReset(); });
+      response_completion_reset_callback_->scheduleCallbackNextIteration();
+    }
+    return;
+  }
 
   // Only reap stream once.
   if (state_.is_zombie_stream_) {
@@ -2438,6 +2515,7 @@ void ConnectionManagerImpl::ActiveStream::onCodecEncodeComplete() {
 }
 
 void ConnectionManagerImpl::ActiveStream::onCodecLowLevelReset() {
+  cancelResponseCompletionReset();
   ASSERT(!state_.codec_encode_complete_);
   state_.on_reset_stream_called_ = true;
   ENVOY_STREAM_LOG(debug, "Codec low level reset", *this);
@@ -2848,7 +2926,30 @@ void ConnectionManagerImpl::ActiveStream::onResponseDataTooLarge() {
   connection_manager_.stats_.named_.rs_too_large_.inc();
 }
 
-void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason, absl::string_view) {
+void ConnectionManagerImpl::ActiveStream::resetStream(Http::StreamResetReason reason,
+                                                      absl::string_view) {
+  if (state_.pending_response_completion_reset_) {
+    // An upstream successful close must not turn normal draining into an abort.
+    if (reason == StreamResetReason::RemoteResetNoError) {
+      return;
+    }
+    cancelResponseCompletionReset();
+    connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
+    // Trailer validation reports a protocol error through the default local-reset API.
+    // Preserve the error mapping from doEndStream while retaining explicit abort reasons.
+    if (reason == StreamResetReason::LocalReset &&
+        streamInfo().hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError)) {
+      reason = StreamResetReason::ProtocolError;
+    }
+    // Even if request EOF arrived during draining, an explicit abort must reach the codec.
+    // Reset callbacks can destroy the stream. Capture the close decision before resetting,
+    // then perform the same post-reset drain check as doEndStream, even outside dispatch.
+    auto& connection_manager = connection_manager_;
+    const bool skip_delay = shouldSkipDeferredCloseDelay();
+    response_encoder_->getStream().resetStream(reason);
+    connection_manager.checkForDeferredClose(skip_delay);
+    return;
+  }
   connection_manager_.stats_.named_.downstream_rq_tx_reset_.inc();
   connection_manager_.doEndStream(*this);
 }

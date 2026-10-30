@@ -1,7 +1,14 @@
 #include <chrono>
+#include <tuple>
+
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/common/http/conn_manager_impl_test_base.h"
+#include "test/common/http/http2/http2_frame.h"
 #include "test/extensions/filters/network/common/fuzz/utils/fakes.h"
+#include "test/mocks/tracing/mocks.h"
 #include "test/server/utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
@@ -14,6 +21,1504 @@ using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
+
+// Exercise normal response draining separately from
+// cancellation, using the codec boundary to control completion without duplicating HCM decisions.
+class Http2ResponseFlushTest : public HttpConnectionManagerImplTest {
+public:
+  void begin(bool guard = true, bool half_close = false, Protocol protocol = Protocol::Http2,
+             RequestHeaderMapPtr request_headers = nullptr) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close",
+          half_close ? "true" : "false"},
+         {"envoy.reloadable_features.http2_defer_reset_until_response_complete",
+          guard ? "true" : "false"}});
+    setup();
+    codec_->protocol_ = protocol;
+    setupFilterChain(1, 0);
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
+        .WillOnce(Return(FilterHeadersStatus::StopIteration));
+    if (request_headers == nullptr) {
+      startRequest(false);
+    } else {
+      EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
+          .WillOnce(Invoke([this](absl::string_view, const FilterChainFactory::UpgradeMap*,
+                                  FilterChainFactoryCallbacks& callbacks) {
+            return filter_factory_.createFilterChain(callbacks);
+          }));
+      EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+        decoder_->decodeHeaders(std::move(request_headers), false);
+        return okStatus();
+      }));
+      Buffer::OwnedImpl input;
+      conn_manager_->onData(input, false);
+    }
+    EXPECT_CALL(*decoder_filters_[0], onStreamComplete()).WillOnce(Invoke([this] {
+      ++completed_;
+    }));
+    EXPECT_CALL(*decoder_filters_[0], onDestroy()).WillOnce(Invoke([this] { ++destroyed_; }));
+    EXPECT_CALL(response_encoder_.stream_, resetStream(_)).Times(0);
+  }
+
+  void respond(bool synchronous = false) {
+    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+        .WillOnce(Invoke([this, synchronous](const ResponseHeaderMap&, bool) {
+          if (synchronous) {
+            response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+          }
+        }));
+    decoder_filters_[0]->callbacks_->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        true, "response_flush");
+  }
+
+  Event::MockSchedulableCallback* complete() {
+    auto* cb = new testing::StrictMock<Event::MockSchedulableCallback>(
+        &filter_callbacks_.connection_.dispatcher_);
+    EXPECT_CALL(*cb, scheduleCallbackNextIteration());
+    // Cancellation is also valid from the callback itself, whose enabled bit is already false.
+    EXPECT_CALL(*cb, cancel()).Times(testing::AtMost(1));
+    response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+    EXPECT_TRUE(cb->enabled_);
+    EXPECT_EQ(0, destroyed_);
+    return cb;
+  }
+
+  void expectReset(StreamResetReason reason = StreamResetReason::LocalReset) {
+    testing::Mock::VerifyAndClearExpectations(&response_encoder_.stream_);
+    EXPECT_CALL(response_encoder_.stream_, resetStream(reason));
+  }
+
+  void requestEnd(bool trailers = false) {
+    EXPECT_CALL(*decoder_filters_[0], decodeData(_, _)).Times(0);
+    EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_)).Times(0);
+    if (trailers) {
+      decoder_->decodeTrailers(std::make_unique<TestRequestTrailerMapImpl>());
+    } else {
+      Buffer::OwnedImpl data("unused request suffix");
+      decoder_->decodeData(data, true);
+    }
+  }
+
+  void expectClosed() {
+    EXPECT_EQ(1, completed_);
+    EXPECT_EQ(1, destroyed_);
+    EXPECT_EQ(0, stats_.named_.downstream_rq_active_.value());
+    EXPECT_EQ(nullptr, response_encoder_.stream_.codec_callbacks_);
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  int completed_{0};
+  int destroyed_{0};
+};
+
+TEST_F(Http2ResponseFlushTest, NormalEndWaitsForCodecComplete) {
+  begin();
+  respond();
+  EXPECT_EQ(0, destroyed_);
+  auto* cb = complete();
+  expectReset();
+  cb->invokeCallback();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, NormalEndAlreadyEncoded) {
+  begin();
+  expectReset();
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createSchedulableCallback_(_)).Times(0);
+  respond(true);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, RuntimeGuardOffRetainsImmediateReset) {
+  begin(false);
+  expectReset();
+  respond();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, RequestDataEndBeforeEncodeComplete) {
+  begin();
+  respond();
+  requestEnd();
+  EXPECT_EQ(0, destroyed_);
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, RequestTrailersBeforeEncodeComplete) {
+  begin();
+  respond();
+  requestEnd(true);
+  EXPECT_EQ(0, destroyed_);
+  response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, RequestDataEndBeforeScheduledReset) {
+  begin();
+  respond();
+  auto* cb = complete();
+  requestEnd();
+  EXPECT_FALSE(cb->enabled_);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, RequestTrailersBeforeScheduledReset) {
+  begin();
+  respond();
+  auto* cb = complete();
+  requestEnd(true);
+  EXPECT_FALSE(cb->enabled_);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, ExplicitAbortAfterRequestEof) {
+  begin();
+  respond();
+  requestEnd();
+  expectReset(StreamResetReason::ProtocolError);
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::ProtocolError);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, ExplicitAbortBeforeScheduledReset) {
+  begin();
+  respond();
+  auto* cb = complete();
+  expectReset(StreamResetReason::LocalReset);
+  decoder_filters_[0]->callbacks_->resetStream();
+  EXPECT_FALSE(cb->enabled_);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, UpstreamNoErrorDoesNotAbortPendingResponse) {
+  begin();
+  respond();
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::RemoteResetNoError);
+  EXPECT_EQ(0, destroyed_);
+  auto* cb = complete();
+  expectReset();
+  cb->invokeCallback();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, DownstreamResetCancelsPendingResponse) {
+  begin();
+  respond();
+  expectReset(StreamResetReason::RemoteReset);
+  response_encoder_.stream_.resetStream(StreamResetReason::RemoteReset);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, DownstreamResetCancelsScheduledReset) {
+  begin();
+  respond();
+  auto* cb = complete();
+  expectReset(StreamResetReason::RemoteReset);
+  response_encoder_.stream_.resetStream(StreamResetReason::RemoteReset);
+  EXPECT_FALSE(cb->enabled_);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, ConnectionCloseCancelsPendingResponse) {
+  begin();
+  respond();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, ConnectionCloseCancelsScheduledReset) {
+  begin();
+  respond();
+  auto* cb = complete();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_FALSE(cb->enabled_);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, LowLevelTimeoutEndsPendingResponse) {
+  begin();
+  respond();
+  response_encoder_.stream_.codec_callbacks_->onCodecLowLevelReset();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, Http3RetainsImmediateReset) {
+  begin(true, false, Protocol::Http3);
+  expectReset();
+  respond();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, Http2IndependentHalfCloseStillWaitsForRequest) {
+  begin(true, true);
+  respond(true);
+  EXPECT_EQ(0, destroyed_);
+  EXPECT_CALL(*decoder_filters_[0], decodeData(_, true))
+      .WillOnce(Return(FilterDataStatus::Continue));
+  Buffer::OwnedImpl end;
+  decoder_->decodeData(end, true);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, ProcessingIdleTimerDisarmedDuringResponseFlush) {
+  stream_idle_timeout_ = std::chrono::milliseconds(25);
+  bool timer_destroyed = false;
+  auto* timer = setUpTimer();
+  timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(25), _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*timer, disableTimer());
+  begin();
+  respond();
+  EXPECT_TRUE(timer_destroyed);
+  auto* cb = complete();
+  expectReset();
+  cb->invokeCallback();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, MaxDurationTimerDisarmedDuringResponseFlush) {
+  max_stream_duration_ = std::chrono::milliseconds(25);
+  bool destroyed = false;
+  auto* timer = setUpTimer();
+  timer->timer_destroyed_ = &destroyed;
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(25), _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*timer, disableTimer());
+  begin();
+  respond();
+  EXPECT_TRUE(destroyed);
+  auto* cb = complete();
+  expectReset();
+  cb->invokeCallback();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, PeriodicLogTimerDisarmedDuringResponseFlush) {
+  access_log_flush_interval_ = std::chrono::milliseconds(25);
+  bool destroyed = false;
+  auto* timer = setUpTimer();
+  timer->timer_destroyed_ = &destroyed;
+  EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(25), _)).Times(testing::AtLeast(1));
+  EXPECT_CALL(*timer, disableTimer());
+  begin();
+  respond();
+  EXPECT_TRUE(destroyed);
+  auto* cb = complete();
+  expectReset();
+  cb->invokeCallback();
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, ConnectRequestRetainsImmediateReset) {
+  begin(true, false, Protocol::Http2,
+        std::make_unique<TestRequestHeaderMapImpl>(
+            TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host:443"}}));
+  expectReset();
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createSchedulableCallback_(_)).Times(0);
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true));
+  // A non-success CONNECT excludes the new wait without establishing a tunnel.
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "403"}}),
+      true, "connect_response");
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, EstablishedTunnelRetainsImmediateReset) {
+  begin(true, false, Protocol::Http2,
+        std::make_unique<TestRequestHeaderMapImpl>(
+            TestRequestHeaderMapImpl{{":method", "CONNECT"}, {":authority", "host:443"}}));
+  expectReset();
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createSchedulableCallback_(_)).Times(0);
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  // HTTP/2 tunnels originate from CONNECT; the tunnel and CONNECT exclusions overlap.
+  decoder_filters_[0]->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      false, "tunnel_response");
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  Buffer::OwnedImpl end;
+  decoder_filters_[0]->callbacks_->encodeData(end, true);
+  expectClosed();
+}
+
+TEST_F(Http2ResponseFlushTest, DownstreamProtocolErrorRetainsImmediateReset) {
+  begin();
+  decoder_filters_[0]->callbacks_->streamInfo().setResponseFlag(
+      StreamInfo::CoreResponseFlag::DownstreamProtocolError);
+  expectReset(StreamResetReason::ProtocolError);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createSchedulableCallback_(_)).Times(0);
+  respond();
+  expectClosed();
+}
+
+// Real HCM/HTTP2 ownership and frame ordering,
+// with only network I/O and dispatcher scheduling controlled at their external boundaries.
+class Http2ResponseFlushLifecycleTest : public HttpConnectionManagerImplMixin,
+                                        public testing::TestWithParam<std::tuple<bool, bool>> {
+public:
+  using Frame = Http2::Http2Frame;
+  class ServerCodec : public Http2::ServerConnectionImpl {
+  public:
+    using Http2::ServerConnectionImpl::getStream;
+    using Http2::ServerConnectionImpl::ServerConnectionImpl;
+    int32_t receiveWindow() const { return adapter_->GetReceiveWindowSize(); }
+  };
+
+  Http2ResponseFlushLifecycleTest() {
+    delete codec_;
+    codec_ = nullptr;
+  }
+
+  ServerConnectionPtr createCodec(Network::Connection& connection, const Buffer::Instance&,
+                                  ServerConnectionCallbacks& callbacks,
+                                  Server::OverloadManager& overload_manager) override {
+    envoy::config::core::v3::Http2ProtocolOptions options;
+    if (constrain_receive_window_) {
+      options.mutable_initial_stream_window_size()->set_value(65535);
+      options.mutable_initial_connection_window_size()->set_value(65535);
+    }
+    auto codec = std::make_unique<ServerCodec>(
+        connection, callbacks, Http2::CodecStats::atomicGet(codec_stats_, *fake_stats_.rootScope()),
+        random_, ::Envoy::Http2::Utility::initializeAndValidateOptions(options).value(),
+        max_request_headers_kb_, max_request_headers_count_, headers_with_underscores_action_,
+        overload_manager, runtime_);
+    real_codec_ = codec.get();
+    return codec;
+  }
+
+  void TearDown() override {
+    conn_manager_.reset();
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+  }
+
+  void dispatch(absl::string_view wire, bool expect_consumed = true) {
+    Buffer::OwnedImpl input(wire);
+    conn_manager_->onData(input, false);
+    if (expect_consumed) {
+      EXPECT_EQ(0, input.length());
+    }
+  }
+
+  std::vector<Frame> output() {
+    std::vector<Frame> frames;
+    while (!wire_output_.empty()) {
+      EXPECT_GE(wire_output_.size(), Frame::HeaderSize);
+      if (wire_output_.size() < Frame::HeaderSize) {
+        break;
+      }
+      const auto* p = reinterpret_cast<const uint8_t*>(wire_output_.data());
+      const size_t size = Frame::HeaderSize + (p[0] << 16) + (p[1] << 8) + p[2];
+      EXPECT_LE(size, wire_output_.size());
+      if (size > wire_output_.size()) {
+        break;
+      }
+      frames.push_back(Frame::makeGenericFrame(absl::string_view(wire_output_).substr(0, size)));
+      wire_output_.erase(0, size);
+    }
+    return frames;
+  }
+
+  void begin(bool closed_request = false, bool disable_timeout = false, int requests = 2,
+             uint32_t connection_window = 1048576) {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"},
+         {"envoy.reloadable_features.http2_use_oghttp2",
+          std::get<0>(GetParam()) ? "true" : "false"}});
+    stream_flush_timeout_ = disable_timeout ? std::chrono::seconds(0) : std::chrono::seconds(5);
+    setup();
+    setupFilterChain(1, 0, requests);
+    ON_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_))
+        .WillByDefault(Invoke([this](Event::TimerCb cb) {
+          auto* timer = new NiceMock<Event::MockTimer>();
+          timer->callback_ = cb;
+          flush_timer_ = timer;
+          return timer;
+        }));
+    ON_CALL(filter_callbacks_.connection_, bufferLimit()).WillByDefault(Return(32768));
+    ON_CALL(filter_callbacks_.connection_.dispatcher_, trackedObjectStackIsEmpty())
+        .WillByDefault(Return(true));
+    ON_CALL(filter_callbacks_.connection_, write(_, _))
+        .WillByDefault(Invoke([this](Buffer::Instance& data, bool) {
+          wire_output_ += data.toString();
+          data.drain(data.length());
+        }));
+    std::string preface =
+        std::string(Frame::Preamble) +
+        std::string(Frame::makeSettingsFrame(Frame::SettingsFlags::None, {{4, 65536}}));
+    if (connection_window > 65535) {
+      preface += std::string(Frame::makeWindowUpdateFrame(0, connection_window - 65535));
+    }
+    dispatch(preface);
+    output();
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, closed_request))
+        .WillOnce(Return(FilterHeadersStatus::StopIteration));
+    EXPECT_CALL(*decoder_filters_[0], decodeData(_, _)).Times(0);
+    EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_)).Times(0);
+    dispatch(closed_request ? std::string(Frame::makeRequest(1, "host", "/response-flush"))
+                            : std::string(Frame::makePostRequest(1, "host", "/response-flush")));
+    EXPECT_CALL(*decoder_filters_[0], onStreamComplete()).WillOnce(Invoke([this] {
+      ++completed_;
+    }));
+    EXPECT_CALL(*decoder_filters_[0], onDestroy()).WillOnce(Invoke([this] { ++destroyed_; }));
+    output();
+  }
+
+  void respond(bool data_end = false, size_t expected_prefix = 65536) {
+    auto* cb = decoder_filters_[0]->callbacks_;
+    cb->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        false, "response_flush");
+    Buffer::OwnedImpl data(body_);
+    cb->encodeData(data, data_end);
+    if (!data_end) {
+      cb->encodeTrailers(std::make_unique<TestResponseTrailerMapImpl>(
+          TestResponseTrailerMapImpl{{"grpc-status", "0"}}));
+    }
+    EXPECT_EQ(0, destroyed_);
+    for (const auto& frame : output()) {
+      ASSERT_NE(Frame::Type::RstStream, frame.type());
+      if (frame.type() == Frame::Type::Data) {
+        received_.append(reinterpret_cast<const char*>(frame.data() + Frame::HeaderSize),
+                         frame.payloadSize());
+        EXPECT_FALSE(frame.endStream());
+      }
+    }
+    EXPECT_EQ(expected_prefix, received_.size());
+  }
+
+  Frame requestEndFrame() {
+    if (std::get<1>(GetParam())) {
+      auto trailers = Frame::makeEmptyHeadersFrame(
+          1, static_cast<Frame::HeadersFlags>(
+                 Http2::orFlags(Frame::HeadersFlags::EndHeaders, Frame::HeadersFlags::EndStream)));
+      trailers.appendHeaderWithoutIndexing({"request-trailer", "done"});
+      trailers.adjustPayloadSize();
+      return trailers;
+    } else {
+      return Frame::makeEmptyDataFrame(1, Frame::DataFlags::EndStream);
+    }
+  }
+
+  void requestEnd() { dispatch(std::string(requestEndFrame())); }
+
+  void windowUpdate() { dispatch(std::string(Frame::makeWindowUpdateFrame(1, body_.size()))); }
+
+  void expectCompleteOutput() {
+    bool end = false;
+    for (const auto& frame : output()) {
+      ASSERT_NE(Frame::Type::RstStream, frame.type());
+      if (frame.type() == Frame::Type::Data || frame.type() == Frame::Type::Headers) {
+        EXPECT_EQ(1, frame.streamId());
+        EXPECT_FALSE(end);
+        if (frame.type() == Frame::Type::Data) {
+          received_.append(reinterpret_cast<const char*>(frame.data() + Frame::HeaderSize),
+                           frame.payloadSize());
+        }
+        if (frame.endStream()) {
+          end = true;
+          // The body must already be complete at END_STREAM, not merely by batch end.
+          EXPECT_EQ(body_, received_);
+        }
+      }
+    }
+    EXPECT_TRUE(end);
+    EXPECT_EQ(body_, received_);
+  }
+
+  void nextStream() {
+    EXPECT_EQ(1, completed_);
+    EXPECT_EQ(1, destroyed_);
+    EXPECT_EQ(0, stats_.named_.downstream_rq_active_.value());
+    // Actually free the old HCM and codec streams before reusing the connection.
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+    EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+        .WillOnce(Return(FilterHeadersStatus::StopIteration));
+    dispatch(std::string(Frame::makeRequest(3, "host", "/next")));
+    EXPECT_CALL(*decoder_filters_[1], onStreamComplete());
+    EXPECT_CALL(*decoder_filters_[1], onDestroy());
+    decoder_filters_[1]->callbacks_->encodeHeaders(
+        std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+        true, "next");
+    bool end = false;
+    for (const auto& frame : output()) {
+      EXPECT_NE(Frame::Type::RstStream, frame.type());
+      if (frame.type() == Frame::Type::Headers && frame.streamId() == 3) {
+        end |= frame.endStream();
+      }
+    }
+    EXPECT_TRUE(end);
+    EXPECT_EQ(0, stats_.named_.downstream_rq_active_.value());
+  }
+
+  Event::MockSchedulableCallback* completeResponseWithScheduledReset() {
+    auto* cb = new testing::StrictMock<Event::MockSchedulableCallback>(
+        &filter_callbacks_.connection_.dispatcher_);
+    EXPECT_CALL(*cb, scheduleCallbackNextIteration());
+    EXPECT_CALL(*cb, cancel());
+    windowUpdate();
+    EXPECT_TRUE(cb->enabled_);
+    EXPECT_EQ(0, destroyed_);
+    expectCompleteOutput();
+    return cb;
+  }
+
+  void expectFinalized() {
+    EXPECT_EQ(1, completed_);
+    EXPECT_EQ(1, destroyed_);
+    EXPECT_EQ(0, stats_.named_.downstream_rq_active_.value());
+    // Free the actual HCM/codec objects before injecting late frames or reusing the connection.
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+    EXPECT_EQ(1, completed_);
+    EXPECT_EQ(1, destroyed_);
+  }
+
+  void expectClosedConnectionCleanedUp() {
+    EXPECT_EQ(Network::Connection::State::Closed, filter_callbacks_.connection_.state());
+    EXPECT_EQ(1, stats_.named_.downstream_cx_destroy_local_.value());
+    expectFinalized();
+    conn_manager_.reset();
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+    EXPECT_EQ(0, TestUtility::findGauge(fake_stats_, "http2.streams_active")->value());
+    EXPECT_EQ(0, TestUtility::findGauge(fake_stats_, "http2.pending_send_bytes")->value());
+    EXPECT_EQ(1, completed_);
+    EXPECT_EQ(1, destroyed_);
+  }
+
+  void expectNoTargetResponseFrames() {
+    for (const auto& frame : output()) {
+      if (frame.streamId() == 1) {
+        EXPECT_NE(Frame::Type::RstStream, frame.type());
+        EXPECT_NE(Frame::Type::Data, frame.type());
+        EXPECT_NE(Frame::Type::Headers, frame.type());
+      }
+    }
+  }
+
+  void expectCancelledResponse() {
+    expectNoTargetResponseFrames();
+    expectFinalized();
+    windowUpdate();
+    expectNoTargetResponseFrames();
+  }
+
+  void expectDisconnectedResponse() {
+    EXPECT_TRUE(output().empty());
+    expectFinalized();
+    conn_manager_.reset();
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+    // Include destructor/deferred-deletion writes, not only the close event itself.
+    EXPECT_TRUE(output().empty());
+    EXPECT_EQ(0, TestUtility::findGauge(fake_stats_, "http2.streams_active")->value());
+    EXPECT_EQ(0, TestUtility::findGauge(fake_stats_, "http2.pending_send_bytes")->value());
+    EXPECT_EQ(1, completed_);
+    EXPECT_EQ(1, destroyed_);
+  }
+
+  void enableMemoryAccounting() {
+    envoy::config::overload::v3::BufferFactoryConfig config;
+    config.set_minimum_account_to_track_power_of_two(16);
+    tracking_factory_ = std::make_unique<Buffer::WatermarkBufferFactory>(config);
+    ON_CALL(filter_callbacks_.connection_.dispatcher_.buffer_factory_, createAccount(_))
+        .WillByDefault(Invoke([this](Http::StreamResetHandler& handler) {
+          retained_account_ = tracking_factory_->createAccount(handler);
+          return retained_account_;
+        }));
+  }
+
+  void finalLogAndSpanOnce(bool cancel, bool scheduled_reset = false) {
+    auto logger = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+    access_logs_.push_back(logger);
+    auto* span = new NiceMock<Tracing::MockSpan>();
+    EXPECT_CALL(*tracer_, startSpan_(_, _, _, _)).WillOnce(Return(span));
+    EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator())
+        .WillRepeatedly(Return(nullptr));
+    EXPECT_CALL(*logger, log(_, _)).Times(0);
+    EXPECT_CALL(*span, finishSpan()).Times(0);
+    begin(false, false, 1);
+    respond();
+    Event::MockSchedulableCallback* completion = nullptr;
+    if (!cancel) {
+      if (scheduled_reset) {
+        completion = completeResponseWithScheduledReset();
+      } else {
+        requestEnd();
+        EXPECT_EQ(0, destroyed_);
+      }
+    }
+    // Both request EOF with output pending and output completion with reset queued
+    // must retain zero final-log/span calls until the actual terminal action.
+    testing::Mock::VerifyAndClearExpectations(logger.get());
+    testing::Mock::VerifyAndClearExpectations(span);
+    EXPECT_CALL(*logger, log(_, _))
+        .WillOnce(Invoke([](const Formatter::Context& context, const StreamInfo::StreamInfo&) {
+          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, context.accessLogType());
+        }));
+    EXPECT_CALL(*span, finishSpan());
+    if (cancel) {
+      dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+      expectNoTargetResponseFrames();
+    } else if (scheduled_reset) {
+      completion->invokeCallback();
+      expectSingleReset(0);
+    } else {
+      windowUpdate();
+      expectCompleteOutput();
+    }
+    expectFinalized();
+  }
+
+  void rejectRequestTrailers() {
+    // Control validation at its external boundary; HCM decides the reset reason and
+    // the real codec encodes it. The underscore rejection is a stream-level error.
+    auto logger = std::make_shared<testing::StrictMock<AccessLog::MockInstance>>();
+    access_logs_.push_back(logger);
+    EXPECT_CALL(*logger, log(_, _))
+        .WillOnce(Invoke([](const Formatter::Context& context, const StreamInfo::StreamInfo& info) {
+          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, context.accessLogType());
+          EXPECT_TRUE(info.hasResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError));
+          EXPECT_EQ("uhv.unexpected_underscore", info.responseCodeDetails().value());
+        }));
+    EXPECT_CALL(header_validator_factory_, createServerHeaderValidator(Protocol::Http2, _))
+        .WillOnce([]() {
+          auto validator = std::make_unique<testing::StrictMock<MockServerHeaderValidator>>();
+          EXPECT_CALL(*validator, validateRequestHeaders(_))
+              .WillOnce(Return(HeaderValidator::ValidationResult::success()));
+          EXPECT_CALL(*validator, transformRequestHeaders(_))
+              .WillOnce(
+                  Return(ServerHeaderValidator::RequestHeadersTransformationResult::success()));
+          EXPECT_CALL(*validator, transformResponseHeaders(_))
+              .WillOnce(
+                  Return(ServerHeaderValidator::ResponseHeadersTransformationResult::success()));
+          EXPECT_CALL(*validator, validateRequestTrailers(_))
+              .WillOnce(Return(HeaderValidator::ValidationResult(
+                  HeaderValidator::ValidationResult::Action::Reject, "uhv.unexpected_underscore")));
+          return validator;
+        });
+  }
+
+  void rejectedRequestTrailers() {
+    auto trailers = Frame::makeEmptyHeadersFrame(
+        1, static_cast<Frame::HeadersFlags>(
+               Http2::orFlags(Frame::HeadersFlags::EndHeaders, Frame::HeadersFlags::EndStream)));
+    trailers.appendHeaderWithoutIndexing({"bad_trailer", "value"});
+    trailers.adjustPayloadSize();
+    dispatch(std::string(trailers));
+  }
+
+  void beginDrainingResponse() {
+    scoped_runtime_.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "true"}});
+    begin(false, false, 1);
+    EXPECT_CALL(drain_close_, drainClose(_)).Times(0);
+    EXPECT_CALL(filter_callbacks_.connection_, close(_, _)).Times(0);
+    // Use an elapsed drain window so this test does not create a proactive drain timer.
+    filter_callbacks_.connection_.raiseConnectionDrain(Network::ConnectionDrainEvent{
+        test_time_.timeSystem().monotonicTime() - std::chrono::hours(1),
+        Server::DrainStrategy::Immediate});
+    auto* drain_timer = new testing::StrictMock<Event::MockTimer>();
+    // Both creations have explicit expectations: a retired drain expectation alone would
+    // still make the subsequent flush-timer creation an unexpected mock call.
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_))
+        .WillOnce(Invoke([drain_timer](Event::TimerCb cb) {
+          drain_timer->callback_ = cb;
+          return drain_timer;
+        }))
+        .WillOnce(Invoke([this](Event::TimerCb cb) {
+          auto* timer = new testing::StrictMock<Event::MockTimer>();
+          timer->callback_ = cb;
+          flush_timer_ = timer;
+          EXPECT_CALL(*timer, enableTimer(std::chrono::milliseconds(5000), _));
+          EXPECT_CALL(*timer, disableTimer()).Times(testing::AtMost(1));
+          return timer;
+        }));
+    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(100), _));
+    EXPECT_CALL(*drain_timer, disableTimer());
+    respond();
+    ASSERT_NE(nullptr, flush_timer_);
+    ASSERT_NE(drain_timer, flush_timer_);
+    EXPECT_TRUE(flush_timer_->enabled_);
+    drain_timer->invokeCallback();
+    bool goaway = false;
+    for (const auto& frame : output()) {
+      EXPECT_NE(Frame::Type::RstStream, frame.type());
+      goaway |= frame.type() == Frame::Type::GoAway;
+    }
+    EXPECT_TRUE(goaway);
+    EXPECT_EQ(0, destroyed_);
+    EXPECT_EQ(Network::Connection::State::Open, filter_callbacks_.connection_.state());
+  }
+
+  void expectSingleReset(uint32_t code) {
+    size_t resets = 0;
+    for (const auto& frame : output()) {
+      EXPECT_NE(Frame::Type::Data, frame.type());
+      if (frame.streamId() == 1) {
+        EXPECT_NE(Frame::Type::Headers, frame.type());
+      }
+      if (frame.type() == Frame::Type::RstStream) {
+        EXPECT_EQ(1, frame.streamId());
+        ASSERT_EQ(4, frame.payloadSize());
+        const auto* p = frame.data() + Frame::HeaderSize;
+        EXPECT_EQ(code, (uint32_t{p[0]} << 24) | (uint32_t{p[1]} << 16) | (uint32_t{p[2]} << 8) |
+                            uint32_t{p[3]});
+        ++resets;
+      }
+    }
+    EXPECT_EQ(1, resets);
+  }
+
+  void expectPrematureResetLimitReached() {
+    // Two streams with a response status followed by two premature resets hit the 50% limit.
+    // Charging the waiting response twice would dilute the ratio and miss the close.
+    EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::Abort, _));
+    // Closing during codec dispatch also follows the existing codec-error close path.
+    EXPECT_CALL(filter_callbacks_.connection_,
+                close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+    for (size_t i = 2; i < 4; ++i) {
+      EXPECT_CALL(*decoder_filters_[i], decodeHeaders(_, true))
+          .WillOnce(Return(FilterHeadersStatus::StopIteration));
+      dispatch(std::string(Frame::makeRequest(2 * i + 1, "host", "/cancel")));
+      EXPECT_CALL(*decoder_filters_[i], onStreamComplete());
+      EXPECT_CALL(*decoder_filters_[i], onDestroy());
+      dispatch(std::string(Frame::makeResetStreamFrame(2 * i + 1, Frame::ErrorCode::Cancel)),
+               i != 3);
+      EXPECT_EQ(i == 3 ? 1 : 0, stats_.named_.downstream_rq_too_many_premature_resets_.value());
+    }
+  }
+
+  std::unique_ptr<Buffer::WatermarkBufferFactory> tracking_factory_;
+  Buffer::BufferMemoryAccountSharedPtr retained_account_;
+  bool constrain_receive_window_{false};
+  Http2::CodecStats::AtomicPtr codec_stats_;
+  ServerCodec* real_codec_{};
+  Event::MockTimer* flush_timer_{};
+  TestScopedRuntime scoped_runtime_;
+  std::string wire_output_;
+  const std::string body_ = std::string(100 * 1024, 'r');
+  std::string received_;
+  int completed_{0};
+  int destroyed_{0};
+};
+
+// Only tests that send request EOF vary DATA versus trailers; all tests cover both codecs.
+class Http2ResponseFlushRequestEofTest : public Http2ResponseFlushLifecycleTest {
+public:
+  void requestEndAndWindowUpdateInSameDispatch(bool window_update_first) {
+    begin();
+    respond();
+    const std::string request_end(requestEndFrame());
+    const std::string window_update(Frame::makeWindowUpdateFrame(1, body_.size()));
+    // Both orders parse request EOF before dispatch flushes response output.
+    dispatch(window_update_first ? window_update + request_end : request_end + window_update);
+    expectCompleteOutput();
+    nextStream();
+  }
+};
+
+TEST_P(Http2ResponseFlushLifecycleTest, ClientResetBeforeCompletionDiscardsPendingResponse) {
+  begin(false, false, 4);
+  respond();
+  dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+  expectCancelledResponse();
+  nextStream();
+  // Keep the cancellation path under its default policy; only lower the threshold for the probes.
+  ON_CALL(runtime_.snapshot_,
+          getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, _))
+      .WillByDefault(Return(1));
+  expectPrematureResetLimitReached();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, NoErrorAfterCompletionPreservesScheduledReset) {
+  begin();
+  respond();
+  auto* cb = completeResponseWithScheduledReset();
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::RemoteResetNoError);
+  EXPECT_TRUE(cb->enabled_);
+  EXPECT_EQ(0, destroyed_);
+  EXPECT_TRUE(output().empty());
+  cb->invokeCallback();
+  expectSingleReset(0);
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, ExplicitAbortBeforeCompletion) {
+  begin();
+  respond();
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::ProtocolError);
+  expectSingleReset(1);
+  expectFinalized();
+  windowUpdate();
+  EXPECT_TRUE(output().empty());
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, ExplicitAbortAfterRequestEofBeforeCompletion) {
+  begin();
+  respond();
+  requestEnd();
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::ProtocolError);
+  expectSingleReset(1);
+  expectFinalized();
+  windowUpdate();
+  EXPECT_TRUE(output().empty());
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, ConnectionCloseBeforeCompletion) {
+  begin(false, false, 1);
+  respond();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  expectDisconnectedResponse();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, FinalLogAndSpanOnceOnCompletion) {
+  finalLogAndSpanOnce(false);
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, FinalLogAndSpanOnceOnCancellation) {
+  finalLogAndSpanOnce(true);
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, FinalLogAndSpanOnceOnScheduledReset) {
+  finalLogAndSpanOnce(false, true);
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, MemoryAccountReleasedAfterResponseCompletion) {
+  enableMemoryAccounting();
+  begin(false, false, 1);
+  ASSERT_NE(nullptr, retained_account_);
+  respond();
+  auto& account = static_cast<Buffer::BufferMemoryAccountImpl&>(*retained_account_);
+  EXPECT_GT(account.balance(), 0);
+  std::weak_ptr<Buffer::BufferMemoryAccount> weak = retained_account_;
+  auto* cb = completeResponseWithScheduledReset();
+  cb->invokeCallback();
+  expectSingleReset(0);
+  expectFinalized();
+  EXPECT_EQ(0, account.balance());
+  retained_account_.reset();
+  EXPECT_TRUE(weak.expired());
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, MemoryAccountReleasedAfterPendingResponseCancellation) {
+  enableMemoryAccounting();
+  begin(false, false, 1);
+  ASSERT_NE(nullptr, retained_account_);
+  respond();
+  auto& account = static_cast<Buffer::BufferMemoryAccountImpl&>(*retained_account_);
+  EXPECT_GT(account.balance(), 0);
+  std::weak_ptr<Buffer::BufferMemoryAccount> weak = retained_account_;
+  // Exercise the real account->codec overload-reset path, not account-selection policy.
+  retained_account_->resetDownstream();
+  expectSingleReset(2);
+  expectFinalized();
+  EXPECT_EQ(0, account.balance());
+  retained_account_.reset();
+  EXPECT_TRUE(weak.expired());
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, BufferedRequestCancellationRestoresConnectionCredit) {
+  constrain_receive_window_ = true;
+  begin();
+  EXPECT_EQ(65535, real_codec_->receiveWindow());
+  real_codec_->getStream(1)->readDisable(true);
+  const std::string request(65535, 'q');
+  for (size_t pos = 0; pos < request.size(); pos += 16384) {
+    dispatch(std::string(Frame::makeDataFrame(1, absl::string_view(request).substr(pos, 16384),
+                                              Frame::DataFlags::None)));
+  }
+  EXPECT_EQ(65535, real_codec_->getStream(1)->unconsumed_bytes_);
+  EXPECT_EQ(0, real_codec_->receiveWindow());
+  respond();
+  dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+  expectCancelledResponse();
+  EXPECT_EQ(65535, real_codec_->receiveWindow());
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  dispatch(std::string(Frame::makePostRequest(3, "host", "/request-credit")));
+  const std::string suffix(16384, 'n');
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        EXPECT_EQ(suffix, data.toString());
+        return FilterDataStatus::Continue;
+      }));
+  dispatch(std::string(Frame::makeDataFrame(3, suffix, Frame::DataFlags::EndStream)));
+  EXPECT_CALL(*decoder_filters_[1], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[1], onDestroy());
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      true, "request_credit");
+  bool end = false;
+  for (const auto& frame : output()) {
+    EXPECT_NE(Frame::Type::RstStream, frame.type());
+    end |= frame.streamId() == 3 && frame.type() == Frame::Type::Headers && frame.endStream();
+  }
+  EXPECT_TRUE(end);
+  EXPECT_EQ(0, stats_.named_.downstream_rq_active_.value());
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, ConnectionWindowUpdateResumesBothResponses) {
+  begin(false, false, 2, 65535);
+  respond(false, 65535);
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  dispatch(std::string(Frame::makeRequest(3, "host", "/shared-credit")));
+  EXPECT_CALL(*decoder_filters_[1], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[1], onDestroy());
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      false, "shared_credit");
+  const std::string other(8192, 's');
+  Buffer::OwnedImpl data(other);
+  decoder_filters_[1]->callbacks_->encodeData(data, true);
+  // Stream 3 has stream credit, but no shared connection credit is left.
+  for (const auto& frame : output()) {
+    EXPECT_NE(Frame::Type::Data, frame.type());
+    EXPECT_NE(Frame::Type::RstStream, frame.type());
+    if (frame.type() == Frame::Type::Headers) {
+      EXPECT_FALSE(frame.endStream());
+    }
+  }
+  requestEnd();
+  windowUpdate();
+  EXPECT_TRUE(output().empty());
+  dispatch(std::string(Frame::makeWindowUpdateFrame(0, body_.size() + other.size())));
+  std::string second;
+  bool first_end = false;
+  bool second_end = false;
+  for (const auto& frame : output()) {
+    EXPECT_NE(Frame::Type::RstStream, frame.type());
+    if (frame.type() == Frame::Type::Data) {
+      auto& body = frame.streamId() == 1 ? received_ : second;
+      body.append(reinterpret_cast<const char*>(frame.data() + Frame::HeaderSize),
+                  frame.payloadSize());
+    }
+    if ((frame.type() == Frame::Type::Data || frame.type() == Frame::Type::Headers) &&
+        frame.endStream()) {
+      if (frame.streamId() == 1) {
+        EXPECT_EQ(body_, received_);
+        first_end = true;
+      } else if (frame.streamId() == 3) {
+        EXPECT_EQ(other, second);
+        second_end = true;
+      }
+    }
+  }
+  EXPECT_TRUE(first_end);
+  EXPECT_TRUE(second_end);
+  EXPECT_EQ(body_, received_);
+  EXPECT_EQ(other, second);
+  expectFinalized();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, InvalidWindowUpdateAbortsPendingResponse) {
+  begin(false, false, 1);
+  respond();
+  dispatch(std::string(Frame::makeWindowUpdateFrame(1, 0)), false);
+  // The adapters differ in error scope; both must terminate pending output exactly once.
+  if (std::get<0>(GetParam())) {
+    EXPECT_EQ(Network::Connection::State::Open, filter_callbacks_.connection_.state());
+    expectSingleReset(1);
+    expectFinalized();
+    windowUpdate();
+    EXPECT_TRUE(output().empty());
+  } else {
+    EXPECT_EQ(Network::Connection::State::Closed, filter_callbacks_.connection_.state());
+    EXPECT_EQ(1, stats_.named_.downstream_cx_protocol_error_.value());
+    expectNoTargetResponseFrames();
+    expectDisconnectedResponse();
+  }
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, InvalidWindowUpdateAfterCompletionCancelsScheduledReset) {
+  begin(false, false, 1);
+  respond();
+  auto* cb = completeResponseWithScheduledReset();
+  dispatch(std::string(Frame::makeWindowUpdateFrame(1, 0)), false);
+  EXPECT_FALSE(cb->enabled_);
+  if (std::get<0>(GetParam())) {
+    EXPECT_EQ(Network::Connection::State::Open, filter_callbacks_.connection_.state());
+    expectSingleReset(1);
+    expectFinalized();
+    windowUpdate();
+    EXPECT_TRUE(output().empty());
+  } else {
+    EXPECT_EQ(Network::Connection::State::Closed, filter_callbacks_.connection_.state());
+    EXPECT_EQ(1, stats_.named_.downstream_cx_protocol_error_.value());
+    expectNoTargetResponseFrames();
+    expectDisconnectedResponse();
+  }
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest,
+       RejectedRequestTrailersDuringResponseFlushUseProtocolError) {
+  rejectRequestTrailers();
+  begin(false, false, 1);
+  respond();
+  rejectedRequestTrailers();
+  expectSingleReset(1);
+  expectFinalized();
+  windowUpdate();
+  EXPECT_TRUE(output().empty());
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, RejectedRequestTrailersAfterCompletionUseProtocolError) {
+  rejectRequestTrailers();
+  begin(false, false, 1);
+  respond();
+  auto* cb = completeResponseWithScheduledReset();
+  rejectedRequestTrailers();
+  EXPECT_FALSE(cb->enabled_);
+  expectSingleReset(1);
+  expectFinalized();
+  windowUpdate();
+  EXPECT_TRUE(output().empty());
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, LateRequestEndBeforeEncodeComplete) {
+  begin();
+  respond();
+  requestEnd();
+  EXPECT_EQ(0, destroyed_);
+  windowUpdate();
+  expectCompleteOutput();
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, LateRequestEndBeforeScheduledReset) {
+  begin();
+  respond();
+  auto* cb = new testing::StrictMock<Event::MockSchedulableCallback>(
+      &filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*cb, scheduleCallbackNextIteration());
+  EXPECT_CALL(*cb, cancel());
+  windowUpdate();
+  ASSERT_TRUE(cb->enabled_);
+  EXPECT_EQ(0, destroyed_);
+  expectCompleteOutput();
+  requestEnd();
+  EXPECT_FALSE(cb->enabled_);
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, DataEndStreamPreserved) {
+  begin();
+  respond(true);
+  requestEnd();
+  windowUpdate();
+  expectCompleteOutput();
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, CancelledWithBufferedRequest) {
+  begin();
+  real_codec_->getStream(1)->readDisable(true);
+  dispatch(
+      std::string(Frame::makeDataFrame(1, "buffered request suffix", Frame::DataFlags::EndStream)));
+  respond();
+  dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+  expectCancelledResponse();
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, CancelledWithScheduledBufferedRequest) {
+  begin();
+  real_codec_->getStream(1)->readDisable(true);
+  dispatch(std::string(Frame::makeDataFrame(1, "buffered request suffix", Frame::DataFlags::None)));
+  requestEnd();
+  respond();
+  testing::StrictMock<testing::MockFunction<void()>> task_destroyed;
+  auto* process = new testing::StrictMock<Event::MockSchedulableCallback>(
+      &filter_callbacks_.connection_.dispatcher_, &task_destroyed);
+  EXPECT_CALL(*process, scheduleCallbackCurrentIteration());
+  real_codec_->getStream(1)->readDisable(false);
+  EXPECT_TRUE(process->enabled_);
+  // Reset must destroy the queued production closure before it can decode buffered input.
+  EXPECT_CALL(task_destroyed, Call());
+  dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+  testing::Mock::VerifyAndClearExpectations(&task_destroyed);
+  // process is now destroyed: never read or invoke it. begin() forbids further filter decoding.
+  expectCancelledResponse();
+  nextStream();
+  // Keep the destruction witness alive through teardown even when an earlier check fails.
+  conn_manager_.reset();
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, ClosedRequestNeedsNoReset) {
+  begin(true);
+  respond();
+  windowUpdate();
+  expectCompleteOutput();
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, FlushTimesOutWithoutWindowUpdate) {
+  begin();
+  respond();
+  ASSERT_NE(nullptr, flush_timer_);
+  test_time_.advanceTimeWait(std::chrono::seconds(5));
+  flush_timer_->invokeCallback();
+  expectSingleReset(2);
+  EXPECT_EQ(1, fake_stats_.counter("http2.tx_flush_timeout").value());
+  expectFinalized();
+  windowUpdate();
+  EXPECT_TRUE(output().empty());
+  nextStream();
+}
+
+// Progress must not turn the final flush deadline into a sliding idle timeout.
+// Use a real timer on simulated time: manually invoking a mock callback would also
+// pass if WINDOW_UPDATE incorrectly postponed the deadline.
+TEST_P(Http2ResponseFlushLifecycleTest, FlushDeadlineUnchangedBySendProgress) {
+  auto api = Api::createApiForTest(test_time_);
+  auto timer_dispatcher = api->allocateDispatcher("response_flush_deadline");
+  begin(false, false, 1);
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_))
+      .WillOnce(
+          Invoke([&](Event::TimerCb cb) { return timer_dispatcher->createTimer(cb).release(); }));
+  respond();
+
+  for (size_t i = 0; i < 2; ++i) {
+    test_time_.advanceTimeAndRun(std::chrono::seconds(2), *timer_dispatcher,
+                                 Event::Dispatcher::RunType::NonBlock);
+    dispatch(std::string(Frame::makeWindowUpdateFrame(1, 8192)));
+    for (const auto& frame : output()) {
+      ASSERT_NE(Frame::Type::RstStream, frame.type());
+      if (frame.type() == Frame::Type::Data || frame.type() == Frame::Type::Headers) {
+        EXPECT_FALSE(frame.endStream());
+      }
+      if (frame.type() == Frame::Type::Data) {
+        received_.append(reinterpret_cast<const char*>(frame.data() + Frame::HeaderSize),
+                         frame.payloadSize());
+      }
+    }
+    EXPECT_EQ(65536 + (i + 1) * 8192, received_.size());
+    EXPECT_EQ(0, destroyed_);
+  }
+
+  test_time_.advanceTimeAndRun(std::chrono::milliseconds(999), *timer_dispatcher,
+                               Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(output().empty());
+  EXPECT_EQ(0, destroyed_);
+  EXPECT_EQ(0, fake_stats_.counter("http2.tx_flush_timeout").value());
+
+  // At t=5s, only 1s has elapsed since the latest actual DATA output.
+  test_time_.advanceTimeAndRun(std::chrono::milliseconds(1), *timer_dispatcher,
+                               Event::Dispatcher::RunType::NonBlock);
+  expectSingleReset(2);
+  EXPECT_EQ(1, fake_stats_.counter("http2.tx_flush_timeout").value());
+  expectFinalized();
+  windowUpdate();
+  test_time_.advanceTimeAndRun(std::chrono::seconds(5), *timer_dispatcher,
+                               Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(output().empty());
+  EXPECT_EQ(1, fake_stats_.counter("http2.tx_flush_timeout").value());
+  expectFinalized();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, ZeroFlushTimeoutStillAllowsClientCancellation) {
+  begin(false, true);
+  respond();
+  EXPECT_EQ(nullptr, flush_timer_);
+  test_time_.advanceTimeWait(std::chrono::hours(1));
+  EXPECT_EQ(0, destroyed_);
+  dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+  expectCancelledResponse();
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, SecondStreamUnaffected) {
+  begin();
+  respond();
+  // Only stream 1 has spent its window. Stream 3 must complete on the same connection.
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  dispatch(std::string(Frame::makeRequest(3, "host", "/concurrent")));
+  EXPECT_CALL(*decoder_filters_[1], onStreamComplete());
+  EXPECT_CALL(*decoder_filters_[1], onDestroy());
+  decoder_filters_[1]->callbacks_->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      false, "concurrent");
+  const std::string other_body(8192, 'i');
+  Buffer::OwnedImpl data(other_body);
+  decoder_filters_[1]->callbacks_->encodeData(data, true);
+  std::string other_received;
+  bool end = false;
+  for (const auto& frame : output()) {
+    EXPECT_NE(Frame::Type::RstStream, frame.type());
+    if (frame.type() == Frame::Type::Data) {
+      EXPECT_EQ(3, frame.streamId());
+      EXPECT_FALSE(end);
+      other_received.append(reinterpret_cast<const char*>(frame.data() + Frame::HeaderSize),
+                            frame.payloadSize());
+    }
+    if (frame.streamId() == 3 &&
+        (frame.type() == Frame::Type::Data || frame.type() == Frame::Type::Headers)) {
+      end |= frame.endStream();
+    }
+  }
+  EXPECT_TRUE(end);
+  EXPECT_EQ(other_body, other_received);
+  EXPECT_EQ(0, destroyed_);
+  requestEnd();
+  windowUpdate();
+  expectCompleteOutput();
+  EXPECT_EQ(1, destroyed_);
+  EXPECT_EQ(0, stats_.named_.downstream_rq_active_.value());
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, SmallOpenRequestEndsBeforeReset) {
+  begin();
+  const std::string body(8192, 's');
+  auto* cb = decoder_filters_[0]->callbacks_;
+  cb->encodeHeaders(
+      std::make_unique<TestResponseHeaderMapImpl>(TestResponseHeaderMapImpl{{":status", "200"}}),
+      false, "small");
+  Buffer::OwnedImpl data(body);
+  cb->encodeData(data, false);
+  cb->encodeTrailers(std::make_unique<TestResponseTrailerMapImpl>(
+      TestResponseTrailerMapImpl{{"grpc-status", "0"}}));
+  bool end = false;
+  size_t resets = 0;
+  for (const auto& frame : output()) {
+    if (frame.type() == Frame::Type::Data) {
+      received_.append(reinterpret_cast<const char*>(frame.data() + Frame::HeaderSize),
+                       frame.payloadSize());
+    } else if (frame.type() == Frame::Type::Headers && frame.endStream()) {
+      EXPECT_EQ(body, received_);
+      end = true;
+    } else if (frame.type() == Frame::Type::RstStream) {
+      EXPECT_TRUE(end);
+      EXPECT_EQ(0, frame.data()[Frame::HeaderSize + 3]);
+      ++resets;
+    }
+  }
+  EXPECT_TRUE(end);
+  EXPECT_EQ(1, resets);
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, ResponseCompletionChargedOnce) {
+  begin(false, false, 4);
+  ON_CALL(runtime_.snapshot_,
+          getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, _))
+      .WillByDefault(Return(1));
+  respond();
+  requestEnd();
+  windowUpdate();
+  expectCompleteOutput();
+  nextStream();
+  expectPrematureResetLimitReached();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, ScheduledResetResponseChargedOnce) {
+  begin(false, false, 4);
+  ON_CALL(runtime_.snapshot_,
+          getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, _))
+      .WillByDefault(Return(1));
+  respond();
+  auto* cb = completeResponseWithScheduledReset();
+  cb->invokeCallback();
+  expectSingleReset(0);
+  nextStream();
+  expectPrematureResetLimitReached();
+}
+
+// Completion has already left the adapter Send stack, but its normal reset is still queued.
+TEST_P(Http2ResponseFlushLifecycleTest, ClientResetAfterCompletionCancelsScheduledReset) {
+  begin(false, false, 4);
+  ON_CALL(runtime_.snapshot_,
+          getInteger(ConnectionManagerImpl::PrematureResetTotalStreamCountKey, _))
+      .WillByDefault(Return(1));
+  respond();
+  auto* cb = completeResponseWithScheduledReset();
+  dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+  EXPECT_FALSE(cb->enabled_);
+  expectFinalized();
+  // Never invoke the canceled callback or retain it across actual deferred deletion.
+  windowUpdate();
+  for (const auto& frame : output()) {
+    EXPECT_NE(Frame::Type::RstStream, frame.type());
+    EXPECT_NE(Frame::Type::Data, frame.type());
+  }
+  nextStream();
+  expectPrematureResetLimitReached();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, ConnectionCloseAfterCompletionCancelsScheduledReset) {
+  begin(false, false, 1);
+  respond();
+  auto* cb = completeResponseWithScheduledReset();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_FALSE(cb->enabled_);
+  expectDisconnectedResponse();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, ExplicitAbortAfterCompletionCancelsScheduledReset) {
+  begin();
+  respond();
+  auto* cb = completeResponseWithScheduledReset();
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::ProtocolError);
+  EXPECT_FALSE(cb->enabled_);
+  expectSingleReset(1);
+  expectFinalized();
+  windowUpdate();
+  EXPECT_TRUE(output().empty());
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, DrainingConnectionWaitsForResponseCompletion) {
+  beginDrainingResponse();
+  auto* cb = completeResponseWithScheduledReset();
+  // Only after the full body and END_STREAM may normal reset close the draining connection.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  cb->invokeCallback();
+  expectSingleReset(0);
+  expectClosedConnectionCleanedUp();
+}
+
+// An explicit abort outside codec dispatch must still close the last draining stream.
+TEST_P(Http2ResponseFlushLifecycleTest, DrainingConnectionClosesOnExplicitAbort) {
+  beginDrainingResponse();
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::ProtocolError);
+  expectSingleReset(1);
+  expectClosedConnectionCleanedUp();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, DrainingConnectionClosesOnExplicitAbortAfterCompletion) {
+  beginDrainingResponse();
+  auto* cb = completeResponseWithScheduledReset();
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::ProtocolError);
+  EXPECT_FALSE(cb->enabled_);
+  expectSingleReset(1);
+  expectClosedConnectionCleanedUp();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, DrainingConnectionClosesAfterRequestEofAndResponse) {
+  beginDrainingResponse();
+  requestEnd();
+  EXPECT_EQ(0, destroyed_);
+  // HCM may request close inside codec completion and again after dispatch. The network
+  // close API is idempotent; actual LocalClose delivery and resource cleanup must be once.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _))
+      .Times(testing::AtLeast(1));
+  windowUpdate();
+  expectCompleteOutput();
+  expectClosedConnectionCleanedUp();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, DrainingConnectionClosesOnEofBeforeScheduledReset) {
+  beginDrainingResponse();
+  auto* cb = completeResponseWithScheduledReset();
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _))
+      .Times(testing::AtLeast(1));
+  // EOF closes the draining connection inside codec dispatch, which can return before
+  // draining the input buffer. The completed response and actual close are the contract.
+  dispatch(std::string(requestEndFrame()), false);
+  EXPECT_FALSE(cb->enabled_);
+  EXPECT_TRUE(output().empty());
+  expectClosedConnectionCleanedUp();
+  EXPECT_TRUE(output().empty());
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, DrainingConnectionClosesOnFlushTimeout) {
+  beginDrainingResponse();
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  test_time_.advanceTimeWait(std::chrono::seconds(5));
+  flush_timer_->invokeCallback();
+  // The low-level reset removes the last HCM stream and closes this draining connection
+  // before the codec queues RST. Closed connections must not output any further frames.
+  EXPECT_TRUE(output().empty());
+  EXPECT_EQ(1, fake_stats_.counter("http2.tx_flush_timeout").value());
+  expectClosedConnectionCleanedUp();
+}
+
+TEST_P(Http2ResponseFlushLifecycleTest, DrainingConnectionClosesOnClientReset) {
+  beginDrainingResponse();
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  dispatch(std::string(Frame::makeResetStreamFrame(1, Frame::ErrorCode::Cancel)));
+  EXPECT_TRUE(output().empty());
+  EXPECT_EQ(0, fake_stats_.counter("http2.tx_flush_timeout").value());
+  expectClosedConnectionCleanedUp();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, BufferedRequestResumesBeforeResponseCompletion) {
+  begin();
+  real_codec_->getStream(1)->readDisable(true);
+  dispatch(std::string(Frame::makeDataFrame(1, "buffered request suffix", Frame::DataFlags::None)));
+  requestEnd();
+  respond();
+  auto* process = new testing::StrictMock<Event::MockSchedulableCallback>(
+      &filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*process, scheduleCallbackCurrentIteration());
+  real_codec_->getStream(1)->readDisable(false);
+  ASSERT_TRUE(process->enabled_);
+  process->invokeCallback();
+  EXPECT_EQ(0, destroyed_);
+  windowUpdate();
+  expectCompleteOutput();
+  nextStream();
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, NoErrorAndPartialWindowUpdatesPreserveResponse) {
+  begin();
+  respond();
+  // Report one successful upstream reset, then advance the downstream response in two steps.
+  decoder_filters_[0]->callbacks_->resetStream(StreamResetReason::RemoteResetNoError);
+  for (size_t i = 0; i < 2; ++i) {
+    dispatch(std::string(Frame::makeWindowUpdateFrame(1, 8192)));
+    for (const auto& frame : output()) {
+      ASSERT_NE(Frame::Type::RstStream, frame.type());
+      if (frame.type() == Frame::Type::Data) {
+        EXPECT_FALSE(frame.endStream());
+        received_.append(reinterpret_cast<const char*>(frame.data() + Frame::HeaderSize),
+                         frame.payloadSize());
+      }
+    }
+    EXPECT_EQ(65536 + (i + 1) * 8192, received_.size());
+    EXPECT_TRUE(flush_timer_->enabled_);
+    EXPECT_EQ(0, destroyed_);
+  }
+  requestEnd();
+  windowUpdate();
+  expectCompleteOutput();
+  nextStream();
+}
+
+// Codec dispatch parses all input before sending. Neither batched order represents EOF
+// arriving after output completion; that distinct case uses separate dispatch calls above.
+TEST_P(Http2ResponseFlushRequestEofTest, RequestEofAndWindowUpdateInSameDispatch) {
+  requestEndAndWindowUpdateInSameDispatch(false);
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, WindowUpdateAndRequestEofInSameDispatch) {
+  requestEndAndWindowUpdateInSameDispatch(true);
+}
+
+TEST_P(Http2ResponseFlushRequestEofTest, DataEndStreamBeforeLateRequestEof) {
+  begin();
+  respond(true);
+  auto* cb = completeResponseWithScheduledReset();
+  requestEnd();
+  EXPECT_FALSE(cb->enabled_);
+  EXPECT_TRUE(output().empty());
+  nextStream();
+}
+
+INSTANTIATE_TEST_SUITE_P(Adapters, Http2ResponseFlushLifecycleTest,
+                         testing::Combine(testing::Bool(), testing::Values(false)));
+INSTANTIATE_TEST_SUITE_P(AdaptersAndRequestEof, Http2ResponseFlushRequestEofTest,
+                         testing::Combine(testing::Bool(), testing::Bool()));
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
   TestScopedRuntime scoped_runtime;

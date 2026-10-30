@@ -202,7 +202,10 @@ AssertionResult IntegrationCodecClient::waitForDisconnect(std::chrono::milliseco
     wait_timer->enableTimer(time_to_wait);
   }
 
-  connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  // Stream callbacks can exit the shared dispatcher without closing the connection.
+  while (!disconnected_ && !wait_timer_triggered) {
+    connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  }
 
   // Disable the timer if it was created. This call is harmless if the timer already triggered.
   if (wait_timer) {

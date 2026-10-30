@@ -675,6 +675,7 @@ envoy_cc_test(
     srcs = ["upstream_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
     rbe_pool = "linux_x64_small",
+    shard_count = 2,
     deps = [
         "//test/test_common:status_utility_lib",
         ":snapshot_host_set_lib",

@@ -778,6 +778,8 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@quiche//:http2_core_recording_headers_handler_lib",
+        "@quiche//:http2_hpack_hpack_decoder_adapter_lib",
     ],
 )
 
@@ -1069,6 +1071,7 @@ envoy_cc_test(
         "//envoy/network:filter_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/filters/http/buffer:config",
         "//test/integration/filters:add_body_filter_config_lib",
         "//test/integration/filters:add_encode_metadata_filter_lib",
@@ -1106,6 +1109,7 @@ envoy_cc_test_library(
         ":http_protocol_integration_lib",
         ":socket_interface_swap_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
