@@ -281,7 +281,7 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
   if (ip == nullptr) {
     return false;
   }
-  return !trie_->getData(address).empty();
+  return trie_->getDataSet(address).has_value();
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
