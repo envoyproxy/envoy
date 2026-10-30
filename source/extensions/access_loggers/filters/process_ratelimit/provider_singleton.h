@@ -55,6 +55,12 @@ namespace LocalRateLimit {
 //    This prevents new filters from using the old limiter.
 class RateLimiterProviderSingleton;
 using RateLimiterProviderSingletonSharedPtr = std::shared_ptr<RateLimiterProviderSingleton>;
+
+// Creates a LocalRateLimiterImpl from a TokenBucket proto config.
+std::shared_ptr<LocalRateLimiterImpl>
+createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
+                      Event::Dispatcher& dispatcher);
+
 class RateLimiterProviderSingleton : public Singleton::Instance {
 public:
   class TokenBucketSubscription;

@@ -3,7 +3,9 @@ syntax = "proto3";
 package envoy.extensions.access_loggers.filters.process_ratelimit.v3;
 
 import "envoy/config/core/v3/config_source.proto";
+import "envoy/type/v3/token_bucket.proto";
 
+import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -19,7 +21,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Filters for rate limiting the access log emission using global token buckets per process and shared across all listeners.
 message ProcessRateLimitFilter {
   // The dynamic config for the token bucket.
-  DynamicTokenBucket dynamic_config = 1;
+  // Only one of ``dynamic_config`` or ``token_bucket`` can be set.
+  DynamicTokenBucket dynamic_config = 1
+      [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
+
+  // The inline token bucket configuration.
+  // Only one of ``dynamic_config`` or ``token_bucket`` can be set.
+  type.v3.TokenBucket token_bucket = 2
+      [(udpa.annotations.field_migrate).oneof_promotion = "config_type"];
 }
 
 message DynamicTokenBucket {
