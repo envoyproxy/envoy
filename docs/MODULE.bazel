@@ -6,7 +6,7 @@ module(
 bazel_dep(name = "envoy", version = "1.41.0-dev")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
 bazel_dep(name = "envoy-examples", version = "0.2.10.envoy")
-bazel_dep(name = "envoy_toolshed", version = "0.5.13.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.14.envoy")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "googleurl", version = "0.0.0-221103-dd4080f.envoy.1")
 bazel_dep(name = "grpc", version = "1.83.0.envoy")
