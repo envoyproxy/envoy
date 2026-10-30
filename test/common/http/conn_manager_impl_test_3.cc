@@ -3259,9 +3259,6 @@ TEST_F(HttpConnectionManagerImplTest, PassMatchUpstreamSchemeHintToStreamInfo) {
 // initiates encoding of the response (i.e. the cache filter).
 // This only works when independent half-close mode is DISABLED.
 TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilter) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
   setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
@@ -3311,16 +3308,16 @@ TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilter) {
 // non-final filter ends the request iff the filter that initiated encoding of the end_stream has
 // already observed the request end_stream.
 TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilterWithIndependentHalfClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
   setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
   setupFilterChain(total_filters, total_filters);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->downstreamCallbacks()->enableHalfClose();
+        return FilterHeadersStatus::Continue;
+      }));
   EXPECT_CALL(*decoder_filters_[0], decodeComplete());
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
@@ -3366,16 +3363,16 @@ TEST_F(HttpConnectionManagerImplTest, EncodingByNonTerminalFilterWithIndependent
 // Only the terminal filter (router) is allowed to half-close upstream response before the
 // downstream request.
 TEST_F(HttpConnectionManagerImplTest, DecodingByNonTerminalEncoderFilterWithIndependentHalfClose) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
   setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
   setupFilterChain(total_filters, total_filters);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->downstreamCallbacks()->enableHalfClose();
+        return FilterHeadersStatus::Continue;
+      }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
 
@@ -3417,16 +3414,16 @@ TEST_F(HttpConnectionManagerImplTest, DecodingByNonTerminalEncoderFilterWithInde
 // In this case decoding end_stream from the client only reaches the filter that encoded the
 // end_stream after which the request is completed.
 TEST_F(HttpConnectionManagerImplTest, DecodingWithAddedTrailersByNonTerminalEncoderFilter) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
   setup();
   constexpr int total_filters = 3;
   constexpr int ecoder_filter_index = 1;
   setupFilterChain(total_filters, total_filters);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::Continue));
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        decoder_filters_[0]->callbacks_->downstreamCallbacks()->enableHalfClose();
+        return FilterHeadersStatus::Continue;
+      }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
 
