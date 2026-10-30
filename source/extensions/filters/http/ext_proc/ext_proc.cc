@@ -712,31 +712,24 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   filter_callbacks_ = &callbacks;
   watermark_callbacks_.setDecoderFilterCallbacks(&callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
+  //Create logging info only if key is free
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
   const absl::string_view key = callbacks.filterConfigName();
-  if (!filter_state->hasDataWithName(key)) {
-    // Retain shared ownership of the logging info object so it remains valid for the lifetime of
-    // this filter even if the FilterState entry at the same key is later replaced.
-    logging_info_ = std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata());
-    logging_info_->setOwner(config_);
-    filter_state->setData(key, logging_info_, Envoy::StreamInfo::FilterState::LifeSpan::Request);
-  } else {
-    const auto* existing = filter_state->getDataReadOnly<ExtProcLoggingInfo>(key);
-    if (existing != nullptr && existing->isOwnedBy(*config_)) {
-      // Same filter config re-created for this request.
-      logging_info_ = std::dynamic_pointer_cast<ExtProcLoggingInfo>(
-          filter_state->getDataSharedMutableGeneric(key));
-    } else {
-      // The key is held by a different filter; overwriting it would corrupt that filter's
-      // callout stats, so record nothing here instead.
-      ENVOY_LOG_EVERY_POW_2(warn,
-                            "ext_proc: filter state key '{}' is already in use by another filter; "
-                            "callout stats will not be recorded for this filter. "
-                            "Filter names should be unique.",
-                            key);
-    }
+  if (filter_state->hasDataWithName(key)) {
+    //The key is already in use, e.g. by another filter with the same name, Sharing or
+    //overwriting that entry would mix up callout stats, so record no logging info here.
+
+    ENVOY_STREAM_LOG(debug,
+                     "Filter state key '{}' already exists; ext_proc logging info not recorded.",
+                      callbacks, key);
+
+    return;                    
   }
+  //Retain shared ownership so the object stays valid for the lifetime of this filter even if
+  //another filter later replaces the FilterState entry at the same key.
+  logging_info_ = std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata());
+  filter_state->setData(key, logging_info_, Envoy::StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {

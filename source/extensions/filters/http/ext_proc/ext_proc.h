@@ -736,11 +736,12 @@ private:
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
   // Shared with FilterState entry keyed by the filter name.
-  // Only reused by instances of the same FilterConfig;
-  // null if the key is held by another filter
+  // Null if that key was already in use when this filter
+  // was set up (e.g. another filter with the same name),
   // in which case no logging info is recorded.
-  // Shared ownership keeps it valid even if the
-  // FilterState entry is later replaced
+  // Shared ownership (not a raw pointer) keeps it valid even if another
+  // filter later replaces the FilterState entry, which would otherwise
+  // be a use after free.
   std::shared_ptr<ExtProcLoggingInfo> logging_info_;
   envoy::config::core::v3::GrpcService grpc_service_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
