@@ -35,6 +35,7 @@
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
+using testing::AnyNumber;
 using testing::Return;
 
 namespace Envoy {
@@ -100,6 +101,11 @@ private:
   uint32_t num_packets_received_{0};
 };
 
+class MockQuicClientHttpConnectionCallbacks : public Http::MockServerConnectionCallbacks {
+public:
+  MOCK_METHOD(void, onMaxStreamsChanged, (uint32_t num_streams), (override));
+};
+
 class EnvoyQuicClientSessionTest
     : public testing::TestWithParam<std::tuple<quic::ParsedQuicVersion, bool>> {
 public:
@@ -131,6 +137,7 @@ public:
     if (quiche_handles_migration_) {
       migration_config_.allow_port_migration = true;
     }
+    EXPECT_CALL(http_connection_callbacks_, onMaxStreamsChanged(_)).Times(AnyNumber());
   }
 
   void SetUp() override {
@@ -174,6 +181,8 @@ public:
 
     envoy_quic_session_->Initialize();
     setQuicConfigWithDefaultValues(envoy_quic_session_->config());
+    quic::test::QuicConfigPeer::SetReceivedMaxBidirectionalStreams(
+        envoy_quic_session_->config(), received_max_bidirectional_streams_);
     quic::test::QuicConfigPeer::SetReceivedStatelessResetToken(
         envoy_quic_session_->config(),
         quic::QuicUtils::GenerateStatelessResetToken(quic::test::TestConnectionId()));
@@ -233,7 +242,8 @@ protected:
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   std::unique_ptr<EnvoyQuicClientSession> envoy_quic_session_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
-  Http::MockServerConnectionCallbacks http_connection_callbacks_;
+  MockQuicClientHttpConnectionCallbacks http_connection_callbacks_;
+  uint32_t received_max_bidirectional_streams_{quic::kDefaultMaxStreamsPerConnection};
   testing::StrictMock<Stats::MockCounter> read_total_;
   testing::StrictMock<Stats::MockGauge> read_current_;
   testing::StrictMock<Stats::MockCounter> write_total_;
@@ -809,6 +819,27 @@ TEST_P(EnvoyQuicClientSessionTest, SetSocketOption) {
   absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
 
   EXPECT_FALSE(envoy_quic_session_->setSocketOption(sockopt_name, sockopt_val));
+}
+
+class EnvoyQuicClientSessionZeroStreamLimitTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    received_max_bidirectional_streams_ = 0;
+    EXPECT_CALL(http_connection_callbacks_, onMaxStreamsChanged(0)).Times(testing::AtLeast(1));
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionZeroStreamLimitTests,
+                         EnvoyQuicClientSessionZeroStreamLimitTest,
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
+
+// A peer limit of zero does not raise QUICHE's outgoing stream limit, so QUICHE never calls
+// OnCanCreateNewOutgoingStream(). The pool must still learn the limit, because during 0-RTT it
+// would otherwise keep its optimistic capacity and attach a stream QUICHE has no ID for.
+TEST_P(EnvoyQuicClientSessionZeroStreamLimitTest, ReportsZeroStreamLimitOnConfigNegotiated) {
+  testing::Mock::VerifyAndClearExpectations(&http_connection_callbacks_);
 }
 
 class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {

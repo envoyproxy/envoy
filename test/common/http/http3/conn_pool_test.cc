@@ -324,6 +324,41 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
+// A stream limit of zero during 0-RTT, as resumed from cached transport parameters, leaves the
+// client Busy before its handshake completes. The peer raising the limit must not be treated as a
+// MAX_STREAMS frame on a connected client.
+TEST_F(Http3ConnPoolImplTest, ZeroRttClientAcceptsRaisedStreamLimitBeforeHandshake) {
+  initialize();
+
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
+  ASSERT_NE(nullptr, cancellable);
+  async_connect_callback->invokeCallback();
+
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  ASSERT_EQ(1u, clients.size());
+  auto& client = dynamic_cast<ActiveClient&>(*clients.front());
+
+  client.onMaxStreamsChanged(0);
+  pool_->onConnectionEvent(client, "", Network::ConnectionEvent::ConnectedZeroRtt);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Busy, client.state());
+
+  client.onMaxStreamsChanged(1);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::ReadyForEarlyData, client.state());
+
+  EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce([cancellable]() {
+    cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+  });
+  pool_->onConnectionEvent(client, "", Network::ConnectionEvent::Connected);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Ready, client.state());
+}
+
 TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
   quic_info_->migration_config_.migrate_session_on_network_change = true;
   createNewStream();
