@@ -862,6 +862,7 @@ public:
   COUNTER(upstream_rq_max_duration_reached)                                                        \
   COUNTER(upstream_rq_active_overflow)                                                             \
   COUNTER(upstream_rq_pending_failure_eject)                                                       \
+  COUNTER(upstream_rq_pending_dropped_codel)                                                       \
   COUNTER(upstream_rq_pending_overflow)                                                            \
   COUNTER(upstream_rq_pending_total)                                                               \
   COUNTER(upstream_rq_0rtt)                                                                        \
