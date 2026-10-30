@@ -290,6 +290,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_ma
 // TODO(adisuissa): flip to true after all xDS types use the new subscription
 // method, and this is tested extensively.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
+// TODO(yanjunxiang-google): flip to true after canarying the feature internally.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_async_client_downstream_flow_control2);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.

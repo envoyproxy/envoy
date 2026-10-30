@@ -1906,9 +1906,13 @@ void ActiveStreamDecoderFilter::addDownstreamWatermarkCallbacks(
 
 void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  ASSERT(std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
-                   &watermark_callbacks) != parent_.watermark_callbacks_.end());
-  parent_.watermark_callbacks_.remove(&watermark_callbacks);
+  if (std::find(parent_.watermark_callbacks_.begin(), parent_.watermark_callbacks_.end(),
+                &watermark_callbacks) != parent_.watermark_callbacks_.end()) {
+    parent_.watermark_callbacks_.remove(&watermark_callbacks);
+  } else {
+    // The watermark callbacks list should be empty at this point.
+    ASSERT(parent_.watermark_callbacks_.empty());
+  }
 }
 
 void ActiveStreamDecoderFilter::addUpstreamWatermarkCallbacks(
