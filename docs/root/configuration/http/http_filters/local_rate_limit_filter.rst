@@ -129,6 +129,80 @@ path, then 10 req/min are allowed. But if they come from a downstream service
 cluster "foo" for "/foo/bar2" path, then 100 req/min are allowed. Otherwise,
 1000 req/min are allowed.
 
+.. _config_http_filters_local_rate_limit_stop_on_match:
+
+Stopping at the first match
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default, the token bucket of every matched descriptor is consumed. Setting
+:ref:`stop_on_match <envoy_v3_api_field_config.route.v3.RateLimit.stop_on_match>` on a
+:ref:`rate limit configuration <envoy_v3_api_msg_config.route.v3.RateLimit>` makes the filter skip
+all later configurations once that configuration has matched, so later buckets are not consumed.
+Earlier configurations still apply, so configurations that should always count must be placed
+before the first one with the flag. Route configurations are evaluated before virtual host
+configurations, so a match on a route configuration with the flag also skips the virtual host
+configurations.
+
+A configuration matches when every one of its ``actions`` populates and the resulting descriptor
+has at least one entry, so a configuration whose actions are all skipped through
+``skip_if_absent`` does not stop the search. A configuration whose
+:ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>` fails to evaluate
+does not stop the search either, so the request falls through to later configurations. A match does
+not require a configured descriptor with a token bucket for it, so a configuration that always
+populates, such as one using ``request_headers`` on a header that is always present, stops the
+search even when its descriptor matches no bucket. The default token bucket is still consumed according to
+:ref:`always_consume_default_token_bucket <envoy_v3_api_field_extensions.filters.http.local_ratelimit.v3.LocalRateLimit.always_consume_default_token_bucket>`.
+
+This makes tiered limits easy to express. In the following configuration, ``client-a`` consumes
+the 100 req/min bucket and not the shared 10 req/min bucket that every other client consumes. All
+requests also consume the 1000 req/min default token bucket, since
+``always_consume_default_token_bucket`` defaults to true:
+
+.. code-block:: yaml
+
+  stat_prefix: http_local_rate_limiter
+  token_bucket:
+    max_tokens: 1000
+    tokens_per_fill: 1000
+    fill_interval: 60s
+  filter_enabled:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  filter_enforced:
+    default_value:
+      numerator: 100
+      denominator: HUNDRED
+  descriptors:
+  - entries:
+    - key: tier
+      value: client-a
+    token_bucket:
+      max_tokens: 100
+      tokens_per_fill: 100
+      fill_interval: 60s
+  - entries:
+    - key: tier
+      value: default
+    token_bucket:
+      max_tokens: 10
+      tokens_per_fill: 10
+      fill_interval: 60s
+  rate_limits:
+  - actions:
+    - header_value_match:
+        descriptor_key: tier
+        descriptor_value: client-a
+        headers:
+        - name: x-user-id
+          string_match:
+            exact: client-a
+    stop_on_match: true
+  - actions:
+    - generic_key:
+        descriptor_key: tier
+        descriptor_value: default
+
 Statistics
 ----------
 

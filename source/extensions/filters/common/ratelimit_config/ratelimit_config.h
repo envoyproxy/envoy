@@ -26,16 +26,19 @@ public:
   // `headers` (request headers) is always present. `response_headers` is optional: it is only set
   // on the apply_on_stream_done path and is nullptr on the request path; it lets a `hits_addend`
   // format resolve `%RESP()%` substitutions.
-  void populateDescriptors(const Http::RequestHeaderMap& headers,
+  // Returns true when a descriptor was appended to `descriptors`.
+  bool populateDescriptors(const Http::RequestHeaderMap& headers,
                            const Http::ResponseHeaderMap* response_headers,
                            const StreamInfo::StreamInfo& info,
                            const std::string& local_service_cluster,
                            RateLimitDescriptors& descriptors) const;
 
   bool applyOnStreamDone() const { return apply_on_stream_done_; }
+  bool stopOnMatch() const { return stop_on_match_; }
 
 private:
   const bool apply_on_stream_done_ = false;
+  const bool stop_on_match_ = false;
   const Envoy::RateLimit::XRateLimitOption x_ratelimit_option_{};
   Formatter::FormatterProviderPtr hits_addend_provider_;
   std::optional<uint64_t> hits_addend_;

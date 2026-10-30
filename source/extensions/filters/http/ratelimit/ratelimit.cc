@@ -109,9 +109,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
     return;
   }
 
-  // Get all applicable rate limit policy entries for the route.
-  populateRateLimitDescriptorsForPolicy(route_entry->rateLimitPolicy(), descriptors, headers,
-                                        on_stream_done);
+  // Get all applicable rate limit policy entries for the route. A route entry with stop_on_match
+  // that produced a descriptor also skips the virtual host entries.
+  if (populateRateLimitDescriptorsForPolicy(route_entry->rateLimitPolicy(), descriptors, headers,
+                                            on_stream_done)) {
+    return;
+  }
 
   switch (vh_rate_limits_) {
   case VhRateLimitOptions::Ignore:
@@ -324,7 +327,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
   }
 }
 
-void Filter::populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
+bool Filter::populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
                                                    std::vector<RateLimit::Descriptor>& descriptors,
                                                    const Http::RequestHeaderMap& headers,
                                                    bool on_stream_done) {
@@ -337,11 +340,20 @@ void Filter::populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy
       continue;
     }
     const bool apply_on_stream_done = rate_limit.applyOnStreamDone();
-    if (on_stream_done == apply_on_stream_done) {
-      rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
-                                     callbacks_->streamInfo());
+    if (on_stream_done != apply_on_stream_done) {
+      continue;
+    }
+    const size_t size_before = descriptors.size();
+    rate_limit.populateDescriptors(descriptors, config_->localInfo().clusterName(), headers,
+                                   callbacks_->streamInfo());
+    // A matching entry with stop_on_match ends the search; later entries are skipped. A
+    // descriptor with no entries (every action skipped via skip_if_absent) is not a match.
+    if (rate_limit.stopOnMatch() && descriptors.size() > size_before &&
+        !descriptors.back().entries_.empty()) {
+      return true;
     }
   }
+  return false;
 }
 
 void Filter::populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply) {

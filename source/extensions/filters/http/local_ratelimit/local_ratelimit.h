@@ -202,7 +202,8 @@ private:
 
   void populateDescriptors(std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
-  void populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
+  // Returns true when an entry with stop_on_match produced a descriptor, which ends the search.
+  bool populateDescriptors(const Router::RateLimitPolicy& rate_limit_policy,
                            std::vector<RateLimit::Descriptor>& descriptors,
                            Http::RequestHeaderMap& headers);
   VhRateLimitOptions getVirtualHostRateLimitOption(OptRef<const Router::Route> route);
