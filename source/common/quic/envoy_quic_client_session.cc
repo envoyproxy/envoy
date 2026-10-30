@@ -373,9 +373,10 @@ void EnvoyQuicClientSession::OnConfigNegotiated() {
     received_ipv4_alternate_server_address_ = config()->ReceivedIPv4AlternateServerAddress();
   }
   quic::QuicSpdyClientSession::OnConfigNegotiated();
-  // QUICHE only notifies when the outgoing stream limit increases. A limit of zero, including one
-  // resumed from cached transport parameters for 0-RTT, would otherwise leave the connection pool
-  // with its optimistic initial capacity and let it create a stream QUICHE cannot open.
+  // QUICHE only notifies when the outgoing stream limit increases, and OnTlsHandshakeComplete()
+  // reports the limit only once the handshake completes. During 0-RTT, a limit of zero resumed
+  // from cached transport parameters would otherwise leave the connection pool with its optimistic
+  // initial capacity and let it create a stream QUICHE cannot open.
   if (connection()->connected() && streamsAvailable() == 0) {
     OnCanCreateNewOutgoingStream(false);
   }

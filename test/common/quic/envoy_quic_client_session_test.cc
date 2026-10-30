@@ -842,6 +842,23 @@ TEST_P(EnvoyQuicClientSessionZeroStreamLimitTest, ReportsZeroStreamLimitOnConfig
   testing::Mock::VerifyAndClearExpectations(&http_connection_callbacks_);
 }
 
+class EnvoyQuicClientSessionNonZeroStreamLimitTest : public EnvoyQuicClientSessionTest {
+public:
+  void SetUp() override {
+    EXPECT_CALL(http_connection_callbacks_, onMaxStreamsChanged(0)).Times(0);
+    EnvoyQuicClientSessionTest::SetUp();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(EnvoyQuicClientSessionNonZeroStreamLimitTests,
+                         EnvoyQuicClientSessionNonZeroStreamLimitTest,
+                         testing::Combine(testing::ValuesIn(quic::CurrentSupportedHttp3Versions()),
+                                          testing::Bool()));
+
+TEST_P(EnvoyQuicClientSessionNonZeroStreamLimitTest, DoesNotReportZeroStreamLimit) {
+  testing::Mock::VerifyAndClearExpectations(&http_connection_callbacks_);
+}
+
 class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {
 public:
   EnvoyQuicClientSessionDisallowMmsgTest()

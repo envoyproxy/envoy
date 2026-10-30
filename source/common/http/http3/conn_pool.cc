@@ -96,8 +96,9 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::Busy && currentUnusedCapacity() != 0) {
     if (!hasHandshakeCompleted()) {
-      // A client only goes Busy before the handshake through 0-RTT, e.g. on a stream limit of
-      // zero resumed from cached transport parameters.
+      // A client only goes Busy before the handshake through 0-RTT, e.g. on a stream limit of zero
+      // resumed from cached transport parameters, and the limit then rises when the handshake
+      // negotiates the real one.
       parent_.transitionActiveClientState(*this, ActiveClient::State::ReadyForEarlyData);
       parent_.onUpstreamReadyForEarlyData(*this);
       return;
@@ -107,7 +108,8 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
     parent_.onUpstreamReady();
   } else if (state() == ActiveClient::State::ReadyForEarlyData) {
     if (currentUnusedCapacity() == 0) {
-      // With HTTP/3 this can only happen during a rejected 0-RTT handshake.
+      // With HTTP/3 this happens on a rejected 0-RTT handshake, or on a stream limit of zero
+      // resumed from cached transport parameters.
       parent_.transitionActiveClientState(*this, ActiveClient::State::Busy);
     } else if (Runtime::runtimeFeatureEnabled(
                    "envoy.reloadable_features.fix_http3_early_data_timing")) {
