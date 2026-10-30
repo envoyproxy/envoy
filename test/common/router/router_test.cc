@@ -30,6 +30,7 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
+#include "source/common/router/upstream_codec_filter.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -2808,6 +2809,180 @@ TEST_F(RouterTest, RetryUpstream5xxRefreshesClusterOnRetry) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
               putResult(_, std::optional<uint64_t>(200)));
   response_decoder->decodeHeaders(std::move(response_headers2), true);
+}
+
+// The upstream HTTP filter of `cluster_with_filters_` prefixes the path with the cluster name and
+// injects a credential for that cluster; other clusters run only the codec filter.
+class RouterRetryHeaderRestoreTest : public RouterTest {
+public:
+  RouterRetryHeaderRestoreTest() {
+    cm_.initializeThreadLocalClusters({"fake_cluster", "alt_cluster"});
+    ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, createFilterChain(_))
+        .WillByDefault(Invoke([this](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+          const std::string cluster = cm_.thread_local_cluster_.cluster_.info_->name_;
+          if (cluster != cluster_with_filters_) {
+            return false;
+          }
+          auto filter = std::make_shared<NiceMock<Http::MockStreamDecoderFilter>>();
+          ON_CALL(*filter, decodeHeaders(_, _))
+              .WillByDefault(Invoke([cluster](Http::RequestHeaderMap& headers, bool) {
+                headers.setPath(absl::StrCat("/", cluster, headers.getPathValue()));
+                headers.setCopy(Http::CustomHeaders::get().Authorization,
+                                absl::StrCat(cluster, "-key"));
+                return Http::FilterHeadersStatus::Continue;
+              }));
+          callbacks.addStreamDecoderFilter(filter);
+          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+          return true;
+        }));
+  }
+
+  // Sends a request to fake_cluster and retries it after a 503 once per entry of `retry_clusters`,
+  // refreshing to that cluster if refresh_cluster_on_retry is set; the last attempt gets a 200.
+  // Returns the request headers each attempt sent upstream.
+  std::vector<Http::TestRequestHeaderMapImpl>
+  retryAfter503(const std::vector<std::string>& retry_clusters,
+                std::function<void()> after_first_attempt = nullptr) {
+    const bool refresh = callbacks_.route_->route_entry_.retry_policy_->refresh_cluster_on_retry_;
+    setIncludeAttemptCountInRequest(true);
+    std::vector<Http::TestRequestHeaderMapImpl> sent;
+    std::vector<std::unique_ptr<NiceMock<Http::MockRequestEncoder>>> encoders;
+    Http::ResponseDecoder* response_decoder = nullptr;
+    auto expect_attempt = [&]() {
+      encoders.push_back(std::make_unique<NiceMock<Http::MockRequestEncoder>>());
+      expectNewStreamWithImmediateEncoder(*encoders.back(), &response_decoder,
+                                          Http::Protocol::Http10);
+      EXPECT_CALL(*encoders.back(), encodeHeaders(_, true))
+          .WillOnce(Invoke([&sent](const Http::RequestHeaderMap& headers, bool) {
+            sent.emplace_back(headers);
+            return absl::OkStatus();
+          }));
+    };
+
+    expect_attempt();
+    expectResponseTimerCreate();
+    HttpTestUtility::addDefaultHeaders(headers_);
+    router_->decodeHeaders(headers_, true);
+    if (after_first_attempt) {
+      after_first_attempt();
+    }
+    if (!refresh) {
+      EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster()).Times(0);
+    }
+    for (const std::string& cluster : retry_clusters) {
+      router_->retry_state_->expectHeadersRetry();
+      response_decoder->decodeHeaders(
+          Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}},
+          true);
+      if (refresh) {
+        EXPECT_CALL(callbacks_.downstream_callbacks_, refreshRouteCluster())
+            .WillOnce(Invoke([this, cluster]() {
+              paths_at_refresh_.emplace_back(headers_.getPathValue());
+              callbacks_.route_->route_entry_.cluster_name_ = cluster;
+              cm_.thread_local_cluster_.cluster_.info_->name_ = cluster;
+            }));
+      }
+      expect_attempt();
+      router_->retry_state_->callback_();
+    }
+
+    EXPECT_CALL(*router_->retry_state_, shouldRetryHeaders(_, _, _))
+        .WillOnce(Return(RetryStatus::No));
+    response_decoder->decodeHeaders(
+        Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}, true);
+    return sent;
+  }
+
+  void disableRestore() {
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.restore_request_headers_on_retry", "false"}});
+  }
+
+  std::string cluster_with_filters_{"fake_cluster"};
+  Http::TestRequestHeaderMapImpl headers_;
+  std::vector<std::string> paths_at_refresh_;
+  TestScopedRuntime scoped_runtime_;
+};
+
+TEST_F(RouterRetryHeaderRestoreTest, RetryStartsFromTheSavedHeaders) {
+  const auto sent = retryAfter503({"fake_cluster"});
+  ASSERT_EQ(2, sent.size());
+  EXPECT_EQ("/fake_cluster/", sent[0].getPathValue());
+  EXPECT_EQ("/fake_cluster/", sent[1].getPathValue());
+  EXPECT_EQ("fake_cluster-key", sent[1].get_(Http::CustomHeaders::get().Authorization));
+  EXPECT_EQ("2", sent[1].getEnvoyAttemptCountValue());
+}
+
+TEST_F(RouterRetryHeaderRestoreTest, RetryKeepsTheLastAttemptsChangesWithTheGuardOff) {
+  disableRestore();
+  const auto sent = retryAfter503({"fake_cluster"});
+  ASSERT_EQ(2, sent.size());
+  EXPECT_EQ("/fake_cluster/fake_cluster/", sent[1].getPathValue());
+}
+
+// The cluster refresh still sees the headers the last attempt left; the next attempt starts from
+// the saved ones.
+TEST_F(RouterRetryHeaderRestoreTest, CrossClusterRetryStartsFromTheSavedHeaders) {
+  callbacks_.route_->route_entry_.retry_policy_->refresh_cluster_on_retry_ = true;
+  const auto sent = retryAfter503({"alt_cluster"});
+  ASSERT_EQ(2, sent.size());
+  EXPECT_THAT(paths_at_refresh_, testing::ElementsAre("/fake_cluster/"));
+  EXPECT_EQ("/", sent[1].getPathValue());
+  EXPECT_FALSE(sent[1].has(Http::CustomHeaders::get().Authorization));
+  EXPECT_EQ("2", sent[1].getEnvoyAttemptCountValue());
+}
+
+TEST_F(RouterRetryHeaderRestoreTest, CrossClusterRetryKeepsTheLastAttemptsChangesWithTheGuardOff) {
+  disableRestore();
+  callbacks_.route_->route_entry_.retry_policy_->refresh_cluster_on_retry_ = true;
+  const auto sent = retryAfter503({"alt_cluster"});
+  ASSERT_EQ(2, sent.size());
+  EXPECT_EQ("/fake_cluster/", sent[1].getPathValue());
+  EXPECT_EQ("fake_cluster-key", sent[1].get_(Http::CustomHeaders::get().Authorization));
+}
+
+TEST_F(RouterRetryHeaderRestoreTest, SavesTheHeadersAtTheFirstAttemptWithUpstreamFilters) {
+  cluster_with_filters_ = "alt_cluster";
+  callbacks_.route_->route_entry_.retry_policy_->refresh_cluster_on_retry_ = true;
+  const auto sent = retryAfter503({"alt_cluster", "fake_cluster"});
+  ASSERT_EQ(3, sent.size());
+  EXPECT_EQ("/", sent[0].getPathValue());
+  EXPECT_EQ("/alt_cluster/", sent[1].getPathValue());
+  EXPECT_EQ("/", sent[2].getPathValue());
+  EXPECT_FALSE(sent[2].has(Http::CustomHeaders::get().Authorization));
+  EXPECT_EQ("3", sent[2].getEnvoyAttemptCountValue());
+}
+
+// Without upstream HTTP filters the headers are not saved, so nothing is restored.
+TEST_F(RouterRetryHeaderRestoreTest, NothingIsRestoredWithoutUpstreamFilters) {
+  cluster_with_filters_.clear();
+  const auto sent = retryAfter503({"fake_cluster"}, [this]() {
+    headers_.addCopy(Http::LowerCaseString("x-added-after-first-attempt"), "1");
+  });
+  ASSERT_EQ(2, sent.size());
+  EXPECT_EQ("1", sent[1].get_("x-added-after-first-attempt"));
+}
+
+TEST_F(RouterRetryHeaderRestoreTest, HedgedRequestsAreNotRestored) {
+  enableHedgeOnPerTryTimeout();
+  const auto sent = retryAfter503({"fake_cluster"});
+  ASSERT_EQ(2, sent.size());
+  EXPECT_EQ("/fake_cluster/fake_cluster/", sent[1].getPathValue());
+}
+
+TEST_F(RouterRetryHeaderRestoreTest, AsyncClientRequestsAreNotRestored) {
+  ON_CALL(callbacks_, downstreamCallbacks())
+      .WillByDefault(Return(OptRef<Http::DownstreamStreamFilterCallbacks>{}));
+  const auto sent = retryAfter503({"fake_cluster"});
+  ASSERT_EQ(2, sent.size());
+  EXPECT_EQ("/fake_cluster/fake_cluster/", sent[1].getPathValue());
+}
+
+TEST_F(RouterRetryHeaderRestoreTest, AutomaticHttp3RetriesAreNotRestored) {
+  router_->auto_configured_for_http3_ = true;
+  const auto sent = retryAfter503({"fake_cluster"});
+  ASSERT_EQ(2, sent.size());
+  EXPECT_EQ("/fake_cluster/fake_cluster/", sent[1].getPathValue());
 }
 
 // Tests that an upstream request is reset even if it can't be retried as long as there is
