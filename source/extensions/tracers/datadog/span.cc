@@ -33,8 +33,14 @@ private:
 
 } // namespace
 
-Span::Span(datadog::tracing::Span&& span, bool use_local_decision)
-    : span_(std::move(span)), use_local_decision_(use_local_decision) {}
+Span::Span(datadog::tracing::Span&& span, bool use_local_decision, bool delegate_sampling)
+    : Span(std::move(span), use_local_decision,
+           delegate_sampling ? std::make_shared<SamplingState>() : nullptr) {}
+
+Span::Span(datadog::tracing::Span&& span, bool use_local_decision,
+           SamplingStateSharedPtr&& sampling_state)
+    : span_(std::move(span)), use_local_decision_(use_local_decision),
+      sampling_state_(std::move(sampling_state)) {}
 
 const datadog::tracing::Optional<datadog::tracing::Span>& Span::impl() const { return span_; }
 
@@ -84,13 +90,30 @@ void Span::log(SystemTime, const std::string&) {
   // Datadog spans don't have in-bound "events" or "logs".
 }
 
-void Span::finishSpan() { span_.reset(); }
+void Span::finalizeSampling() {
+  if (!sampling_state_ || sampling_state_->finalized) {
+    return;
+  }
+  if (sampling_state_->drop) {
+    span_->trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+  }
+  sampling_state_->finalized = true;
+}
+
+void Span::finishSpan() {
+  if (span_) {
+    finalizeSampling();
+    span_.reset();
+  }
+}
 
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   if (!span_) {
     return;
   }
 
+  finalizeSampling();
   TraceContextWriter writer{trace_context};
   span_->inject(writer);
 }
@@ -114,7 +137,8 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config&, const std::string& nam
   config.resource = name;
   config.start = estimateTime(start_time);
 
-  return std::make_unique<Span>(span_->create_child(config));
+  return Tracing::SpanPtr(
+      new Span(span_->create_child(config), false, SamplingStateSharedPtr(sampling_state_)));
 }
 
 void Span::setSampled(bool sampled) {
@@ -122,9 +146,16 @@ void Span::setSampled(bool sampled) {
     return;
   }
 
-  auto priority = static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
-                                           : datadog::tracing::SamplingPriority::USER_DROP);
-  span_->trace_segment().override_sampling_priority(priority);
+  if (sampling_state_) {
+    if (!sampling_state_->finalized) {
+      sampling_state_->drop = !sampled;
+    }
+    return;
+  }
+
+  span_->trace_segment().override_sampling_priority(
+      static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
+                               : datadog::tracing::SamplingPriority::USER_DROP));
 }
 
 bool Span::exportedSpan() const {

@@ -126,7 +126,7 @@ public:
         id_generator_(std::make_shared<FixedIDGenerator>(0xcafebabe)), tracer_(createTracer()) {}
 
   // Creates a Datadog tracer for testing
-  datadog::tracing::Tracer createTracer() {
+  datadog::tracing::Tracer createTracer(double sample_rate = 0) {
     datadog::tracing::TracerConfig config;
     config.service = "test-service";
     config.logger = test_logger_;
@@ -145,7 +145,7 @@ public:
 
     // Configure a sampler rule that drops all spans.
     datadog::tracing::TraceSamplerConfig::Rule rule;
-    rule.sample_rate = 0;
+    rule.sample_rate = sample_rate;
     config.trace_sampler.rules.push_back(std::move(rule));
 
     auto validated_config = datadog::tracing::finalize_config(config);
@@ -315,52 +315,106 @@ TEST_F(DatadogTracerSpanTest, SpawnChild) {
   EXPECT_TRUE(test_logger_->errors().empty());
 }
 
-TEST_F(DatadogTracerSpanTest, SetSampledTrue) {
-  // `Span::setSampled(bool)` on any span causes the entire group (chunk) of
-  // spans to take that sampling override. In terms of dd-trace-cpp, this means
-  // that the local root of the chunk will have its
-  // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
-  // (hard drop) or 2 (hard keep).
-  auto dd_span = tracer_.create_span();
-
-  // First ensure that the trace will be dropped (until we override it by
-  // calling `setSampled`, below).
-  dd_span.trace_segment().override_sampling_priority(
-      static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
-
-  Span parent(std::move(dd_span));
-  auto child = parent.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
-
-  child->setSampled(true);
-  child->finishSpan();
-  parent.finishSpan();
-
-  // Verify the spans successfully complete without errors.
-  EXPECT_TRUE(test_logger_->errors().empty());
+TEST_F(DatadogTracerSpanTest, EnvoySampling) {
+  Span span(tracer_.create_span());
+  for (bool sampled : {true, false, true}) {
+    span.setSampled(sampled);
+    ASSERT_TRUE(span.impl()->trace_segment().sampling_decision());
+    EXPECT_EQ(static_cast<int>(sampled ? datadog::tracing::SamplingPriority::USER_KEEP
+                                       : datadog::tracing::SamplingPriority::USER_DROP),
+              span.impl()->trace_segment().sampling_decision()->priority);
+    Tracing::TestTraceContextImpl context{};
+    span.injectContext(context, Tracing::UpstreamContext());
+    EXPECT_EQ(sampled ? "2" : "-1", context.context_map_.at("x-datadog-sampling-priority"));
+  }
 }
 
-TEST_F(DatadogTracerSpanTest, SetSampledFalse) {
-  // `Span::setSampled(bool)` on any span causes the entire group (chunk) of
-  // spans to take that sampling override. In terms of dd-trace-cpp, this means
-  // that the local root of the chunk will have its
-  // `datadog::tracing::tags::internal::sampling_priority` tag set to either -1
-  // (hard drop) or 2 (hard keep).
-  auto dd_span = tracer_.create_span();
+TEST_F(DatadogTracerSpanTest, DelegatedSampling) {
+  for (double sample_rate : {0.0, 1.0}) {
+    for (bool sampled : {false, true}) {
+      SCOPED_TRACE(testing::Message() << "rate=" << sample_rate << " sampled=" << sampled);
+      auto tracer = createTracer(sample_rate);
+      Span span(tracer.create_span(), true, true);
+      // Model a route refresh that reverses the original decision.
+      span.setSampled(!sampled);
+      span.setSampled(sampled);
+      EXPECT_FALSE(span.impl()->trace_segment().sampling_decision());
 
-  // First ensure that the trace will be kept (until we override it by
-  // calling `setSampled`, below).
-  dd_span.trace_segment().override_sampling_priority(
-      static_cast<int>(datadog::tracing::SamplingPriority::USER_KEEP));
+      Tracing::TestTraceContextImpl context{};
+      span.injectContext(context, Tracing::UpstreamContext());
+      const std::string expected = sampled && sample_rate == 1.0 ? "2" : "-1";
+      EXPECT_EQ(expected, context.context_map_.at("x-datadog-sampling-priority"));
 
-  Span parent(std::move(dd_span));
+      // Once propagated, later updates must not change the decision.
+      span.setSampled(!sampled);
+      Tracing::TestTraceContextImpl second_context{};
+      span.injectContext(second_context, Tracing::UpstreamContext());
+      EXPECT_EQ(expected, second_context.context_map_.at("x-datadog-sampling-priority"));
+      span.finishSpan();
+    }
+  }
+}
+
+TEST_F(DatadogTracerSpanTest, DelegatedSamplingWithoutInjection) {
+  for (bool sampled : {false, true}) {
+    auto tracer = createTracer(1.0);
+    Span span(tracer.create_span(), true, true);
+    // Keep the segment alive to inspect the priority after finishing the parent.
+    auto child = span.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
+    span.setSampled(!sampled);
+    span.setSampled(sampled);
+    span.finishSpan();
+
+    auto& child_span = dynamic_cast<Span&>(*child);
+    if (sampled) {
+      EXPECT_FALSE(child_span.impl()->trace_segment().sampling_decision());
+    } else {
+      ASSERT_TRUE(child_span.impl()->trace_segment().sampling_decision());
+      EXPECT_EQ(-1, child_span.impl()->trace_segment().sampling_decision()->priority);
+    }
+    Tracing::TestTraceContextImpl context{};
+    child->injectContext(context, Tracing::UpstreamContext());
+    EXPECT_EQ(sampled ? "2" : "-1", context.context_map_.at("x-datadog-sampling-priority"));
+  }
+}
+
+TEST_F(DatadogTracerSpanTest, DestructionFinalizesDelegatedSampling) {
+  auto tracer = createTracer(1.0);
+  Tracing::SpanPtr child;
+  {
+    Span parent(tracer.create_span(), true, true);
+    child = parent.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
+    parent.setSampled(false);
+  }
+  Tracing::TestTraceContextImpl context{};
+  child->injectContext(context, Tracing::UpstreamContext());
+  EXPECT_EQ("-1", context.context_map_.at("x-datadog-sampling-priority"));
+}
+
+TEST_F(DatadogTracerSpanTest, ChildInheritsDelegatedSampling) {
+  Span parent(tracer_.create_span(), true, true);
   auto child = parent.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
+  child->setSampled(true);
+  Tracing::TestTraceContextImpl context{};
+  child->injectContext(context, Tracing::UpstreamContext());
+  // The Datadog rule drops everything, even when the child is sampled by Envoy.
+  EXPECT_EQ("-1", context.context_map_.at("x-datadog-sampling-priority"));
+}
 
-  child->setSampled(false);
-  child->finishSpan();
-  parent.finishSpan();
+TEST_F(DatadogTracerSpanTest, ChildInjectionFinalizesSharedSampling) {
+  auto tracer = createTracer(1.0);
+  Span parent(tracer.create_span(), true, true);
+  parent.setSampled(false);
+  auto child = parent.spawnChild(Tracing::MockConfig{}, "child", time_.timeSystem().systemTime());
+  Tracing::TestTraceContextImpl context{};
+  child->injectContext(context, Tracing::UpstreamContext());
+  EXPECT_EQ("-1", context.context_map_.at("x-datadog-sampling-priority"));
 
-  // Verify the spans successfully complete without errors.
-  EXPECT_TRUE(test_logger_->errors().empty());
+  parent.setSampled(true);
+  child->setSampled(true);
+  Tracing::TestTraceContextImpl parent_context{};
+  parent.injectContext(parent_context, Tracing::UpstreamContext());
+  EXPECT_EQ("-1", parent_context.context_map_.at("x-datadog-sampling-priority"));
 }
 
 TEST_F(DatadogTracerSpanTest, UseLocalDecisionDefault) {

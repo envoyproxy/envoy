@@ -345,7 +345,13 @@ TEST_F(DatadogTracerTest, ExtractionFailure) {
   ASSERT_TRUE(maybe_dd_span);
 }
 
-TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
+class DatadogTracerSamplingTest : public DatadogTracerTest,
+                                  public testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(SamplingModes, DatadogTracerSamplingTest, testing::Bool());
+
+TEST_P(DatadogTracerSamplingTest, EnvoySamplingVersusExtractedSampling) {
+  const bool delegate_sampling = GetParam();
   // Verify that sampling decisions extracted from incoming requests are honored
   // regardless of the sampling decision made by Envoy (i.e. `bool
   // Tracing::Decision::traced`).
@@ -357,9 +363,9 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
   // must be the same as that which was extracted.
   //
   // If a sampling decision is not present in the extracted trace context, then
-  // an Envoy decision of "drop" is honored. An Envoy decision of "keep"
-  // delegates the sampling decision to the underlying Datadog tracer, which
-  // will not make a sampling decision immediately.
+  // Envoy's decision is applied immediately unless delegated sampling is
+  // enabled. In delegated mode, the decision is deferred until injection or
+  // completion.
 
   struct Case {
     int line;
@@ -382,9 +388,10 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
       // of "traceparent" always containing a sampling decision in its flags. See
       // the main body of the test, below, for more information.
       {__LINE__, datadog::tracing::nullopt, true, datadog::tracing::PropagationStyle::W3C, 0},
-      // This is the only case, at least in this test, where Envoy's decision
-      // affects the resulting sampling priority.
-      {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::DATADOG, -1},
+      // Envoy's drop decision is now deferred to injectContext()/finishSpan(),
+      // so the trace segment does not have a sampling decision immediately.
+      {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::DATADOG,
+       datadog::tracing::nullopt},
       {__LINE__, datadog::tracing::nullopt, false, datadog::tracing::PropagationStyle::W3C, 0},
 
       {__LINE__, -1, true, datadog::tracing::PropagationStyle::DATADOG, -1},
@@ -427,7 +434,7 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
     config.report_traces = false;
     config.telemetry.enabled = false;
     Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                  thread_local_slot_allocator_, time_);
+                  thread_local_slot_allocator_, time_, delegate_sampling);
 
     Tracing::Decision envoy_decision;
     envoy_decision.reason = Tracing::Reason::Sampling;
@@ -473,12 +480,15 @@ TEST_F(DatadogTracerTest, EnvoySamplingVersusExtractedSampling) {
 
     const datadog::tracing::Optional<datadog::tracing::SamplingDecision> decision =
         dd_span.trace_segment().sampling_decision();
-    if (test_case.resulting_sampling_priority) {
+    auto expected_priority = test_case.resulting_sampling_priority;
+    if (!delegate_sampling && !expected_priority) {
+      expected_priority = test_case.envoy_decision_keep ? 2 : -1;
+    }
+    if (expected_priority) {
       // We expect that the tracer made a sampling decision immediately, and
       // that it has the expected sampling priority.
       ASSERT_NE(datadog::tracing::nullopt, decision) << failure_context.str();
-      EXPECT_EQ(*test_case.resulting_sampling_priority, decision->priority)
-          << failure_context.str();
+      EXPECT_EQ(*expected_priority, decision->priority) << failure_context.str();
     } else {
       // We expect that the tracer did not immediately make a sampling decision.
       EXPECT_EQ(datadog::tracing::nullopt, decision) << failure_context.str();
