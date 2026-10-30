@@ -31,6 +31,7 @@ envoy_extension_cc_test(
     size = "medium",
     srcs = ["reverse_tunnel_acceptor_extension_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"],
+    rbe_pool = "linux_x64_small",
     deps = [
         "//source/common/network:socket_interface_lib",
         "//source/common/network:utility_lib",
