@@ -122,7 +122,8 @@ public:
       auto config = Config::Utility::translateAnyToFactoryConfig(
           bootstrap_extension.typed_config(),
           server_.messageValidationContext().staticValidationVisitor(), factory);
-      auto extension_or_error = factory.createBootstrapExtensionOrError(*config, server_factory_context_);
+      auto extension_or_error =
+          factory.createBootstrapExtensionOrError(*config, server_factory_context_);
       THROW_IF_NOT_OK_REF(extension_or_error.status());
       bootstrap_extensions.push_back(std::move(extension_or_error.value()));
     }

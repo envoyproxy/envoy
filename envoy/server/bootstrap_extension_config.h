@@ -62,8 +62,8 @@ public:
     // This is the terminal of the delegation below, so it must not delegate back: an extension
     // that implements neither method lands here.
     throwEnvoyExceptionOrPanic("Bootstrap extension factory implements neither "
-                              "createBootstrapExtensionOrError nor the deprecated "
-                              "createBootstrapExtension");
+                               "createBootstrapExtensionOrError nor the deprecated "
+                               "createBootstrapExtension");
     return nullptr;
   }
 
