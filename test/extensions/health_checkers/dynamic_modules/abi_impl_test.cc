@@ -44,6 +44,19 @@ TEST(DynamicModuleHealthCheckerAbiImplTest, NullArgumentsAreSafe) {
                                                                                    key, nullptr));
   EXPECT_EQ(envoy_dynamic_module_type_host_health_Unhealthy,
             envoy_dynamic_module_callback_health_checker_get_host_health(nullptr));
+  // set_health_metadata rejects a null session, and an empty, null or reserved key, before the
+  // session pointer is touched.
+  const envoy_dynamic_module_type_module_buffer value{"v", 1};
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_health_checker_set_health_metadata(nullptr, key, value));
+  EXPECT_FALSE(envoy_dynamic_module_callback_health_checker_set_health_metadata(
+      fake_session, {nullptr, 0}, value));
+  EXPECT_FALSE(envoy_dynamic_module_callback_health_checker_set_health_metadata(fake_session,
+                                                                                {"k", 0}, value));
+  EXPECT_FALSE(envoy_dynamic_module_callback_health_checker_set_health_metadata(
+      fake_session, {"http_status_code", 16}, value));
+  EXPECT_FALSE(envoy_dynamic_module_callback_health_checker_set_health_metadata(fake_session, key,
+                                                                                {nullptr, 1}));
 }
 
 struct StubReceiver : public HealthCheckResultReceiver {

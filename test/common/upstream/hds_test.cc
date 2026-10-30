@@ -1376,6 +1376,50 @@ TEST_F(HdsTest, TestSendResponseWithHealthMetadata) {
               Contains(IsStructNumber("http_status_code", 200.0)));
 }
 
+// Test that sendResponse forwards the string metadata a health checker attached to the host,
+// alongside the HTTP status code.
+TEST_F(HdsTest, TestSendResponseIncludesHealthCheckMetadata) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  message.reset(createSimpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(server_context_.dispatcher_, createClientConnection_(_, _, _, _))
+      .WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, false));
+  EXPECT_CALL(*test_factory_, createClusterInfo(_)).WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(server_context_.dispatcher_, deferredDelete_(_));
+
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  auto& host = hds_delegate_->hdsClusters()[0]->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  host->setLastHealthCheckHttpStatus(503);
+  host->setHealthCheckMetadata({{"probe", "ok"}, {"region", "us-east-1"}});
+
+  auto msg = hds_delegate_->sendResponse();
+
+  const auto& legacy_fields =
+      msg.endpoint_health_response().endpoints_health(0).health_metadata().fields();
+  EXPECT_EQ(legacy_fields.size(), 3);
+  EXPECT_THAT(legacy_fields, Contains(IsStructString("probe", "ok")));
+  EXPECT_THAT(legacy_fields, Contains(IsStructString("region", "us-east-1")));
+  EXPECT_THAT(legacy_fields, Contains(IsStructNumber("http_status_code", 503.0)));
+
+  const auto& structured_fields = msg.endpoint_health_response()
+                                      .cluster_endpoints_health(0)
+                                      .locality_endpoints_health(0)
+                                      .endpoints_health(0)
+                                      .health_metadata()
+                                      .fields();
+  EXPECT_THAT(structured_fields, Contains(IsStructString("probe", "ok")));
+  EXPECT_THAT(structured_fields, Contains(IsStructString("region", "us-east-1")));
+}
+
 // Test that sendResponse does not include health_metadata when no metadata
 // has been set on the host (default empty Struct).
 TEST_F(HdsTest, TestSendResponseNoHealthMetadataByDefault) {
