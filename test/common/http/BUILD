@@ -345,7 +345,12 @@ envoy_cc_test(
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
         "//envoy/network:proxy_protocol_options_lib",
+        "//source/common/buffer:watermark_buffer_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http/http2:codec_lib",
+        "//test/common/http/http2:http2_frame",
         "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
+        "//test/mocks/tracing:tracing_mocks",
         "//test/server:utility_lib",
     ],
 )

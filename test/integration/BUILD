@@ -775,6 +775,8 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@quiche//:http2_core_recording_headers_handler_lib",
+        "@quiche//:http2_hpack_hpack_decoder_adapter_lib",
     ],
 )
 

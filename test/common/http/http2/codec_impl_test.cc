@@ -2403,8 +2403,97 @@ TEST_P(Http2CodecImplFlowControlTest, PendingRecvBufferBoundedWhenDeferProcessin
   }
 }
 
-// Verify that we create and disable the stream flush timer when trailers follow a stream that
-// does not have enough window.
+// A response ending in DATA END_STREAM may retain its open request after encoding.
+// The pending-data timer must already be gone when completion is notified.
+TEST_P(Http2CodecImplFlowControlTest, ResponseEndStreamDisarmsFlushTimerBeforeCompletionCallback) {
+  initialize();
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  driveToCompletion();
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+
+  bool timer_destroyed = false;
+  auto* flush_timer = new testing::StrictMock<Event::MockTimer>();
+  flush_timer->timer_destroyed_ = &timer_destroyed;
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      }));
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+  EXPECT_CALL(response_decoder_, decodeData(_, _)).Times(AtLeast(1));
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'x'));
+  response_encoder_->encodeData(body, true);
+  driveServer();
+  driveClient();
+  ASSERT_FALSE(timer_destroyed);
+  {
+    InSequence order;
+    EXPECT_CALL(*flush_timer, disableTimer());
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecEncodeComplete()).WillOnce(Invoke([&] {
+      EXPECT_TRUE(timer_destroyed);
+    }));
+  }
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(0);
+  driveToCompletion();
+  EXPECT_TRUE(timer_destroyed);
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
+  // End the still-open request naturally, after the timer has been destroyed.
+  EXPECT_CALL(request_decoder_, decodeData(_, true));
+  Buffer::OwnedImpl end;
+  request_encoder_->encodeData(end, true);
+  driveToCompletion();
+}
+
+TEST_P(Http2CodecImplFlowControlTest, ResponseFlushTimeoutBeforeFinalWindowUpdate) {
+  initialize();
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  driveToCompletion();
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  response_encoder_->encodeHeaders(response_headers, false);
+  driveToCompletion();
+  auto* flush_timer = new testing::StrictMock<Event::MockTimer>();
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      }));
+  EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+  EXPECT_CALL(*flush_timer, disableTimer()).Times(0);
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
+  // Timeout and successful completion are alternative outcomes, including after late credit.
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecEncodeComplete()).Times(0);
+  Buffer::OwnedImpl body(std::string(1024 * 1024, 'x'));
+  response_encoder_->encodeData(body, true);
+  driveServer();
+  driveClient();
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  MockStreamCallbacks client_callbacks;
+  request_encoder_->getStream().addCallbacks(client_callbacks);
+  EXPECT_CALL(client_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  flush_timer->invokeCallback();
+  driveToCompletion();
+  // A late stream WINDOW_UPDATE must not resurrect a reset stream or notify HCM twice.
+  Buffer::OwnedImpl update(std::string(Http2Frame::makeWindowUpdateFrame(1, 65536)));
+  server_wrapper_->buffer_.move(update);
+  driveToCompletion();
+  EXPECT_OK(server_wrapper_->status_);
+  EXPECT_EQ(0, server_wrapper_->buffer_.length());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
+}
+
 TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   initialize();
 
