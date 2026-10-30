@@ -942,6 +942,8 @@ TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
   EXPECT_EQ("500", response->headers().Status()->value().getStringView());
   EXPECT_EQ("bar",
             response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+  // The decoder must remain alive for reset callbacks during connection cleanup.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(DynamicModulesIntegrationTest, HttpCalloutsOK) {
@@ -961,6 +963,8 @@ TEST_P(DynamicModulesIntegrationTest, HttpCalloutsOK) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ("local_response_body", response->body());
+  // The decoder must remain alive for reset callbacks during connection cleanup.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(DynamicModulesIntegrationTest, Scheduler) {
@@ -1486,6 +1490,8 @@ TEST_P(DynamicModulesIntegrationTest, HttpStreamBasic) {
   EXPECT_EQ(
       "basic",
       response->headers().get(Http::LowerCaseString("x-stream-test"))[0]->value().getStringView());
+  // The decoder must remain alive for reset callbacks during connection cleanup.
+  cleanupUpstreamAndDownstream();
 }
 
 // Test bidirectional HTTP stream callout. A POST request with streaming request and response.
@@ -1530,6 +1536,8 @@ TEST_P(DynamicModulesIntegrationTest, HttpStreamBidirectional) {
                                       ->value()
                                       .getStringView())),
             1);
+  // The decoder must remain alive for reset callbacks during connection cleanup.
+  cleanupUpstreamAndDownstream();
 }
 
 // Test upstream reset logic.
@@ -1553,6 +1561,8 @@ TEST_P(DynamicModulesIntegrationTest, HttpStreamUpstreamReset) {
   EXPECT_EQ("upstream_reset", response->body());
   EXPECT_EQ("true",
             response->headers().get(Http::LowerCaseString("x-reset"))[0]->value().getStringView());
+  // The decoder must remain alive for reset callbacks during connection cleanup.
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(DynamicModulesIntegrationTest, ConfigScheduler) {
