@@ -23,4 +23,13 @@ message ReverseTunnelUpstreamCodecOptions {
   // When true, the upstream HTTP/2 client codec emits a GOAWAY when the reverse tunnel begins
   // draining. Defaults to false, in which case the stock HTTP/2 client codec is used unchanged.
   bool enable_drain_with_goaway = 1;
+
+  // The metadata key to check when when we get a metadata from the downstream.
+  // The reporter will be notified if the metadata key is present and has the value "true".
+  // Default is no-op, which means the reporter will not be notified.
+  // Requires the cluster's ``http2_protocol_options.allow_metadata`` to be true: without it the
+  // upstream client codec does not decode the stream-0 METADATA frame, so the drain signal is
+  // never received and the reporter is never notified on metadata drain. An empty value (the
+  // default) means no metadata key is watched and the reporter is never notified.
+  string metadata_key = 2;
 }
