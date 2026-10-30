@@ -193,6 +193,15 @@ bazel_tool_path() {
     echo "${root}/${path}"
 }
 
+# Resolve the LLVM toolchain's `llvm-strip` as `STRIP_BIN` (it strips GCC-built binaries too),
+# rather than relying on binutils in the build image.
+hermetic_strip() {
+    if [[ -z "${STRIP_BIN:-}" ]]; then
+        STRIP_BIN="$(bazel_tool_path @llvm_toolchain_llvm//:strip)"
+        export STRIP_BIN
+    fi
+}
+
 hermetic_jq() {
     if [[ -z "${JQ_BIN:-}" ]]; then
         JQ_BIN="$(bazel_tool_path @jq//:jq)"
