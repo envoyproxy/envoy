@@ -79,6 +79,18 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "b3_span_context_test",
+    srcs = ["b3_span_context_test.cc"],
+    extension_names = ["envoy.tracers.opentelemetry"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "grpc_trace_exporter_test",
     srcs = ["grpc_trace_exporter_test.cc"],
     extension_names = ["envoy.tracers.opentelemetry"],

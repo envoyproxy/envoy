@@ -1,5 +1,6 @@
 #include "source/extensions/tracers/opentelemetry/opentelemetry_tracer_impl.h"
 
+#include <algorithm>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -12,6 +13,7 @@
 #include "source/common/http/http_service_headers.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/tracing/tracer_config_impl.h"
+#include "source/extensions/tracers/opentelemetry/b3_span_context.h"
 #include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
@@ -36,6 +38,8 @@ namespace {
 
 // Default max cache size for OpenTelemetry tracer
 static constexpr uint64_t DEFAULT_MAX_CACHE_SIZE = 1024;
+
+constexpr absl::string_view kDefaultVersion = "00";
 
 SamplerSharedPtr
 tryCreateSamper(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
@@ -66,6 +70,57 @@ OTelSpanKind getSpanKind(const Tracing::Config& config) {
               : ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER);
 }
 
+template <class RepeatedFormats>
+TraceContextFormats toTraceContextFormats(const RepeatedFormats& formats,
+                                          absl::string_view field_name) {
+  if (formats.empty()) {
+    return {envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT};
+  }
+  TraceContextFormats result;
+  result.reserve(formats.size());
+  for (const int format : formats) {
+    const auto trace_context_format = static_cast<TraceContextFormat>(format);
+    if (std::find(result.begin(), result.end(), trace_context_format) != result.end()) {
+      throw EnvoyException(fmt::format(
+          "OpenTelemetry tracer {} contains duplicate trace context format: {}", field_name,
+          envoy::config::trace::v3::OpenTelemetryConfig::TraceContextFormat_Name(
+              trace_context_format)));
+    }
+    result.push_back(trace_context_format);
+  }
+  return result;
+}
+
+// Extracts the parent span context in the given format. Returns std::nullopt if the trace context
+// has no headers for the format. B3 context without a sampling decision uses `traced`.
+std::optional<absl::StatusOr<SpanContext>>
+extractSpanContext(TraceContextFormat format, Tracing::TraceContext& trace_context, bool traced) {
+  switch (format) {
+  case envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT: {
+    SpanContextExtractor extractor(trace_context);
+    if (!extractor.propagationHeaderPresent()) {
+      return std::nullopt;
+    }
+    return extractor.extractSpanContext();
+  }
+  case envoy::config::trace::v3::OpenTelemetryConfig::B3:
+  case envoy::config::trace::v3::OpenTelemetryConfig::B3_MULTI: {
+    if (!b3HeadersPresent(trace_context)) {
+      return std::nullopt;
+    }
+    absl::StatusOr<B3SpanContext> b3_context = extractB3SpanContext(trace_context);
+    if (!b3_context.ok()) {
+      return b3_context.status();
+    }
+    return SpanContext(kDefaultVersion, b3_context->trace_id, b3_context->span_id,
+                       b3_context->sampled.value_or(traced), /*tracestate=*/"",
+                       /*is_remote=*/true);
+  }
+  default:
+    PANIC_DUE_TO_CORRUPT_ENUM;
+  }
+}
+
 } // namespace
 
 Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
@@ -77,7 +132,9 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
                const ResourceProvider& resource_provider)
     : tls_slot_ptr_(context.serverFactoryContext().threadLocal().allocateSlot()),
       tracing_stats_{OPENTELEMETRY_TRACER_STATS(
-          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
+          POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))},
+      incoming_trace_context_(toTraceContextFormats(opentelemetry_config.incoming_trace_context(),
+                                                    "incoming_trace_context")) {
   auto& factory_context = context.serverFactoryContext();
 
   ResourceProviderOptions options;
@@ -159,11 +216,14 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
         Http::HttpServiceHeadersApplicator::createOrThrow(*http_service, factory_context);
   }
 
+  const TraceContextFormats outgoing_trace_context = toTraceContextFormats(
+      opentelemetry_config.outgoing_trace_context(), "outgoing_trace_context");
+
   // Create the tracer in Thread Local Storage.
   tls_slot_ptr_->set([http_service, max_cache_size, set_instrumentation_scope, &factory_context,
                       this, resource_ptr, sampler, headers_applicator, grpc_client_factory,
-                      custom_exporter_factory, shared_unpacked_config,
-                      worker_factory_context](Event::Dispatcher& dispatcher) {
+                      custom_exporter_factory, shared_unpacked_config, worker_factory_context,
+                      outgoing_trace_context](Event::Dispatcher& dispatcher) {
     OpenTelemetryTraceExporterPtr exporter;
     if (grpc_client_factory != nullptr) {
       auto async_client_or_error = grpc_client_factory->createUncachedRawAsyncClient();
@@ -197,7 +257,7 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
         factory_context.runtime(), dispatcher, tracing_stats_, resource_ptr, sampler,
-        max_cache_size, set_instrumentation_scope);
+        max_cache_size, set_instrumentation_scope, outgoing_trace_context);
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }
@@ -209,7 +269,6 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::Decision tracing_decision) {
   // Get tracer from TLS and start span.
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
-  SpanContextExtractor extractor(trace_context);
   const auto span_kind = getSpanKind(config);
   auto applyTracingDecision = [&tracing_decision](Tracing::SpanPtr span) -> Tracing::SpanPtr {
     if (!tracing_decision.traced) {
@@ -217,23 +276,30 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     }
     return span;
   };
-  if (!extractor.propagationHeaderPresent()) {
-    // No propagation header, so we can create a fresh span with the given decision.
-    return applyTracingDecision(tracer.startSpan(operation_name, stream_info,
-                                                 stream_info.startTime(), tracing_decision,
-                                                 trace_context, span_kind));
-  } else {
-    // Try to extract the span context. If we can't, just return a null span.
-    absl::StatusOr<SpanContext> span_context = extractor.extractSpanContext();
-    if (span_context.ok()) {
-      return applyTracingDecision(tracer.startSpan(operation_name, stream_info,
-                                                   stream_info.startTime(), span_context.value(),
-                                                   trace_context, span_kind));
-    } else {
-      ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
-      return std::make_unique<Tracing::NullSpan>();
+  // The first format with a valid span context becomes the parent. Malformed formats are skipped.
+  bool malformed_trace_context = false;
+  for (const TraceContextFormat format : incoming_trace_context_) {
+    std::optional<absl::StatusOr<SpanContext>> span_context =
+        extractSpanContext(format, trace_context, tracing_decision.traced);
+    if (!span_context.has_value()) {
+      continue;
     }
+    if (!span_context->ok()) {
+      ENVOY_LOG(trace, "Unable to extract span context: {}", span_context->status());
+      malformed_trace_context = true;
+      continue;
+    }
+    return applyTracingDecision(tracer.startSpan(operation_name, stream_info,
+                                                 stream_info.startTime(), span_context->value(),
+                                                 trace_context, span_kind));
   }
+  if (malformed_trace_context) {
+    // Trace context was present but could not be extracted, so the request is not traced.
+    return std::make_unique<Tracing::NullSpan>();
+  }
+  // No trace context, so we can create a fresh span with the given decision.
+  return applyTracingDecision(tracer.startSpan(operation_name, stream_info, stream_info.startTime(),
+                                               tracing_decision, trace_context, span_kind));
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr tracer) : tracer_(std::move(tracer)) {}

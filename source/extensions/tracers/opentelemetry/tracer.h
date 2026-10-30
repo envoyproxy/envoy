@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <vector>
 
 #include "envoy/api/api.h"
 #include "envoy/common/optref.h"
@@ -32,6 +33,9 @@ struct OpenTelemetryTracerStats {
   OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+using TraceContextFormat = envoy::config::trace::v3::OpenTelemetryConfig::TraceContextFormat;
+using TraceContextFormats = std::vector<TraceContextFormat>;
+
 /**
  * OpenTelemetry Tracer. It is stored in TLS and contains the exporter.
  */
@@ -40,9 +44,16 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true);
+         SamplerSharedPtr sampler, uint64_t max_cache_size, bool set_instrumentation_scope = true,
+         TraceContextFormats outgoing_trace_context = {
+             envoy::config::trace::v3::OpenTelemetryConfig::TRACE_CONTEXT});
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
+
+  /**
+   * @return the trace context formats injected into upstream requests.
+   */
+  const TraceContextFormats& outgoingTraceContext() const { return outgoing_trace_context_; }
 
   Tracing::SpanPtr startSpan(const std::string& operation_name,
                              const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
@@ -77,6 +88,7 @@ private:
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
   const bool set_instrumentation_scope_{true};
+  const TraceContextFormats outgoing_trace_context_;
 };
 
 /**

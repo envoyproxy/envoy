@@ -113,6 +113,22 @@ Alternatively the trace context can be manually propagated by the service:
   This option is disabled by default (``USE_B3``) to maintain backward compatibility, where only
   B3 headers are used for both extraction and injection.
 
+* When using the OpenTelemetry tracer, Envoy relies on the service to propagate the W3C trace
+  context headers (:ref:`traceparent <config_http_conn_man_headers_traceparent>` and
+  :ref:`tracestate <config_http_conn_man_headers_tracestate>`) by default. The tracer can also
+  extract and inject B3 headers, using the single :ref:`config_http_conn_man_headers_b3` header or
+  the multiple ``x-b3-*`` headers. This is controlled by the
+  :ref:`incoming_trace_context <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.incoming_trace_context>`
+  and :ref:`outgoing_trace_context <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.outgoing_trace_context>`
+  configuration options:
+
+  - For downstream requests: Extract trace context from the first configured format whose headers
+    are present and valid.
+  - For upstream requests: Inject trace context in every configured format.
+
+  Configuring the formats separately supports migrations between formats, for example accepting
+  both W3C and B3 headers while only injecting W3C headers.
+
 * When using the Datadog tracer, Envoy relies on the service to propagate the
   Datadog-specific HTTP headers (
   :ref:`config_http_conn_man_headers_x-datadog-trace-id`,
