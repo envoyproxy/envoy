@@ -174,8 +174,10 @@ bazel_tool_path() {
     local target="$1"
     local path
     local root
+    # Leave the `bazel-bin` etc convenience symlinks pointing at the caller's build, which may
+    # use different options (eg `-c opt`).
     bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
-        --remote_download_toplevel "$target" >&2
+        --remote_download_toplevel --experimental_convenience_symlinks=ignore "$target" >&2
     path="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" cquery "${BAZEL_BUILD_OPTIONS[@]}" \
         --output=files "$target" 2>/dev/null)"
     if [[ -z "$path" || "$path" == *$'\n'* ]]; then
@@ -191,6 +193,15 @@ bazel_tool_path() {
         root="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" execution_root)"
     fi
     echo "${root}/${path}"
+}
+
+# Resolve the LLVM toolchain's `llvm-strip` as `STRIP_BIN` (it strips GCC-built binaries too),
+# rather than relying on binutils in the build image.
+hermetic_strip() {
+    if [[ -z "${STRIP_BIN:-}" ]]; then
+        STRIP_BIN="$(bazel_tool_path @llvm_toolchain_llvm//:strip)"
+        export STRIP_BIN
+    fi
 }
 
 hermetic_jq() {
