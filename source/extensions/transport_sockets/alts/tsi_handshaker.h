@@ -73,8 +73,9 @@ public:
 
   /**
    * Delete the handshaker when it is ready. This must be called after releasing from a smart
-   * pointer. If there is no call in progress, this calls dispatcher_.deferredDelete(). If there is
-   * a call in progress dispatcher_.deferredDelete happens after ongoing next call are processed.
+   * pointer. If there is no call in progress, this calls dispatcher_.deferredDelete(). If a call
+   * is still waiting for the handshaker service, it is cancelled first. If a call has already
+   * posted its result, dispatcher_.deferredDelete happens after that result is processed.
    */
   void deferredDelete();
 
@@ -89,6 +90,10 @@ private:
   // This is set to true when there is an ongoing next call to handshaker, and set to false when
   // the callback posted to dispatcher_ by TsiHandshaker::onNextDone is executed.
   bool calling_{false};
+
+  // This is set to true when TsiHandshaker::onNextDone posts the result of the ongoing next call
+  // to dispatcher_, and set to false when the posted callback is executed.
+  bool result_posted_{false};
 
   // This will be set when deferredDelete is called. If there is an ongoing next call,
   // the handshaker will delete itself after the call is processed.

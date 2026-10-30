@@ -133,8 +133,9 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     }
 
     if (!handshake_result->unused_bytes.empty()) {
-      // All handshake data is consumed.
-      ASSERT(raw_read_buffer_.length() == 0);
+      // The unused bytes are what the peer sent after its last handshake message. While an
+      // asynchronous handshaker waits for the handshaker service, newly arrived bytes are read
+      // into raw_read_buffer_. They came after the unused bytes, so prepend the unused bytes.
       absl::string_view unused_bytes(
           reinterpret_cast<const char*>(handshake_result->unused_bytes.data()),
           handshake_result->unused_bytes.size());
@@ -168,7 +169,9 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     return Network::PostIoAction::Close;
   }
 
-  if (raw_read_buffer_.length() > 0) {
+  // Ask for a read if bytes are waiting, or to report an end of stream that was read while the
+  // handshake was in progress.
+  if (raw_read_buffer_.length() > 0 || end_stream_read_) {
     callbacks_->setTransportSocketIsReadable();
   }
 
@@ -247,7 +250,12 @@ Network::IoResult TsiSocket::readFromRawSocket() {
 Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
   Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false};
   if (!handshake_complete_) {
-    if (!end_stream_read_ && !read_error_) {
+    // While a call to the handshaker service is pending, the peer's bytes collect in
+    // raw_read_buffer_. Stop reading once it holds default_max_frame_size_ bytes, so that the peer
+    // can't make it grow without bound. doHandshakeNextDone() asks for a read after the call.
+    const bool read_buffer_full =
+        handshaker_next_calling_ && raw_read_buffer_.length() >= default_max_frame_size_;
+    if (!end_stream_read_ && !read_error_ && !read_buffer_full) {
       result = readFromRawSocket();
       ENVOY_CONN_LOG(debug, "TSI: raw read result action {} bytes {} end_stream {}",
                      callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
@@ -256,7 +264,10 @@ Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
         return result;
       }
 
-      if (result.end_stream_read_ && result.bytes_processed_ == 0) {
+      // An end of stream without data fails the handshake. With half-close, though, a pending call
+      // to the handshaker service may still complete it, so doHandshakeNextDone() decides.
+      if (result.end_stream_read_ && result.bytes_processed_ == 0 &&
+          !(handshaker_next_calling_ && callbacks_->connection().isHalfCloseEnabled())) {
         return {Network::PostIoAction::Close, result.bytes_processed_, result.end_stream_read_};
       }
     }
