@@ -137,4 +137,77 @@ static void BM_IntrusiveListIterate(benchmark::State& state) {
 }
 BENCHMARK(BM_IntrusiveListIterate)->Arg(64)->Arg(512);
 
+// ---------------------------------------------------------------------------
+// Move-to-front benchmarks (keeping a list in LRU order, e.g. the HTTP/2 codec's
+// active_streams_ on every encode). Items are moved in round-robin order.
+// ---------------------------------------------------------------------------
+
+// Benchmark moving an item to the front of a std::list<unique_ptr<T>> by removing it
+// and inserting it again, which frees and reallocates the list node.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_StdListMoveToFrontReinsert(benchmark::State& state) {
+  const int n = state.range(0);
+  std::list<std::unique_ptr<StdListObject>> list;
+  std::vector<StdListObject*> ptrs;
+  ptrs.reserve(n);
+  for (int i = 0; i < n; ++i) {
+    auto obj = std::make_unique<StdListObject>(i);
+    ptrs.push_back(obj.get());
+    LinkedList::moveIntoListBack(std::move(obj), list);
+  }
+  int next = 0;
+  for (auto _ : state) {
+    StdListObject* p = ptrs[next];
+    next = next + 1 == n ? 0 : next + 1;
+    LinkedList::moveIntoList(p->removeFromList(list), list);
+  }
+  benchmark::DoNotOptimize(list);
+}
+BENCHMARK(BM_StdListMoveToFrontReinsert)->Arg(1)->Arg(8)->Arg(64)->Arg(512);
+
+// Benchmark moving an item to the front of a std::list<unique_ptr<T>> with splice,
+// which relinks the existing node.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_StdListMoveToFrontSplice(benchmark::State& state) {
+  const int n = state.range(0);
+  std::list<std::unique_ptr<StdListObject>> list;
+  std::vector<StdListObject*> ptrs;
+  ptrs.reserve(n);
+  for (int i = 0; i < n; ++i) {
+    auto obj = std::make_unique<StdListObject>(i);
+    ptrs.push_back(obj.get());
+    LinkedList::moveIntoListBack(std::move(obj), list);
+  }
+  int next = 0;
+  for (auto _ : state) {
+    StdListObject* p = ptrs[next];
+    next = next + 1 == n ? 0 : next + 1;
+    list.splice(list.begin(), list, p->entry());
+  }
+  benchmark::DoNotOptimize(list);
+}
+BENCHMARK(BM_StdListMoveToFrontSplice)->Arg(1)->Arg(8)->Arg(64)->Arg(512);
+
+// Benchmark moving an item to the front of an IntrusiveList<T>.
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_IntrusiveListMoveToFront(benchmark::State& state) {
+  const int n = state.range(0);
+  IntrusiveList<IntrusiveObject> list;
+  std::vector<IntrusiveObject*> ptrs;
+  ptrs.reserve(n);
+  for (int i = 0; i < n; ++i) {
+    auto obj = std::make_unique<IntrusiveObject>(i);
+    ptrs.push_back(obj.get());
+    list.pushBack(std::move(obj));
+  }
+  int next = 0;
+  for (auto _ : state) {
+    IntrusiveObject* p = ptrs[next];
+    next = next + 1 == n ? 0 : next + 1;
+    list.push(p->removeFromList(list));
+  }
+  benchmark::DoNotOptimize(list);
+}
+BENCHMARK(BM_IntrusiveListMoveToFront)->Arg(1)->Arg(8)->Arg(64)->Arg(512);
+
 } // namespace Envoy
