@@ -491,18 +491,9 @@ void GrpcMuxImpl::processDiscoveryResources(const std::vector<DecodedResourcePtr
     }
 
     all_resource_refs.emplace_back(*resource);
-    if (XdsResourceIdentifier::hasXdsTpScheme(resource->name())) {
-      // Sort the context params of an xdstp resource, so we can compare them easily.
-      auto resource_or_error = XdsResourceIdentifier::decodeUrn(resource->name());
-      THROW_IF_NOT_OK_REF(resource_or_error.status());
-      xds::core::v3::ResourceName xdstp_resource = resource_or_error.value();
-      XdsResourceIdentifier::EncodeOptions options;
-      options.sort_context_params_ = true;
-      resource_ref_map.emplace(XdsResourceIdentifier::encodeUrn(xdstp_resource, options),
-                               *resource);
-    } else {
-      resource_ref_map.emplace(resource->name(), *resource);
-    }
+    auto normalized_name_or_error = XdsResourceIdentifier::normalizeResourceName(resource->name());
+    THROW_IF_NOT_OK_REF(normalized_name_or_error.status());
+    resource_ref_map.emplace(std::move(normalized_name_or_error.value()), *resource);
   }
 
   // Execute external config validators if there are any watches.

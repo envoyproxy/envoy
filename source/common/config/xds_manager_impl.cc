@@ -369,7 +369,9 @@ absl::StatusOr<std::unique_ptr<SingletonSubscription>> XdsManagerImpl::subscribe
     absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
     absl::string_view type_url, Stats::Scope& scope, SingletonSubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
-  auto adapter = std::make_unique<SingletonSubscriptionCallbacksAdapter>(callbacks);
+  auto adapter_or_error = SingletonSubscriptionCallbacksAdapter::create(callbacks, resource_name);
+  RETURN_IF_NOT_OK_REF(adapter_or_error.status());
+  auto adapter = std::move(adapter_or_error.value());
   absl::StatusOr<SubscriptionPtr> sub_or_error = subscribeToSingletonResource(
       resource_name, config, type_url, scope, *adapter, resource_decoder, options);
   if (!sub_or_error.ok()) {
