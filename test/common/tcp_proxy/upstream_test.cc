@@ -147,7 +147,7 @@ TEST_P(HttpUpstreamTest, UpstreamReset) {
   EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
 }
 
-// Remote-originated reset reasons should produce RemoteClose (default behavior).
+// Remote-originated reset reasons should produce RemoteClose.
 TEST_P(HttpUpstreamTest, UpstreamRemoteResetProducesRemoteClose) {
   this->setupUpstream();
   testing::Mock::VerifyAndClearExpectations(&this->encoder_);
@@ -160,6 +160,7 @@ TEST_P(HttpUpstreamTest, UpstreamRemoteResetProducesRemoteClose) {
       Http::StreamResetReason::RemoteReset,
       Http::StreamResetReason::RemoteRefusedStreamReset,
       Http::StreamResetReason::RemoteConnectionFailure,
+      Http::StreamResetReason::RemoteResetNoError,
   };
 
   for (const auto reason : remote_reasons) {
@@ -202,19 +203,6 @@ TEST_P(HttpUpstreamTest, UpstreamLocalResetProducesLocalClose) {
   }
 }
 
-// When the runtime guard is disabled, all reset reasons (including remote) should produce
-// LocalClose with Normal close type.
-TEST_P(HttpUpstreamTest, UpstreamResetWithGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.map_http_stream_reset_to_tcp_rst", "false"}});
-  this->setupUpstream();
-  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
-  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
-  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
-}
-
 TEST_P(HttpUpstreamTest, UpstreamRemoteResetAfterStreamCompleteProducesLocalClose) {
   this->setupUpstream();
   testing::Mock::VerifyAndClearExpectations(&this->encoder_);
@@ -223,15 +211,22 @@ TEST_P(HttpUpstreamTest, UpstreamRemoteResetAfterStreamCompleteProducesLocalClos
   EXPECT_CALL(this->encoder_, http1StreamEncoderOptions()).Times(AnyNumber());
   EXPECT_CALL(this->encoder_, enableTcpTunneling()).Times(AnyNumber());
 
-  // Simulate stream already completed normally via half-close path.
   EXPECT_CALL(this->callbacks_, onEvent(_)).Times(AnyNumber());
-  this->upstream_->doneReading();
 
-  // Remote reset after completion should NOT produce RST.
-  EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
-  EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
-  this->upstream_->onResetStream(Http::StreamResetReason::RemoteReset, "");
-  EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+  const Http::StreamResetReason remote_reasons[] = {
+      Http::StreamResetReason::RemoteReset,
+      Http::StreamResetReason::RemoteRefusedStreamReset,
+      Http::StreamResetReason::RemoteConnectionFailure,
+      Http::StreamResetReason::RemoteResetNoError,
+  };
+  for (const auto reason : remote_reasons) {
+    this->setupUpstream();
+    this->upstream_->doneReading();
+    EXPECT_CALL(this->encoder_.stream_, resetStream(_)).Times(0);
+    EXPECT_CALL(this->callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    this->upstream_->onResetStream(reason, "");
+    EXPECT_EQ(this->upstream_->detectedCloseType(), StreamInfo::DetectedCloseType::Normal);
+  }
 }
 
 TEST_P(HttpUpstreamTest, UpstreamRemoteResetBeforeStreamCompleteProducesRemoteClose) {
