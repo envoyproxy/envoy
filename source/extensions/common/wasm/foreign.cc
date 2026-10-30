@@ -285,7 +285,7 @@ public:
     WasmForeignFunction f =
         [self](WasmBase&, std::string_view expr,
                const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
-      auto parse_status = google::api::expr::parser::Parse(std::string(expr));
+      auto parse_status = google::api::expr::parser::Parse(expr);
       if (!parse_status.ok()) {
         ENVOY_LOG(info, "expr_create parse error: {}", parse_status.status().message());
         return WasmResult::BadArgument;

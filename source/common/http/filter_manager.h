@@ -51,7 +51,7 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<Protobuf::StringValue>();
-    message->set_value(std::string(filter_config_name_));
+    message->set_value(filter_config_name_);
     return message;
   }
 

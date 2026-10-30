@@ -60,7 +60,7 @@ absl::StatusOr<std::shared_ptr<TlsStore>>
 GlobalTlsStores::getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                              Server::Configuration::ServerFactoryContext& context,
                              absl::string_view target_address, absl::string_view domain) {
-  TlsStoreIndex index = std::make_pair(std::string(target_address), std::string(domain));
+  TlsStoreIndex index(target_address, domain);
   // Find existing TlsStore or initialize a new one.
   auto it = stores().find(index);
   if (it != stores().end()) {
