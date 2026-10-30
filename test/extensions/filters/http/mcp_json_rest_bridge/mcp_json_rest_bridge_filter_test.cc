@@ -813,6 +813,71 @@ TEST_F(McpJsonRestBridgeFilterTest, IdFieldWithFloatReturnsError) {
           R"json({"error":{"code":-32600,"message":"Missing ID field"},"id":null,"jsonrpc":"2.0"})json"));
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, UnsupportedNotificationReturnsBadRequest) {
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // A notification without an ID is rejected as an unsupported method rather than for the missing
+  // ID, and with an HTTP error status since it has no JSON-RPC response.
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::BadRequest),
+          StrEq(
+              R"json({"code":-32601,"message":"MCP method notifications/cancelled is not supported"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":1}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedWithIdReturnsUnsupportedMethodError) {
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // With an ID, the message is a request rather than a notification, so it does not get an empty
+  // 202 Accepted response.
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::OK),
+          StrEq(
+              R"json({"code":-32601,"message":"MCP method notifications/initialized is not supported"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_method_not_supported")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":1,"method":"notifications/initialized"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest, NotificationsInitializedWithNullIdReturnsError) {
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"}, {":path", "/mcp"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  // A message with an "id" member, even a null one, is not a notification, so its ID is validated.
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Eq(Http::Code::OK),
+                             StrEq(R"json({"code":-32600,"message":"Missing ID field"})json"), _, _,
+                             StrEq("mcp_json_rest_bridge_request_id_not_found")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":null,"method":"notifications/initialized"})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
 TEST_F(McpJsonRestBridgeFilterTest, InvalidInputJsonReturnsError) {
   ASSERT_OK(makeFilter());
 
@@ -3637,7 +3702,7 @@ TEST_F(McpJsonRestBridgeFilterTest,
 
   EXPECT_CALL(
       decoder_callbacks_,
-      sendLocalReply(Eq(Http::Code::OK),
+      sendLocalReply(Eq(Http::Code::BadRequest),
                      StrEq(R"json({"code":-32602,"message":"Unsupported MCP version"})json"), _, _,
                      StrEq("mcp_json_rest_bridge_request_unsupported_mcp_version")));
   Buffer::OwnedImpl body(R"json({"jsonrpc":"2.0","method":"notifications/initialized"})json");
