@@ -1,7 +1,12 @@
+#include <algorithm>
+#include <array>
+#include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 
 #include "envoy/common/platform.h"
 #include "envoy/config/listener/v3/listener.pb.h"
@@ -14,6 +19,8 @@
 #include "source/common/event/dispatcher_impl.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -24,6 +31,7 @@
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
+#include "source/common/tls/io_handle_bio.h"
 #include "source/common/tls/private_key/private_key_manager_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
@@ -8616,6 +8624,8 @@ TEST_P(SslSocketTest, AsyncCertSelectionCallbackWhenNotBlocked) {
 
 class SslReadBufferLimitTest : public SslSocketTest {
 protected:
+  void readAheadResumeTest(bool runtime_enabled);
+
   void initialize() {
     TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml_),
                               downstream_tls_context_);
@@ -8855,6 +8865,401 @@ TEST_P(SslReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(32 * 1024, 32 * 1024, 256 * 1024, 1, false);
 }
 
+TEST_P(SslReadBufferLimitTest, ReadAheadRuntimeDisabled) { readAheadResumeTest(false); }
+
+TEST_P(SslReadBufferLimitTest, ReadAheadFollowsBufferReservation) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_io_handle_read_ahead", "true"}});
+  initialize();
+
+  SslSocket* server_transport = nullptr;
+  auto on_unexpected_event = [this](Network::ConnectionEvent event) {
+    ADD_FAILURE() << "Unexpected connection event during handshake: " << static_cast<int>(event);
+    dispatcher_->exit();
+  };
+  EXPECT_CALL(client_callbacks_, onEvent(_)).WillRepeatedly(Invoke(on_unexpected_event));
+  EXPECT_CALL(server_callbacks_, onEvent(_)).WillRepeatedly(Invoke(on_unexpected_event));
+  uint32_t connected = 0;
+  auto on_connected = [&](Network::ConnectionEvent) {
+    if (++connected == 2) {
+      dispatcher_->exit();
+    }
+  };
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) {
+        auto transport = server_ssl_socket_factory_->createDownstreamTransportSocket();
+        server_transport = dynamic_cast<SslSocket*>(transport.get());
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), std::move(transport), stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  ASSERT_EQ(2, connected);
+  ASSERT_NE(nullptr, server_transport);
+  server_connection_->readDisable(true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  auto* client_transport = dynamic_cast<SslSocket*>(client_transport_socket_);
+  ASSERT_NE(nullptr, client_transport);
+  auto* server_connection = dynamic_cast<Network::ConnectionImpl*>(server_connection_.get());
+  ASSERT_NE(nullptr, server_connection);
+  BIO* output = BIO_new(BIO_s_mem());
+  ASSERT_NE(nullptr, output);
+  SSL_set0_wbio(client_transport->rawSslForTest(), output);
+  const std::string first_record(SSL3_RT_MAX_PLAIN_LENGTH - 1, 'a');
+  const std::string second_record(SSL3_RT_MAX_PLAIN_LENGTH, 'b');
+  ASSERT_EQ(first_record.size(),
+            SSL_write(client_transport->rawSslForTest(), first_record.data(), first_record.size()));
+  const uint8_t* ciphertext = nullptr;
+  size_t first_ciphertext_length = 0;
+  ASSERT_EQ(1, BIO_mem_contents(output, &ciphertext, &first_ciphertext_length));
+  ASSERT_EQ(second_record.size(), SSL_write(client_transport->rawSslForTest(), second_record.data(),
+                                            second_record.size()));
+  size_t ciphertext_length = 0;
+  ASSERT_EQ(1, BIO_mem_contents(output, &ciphertext, &ciphertext_length));
+
+  StrictMock<Network::MockIoHandle> receiver_io;
+  SSL_set0_rbio(server_transport->rawSslForTest(), BIO_new_io_handle(&receiver_io));
+  Buffer::WatermarkBuffer read_buffer([] {}, [] {}, [] {});
+  auto expect_read_size = [&](uint64_t expected_size) {
+    EXPECT_CALL(receiver_io, readv(expected_size, _, 1))
+        .WillOnce(Invoke([expected_size](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+          EXPECT_EQ(expected_size, slices[0].len_);
+          return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+        }));
+    const uint64_t original_length = read_buffer.length();
+    const auto result = server_transport->doRead(read_buffer);
+    EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+    EXPECT_FALSE(result.end_stream_read_);
+    EXPECT_EQ(0, result.bytes_processed_);
+    EXPECT_EQ(original_length, read_buffer.length());
+  };
+
+  constexpr uint64_t record_overhead = SSL3_RT_HEADER_LENGTH + SSL3_RT_MAX_ENCRYPTED_OVERHEAD;
+  read_buffer.setWatermarks(64 * 1024);
+  expect_read_size(64 * 1024 + 4 * record_overhead);
+  {
+    auto reservation = read_buffer.reserveForRead();
+    for (uint64_t i = 0; i < reservation.numSlices(); ++i) {
+      auto& slice = reservation.slices()[i];
+      memset(slice.mem_, 'a', slice.len_);
+    }
+    reservation.commit(48 * 1024);
+  }
+  expect_read_size(16 * 1024 + record_overhead);
+  read_buffer.drain(read_buffer.length());
+  read_buffer.setWatermarks(256 * 1024);
+  expect_read_size(128 * 1024 + 8 * record_overhead);
+
+  // The first record leaves one byte in the reservation, but the next record still needs a full
+  // ciphertext read before TLS can authenticate it and return that byte.
+  const uint64_t full_record_read_size = SSL3_RT_MAX_PLAIN_LENGTH + record_overhead;
+  EXPECT_CALL(receiver_io, readv(_, _, 1))
+      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t) {
+        EXPECT_EQ(full_record_read_size, max_length);
+        EXPECT_EQ(max_length, slices[0].len_);
+        const uint64_t length = std::min<uint64_t>(max_length, first_ciphertext_length);
+        EXPECT_EQ(first_ciphertext_length, length);
+        memcpy(slices[0].mem_, ciphertext, length);
+        return Api::IoCallUint64Result{length, Api::IoError::none()};
+      }))
+      .WillOnce(Invoke([&](uint64_t max_length, Buffer::RawSlice* slices, uint64_t) {
+        EXPECT_EQ(full_record_read_size, max_length);
+        EXPECT_EQ(max_length, slices[0].len_);
+        const uint64_t remaining = ciphertext_length - first_ciphertext_length;
+        const uint64_t length = std::min<uint64_t>(max_length, remaining);
+        EXPECT_EQ(remaining, length);
+        memcpy(slices[0].mem_, ciphertext + first_ciphertext_length, length);
+        return Api::IoCallUint64Result{length, Api::IoError::none()};
+      }))
+      .WillRepeatedly(Invoke([](uint64_t, Buffer::RawSlice*, uint64_t) {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      }));
+  server_connection_->setBufferLimits(SSL3_RT_MAX_PLAIN_LENGTH);
+  auto& connection_read_buffer = server_connection->getReadBuffer().buffer;
+  const auto first_result = server_transport->doRead(connection_read_buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, first_result.action_);
+  EXPECT_FALSE(first_result.end_stream_read_);
+  EXPECT_EQ(SSL3_RT_MAX_PLAIN_LENGTH, first_result.bytes_processed_);
+  EXPECT_EQ(first_record + "b", connection_read_buffer.toString());
+  connection_read_buffer.drain(connection_read_buffer.length());
+  const auto second_result = server_transport->doRead(connection_read_buffer);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, second_result.action_);
+  EXPECT_FALSE(second_result.end_stream_read_);
+  EXPECT_EQ(second_record.size() - 1, second_result.bytes_processed_);
+  EXPECT_EQ(second_record.substr(1), connection_read_buffer.toString());
+  connection_read_buffer.drain(connection_read_buffer.length());
+
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  server_connection_->close(Network::ConnectionCloseType::NoFlush);
+  client_connection_->close(Network::ConnectionCloseType::NoFlush);
+  // The replacement input BIO borrows receiver_io, so destroy its connection before the mock.
+  server_connection_.reset();
+}
+
+TEST_P(SslReadBufferLimitTest, ReadAheadAcrossTls13KeyUpdate) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.tls_io_handle_read_ahead", "true"}});
+  initialize();
+  auto* client_transport = dynamic_cast<SslSocket*>(client_transport_socket_);
+  ASSERT_NE(nullptr, client_transport);
+  SSL* client_ssl = client_transport->rawSslForTest();
+  ASSERT_EQ(1, SSL_set_max_proto_version(client_ssl, TLS1_3_VERSION));
+  ASSERT_EQ(1, SSL_set_min_proto_version(client_ssl, TLS1_3_VERSION));
+
+  SslSocket* server_transport = nullptr;
+  auto on_unexpected_event = [this](Network::ConnectionEvent event) {
+    ADD_FAILURE() << "Unexpected connection event during handshake: " << static_cast<int>(event);
+    dispatcher_->exit();
+  };
+  EXPECT_CALL(client_callbacks_, onEvent(_)).WillRepeatedly(Invoke(on_unexpected_event));
+  EXPECT_CALL(server_callbacks_, onEvent(_)).WillRepeatedly(Invoke(on_unexpected_event));
+  uint32_t connected = 0;
+  auto on_connected = [&](Network::ConnectionEvent) {
+    if (++connected == 2) {
+      dispatcher_->exit();
+    }
+  };
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) {
+        auto transport = server_ssl_socket_factory_->createDownstreamTransportSocket();
+        server_transport = dynamic_cast<SslSocket*>(transport.get());
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), std::move(transport), stream_info_);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  ASSERT_EQ(2, connected);
+  ASSERT_NE(nullptr, server_transport);
+  SSL* server_ssl = server_transport->rawSslForTest();
+  ASSERT_EQ(TLS1_3_VERSION, SSL_version(server_ssl));
+  server_connection_->readDisable(true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  // Capture genuine KeyUpdate and application records together, avoiding TCP delivery timing.
+  BIO* output = BIO_new(BIO_s_mem());
+  ASSERT_NE(nullptr, output);
+  SSL_set0_wbio(client_ssl, output);
+#ifdef ENVOY_SSL_OPENSSL
+  ASSERT_EQ(1, ossl_SSL_key_update(client_ssl, ossl_SSL_KEY_UPDATE_NOT_REQUESTED));
+  // Without AUTO_RETRY, OpenSSL yields WANT_READ after the control record even when the BIO
+  // already contains application ciphertext. BoringSSL processes both records in one call.
+  ossl_SSL_clear_mode(server_ssl, ossl_SSL_MODE_AUTO_RETRY);
+#else
+  ASSERT_EQ(1, SSL_key_update(client_ssl, SSL_KEY_UPDATE_NOT_REQUESTED));
+#endif
+  const std::string payload = "application data after a TLS 1.3 KeyUpdate";
+  ASSERT_EQ(payload.size(), SSL_write(client_ssl, payload.data(), payload.size()));
+  const uint8_t* ciphertext = nullptr;
+  size_t ciphertext_length = 0;
+  ASSERT_EQ(1, BIO_mem_contents(output, &ciphertext, &ciphertext_length));
+  ASSERT_GT(ciphertext_length, payload.size());
+  ASSERT_LE(ciphertext_length, 16384);
+
+  NiceMock<Network::MockIoHandle> receiver_io;
+  EXPECT_CALL(receiver_io, readv(_, _, 1))
+      .WillOnce(Invoke([&](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+        memcpy(slices[0].mem_, ciphertext, ciphertext_length);
+        return Api::IoCallUint64Result{ciphertext_length, Api::IoError::none()};
+      }))
+      .WillRepeatedly(Invoke([](uint64_t, Buffer::RawSlice*, uint64_t) {
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
+      }));
+  BIO* input = BIO_new_io_handle(&receiver_io);
+  SSL_set0_rbio(server_ssl, input);
+
+  Buffer::OwnedImpl first_read;
+  const auto result = server_transport->doRead(first_read);
+  EXPECT_EQ(Network::PostIoAction::KeepOpen, result.action_);
+  EXPECT_FALSE(result.end_stream_read_);
+#ifdef ENVOY_SSL_OPENSSL
+  EXPECT_EQ(0, result.bytes_processed_);
+  EXPECT_EQ(0, first_read.length());
+  EXPECT_GT(BIO_pending(input), 0);
+  bool received = false;
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  EXPECT_CALL(*read_filter_, onData(_, false)).WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+    EXPECT_EQ(payload, data.toString());
+    data.drain(data.length());
+    received = true;
+    return Network::FilterStatus::StopIteration;
+  }));
+  server_connection_->readDisable(false);
+  // No kernel input remains. Only doRead's requested resumption can deliver the cached record.
+  // NonBlock makes a missing resumption fail promptly instead of hanging the test.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_TRUE(received);
+#else
+  EXPECT_EQ(payload.size(), result.bytes_processed_);
+  EXPECT_EQ(payload, first_read.toString());
+  server_connection_->readDisable(false);
+#endif
+  EXPECT_EQ(0, BIO_pending(input));
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  server_connection_->close(Network::ConnectionCloseType::NoFlush);
+  client_connection_->close(Network::ConnectionCloseType::NoFlush);
+  // The replacement input BIO borrows receiver_io, so destroy its connection before the mock.
+  server_connection_.reset();
+}
+
+TEST_P(SslReadBufferLimitTest, ReadAheadResumesBufferedCiphertextAfterReadDisable) {
+  readAheadResumeTest(true);
+}
+
+void SslReadBufferLimitTest::readAheadResumeTest(bool runtime_enabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_io_handle_read_ahead", runtime_enabled ? "true" : "false"}});
+  initialize();
+  auto* client_transport = dynamic_cast<SslSocket*>(client_transport_socket_);
+  ASSERT_NE(nullptr, client_transport);
+  // Pin TLS 1.2 so the receiver-side barrier below can identify the final close_notify record.
+  ASSERT_EQ(1, SSL_set_max_proto_version(client_transport->rawSslForTest(), TLS1_2_VERSION));
+  client_connection_->noDelay(true);
+  client_connection_->enableHalfClose(true);
+
+  SslSocket* server_transport = nullptr;
+  Network::IoHandle* server_io_handle = nullptr;
+  uint32_t connected = 0;
+  auto on_connected = [&](Network::ConnectionEvent) {
+    if (++connected == 2) {
+      dispatcher_->exit();
+    }
+  };
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce(Invoke(on_connected));
+  EXPECT_CALL(listener_callbacks_, onAccept_(_))
+      .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) {
+        server_io_handle = &socket->ioHandle();
+        auto transport = server_ssl_socket_factory_->createDownstreamTransportSocket();
+        server_transport = dynamic_cast<SslSocket*>(transport.get());
+        server_connection_ = dispatcher_->createServerConnection(
+            std::move(socket), std::move(transport), stream_info_);
+        server_connection_->setBufferLimits(1024);
+        server_connection_->enableHalfClose(true);
+        server_connection_->addConnectionCallbacks(server_callbacks_);
+        server_connection_->addReadFilter(read_filter_);
+      }));
+  EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
+  EXPECT_CALL(*read_filter_, onNewConnection());
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  ASSERT_NE(nullptr, server_transport);
+  ASSERT_EQ(2, connected);
+  ASSERT_EQ(TLS1_2_VERSION, SSL_version(server_transport->rawSslForTest()));
+
+  // Changing the runtime value must not change this established connection's latched behavior.
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_io_handle_read_ahead", runtime_enabled ? "false" : "true"}});
+  server_connection_->readDisable(true);
+  const std::string payload(32 * 1024 + 37, 'a');
+  uint64_t sent = 0;
+  client_connection_->addBytesSentCallback([&](uint64_t bytes) {
+    sent += bytes;
+    if (sent == payload.size()) {
+      dispatcher_->exit();
+    }
+    return true;
+  });
+  Buffer::OwnedImpl write_buffer(payload);
+  client_connection_->write(write_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  ASSERT_EQ(payload.size(), sent);
+
+  // Bytes-sent means the sender accepted all plaintext, not that the receiver has all ciphertext.
+  // Wait without consuming data until all three application records and close_notify are queued.
+  // The record count follows doWrite()'s 16 KiB SSL_write chunks for this fixed-size payload.
+  // Kernel TCP delivery uses real time independently of the fixture's simulated clock.
+  std::array<char, 64 * 1024> queued_ciphertext;
+  bool all_records_queued = false;
+  auto now = [] { return std::chrono::steady_clock::now(); }; // NO_CHECK_FORMAT(real_time)
+  const auto deadline = now() + std::chrono::seconds(5);
+  while (!all_records_queued && now() < deadline) {
+    auto peek =
+        server_io_handle->recv(queued_ciphertext.data(), queued_ciphertext.size(), MSG_PEEK);
+    if (peek.ok()) {
+      uint64_t offset = 0;
+      uint32_t records = 0;
+      while (records < 4 && peek.return_value_ - offset >= 5) {
+        const auto* header = reinterpret_cast<const uint8_t*>(queued_ciphertext.data() + offset);
+        const uint64_t record_length = 5 + (uint64_t{header[3]} << 8) + header[4];
+        const uint8_t expected_type = records < 3 ? SSL3_RT_APPLICATION_DATA : SSL3_RT_ALERT;
+        if (header[0] != expected_type || record_length > peek.return_value_ - offset) {
+          break;
+        }
+        offset += record_length;
+        ++records;
+      }
+      all_records_queued = records == 4 && offset == peek.return_value_;
+    }
+    if (!all_records_queued) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1)); // NO_CHECK_FORMAT(real_time)
+    }
+  }
+  if (!all_records_queued) {
+    EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+    client_connection_->close(Network::ConnectionCloseType::NoFlush);
+    server_connection_->close(Network::ConnectionCloseType::NoFlush);
+    FAIL() << "Timed out waiting for all TLS records in the receiver queue";
+  }
+
+  std::string received;
+  bool paused = false;
+  bool received_end_stream = false;
+  EXPECT_CALL(*read_filter_, onData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool end_stream) {
+        received += data.toString();
+        data.drain(data.length());
+        if (!paused) {
+          paused = true;
+          EXPECT_FALSE(end_stream);
+          EXPECT_EQ(runtime_enabled,
+                    BIO_pending(SSL_get_rbio(server_transport->rawSslForTest())) > 0);
+          // Read-ahead follows the small reservation instead of consuming the whole payload.
+          char byte;
+          auto peek = server_io_handle->recv(&byte, 1, MSG_PEEK);
+          EXPECT_TRUE(peek.ok());
+          server_connection_->readDisable(true);
+          dispatcher_->post([&] { server_connection_->readDisable(false); });
+        }
+        if (end_stream) {
+          EXPECT_FALSE(received_end_stream);
+          received_end_stream = true;
+          EXPECT_EQ(payload, received);
+          EXPECT_EQ(0, BIO_pending(SSL_get_rbio(server_transport->rawSslForTest())));
+          dispatcher_->exit();
+        }
+        return Network::FilterStatus::StopIteration;
+      }));
+  server_connection_->readDisable(false);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  EXPECT_TRUE(paused);
+  EXPECT_TRUE(received_end_stream);
+  EXPECT_EQ(payload, received);
+  EXPECT_EQ(0, server_stats_store_.counter("ssl.connection_error").value());
+  EXPECT_EQ(0, client_stats_store_.counter("ssl.connection_error").value());
+  EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  client_connection_->close(Network::ConnectionCloseType::NoFlush);
+  server_connection_->close(Network::ConnectionCloseType::NoFlush);
+}
+
 TEST_P(SslReadBufferLimitTest, WritesSmallerThanBufferLimit) { singleWriteTest(5 * 1024, 1024); }
 
 TEST_P(SslReadBufferLimitTest, WritesLargerThanBufferLimit) { singleWriteTest(1024, 5 * 1024); }
@@ -8981,7 +9386,13 @@ BORINGSSL_TEST_P(SslSocketTest, RsaPrivateKeyProviderAsyncSignSuccess) {
 
   TestUtilOptions successful_test_options(successful_client_ctx_yaml, server_ctx_yaml, true,
                                           version_);
-  testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+  for (const bool read_ahead : {false, true}) {
+    SCOPED_TRACE(read_ahead);
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_io_handle_read_ahead", read_ahead ? "true" : "false"}});
+    testUtil(successful_test_options.setPrivateKeyMethodExpected(true));
+  }
 }
 
 // Test asynchronous decryption (RSA).
@@ -9924,16 +10335,22 @@ BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorSucceeds) {
 )EOF";
   auto* cert_validator_factory = Registry::FactoryRegistry<CertValidatorFactory>::getFactory(
       "envoy.tls.cert_validator.timed_cert_validator");
-  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)->resetForTest();
-  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(0));
-  static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setExpectedHostName("example.com");
+  for (const bool read_ahead : {false, true}) {
+    SCOPED_TRACE(read_ahead);
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_io_handle_read_ahead", read_ahead ? "true" : "false"}});
+    static_cast<TimedCertValidatorFactory*>(cert_validator_factory)->resetForTest();
+    static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
+        ->setValidationTimeOutMs(std::chrono::milliseconds(0));
+    static_cast<TimedCertValidatorFactory*>(cert_validator_factory)
+        ->setExpectedHostName("example.com");
 
-  TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
-  testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
-               .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
-               .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+    TestUtilOptions test_options(client_ctx_yaml, server_ctx_yaml, true, version_);
+    testUtil(test_options.setExpectedSha256Digest(TEST_NO_SAN_CERT_256_HASH)
+                 .setExpectedSha1Digest(TEST_NO_SAN_CERT_1_HASH)
+                 .setExpectedSerialNumber(TEST_NO_SAN_CERT_SERIAL));
+  }
 }
 
 BORINGSSL_TEST_P(SslSocketTest, AsyncCustomCertValidatorFails) {
