@@ -392,9 +392,10 @@ void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char*
 
     auto len = key.length();
     // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
-    // is safe.
+    // is safe. Only the length is stored: writing go_buf (a Go pointer) into Go memory from C++
+    // would skip the Go write barrier. The Go side sets the data pointers from go_buf and these
+    // lengths, in the same order.
     go_strs[i].n = len;
-    go_strs[i].p = go_buf;
     // go_buf is the heap memory of go, and the length is the total length of all keys and values in
     // the header. So use memcpy is safe.
     memcpy(go_buf, key.data(), len); // NOLINT(safe-memcpy)
@@ -405,7 +406,6 @@ void copyHeaderMapToGo(const Envoy::Http::HeaderMap& m, GoString* go_strs, char*
     go_strs[i].n = len;
     // go_buf may be an invalid pointer in Golang side when len is 0.
     if (len > 0) {
-      go_strs[i].p = go_buf;
       memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
       go_buf += len;
     }
