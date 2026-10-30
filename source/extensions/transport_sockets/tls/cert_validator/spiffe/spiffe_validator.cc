@@ -142,19 +142,14 @@ parseTrustBundles(absl::string_view trust_bundle_mapping_str) {
 SINGLETON_MANAGER_REGISTRATION(spiffe_trust_bundles);
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                                 SslStats& stats,
+                                 const SPIFFEConfig& message, SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope, absl::Status& creation_status)
-    : stats_(stats), time_source_(context.timeSource()) {
+    : allow_optional_client_certificate_(message.allow_optional_client_certificate()),
+      stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
   suppress_client_ca_list_ = config->suppressClientCaList();
-
-  SPIFFEConfig message;
-  SET_AND_RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
-                               config->customValidatorConfig().value().typed_config(),
-                               ProtobufMessage::getStrictValidationVisitor(), message),
-                           creation_status);
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
@@ -247,7 +242,12 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   initializeCertExpirationStats(scope, config->caCertName());
 }
 
-absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
+absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool require_client_cert) {
+  require_client_certificate_ = !allow_optional_client_certificate_ || require_client_cert;
+  if (!require_client_certificate_) {
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, nullptr);
+  }
+
   // When suppressed, CAs are still used for validation (loaded via the trust bundle
   // in initializeSslContexts) but their names are not advertised in the TLS
   // CertificateRequest. Skip building the name stack entirely — this is the common
@@ -297,6 +297,16 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
   if (suppress_client_ca_list_) {
     bool suppress = true;
     rc = EVP_DigestUpdate(md.get(), &suppress, sizeof(suppress));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
+  // Hash the effective requirement so anonymous sessions cannot resume where certificates are
+  // required. Keep the digest unchanged for existing deployments that have not opted in.
+  if (allow_optional_client_certificate_) {
+    constexpr absl::string_view option = "allow_optional_client_certificate";
+    rc = EVP_DigestUpdate(md.get(), option.data(), option.size());
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    rc = EVP_DigestUpdate(md.get(), &require_client_certificate_,
+                          sizeof(require_client_certificate_));
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
   }
 }
@@ -556,9 +566,14 @@ public:
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context,
                       Stats::Scope& scope) override {
+    ASSERT(config != nullptr);
+    SPIFFEConfig message;
+    RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+        config->customValidatorConfig().value().typed_config(),
+        ProtobufMessage::getStrictValidationVisitor(), message));
     absl::Status creation_status = absl::OkStatus();
     auto validator =
-        std::make_unique<SPIFFEValidator>(config, stats, context, scope, creation_status);
+        std::make_unique<SPIFFEValidator>(config, message, stats, context, scope, creation_status);
     RETURN_IF_NOT_OK(creation_status);
     return validator;
   }
