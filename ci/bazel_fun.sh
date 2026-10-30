@@ -174,8 +174,10 @@ bazel_tool_path() {
     local target="$1"
     local path
     local root
+    # Leave the `bazel-bin` etc convenience symlinks pointing at the caller's build, which may
+    # use different options (eg `-c opt`).
     bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
-        --remote_download_toplevel "$target" >&2
+        --remote_download_toplevel --experimental_convenience_symlinks=ignore "$target" >&2
     path="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" cquery "${BAZEL_BUILD_OPTIONS[@]}" \
         --output=files "$target" 2>/dev/null)"
     if [[ -z "$path" || "$path" == *$'\n'* ]]; then
