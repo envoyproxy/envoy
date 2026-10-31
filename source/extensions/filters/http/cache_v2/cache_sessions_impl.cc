@@ -94,6 +94,9 @@ void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
         dispatcher(), lookup().timestamp(),
         [ranges = std::move(ranges.value()), cl = content_length_,
          cb = std::move(cb)](Http::ResponseHeaderMapPtr headers, EndStream end_stream) mutable {
+          if (end_stream == EndStream::Reset) {
+            return cb(nullptr, EndStream::Reset);
+          }
           ASSERT(headers != nullptr, "it should be impossible for headers to be null");
           // The Range header field is evaluated after evaluating the precondition header
           // fields defined in Section 13.1, and only if the result in absence of the Range
@@ -152,12 +155,16 @@ void CacheSession::clearUncacheableState() {
   state_ = State::New;
 }
 
-void CacheSession::wantHeaders(Event::Dispatcher&, SystemTime lookup_timestamp,
+void CacheSession::wantHeaders(Event::Dispatcher& dispatcher, SystemTime lookup_timestamp,
                                GetHeadersCallback&& cb) {
   Http::ResponseHeaderMapPtr headers;
   EndStream end_stream_after_headers;
   {
     absl::MutexLock lock(mu_);
+    if (state_ == State::Failed) {
+      dispatcher.post([cb = std::move(cb)]() mutable { cb(nullptr, EndStream::Reset); });
+      return;
+    }
     ASSERT(entry_.response_headers_ != nullptr,
            "headers should have been initialized during lookup");
     headers = Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*entry_.response_headers_);
@@ -172,6 +179,10 @@ void CacheSession::wantHeaders(Event::Dispatcher&, SystemTime lookup_timestamp,
 void CacheSession::wantBodyRange(AdjustedByteRange range, Event::Dispatcher& dispatcher,
                                  GetBodyCallback&& cb) {
   absl::MutexLock lock(mu_);
+  if (state_ == State::Failed) {
+    dispatcher.post([cb = std::move(cb)]() mutable { cb(nullptr, EndStream::Reset); });
+    return;
+  }
   ASSERT(entry_.response_headers_ != nullptr,
          "body should not be requested when headers haven't been sent");
   if (auto cache_sessions = cache_sessions_.lock()) {
@@ -184,6 +195,10 @@ void CacheSession::wantBodyRange(AdjustedByteRange range, Event::Dispatcher& dis
 
 void CacheSession::wantTrailers(Event::Dispatcher& dispatcher, GetTrailersCallback&& cb) {
   absl::MutexLock lock(mu_);
+  if (state_ == State::Failed) {
+    dispatcher.post([cb = std::move(cb)]() mutable { cb(nullptr, EndStream::Reset); });
+    return;
+  }
   if (entry_.response_trailers_ != nullptr) {
     auto trailers = Http::createHeaderMap<Http::ResponseTrailerMapImpl>(*entry_.response_trailers_);
     dispatcher.post([cb = std::move(cb), trailers = std::move(trailers)]() mutable {
@@ -202,6 +217,9 @@ void CacheSession::wantTrailers(Event::Dispatcher& dispatcher, GetTrailersCallba
 void CacheSession::onHeadersInserted(CacheReaderPtr cache_reader,
                                      Http::ResponseHeaderMapPtr headers, bool end_stream) {
   absl::MutexLock lock(mu_);
+  if (state_ == State::Failed) {
+    return;
+  }
   std::shared_ptr<CacheSessionsImpl> cache_sessions = cache_sessions_.lock();
   if (!cache_sessions) {
     ENVOY_LOG(error, "cache config was deleted while header-insertion was in flight");
@@ -286,6 +304,9 @@ void CacheSession::sendSuccessfulLookupResultTo(LookupSubscriber& subscriber,
 
 void CacheSession::onBodyInserted(AdjustedByteRange range, bool end_stream) {
   absl::MutexLock lock(mu_);
+  if (state_ == State::Failed) {
+    return;
+  }
   body_length_available_ = range.end();
   if (end_stream) {
     insertComplete();
@@ -297,6 +318,9 @@ void CacheSession::onBodyInserted(AdjustedByteRange range, bool end_stream) {
 void CacheSession::onTrailersInserted(Http::ResponseTrailerMapPtr trailers) {
   ASSERT(trailers);
   absl::MutexLock lock(mu_);
+  if (state_ == State::Failed) {
+    return;
+  }
   entry_.response_trailers_ = std::move(trailers);
   insertComplete();
   for (TrailerSubscriber& subscriber : trailer_subscribers_) {
@@ -355,8 +379,14 @@ static void postUpstreamPassThroughWithReset(CacheSession::LookupSubscriber&& su
   });
 }
 
-void CacheSession::onCacheError() {
+void CacheSession::onCacheError(bool reset_lookups) {
   mu_.AssertHeld();
+  if (state_ == State::Failed) {
+    return;
+  }
+  // Old readers and insertion callbacks may outlive the failure. Keep them isolated from
+  // subsequent lookups by retiring this session instead of reusing its state.
+  state_ = State::Failed;
   auto cache_sessions = cache_sessions_.lock();
   if (cache_sessions) {
     Event::Dispatcher* dispatcher = nullptr;
@@ -377,7 +407,15 @@ void CacheSession::onCacheError() {
     cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
   }
   for (LookupSubscriber& sub : lookup_subscribers_) {
-    postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
+    if (reset_lookups) {
+      sub.dispatcher().post([cb = std::move(sub.callback_)]() mutable {
+        auto result = std::make_unique<ActiveLookupResult>();
+        result->status_ = CacheEntryStatus::UpstreamReset;
+        cb(std::move(result));
+      });
+    } else {
+      postUpstreamPassThrough(std::move(sub), CacheEntryStatus::LookupError);
+    }
   }
   for (BodySubscriber& sub : body_subscribers_) {
     sub.dispatcher().post(
@@ -390,7 +428,6 @@ void CacheSession::onCacheError() {
   lookup_subscribers_.clear();
   body_subscribers_.clear();
   trailer_subscribers_.clear();
-  state_ = State::New;
 }
 
 void CacheSession::insertComplete() {
@@ -492,6 +529,9 @@ void CacheSession::onBodyChunkFromCache(AdjustedByteRange range, Buffer::Instanc
                                         EndStream end_stream) {
   absl::MutexLock lock(mu_);
   read_action_in_flight_ = false;
+  if (state_ == State::Failed) {
+    return;
+  }
   if (end_stream == EndStream::Reset) {
     ENVOY_LOG(error, "cache entry provoked reset");
     onCacheError();
@@ -560,6 +600,15 @@ void CacheSession::getLookupResult(ActiveLookupRequestPtr lookup, ActiveLookupRe
                                                              content_length_header_),
                        std::move(cb)};
   switch (state_) {
+  case State::Failed: {
+    // The session may have failed between getEntry() and getLookupResult().
+    sub.dispatcher().post([cb = std::move(sub.callback_)]() mutable {
+      auto result = std::make_unique<ActiveLookupResult>();
+      result->status_ = CacheEntryStatus::UpstreamReset;
+      cb(std::move(result));
+    });
+    return;
+  }
   case State::Vary:
     IS_ENVOY_BUG("not implemented yet");
     ABSL_FALLTHROUGH_INTENDED;
@@ -632,7 +681,7 @@ void CacheSession::getLookupResult(ActiveLookupRequestPtr lookup, ActiveLookupRe
 void CacheSession::onCacheLookupResult(absl::StatusOr<LookupResult>&& lookup_result) {
   absl::MutexLock lock(mu_);
   if (!lookup_result.ok()) {
-    return onCacheError();
+    return onCacheError(/*reset_lookups=*/false);
   }
   entry_ = std::move(lookup_result.value());
   if (!entry_.populated()) {
@@ -779,11 +828,19 @@ void CacheSession::onUncacheable(Http::ResponseHeaderMapPtr headers, EndStream e
 void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
                                      bool range_header_was_stripped) {
   absl::MutexLock lock(mu_);
+  if (state_ == State::Failed) {
+    upstream_request_ = nullptr;
+    return;
+  }
   Event::Dispatcher& dispatcher = lookup_subscribers_.front().dispatcher();
   ASSERT(upstream_request_);
   if (end_stream == EndStream::Reset) {
     upstream_request_ = nullptr;
-    state_ = State::New;
+    if (state_ != State::Validating) {
+      return onCacheError();
+    }
+    // A failed validation does not invalidate the cached response already being read.
+    state_ = State::Exists;
     for (LookupSubscriber& subscriber : lookup_subscribers_) {
       subscriber.dispatcher().post([callback = std::move(subscriber.callback_)]() mutable {
         auto result = std::make_unique<ActiveLookupResult>();
@@ -893,6 +950,8 @@ std::shared_ptr<CacheSession> CacheSessionsImpl::getEntry(const Key& key) {
   auto [it, is_new] = entries_.try_emplace(key);
   if (is_new) {
     stats().incCacheSessionsEntries();
+  }
+  if (is_new || it->second->failed()) {
     it->second = std::make_shared<CacheSession>(weak_from_this(), key);
   }
   auto ret = it->second;
