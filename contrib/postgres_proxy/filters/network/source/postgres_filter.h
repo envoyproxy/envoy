@@ -7,6 +7,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/common/rbac/engine.h"
 
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
 #include "contrib/postgres_proxy/filters/network/source/postgres_decoder.h"
@@ -53,7 +54,9 @@ namespace PostgresProxy {
   COUNTER(notices_debug)                                                                           \
   COUNTER(notices_info)                                                                            \
   COUNTER(notices_log)                                                                             \
-  COUNTER(notices_unknown)
+  COUNTER(notices_unknown)                                                                         \
+  COUNTER(authorization_allowed)                                                                   \
+  COUNTER(authorization_denied)
 
 /**
  * Struct definition for all Postgres proxy stats. @see stats_macros.h
@@ -88,6 +91,7 @@ public:
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
+  std::unique_ptr<Filters::Common::RBAC::RoleBasedAccessControlEngine> engine_;
 
 private:
   PostgresProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -131,6 +135,14 @@ public:
   void sendUpstream(Buffer::Instance&) override;
   bool encryptUpstream(bool, Buffer::Instance&) override;
   void verifyDownstreamSSL() override;
+  bool authorizationEnabled() const override { return config_->engine_ != nullptr; }
+  bool authorizeStartup() override;
+  void rejectStartup(absl::string_view log_policy_id) override;
+  bool shouldPassthroughSSL() const override {
+    return config_->downstream_ssl_ == envoy::extensions::filters::network::postgres_proxy::
+                                           v3alpha::PostgresProxy::DISABLE &&
+           !config_->terminate_ssl_;
+  }
 
   void closeConn();
   bool isSwitchedToTls() { return switched_to_tls_; };
