@@ -433,13 +433,83 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   idle_timer->invokeCallback();
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
 
   EXPECT_EQ(1U, stats_.named_.downstream_cx_idle_timeout_.value());
+}
+
+class HttpConnectionManagerIdleDrainTest : public HttpConnectionManagerImplTest {
+protected:
+  // Sends one request, then fires the connection idle timer, which starts the drain sequence.
+  void startIdleDrain() {
+    idle_timeout_ = std::chrono::milliseconds(10);
+    idle_timer_ = setUpTimer();
+    EXPECT_CALL(*idle_timer_, enableTimer(_, _)).Times(testing::AnyNumber());
+    EXPECT_CALL(*idle_timer_, disableTimer()).Times(testing::AnyNumber());
+    setup();
+    sendRequestAndResponse();
+
+    drain_timer_ = setUpTimer();
+    EXPECT_CALL(*drain_timer_, enableTimer(_, _));
+    EXPECT_CALL(*drain_timer_, disableTimer()).Times(testing::AnyNumber());
+    idle_timer_->invokeCallback();
+  }
+
+  void sendRequestAndResponse() {
+    auto* filter = new NiceMock<MockStreamDecoderFilter>();
+    EXPECT_CALL(filter_factory_, createFilterChain(_))
+        .WillOnce([this, filter](FilterChainFactoryCallbacks& callbacks) -> bool {
+          auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+          callbacks.setFilterConfigName("");
+          factory(callbacks);
+          return true;
+        });
+    EXPECT_CALL(*filter, decodeHeaders(_, true))
+        .WillOnce(Return(FilterHeadersStatus::StopIteration));
+    startRequest(true);
+
+    filter->callbacks_->streamInfo().setResponseCodeDetails("");
+    filter->callbacks_->encodeHeaders(
+        ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true, "details");
+    response_encoder_.stream_.codec_callbacks_->onCodecEncodeComplete();
+  }
+
+  void expectCloseOnDrainTimeout(Network::ConnectionCloseType close_type) {
+    EXPECT_CALL(*codec_, goAway());
+    EXPECT_CALL(filter_callbacks_.connection_, close(close_type, _));
+    drain_timer_->invokeCallback();
+  }
+
+  Event::MockTimer* idle_timer_{};
+  Event::MockTimer* drain_timer_{};
+};
+
+TEST_F(HttpConnectionManagerIdleDrainTest, KeepsDelayedCloseWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.http1_skip_delayed_close_on_idle_drain", "false"}});
+  startIdleDrain();
+  expectCloseOnDrainTimeout(Network::ConnectionCloseType::FlushWriteAndDelay);
+}
+
+// The drain timeout writes the final GOAWAY, which the client should get to read.
+TEST_F(HttpConnectionManagerIdleDrainTest, KeepsDelayedCloseForHttp2) {
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
+  startIdleDrain();
+  expectCloseOnDrainTimeout(Network::ConnectionCloseType::FlushWriteAndDelay);
+}
+
+TEST_F(HttpConnectionManagerIdleDrainTest, KeepsDelayedCloseAfterResponseWhileDraining) {
+  startIdleDrain();
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
+      .WillOnce([](const ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ("close", headers.getConnectionValue());
+      });
+  sendRequestAndResponse();
+  expectCloseOnDrainTimeout(Network::ConnectionCloseType::FlushWriteAndDelay);
 }
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionDurationResponseFlag) {
@@ -664,8 +734,7 @@ TEST_F(HttpConnectionManagerImplTest, ConnectionDuration) {
   connection_duration_timer->invokeCallback();
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
@@ -2340,8 +2409,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitter) {
   connection_duration_timer->invokeCallback();
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
@@ -2380,8 +2448,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutJitterZeroPercent) {
   connection_duration_timer->invokeCallback();
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
@@ -2418,8 +2485,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainTimeoutNoJitter) {
   connection_duration_timer->invokeCallback();
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_,
-              close(Network::ConnectionCloseType::FlushWriteAndDelay, _));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite, _));
   EXPECT_CALL(*connection_duration_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();

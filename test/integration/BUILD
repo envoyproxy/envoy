@@ -1787,6 +1787,7 @@ envoy_cc_test(
         "//test/integration/filters:stop_iteration_and_continue",
         "//test/mocks/http:http_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
