@@ -23,6 +23,9 @@ TEST(ReleaseAssertDeathTest, AssertIncludesStackTrace) {
 #ifdef NDEBUG
   GTEST_SKIP() << "optimized build inlines functions so the stack trace won't be reliable";
 #endif
+#ifdef _WIN32
+  GTEST_SKIP() << "Windows inlines releaseAssertInAFunction even in debug builds.";
+#endif
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
   GTEST_SKIP() << "memory sanitizer build inlines functions so the stack trace won't be reliable";
