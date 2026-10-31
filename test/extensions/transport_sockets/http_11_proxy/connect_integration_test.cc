@@ -97,7 +97,9 @@ typed_config:
         addFakeUpstream(upstreamProtocol());
         addFakeUpstream(upstreamProtocol());
       }
-      fake_upstreams_[1]->setDisableAllAndDoNotEnable(true);
+      if (upstream_tls_) {
+        fake_upstreams_[1]->setDisableAllAndDoNotEnable(true);
+      }
       default_proxy_address_ = fake_upstreams_[1]->localAddress();
     }
 
@@ -275,12 +277,11 @@ TEST_P(Http11ConnectHttpIntegrationTest, CleartextRequestResponseWithDefaultProx
   ASSERT_TRUE(fake_upstream_raw_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &observed_data));
   EXPECT_FALSE(absl::StrContains(observed_data, "CONNECT"));
-  EXPECT_TRUE(absl::StrContains(observed_data,
-                                "GET http://sni.lyft.com/test/long/url HTTP/1.1"))
+  EXPECT_TRUE(absl::StrContains(observed_data, "GET http://sni.lyft.com/test/long/url HTTP/1.1"))
       << observed_data;
 
-  ASSERT_TRUE(fake_upstream_raw_connection->write(
-      "HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", false));
+  ASSERT_TRUE(
+      fake_upstream_raw_connection->write("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", false));
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }

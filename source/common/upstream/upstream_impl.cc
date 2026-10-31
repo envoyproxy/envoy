@@ -834,15 +834,15 @@ Host::CreateConnectionData HostImplBase::createConnection(
       (!transport_socket_options || !transport_socket_options->http11ProxyInfo()) &&
       socket_factory.defaultHttp11ProxyInfo().has_value() &&
       *proxy_address.value() == *socket_factory.defaultHttp11ProxyInfo()->proxy_address) {
-    const std::string hostname = host->hostname().empty()
-                                     ? host->address()->asString()
-                                     : absl::StrCat(host->hostname(), ":",
-                                                   host->address()->ip()->port());
+    const std::string hostname =
+        host->hostname().empty()
+            ? host->address()->asString()
+            : absl::StrCat(host->hostname(), ":", host->address()->ip()->port());
     connection_transport_socket_options =
-      std::make_shared<Network::Http11ProxyDecoratingTransportSocketOptions>(
-        Network::TransportSocketOptions::Http11ProxyInfo(
-          hostname, socket_factory.defaultHttp11ProxyInfo()->proxy_address),
-        transport_socket_options);
+        std::make_shared<Network::Http11ProxyDecoratingTransportSocketOptions>(
+            Network::TransportSocketOptions::Http11ProxyInfo(
+                hostname, socket_factory.defaultHttp11ProxyInfo()->proxy_address),
+            transport_socket_options);
   }
 
   Network::ClientConnectionPtr connection;
@@ -892,7 +892,7 @@ Host::CreateConnectionData HostImplBase::createConnection(
     upstream_info->setUpstreamHost(host);
   }
   cluster.createNetworkFilterChain(*connection);
-  return {std::move(connection), std::move(host)};
+  return {std::move(connection), std::move(host), std::move(connection_transport_socket_options)};
 }
 
 void HostImplBase::weight(uint32_t new_weight) { weight_ = std::max(1U, new_weight); }
