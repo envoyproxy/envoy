@@ -23,6 +23,9 @@ bool isRuntimeFeature(absl::string_view feature);
 bool isLegacyRuntimeFeature(absl::string_view feature);
 
 bool runtimeFeatureEnabled(absl::string_view feature);
+// Same as above, for a flag already resolved via RuntimeFeaturesDefaults::get().getFlag(feature).
+// A null flag is reported as an unknown feature.
+bool runtimeFeatureEnabled(absl::CommandLineFlag* flag, absl::string_view feature);
 uint64_t getInteger(absl::string_view feature, uint64_t default_value);
 
 void markRuntimeInitialized();
@@ -48,6 +51,16 @@ private:
 };
 
 using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
+
+// Like runtimeFeatureEnabled(feature), but resolves the flag only once per call site, so hot paths
+// skip the name lookup. The value is still read on every call, so runtime overrides take effect
+// immediately. The feature must be a string literal.
+#define ENVOY_RUNTIME_FEATURE_ENABLED(feature)                                                     \
+  ([]() -> bool {                                                                                  \
+    static absl::CommandLineFlag* const flag =                                                     \
+        ::Envoy::Runtime::RuntimeFeaturesDefaults::get().getFlag(feature);                         \
+    return ::Envoy::Runtime::runtimeFeatureEnabled(flag, feature);                                 \
+  }())
 
 } // namespace Runtime
 } // namespace Envoy

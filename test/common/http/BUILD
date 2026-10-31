@@ -224,7 +224,10 @@ envoy_cc_benchmark_binary(
     srcs = ["filter_manager_benchmark.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:watermark_buffer_lib",
         "//source/common/http:filter_manager_lib",
+        "//source/common/http:header_map_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/local_reply:local_reply_mocks",
@@ -232,6 +235,7 @@ envoy_cc_benchmark_binary(
         "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:test_runtime_lib",
         "@benchmark",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 

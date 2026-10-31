@@ -36,6 +36,10 @@ message RemoveResponseHeadersFilterConfig {
 }
 message WaitForWholeRequestAndResponseFilterConfig {
 }
+message HoldEndStreamFilterConfig {
+}
+message UppercaseBufferFilterConfig {
+}
 message ContinueHeadersOnlyInjectBodyFilterConfig {
 }
 message StopIterationHeadersInjectBodyFilterConfig {

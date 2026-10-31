@@ -242,6 +242,7 @@ protected:
       processing_response_factory_registration_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_1_;
+  envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_2_;
   bool protocol_config_encoded_ = false;
   ProtocolConfiguration protocol_config_;
   uint32_t max_message_timeout_ms_{0};
@@ -250,6 +251,8 @@ protected:
   FakeStreamPtr processor_stream_;
   FakeHttpConnectionPtr processor_connection_1_;
   FakeStreamPtr processor_stream_1_;
+  FakeHttpConnectionPtr processor_connection_2_;
+  FakeStreamPtr processor_stream_2_;
   TestScopedRuntime scoped_runtime_;
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;

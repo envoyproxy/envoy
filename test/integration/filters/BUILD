@@ -359,6 +359,24 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "per_filter_buffer_test_filters_lib",
+    srcs = [
+        "per_filter_buffer_test_filters.cc",
+    ],
+    deps = [
+        ":common_lib",
+        ":test_filters_proto_cc_proto",
+        "//envoy/event:timer_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_test_library(
     name = "add_invalid_data_filter_lib",
     srcs = [
         "add_invalid_data_filter.cc",
