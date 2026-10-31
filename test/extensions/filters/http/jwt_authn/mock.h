@@ -79,12 +79,14 @@ public:
     ON_CALL(*this, getJwtCache()).WillByDefault(::testing::ReturnRef(jwt_cache_));
     ON_CALL(*this, isSubjectAllowed(_)).WillByDefault(::testing::Return(true));
     ON_CALL(*this, isLifetimeAllowed(_, _)).WillByDefault(::testing::Return(true));
+    ON_CALL(*this, isAlgorithmAllowed(_)).WillByDefault(::testing::Return(true));
     ON_CALL(*this, retryPolicy()).WillByDefault(::testing::ReturnRef(retry_policy_));
   }
 
   MOCK_METHOD(bool, areAudiencesAllowed, (const std::vector<std::string>&), (const));
   MOCK_METHOD(bool, isSubjectAllowed, (const absl::string_view), (const));
   MOCK_METHOD(bool, isLifetimeAllowed, (const absl::Time&, const absl::Time*), (const));
+  MOCK_METHOD(bool, isAlgorithmAllowed, (absl::string_view), (const));
   MOCK_METHOD(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&, getJwtProvider,
               (), (const));
   MOCK_METHOD(const std::vector<ClaimToHeader>&, claimsToHeaders, (), (const));

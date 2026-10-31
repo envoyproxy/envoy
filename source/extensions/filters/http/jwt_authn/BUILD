@@ -58,6 +58,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/jwt:jwt_lib",
         "//source/common/router:retry_policy_lib",
+        "@abseil-cpp//absl/container:flat_hash_set",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

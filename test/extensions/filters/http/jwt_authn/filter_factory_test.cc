@@ -80,6 +80,17 @@ TEST(HttpJwtAuthnFilterFactoryTest, ProviderWithoutIssuer) {
   cb(filter_callback);
 }
 
+TEST(HttpJwtAuthnFilterFactoryTest, UnknownAllowedAlgorithm) {
+  JwtAuthentication proto_config;
+  auto& provider = (*proto_config.mutable_providers())["provider"];
+  provider.mutable_local_jwks()->set_inline_string(PublicKey);
+  provider.add_allowed_algorithms("RS256");
+  TestUtility::validate(proto_config);
+
+  provider.add_allowed_algorithms("none");
+  EXPECT_THROW(TestUtility::validate(proto_config), EnvoyException);
+}
+
 TEST(HttpJwtAuthnFilterFactoryTest, EmptyPerRouteConfig) {
   PerRouteConfig per_route;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;

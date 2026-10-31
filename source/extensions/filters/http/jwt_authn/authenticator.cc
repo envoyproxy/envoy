@@ -243,6 +243,11 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
+  if (!jwks_data_->isAlgorithmAllowed(jwt_->alg_)) {
+    doneWithStatus(Status::JwtAlgorithmNotAllowed);
+    return;
+  }
+
   const bool sub_allowed = jwks_data_->isSubjectAllowed(jwt_->sub_);
 
   if (!sub_allowed) {
