@@ -804,6 +804,87 @@ private:
   Api::ApiPtr api_ = Api::createApiForTest();
 };
 
+TEST(DefaultCertValidatorTest, ClientCertificateRequirementWithoutCa) {
+  TestScopedRuntime runtime;
+  testing::StrictMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+  CleanMockCertValidationConfig accept_untrusted("no-ca");
+  const Ssl::CertificateValidationContextConfig* configs[] = {nullptr, &accept_untrusted};
+
+  for (const std::string value : {"", "true", "false", "true"}) {
+    SCOPED_TRACE(value.empty() ? "default" : value);
+    runtime.mergeValues(
+        {{"envoy.reloadable_features.require_client_certificate_without_ca", value}});
+    for (const auto* config : configs) {
+      SCOPED_TRACE(config == nullptr ? "no validation context" : "accept untrusted without CA");
+      for (bool required : {false, true}) {
+        SCOPED_TRACE(required);
+        DefaultCertValidator validator(config, stats, context);
+        bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+        ASSERT_NE(ssl_ctx, nullptr);
+        auto verify_mode =
+            validator.initializeSslContexts({ssl_ctx.get()}, false, *store.rootScope());
+        ASSERT_OK(verify_mode);
+        EXPECT_EQ(config == nullptr ? SSL_VERIFY_NONE : SSL_VERIFY_PEER, verify_mode.value());
+        SSL_CTX_set_verify(ssl_ctx.get(), verify_mode.value(), nullptr);
+
+        ASSERT_OK(validator.addClientValidationContext(ssl_ctx.get(), required));
+
+        EXPECT_EQ(required && value != "false" ? SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT
+                                               : verify_mode.value(),
+                  SSL_CTX_get_verify_mode(ssl_ctx.get()));
+        STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+        if (ca_list != nullptr) {
+          EXPECT_EQ(sk_X509_NAME_num(ca_list), 0);
+        }
+      }
+    }
+  }
+}
+
+TEST(DefaultCertValidatorTest, ClientCertificateRequirementWithCa) {
+  TestScopedRuntime runtime;
+  testing::StrictMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+  const std::string ca_path =
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem");
+  const std::string ca_pem = TestEnvironment::readFileToStringForTest(ca_path);
+  bssl::UniquePtr<X509> ca_cert = readCertFromFile(ca_path);
+  ASSERT_NE(ca_cert, nullptr);
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  TestCertificateValidationContextConfig config(typed_config, false, {}, ca_pem);
+  EXPECT_CALL(context, singletonManager()).Times(testing::AnyNumber());
+
+  for (const std::string value : {"", "true", "false"}) {
+    SCOPED_TRACE(value.empty() ? "default" : value);
+    runtime.mergeValues(
+        {{"envoy.reloadable_features.require_client_certificate_without_ca", value}});
+    for (bool required : {false, true}) {
+      SCOPED_TRACE(required);
+      DefaultCertValidator validator(&config, stats, context);
+      bssl::UniquePtr<SSL_CTX> ssl_ctx(SSL_CTX_new(TLS_method()));
+      ASSERT_NE(ssl_ctx, nullptr);
+      auto verify_mode =
+          validator.initializeSslContexts({ssl_ctx.get()}, false, *store.rootScope());
+      ASSERT_OK(verify_mode);
+      EXPECT_EQ(SSL_VERIFY_PEER, verify_mode.value());
+      SSL_CTX_set_verify(ssl_ctx.get(), verify_mode.value(), nullptr);
+
+      ASSERT_OK(validator.addClientValidationContext(ssl_ctx.get(), required));
+
+      EXPECT_EQ(required ? SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT : SSL_VERIFY_PEER,
+                SSL_CTX_get_verify_mode(ssl_ctx.get()));
+      STACK_OF(X509_NAME)* ca_list = SSL_CTX_get_client_CA_list(ssl_ctx.get());
+      ASSERT_NE(ca_list, nullptr);
+      ASSERT_EQ(sk_X509_NAME_num(ca_list), 1);
+      EXPECT_EQ(X509_NAME_cmp(sk_X509_NAME_value(ca_list, 0), X509_get_subject_name(ca_cert.get())),
+                0);
+    }
+  }
+}
+
 TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   Stats::TestUtil::TestStore store;
