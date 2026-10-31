@@ -22,6 +22,7 @@
 
 using Envoy::Extensions::Clusters::DynamicModules::PersistentHostSet;
 using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::isValidModuleBuffer;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 namespace {
@@ -1180,6 +1181,9 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struc
                         "stream info is not available");
     return false;
   }
+  if (!isValidModuleBuffer(ns) || !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
   return ContextAccessor::setDynamicMetadataStruct(
       *stream_info, absl::string_view(ns.ptr, ns.length),
       absl::string_view(serialized_struct.ptr, serialized_struct.length));
@@ -1196,6 +1200,9 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata
   if (!stream_info) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
                         "stream info is not available");
+    return false;
+  }
+  if (!isValidModuleBuffer(ns) || !isValidModuleBuffer(serialized_any)) {
     return false;
   }
   return ContextAccessor::setDynamicTypedMetadata(

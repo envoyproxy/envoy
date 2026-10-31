@@ -1314,6 +1314,12 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicMetadataStruct) {
   EXPECT_FALSE(envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
       filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
   EXPECT_FALSE(metadata.filter_metadata().contains("empty.ns"));
+
+  // A null pointer with a non-zero length violates the ABI contract and is rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {nullptr, 8}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+      filterPtr(), {nullptr, 8}, {serialized.data(), serialized.size()}));
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicTypedMetadata) {
@@ -1350,6 +1356,12 @@ TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetDynamicTypedMetadata) {
       filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
   EXPECT_TRUE(typed_metadata.at(ns).Is<Protobuf::StringValue>());
   EXPECT_TRUE(typed_metadata.at(ns).value().empty());
+
+  // A null pointer with a non-zero length violates the ABI contract and is rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {nullptr, 8}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+      filterPtr(), {nullptr, 8}, {hello.data(), hello.size()}));
 }
 
 TEST_F(DynamicModuleNetworkFilterAbiCallbackTest, SetAndGetDynamicMetadataNumber) {

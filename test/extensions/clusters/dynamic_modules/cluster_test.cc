@@ -3495,6 +3495,12 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStruct) {
   EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
       context_ptr, ns_buf, {invalid.data(), invalid.size()}));
 
+  // A null pointer with a non-zero length violates the ABI contract and is rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      context_ptr, ns_buf, {nullptr, 8}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      context_ptr, {nullptr, 8}, {serialized.data(), serialized.size()}));
+
   EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
       nullptr, ns_buf, {serialized.data(), serialized.size()}));
   NiceMock<Upstream::MockLoadBalancerContext> no_info_context;
@@ -3532,6 +3538,12 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicTypedMetadata) {
       context_ptr, ns_buf, {nullptr, 0}));
   EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
       context_ptr, ns_buf, {invalid.data(), invalid.size()}));
+
+  // A null pointer with a non-zero length violates the ABI contract and is rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      context_ptr, ns_buf, {nullptr, 8}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      context_ptr, {nullptr, 8}, {serialized.data(), serialized.size()}));
 
   EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
       nullptr, ns_buf, {serialized.data(), serialized.size()}));

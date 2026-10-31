@@ -1042,8 +1042,8 @@ bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
 
-  if (callbacks == nullptr || filter_namespace.ptr == nullptr ||
-      (serialized_struct.ptr == nullptr && serialized_struct.length != 0)) {
+  if (callbacks == nullptr || !isValidModuleBuffer(filter_namespace) ||
+      !isValidModuleBuffer(serialized_struct)) {
     return false;
   }
 
@@ -1059,8 +1059,8 @@ bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
   auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
   auto* callbacks = filter->callbacks();
 
-  if (callbacks == nullptr || filter_namespace.ptr == nullptr ||
-      (serialized_any.ptr == nullptr && serialized_any.length != 0)) {
+  if (callbacks == nullptr || !isValidModuleBuffer(filter_namespace) ||
+      !isValidModuleBuffer(serialized_any)) {
     return false;
   }
 

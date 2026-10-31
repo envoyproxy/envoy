@@ -671,6 +671,9 @@ bool envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer serialized_struct) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (!isValidModuleBuffer(filter_namespace) || !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
   return ContextAccessor::setDynamicMetadataStruct(
       filter->connection().streamInfo(),
       absl::string_view(filter_namespace.ptr, filter_namespace.length),
@@ -682,6 +685,9 @@ bool envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     envoy_dynamic_module_type_module_buffer serialized_any) {
   auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (!isValidModuleBuffer(filter_namespace) || !isValidModuleBuffer(serialized_any)) {
+    return false;
+  }
   return ContextAccessor::setDynamicTypedMetadata(
       filter->connection().streamInfo(),
       absl::string_view(filter_namespace.ptr, filter_namespace.length),

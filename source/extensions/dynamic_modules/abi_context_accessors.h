@@ -15,6 +15,12 @@ namespace DynamicModules {
 
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
 
+// A module buffer is valid when its pointer is non-null or its length is zero. A null pointer with
+// a non-zero length violates the ABI contract, so callbacks reject it instead of dereferencing it.
+inline bool isValidModuleBuffer(envoy_dynamic_module_type_module_buffer buffer) {
+  return buffer.ptr != nullptr || buffer.length == 0;
+}
+
 /**
  * Shared context accessors used by Dynamic Module extensions to expose Envoy request and
  * response state across the C ABI boundary. The access logger and formatter extensions both wrap
