@@ -497,6 +497,14 @@ message OAuth2Config {
   // is set to ``PRIVATE_KEY_JWT``.
   PrivateKeyJwtConfig private_key_jwt_config = 32;
 
+  // If true, the filter first sends the authorization parameters to ``par_endpoint`` (RFC 9126)
+  // and redirects the user with only the returned ``request_uri``. Default is false.
+  bool use_par = 36;
+
+  // Pushed Authorization Request (PAR) endpoint on the authorization server. Required when
+  // ``use_par`` is true.
+  config.core.v3.HttpUri par_endpoint = 35;
+
   // If set, an access, ID or refresh token cookie that is larger than
   // :ref:`max_cookie_size <envoy_v3_api_field_extensions.filters.http.oauth2.v3.TokenCookieChunking.max_cookie_size>`
   // is split across multiple cookies. If not set, every token is written as a single cookie,
