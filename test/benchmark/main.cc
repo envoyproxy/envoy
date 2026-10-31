@@ -48,6 +48,9 @@ int main(int argc, char** argv) {
   }
 
   TestEnvironment::initializeTestMain(argv[0]);
+  // Record the thread running the benchmarks (the first thread of the process) as the test
+  // thread, for platforms that cannot identify it directly.
+  Thread::TestThread::registerTestThread();
 
   // Suppressing non-error messages in benchmark tests. This hides warning
   // messages that appear when using a runtime feature when there isn't an initialized
