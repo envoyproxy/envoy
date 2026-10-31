@@ -432,7 +432,10 @@ bool isLegacyRuntimeFeature(absl::string_view feature) {
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  absl::CommandLineFlag* flag = RuntimeFeaturesDefaults::get().getFlag(feature);
+  return runtimeFeatureEnabled(RuntimeFeaturesDefaults::get().getFlag(feature), feature);
+}
+
+bool runtimeFeatureEnabled(absl::CommandLineFlag* flag, absl::string_view feature) {
   if (flag == nullptr) {
     IS_ENVOY_BUG(absl::StrCat("Unable to find runtime feature ", feature));
     return false;

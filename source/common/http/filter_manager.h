@@ -801,12 +801,12 @@ public:
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue),
-        per_filter_observed_end_stream_(Runtime::runtimeFeatureEnabled(
+        per_filter_observed_end_stream_(ENVOY_RUNTIME_FEATURE_ENABLED(
             "envoy.reloadable_features.filter_manager_per_filter_observed_end_stream")),
-        inject_data_with_state_update_(Runtime::runtimeFeatureEnabled(
+        inject_data_with_state_update_(ENVOY_RUNTIME_FEATURE_ENABLED(
             "envoy.reloadable_features.ext_proc_inject_data_with_state_update")),
         per_filter_buffer_(per_filter_observed_end_stream_ &&
-                           Runtime::runtimeFeatureEnabled(
+                           ENVOY_RUNTIME_FEATURE_ENABLED(
                                "envoy.reloadable_features.filter_manager_per_filter_buffer")),
         request_buffer_tracker_(
             buffer_limit, [this]() -> void { onRequestBufferAboveLimit(); },
