@@ -118,6 +118,35 @@ TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions)
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
+// Validates that internal gRPC async client sets HTTP/2 protocol in StreamOptions by default.
+TEST_F(EnvoyAsyncClientImplTest, Http2ProtocolOptionSetByDefault) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce([](Http::AsyncClient::StreamCallbacks&,
+                   const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+        EXPECT_EQ(opts.protocol, Http::Protocol::Http2);
+        return nullptr;
+      });
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+// Validates that caller-provided protocol option is preserved.
+TEST_F(EnvoyAsyncClientImplTest, CustomProtocolOptionPreserved) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce([](Http::AsyncClient::StreamCallbacks&,
+                   const Http::AsyncClient::StreamOptions& opts) -> Http::AsyncClient::Stream* {
+        EXPECT_EQ(opts.protocol, Http::Protocol::Http3);
+        return nullptr;
+      });
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                          Http::AsyncClient::StreamOptions().setProtocol(Http::Protocol::Http3));
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validates that the HTTP stream keeps the async client default buffer limit when
 // per_stream_buffer_limit_bytes is not configured.
 TEST_F(EnvoyAsyncClientImplTest, PerStreamBufferLimitNotSetByDefault) {

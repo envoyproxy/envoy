@@ -2410,6 +2410,103 @@ TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithValidRouteEntry) {
             metadata_criteria.get());
 }
 
+TEST_F(AsyncClientImplTest, StreamOptionsProtocol) {
+  AsyncClient::Stream* stream = client_.start(
+      stream_callbacks_, AsyncClient::StreamOptions().setProtocol(Http::Protocol::Http2));
+  EXPECT_EQ(stream->streamInfo().protocol(), Http::Protocol::Http2);
+
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
+TEST_F(AsyncClientImplTest, StreamOptionsEquality) {
+  AsyncClient::StreamOptions opts1;
+  AsyncClient::StreamOptions opts2;
+  EXPECT_EQ(opts1, opts2);
+
+  opts1.setProtocol(Http::Protocol::Http2);
+  EXPECT_NE(opts1, opts2);
+
+  opts2.setProtocol(Http::Protocol::Http2);
+  EXPECT_EQ(opts1, opts2);
+}
+
+TEST_F(AsyncClientImplTest, GrpcStreamSetsHttp2Protocol) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.thread_local_cluster_,
+              httpConnPool(_, _, Eq(std::make_optional(Http::Protocol::Http2)), _));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          });
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setContentType("application/grpc");
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  expectResponseHeaders(stream_callbacks_, 200, false);
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  EXPECT_EQ(stream->streamInfo().protocol(), Http::Protocol::Http11);
+
+  stream->sendHeaders(headers, false);
+  EXPECT_EQ(stream->streamInfo().protocol(), Http::Protocol::Http2);
+  stream->sendData(*body, true);
+
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+}
+
+TEST_F(AsyncClientImplTest, NonGrpcStreamRetainsHttp11Protocol) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.thread_local_cluster_,
+              httpConnPool(_, _, Eq(std::make_optional(Http::Protocol::Http11)), _));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(
+          [&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+            callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                                  stream_info_, {});
+            response_decoder_ = &decoder;
+            return nullptr;
+          });
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  EXPECT_CALL(stream_encoder_, encodeHeaders(_, false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  expectResponseHeaders(stream_callbacks_, 200, false);
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+  EXPECT_EQ(stream->streamInfo().protocol(), Http::Protocol::Http11);
+
+  stream->sendHeaders(headers, false);
+  EXPECT_EQ(stream->streamInfo().protocol(), Http::Protocol::Http11);
+  stream->sendData(*body, true);
+
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+}
+
 } // namespace
 
 // Must not be in anonymous namespace for friend to work.
