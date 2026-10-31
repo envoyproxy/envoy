@@ -1,7 +1,10 @@
 #include "source/common/json/wuffs_json/wuffs_json_cursor.h"
 
+#include <cstdint>
+#include <memory>
 #include <string>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
@@ -56,12 +59,61 @@ void appendCodePoint(std::string& out, uint32_t code_point) {
 
 } // namespace
 
+bool WuffsJsonCursor::SeenKeys::insert(absl::string_view key) {
+  if (large_ != nullptr) {
+    return large_->insert(std::string(key)).second;
+  }
+
+  size_t begin = 0;
+  for (const uint32_t end : ends_) {
+    if (absl::string_view(bytes_).substr(begin, end - begin) == key) {
+      return false;
+    }
+    begin = end;
+  }
+
+  if (ends_.size() < kLinearScanLimit) {
+    bytes_.append(key.data(), key.size());
+    ends_.push_back(static_cast<uint32_t>(bytes_.size()));
+    return true;
+  }
+
+  // Too many keys for a scan: move them into a hash set and use that from now on.
+  large_ = std::make_unique<absl::flat_hash_set<std::string>>();
+  large_->reserve(ends_.size() * 2);
+  begin = 0;
+  for (const uint32_t end : ends_) {
+    large_->emplace(bytes_, begin, end - begin);
+    begin = end;
+  }
+  bytes_.clear();
+  ends_.clear();
+  return large_->insert(std::string(key)).second;
+}
+
+void WuffsJsonCursor::SeenKeys::clear() {
+  bytes_.clear();
+  ends_.clear();
+  // Free the hash set so one wide object does not keep it alive for its siblings.
+  large_.reset();
+}
+
 WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
   decoder_ = wuffs_json__decoder::alloc();
   token_buf_ =
       wuffs_base__slice_token__writer(wuffs_base__make_slice_token(token_data_, kTokenBufLen));
   // RFC 8259: JSON-text = ws value ws — trailing whitespace is valid.
   decoder_->set_quirk(WUFFS_JSON__QUIRK_ALLOW_TRAILING_FILLER, 1);
+}
+
+absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
+  // Latch the first error. A failed call can leave token_buf_ and
+  // body_src_pos_ out of step with the chunk, so parsing must not resume.
+  if (!status_.ok()) {
+    return status_;
+  }
+  status_ = feedChunk(chunk, closed);
+  return status_;
 }
 
 // Feeds one body chunk into the Wuffs JSON tokenizer and dispatches tokens
@@ -101,7 +153,7 @@ WuffsJsonCursor::WuffsJsonCursor(Handler& handler) : handler_(handler) {
 //   short_read      — need more input; break and resume on next feed().
 //   short_write     — token_buf_ full; reset ring and retry.
 //   other           — malformed JSON; return InvalidArgumentError.
-absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
+absl::Status WuffsJsonCursor::feedChunk(absl::string_view chunk, bool closed) {
   if (!decoder_) {
     return absl::InternalError("wuffs json: alloc failed");
   }
@@ -193,7 +245,11 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
 
     if (status.repr == nullptr || wuffs_base__status__is_note(&status)) {
       wuffs_done_ = true;
-      if (closed && source_buf.meta.ri < effective_chunk.size()) {
+      // Wuffs reports completion only at the end of a closed source or at the
+      // first non-whitespace byte after the root value, so any unread byte
+      // here is extra data. Reject it even when !closed: the raw body is
+      // forwarded upstream, so skipping it would let unparsed JSON through.
+      if (source_buf.meta.ri < effective_chunk.size()) {
         return absl::InvalidArgumentError("wuffs json: trailing bytes after root value");
       }
       break;
@@ -300,7 +356,7 @@ absl::Status WuffsJsonCursor::handleStringToken(absl::string_view raw, uint64_t 
       // TODO(tyxia): duplicate-key rejection is unconditional. There are 3 popular options
       // here: reject / last-wins / first-wins
       // Adding a configuration option here to enable different options.
-      if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_).second) {
+      if (depth_ < kMaxTrackedDepth && !seen_keys_[depth_].insert(key_buffer_)) {
         return absl::InvalidArgumentError(
             absl::StrCat("wuffs json: duplicate key \"", key_buffer_, "\""));
       }

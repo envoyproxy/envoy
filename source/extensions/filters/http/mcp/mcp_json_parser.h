@@ -200,8 +200,13 @@ private:
   };
   std::stack<NestedContext> context_stack_;
 
-  // Current path tracking
-  std::vector<std::string> path_stack_;
+  // Current path tracking: one frame per open object (root and empty-key
+  // objects included), so StartObject/EndObject always pair up. Each frame
+  // stores the path length to restore on EndObject.
+  struct PathFrame {
+    size_t cache_size_before;
+  };
+  std::vector<PathFrame> path_stack_;
 
   // Track collected fields
   absl::flat_hash_set<std::string> collected_fields_;
