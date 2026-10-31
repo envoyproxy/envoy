@@ -15,6 +15,16 @@
 namespace Envoy {
 namespace DynamicModules {
 
+namespace {
+
+// Envoy treats a null value pointer as "remove the header", so an empty value, including a
+// default-constructed std::string_view, must be passed with a non-null pointer.
+envoy_dynamic_module_type_module_buffer headerValueToModuleBuffer(std::string_view value) {
+  return {value.data() != nullptr ? value.data() : "", value.size()};
+}
+
+} // namespace
+
 // BodyBuffer implementation
 template <envoy_dynamic_module_type_http_body_type Type> class BodyBufferImpl : public BodyBuffer {
 public:
@@ -109,13 +119,13 @@ public:
   void set(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_set_header(
         host_plugin_ptr_, Type, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
-        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+        headerValueToModuleBuffer(value));
   }
 
   void add(std::string_view key, std::string_view value) override {
     envoy_dynamic_module_callback_http_add_header(
         host_plugin_ptr_, Type, envoy_dynamic_module_type_module_buffer{key.data(), key.size()},
-        envoy_dynamic_module_type_module_buffer{value.data(), value.size()});
+        headerValueToModuleBuffer(value));
   }
 
   void remove(std::string_view key) override {
