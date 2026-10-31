@@ -11,6 +11,7 @@
 #include "source/common/json/json_loader.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/extensions/filters/network/ext_authz/ext_authz.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -200,6 +201,159 @@ shadow_mode: true
 stat_prefix: name
   )EOF";
 };
+
+TEST_F(ExtAuthzFilterTest, CheckOnNewConnection) {
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  const auto* receive_before_connect =
+      filter_callbacks_.connection_.stream_info_.filterState()
+          ->getDataReadOnly<StreamInfo::BoolAccessor>("envoy.tcp_proxy.receive_before_connect");
+  ASSERT_NE(nullptr, receive_before_connect);
+  EXPECT_TRUE(receive_before_connect->value());
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) {
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+}
+
+TEST_F(ExtAuthzFilterTest, PreserveReceiveBeforeConnect) {
+  auto receive_before_connect = std::make_shared<StreamInfo::BoolAccessorImpl>(true);
+  filter_callbacks_.connection_.stream_info_.filterState()->setData(
+      "envoy.tcp_proxy.receive_before_connect", receive_before_connect,
+      StreamInfo::FilterState::LifeSpan::Connection);
+  expectConnectionNotClosed();
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_EQ(receive_before_connect.get(), filter_callbacks_.connection_.stream_info_.filterState()
+                                              ->getDataReadOnly<StreamInfo::BoolAccessor>(
+                                                  "envoy.tcp_proxy.receive_before_connect"));
+}
+
+TEST_F(ExtAuthzFilterTest, RejectReceiveBeforeConnectFalse) {
+  auto receive_before_connect = std::make_shared<StreamInfo::BoolAccessorImpl>(false);
+  filter_callbacks_.connection_.stream_info_.filterState()->setData(
+      "envoy.tcp_proxy.receive_before_connect", receive_before_connect,
+      StreamInfo::FilterState::LifeSpan::Connection);
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "ext_authz_bad_state_close"));
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_EQ(receive_before_connect.get(), filter_callbacks_.connection_.stream_info_.filterState()
+                                              ->getDataReadOnly<StreamInfo::BoolAccessor>(
+                                                  "envoy.tcp_proxy.receive_before_connect"));
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+}
+
+TEST_F(ExtAuthzFilterTest, RejectReceiveBeforeConnectWrongType) {
+  auto invalid_state = std::make_shared<ExtAuthzDecisionObject>(ExtAuthzDecisionProto::OK, 0);
+  filter_callbacks_.connection_.stream_info_.filterState()->setData(
+      "envoy.tcp_proxy.receive_before_connect", invalid_state,
+      StreamInfo::FilterState::LifeSpan::Connection);
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::NoFlush, "ext_authz_bad_state_close"));
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_EQ(invalid_state.get(), filter_callbacks_.connection_.stream_info_.filterState()
+                                     ->getDataReadOnly<ExtAuthzDecisionObject>(
+                                         "envoy.tcp_proxy.receive_before_connect"));
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+}
+
+TEST_F(ExtAuthzFilterTest, LeaveReceiveBeforeConnectUntouchedByDefault) {
+  auto receive_before_connect = std::make_shared<StreamInfo::BoolAccessorImpl>(false);
+  filter_callbacks_.connection_.stream_info_.filterState()->setData(
+      "envoy.tcp_proxy.receive_before_connect", receive_before_connect,
+      StreamInfo::FilterState::LifeSpan::Connection);
+  expectConnectionNotClosed();
+  initialize(default_yaml_string_);
+  EXPECT_EQ(receive_before_connect.get(), filter_callbacks_.connection_.stream_info_.filterState()
+                                              ->getDataReadOnly<StreamInfo::BoolAccessor>(
+                                                  "envoy.tcp_proxy.receive_before_connect"));
+}
+
+TEST_F(ExtAuthzFilterTest, SynchronousCheckOnNewConnection) {
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) {
+        callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::OK));
+      }));
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+}
+
+TEST_F(ExtAuthzFilterTest, CancelCheckOnNewConnection) {
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_CALL(*client_, check(_, _, _, _));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  EXPECT_CALL(*client_, cancel());
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  filter_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(ExtAuthzFilterTest, DenyCheckOnNewConnection) {
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) {
+        request_callbacks_ = &callbacks;
+      }));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+}
+
+TEST_F(ExtAuthzFilterTest, FailOpenCheckOnNewConnection) {
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) {
+        callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+      }));
+  expectConnectionNotClosed();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+}
+
+TEST_F(ExtAuthzFilterTest, FailClosedCheckOnNewConnection) {
+  initialize(default_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  config_->setFailModeAllow(false);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) {
+        callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+}
+
+TEST_F(ExtAuthzFilterTest, ShadowCheckOnNewConnection) {
+  initialize(shadow_yaml_string_ + "\ncheck_on_new_connection: true\n");
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) {
+        callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+      }));
+  expectConnectionNotClosed();
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  ASSERT_NE(nullptr, extAuthzDecision());
+  EXPECT_EQ(ExtAuthzDecisionProto::DENIED, extAuthzDecision()->checkResult());
+}
+
+TEST_F(ExtAuthzFilterTest, DisabledCheckOnNewConnection) {
+  initialize(default_yaml_string_ + R"EOF(
+check_on_new_connection: true
+filter_enabled_metadata:
+  filter: test
+  path:
+  - key: enabled
+  value:
+    bool_match: true
+)EOF");
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.disabled").value());
+}
 
 TEST_F(ExtAuthzFilterTest, BadExtAuthzConfig) {
   std::string yaml_string = R"EOF(

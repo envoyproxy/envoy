@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/protobuf/arena_wrapped_proto.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
@@ -98,6 +99,7 @@ public:
         include_tls_session_(config.include_tls_session()),
         send_tls_alert_on_denial_(config.send_tls_alert_on_denial()),
         shadow_mode_(config.shadow_mode()),
+        check_on_new_connection_(config.check_on_new_connection()),
         filter_enabled_metadata_(
             config.has_filter_enabled_metadata()
                 ? std::optional<Matchers::MetadataMatcher>(
@@ -123,6 +125,7 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   bool sendTlsAlertOnDenial() const { return send_tls_alert_on_denial_; }
   bool shadowMode() const { return shadow_mode_; }
+  bool checkOnNewConnection() const { return check_on_new_connection_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
   bool filterEnabledMetadata(const envoy::config::core::v3::Metadata& metadata) const {
     return filter_enabled_metadata_.has_value() ? filter_enabled_metadata_->match(metadata) : true;
@@ -143,6 +146,7 @@ private:
   const bool include_tls_session_;
   const bool send_tls_alert_on_denial_;
   const bool shadow_mode_;
+  const bool check_on_new_connection_;
   const std::optional<Matchers::MetadataMatcher> filter_enabled_metadata_;
   const std::vector<std::string> metadata_context_namespaces_;
   const std::vector<std::string> typed_metadata_context_namespaces_;
@@ -159,7 +163,8 @@ using ConfigSharedPtr = std::shared_ptr<Config>;
  */
 class Filter : public Network::ReadFilter,
                public Network::ConnectionCallbacks,
-               public Filters::Common::ExtAuthz::RequestCallbacks {
+               public Filters::Common::ExtAuthz::RequestCallbacks,
+               protected Logger::Loggable<Logger::Id::filter> {
   using LabelsMap = std::map<std::string, std::string>;
 
 public:
@@ -170,10 +175,7 @@ public:
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
-  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
-    filter_callbacks_ = &callbacks;
-    filter_callbacks_->connection().addConnectionCallbacks(*this);
-  }
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
 
   // Network::ConnectionCallbacks
   void onEvent(Network::ConnectionEvent event) override;
@@ -193,6 +195,7 @@ private:
   // then the filter chain should stop. Otherwise the filter chain can continue to the next filter.
   enum class FilterReturn { Stop, Continue };
   void callCheck();
+  Network::FilterStatus checkAuthorization();
   // Releases the buffered data to the rest of the filter chain.
   void continueFilterChain();
   // Records the authorization decision in FilterState for a subsequent filter to enforce.
