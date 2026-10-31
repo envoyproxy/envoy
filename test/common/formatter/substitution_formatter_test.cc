@@ -3003,6 +3003,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
+}
+
+TEST(SubstitutionFormatterTest, streamInfoFormatterWithUpstreamSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_SESSION_ID");
