@@ -27,11 +27,13 @@
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/tcp_proxy/upstream.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/tcp_proxy/tcp_proxy_test_base.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/buffer/mocks.h"
+#include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -1029,6 +1031,13 @@ TEST_P(TcpProxyTest, ReceiveBeforeConnectBuffersOnEarlyData) {
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_EQ(early_data.size() + 5,
+            filter_->getStreamInfo().getUpstreamBytesMeter()->wireBytesSent());
+  EXPECT_EQ(5, filter_->getStreamInfo().getUpstreamBytesMeter()->wireBytesReceived());
+  EXPECT_EQ(5, filter_->getStreamInfo().getDownstreamBytesMeter()->wireBytesSent());
+  EXPECT_EQ(early_data.size() + 5,
+            filter_->getStreamInfo().getDownstreamBytesMeter()->wireBytesReceived());
 }
 
 TEST_P(TcpProxyTest, ReceiveBeforeConnectEarlyDataWithEndStream) {
@@ -1777,6 +1786,67 @@ TEST_P(TcpProxyTest, AccessLogBytesMeterData) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "4 3 3 4");
+}
+
+TEST_P(TcpProxyTest, AccessLogBytesMeterDataWithHttpUpstream) {
+  setup(1, false, true,
+        accessLogConfig("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+                        "%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED%"));
+  auto tunnel_config = defaultConfig();
+  tunnel_config.mutable_tunneling_config()->set_hostname("host.com:80");
+  TunnelingConfigHelperImpl tunnel_helper(factory_context_.scope(), tunnel_config,
+                                          factory_context_);
+  Filter::UpstreamCallbacks callbacks(filter_.get());
+  testing::StrictMock<Http::MockRequestEncoder> encoder;
+  EXPECT_CALL(encoder, getStream()).WillRepeatedly(ReturnRef(encoder.stream_));
+  EXPECT_CALL(encoder, encodeHeaders(_, false));
+  EXPECT_CALL(encoder, encodeData(_, false))
+      .Times(2)
+      .WillRepeatedly(Invoke([](Buffer::Instance& data, bool) { data.drain(data.length()); }));
+  auto upstream = std::make_unique<HttpUpstream>(callbacks, tunnel_helper, filter_->getStreamInfo(),
+                                                 Http::CodecType::HTTP2);
+  auto* http_upstream = upstream.get();
+  upstream->setRequestEncoder(encoder, false);
+
+  // The HTTP codec owns the shared upstream meter, including framing bytes.
+  const auto& codec_meter = encoder.stream_.bytesMeter();
+  filter_->getStreamInfo().setUpstreamBytesMeter(codec_meter);
+  codec_meter->addWireBytesSent(100);
+  codec_meter->addWireBytesReceived(200);
+
+  Buffer::OwnedImpl early_data("early");
+  filter_->onData(early_data, false);
+  Upstream::HostDescriptionConstSharedPtr host = upstream_hosts_.at(0);
+  filter_->onGenericPoolReady(nullptr, std::move(upstream), host,
+                              upstream_connections_.at(0)->connectionInfoProvider(), nullptr);
+  Buffer::OwnedImpl request("hello");
+  filter_->onData(request, false);
+  Buffer::OwnedImpl response("world");
+  http_upstream->responseDecoder().decodeData(response, false);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "100 200 5 10");
+}
+
+TEST_P(TcpProxyTest, AccessLogBytesMeterDataWithTunnelingDisabled) {
+  auto config = accessLogConfig("%UPSTREAM_WIRE_BYTES_SENT% %UPSTREAM_WIRE_BYTES_RECEIVED% "
+                                "%DOWNSTREAM_WIRE_BYTES_SENT% %DOWNSTREAM_WIRE_BYTES_RECEIVED%");
+  config.mutable_tunneling_config()->set_hostname("host.com:80");
+  filter_callbacks_.connection_.streamInfo().filterState()->setData(
+      DisableTunnelingFilterStateKey, std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+      StreamInfo::FilterState::LifeSpan::Connection);
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl request("hello");
+  filter_->onData(request, false);
+  Buffer::OwnedImpl response("response");
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+  filter_.reset();
+  EXPECT_EQ(access_log_data_, "5 8 8 5");
 }
 
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged with the

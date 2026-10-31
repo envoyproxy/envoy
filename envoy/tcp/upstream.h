@@ -144,6 +144,14 @@ public:
   virtual void encodeData(Buffer::Instance& data, bool end_stream) PURE;
 
   /**
+   * Whether the upstream updates the upstream bytes meter in the downstream StreamInfo.
+   * Implementations returning true must account for both sent and received bytes in that meter.
+   * The TCP proxy will then only update its downstream bytes meter. Implementations returning
+   * false rely on the TCP proxy to account for upstream payload bytes.
+   */
+  virtual bool accountsForUpstreamBytes() const { return false; }
+
+  /**
    * Adds a callback to be called when the data is sent to the kernel.
    * @param cb supplies the callback to be called
    */
