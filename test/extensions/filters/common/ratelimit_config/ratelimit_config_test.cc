@@ -17,6 +17,7 @@
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
@@ -603,9 +604,7 @@ TEST_F(RateLimitConfigTest, HitsAddendFromResponseHeader) {
   EXPECT_EQ(7, descriptors[0].hits_addend_.value());
 }
 
-// Backward compatibility: with no response headers in the context (e.g. the request-time
-// path, where response_headers is nullptr), %RESP(<header>)% resolves to a non-numeric value
-// and the whole descriptor is dropped -- exactly the pre-change behavior.
+// Missing or empty usage is dropped quietly, even without response headers (for example, a reset).
 TEST_F(RateLimitConfigTest, HitsAddendResponseHeaderMissingDropsDescriptor) {
   const std::string yaml = R"EOF(
   rate_limits:
@@ -621,10 +620,21 @@ TEST_F(RateLimitConfigTest, HitsAddendResponseHeaderMissingDropsDescriptor) {
   ASSERT_OK(creation_status_);
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  config_->populateDescriptors(headers_, /*response_headers=*/nullptr, stream_info_, "",
-                               descriptors, /*on_stream_done=*/true);
+  EXPECT_NO_LOGS(config_->populateDescriptors(headers_, /*response_headers=*/nullptr, stream_info_,
+                                              "", descriptors, /*on_stream_done=*/true));
+  EXPECT_NO_LOGS(config_->populateDescriptors(headers_, &response_headers_, stream_info_, "",
+                                              descriptors, /*on_stream_done=*/true));
+  response_headers_.addCopy("x-actual-cost", "");
+  EXPECT_NO_LOGS(config_->populateDescriptors(headers_, &response_headers_, stream_info_, "",
+                                              descriptors, /*on_stream_done=*/true));
 
   EXPECT_EQ(0, descriptors.size());
+
+  // Explicit zero remains valid usage.
+  response_headers_.setCopy(Http::LowerCaseString("x-actual-cost"), "0");
+  config_->populateDescriptors(headers_, &response_headers_, stream_info_, "", descriptors, true);
+  ASSERT_EQ(1, descriptors.size());
+  EXPECT_EQ(0, descriptors[0].hits_addend_.value());
 }
 
 // When the override metadata is missing, the descriptor is still produced without a limit.

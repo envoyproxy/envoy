@@ -2805,7 +2805,10 @@ message RateLimit {
   // requests based on the action with this field set to true. Users should ensure that the rate limit is enforced by the actions
   // applied on the request path, i.e. the ones with this field set to false.
   //
-  // Currently, this is only supported by the HTTP global rate filter.
+  // Supported by HTTP global rate limiting. HTTP local rate limiting supports this only for the
+  // filter's embedded ``rate_limits``, including per-route ``typed_per_filter_config``, and ignores it
+  // for route and virtual-host ``rate_limits``. Local completion updates matching descriptor buckets,
+  // draining over-budget buckets to zero; the default bucket is consumed only on requests.
   bool apply_on_stream_done = 6;
 
   // Descriptor level X-RateLimit headers options which may override the filter level setting.

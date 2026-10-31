@@ -208,6 +208,14 @@ void RateLimitPolicy::populateDescriptors(const Http::RequestHeaderMap& headers,
     const Protobuf::Value hits_addend_value =
         hits_addend_provider_->formatValue({&headers, response_headers}, stream_info);
 
+    // Local replies and responses without a cost may have no completion usage.
+    if (apply_on_stream_done_ &&
+        (hits_addend_value.kind_case() == Protobuf::Value::KIND_NOT_SET ||
+         hits_addend_value.has_null_value() ||
+         (hits_addend_value.has_string_value() && hits_addend_value.string_value().empty()))) {
+      return;
+    }
+
     double hits_addend = 0;
     bool success = true;
 

@@ -58,6 +58,9 @@ FilterConfig::FilterConfig(
               : std::nullopt),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
+      has_stream_done_actions_(
+          std::any_of(config.rate_limits().begin(), config.rate_limits().end(),
+                      [](const auto& rate_limit) { return rate_limit.apply_on_stream_done(); })),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
       enable_retry_after_header_(config.enable_retry_after_header() &&
@@ -154,6 +157,9 @@ bool FilterConfig::enforced() const {
   return filter_enforced_.has_value() ? filter_enforced_->enabled() : false;
 }
 
+Filter::Filter(FilterConfigSharedPtr config)
+    : config_(std::move(config)), used_config_(config_.get()) {}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
@@ -175,7 +181,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   std::vector<RateLimit::Descriptor> descriptors;
   if (used_config_->hasDescriptors()) {
     if (used_config_->hasRateLimitConfigs()) {
-      used_config_->populateDescriptors(headers, decoder_callbacks_->streamInfo(), descriptors);
+      used_config_->populateDescriptors(headers, /*response_headers=*/nullptr,
+                                        decoder_callbacks_->streamInfo(), descriptors,
+                                        /*on_stream_done=*/false);
+      if (used_config_->hasStreamDoneActions()) {
+        // Keep the request headers and the route that owns per-route config for onDestroy().
+        request_headers_ = &headers;
+        route_ = decoder_callbacks_->routeSharedPtr();
+      }
     } else {
       populateDescriptors(descriptors, headers);
     }
@@ -235,6 +248,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
+  // Stream-owned headers outlive onDestroy(), as in the global rate limit filter.
+  response_headers_ = &headers;
   // We can never assume the decodeHeaders() was called before encodeHeaders().
   if (!token_bucket_context_) {
     return Http::FilterHeadersStatus::Continue;
@@ -253,6 +268,25 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+void Filter::onDestroy() {
+  // Only set when the used config's embedded rate limits have apply_on_stream_done entries.
+  if (request_headers_ == nullptr) {
+    return;
+  }
+  std::vector<RateLimit::Descriptor> descriptors;
+  used_config_->populateDescriptors(*request_headers_, response_headers_,
+                                    decoder_callbacks_->streamInfo(), descriptors,
+                                    /*on_stream_done=*/true);
+  if (descriptors.empty()) {
+    return;
+  }
+  if (used_config_->rateLimitPerConnection()) {
+    getPerConnectionRateLimiter().consumeDescriptors(descriptors);
+  } else {
+    used_config_->consumeDescriptors(descriptors);
+  }
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result

@@ -220,6 +220,82 @@ protected:
                    expected_reset);
   }
 
+  // Charges response usage at completion from the filter-level or per-route configuration.
+  void testStreamDoneUsageLimitsSubsequentRequests(bool per_route) {
+    if (per_route) {
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter filter;
+      TestUtility::loadFromYaml(std::string(stream_done_filter_config_), filter);
+      config_helper_.addConfigModifier(
+          [filter](envoy::extensions::filters::network::http_connection_manager::v3::
+                       HttpConnectionManager& hcm) {
+            auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+            (*route->mutable_typed_per_filter_config())[filter.name()] = filter.typed_config();
+          });
+      // The filter-level config is disabled, so only the route's config applies.
+      initializeFilter(R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+)EOF");
+    } else {
+      initializeFilter(std::string(stream_done_filter_config_));
+    }
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response = makeRequest("client");
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(
+        Http::TestResponseHeaderMapImpl{{":status", "200"}, {"x-usage", "5"}}, false);
+    upstream_request_->encodeData(1, true);
+    verifyResponse(std::move(response), "200", 1, "6", "5", "0");
+    // Response usage exhausts the descriptor budget before the next request.
+    sendRateLimitedRequest("6", "0", "1000");
+    EXPECT_EQ(1,
+              test_server_->counter("http_local_rate_limiter.http_local_rate_limit.ok")->value());
+    EXPECT_EQ(
+        1,
+        test_server_->counter("http_local_rate_limiter.http_local_rate_limit.enforced")->value());
+  }
+
+  static constexpr absl::string_view stream_done_filter_config_ =
+      R"EOF(
+name: envoy.filters.http.local_ratelimit
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+  stat_prefix: http_local_rate_limiter
+  token_bucket:
+    max_tokens: 100
+    tokens_per_fill: 1
+    fill_interval: 1000s
+  filter_enabled:
+    default_value:
+      numerator: 100
+  filter_enforced:
+    default_value:
+      numerator: 100
+  enable_x_ratelimit_headers: DRAFT_VERSION_03
+  descriptors:
+  - entries:
+    - key: usage
+      value: service
+    token_bucket:
+      max_tokens: 6
+      tokens_per_fill: 1
+      fill_interval: 1000s
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_key: usage
+        descriptor_value: service
+  - actions:
+    - generic_key:
+        descriptor_key: usage
+        descriptor_value: service
+    apply_on_stream_done: true
+    hits_addend:
+      format: "%RESP(x-usage)%"
+)EOF";
+
   static constexpr absl::string_view filter_config_ =
       R"EOF(
 name: envoy.filters.http.local_ratelimit
@@ -492,6 +568,14 @@ INSTANTIATE_TEST_SUITE_P(
     Protocols, LocalRateLimitFilterIntegrationTest,
     testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParamsWithoutHTTP3()),
     HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(LocalRateLimitFilterIntegrationTest, StreamDoneUsageLimitsSubsequentRequests) {
+  testStreamDoneUsageLimitsSubsequentRequests(/*per_route=*/false);
+}
+
+TEST_P(LocalRateLimitFilterIntegrationTest, PerRouteStreamDoneUsageLimitsSubsequentRequests) {
+  testStreamDoneUsageLimitsSubsequentRequests(/*per_route=*/true);
+}
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DynamicDesciptorsBasicTest) {
   initializeFilter(fmt::format(filter_config_with_blank_value_descriptor_, 20, "false"));
