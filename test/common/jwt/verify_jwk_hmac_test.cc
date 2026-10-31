@@ -5,6 +5,7 @@
 #include "source/common/jwt/verify.h"
 
 #include "test/common/jwt/test_common.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
 
@@ -127,6 +128,84 @@ const std::string JwtTextWithNonExistKid =
     "ImV4cCI6MTUwMTI4MTA1OH0."
     "WFHsFo29tA5_gT_rzm6WheQhCwwBPrRZWFEAWRF9Ym4";
 
+// Two HS256 keys without kid, identified by certificate thumbprint. JWKS keys are tried in order,
+// so a token signed by the second key verifies only if the first is skipped or fails.
+const std::string SymmetricKeyHMACWithThumbprints = R"(
+{
+  "keys": [
+    {
+      "kty": "oct",
+      "alg": "HS256",
+      "kid": "key-a",
+      "x5t#S256": "thumb-s256-a",
+      "x5t": "thumb-a",
+      "k": "LcHQCLETtc_QO4D69zCnQEIAYaZ6BsldibDzuRHE5bI"
+    },
+    {
+      "kty": "oct",
+      "alg": "HS256",
+      "kid": "key-b",
+      "x5t#S256": "thumb-s256-b",
+      "x5t": "thumb-b",
+      "k": "nyeGXUHngW64dyg2EuDs_8x6VGa14Bkrv1SFQwOzKfI"
+    }
+  ]
+}
+)";
+
+// All tokens below have payload
+// {"iss":"https://example.com","sub":"test@example.com","exp":1501281058}
+// and no kid unless the header says otherwise.
+
+// Header:  {"alg":"HS256","typ":"JWT","x5t#S256":"thumb-s256-b"}
+const std::string JwtX5tS256B =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsIng1dCNTMjU2IjoidGh1bWItczI1Ni1iIn0."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0."
+    "ldFlvSOUNVP8Ysp1pit7qq3vZ54AZc4_KucEO_kgQGI";
+
+// Header:  {"alg":"HS256","typ":"JWT","x5t#S256":"thumb-s256-b"}
+const std::string JwtX5tS256BSignedByA =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsIng1dCNTMjU2IjoidGh1bWItczI1Ni1iIn0."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0."
+    "Z638Q0mWPV8uJAsWQakRFL3nBtmculcDpzM0ECT5m28";
+
+// Header:  {"alg":"HS256","typ":"JWT","x5t":"thumb-b"}
+const std::string JwtX5tB =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsIng1dCI6InRodW1iLWIifQ."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0."
+    "vQfhpi14j9gWz8NHjwvMuOuOF5_8vRk5_an_WBO6ebY";
+
+// Header:  {"alg":"HS256","typ":"JWT","x5t":"thumb-b"}
+const std::string JwtX5tBSignedByA =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsIng1dCI6InRodW1iLWIifQ."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0."
+    "0TRzXBCW7037ByvUwwAZz8t6QBQgO5UIJj4DEtV_VlI";
+
+// Header:  {"alg":"HS256","typ":"JWT","x5t#S256":"thumb-s256-b","x5t":"thumb-a"}
+const std::string JwtX5tS256BX5tA =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsIng1dCNTMjU2IjoidGh1bWItczI1Ni1iIiwieDV0IjoidGh1bWItYSJ9."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0."
+    "g0_Va-2izYzo3toqXO26AxhgScDdFqW9BDaIouJU4s8";
+
+// Header:  {"alg":"HS256","typ":"JWT","x5t#S256":"thumb-unknown"}
+const std::string JwtX5tUnknown =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsIng1dCNTMjU2IjoidGh1bWItdW5rbm93biJ9."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0."
+    "HRXbkIliqOs6oSYwnjG-YA1ucx7rm4qk2s2dJdTq3yc";
+
+// Header:  {"alg":"HS256","typ":"JWT","kid":"key-b","x5t#S256":"thumb-s256-a"}
+const std::string JwtKidBX5tA =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleS1iIiwieDV0I1MyNTYiOiJ0aHVtYi1zMjU2LWEifQ."
+    "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+    "ImV4cCI6MTUwMTI4MTA1OH0."
+    "YGeTnzN4YWtVo4nZISFuzTuW5FmVROIkQwwKO_Tu4dk";
+
 class VerifyJwkHmacTest : public testing::Test {
 protected:
   void SetUp() override {
@@ -224,6 +303,76 @@ TEST_F(VerifyJwkHmacTest, OkSymmetricKeyNotKid) {
 
   Jwt jwt;
   EXPECT_EQ(jwt.parseFromString(JwtTextNoKid), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
+}
+
+TEST_F(VerifyJwkHmacTest, X5tS256SelectsKey) {
+  jwks_ = Jwks::createFrom(SymmetricKeyHMACWithThumbprints, Jwks::Type::JWKS);
+  ASSERT_EQ(jwks_->getStatus(), Status::Ok);
+
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtX5tS256B), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
+
+  // Key A is skipped, so a token it signed fails against key B.
+  EXPECT_EQ(jwt.parseFromString(JwtX5tS256BSignedByA), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+TEST_F(VerifyJwkHmacTest, X5tIgnoredWithRuntimeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.jwt_authn_select_key_by_x5t", "false"}});
+  jwks_ = Jwks::createFrom(SymmetricKeyHMACWithThumbprints, Jwks::Type::JWKS);
+  ASSERT_EQ(jwks_->getStatus(), Status::Ok);
+
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtX5tS256BSignedByA), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
+}
+
+TEST_F(VerifyJwkHmacTest, X5tSelectsKey) {
+  jwks_ = Jwks::createFrom(SymmetricKeyHMACWithThumbprints, Jwks::Type::JWKS);
+  ASSERT_EQ(jwks_->getStatus(), Status::Ok);
+
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtX5tB), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
+
+  EXPECT_EQ(jwt.parseFromString(JwtX5tBSignedByA), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwtVerificationFail);
+}
+
+TEST_F(VerifyJwkHmacTest, X5tS256TakesPrecedenceOverX5t) {
+  jwks_ = Jwks::createFrom(SymmetricKeyHMACWithThumbprints, Jwks::Type::JWKS);
+  ASSERT_EQ(jwks_->getStatus(), Status::Ok);
+
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtX5tS256BX5tA), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
+}
+
+TEST_F(VerifyJwkHmacTest, X5tUnknownFail) {
+  jwks_ = Jwks::createFrom(SymmetricKeyHMACWithThumbprints, Jwks::Type::JWKS);
+  ASSERT_EQ(jwks_->getStatus(), Status::Ok);
+
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtX5tUnknown), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::JwksKidAlgMismatch);
+}
+
+TEST_F(VerifyJwkHmacTest, KidTakesPrecedenceOverX5t) {
+  jwks_ = Jwks::createFrom(SymmetricKeyHMACWithThumbprints, Jwks::Type::JWKS);
+  ASSERT_EQ(jwks_->getStatus(), Status::Ok);
+
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtKidBX5tA), Status::Ok);
+  EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
+}
+
+TEST_F(VerifyJwkHmacTest, X5tKeyWithoutThumbprintIsTried) {
+  // The default key set has no thumbprints, so every key is still tried.
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(JwtX5tS256B), Status::Ok);
   EXPECT_EQ(verifyJwt(jwt, *jwks_, 1), Status::Ok);
 }
 

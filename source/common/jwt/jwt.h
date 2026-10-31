@@ -44,6 +44,9 @@ struct Jwt {
   std::string alg_;
   // kid
   std::string kid_;
+  // x5t#S256 and x5t certificate thumbprints
+  std::string x5t_s256_;
+  std::string x5t_;
   // iss
   std::string iss_;
   // audiences

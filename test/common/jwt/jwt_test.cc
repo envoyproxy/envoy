@@ -218,6 +218,32 @@ TEST(JwtParseTest, TestParseHeaderBadFormatKid) {
   ASSERT_EQ(jwt.parseFromString(jwt_text), Status::JwtHeaderBadKid);
 }
 
+TEST(JwtParseTest, TestParseHeaderX5t) {
+  // Header:  {"alg":"RS256","typ":"JWT","x5t#S256":"s256","x5t":"sha1"}
+  const std::string jwt_text =
+      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsIng1dCNTMjU2IjoiczI1NiIsIng1dCI6InNoYTEifQ."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  EXPECT_EQ(jwt.x5t_s256_, "s256");
+  EXPECT_EQ(jwt.x5t_, "sha1");
+}
+
+TEST(JwtParseTest, TestParseHeaderNonStringX5tIgnored) {
+  // Header:  {"alg":"RS256","typ":"JWT","x5t#S256":1,"x5t":true}
+  const std::string jwt_text =
+      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsIng1dCNTMjU2IjoxLCJ4NXQiOnRydWV9."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  EXPECT_EQ(jwt.x5t_s256_, "");
+  EXPECT_EQ(jwt.x5t_, "");
+}
+
 TEST(JwtParseTest, TestParsePayloadBadBase64) {
   /*
    * jwt with payload replaced by
