@@ -158,8 +158,8 @@ private:
 
 class Http11ProxyDecoratingTransportSocketOptions : public TransportSocketOptions {
 public:
-  Http11ProxyDecoratingTransportSocketOptions(
-      Http11ProxyInfo proxy_info, TransportSocketOptionsConstSharedPtr inner_options)
+  Http11ProxyDecoratingTransportSocketOptions(Http11ProxyInfo proxy_info,
+                                              TransportSocketOptionsConstSharedPtr inner_options)
       : proxy_info_(std::move(proxy_info)),
         inner_options_(inner_options ? std::move(inner_options)
                                      : std::make_shared<TransportSocketOptionsImpl>()) {}
