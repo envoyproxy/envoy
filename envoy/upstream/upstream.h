@@ -156,6 +156,7 @@ public:
   struct CreateConnectionData {
     Network::ClientConnectionPtr connection_;
     HostDescriptionConstSharedPtr host_description_;
+    Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   };
 
   // We use an X-macro here to make it easier to verify that all the enum values are accounted for.

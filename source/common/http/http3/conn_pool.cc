@@ -224,7 +224,9 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
         bool auto_connect = false;
         CodecClientPtr codec = std::make_unique<CodecClientProd>(
             CodecType::HTTP3, std::move(data.connection_), data.host_description_,
-            pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions(),
+            pool->dispatcher(), pool->randomGenerator(),
+            data.transport_socket_options_ ? data.transport_socket_options_
+                                           : pool->transportSocketOptions(),
             auto_connect);
         return codec;
       },
