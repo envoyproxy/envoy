@@ -15,6 +15,12 @@ namespace DynamicModules {
 
 using HeadersMapOptConstRef = OptRef<const Http::HeaderMap>;
 
+// A module buffer is valid when its pointer is non-null or its length is zero. A null pointer with
+// a non-zero length violates the ABI contract, so callbacks reject it instead of dereferencing it.
+inline bool isValidModuleBuffer(envoy_dynamic_module_type_module_buffer buffer) {
+  return buffer.ptr != nullptr || buffer.length == 0;
+}
+
 /**
  * Shared context accessors used by Dynamic Module extensions to expose Envoy request and
  * response state across the C ABI boundary. The access logger and formatter extensions both wrap
@@ -127,6 +133,19 @@ public:
   setDynamicMetadataStringBatch(StreamInfo::StreamInfo& stream_info, absl::string_view filter_name,
                                 const envoy_dynamic_module_type_module_key_value_pair* entries,
                                 size_t entries_size);
+
+  // Set dynamic metadata from a serialized google.protobuf.Struct, merging into the named filter
+  // namespace. An empty struct is a no-op and does not create the namespace. Returns false when
+  // the buffer does not parse.
+  static bool setDynamicMetadataStruct(StreamInfo::StreamInfo& stream_info,
+                                       absl::string_view filter_name,
+                                       absl::string_view serialized_struct);
+
+  // Set typed dynamic metadata from a serialized google.protobuf.Any, replacing the entry of the
+  // named filter namespace. Returns false when the buffer does not parse or has no type URL.
+  static bool setDynamicTypedMetadata(StreamInfo::StreamInfo& stream_info,
+                                      absl::string_view filter_name,
+                                      absl::string_view serialized_any);
 
   // Set a string value in filter state. When life_span or stream_sharing is set, it is passed to
   // setData.

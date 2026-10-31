@@ -191,5 +191,68 @@ public:
 
 REGISTER_NETWORK_FILTER_CONFIG_FACTORY(BufferLimitsConfigFactory, "buffer_limits");
 
+class DynamicMetadataFilter : public NetworkFilter {
+public:
+  explicit DynamicMetadataFilter(NetworkFilterHandle& handle) : handle_(handle) {}
+
+  NetworkFilterStatus onNewConnection() override {
+    // A serialized google.protobuf.Struct with "k" set to "v".
+    static constexpr char serialized_struct[] = {0x0a, 0x08, 0x0a, 0x01, 0x6b,
+                                                 0x12, 0x03, 0x1a, 0x01, 0x76};
+    // Stop the chain instead of asserting, since assert is compiled out in opt builds.
+    if (!handle_.setMetadataStruct(
+            "dynamic_modules.struct",
+            std::string_view(serialized_struct, sizeof(serialized_struct))) ||
+        handle_.getMetadataString("dynamic_modules.struct", "k") != "v") {
+      return NetworkFilterStatus::Stop;
+    }
+
+    // A serialized google.protobuf.Any with type URL "t/x" and value 0x01 0x02.
+    static constexpr char serialized_any[] = {0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02};
+    if (!handle_.setTypedMetadata("dynamic_modules.typed",
+                                  std::string_view(serialized_any, sizeof(serialized_any)))) {
+      return NetworkFilterStatus::Stop;
+    }
+
+    // A struct that does not parse and an Any without a type URL are rejected.
+    if (handle_.setMetadataStruct("dynamic_modules.struct", std::string_view("\x0f", 1)) ||
+        handle_.setTypedMetadata("dynamic_modules.typed", {})) {
+      return NetworkFilterStatus::Stop;
+    }
+    return NetworkFilterStatus::Continue;
+  }
+
+  NetworkFilterStatus onRead(NetworkBuffer&, bool) override {
+    return NetworkFilterStatus::Continue;
+  }
+
+  NetworkFilterStatus onWrite(NetworkBuffer&, bool) override {
+    return NetworkFilterStatus::Continue;
+  }
+
+  void onEvent(NetworkConnectionEvent) override {}
+  void onDestroy() override {}
+
+private:
+  NetworkFilterHandle& handle_;
+};
+
+class DynamicMetadataFactory : public NetworkFilterFactory {
+public:
+  std::unique_ptr<NetworkFilter> create(NetworkFilterHandle& handle) override {
+    return std::make_unique<DynamicMetadataFilter>(handle);
+  }
+};
+
+class DynamicMetadataConfigFactory : public NetworkFilterConfigFactory {
+public:
+  std::unique_ptr<NetworkFilterFactory> create(NetworkFilterConfigHandle&,
+                                               std::string_view) override {
+    return std::make_unique<DynamicMetadataFactory>();
+  }
+};
+
+REGISTER_NETWORK_FILTER_CONFIG_FACTORY(DynamicMetadataConfigFactory, "dynamic_metadata");
+
 } // namespace DynamicModules
 } // namespace Envoy

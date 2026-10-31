@@ -544,6 +544,28 @@ func (h *dymNetworkFilterHandle) SetMetadata(metadataNamespace, key string, valu
 	runtime.KeepAlive(strValue)
 }
 
+func (h *dymNetworkFilterHandle) SetMetadataStruct(metadataNamespace string, serializedStruct []byte) bool {
+	ret := C.envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedStruct),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedStruct)
+	return bool(ret)
+}
+
+func (h *dymNetworkFilterHandle) SetTypedMetadata(metadataNamespace string, serializedAny []byte) bool {
+	ret := C.envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+		h.hostPluginPtr,
+		stringToModuleBuffer(metadataNamespace),
+		bytesToModuleBuffer(serializedAny),
+	)
+	runtime.KeepAlive(metadataNamespace)
+	runtime.KeepAlive(serializedAny)
+	return bool(ret)
+}
+
 func (h *dymNetworkFilterHandle) SetSocketOptionInt(
 	level, name int64,
 	state shared.SocketOptionState,

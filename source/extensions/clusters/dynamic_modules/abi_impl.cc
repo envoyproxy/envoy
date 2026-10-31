@@ -22,6 +22,7 @@
 
 using Envoy::Extensions::Clusters::DynamicModules::PersistentHostSet;
 using Envoy::Extensions::DynamicModules::ContextAccessor;
+using Envoy::Extensions::DynamicModules::isValidModuleBuffer;
 using Envoy::Extensions::DynamicModules::MetricRegistry;
 
 namespace {
@@ -1165,6 +1166,48 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
   ContextAccessor::setDynamicMetadataStringBatch(*stream_info, absl::string_view(ns.ptr, ns.length),
                                                  entries, entries_size);
   return true;
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  if (!isValidModuleBuffer(ns) || !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicMetadataStruct(
+      *stream_info, absl::string_view(ns.ptr, ns.length),
+      absl::string_view(serialized_struct.ptr, serialized_struct.length));
+}
+
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  if (context_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* stream_info = getContext(context_envoy_ptr)->requestStreamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  if (!isValidModuleBuffer(ns) || !isValidModuleBuffer(serialized_any)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicTypedMetadata(
+      *stream_info, absl::string_view(ns.ptr, ns.length),
+      absl::string_view(serialized_any.ptr, serialized_any.length));
 }
 
 envoy_dynamic_module_type_cluster_scheduler_module_ptr

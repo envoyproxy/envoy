@@ -264,10 +264,7 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, BufferLimits) {
   tcp_client->close();
 }
 
-TEST_P(DynamicModulesNetworkSdkIntegrationTest, DynamicMetadataBatch) {
-  if (GetParam() != "rust") {
-    GTEST_SKIP() << "the dynamic_metadata filter is only in the rust test module";
-  }
+TEST_P(DynamicModulesNetworkSdkIntegrationTest, DynamicMetadata) {
   initializeSdkFilter("dynamic_metadata");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -276,8 +273,8 @@ TEST_P(DynamicModulesNetworkSdkIntegrationTest, DynamicMetadataBatch) {
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  // The filter sets batch metadata and reads it back on new connection, asserting in the module. A
-  // failure there stops the chain and the upstream never sees data.
+  // The filter sets dynamic metadata and reads the untyped values back on new connection, checking
+  // them in the module. A failure there stops the chain and the upstream never sees data.
   ASSERT_TRUE(tcp_client->write("hello", false));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 

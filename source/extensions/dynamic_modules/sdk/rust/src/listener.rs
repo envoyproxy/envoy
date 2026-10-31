@@ -286,6 +286,21 @@ pub trait EnvoyListenerFilter {
     entries: &'a [(&'a str, &'a str)],
   );
 
+  /// Merge a serialized `google.protobuf.Struct` into a dynamic metadata namespace. Existing
+  /// entries with the same key are overwritten. An empty struct is a no-op and does not create
+  /// the namespace.
+  ///
+  /// Returns true if the struct was merged, false if the buffer does not parse as a
+  /// `google.protobuf.Struct`.
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) -> bool;
+
+  /// Set the `typed_filter_metadata` entry of a namespace from a serialized `google.protobuf.Any`,
+  /// replacing an existing entry.
+  ///
+  /// Returns true if the entry was set, false if the buffer does not parse as a
+  /// `google.protobuf.Any` with a type URL.
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) -> bool;
+
   /// Get the number-typed dynamic metadata value with the given namespace and key value.
   /// Returns None if the metadata is not found or is the wrong type.
   fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
@@ -1083,6 +1098,26 @@ impl EnvoyListenerFilter for EnvoyListenerFilterImpl {
         str_to_module_buffer(namespace),
         entries.as_ptr() as *const abi::envoy_dynamic_module_type_module_key_value_pair,
         entries.len(),
+      )
+    }
+  }
+
+  fn set_dynamic_metadata_struct(&mut self, namespace: &str, serialized_struct: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+        self.raw,
+        str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&mut self, namespace: &str, serialized_any: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+        self.raw,
+        str_to_module_buffer(namespace),
+        crate::bytes_to_module_buffer(serialized_any),
       )
     }
   }

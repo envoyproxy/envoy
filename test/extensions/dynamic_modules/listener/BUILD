@@ -21,8 +21,11 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:listener_no_op",
         "//test/extensions/dynamic_modules/test_data/c:listener_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/cpp:listener_integration_test",
+        "//test/extensions/dynamic_modules/test_data/go:listener_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:listener_integration_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.listener.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [
@@ -84,6 +87,7 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
     ],
 )

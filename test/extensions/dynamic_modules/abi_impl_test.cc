@@ -831,6 +831,13 @@ WEAK_STUB(ClusterLbContextSetDynamicMetadataString,
 WEAK_STUB(ClusterLbContextSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_string_batch(
               nullptr, {nullptr, 0}, nullptr, 0))
+WEAK_STUB(ClusterLbContextSetDynamicMetadataStruct,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+              nullptr, {nullptr, 0}, {nullptr, 0}))
+WEAK_STUB(ClusterLbContextSetDynamicTypedMetadata,
+          envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(nullptr,
+                                                                                      {nullptr, 0},
+                                                                                      {nullptr, 0}))
 WEAK_STUB(ClusterLbGetClusterName,
           envoy_dynamic_module_callback_cluster_lb_get_cluster_name(nullptr, nullptr))
 WEAK_STUB(ClusterLbGetHostsCount,
@@ -1723,6 +1730,12 @@ WEAK_STUB(NetworkSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(nullptr,
                                                                                   {nullptr, 0},
                                                                                   nullptr, 0))
+WEAK_STUB(NetworkSetDynamicMetadataStruct,
+          envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(nullptr, {nullptr, 0},
+                                                                            {nullptr, 0}))
+WEAK_STUB(NetworkSetDynamicTypedMetadata,
+          envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(nullptr, {nullptr, 0},
+                                                                           {nullptr, 0}))
 
 WEAK_STUB(ListenerFilterGetAddressType,
           envoy_dynamic_module_callback_listener_filter_get_address_type(nullptr))
@@ -1736,6 +1749,14 @@ WEAK_STUB(ListenerFilterSetDynamicMetadataNumber,
 WEAK_STUB(ListenerFilterSetDynamicMetadataStringBatch,
           envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_batch(
               nullptr, {nullptr, 0}, nullptr, 0))
+WEAK_STUB(ListenerFilterSetDynamicMetadataStruct,
+          envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(nullptr,
+                                                                                    {nullptr, 0},
+                                                                                    {nullptr, 0}))
+WEAK_STUB(ListenerFilterSetDynamicTypedMetadata,
+          envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(nullptr,
+                                                                                   {nullptr, 0},
+                                                                                   {nullptr, 0}))
 
 WEAK_STUB(HttpAddDynamicMetadataListNumber,
           envoy_dynamic_module_callback_http_add_dynamic_metadata_list_number(nullptr, {nullptr, 0},
