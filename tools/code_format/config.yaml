@@ -94,6 +94,8 @@ paths:
     - source/common/network/listen_socket_impl.cc
     - source/common/network/io_socket_handle_base_impl.cc
     - source/common/network/address_impl.cc
+    # BootstrapExtensionFactory reports configuration errors through its legacy throwing API.
+    - source/common/network/socket_interface_impl.cc
     - source/common/stats/tag_extractor_impl.cc
     - source/common/protobuf/yaml_utility.cc
     - source/common/protobuf/utility.cc
