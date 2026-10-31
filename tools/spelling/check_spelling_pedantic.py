@@ -8,8 +8,10 @@ import math
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
+import time
 
 from functools import partial
 from itertools import chain
@@ -52,6 +54,12 @@ METHOD_DOC = re.compile(r'@(param\s+\w+|return(\s+const)?\s+\w+)')
 # Camel Case splitter
 CAMEL_CASE = re.compile(r'[A-Z]?[a-z]+|[A-Z]+(?=[A-Z]|$)')
 
+# A camel case identifier: letters with a case change after the first one (HeaderMapImpl,
+# HTTPServer, gRPC), as opposed to a capitalised or all-caps word. Bounded by non-letters rather
+# than \b, so the parts of Snake_CamelCase identifiers are found too.
+CAMEL_TOKEN = re.compile(r'(?<![A-Za-z])[A-Za-z]*(?:[a-z][A-Z]|[A-Z][A-Z][a-z])[A-Za-z]*(?![A-Za-z])')
+SHORT_CAMEL = 6
+
 # Base64: we assume base64 encoded data in tests is never mixed with
 # other comments on a single line.
 BASE64 = re.compile(r'^[\s*]+([A-Za-z0-9/+=]{16,})\s*$')
@@ -69,7 +77,7 @@ BIT_FIELDS = re.compile(r'[01]+[XxYy]+')
 AB_FIELDS = re.compile(r'\W([AB]+)\W')
 
 # Matches e.g. FC00::/8 or 2001::abcd/64. Does not match ::1/128, but
-# aspell ignores that anyway.
+# the spell checker ignores that anyway.
 IPV6_ADDR = re.compile(r'(?:\W|^)([A-Fa-f0-9]+:[A-Fa-f0-9:]+/[0-9]{1,3})(?:\W|$)')
 
 # Quoted words: "word", 'word', or *word*.
@@ -116,8 +124,35 @@ SMART_QUOTES = {
     "\u201d": '"',
 }
 
-# Valid dictionary words. Anything else crashes aspell.
+DIGIT = re.compile(r'[0-9]')
+
+# Characters outside ASCII. aspell skipped words outside its charset: a word containing a
+# non-ASCII letter (café, François, CJK text) is skipped whole rather than checked in fragments,
+# while other non-ASCII characters (punctuation, symbols) just separate words. Masking them also
+# keeps hunspell's byte offsets equal to character offsets.
+NON_ASCII_SEPARATOR = re.compile(r'[^\x00-\x7f\w]')
+NON_ASCII_WORD = re.compile(r'\w*[^\x00-\x7f]\w*')
+
+# An apostrophe is only part of a word between letters (doesn't, o'clock). The dictionary lists it
+# as a word character, so quotes around symbols ('#', '\0') and possessives of identifiers
+# (head_'s) would otherwise be checked as words, as aspell never did.
+STRAY_APOSTROPHE = re.compile(r"(?<![A-Za-z])'|'(?![A-Za-z])")
+
+# Anything that looks like a URL, host name, path, email address or string literal with escape
+# sequences: aspell's URL filter skipped these, hunspell has no equivalent. A dot only counts
+# between name parts (example.com, stat name templates like vhost.<name>.vcluster.[<cluster>.]),
+# so sentence punctuation (`woork.)`, `woork...`) does not hide a word from the check.
+URL_LIKE = re.compile(r'\S*(?:://|@|/|\\|[A-Za-z0-9_\-\]>)*]\.[A-Za-z0-9_\[<(*])\S*')
+
+# Valid dictionary words. Anything else is not a word to the spell checker.
 DICTIONARY_WORD = re.compile(r"^[A-Za-z']+$")
+
+# The spell checker: hunspell speaking the ispell pipe protocol. Under bazel these point at the
+# hermetic toolchain's binary and dictionary (see tools/spelling/BUILD); otherwise `hunspell` on
+# PATH with its installed `en_US` dictionary. The dictionary is given to `hunspell -d`, which
+# takes the path without the `.dic` extension.
+HUNSPELL = os.environ.get("HUNSPELL", "hunspell")
+HUNSPELL_DICT = os.environ.get("HUNSPELL_DICT", "en_US").removesuffix(".dic")
 
 DEBUG = 0
 COLOR = True
@@ -141,11 +176,17 @@ def debug1(s):
 
 
 class SpellChecker:
-    """Aspell-based spell checker."""
+    """Hunspell-based spell checker."""
 
     def __init__(self, dictionary_file):
         self.dictionary_file = dictionary_file
-        self.aspell = None
+        self.hunspell = None
+        self.words = set()
+        # Timing, reported with --debug: startup, time spent in the pipe, and the slowest lines.
+        self.startup_seconds = 0.0
+        self.pipe_seconds = 0.0
+        self.pipe_calls = 0
+        self.slowest = []
         self.prefixes = []
         self.suffixes = []
         self.prefix_re = None
@@ -154,57 +195,71 @@ class SpellChecker:
     def start(self):
         words, prefixes, suffixes = self.load_dictionary()
 
+        self.words = set(word.strip() for word in words)
         self.prefixes = prefixes
         self.suffixes = suffixes
 
         self.prefix_re = re.compile(r"(?:\s|^)((%s)-)" % ("|".join(prefixes)), re.IGNORECASE)
         self.suffix_re = re.compile(r"(-(%s))(?:\s|$)" % ("|".join(suffixes)), re.IGNORECASE)
 
-        pws = os.path.realpath(".aspell.en.pws")
-        # Generate aspell personal dictionary.
+        # Generate the personal word list: one word per line.
+        pws = os.path.realpath(".hunspell.en.pws")
         with open(pws, 'w') as f:
-            f.write("personal_ws-1.1 en %d\n" % (len(words)))
-            f.writelines(words)
+            f.write("".join(f"{word.strip()}\n" for word in words))
 
-        # Start an aspell process.
-        aspell_args = ["aspell", "pipe", "--lang=en_US", "--encoding=utf-8", f"--personal={pws}"]
-        self.aspell = subprocess.Popen(
-            aspell_args,
+        started = time.monotonic()
+        hunspell = shutil.which(HUNSPELL)
+        if not hunspell:
+            print(f"hunspell not found: {HUNSPELL}")
+            sys.exit(2)
+
+        # Start a hunspell process speaking the ispell pipe protocol. The environment is
+        # cleared: hunspell also reads DICTIONARY, DICPATH, WORDLIST and $HOME/.hunspell_* if set.
+        hunspell_args = [
+            hunspell, "-a", "-i", "utf-8", "-d", HUNSPELL_DICT, "-p", pws]
+        self.hunspell = subprocess.Popen(
+            hunspell_args,
             bufsize=4096,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            universal_newlines=True)
+            universal_newlines=True,
+            env={})
 
-        # Read the version line that aspell emits on startup.
-        self.aspell.stdout.readline()
+        # Read the version line that hunspell emits on startup.
+        self.hunspell.stdout.readline()
+        self.startup_seconds += time.monotonic() - started
 
     def stop(self):
-        if not self.aspell:
+        if not self.hunspell:
             return
 
-        self.aspell.stdin.close()
-        self.aspell.wait()
-        self.aspell = None
+        self.hunspell.stdin.close()
+        self.hunspell.wait()
+        self.hunspell = None
 
     def check(self, line):
+        # Block comment text keeps its newline; a second, empty line would get its own (empty)
+        # response from hunspell and shift the results for everything after it.
+        line = line.rstrip("\r\n")
         if line.strip() == '':
             return []
 
-        self.aspell.poll()
-        if self.aspell.returncode is not None:
-            print("aspell quit unexpectedly: return code %d" % (self.aspell.returncode))
+        self.hunspell.poll()
+        if self.hunspell.returncode is not None:
+            print("hunspell quit unexpectedly: return code %d" % (self.hunspell.returncode))
             sys.exit(2)
 
-        debug1("ASPELL< %s" % (line))
+        debug1("HUNSPELL< %s" % (line))
 
-        self.aspell.stdin.write(line + os.linesep)
-        self.aspell.stdin.flush()
+        started = time.monotonic()
+        self.hunspell.stdin.write(line + os.linesep)
+        self.hunspell.stdin.flush()
 
         errors = []
         while True:
-            result = self.aspell.stdout.readline().strip()
-            debug1("ASPELL> %s" % (result))
+            result = self.hunspell.stdout.readline().strip()
+            debug1("HUNSPELL> %s" % (result))
 
             # Check for end of results.
             if result == "":
@@ -233,10 +288,21 @@ class SpellChecker:
 
                 errors.append((original, int(o), suggestions))
             else:
-                print("aspell produced unexpected output: %s" % (result))
+                print("hunspell produced unexpected output: %s" % (result))
                 sys.exit(2)
 
+        elapsed = time.monotonic() - started
+        self.pipe_seconds += elapsed
+        self.pipe_calls += 1
+        self.slowest = sorted(self.slowest + [(elapsed, line)], reverse=True)[:10]
+
         return errors
+
+    def report_timing(self, total_seconds):
+        print("Timing: %.1fs total, %.2fs hunspell startup, %.1fs in %d hunspell round trips" %
+              (total_seconds, self.startup_seconds, self.pipe_seconds, self.pipe_calls))
+        for (elapsed, line) in self.slowest:
+            print("  %6.0fms %s" % (elapsed * 1000, line.strip()[:100]))
 
     def load_dictionary(self):
         # Read the custom dictionary.
@@ -253,9 +319,9 @@ class SpellChecker:
         # Allow acronyms and abbreviations to be spelled in lowercase.
         # (e.g. Convert "HTTP" into "HTTP" and "http" which also matches
         # "Http").
-        for word in words:
+        for word in list(words):
             if word.isupper():
-                words += word.lower()
+                words.append(word.lower())
 
         return (words, prefixes, suffixes)
 
@@ -438,7 +504,35 @@ def check_comment(checker, offset, comment):
     if not comment[0].isalnum():
         comment = ' ' + comment[1:]
 
-    errors = checker.check(comment)
+    # URLs, host names, paths, email addresses and escaped string literals are skipped, as aspell
+    # did for us.
+    comment, _ = mask_with_regex(comment, URL_LIKE, 0)
+
+    # Digits separate words (eg SHA256 checks "SHA"), as they did for aspell; hunspell's en_US
+    # dictionary declares them word characters.
+    comment = DIGIT.sub(' ', comment)
+    comment = NON_ASCII_SEPARATOR.sub(' ', comment)
+    comment, _ = mask_with_regex(comment, NON_ASCII_WORD, 0)
+
+    # Check camel case identifiers by their parts up front, rather than letting the whole
+    # identifier fail and splitting it afterwards: hunspell's suggestions for a long unknown word
+    # are expensive (tens of ms) and dominate the run time otherwise. Identifiers in the custom
+    # dictionary are accepted whole, and short ones (WiFi, VoIP, OSes) are still tried whole first,
+    # which is cheap.
+    errors = []
+    for m in CAMEL_TOKEN.finditer(comment):
+        token = m.group(0)
+        if token in checker.words:
+            continue
+        if len(token) <= SHORT_CAMEL and not checker.check(token):
+            continue
+        errors += check_camel_case(checker, (token, m.start(), []))
+    comment, _ = mask_with_regex(comment, CAMEL_TOKEN, 0)
+
+    # After the identifiers are gone, their possessives (RouteAction's) are stray apostrophes.
+    comment = STRAY_APOSTROPHE.sub(' ', comment)
+
+    errors += checker.check(comment)
 
     # Fix up offsets relative to the start of the line vs start of the comment.
     errors = [(w, o + offset, s) for (w, o, s) in errors]
@@ -448,7 +542,9 @@ def check_comment(checker, offset, comment):
 
     errors = [*chain.from_iterable(map(lambda err: check_affix(checker, err), errors))]
 
-    return errors
+    # The identifiers were checked first, so restore source order: printing and fixing errors
+    # assume ascending offsets.
+    return sorted(errors, key=lambda err: err[1])
 
 
 def print_error(file, line_offset, lines, errors):
@@ -725,6 +821,7 @@ def check_file(checker, file, lines, error_handler):
 
 
 def execute(files, dictionary_file, fix):
+    started = time.monotonic()
     checker = SpellChecker(dictionary_file)
     checker.start()
 
@@ -748,6 +845,8 @@ def execute(files, dictionary_file, fix):
                 f.writelines(lines)
 
     checker.stop()
+    if DEBUG > 0:
+        checker.report_timing(time.monotonic() - started)
 
     print(
         "Checked %d file(s) and %d comment(s), found %d error(s)." %
@@ -764,7 +863,9 @@ if __name__ == "__main__":
     except:
         locale.setlocale(locale.LC_ALL, 'C.UTF-8')
 
-    default_dictionary = os.environ["ASPELL_DICT"]
+    default_dictionary = os.environ.get(
+        "SPELLING_DICTIONARY",
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "spelling_dictionary.txt"))
 
     parser = argparse.ArgumentParser(description="Check comment spelling.")
     parser.add_argument(

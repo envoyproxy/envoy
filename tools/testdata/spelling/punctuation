@@ -1,0 +1,3 @@
+// A typo before sentence punctuation is still checked (mistaek.) and so is this one: mistaak...
+// Host names, URLs and stat name templates are skipped: example.com, https://example.com/path
+// and vhost.<name>.vcluster.[<cluster>.]upstream_rq*.
