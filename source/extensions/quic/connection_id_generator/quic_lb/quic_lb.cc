@@ -138,12 +138,9 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
   }
 }
 
-struct KeyAndVersion {
-  std::string encryption_key_;
-  uint8_t configuration_version_;
-};
+} // namespace
 
-absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
+absl::StatusOr<Factory::KeyAndVersion> Factory::getAndValidateKeyAndVersion(
     const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret, Api::Api& api) {
   const auto& secrets = secret.secrets();
 
@@ -184,8 +181,6 @@ absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
 
   return KeyAndVersion{std::move(key), version};
 }
-
-} // namespace
 
 Factory::Factory(
     const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config)
@@ -264,9 +259,13 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
   }
 
   ret->secrets_provider_validation_callback_handle_ = ret->secrets_provider_->addValidationCallback(
-      [&api = context.serverFactoryContext().api()](
+      [&factory = *ret, &api = context.serverFactoryContext().api()](
           const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret)
-          -> absl::Status { return getAndValidateKeyAndVersion(secret, api).status(); });
+          -> absl::Status {
+        auto data_or_result = getAndValidateKeyAndVersion(secret, api);
+        RETURN_IF_NOT_OK_REF(data_or_result.status());
+        return factory.validateKeyAndVersion(data_or_result.value());
+      });
 
   ret->secrets_provider_update_callback_handle_ = ret->secrets_provider_->addUpdateCallback(
       [&factory = *ret, &api = context.serverFactoryContext().api()]() -> absl::Status {
@@ -281,6 +280,16 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
   return ret;
 }
 
+absl::Status Factory::validateKeyAndVersion(const KeyAndVersion& data) const {
+  if (key_and_version_.has_value() &&
+      key_and_version_->configuration_version_ == data.configuration_version_ &&
+      key_and_version_->encryption_key_ != data.encryption_key_) {
+    return absl::InvalidArgumentError(
+        "'encryption_key' cannot change without changing 'configuration_version'");
+  }
+  return absl::OkStatus();
+}
+
 absl::Status Factory::updateSecret(Api::Api& api) {
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret =
       secrets_provider_->secret();
@@ -291,6 +300,13 @@ absl::Status Factory::updateSecret(Api::Api& api) {
   auto data_or_result = getAndValidateKeyAndVersion(*secret, api);
 
   RETURN_IF_NOT_OK_REF(data_or_result.status());
+  RETURN_IF_NOT_OK(validateKeyAndVersion(data_or_result.value()));
+
+  if (key_and_version_.has_value() &&
+      key_and_version_->configuration_version_ == data_or_result->configuration_version_) {
+    return absl::OkStatus();
+  }
+  key_and_version_ = data_or_result.value();
 
   tls_slot_->runOnAllThreads(
       [data = data_or_result.value()](OptRef<QuicLbConnectionIdGenerator::ThreadLocalData> obj) {

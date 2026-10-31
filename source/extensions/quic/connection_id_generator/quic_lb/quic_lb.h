@@ -75,7 +75,16 @@ public:
   getCompatibleConnectionIdWorkerSelector(uint32_t concurrency) override;
 
 private:
+  struct KeyAndVersion {
+    std::string encryption_key_;
+    uint8_t configuration_version_;
+  };
+
+  static absl::StatusOr<KeyAndVersion> getAndValidateKeyAndVersion(
+      const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret, Api::Api& api);
+
   Factory(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config);
+  absl::Status validateKeyAndVersion(const KeyAndVersion& data) const;
   absl::Status updateSecret(Api::Api& api);
 
   const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config config_;
@@ -83,6 +92,7 @@ private:
   Common::CallbackHandlePtr secrets_provider_validation_callback_handle_;
   Common::CallbackHandlePtr secrets_provider_update_callback_handle_;
   ThreadLocal::TypedSlotPtr<QuicLbConnectionIdGenerator::ThreadLocalData> tls_slot_;
+  std::optional<KeyAndVersion> key_and_version_;
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   sock_fprog prog_;
