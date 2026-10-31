@@ -59,9 +59,11 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
 
 absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleClusterConfig::create(
     const std::string& cluster_name, const std::string& cluster_config,
-    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope) {
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
+    bool persistent_host_partitions_allowed) {
   auto config = std::shared_ptr<DynamicModuleClusterConfig>(
-      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope));
+      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope,
+                                     persistent_host_partitions_allowed));
 
   // Resolve all required function pointers from the dynamic module.
 #define RESOLVE_SYMBOL(name, type, member)                                                         \
@@ -161,8 +163,10 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
 
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
-    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")), metrics_(*stats_scope_),
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
+    bool persistent_host_partitions_allowed)
+    : persistent_host_partitions_allowed_(persistent_host_partitions_allowed),
+      stats_scope_(stats_scope.createScope("dynamicmodulescustom.")), metrics_(*stats_scope_),
       cluster_name_(cluster_name), cluster_config_(cluster_config),
       dynamic_module_(std::move(module)) {}
 
@@ -1103,15 +1107,16 @@ DynamicModuleClusterFactory::createClusterWithConfig(
   auto dynamic_module = std::move(load_result->loaded);
 
   // Create the cluster configuration.
-  auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(dynamic_module), server_scope);
+  auto config_or_error =
+      DynamicModuleClusterConfig::create(proto_config.cluster_name(), cluster_config_bytes,
+                                         std::move(dynamic_module), server_scope, is_module_lb);
   if (!config_or_error.ok()) {
     Envoy::Extensions::DynamicModules::incrementLoadFailure(
         server_context, proto_config.cluster_name(),
         Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return config_or_error.status();
   }
-  config_or_error.value()->use_persistent_host_partitions_ =
+  config_or_error.value()->use_persistent_host_partitions_ |=
       proto_config.use_persistent_host_partitions();
 
   // Create the cluster.
