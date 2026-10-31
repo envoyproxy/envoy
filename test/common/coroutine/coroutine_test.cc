@@ -797,6 +797,11 @@ TEST(LeafAwaitableTest, SynchronousCompleteInsideOnStartResumesCleanly) {
   EXPECT_EQ(sum, 1000 * 1001 / 2);
 }
 
+} // namespace
+
+// The backtrace helpers have external linkage so they can be symbolized from the exported symbol
+// table. Builds without full debug info (e.g. Windows fastbuild) do not include internal symbols,
+// and Windows symbolization then reports the nearest preceding public symbol instead of failing.
 ABSL_ATTRIBUTE_NOINLINE Task<absl::StatusOr<std::vector<std::string>>>
 backtraceLevel2(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return std::move(f)();
@@ -811,6 +816,8 @@ ABSL_ATTRIBUTE_NOINLINE Task<absl::StatusOr<std::vector<std::string>>>
 backtraceLevel0(absl::AnyInvocable<std::vector<std::string>()> f) {
   co_return co_await backtraceLevel1(std::move(f));
 }
+
+namespace {
 
 TEST(BacktraceTest, BacktraceWorks) {
   auto exec = std::make_shared<ManualExecutor>();
