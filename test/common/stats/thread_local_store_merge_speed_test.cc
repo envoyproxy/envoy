@@ -62,8 +62,8 @@ public:
     for (size_t i = 0; i < tls_histograms_.size(); ++i) {
       const size_t value_count = i < non_empty_sources_ ? values_per_source_ : 0;
       if (value_count != 0) {
-        // recordValue() uses hist_insert_intscale(..., scale=0). Circllhist normalizes these
-        // values to two significant digits plus an exponent, so the 100-wide steps below map to
+        // The insertion call uses scale zero. The library normalizes values
+        // to two significant digits plus an exponent, so the 100-wide steps below map to
         // distinct buckets for the ranges used by this benchmark. Disjoint sources are separated
         // by 10000, which changes the exponent and keeps their buckets distinct.
         for (size_t value_index = 0; value_index < value_count; ++value_index) {
