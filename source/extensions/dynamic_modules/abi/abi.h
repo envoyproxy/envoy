@@ -4898,6 +4898,40 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_struct is called by the module to
+ * merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing entries
+ * with the same key are overwritten. An empty struct is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_struct is the serialized google.protobuf.Struct owned by the module. Its
+ * pointer may be null only when its length is zero.
+ * @return true if the struct was merged, false if the buffer does not parse as a
+ * google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_typed_metadata is called by the module to set
+ * the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any, replacing
+ * an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_any is the serialized google.protobuf.Any owned by the module. Its pointer
+ * may be null only when its length is zero.
+ * @return true if the entry was set, false if the buffer does not parse as a google.protobuf.Any
+ * with a type URL.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
 // ------------------------------ HTTP Callouts -------------------------------
 
 /**
@@ -6431,6 +6465,41 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_b
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct is called by the
+ * module to merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the dynamic metadata is not accessible or the
+ * buffer does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata is called by the module
+ * to set the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any,
+ * replacing an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the dynamic metadata is not accessible or the buffer
+ * does not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the
@@ -11696,6 +11765,41 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
     envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct merges a serialized
+ * google.protobuf.Struct into the request's dynamic metadata under the given namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the request has no stream info or the buffer
+ * does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata sets the
+ * typed_filter_metadata entry of the request's dynamic metadata under the given namespace from a
+ * serialized google.protobuf.Any, replacing an existing entry.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the request has no stream info or the buffer does
+ * not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 /**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module

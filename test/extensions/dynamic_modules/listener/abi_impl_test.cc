@@ -23,6 +23,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/host.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
@@ -1550,6 +1551,72 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStringBatch
       static_cast<void*>(filter.get()), ns_buf, entries.data(), entries.size());
 }
 
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStruct) {
+  const std::string ns = "test_ns";
+  const auto& metadata = callbacks_.stream_info_.metadata_;
+  // Only the two non-empty structs that parse reach the stream info.
+  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(ns, testing::_)).Times(2);
+
+  // A nested struct round trips into the namespace.
+  Protobuf::Struct nested;
+  (*(*nested.mutable_fields())["outer"].mutable_struct_value()->mutable_fields())["inner"]
+      .set_string_value("value");
+  (*nested.mutable_fields())["key"].set_string_value("old");
+  std::string serialized;
+  ASSERT_TRUE(nested.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {serialized.data(), serialized.size()}));
+  EXPECT_EQ("value", metadata.filter_metadata()
+                         .at(ns)
+                         .fields()
+                         .at("outer")
+                         .struct_value()
+                         .fields()
+                         .at("inner")
+                         .string_value());
+
+  // A later struct overwrites the keys it sets and keeps the others.
+  Protobuf::Struct update;
+  (*update.mutable_fields())["key"].set_string_value("new");
+  ASSERT_TRUE(update.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {serialized.data(), serialized.size()}));
+  EXPECT_EQ("new", metadata.filter_metadata().at(ns).fields().at("key").string_value());
+  EXPECT_TRUE(metadata.filter_metadata().at(ns).fields().contains("outer"));
+
+  // An empty struct does not create the namespace, and a buffer that does not parse as a
+  // google.protobuf.Struct is rejected.
+  const std::string invalid = serialized + '\x0f';
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {"empty_ns", 8}, {nullptr, 0}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
+  EXPECT_FALSE(metadata.filter_metadata().contains("empty_ns"));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullCallbacks) {
+  auto filter = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
+  filter->onAccept(callbacks_);
+  filter->setCallbacksForTest(nullptr);
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      static_cast<void*>(filter.get()), {"test_ns", 7}, {"", 0}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullNamespace) {
+  Protobuf::Struct value;
+  (*value.mutable_fields())["key"].set_string_value("value");
+  std::string serialized;
+  ASSERT_TRUE(value.SerializeToString(&serialized));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {nullptr, 7}, {serialized.data(), serialized.size()}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicMetadataStructNullValue) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+      filterPtr(), {"test_ns", 7}, {nullptr, 8}));
+}
+
 // =============================================================================
 // Tests for set_filter_state.
 // =============================================================================
@@ -1944,18 +2011,42 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetDynamicMetadataNullCallbac
   EXPECT_EQ(0, value_out.length);
 }
 
-TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataSuccess) {
-  char ns[] = "test_ns";
-  char key[] = "key1";
-  char value[] = "value1";
-  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
-  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
-  envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadata) {
+  const std::string ns = "test_ns";
+  const auto& typed_metadata = callbacks_.stream_info_.metadata_.typed_filter_metadata();
+  Protobuf::StringValue payload;
+  Protobuf::Any any;
 
-  EXPECT_CALL(callbacks_.stream_info_, setDynamicMetadata(testing::_, testing::_));
+  // A packed Any round trips into the typed metadata with its type URL preserved.
+  payload.set_value("hello");
+  ASSERT_TRUE(any.PackFrom(payload));
+  std::string hello;
+  ASSERT_TRUE(any.SerializeToString(&hello));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {hello.data(), hello.size()}));
+  Protobuf::StringValue unpacked;
+  ASSERT_TRUE(typed_metadata.at(ns).UnpackTo(&unpacked));
+  EXPECT_EQ("hello", unpacked.value());
 
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(filterPtr(), ns_buf,
-                                                                            key_buf, value_buf);
+  // A later Any replaces the entry even when its value is empty.
+  ASSERT_TRUE(any.PackFrom(Protobuf::StringValue()));
+  std::string empty_value;
+  ASSERT_TRUE(any.SerializeToString(&empty_value));
+  EXPECT_TRUE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {empty_value.data(), empty_value.size()}));
+  EXPECT_TRUE(typed_metadata.at(ns).value().empty());
+
+  // An empty buffer has no type URL, so it is rejected with the same warning as a buffer that
+  // does not parse as a google.protobuf.Any.
+  EXPECT_LOG_CONTAINS("warn", "with a buffer of 0 bytes that is not a google.protobuf.Any", {
+    EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+        filterPtr(), {ns.data(), ns.size()}, {nullptr, 0}));
+  });
+  const std::string invalid = hello + '\x0f';
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {ns.data(), ns.size()}, {invalid.data(), invalid.size()}));
+  EXPECT_TRUE(typed_metadata.at(ns).Is<Protobuf::StringValue>());
+  EXPECT_TRUE(typed_metadata.at(ns).value().empty());
 }
 
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCallbacks) {
@@ -1963,16 +2054,22 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullCa
   filter->onAccept(callbacks_);
   filter->setCallbacksForTest(nullptr);
 
-  char ns[] = "test_ns";
-  char key[] = "key1";
-  char value[] = "value1";
-  envoy_dynamic_module_type_module_buffer ns_buf = {ns, 7};
-  envoy_dynamic_module_type_module_buffer key_buf = {key, 4};
-  envoy_dynamic_module_type_module_buffer value_buf = {value, 6};
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      static_cast<void*>(filter.get()), {"test_ns", 7}, {"", 0}));
+}
 
-  // TODO(wbpcode): this should never happen in practice, but ensure it doesn't crash.
-  envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string(
-      static_cast<void*>(filter.get()), ns_buf, key_buf, value_buf);
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullNamespace) {
+  Protobuf::Any any;
+  ASSERT_TRUE(any.PackFrom(Protobuf::StringValue()));
+  std::string serialized;
+  ASSERT_TRUE(any.SerializeToString(&serialized));
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {nullptr, 7}, {serialized.data(), serialized.size()}));
+}
+
+TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SetDynamicTypedMetadataNullValue) {
+  EXPECT_FALSE(envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+      filterPtr(), {"test_ns", 7}, {nullptr, 8}));
 }
 
 // =============================================================================

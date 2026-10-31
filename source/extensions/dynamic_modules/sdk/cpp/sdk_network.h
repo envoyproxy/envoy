@@ -189,6 +189,23 @@ public:
     setMetadata(ns, key, std::string_view(value));
   }
 
+  /**
+   * Merges a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing entries
+   * with the same key are overwritten. An empty struct is a no-op and does not create the
+   * namespace.
+   * @return true if the struct was merged, false if the buffer does not parse as a
+   * google.protobuf.Struct.
+   */
+  virtual bool setMetadataStruct(std::string_view ns, std::string_view serialized_struct) = 0;
+
+  /**
+   * Sets the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any,
+   * replacing an existing entry.
+   * @return true if the entry was set, false if the buffer does not parse as a google.protobuf.Any
+   * with a type URL.
+   */
+  virtual bool setTypedMetadata(std::string_view ns, std::string_view serialized_any) = 0;
+
   /** Stores an integer socket option for the supplied socket state. */
   virtual void setSocketOptionInt(int64_t level, int64_t name, SocketOptionState state,
                                   int64_t value) = 0;

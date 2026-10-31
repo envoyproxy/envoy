@@ -826,6 +826,20 @@ func (mr *MockNetworkFilterHandleMockRecorder) SetMetadata(metadataNamespace, ke
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetadata", reflect.TypeOf((*MockNetworkFilterHandle)(nil).SetMetadata), metadataNamespace, key, value)
 }
 
+// SetMetadataStruct mocks base method.
+func (m *MockNetworkFilterHandle) SetMetadataStruct(metadataNamespace string, serializedStruct []byte) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetMetadataStruct", metadataNamespace, serializedStruct)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetMetadataStruct indicates an expected call of SetMetadataStruct.
+func (mr *MockNetworkFilterHandleMockRecorder) SetMetadataStruct(metadataNamespace, serializedStruct any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetMetadataStruct", reflect.TypeOf((*MockNetworkFilterHandle)(nil).SetMetadataStruct), metadataNamespace, serializedStruct)
+}
+
 // SetSocketOptionBytes mocks base method.
 func (m *MockNetworkFilterHandle) SetSocketOptionBytes(level, name int64, state shared.SocketOptionState, value []byte) {
 	m.ctrl.T.Helper()
@@ -848,6 +862,20 @@ func (m *MockNetworkFilterHandle) SetSocketOptionInt(level, name int64, state sh
 func (mr *MockNetworkFilterHandleMockRecorder) SetSocketOptionInt(level, name, state, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetSocketOptionInt", reflect.TypeOf((*MockNetworkFilterHandle)(nil).SetSocketOptionInt), level, name, state, value)
+}
+
+// SetTypedMetadata mocks base method.
+func (m *MockNetworkFilterHandle) SetTypedMetadata(metadataNamespace string, serializedAny []byte) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetTypedMetadata", metadataNamespace, serializedAny)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetTypedMetadata indicates an expected call of SetTypedMetadata.
+func (mr *MockNetworkFilterHandleMockRecorder) SetTypedMetadata(metadataNamespace, serializedAny any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTypedMetadata", reflect.TypeOf((*MockNetworkFilterHandle)(nil).SetTypedMetadata), metadataNamespace, serializedAny)
 }
 
 // StartUpstreamSecureTransport mocks base method.

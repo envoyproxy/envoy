@@ -372,6 +372,21 @@ pub trait ClusterLbContext {
     entries: &'a [(&'a str, &'a str)],
   ) -> bool;
 
+  /// Merges a serialized `google.protobuf.Struct` into the request's dynamic metadata under
+  /// `namespace`. Existing entries with the same key are overwritten. An empty struct is a no-op
+  /// and does not create the namespace.
+  ///
+  /// Returns `true` if the struct was merged, `false` if the request has no stream info or the
+  /// buffer does not parse as a `google.protobuf.Struct`.
+  fn set_dynamic_metadata_struct(&self, namespace: &str, serialized_struct: &[u8]) -> bool;
+
+  /// Sets the `typed_filter_metadata` entry of the request's dynamic metadata under `namespace`
+  /// from a serialized `google.protobuf.Any`, replacing an existing entry.
+  ///
+  /// Returns `true` if the entry was set, `false` if the request has no stream info or the buffer
+  /// does not parse as a `google.protobuf.Any` with a type URL.
+  fn set_dynamic_typed_metadata(&self, namespace: &str, serialized_any: &[u8]) -> bool;
+
   /// Creates a per-worker timer on this request's worker dispatcher.
   ///
   /// The worker dispatcher is captured on this load balancer for the duration of host selection,
@@ -2820,6 +2835,26 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
     }
   }
 
+  fn set_dynamic_metadata_struct(&self, namespace: &str, serialized_struct: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&self, namespace: &str, serialized_any: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_any),
+      )
+    }
+  }
+
   fn worker_timer_new(&self) -> Option<Box<dyn EnvoyClusterWorkerTimer>> {
     let raw_ptr =
       unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_new(self.raw_lb) };
@@ -3313,6 +3348,24 @@ mod tests {
       .lock()
       .unwrap()
       .is_empty());
+  }
+
+  // Checks the struct and typed wrappers forward the context, namespace and buffer unchanged.
+  #[test]
+  fn set_dynamic_metadata_struct_and_typed_forward_their_buffers() {
+    let context = ClusterLbContextRef::new(0x1 as _, std::ptr::null_mut());
+
+    assert!(context.set_dynamic_metadata_struct("dec", b"struct-bytes"));
+    assert!(context.set_dynamic_typed_metadata("dec", b"any-bytes"));
+    assert_eq!(
+      *crate::mod_test::MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+        .lock()
+        .unwrap(),
+      vec![
+        ("struct", 0x1, "dec".to_owned(), b"struct-bytes".to_vec()),
+        ("typed", 0x1, "dec".to_owned(), b"any-bytes".to_vec()),
+      ]
+    );
   }
 
   // The stub in `lib_test.rs` maps each priority to a scenario, so this drives the real wrapper's
