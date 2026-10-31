@@ -400,6 +400,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/protobuf",
+        "@abseil-cpp//absl/base:core_headers",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],

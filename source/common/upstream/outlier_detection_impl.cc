@@ -77,8 +77,9 @@ void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
 }
 
 void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
-  external_origin_sr_monitor_.incTotalReqCounter();
-  if (Http::CodeUtility::is5xx(response_code)) {
+  const bool is_5xx = Http::CodeUtility::is5xx(response_code);
+  external_origin_sr_monitor_.incReqCounters(!is_5xx);
+  if (is_5xx) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
     if (!detector) {
       // It's possible for the cluster/detector to go away while we still have a host in use.
@@ -99,7 +100,6 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       detector->onConsecutive5xx(host_.lock());
     }
   } else {
-    external_origin_sr_monitor_.incSuccessReqCounter();
     consecutive_5xx_ = 0;
     consecutive_gateway_failure_ = 0;
   }
@@ -215,7 +215,7 @@ void DetectorHostMonitorImpl::localOriginFailure() {
     // It's possible for the cluster/detector to go away while we still have a host in use.
     return;
   }
-  local_origin_sr_monitor_.incTotalReqCounter();
+  local_origin_sr_monitor_.incReqCounters(false);
   if (++consecutive_local_origin_failure_ ==
       detector->runtime().snapshot().getInteger(
           ConsecutiveLocalOriginFailureRuntime,
@@ -231,8 +231,7 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
     return;
   }
 
-  local_origin_sr_monitor_.incTotalReqCounter();
-  local_origin_sr_monitor_.incSuccessReqCounter();
+  local_origin_sr_monitor_.incReqCounters(true);
 
   resetConsecutiveLocalOriginFailure();
 }
@@ -1013,25 +1012,24 @@ void EventLoggerImpl::setCommonEventParams(envoy::data::cluster::v3::OutlierDete
   TimestampUtil::systemClockToTimestamp(time_source_.systemTime(), *event.mutable_timestamp());
 }
 
-SuccessRateAccumulatorBucket* SuccessRateAccumulator::updateCurrentWriter() {
-  // Right now current is being written to and backup is not. Flush the backup and swap.
-  backup_success_rate_bucket_->success_request_counter_ = 0;
-  backup_success_rate_bucket_->total_request_counter_ = 0;
-
-  current_success_rate_bucket_.swap(backup_success_rate_bucket_);
-
-  return current_success_rate_bucket_.get();
+void SuccessRateAccumulator::updateCurrentWriter() {
+  backup_snapshot_ = counters_.exchange(0, std::memory_order_acq_rel);
+  has_backup_ = true;
 }
 
 std::optional<std::pair<double, uint64_t>> SuccessRateAccumulator::getSuccessRateAndVolume() {
-  if (!backup_success_rate_bucket_->total_request_counter_) {
+  if (!has_backup_ || (backup_snapshot_ & SATURATED_BIT) != 0) {
     return std::nullopt;
   }
 
-  double success_rate = backup_success_rate_bucket_->success_request_counter_ * 100.0 /
-                        backup_success_rate_bucket_->total_request_counter_;
+  const uint64_t total = (backup_snapshot_ >> 32) & 0x7FFFFFFFU;
+  const uint64_t success = backup_snapshot_ & 0x7FFFFFFFU;
+  if (total == 0 || total >= CAPACITY_LIMIT || success > total) {
+    return std::nullopt;
+  }
 
-  return {{success_rate, backup_success_rate_bucket_->total_request_counter_}};
+  const double success_rate = static_cast<double>(success) * 100.0 / static_cast<double>(total);
+  return {{success_rate, total}};
 }
 
 } // namespace Outlier
