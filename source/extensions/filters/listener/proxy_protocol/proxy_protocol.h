@@ -50,7 +50,9 @@ struct LegacyProxyProtocolStats {
 // clang-format off
 #define GENERAL_PROXY_PROTOCOL_STATS(COUNTER)                                         \
   COUNTER(not_found_allowed)                                                          \
-  COUNTER(not_found_disallowed)
+  COUNTER(not_found_disallowed)                                                       \
+  COUNTER(tlv_invalid)                                                                \
+  COUNTER(tlv_missing)
 // clang-format on
 
 struct GeneralProxyProtocolStats {
@@ -123,6 +125,16 @@ public:
   size_t numberOfNeededTlvTypes() const;
 
   /**
+   * Return true if a connection without this type of TLV must be rejected.
+   */
+  bool isTlvTypeRequired(uint8_t type) const;
+
+  /**
+   * Number of TLV types that a connection must carry.
+   */
+  size_t numberOfRequiredTlvTypes() const;
+
+  /**
    * Return true if the type of TLV is needed for pass-through.
    */
   bool isPassThroughTlvTypeNeeded(uint8_t type) const;
@@ -149,6 +161,7 @@ public:
 
 private:
   absl::flat_hash_map<uint8_t, KeyValuePair> tlv_types_;
+  absl::flat_hash_set<uint8_t> required_tlv_types_;
   const bool allow_requests_without_proxy_protocol_;
   const bool pass_all_tlvs_;
   absl::flat_hash_set<uint8_t> pass_through_tlvs_;
@@ -219,6 +232,9 @@ private:
 
   // Store the parsed proxy protocol TLVs.
   Network::ProxyProtocolTLVVector parsed_tlvs_;
+
+  // The required TLV types that were found with a value that could be encoded.
+  absl::flat_hash_set<uint8_t> present_required_tlvs_;
 };
 
 } // namespace ProxyProtocol
