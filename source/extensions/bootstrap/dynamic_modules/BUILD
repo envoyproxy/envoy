@@ -14,8 +14,11 @@ envoy_cc_library(
     srcs = ["extension_config.cc"],
     hdrs = ["extension_config.h"],
     deps = [
+        "//envoy/common:callback",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:async_client_interface",
+        "//envoy/secret:secret_manager_interface",
+        "//envoy/secret:secret_provider_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/server:listener_manager_interface",
         "//envoy/stats:stats_interface",
