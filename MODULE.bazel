@@ -159,7 +159,7 @@ single_version_override(
 #
 # git_override(
 #     module_name = "envoy_toolshed",
-#     commit = "4c200b2990500e3bebf3f202e096894a957a1876",
+#     commit = "59c5214fb81d351d2a236cdc901e770f923607e3",
 #     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
 # )
