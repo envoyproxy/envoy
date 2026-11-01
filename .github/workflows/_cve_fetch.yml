@@ -54,6 +54,7 @@ jobs:
       run: |
         bazel run --config=ci --config=cves //tools/dependency:cves.update \
           --action_env=CVE_UPDATE_NONCE="$(date +%s%N)" \
+          --action_env=GITHUB_TOKEN \
           ${OVERWRITE_ALL_CVE_DATA:+--action_env=OVERWRITE_ALL_CVE_DATA=1}
     - name: Upload (sync) to GCS bucket
       run: |
