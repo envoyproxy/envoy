@@ -3648,6 +3648,10 @@ WEAK_STUB(envoy_dynamic_module_type_host_health,
           envoy_dynamic_module_callback_health_checker_get_host_health,
           envoy_dynamic_module_type_host_health_Unhealthy,
           envoy_dynamic_module_type_health_checker_session_envoy_ptr)
+
+WEAK_STUB(bool, envoy_dynamic_module_callback_health_checker_set_health_metadata, false,
+          envoy_dynamic_module_type_health_checker_session_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer, envoy_dynamic_module_type_module_buffer)
 #undef WEAK_STUB
 #undef WEAK_STUB_VOID
 

@@ -16640,6 +16640,29 @@ bool envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(
 envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_health_checker_get_host_health(
     envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_health_checker_set_health_metadata attaches a string key/value pair
+ * to the result of the health check currently in flight for the session. The accumulated pairs
+ * replace the host's health check metadata when the check resolves (a reported result or a
+ * timeout), so each check starts with an empty set. Envoy forwards the metadata to the management
+ * server in the HDS EndpointHealth.health_metadata field. Setting an existing key overwrites it.
+ *
+ * The key ``http_status_code`` is reserved for the HTTP health checker and is rejected.
+ *
+ * This must be called on the main thread during
+ * envoy_dynamic_module_on_health_checker_session_on_interval. The metadata applies to the check
+ * started by that interval, including when the check later times out.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param key is the metadata key. Envoy copies it.
+ * @param value is the metadata value. Envoy copies it.
+ * @return true if the pair was stored, false if the session pointer is null, the key is empty or
+ * reserved, or a buffer is invalid.
+ */
+bool envoy_dynamic_module_callback_health_checker_set_health_metadata(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
 // =============================================================================
 // ============================ Cluster Specifier ==============================
 // =============================================================================
