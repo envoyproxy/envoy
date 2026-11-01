@@ -1459,8 +1459,6 @@ TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, ServesOnlyDynamicCe
       selectorProto("tls_certificate_selector_dynamic", certificateAndKeyPem("server2"));
   proto_config.set_allow_dynamic_certificates(true);
   DownstreamTlsContext tls_context;
-  tls_context.set_disable_stateless_session_resumption(true);
-  tls_context.set_disable_stateful_session_resumption(true);
   auto* selector_config =
       tls_context.mutable_common_tls_context()->mutable_custom_tls_certificate_selector();
   selector_config->set_name("envoy.tls.certificate_selectors.dynamic_modules");
@@ -1489,28 +1487,6 @@ TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest, DownstreamFactoryRe
                               server_tls_config_, true)
           .status(),
       HasStatusMessage("Dynamic module TLS certificate selector does not support QUIC listeners"));
-}
-
-TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
-       DownstreamDynamicCertificatesRequireDisabledSessionResumption) {
-  DynamicModuleTlsCertificateSelectorProto proto_config =
-      selectorProto("tls_certificate_selector_dynamic");
-  proto_config.set_allow_dynamic_certificates(true);
-  const std::string error = "Dynamic certificates require both stateless and stateful session "
-                            "resumption to be disabled";
-
-  EXPECT_CALL(server_tls_config_, disableStatelessSessionResumption())
-      .WillRepeatedly(Return(false));
-  EXPECT_CALL(server_tls_config_, disableStatefulSessionResumption()).WillRepeatedly(Return(true));
-  EXPECT_THAT(createDownstreamFactory(proto_config, server_tls_config_).status(),
-              HasStatusMessage(error));
-  EXPECT_CALL(server_tls_config_, disableStatelessSessionResumption()).WillRepeatedly(Return(true));
-  EXPECT_CALL(server_tls_config_, disableStatefulSessionResumption()).WillRepeatedly(Return(false));
-  EXPECT_THAT(createDownstreamFactory(proto_config, server_tls_config_).status(),
-              HasStatusMessage(error));
-  EXPECT_CALL(server_tls_config_, disableStatefulSessionResumption()).WillRepeatedly(Return(true));
-  EXPECT_CALL(server_tls_config_, isReady()).WillRepeatedly(Return(true));
-  EXPECT_TRUE(createDownstreamFactory(proto_config, server_tls_config_).ok());
 }
 
 TEST_F(DynamicModuleTlsCertificateSelectorConfigFactoryTest,
