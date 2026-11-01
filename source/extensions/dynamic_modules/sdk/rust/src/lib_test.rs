@@ -12552,6 +12552,7 @@ const STUB_ROUTE_HEADERS: [(&[u8], &[u8]); 2] = [(b":path", b"/index"), (b"env",
 const STUB_ROUTE_VALUE: &str = "route-value";
 const STUB_ROUTE_RANDOM_VALUE: u64 = 0x1234;
 const STUB_ROUTE_TEMPLATE_ID: &str = "canary";
+const STUB_ROUTE_VIRTUAL_CLUSTER: &str = "rides";
 
 // Toggles that let a single test drive both the found and the not-found branch of a callback.
 static STUB_ROUTE_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
@@ -12587,6 +12588,7 @@ struct StubRouteDecision {
   )>,
   host: Option<String>,
   route_name: Option<String>,
+  virtual_cluster: Option<String>,
   request_headers: Vec<(
     String,
     String,
@@ -12622,6 +12624,7 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     prefix_rewrite_rule: None,
     host: None,
     route_name: None,
+    virtual_cluster: None,
     request_headers: Vec::new(),
     removed_request_headers: Vec::new(),
     response_headers: Vec::new(),
@@ -13403,6 +13406,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_name(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  virtual_cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let virtual_cluster = unsafe { stub_specifier_string(virtual_cluster_name) };
+  if !virtual_cluster.is_empty() && virtual_cluster != STUB_ROUTE_VIRTUAL_CLUSTER {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().virtual_cluster = Some(virtual_cluster);
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_add_request_header(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
   key: abi::envoy_dynamic_module_type_module_buffer,
@@ -14039,6 +14055,13 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_host(""));
   assert!(ctx.set_route_name("module_route"));
   assert!(!ctx.set_route_name(""));
+  assert!(!ctx.set_virtual_cluster("unknown"));
+  assert!(ctx.set_virtual_cluster(""));
+  assert_eq!(
+    Some(String::new()),
+    STUB_ROUTE_DECISION.lock().unwrap().virtual_cluster.clone()
+  );
+  assert!(ctx.set_virtual_cluster(STUB_ROUTE_VIRTUAL_CLUSTER));
   assert!(ctx.add_request_header(
     "x-add",
     "value",
@@ -14115,6 +14138,10 @@ fn test_route_specifier_context_records_decision() {
   );
   assert_eq!(Some("example.com".to_string()), decision.host);
   assert_eq!(Some("module_route".to_string()), decision.route_name);
+  assert_eq!(
+    Some(STUB_ROUTE_VIRTUAL_CLUSTER.to_string()),
+    decision.virtual_cluster
+  );
   assert_eq!(
     vec![(
       "x-add".to_string(),
