@@ -768,11 +768,12 @@ public:
         TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
 
     // Log the dynamic-metadata values the cluster writes during host selection, including the two
-    // strings written by the batch setter.
+    // strings written by the batch setter and the one merged in by the struct setter.
     useAccessLog("%DYNAMIC_METADATA(dynamic_modules.test:number_key)% "
                  "%DYNAMIC_METADATA(dynamic_modules.test:string_key)% "
                  "%DYNAMIC_METADATA(dynamic_modules.test:l1_decision)% "
-                 "%DYNAMIC_METADATA(dynamic_modules.test:l2_selector)%");
+                 "%DYNAMIC_METADATA(dynamic_modules.test:l2_selector)% "
+                 "%DYNAMIC_METADATA(dynamic_modules.test:k)%");
 
     // Replace cluster_0 with a dynamic-module cluster whose Rust load balancer
     // sets dynamic metadata on the request during host selection.
@@ -820,7 +821,7 @@ TEST_P(DynamicModuleClusterDynamicMetadataIntegrationTest, SetsDynamicMetadataDu
   EXPECT_EQ("200", response->headers().getStatusValue());
 
   const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_EQ("1234 test_value resolved dicer", log);
+  EXPECT_EQ("1234 test_value resolved dicer v", log);
 }
 
 // =============================================================================
