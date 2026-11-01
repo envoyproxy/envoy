@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v3/certs.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
@@ -148,6 +150,20 @@ public:
         makeSslClientConnection(ClientSslTransportOptions().setSni(server_name));
     connection->connect();
     return connection;
+  }
+
+  // Flushes the stats every 100 milliseconds, since a flush updates the server statistics of the
+  // certificates.
+  void flushStatsOften() {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.mutable_stats_flush_interval()->set_nanos(100 * 1000 * 1000);
+    });
+  }
+
+  // Waits for a stats flush that sets the expiration of the first OCSP response to a matching
+  // value.
+  void waitForOcspResponseExpiration(testing::Matcher<uint64_t> matcher) {
+    test_server_->waitForGauge("server.seconds_until_first_ocsp_response_expiring", matcher);
   }
 
   // Serves the validation context of the listener from a file over SDS.
@@ -348,6 +364,68 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, StaplesDynamicCertifi
   codec_client_->close();
 }
 
+// The expiration of the first OCSP response resets once the module replaces the only certificate
+// with an OCSP response by one without.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       ReplacingStapledCertificateResetsOcspResponseExpiration) {
+  flushStatsOften();
+  initializeWithDynamicCertificates(
+      {dynamicCertificate("prefetch", "ocsp.lyft.com", "server", true),
+       dynamicCertificate("hold", "ocsp.lyft.com", "server")});
+  waitForOcspResponseExpiration(testing::Gt(0));
+  // The module provides the held certificate when the release name is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("release.lyft.com"));
+  waitForOcspResponseExpiration(testing::Eq(0));
+}
+
+// The expiration of the first OCSP response resets once the module removes the only certificate
+// with an OCSP response.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       RemovingStapledCertificateResetsOcspResponseExpiration) {
+  flushStatsOften();
+  initializeWithDynamicCertificates(
+      {dynamicCertificate("prefetch", "ocsp.lyft.com", "server", true)});
+  waitForOcspResponseExpiration(testing::Gt(0));
+  // The module removes the certificate whose name follows the "remove." prefix.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("remove.ocsp.lyft.com"));
+  waitForOcspResponseExpiration(testing::Eq(0));
+}
+
+// The dynamic certificates are listed by /certs without the trusted certificate, which only the TLS
+// context lists, and the selector tracks them in its stats.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ReportsDynamicCertificates) {
+  DISABLE_IF_ADMIN_DISABLED;
+  initializeWithDynamicCertificates({dynamicCertificate("prefetch", "prefetch.lyft.com", "server2"),
+                                     dynamicCertificate("hold", "hold.lyft.com", "server2")});
+  test_server_->waitForGauge(listenerStatPrefix("dynamic_certificates.active"), testing::Eq(1));
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "GET", "/certs", "", downstreamProtocol(), version_);
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Only the dynamic certificate is for lyft2.com.
+  EXPECT_THAT(response->body(), testing::HasSubstr("lyft2.com"));
+  envoy::admin::v3::Certificates certificates;
+  TestUtility::loadFromJson(response->body(), certificates);
+  EXPECT_EQ(2, certificates.certificates_size());
+  EXPECT_EQ(1, std::count_if(certificates.certificates().begin(), certificates.certificates().end(),
+                             [](const envoy::admin::v3::Certificate& certificate) {
+                               return !certificate.ca_cert().empty();
+                             }));
+
+  Network::ClientConnectionPtr connection = startHandshake("hold.lyft.com");
+  waitForModuleCounter("requested", 1, dispatcher_.get());
+  EXPECT_EQ(1U, test_server_->gauge(listenerStatPrefix("dynamic_certificates.pending"))->value());
+  connection->close(Network::ConnectionCloseType::NoFlush);
+
+  // The module provides the held certificate when the release name is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("release.lyft.com"));
+  test_server_->waitForGauge(listenerStatPrefix("dynamic_certificates.pending"), testing::Eq(0));
+  test_server_->waitForGauge(listenerStatPrefix("dynamic_certificates.active"), testing::Eq(2));
+  EXPECT_EQ(2U,
+            test_server_->counter(listenerStatPrefix("dynamic_certificates.requested"))->value());
+  EXPECT_EQ(2U,
+            test_server_->counter(listenerStatPrefix("dynamic_certificates.provided"))->value());
+}
+
 class DynamicModuleUpstreamTlsCertificateSelectorIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
@@ -458,6 +536,8 @@ TEST_P(DynamicModuleUpstreamTlsCertificateSelectorIntegrationTest, ServesDynamic
                          {});
   expectClientCertificate(TEST_CLIENT_ECDSA_CERT_HASH, default_request_headers_);
   test_server_->waitForCounter("dynamicmodulescustom.requested", testing::Eq(1));
+  test_server_->waitForCounter("cluster.cluster_0.dynamic_certificates.provided", testing::Eq(1));
+  test_server_->waitForGauge("cluster.cluster_0.dynamic_certificates.active", testing::Eq(1));
 }
 
 } // namespace
