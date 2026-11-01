@@ -40,6 +40,8 @@ public:
   MOCK_METHOD(void, onRefreshAccessTokenSuccess,
               (const std::string&, const std::string&, const std::string&, std::chrono::seconds));
   MOCK_METHOD(Http::FilterHeadersStatus, onRefreshAccessTokenFailure, ());
+  MOCK_METHOD(void, onPushAuthorizationRequestSuccess, ());
+  MOCK_METHOD(void, onPushAuthorizationRequestFailure, ());
 };
 
 class OAuth2ClientTest : public testing::Test {
@@ -236,7 +238,7 @@ TEST_F(OAuth2ClientTest, PushAuthorizationRequestSuccess) {
   client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
   EXPECT_EQ(1, callbacks_.size());
   EXPECT_EQ(OAuthState::PendingPushedAuthorizationRequest, client_->getState());
-  EXPECT_CALL(*mock_callbacks_, handleOAuthFailure(_, _)).Times(0);
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestSuccess());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -269,8 +271,7 @@ TEST_F(OAuth2ClientTest, PushAuthorizationRequestMissingRequestUri) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, handleOAuthFailure(_, _))
-      .WillOnce(Return(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestFailure());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
@@ -289,8 +290,7 @@ TEST_F(OAuth2ClientTest, PushAuthorizationRequestHttpFailure) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_CALL(*mock_callbacks_, handleOAuthFailure(_, _))
-      .WillOnce(Return(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestFailure());
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
   }));

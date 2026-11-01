@@ -1837,6 +1837,15 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   decoder_callbacks_->continueDecoding();
 }
 
+void OAuth2Filter::onPushAuthorizationRequestSuccess() {
+  // TODO: send the redirect with client_id and request_uri (redirect work is in progress).
+  sendServiceUnavailableResponse("PAR redirect is not implemented yet");
+}
+
+void OAuth2Filter::onPushAuthorizationRequestFailure() {
+  sendUnauthorizedResponse("Failed to push authorization request");
+}
+
 Http::FilterHeadersStatus OAuth2Filter::onRefreshAccessTokenFailure() {
   config_->stats().oauth_refreshtoken_failure_.inc();
   // We failed to get an access token via the refresh token. Forward the request based on the

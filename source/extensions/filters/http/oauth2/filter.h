@@ -485,6 +485,8 @@ public:
                                    std::chrono::seconds expires_in) override;
 
   Http::FilterHeadersStatus onRefreshAccessTokenFailure() override;
+  void onPushAuthorizationRequestSuccess() override;
+  void onPushAuthorizationRequestFailure() override;
 
   // Handles unauthorized requests by checking allow_failed_matcher and either continuing
   // the request as unauthorized (if matcher matches) or sending an unauthorized response.

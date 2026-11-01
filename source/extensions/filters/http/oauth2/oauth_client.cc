@@ -319,7 +319,10 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   // Check that the auth cluster returned a happy response.
   const absl::string_view response_code = message->headers().getStatusValue();
 
-  if (response_code != "200") {
+  // RFC 9126 section 2.2: a successful PAR response is 201 Created.
+  const bool is_par_success =
+      oldState == OAuthState::PendingPushedAuthorizationRequest && response_code == "201";
+  if (response_code != "200" && !is_par_success) {
     const std::string response_body = message->bodyAsString();
     ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
                             "Oauth response code: {}", response_code);
@@ -335,9 +338,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
       handleRefreshTokenFailure(is_request_dispatched);
       break;
     case OAuthState::PendingPushedAuthorizationRequest:
-      handleOAuthFailure(
-          is_request_dispatched, "Failed to push authorization request",
-          fmt::format("response code: {}, response body: {}", response_code, response_body));
+      ENVOY_TAGGED_STREAM_LOG(debug, oauthLogTags(*decoder_callbacks_), *decoder_callbacks_,
+                              "PAR request failed with response code: {}", response_code);
+      parent_->onPushAuthorizationRequestFailure();
       break;
     default:
       PANIC("Malformed oauth client state");
@@ -348,11 +351,10 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
   const std::string response_body = message->bodyAsString();
 
   if (oldState == OAuthState::PendingPushedAuthorizationRequest) {
-    // On success, request_uri_ is set and the state is Idle. The caller reads it with
-    // pushedRequestUri().
-    if (!parsePushedAuthorizationResponse(response_body)) {
-      handleOAuthFailure(is_request_dispatched, "No request_uri found in the PAR response",
-                         fmt::format("response body: {}", response_body));
+    if (parsePushedAuthorizationResponse(response_body)) {
+      parent_->onPushAuthorizationRequestSuccess();
+    } else {
+      parent_->onPushAuthorizationRequestFailure();
     }
     return;
   }
@@ -430,8 +432,7 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
     handleRefreshTokenFailure(is_request_dispatched);
     break;
   case OAuthState::PendingPushedAuthorizationRequest:
-    handleOAuthFailure(is_request_dispatched,
-                       "Failed to push authorization request due to HTTP request failure");
+    parent_->onPushAuthorizationRequestFailure();
     break;
   default:
     PANIC("Malformed oauth client state");
