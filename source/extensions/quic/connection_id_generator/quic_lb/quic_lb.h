@@ -40,6 +40,9 @@ public:
     const bool unencrypted_mode_;
     const uint32_t nonce_length_bytes_;
     const quic::LoadBalancerServerId server_id_;
+    // The configuration version last applied to `encoder_`, which refuses a config with the active
+    // config ID: replacing it requires deleting it first.
+    std::optional<uint8_t> version_;
   };
 
   QuicLbConnectionIdGenerator(ThreadLocal::TypedSlot<ThreadLocalData>& tls, uint32_t worker_id);
@@ -84,7 +87,6 @@ private:
       const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret, Api::Api& api);
 
   Factory(const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config& config);
-  absl::Status validateKeyAndVersion(const KeyAndVersion& data) const;
   absl::Status updateSecret(Api::Api& api);
 
   const envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config config_;
@@ -92,6 +94,7 @@ private:
   Common::CallbackHandlePtr secrets_provider_validation_callback_handle_;
   Common::CallbackHandlePtr secrets_provider_update_callback_handle_;
   ThreadLocal::TypedSlotPtr<QuicLbConnectionIdGenerator::ThreadLocalData> tls_slot_;
+  // The key and version last applied to the workers, to tell an identical update from a change.
   std::optional<KeyAndVersion> key_and_version_;
 
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)

@@ -3,6 +3,7 @@
 
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/status_utility.h"
 
@@ -486,22 +487,43 @@ public:
     return update_callback_();
   }
 
-  void expectConnectionId(uint8_t version, absl::string_view key = "0123456789abcdef") {
+  quic::QuicConnectionId nextConnectionId() {
     auto generator = createTypedIdGenerator(*factory_);
     auto connection_id = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
-    ASSERT_TRUE(connection_id.has_value());
-    EXPECT_EQ(static_cast<uint8_t>(connection_id->data()[0]) >> quic::kConnectionIdLengthBits,
+    EXPECT_TRUE(connection_id.has_value());
+    return connection_id.value_or(quic::QuicConnectionId{});
+  }
+
+  // The server ID and nonce in an encrypted `connection_id`, decrypted with `version` and `key`.
+  static std::string decrypt(const quic::QuicConnectionId& connection_id, uint8_t version,
+                             absl::string_view key) {
+    auto config = quic::LoadBalancerConfig::Create(version, 6, 10, key);
+    EXPECT_TRUE(config.has_value());
+    uint8_t plaintext[quic::kLoadBalancerBlockSize];
+    EXPECT_TRUE(config->BlockDecrypt(reinterpret_cast<const uint8_t*>(connection_id.data() + 1),
+                                     plaintext));
+    return {reinterpret_cast<const char*>(plaintext), sizeof(plaintext)};
+  }
+
+  // The nonce in a decrypted connection ID, as the QUICHE encoder writes it: the low 8
+  // bytes, then the rest, in host byte order.
+  static absl::uint128 nonce(absl::string_view plaintext) {
+    uint64_t low = 0;
+    uint16_t high = 0;
+    memcpy(&low, plaintext.data() + 6, sizeof(low));
+    memcpy(&high, plaintext.data() + 6 + sizeof(low), sizeof(high));
+    return absl::MakeUint128(high, low);
+  }
+
+  void expectConnectionId(uint8_t version, absl::string_view key = "0123456789abcdef") {
+    const auto connection_id = nextConnectionId();
+    EXPECT_EQ(static_cast<uint8_t>(connection_id.data()[0]) >> quic::kConnectionIdLengthBits,
               version);
-    ASSERT_EQ(connection_id->length(), 18);
+    ASSERT_EQ(connection_id.length(), 18);
     if (GetParam()) {
-      EXPECT_EQ(absl::string_view(connection_id->data() + 1, 6), "server");
+      EXPECT_EQ(absl::string_view(connection_id.data() + 1, 6), "server");
     } else {
-      auto config = quic::LoadBalancerConfig::Create(version, 6, 10, key);
-      ASSERT_TRUE(config.has_value());
-      uint8_t plaintext[quic::kLoadBalancerBlockSize];
-      ASSERT_TRUE(config->BlockDecrypt(reinterpret_cast<const uint8_t*>(connection_id->data() + 1),
-                                       plaintext));
-      EXPECT_EQ(absl::string_view(reinterpret_cast<const char*>(plaintext), 6), "server");
+      EXPECT_EQ(decrypt(connection_id, version, key).substr(0, 6), "server");
     }
   }
 
@@ -521,31 +543,44 @@ INSTANTIATE_TEST_SUITE_P(EncryptionModes, QuicLbSecretUpdateTest, testing::Bool(
 TEST_P(QuicLbSecretUpdateTest, IdenticalUpdateIsANoop) {
   initialize(true);
   expectConnectionId(0);
-  EXPECT_OK(applySecret(0));
-  EXPECT_OK(applySecret(0));
+  EXPECT_LOG_NOT_CONTAINS("warn", "'encryption_key' changed", EXPECT_OK(applySecret(0)));
   expectConnectionId(0);
+  if (GetParam()) {
+    return; // Unencrypted mode hides the nonce behind a hash.
+  }
+  // The encoder was not touched: a new config would have started from a new random nonce.
+  const auto before = nonce(decrypt(nextConnectionId(), 0, "0123456789abcdef"));
+  EXPECT_OK(applySecret(0));
+  const auto after = nonce(decrypt(nextConnectionId(), 0, "0123456789abcdef"));
+  EXPECT_EQ(after, before + 1);
 }
 
-TEST_P(QuicLbSecretUpdateTest, SameVersionWithDifferentKeyIsRejected) {
+TEST_P(QuicLbSecretUpdateTest, SameVersionWithDifferentKeyIsApplied) {
   initialize(true);
   const auto candidate = encryptionParamaters(0, "fedcba9876543210");
-  ASSERT_EQ(validation_callback_(candidate.generic_secret()).code(),
-            absl::StatusCode::kInvalidArgument);
-  auto status = applySecret(0, "fedcba9876543210");
-  EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(status.message(),
-            "'encryption_key' cannot change without changing 'configuration_version'");
-  EXPECT_EQ(secret_.secrets().at("encryption_key").inline_string(), "0123456789abcdef");
-  expectConnectionId(0);
-
-  EXPECT_OK(applySecret(1, "fedcba9876543210"));
-  expectConnectionId(1, "fedcba9876543210");
-  EXPECT_OK(applySecret(1, "fedcba9876543210"));
-  expectConnectionId(1, "fedcba9876543210");
-
-  // A previous version can be reused after rotating away from it.
-  EXPECT_OK(applySecret(0, "fedcba9876543210"));
+  EXPECT_OK(validation_callback_(candidate.generic_secret()));
+  if (GetParam()) {
+    // The key is not used in unencrypted mode, so nothing changes.
+    EXPECT_LOG_NOT_CONTAINS("warn", "'encryption_key' changed",
+                            EXPECT_OK(applySecret(0, "fedcba9876543210")));
+    expectConnectionId(0);
+    return;
+  }
+  EXPECT_LOG_CONTAINS("warn", "'encryption_key' changed without changing 'configuration_version' 0",
+                      EXPECT_OK(applySecret(0, "fedcba9876543210")));
   expectConnectionId(0, "fedcba9876543210");
+  EXPECT_NE(decrypt(nextConnectionId(), 0, "0123456789abcdef").substr(0, 6), "server");
+
+  // Applied again, the same key and version are a no-op.
+  EXPECT_LOG_NOT_CONTAINS("warn", "'encryption_key' changed",
+                          EXPECT_OK(applySecret(0, "fedcba9876543210")));
+  expectConnectionId(0, "fedcba9876543210");
+
+  // Rotating to another version, and back to a previous one, still works.
+  EXPECT_OK(applySecret(1, "fedcba9876543210"));
+  expectConnectionId(1, "fedcba9876543210");
+  EXPECT_OK(applySecret(0, "0123456789abcdef"));
+  expectConnectionId(0, "0123456789abcdef");
 }
 
 TEST_P(QuicLbSecretUpdateTest, DeferredSecretInitialization) {
@@ -553,15 +588,8 @@ TEST_P(QuicLbSecretUpdateTest, DeferredSecretInitialization) {
   EXPECT_EQ(applySecret(0, "bad").code(), absl::StatusCode::kInvalidArgument);
   EXPECT_OK(applySecret(0));
   expectConnectionId(0);
-  EXPECT_EQ(applySecret(0, "fedcba9876543210").code(), absl::StatusCode::kInvalidArgument);
-  expectConnectionId(0);
-}
-
-TEST_P(QuicLbSecretUpdateTest, UpdateCallbackAlsoValidatesVersion) {
-  initialize(true);
-  secret_ = encryptionParamaters(0, "fedcba9876543210").generic_secret();
-  EXPECT_EQ(update_callback_().code(), absl::StatusCode::kInvalidArgument);
-  expectConnectionId(0);
+  EXPECT_OK(applySecret(0, "fedcba9876543210"));
+  expectConnectionId(0, "fedcba9876543210");
 }
 
 TEST(QuicLbTest, EmptySecretCallback) {

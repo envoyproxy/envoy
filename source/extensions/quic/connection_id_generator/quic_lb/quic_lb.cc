@@ -116,10 +116,17 @@ QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_v
   if (!lb_config.has_value()) {
     return absl::InvalidArgumentError("error generating quic::LoadBalancerConfig");
   }
+  if (version_ == version) {
+    // The encoder refuses a config with the active config ID, so the active one is deleted first.
+    // Nothing runs on this thread in between, so no connection ID is generated without a config.
+    encoder_.DeleteConfig();
+  }
   bool success = encoder_.UpdateConfig(lb_config.value(), server_id_);
   if (!success) {
+    version_.reset();
     return absl::InvalidArgumentError("Error setting configuration of quic-lb CID encoder");
   }
+  version_ = version;
 
   return absl::OkStatus();
 }
@@ -259,13 +266,9 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
   }
 
   ret->secrets_provider_validation_callback_handle_ = ret->secrets_provider_->addValidationCallback(
-      [&factory = *ret, &api = context.serverFactoryContext().api()](
+      [&api = context.serverFactoryContext().api()](
           const envoy::extensions::transport_sockets::tls::v3::GenericSecret& secret)
-          -> absl::Status {
-        auto data_or_result = getAndValidateKeyAndVersion(secret, api);
-        RETURN_IF_NOT_OK_REF(data_or_result.status());
-        return factory.validateKeyAndVersion(data_or_result.value());
-      });
+          -> absl::Status { return getAndValidateKeyAndVersion(secret, api).status(); });
 
   ret->secrets_provider_update_callback_handle_ = ret->secrets_provider_->addUpdateCallback(
       [&factory = *ret, &api = context.serverFactoryContext().api()]() -> absl::Status {
@@ -280,16 +283,6 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
   return ret;
 }
 
-absl::Status Factory::validateKeyAndVersion(const KeyAndVersion& data) const {
-  if (key_and_version_.has_value() &&
-      key_and_version_->configuration_version_ == data.configuration_version_ &&
-      key_and_version_->encryption_key_ != data.encryption_key_) {
-    return absl::InvalidArgumentError(
-        "'encryption_key' cannot change without changing 'configuration_version'");
-  }
-  return absl::OkStatus();
-}
-
 absl::Status Factory::updateSecret(Api::Api& api) {
   const envoy::extensions::transport_sockets::tls::v3::GenericSecret* secret =
       secrets_provider_->secret();
@@ -300,11 +293,19 @@ absl::Status Factory::updateSecret(Api::Api& api) {
   auto data_or_result = getAndValidateKeyAndVersion(*secret, api);
 
   RETURN_IF_NOT_OK_REF(data_or_result.status());
-  RETURN_IF_NOT_OK(validateKeyAndVersion(data_or_result.value()));
 
   if (key_and_version_.has_value() &&
       key_and_version_->configuration_version_ == data_or_result->configuration_version_) {
-    return absl::OkStatus();
+    // The key is not used in unencrypted mode, so only the version can change the configuration.
+    if (config_.unencrypted_mode() ||
+        key_and_version_->encryption_key_ == data_or_result->encryption_key_) {
+      return absl::OkStatus();
+    }
+    ENVOY_LOG_MISC(warn,
+                   "quic-lb: 'encryption_key' changed without changing 'configuration_version' "
+                   "{}; connection IDs issued under the previous key may no longer be routed to "
+                   "this server by a load balancer",
+                   data_or_result->configuration_version_);
   }
   key_and_version_ = data_or_result.value();
 

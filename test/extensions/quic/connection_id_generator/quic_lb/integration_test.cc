@@ -36,7 +36,10 @@ public:
         });
   }
 
-  void writeEncryptionParameters(uint8_t version, absl::string_view key, bool update = false) {
+  // `extra` adds an entry the extension ignores, so that SDS sees a changed secret even when the
+  // key and version are the same.
+  void writeEncryptionParameters(uint8_t version, absl::string_view key, bool update = false,
+                                 absl::string_view extra = "") {
     const char version_byte = static_cast<char>(version);
     TestEnvironment::writeStringToFileForTest(
         update ? "quic_lb.next.yaml" : "quic_lb.yaml",
@@ -51,7 +54,10 @@ resources:
                      Base64::encode(key.data(), key.size()), R"EOF(
         configuration_version:
           inline_bytes: )EOF",
-                     Base64::encode(&version_byte, sizeof(version_byte)), "\n"),
+                     Base64::encode(&version_byte, sizeof(version_byte)), "\n",
+                     extra.empty()
+                         ? ""
+                         : absl::StrCat("        unused:\n          inline_string: ", extra, "\n")),
         false);
     if (update) {
       TestEnvironment::renameFile(TestEnvironment::temporaryPath("quic_lb.next.yaml"),
@@ -66,21 +72,25 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, QuicLbIntegrationTest,
 
 TEST_P(QuicLbIntegrationTest, Basic) { testRouterHeaderOnlyRequestAndResponse(); }
 
-TEST_P(QuicLbIntegrationTest, RejectsKeyChangeWithoutVersionChange) {
+TEST_P(QuicLbIntegrationTest, AppliesKeyChangeWithoutVersionChange) {
   initialize();
   test_server_->waitForCounter("sds.quic_lb.update_success", testing::Eq(1));
 
+  // A new key under the active version is applied, not rejected.
   writeEncryptionParameters(1, "1111111111111111", true);
-  test_server_->waitForCounter("sds.quic_lb.update_rejected", testing::Eq(1));
-  EXPECT_EQ(1, test_server_->counter("sds.quic_lb.update_success")->value());
-
-  writeEncryptionParameters(2, "1111111111111111", true);
   test_server_->waitForCounter("sds.quic_lb.update_success", testing::Eq(2));
-  EXPECT_EQ(1, test_server_->counter("sds.quic_lb.update_rejected")->value());
 
   writeEncryptionParameters(2, "1111111111111111", true);
   test_server_->waitForCounter("sds.quic_lb.update_success", testing::Eq(3));
-  EXPECT_EQ(1, test_server_->counter("sds.quic_lb.update_rejected")->value());
+
+  // A changed secret with the same key and version reaches the extension, which leaves the active
+  // configuration as it is.
+  writeEncryptionParameters(2, "1111111111111111", true, "changed");
+  test_server_->waitForCounter("sds.quic_lb.update_success", testing::Eq(4));
+  EXPECT_EQ(0, test_server_->counter("sds.quic_lb.update_rejected")->value());
+  EXPECT_EQ(0, test_server_->counter("server.envoy_bug_failures")->value());
+
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 TEST_P(QuicLbIntegrationTest, SecretsNotReady) {
