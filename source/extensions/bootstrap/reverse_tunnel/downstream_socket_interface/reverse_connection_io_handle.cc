@@ -128,7 +128,7 @@ void ReverseConnectionIOHandle::cleanup() {
   child_io_handles_.clear();
 
   worker_dispatcher_ = nullptr;
-  IoSocketHandleImpl::resetFileEvents();
+  resetFileEvents();
 
   // Clear cluster to hosts mapping.
   cluster_to_resolved_hosts_map_.clear();
@@ -316,37 +316,35 @@ void ReverseConnectionIOHandle::resetFileEvents() {
     rev_conn_retry_timer_.reset();
   }
 
-  if (!worker_dispatcher_ || !worker_dispatcher_->isThreadSafe()) {
-    return;
-  }
-
-  conn_wrapper_to_host_map_.clear();
-  std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
-  connection_wrappers_.clear();
-  for (auto& wrapper : wrappers) {
-    if (wrapper == nullptr) {
-      continue;
+  // Handshake connections have their own file events. Tear them down on this worker so
+  // main-thread close()/destructor does not destroy in-flight codecs. Skip when
+  // worker_dispatcher_ is null (cleanup() after workers are gone).
+  if (worker_dispatcher_ != nullptr && worker_dispatcher_->isThreadSafe()) {
+    conn_wrapper_to_host_map_.clear();
+    std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers = std::move(connection_wrappers_);
+    connection_wrappers_.clear();
+    for (auto& wrapper : wrappers) {
+      if (wrapper == nullptr) {
+        continue;
+      }
+      wrapper->shutdown();
+      worker_dispatcher_->deferredDelete(std::move(wrapper));
     }
-    wrapper->shutdown();
-    worker_dispatcher_->deferredDelete(std::move(wrapper));
-  }
 
-  // Close any established tunnels still queued for accept() on the worker that owns these
-  // ClientConnections. Leaving them for the main-thread destructor would close worker-owned
-  // connections off thread.
-  while (!established_connections_.empty()) {
-    auto established = std::move(established_connections_.front());
-    established_connections_.pop();
-    if (established.connection != nullptr &&
-        established.connection->state() == Network::Connection::State::Open) {
-      established.connection->close(Network::ConnectionCloseType::NoFlush);
+    // Close any established tunnels still queued for accept() on the worker that owns these
+    // ClientConnections. Leaving them for the main-thread destructor would close worker-owned
+    // connections off thread.
+    while (!established_connections_.empty()) {
+      auto established = std::move(established_connections_.front());
+      established_connections_.pop();
+      if (established.connection != nullptr &&
+          established.connection->state() == Network::Connection::State::Open) {
+        established.connection->close(Network::ConnectionCloseType::NoFlush);
+      }
     }
   }
 
-  if (!extension_ || !extension_->getLocalRegistry()) {
-    return;
-  }
-  extension_->getLocalRegistry()->unregisterIoHandle(this);
+  IoSocketHandleImpl::resetFileEvents();
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {

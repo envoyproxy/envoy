@@ -1,6 +1,3 @@
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <memory>
 
@@ -9,8 +6,11 @@
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/http/header_map_impl.h"
+#include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
@@ -44,6 +44,7 @@ using testing::HasSubstr;
 using testing::IsSupersetOf;
 using testing::Key;
 using testing::NiceMock;
+using testing::Pair;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -117,12 +118,27 @@ protected:
     extension_->access_logs_.push_back(std::move(log));
   }
 
+  static os_fd_t createTestSocket() {
+    const os_fd_t fd =
+        Api::OsSysCallsSingleton::get().socket(AF_INET, SOCK_STREAM, 0).return_value_;
+    EXPECT_TRUE(SOCKET_VALID(fd));
+    return fd;
+  }
+
   std::unique_ptr<ReverseConnectionIOHandle>
   createTestIOHandle(const ReverseConnectionSocketConfig& config) {
-    int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
-    EXPECT_GE(test_fd, 0);
-    return std::make_unique<ReverseConnectionIOHandle>(test_fd, config, cluster_manager_,
+    return std::make_unique<ReverseConnectionIOHandle>(createTestSocket(), config, cluster_manager_,
                                                        extension_.get(), *stats_scope_);
+  }
+
+  // Mirrors ReverseConnectionIOHandle::accept(): the tunnel handle registers itself with the
+  // worker registry on construction and unregisters on destruction.
+  static std::unique_ptr<DownstreamReverseConnectionIOHandle>
+  createTunnelHandle(ReverseConnectionIOHandle& parent, const std::string& key) {
+    auto socket = std::make_unique<Network::ConnectionSocketImpl>(
+        std::make_unique<Network::IoSocketHandleImpl>(createTestSocket()), nullptr, nullptr);
+    return std::make_unique<DownstreamReverseConnectionIOHandle>(std::move(socket), &parent, key,
+                                                                 /*connection_id=*/1);
   }
 
   void TearDown() override {
@@ -1025,7 +1041,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, IndexParsesWorkerDispatcherName) {
   EXPECT_EQ(DownstreamSocketThreadLocal(not_prefixed, *scope).index(), std::nullopt);
 }
 
-TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsGathersRegisteredHandles) {
+TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsCountsTunnelHandles) {
   setupThreadLocalSlot();
   auto* registry = extension_->getLocalRegistry();
   ASSERT_NE(registry, nullptr);
@@ -1033,30 +1049,58 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsGathersRegisteredHandle
   ReverseConnectionSocketConfig config_a;
   config_a.src_cluster_id = "cluster-a";
   config_a.src_node_id = "node-a";
-  auto handle_a = createTestIOHandle(config_a);
-  registry->registerIoHandle(handle_a.get());
+  auto parent_a = createTestIOHandle(config_a);
 
   ReverseConnectionSocketConfig config_b;
   config_b.src_cluster_id = "cluster-b";
   config_b.src_node_id = "node-b";
   config_b.src_tenant_id = "tenant-b";
-  auto handle_b = createTestIOHandle(config_b);
-  registry->registerIoHandle(handle_b.get());
+  auto parent_b = createTestIOHandle(config_b);
+
+  // A listener handle with no accepted tunnels is not reported.
+  absl::flat_hash_map<std::string, size_t> empty;
+  registry->activeTunnels(empty);
+  EXPECT_TRUE(empty.empty());
+
+  auto tunnel_a1 = createTunnelHandle(*parent_a, "a1");
+  auto tunnel_a2 = createTunnelHandle(*parent_a, "a2");
+  auto tunnel_b1 = createTunnelHandle(*parent_b, "b1");
 
   absl::flat_hash_map<std::string, size_t> map;
   registry->activeTunnels(map);
+  EXPECT_THAT(map, UnorderedElementsAre(Pair("node-a:cluster-a:", 2),
+                                        Pair("node-b:cluster-b:tenant-b", 1)));
 
-  EXPECT_EQ(map.size(), 2);
-  EXPECT_EQ(map["node-a:cluster-a:"], 0);
-  EXPECT_EQ(map["node-b:cluster-b:tenant-b"], 0);
+  tunnel_a1.reset();
+  tunnel_b1.reset();
+  absl::flat_hash_map<std::string, size_t> after_close;
+  registry->activeTunnels(after_close);
+  EXPECT_THAT(after_close, UnorderedElementsAre(Pair("node-a:cluster-a:", 1)));
+}
 
-  registry->unregisterIoHandle(handle_a.get());
-  absl::flat_hash_map<std::string, size_t> after_unregister;
-  registry->activeTunnels(after_unregister);
-  EXPECT_EQ(after_unregister.size(), 1);
-  EXPECT_EQ(after_unregister.count("node-a:cluster-a:"), 0);
+// Stopping the listener resets its file events, but accepted tunnels stay open and must still be
+// reported until they close.
+TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsSurviveListenerResetFileEvents) {
+  setupThreadLocalSlot();
+  auto* registry = extension_->getLocalRegistry();
+  ASSERT_NE(registry, nullptr);
 
-  registry->unregisterIoHandle(handle_b.get());
+  ReverseConnectionSocketConfig config;
+  config.src_cluster_id = "cluster-a";
+  config.src_node_id = "node-a";
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "a1");
+
+  parent->resetFileEvents();
+
+  absl::flat_hash_map<std::string, size_t> map;
+  registry->activeTunnels(map);
+  EXPECT_THAT(map, UnorderedElementsAre(Pair("node-a:cluster-a:", 1)));
+
+  tunnel.reset();
+  absl::flat_hash_map<std::string, size_t> after_close;
+  registry->activeTunnels(after_close);
+  EXPECT_TRUE(after_close.empty());
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, ActiveTunnelsSkipsNonWorkerAndUninitializedSlots) {
@@ -1134,14 +1178,12 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, ResultsReadyNoOpsWhenStreamDestroyed
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerGathersAndStreamsResult) {
   setupThreadLocalSlot();
-  auto* registry = extension_->getLocalRegistry();
-  ASSERT_NE(registry, nullptr);
 
   ReverseConnectionSocketConfig config;
   config.src_cluster_id = "cluster-a";
   config.src_node_id = "node-a";
-  auto handle = createTestIOHandle(config);
-  registry->registerIoHandle(handle.get());
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "a1");
 
   NiceMock<Server::MockAdminStream> admin_stream;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -1164,25 +1206,20 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerGathersAndStreamsResul
   EXPECT_TRUE(response.toString().empty());
   EXPECT_EQ(headers.getContentTypeValue(), "text/plain");
 
-  EXPECT_THAT(streamed, HasSubstr("node-a:cluster-a:: 0"));
-  EXPECT_EQ(std::count(streamed.begin(), streamed.end(), '\n'), 1);
+  EXPECT_EQ(streamed, "node-a:cluster-a:: 1\n");
 
   ASSERT_NE(destroy_cb, nullptr);
   destroy_cb();
-
-  registry->unregisterIoHandle(handle.get());
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerSkipsWriteOnClientDisconnect) {
   setupThreadLocalSlot();
-  auto* registry = extension_->getLocalRegistry();
-  ASSERT_NE(registry, nullptr);
 
   ReverseConnectionSocketConfig config;
   config.src_cluster_id = "cluster-a";
   config.src_node_id = "node-a";
-  auto handle = createTestIOHandle(config);
-  registry->registerIoHandle(handle.get());
+  auto parent = createTestIOHandle(config);
+  auto tunnel = createTunnelHandle(*parent, "a1");
 
   NiceMock<Server::MockAdminStream> admin_stream;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -1204,8 +1241,6 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerSkipsWriteOnClientDisc
   Http::TestResponseHeaderMapImpl headers;
   Buffer::OwnedImpl response;
   EXPECT_EQ(extension_->tunnelsHandler(headers, response, admin_stream), Http::Code::OK);
-
-  registry->unregisterIoHandle(handle.get());
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, TunnelsHandlerRejectsZeroConcurrency) {

@@ -39,8 +39,11 @@ envoy_extension_cc_test(
     srcs = ["reverse_tunnel_initiator_extension_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     deps = [
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/network:connection_socket_lib",
+        "//source/common/network:default_socket_interface_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/thread_local:thread_local_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",

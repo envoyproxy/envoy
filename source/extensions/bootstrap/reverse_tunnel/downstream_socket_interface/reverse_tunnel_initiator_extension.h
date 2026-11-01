@@ -31,7 +31,7 @@ namespace ReverseConnection {
 
 // Forward declarations
 class DownstreamSocketThreadLocal;
-class ReverseConnectionIOHandle;
+class DownstreamReverseConnectionIOHandle;
 
 struct AttachedTunnelsRequest {
   AttachedTunnelsRequest(Server::AdminStream* stream, uint32_t concurrency)
@@ -278,11 +278,11 @@ public:
 
   void activeTunnels(absl::flat_hash_map<std::string, size_t>& active_tunnels) const;
 
-  void registerIoHandle(const ReverseConnectionIOHandle* io_handle) {
+  void registerIoHandle(const DownstreamReverseConnectionIOHandle* io_handle) {
     io_handles_.insert(io_handle);
   }
 
-  void unregisterIoHandle(const ReverseConnectionIOHandle* io_handle) {
+  void unregisterIoHandle(const DownstreamReverseConnectionIOHandle* io_handle) {
     io_handles_.erase(io_handle);
   }
 
@@ -291,7 +291,7 @@ public:
 private:
   Event::Dispatcher& dispatcher_;
   Stats::Scope& scope_;
-  absl::flat_hash_set<const ReverseConnectionIOHandle*> io_handles_;
+  absl::flat_hash_set<const DownstreamReverseConnectionIOHandle*> io_handles_;
   static constexpr absl::string_view dispatcher_prefix_{"worker_"};
 };
 

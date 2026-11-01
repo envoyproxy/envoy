@@ -542,7 +542,7 @@ void ReverseTunnelInitiatorExtension::activeTunnels(
 void DownstreamSocketThreadLocal::activeTunnels(
     absl::flat_hash_map<std::string, size_t>& active_tunnels) const {
   for (const auto* io_handle : io_handles_) {
-    active_tunnels[io_handle->connectionInfo()] += io_handle->numActiveTunnels();
+    active_tunnels[io_handle->connectionInfo()]++;
   }
 }
 

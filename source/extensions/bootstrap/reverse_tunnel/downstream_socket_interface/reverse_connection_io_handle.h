@@ -409,18 +409,20 @@ public:
     return config_.handshake_headers;
   }
 
-  std::string connectionInfo() const {
-    return fmt::format("{}:{}:{}", config_.src_node_id, config_.src_cluster_id,
-                       config_.src_tenant_id);
-  }
-
-  size_t numActiveTunnels() const { return child_io_handles_.size(); }
-
   /**
    * @return the handshake response deadline applied to each dial attempt.
    */
   std::chrono::milliseconds handshakeTimeout() const {
     return std::chrono::milliseconds(config_.handshake_timeout_ms);
+  }
+
+  /**
+   * @return "src_node:src_cluster:src_tenant", the key used by the /reverse_tunnel/tunnels admin
+   * endpoint.
+   */
+  std::string connectionInfo() const {
+    return fmt::format("{}:{}:{}", config_.src_node_id, config_.src_cluster_id,
+                       config_.src_tenant_id);
   }
 
 private:

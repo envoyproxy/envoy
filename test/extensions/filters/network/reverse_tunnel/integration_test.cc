@@ -247,6 +247,7 @@ void ReverseTunnelFilterIntegrationTest::addDrainingAwareReverseConnectionHcmLis
 
         const std::string listener_yaml = fmt::format(R"EOF(
 name: reverse_connection_listener
+stat_prefix: reverse_conn_listener
 address:
   socket_address:
     address: "rc://e2e-node:e2e-cluster:e2e-tenant@cluster_0:{}"
@@ -707,6 +708,22 @@ TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointListsEstablishedC
   drainReverseTunnelListenersAndAwaitStop();
 }
 
+TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointCountsTunnelsAfterListenerStop) {
+  DISABLE_IF_ADMIN_DISABLED;
+  runEndToEndReverseConnectionHandshakeScenario(/*drain_at_end=*/false);
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Ge(1));
+
+  drainReverseTunnelListenersAndAwaitStop();
+  EXPECT_GE(test_server_->gauge("listener.reverse_conn_listener.downstream_cx_active")->value(), 1);
+
+  BufferingStreamDecoderPtr response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reverse_tunnel/tunnels", "",
+                                         Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 1\n", response->body());
+}
+
 TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseConnections) {
   DISABLE_IF_ADMIN_DISABLED;
   drain_strategy_ = Server::DrainStrategy::Immediate;
@@ -760,6 +777,60 @@ TEST_P(ReverseTunnelFilterIntegrationTest, DrainingAwareHcmSendsGoAwayOnReverseC
   // Advance simulated time past the 1s drain_time so the graceful drain completion timer fires.
   timeSystem().advanceTimeWait(std::chrono::seconds(2));
   // Confirm the full chain completed: workers stopped the listener and called.
+  test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
+}
+
+TEST_P(ReverseTunnelFilterIntegrationTest, AdminTunnelsEndpointCountDropsAsDrainedTunnelsClose) {
+  DISABLE_IF_ADMIN_DISABLED;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  drain_time_ = std::chrono::seconds(1);
+  addDrainingAwareReverseConnectionHcmListener(/*reverse_connection_count=*/2);
+  initialize();
+
+  auto query_tunnels = [this]() {
+    BufferingStreamDecoderPtr response =
+        IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reverse_tunnel/tunnels",
+                                           "", Http::CodecType::HTTP1, GetParam());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    return std::string(response->body());
+  };
+
+  FakeRawConnectionPtr reverse_conn_1;
+  FakeRawConnectionPtr reverse_conn_2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn_1));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(reverse_conn_2));
+  completeReverseTunnelHandshake(*reverse_conn_1);
+  completeReverseTunnelHandshake(*reverse_conn_2);
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(200));
+  startHttp2Session(*reverse_conn_1);
+  startHttp2Session(*reverse_conn_2);
+
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(2));
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 2\n", query_tunnels());
+
+  BufferingStreamDecoderPtr admin_response =
+      IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/drain_listeners?graceful",
+                                         "", Http::CodecType::HTTP1, GetParam());
+  ASSERT_TRUE(admin_response->complete());
+  ASSERT_EQ("200", admin_response->headers().getStatusValue());
+  ASSERT_TRUE(reverse_conn_1->waitForData(
+      waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway), nullptr));
+  ASSERT_TRUE(reverse_conn_2->waitForData(
+      waitForHttp2FrameType(Http::Http2::Http2Frame::Type::GoAway), nullptr));
+
+  // Draining tunnels stay counted until they actually close.
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 2\n", query_tunnels());
+
+  ASSERT_TRUE(reverse_conn_1->close());
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(1));
+  EXPECT_EQ("e2e-node:e2e-cluster:e2e-tenant: 1\n", query_tunnels());
+
+  ASSERT_TRUE(reverse_conn_2->close());
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(0));
+  EXPECT_EQ("", query_tunnels());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
   test_server_->waitForCounter("listener_manager.listener_stopped", Ge(1));
 }
 
