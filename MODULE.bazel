@@ -179,6 +179,14 @@ git_override(
     strip_prefix = "jq",
 )
 
+# `rules_jq` is not in the registry commit pinned in .bazelrc
+git_override(
+    module_name = "rules_jq",
+    commit = "e95aa47c6294a048a45b7b425e334840ebcde025",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "rules_jq",
+)
+
 ####################################################################################
 # setup: Compilers
 ####################################################################################
