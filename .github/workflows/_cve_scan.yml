@@ -37,7 +37,7 @@ jobs:
         mkdir -p ${{ steps.vars.outputs.cve-data-path }}
     - name: Download (sync) from GCS bucket
       run: |
-        gsutil -mq rsync \
+        gsutil -mq rsync -r \
           "gs://${{ vars.GCS_CVE_BUCKET }}" \
           "${{ steps.vars.outputs.cve-data-path }}"
     - name: Run CVE dependency scanner
