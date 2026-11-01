@@ -177,7 +177,23 @@ void OAuth2ClientImpl::cancel() {
   state_ = OAuthState::Idle;
 }
 
-void OAuth2ClientImpl::asyncPushAuthorizationRequest(const std::string& auth_params,
+namespace {
+// Percent-encodes each key and value, then joins them into a form body.
+std::string encodeFormParams(const OAuth2Client::FormParams& params) {
+  std::string body;
+  for (const auto& [key, value] : params) {
+    if (!body.empty()) {
+      body += "&";
+    }
+    body += Http::Utility::PercentEncoding::encode(key, WwwFormUrlEncodedReservedCharacters);
+    body += "=";
+    body += Http::Utility::PercentEncoding::encode(value, WwwFormUrlEncodedReservedCharacters);
+  }
+  return body;
+}
+} // namespace
+
+void OAuth2ClientImpl::asyncPushAuthorizationRequest(const FormParams& params,
                                                      const std::string& client_id,
                                                      const std::string& secret,
                                                      AuthType auth_type) {
@@ -185,7 +201,7 @@ void OAuth2ClientImpl::asyncPushAuthorizationRequest(const std::string& auth_par
   ASSERT(par_endpoint_ != nullptr);
   state_ = OAuthState::PendingPushedAuthorizationRequest;
 
-  // auth_params must already be percent-encoded, e.g. "response_type=code&redirect_uri=...".
+  const std::string auth_params = encodeFormParams(params);
   Http::RequestMessagePtr request = createPostRequest(*par_endpoint_);
   std::string body;
 

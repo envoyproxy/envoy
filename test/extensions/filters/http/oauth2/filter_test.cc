@@ -176,7 +176,7 @@ public:
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 
   MOCK_METHOD(void, asyncPushAuthorizationRequest,
-              (const std::string&, const std::string&, const std::string&,
+              (const FormParams&, const std::string&, const std::string&,
                Envoy::Extensions::HttpFilters::Oauth2::AuthType));
 
   MOCK_METHOD(const std::string&, pushedRequestUri, (), (const, override));

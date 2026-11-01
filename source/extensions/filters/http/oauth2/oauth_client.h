@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "envoy/common/pure.h"
 #include "envoy/config/core/v3/http_uri.pb.h"
@@ -48,9 +50,12 @@ public:
                                        const std::string& client_id, const std::string& secret,
                                        AuthType auth_type = AuthType::UrlEncodedBody) PURE;
 
+  // Raw (unencoded) key/value pairs. The client percent-encodes them.
+  using FormParams = std::vector<std::pair<std::string, std::string>>;
+
   // Sends the authorization parameters to the PAR endpoint. On success, the returned
   // request_uri is available from pushedRequestUri().
-  virtual void asyncPushAuthorizationRequest(const std::string& auth_params,
+  virtual void asyncPushAuthorizationRequest(const FormParams& params,
                                              const std::string& client_id,
                                              const std::string& secret,
                                              AuthType auth_type = AuthType::UrlEncodedBody) PURE;
@@ -94,7 +99,7 @@ public:
   void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
                                const std::string& secret, AuthType auth_type) override;
 
-  void asyncPushAuthorizationRequest(const std::string& auth_params, const std::string& client_id,
+  void asyncPushAuthorizationRequest(const FormParams& params, const std::string& client_id,
                                      const std::string& secret, AuthType auth_type) override;
 
   const std::string& pushedRequestUri() const override { return request_uri_; }
