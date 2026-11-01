@@ -198,7 +198,10 @@ void OAuth2ClientImpl::asyncPushAuthorizationRequest(const FormParams& params,
                                                      const std::string& secret,
                                                      AuthType auth_type) {
   ASSERT(state_ == OAuthState::Idle);
-  ASSERT(par_endpoint_ != nullptr);
+  if (par_endpoint_ == nullptr) {
+    parent_->onPushAuthorizationRequestFailure();
+    return;
+  }
   state_ = OAuthState::PendingPushedAuthorizationRequest;
 
   const std::string auth_params = encodeFormParams(params);
@@ -243,12 +246,16 @@ void OAuth2ClientImpl::asyncPushAuthorizationRequest(const FormParams& params,
 }
 
 bool OAuth2ClientImpl::parsePushedAuthorizationResponse(const std::string& response_body) {
+  request_uri_.clear();
   auto json_or_error = Json::Factory::loadFromString(response_body);
   if (!json_or_error.ok()) {
     return false;
   }
   auto request_uri_or_error = json_or_error.value()->getString("request_uri");
   if (!request_uri_or_error.ok()) {
+    return false;
+  }
+  if (request_uri_or_error.value().empty()) {
     return false;
   }
   request_uri_ = request_uri_or_error.value();
@@ -268,6 +275,9 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg, const Http
 
     in_flight_request_ =
         thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
+  } else if (state_ == OAuthState::PendingPushedAuthorizationRequest) {
+    state_ = OAuthState::Idle;
+    parent_->onPushAuthorizationRequestFailure();
   } else {
     handleOAuthFailure(false, "Token endpoint cluster not found");
   }

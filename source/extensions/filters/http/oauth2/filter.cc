@@ -889,6 +889,12 @@ FilterConfig::FilterConfig(
     original_request_uri_formatter_ = std::move(formatter_or_error.value());
   }
 
+  use_par_ = proto_config.use_par();
+  if (use_par_ && !proto_config.has_par_endpoint()) {
+    creation_status = absl::InvalidArgumentError("use_par requires par_endpoint to be set");
+    return;
+  }
+
   if (!context.clusterManager().hasCluster(oauth_token_endpoint_.cluster())) {
     // This is not necessarily a configuration error — sometimes cluster is sent later than the
     // listener in the xDS stream.

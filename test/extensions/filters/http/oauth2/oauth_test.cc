@@ -237,12 +237,12 @@ TEST_F(OAuth2ClientTest, PushAuthorizationRequestSuccess) {
   client_->setCallbacks(*mock_callbacks_);
   client_->asyncPushAuthorizationRequest({{"response_type", "code"}}, "b", "c");
   EXPECT_EQ(1, callbacks_.size());
-  EXPECT_EQ(OAuthState::PendingPushedAuthorizationRequest, client_->getState());
+  EXPECT_EQ(OAuth2Client::OAuthState::PendingPushedAuthorizationRequest, client_->getState());
   EXPECT_CALL(*mock_callbacks_, onPushAuthorizationRequestSuccess());
   Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
   ASSERT_TRUE(popPendingCallback(
       [&](auto* callback) { callback->onSuccess(request, std::move(mock_response)); }));
-  EXPECT_EQ(OAuthState::Idle, client_->getState());
+  EXPECT_EQ(OAuth2Client::OAuthState::Idle, client_->getState());
   EXPECT_EQ("urn:ietf:params:oauth:request_uri:abc", client_->pushedRequestUri());
 }
 
@@ -294,7 +294,7 @@ TEST_F(OAuth2ClientTest, PushAuthorizationRequestHttpFailure) {
   ASSERT_TRUE(popPendingCallback([&](auto* callback) {
     callback->onFailure(request_, Http::AsyncClient::FailureReason::Reset);
   }));
-  EXPECT_EQ(OAuthState::Idle, client_->getState());
+  EXPECT_EQ(OAuth2Client::OAuthState::Idle, client_->getState());
 }
 
 TEST_F(OAuth2ClientTest, RequestAccessTokenErrorResponse) {
