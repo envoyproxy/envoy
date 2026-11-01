@@ -38,6 +38,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "async_redis_lib",
+    srcs = ["async_redis.cc"],
+    hdrs = ["async_redis.h"],
+    copts = ["-Wno-old-style-cast"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:file_event_interface",
+        "//envoy/event:timer_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:leaf_awaitable_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
+        "@hiredis",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],

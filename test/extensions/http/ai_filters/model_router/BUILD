@@ -12,6 +12,32 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "async_redis_test",
+    srcs = ["async_redis_test.cc"],
+    copts = ["-Wno-old-style-cast"],
+    extension_names = ["envoy.http.ai_filters.model_router"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//envoy/api:api_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:file_event_interface",
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/coroutine:dispatcher_executor_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/extensions/http/ai_filters/model_router:async_redis_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@hiredis",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "local_quota_test",
     srcs = ["local_quota_test.cc"],
     extension_names = ["envoy.http.ai_filters.model_router"],
