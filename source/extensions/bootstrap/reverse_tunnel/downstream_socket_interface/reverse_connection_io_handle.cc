@@ -304,7 +304,6 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
       (worker_dispatcher_ == nullptr || worker_dispatcher_->isThreadSafe())) {
     rev_conn_retry_timer_.reset();
   }
-  host_to_conn_info_map_.clear();
 
   return IoSocketHandleImpl::close();
 }

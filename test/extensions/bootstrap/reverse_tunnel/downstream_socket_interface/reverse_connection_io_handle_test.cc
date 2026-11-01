@@ -3510,6 +3510,37 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTrackedEmitsHo
   EXPECT_EQ(getHostConnectionInfo(host).connection_keys.count(connection_key), 0);
 }
 
+// Accepted tunnels outlive the listener's close(), so their later close must still be attributed
+// to the host and release its state gauge.
+TEST_F(ReverseConnectionIOHandleTest, TunnelClosedAfterListenerCloseReleasesStateGauge) {
+  setupThreadLocalSlot();
+
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  ASSERT_NE(io_handle_, nullptr);
+
+  auto* mock_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
+  Event::FileReadyCb mock_callback = [](uint32_t) -> absl::Status { return absl::OkStatus(); };
+  io_handle_->initializeFileEvent(dispatcher_, mock_callback, Event::FileTriggerType::Level,
+                                  Event::FileReadyType::Read);
+
+  const std::string host = "192.168.1.1";
+  const std::string connection_key = "192.168.1.1:12345";
+  addHostConnectionInfo(host, "test-cluster", 1);
+  getMutableHostConnectionInfo(host).connection_keys.insert(connection_key);
+  io_handle_->updateConnectionState(host, "test-cluster", connection_key,
+                                    ReverseConnectionState::Connected);
+  const std::string connected_gauge = "test_scope.reverse_connections.host.192.168.1.1.connected";
+  ASSERT_EQ(extension_->getCrossWorkerStatMap()[connected_gauge], 1);
+
+  io_handle_->close();
+  io_handle_->onDownstreamConnectionClosed(connection_key, /*connection_id=*/99);
+
+  EXPECT_EQ(extension_->getCrossWorkerStatMap()[connected_gauge], 0)
+      << "a tunnel closing after the listener's close() must still decrement its state gauge";
+}
+
 TEST_F(ReverseConnectionIOHandleTest, ChildMarkTunnelDrainingForwardsKeyAndId) {
   setupThreadLocalSlot();
 
