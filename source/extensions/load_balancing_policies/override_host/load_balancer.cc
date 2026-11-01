@@ -202,6 +202,10 @@ void OverrideHostLoadBalancer::LoadBalancerImpl::addSelectedHostKey(
     return;
   }
 
+  if (context == nullptr || context->requestStreamInfo() == nullptr) {
+    return;
+  }
+
   if (response.host == nullptr) {
     return;
   }

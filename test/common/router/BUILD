@@ -56,6 +56,8 @@ envoy_cc_test_library(
         "//source/common/http:headers_lib",
         "//source/common/router:config_lib",
         "//source/common/router:string_accessor_lib",
+        "//source/common/stats:allocator_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:upstream_address_lib",
         "//source/extensions/formatter/cel:config",
@@ -397,6 +399,23 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "router_ratelimit_speed_test",
+    srcs = ["router_ratelimit_speed_test.cc"],
+    deps = [
+        "//source/common/router:router_ratelimit_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:utility_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "router_ratelimit_speed_test_benchmark_test",
+    benchmark_binary = "router_ratelimit_speed_test",
+)
+
 envoy_cc_test(
     name = "router_test",
     srcs = [
@@ -535,6 +554,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_outlier_detection_test",
     srcs = ["router_outlier_detection_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":router_test_base_lib",
         "//source/common/router:router_lib",

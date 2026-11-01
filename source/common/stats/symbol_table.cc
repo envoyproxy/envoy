@@ -9,6 +9,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/utility.h"
+#include "source/common/stats/well_known_stat_names.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -241,9 +242,17 @@ void SymbolTable::Encoding::appendToMemBlock(StatName stat_name,
 
 SymbolTable::SymbolTable()
     // Have to be explicitly initialized, if we want to use the ABSL_GUARDED_BY macro.
-    : next_symbol_(FirstValidSymbol), monotonic_counter_(FirstValidSymbol) {}
+    : next_symbol_(FirstValidSymbol), monotonic_counter_(FirstValidSymbol) {
+  // Encoded eagerly so the well-known tokens get the low-valued, single-byte symbols.
+  well_known_stat_names_ = std::make_unique<WellKnownStatNames>(*this);
+  // Encoding the names above is recorded as lookups; reset so that recent-lookup
+  // totals only reflect lookups made after construction.
+  clearRecentLookups();
+}
 
 SymbolTable::~SymbolTable() {
+  // Release the well-known names first, so that the leak check below sees an empty table.
+  well_known_stat_names_.reset();
   // To avoid leaks into the symbol table, we expect all StatNames to be freed.
   // Note: this could potentially be short-circuited if we decide a fast exit
   // is needed in production. But it would be good to ensure clean up during

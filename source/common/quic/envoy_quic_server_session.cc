@@ -117,24 +117,25 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   if (!ShouldCreateIncomingStream(id)) {
     return nullptr;
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_fix_goaway_loadshed_point")) {
-    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
-        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
-      connection()->CloseConnection(quic::QUIC_PEER_GOING_AWAY, "Server overloaded",
-                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
-      return nullptr;
-    } else if (should_send_go_away_on_dispatch_ != nullptr &&
-               should_send_go_away_on_dispatch_->shouldShedLoad() && !h3_go_away_sent_) {
-      SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
-      h3_go_away_sent_ = true;
-    }
-  }
   if (!codec_stats_.has_value() || !http3_options_.has_value()) {
     ENVOY_BUG(false,
               fmt::format(
                   "Quic session {} attempts to create stream {} before HCM filter is initialized.",
                   this->id(), id));
     return nullptr;
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_fix_goaway_loadshed_point")) {
+    if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+        should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+      connection()->CloseConnection(quic::QUIC_PEER_GOING_AWAY, "Server overloaded",
+                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+      return nullptr;
+    } else if (should_send_go_away_on_dispatch_ != nullptr && !h3_go_away_sent_ &&
+               should_send_go_away_on_dispatch_->shouldShedLoad()) {
+      SendHttp3GoAway(quic::QUIC_PEER_GOING_AWAY, "Server overloaded");
+      h3_go_away_sent_ = true;
+      codec_stats_->goaway_sent_.inc();
+    }
   }
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL, codec_stats_.value(),
                                           http3_options_.value(), headers_with_underscores_action_);

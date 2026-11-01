@@ -125,8 +125,10 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
 
   // The new route configuration and VHDS subscription have been built without error, now we can
   // update the state and start warming up.
-  base_.updateState(std::move(new_route_config), new_hash, version_info, std::move(config),
-                    std::move(update_init_manager), std::move(update_id));
+  Protobuf::Any route_config_any;
+  MessageUtil::packFrom(route_config_any, *new_route_config);
+  base_.updateState(std::move(route_config_any), new_route_config->name(), new_hash, version_info,
+                    std::move(config), std::move(update_init_manager), std::move(update_id));
 
   // Now, the state is updated and previous warming update is aborted (if any), we can update the
   // VHDS subscription here. So the destruction of the previous subscription will not bring any
@@ -188,11 +190,14 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
       std::make_unique<envoy::config::route::v3::RouteConfiguration>();
   // Merge the latest RouteConfiguration with the updated VHDS. That is the one an update that is
   // still warming up built, if any, so that this update supersedes it instead of losing it.
-  route_config_after_this_update->CheckTypeAndMergeFrom(latestProtobufConfiguration());
+  const Protobuf::Any& latest_route_config_any = latestRouteConfigurationAny();
+  RELEASE_ASSERT(
+      MessageUtil::unpackTo(latest_route_config_any, *route_config_after_this_update).ok(),
+      "Failed to unpack RouteConfiguration from Any");
   rebuildRouteConfigVirtualHosts(*rds_virtual_hosts_, *vhosts_after_this_update,
                                  *route_config_after_this_update);
 
-  base_.updateConfig(std::move(route_config_after_this_update), std::nullopt, version_info);
+  base_.updateConfig(*route_config_after_this_update, std::nullopt, version_info);
   // No exception, the new route configuration is valid, can update the state. This has to happen
   // before the update is published, because publishing runs the on-demand VHDS callbacks against
   // resourceIdsInLastVhdsUpdate().

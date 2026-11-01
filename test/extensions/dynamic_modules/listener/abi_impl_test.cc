@@ -112,10 +112,9 @@ public:
     filter_config_->stat_creation_frozen_ = false;
 
     ON_CALL(callbacks_, dispatcher()).WillByDefault(testing::ReturnRef(worker_thread_dispatcher_));
-    ON_CALL(callbacks_, filterState())
-        .WillByDefault(testing::Invoke([this]() -> StreamInfo::FilterState& {
-          return *callbacks_.stream_info_.filterState();
-        }));
+    ON_CALL(callbacks_, filterState()).WillByDefault([this]() -> StreamInfo::FilterState& {
+      return *callbacks_.stream_info_.filterState();
+    });
 
     filter_ = std::make_shared<DynamicModuleListenerFilter>(filter_config_);
     filter_->onAccept(callbacks_);
@@ -1363,11 +1362,11 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketSuccess) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
         return {len, Api::IoError::none()};
-      }));
+      });
 
   char data[] = "S";
   envoy_dynamic_module_type_module_buffer data_buf = {data, 1};
@@ -1380,11 +1379,11 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketMultipleBytes) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
         return {len, Api::IoError::none()};
-      }));
+      });
 
   char data[] = "hello world";
   envoy_dynamic_module_type_module_buffer data_buf = {data, 11};
@@ -1424,9 +1423,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, WriteToSocketIoError) {
   NiceMock<Network::MockIoHandle> io_handle;
   EXPECT_CALL(callbacks_.socket_, ioHandle()).WillOnce(testing::ReturnRef(io_handle));
   EXPECT_CALL(io_handle, write(testing::_))
-      .WillOnce(testing::Invoke([](Buffer::Instance&) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance&) -> Api::IoCallUint64Result {
         return {0, Network::IoSocketError::create(ECONNRESET)};
-      }));
+      });
 
   char data[] = "S";
   envoy_dynamic_module_type_module_buffer data_buf = {data, 1};
@@ -2242,9 +2241,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 789);
 
@@ -2264,9 +2263,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback and invoke it to verify onScheduled is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 999);
 
@@ -2287,9 +2286,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 123);
 
@@ -2320,9 +2319,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, SchedulerRequiresSharedOwners
   auto* shared_scheduler =
       envoy_dynamic_module_callback_listener_filter_scheduler_new(shared_filter.get());
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
   envoy_dynamic_module_callback_listener_filter_scheduler_commit(shared_scheduler, 1);
   captured_cb();
   envoy_dynamic_module_callback_listener_filter_scheduler_delete(shared_scheduler);
@@ -2336,9 +2335,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(main_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   envoy_dynamic_module_callback_listener_filter_config_scheduler_commit(scheduler, 456);
 
@@ -2376,9 +2375,9 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest,
   ASSERT_NE(nullptr, scheduler);
 
   Event::PostCb captured_cb;
-  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(worker_thread_dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   std::thread foreign(
       [&]() { envoy_dynamic_module_callback_listener_filter_scheduler_commit(scheduler, 42); });
@@ -2582,12 +2581,13 @@ TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionIntNullCallbac
 TEST_F(DynamicModuleListenerFilterAbiCallbackTest, GetSocketOptionBytesSuccess) {
   Api::SysCallIntResult success_result{0, 0};
   EXPECT_CALL(callbacks_.socket_, getSocketOption(1, 2, testing::_, testing::_))
-      .WillOnce(testing::DoAll(testing::Invoke([](int, int, void* optval, socklen_t* optlen) {
-                                 const char* data = "test";
-                                 memcpy(optval, data, 4);
-                                 *optlen = 4;
-                               }),
-                               testing::Return(success_result)));
+      .WillOnce(testing::DoAll(
+          [](int, int, void* optval, socklen_t* optlen) {
+            const char* data = "test";
+            memcpy(optval, data, 4);
+            *optlen = 4;
+          },
+          testing::Return(success_result)));
 
   char buffer[16] = {0};
   size_t actual_size = 0;

@@ -138,10 +138,12 @@ protected:
     histograms_.clear();
     textReadouts_.clear();
     endpoints_helper_.reset();
-    EXPECT_EQ(0, symbol_table_->numSymbols());
+    EXPECT_EQ(num_base_symbols_, symbol_table_->numSymbols());
   }
 
   Stats::TestUtil::TestSymbolTable symbol_table_;
+  // Symbols pre-encoded by the table itself (the well-known stat names).
+  const uint64_t num_base_symbols_{symbol_table_->numSymbols()};
   Stats::Allocator alloc_;
   Stats::StatNamePool pool_;
   std::vector<Stats::CounterSharedPtr> counters_;

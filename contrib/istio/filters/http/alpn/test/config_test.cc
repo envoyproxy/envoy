@@ -38,9 +38,9 @@ TEST(AlpnFilterConfigTest, OverrideAlpn) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   Http::StreamDecoderFilterSharedPtr added_filter;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_))
-      .WillOnce(Invoke([&added_filter](Http::StreamDecoderFilterSharedPtr filter) {
+      .WillOnce([&added_filter](Http::StreamDecoderFilterSharedPtr filter) {
         added_filter = std::move(filter);
-      }));
+      });
 
   cb(filter_callback);
   EXPECT_NE(dynamic_cast<AlpnFilter*>(added_filter.get()), nullptr);

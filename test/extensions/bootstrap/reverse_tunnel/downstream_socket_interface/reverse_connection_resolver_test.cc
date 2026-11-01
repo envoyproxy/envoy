@@ -170,15 +170,15 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigInvalidCount
                                 testing::HasSubstr("Invalid connection count")));
 }
 
-// A zero connection count is rejected since the supported range is [1, 1024].
+// A zero connection count is accepted so a listener can stay idle until an update raises it.
 TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigZeroCount) {
   std::string address_str =
       createReverseConnectionAddress("node-123", "cluster-456", "tenant-789", "remote-cluster", 0);
   auto socket_address = createSocketAddress(address_str);
 
   auto result = extractReverseConnectionConfig(socket_address);
-  EXPECT_THAT(result, HasStatus(absl::StatusCode::kInvalidArgument,
-                                testing::HasSubstr("outside the supported range")));
+  EXPECT_OK(result);
+  EXPECT_EQ(result.value().connection_count, 0);
 }
 
 // A connection count above 1024 is rejected so one tick cannot dial an unbounded number inline.

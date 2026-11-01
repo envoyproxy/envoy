@@ -15,11 +15,11 @@
 #include "source/common/config/resource_name.h"
 #include "source/common/grpc/common.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/config_subscription/grpc/delta_subscription_state.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
 #include "source/extensions/config_subscription/grpc/grpc_mux_failover.h"
 #include "source/extensions/config_subscription/grpc/pausable_ack_queue.h"
 #include "source/extensions/config_subscription/grpc/watch_map.h"
+#include "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.h"
 
 namespace Envoy {
 namespace Config {
@@ -85,9 +85,8 @@ public:
                                std::function<std::unique_ptr<Upstream::LoadStatsReporter>()>
                                    load_stats_reporter_factory = nullptr) override;
 
-  // TODO(adisuissa): finish implementation.
-  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
-  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+  Upstream::LoadStatsReporter* loadStatsReporter() const override;
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override;
 
   GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                       envoy::service::discovery::v3::DeltaDiscoveryResponse>&
@@ -117,7 +116,7 @@ public:
     }
 
     WatchMap watch_map_;
-    DeltaSubscriptionState sub_state_;
+    XdsMux::DeltaSubscriptionState sub_state_;
     std::string control_plane_identifier_;
 
     SubscriptionStuff(const SubscriptionStuff&) = delete;
@@ -151,8 +150,9 @@ private:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
-    void append(const absl::flat_hash_set<std::string>& resources) override {
-      parent_.appendWatch(type_url_, watch_, resources, options_);
+    void update(const absl::flat_hash_set<std::string>& resources_to_add,
+                const absl::flat_hash_set<std::string>& resources_to_remove) override {
+      parent_.updateWatch(type_url_, watch_, resources_to_add, resources_to_remove, options_);
     }
 
     void accept(const absl::flat_hash_set<std::string>& patterns) override {
@@ -186,10 +186,11 @@ private:
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
 
-  // Additionally adds resources to the given watch's interest, updating both the watch-map routing
-  // and the subscription (see GrpcMuxWatch::append).
-  void appendWatch(const std::string& type_url, Watch* watch,
-                   const absl::flat_hash_set<std::string>& resources,
+  // Additionally adds and/or removes resources in the given watch's interest, updating both the
+  // watch-map routing and the subscription (see GrpcMuxWatch::update).
+  void updateWatch(const std::string& type_url, Watch* watch,
+                   const absl::flat_hash_set<std::string>& resources_to_add,
+                   const absl::flat_hash_set<std::string>& resources_to_remove,
                    const SubscriptionOptions& options);
   // Registers glob interest for the given watch; routing only, never affects the subscription
   // (see GrpcMuxWatch::accept).
@@ -256,6 +257,12 @@ private:
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};
+
+  // A Load-Stats-Reporter factory method that allows to lazily create the
+  // reporter if needed.
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+  // The load stats reporter, lazily created.
+  std::unique_ptr<Upstream::LoadStatsReporter> lrs_server_;
 };
 
 using NewGrpcMuxImplPtr = std::unique_ptr<NewGrpcMuxImpl>;

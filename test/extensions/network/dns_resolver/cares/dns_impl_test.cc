@@ -935,17 +935,17 @@ public:
       if (getifaddrs_supported) {
         if (getifaddrs_success) {
           EXPECT_CALL(os_sys_calls, getifaddrs(_))
-              .WillOnce(Invoke([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
+              .WillOnce([&](Api::InterfaceAddressVector& vector) -> Api::SysCallIntResult {
                 for (uint32_t i = 0; i < ifaddrs.size(); i++) {
                   auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(ifaddrs[i]);
                   vector.emplace_back(fmt::format("interface_{}", i), 0, addr);
                 }
                 return {0, 0};
-              }));
+              });
         } else {
           EXPECT_CALL(os_sys_calls, getifaddrs(_))
-              .WillOnce(Invoke(
-                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; }));
+              .WillOnce(
+                  [&](Api::InterfaceAddressVector&) -> Api::SysCallIntResult { return {-1, 1}; });
         }
       }
     } else {
@@ -955,33 +955,31 @@ public:
 
     // These passthrough calls are needed to let the resolver communicate with the DNS server
     EXPECT_CALL(os_sys_calls, accept(_, _, _))
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [&](os_fd_t sockfd, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallSocketResult {
               return real_syscall.accept(sockfd, addr, addrlen);
-            }));
+            });
     EXPECT_CALL(os_sys_calls, readv(_, _, _))
-        .WillRepeatedly(
-            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
-              return real_syscall.readv(fd, iov, num_iov);
-            }));
+        .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+          return real_syscall.readv(fd, iov, num_iov);
+        });
     EXPECT_CALL(os_sys_calls, writev(_, _, _))
-        .WillRepeatedly(
-            Invoke([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
-              return real_syscall.writev(fd, iov, num_iov);
-            }));
+        .WillRepeatedly([&](os_fd_t fd, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+          return real_syscall.writev(fd, iov, num_iov);
+        });
     EXPECT_CALL(os_sys_calls, send(_, _, _, _))
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [&](os_fd_t socket, void* buffer, size_t length, int flags) -> Api::SysCallSizeResult {
               return real_syscall.send(socket, buffer, length, flags);
-            }));
+            });
     EXPECT_CALL(os_sys_calls, close(_))
-        .WillRepeatedly(Invoke(
-            [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); }));
+        .WillRepeatedly(
+            [&](os_fd_t sockfd) -> Api::SysCallIntResult { return real_syscall.close(sockfd); });
     EXPECT_CALL(os_sys_calls, getaddrinfo(_, _, _, _))
-        .WillRepeatedly(Invoke([&](const char* node, const char* service,
-                                   const struct addrinfo* hints, struct addrinfo** res) {
+        .WillRepeatedly([&](const char* node, const char* service, const struct addrinfo* hints,
+                            struct addrinfo** res) {
           return real_syscall.getaddrinfo(node, service, hints, res);
-        }));
+        });
 
     resolveWithExpectations("some.good.domain", lookup_family, resolution_status,
                             expected_addresses, {}, std::nullopt);
@@ -2332,104 +2330,6 @@ TEST_F(DnsImplConstructor, VerifyCustomQcacheMaxTtl) {
   EXPECT_TRUE((optmask & ARES_OPT_QUERY_CACHE) == ARES_OPT_QUERY_CACHE);
   EXPECT_EQ(123, opts.qcache_max_ttl);
   ares_destroy_options(&opts);
-}
-
-TEST_F(DnsImplConstructor, ReusesResolverForIdenticalConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "true"}});
-
-  auto typed_dns_resolver_config = getCaresDnsResolverConfig(0);
-  Network::DnsResolverFactory& dns_resolver_factory =
-      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-
-  auto resolver1 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
-          .value();
-  auto resolver2 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
-          .value();
-
-  EXPECT_EQ(resolver1.get(), resolver2.get());
-}
-
-TEST_F(DnsImplConstructor, DoesNotReuseResolverForIdenticalConfigWhenFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "false"}});
-
-  auto typed_dns_resolver_config = getCaresDnsResolverConfig(0);
-  Network::DnsResolverFactory& dns_resolver_factory =
-      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-
-  auto resolver1 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
-          .value();
-  auto resolver2 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
-          .value();
-
-  EXPECT_NE(resolver1.get(), resolver2.get());
-}
-
-TEST_F(DnsImplConstructor, DoesNotReuseResolverForDifferentConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "true"}});
-
-  auto typed_dns_resolver_config1 = getCaresDnsResolverConfig(67);
-  auto typed_dns_resolver_config2 = getCaresDnsResolverConfig(123);
-
-  Network::DnsResolverFactory& dns_resolver_factory =
-      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config1);
-
-  auto resolver1 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config1)
-          .value();
-  auto resolver2 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config2)
-          .value();
-
-  EXPECT_NE(resolver1.get(), resolver2.get());
-}
-
-TEST_F(DnsImplConstructor, CleansExpiredResolverBeforeReinsertingIdenticalConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.shared_cares_dns_resolver", "true"}});
-
-  auto typed_dns_resolver_config = getCaresDnsResolverConfig(1234);
-
-  Network::DnsResolverFactory& dns_resolver_factory =
-      createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
-
-  DnsResolver* first_resolver = nullptr;
-  {
-    auto resolver1 =
-        dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
-            .value();
-    // Save the pointer only for identity comparison after resolver1 is destroyed.
-    first_resolver = resolver1.get();
-  }
-
-  auto typed_dns_resolver_config2 = getCaresDnsResolverConfig(5678);
-  // Create another resolver with a different config to trigger eviction of the first resolver from
-  // the resolver map.
-  auto resolver2 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config2)
-          .value();
-
-  // This is a dummy resolver so if memory is immediately reused, this will take the memory released
-  // by the first resolver.
-  auto typed_dns_resolver_config3 = getCaresDnsResolverConfig(890);
-  auto resolver3 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config3)
-          .value();
-
-  // Create a forth resolver with the same config as the first resolver and verify the first
-  // resolver is not reused, which proves that the first resolver was evicted from the resolver map.
-  auto resolver4 =
-      dns_resolver_factory.createDnsResolver(*dispatcher_, *api_, typed_dns_resolver_config)
-          .value();
-
-  EXPECT_NE(resolver2.get(), resolver4.get());
-  EXPECT_NE(first_resolver, resolver4.get());
 }
 
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {

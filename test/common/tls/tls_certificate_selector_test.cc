@@ -17,6 +17,7 @@
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/ssl/ssl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
@@ -45,7 +46,6 @@
 
 using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
-using testing::Invoke;
 using testing::MockFunction;
 using testing::NiceMock;
 using ::testing::Not;
@@ -322,7 +322,7 @@ protected:
     Network::MockConnectionCallbacks server_connection_callbacks;
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     EXPECT_CALL(callbacks, onAccept_(_))
-        .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
+        .WillOnce([&](Network::ConnectionSocketPtr& socket) -> void {
           auto ssl_socket = server_ssl_socket_factory->createDownstreamTransportSocket();
           // configureInitialCongestionWindow is an unimplemented empty function, this is just to
           // increase code coverage.
@@ -330,7 +330,7 @@ protected:
           server_connection = dispatcher->createServerConnection(
               std::move(socket), std::move(ssl_socket), stream_info);
           server_connection->addConnectionCallbacks(server_connection_callbacks);
-        }));
+        });
     EXPECT_CALL(callbacks, recordConnectionsAcceptedOnSocketEvent(_));
 
     Network::MockConnectionCallbacks client_connection_callbacks;
@@ -341,10 +341,17 @@ protected:
     auto connect_second_time = [&]() {
       ENVOY_LOG_MISC(debug, "connect count: {}", connect_count);
       if (++connect_count == 2) {
-        // By default, the session is not created with session resumption. The
-        // client should see a session ID but the server should not.
-        EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
-        EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+        // By default, the session is not created with session resumption. With TLS 1.2, the client
+        // sees a session ID but the server doesn't. TLS 1.3 has no session ID on the client. A TLS
+        // 1.3 server has no session ID with BoringSSL, but OpenSSL creates one when it sends a
+        // ticket.
+        if (client_connection->ssl()->tlsVersion() == "TLSv1.3") {
+          EXPECT_EQ(EMPTY_STRING, client_connection->ssl()->sessionId());
+          EXPECT_EQ(SSL_SELECT(true, false), server_connection->ssl()->sessionId().empty());
+        } else {
+          EXPECT_EQ(EMPTY_STRING, server_connection->ssl()->sessionId());
+          EXPECT_NE(EMPTY_STRING, client_connection->ssl()->sessionId());
+        }
 
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -361,14 +368,14 @@ protected:
 
     if (mod == Ssl::SelectionResult::SelectionStatus::Failed) {
       EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { close_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { close_second_time(); });
     } else {
       EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-          .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { connect_second_time(); }));
+          .WillOnce([&](Network::ConnectionEvent) -> void { connect_second_time(); });
       EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
       EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
     }

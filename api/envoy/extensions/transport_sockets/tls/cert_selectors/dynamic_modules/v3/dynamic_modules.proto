@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3;
+
+import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
+
+import "google/protobuf/any.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3";
+option java_outer_classname = "DynamicModulesProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/cert_selectors/dynamic_modules/v3;dynamic_modulesv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Dynamic Module TLS Certificate Selector]
+// [#extension: envoy.tls.certificate_selectors.dynamic_modules]
+
+// Configuration for the dynamic module TLS certificate selector. For each handshake the module
+// selects the certificate that Envoy uses, which is one of the certificates configured in the TLS
+// context, the one that Envoy selects without a custom selector, or a dynamic certificate that the
+// module provides at runtime. Envoy applies the configured OCSP stapling policy to the selected
+// certificate. This works for both downstream and upstream TLS contexts. QUIC listeners are not
+// supported.
+//
+// Example:
+//
+// .. validated-code-block:: yaml
+//   :type-name: envoy.extensions.transport_sockets.tls.v3.CommonTlsContext
+//
+//   custom_tls_certificate_selector:
+//     name: envoy.tls.certificate_selectors.dynamic_modules
+//     typed_config:
+//       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.cert_selectors.dynamic_modules.v3.DynamicModuleTlsCertificateSelector
+//       dynamic_module_config:
+//         name: my_module
+//       selector_name: my_selector
+//
+message DynamicModuleTlsCertificateSelector {
+  // Dynamic module configuration. See :ref:`dynamic module configuration
+  // <envoy_v3_api_msg_extensions.dynamic_modules.v3.DynamicModuleConfig>` for details.
+  //
+  // .. note::
+  //   This extension loads the module while the TLS context is configured, so it cannot wait for
+  //   an asynchronous fetch. A remote :ref:`module
+  //   <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.module>` is therefore
+  //   accepted only when the module is already cached on disk, and is otherwise rejected. Setting
+  //   :ref:`nack_on_cache_miss
+  //   <envoy_v3_api_field_extensions.dynamic_modules.v3.DynamicModuleConfig.nack_on_cache_miss>` to
+  //   ``true`` makes the rejection start a background fetch so that a later update succeeds. Prefer
+  //   ``name`` or a local data source.
+  envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1
+      [(validate.rules).message = {required: true}];
+
+  // The name of the certificate selector implementation in the dynamic module.
+  // This is passed to the module's ``envoy_dynamic_module_on_tls_certificate_selector_config_new``
+  // function.
+  string selector_name = 2 [(validate.rules).string = {min_len: 1}];
+
+  // Optional configuration for the certificate selector. This is passed as bytes to the dynamic
+  // module. If not specified, no configuration bytes are passed to the module.
+  google.protobuf.Any selector_config = 3;
+
+  // Allows the module to provide certificates at runtime in addition to the ones configured in the
+  // TLS context. Each dynamic certificate is built with the settings of the TLS context, including
+  // its certificate validation, and a handshake that selects one that is not provided yet can wait
+  // until the module provides or removes it.
+  //
+  // A downstream TLS context must set both
+  // :ref:`disable_stateless_session_resumption
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
+  // and :ref:`disable_stateful_session_resumption
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>`,
+  // and an upstream TLS context must set :ref:`max_session_keys
+  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.max_session_keys>`
+  // to 0, since a resumed session reuses the certificate of the original handshake.
+  //
+  // Defaults to false.
+  bool allow_dynamic_certificates = 4;
+}

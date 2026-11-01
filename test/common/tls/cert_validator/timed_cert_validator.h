@@ -3,7 +3,9 @@
 #include <openssl/ssl.h>
 
 #include <chrono>
+#include <functional>
 #include <memory>
+#include <utility>
 
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/cert_validator/factory.h"
@@ -30,7 +32,19 @@ public:
                     const CertValidator::ExtraValidationContext& validation_context, bool is_server,
                     absl::string_view host_name) override;
 
-  bool validationPending() const { return validation_timer_->enabled(); }
+  bool validationStarted() const { return validation_timer_ != nullptr; }
+  bool validationPending() const {
+    return validation_timer_ != nullptr && validation_timer_->enabled();
+  }
+  void setOnValidationStartedCallback(std::function<void()> callback) {
+    on_validation_started_ = std::move(callback);
+  }
+  void updateValidationTimeOutMs(std::chrono::milliseconds validation_time_out_ms) {
+    validation_time_out_ms_ = validation_time_out_ms;
+    if (validationPending()) {
+      validation_timer_->enableTimer(validation_time_out_ms_);
+    }
+  }
   void setExpectedLocalAddress(absl::string_view expected_local_address) {
     expected_local_address_ = expected_local_address;
   }
@@ -41,6 +55,7 @@ public:
 private:
   Event::TimerPtr validation_timer_;
   std::chrono::milliseconds validation_time_out_ms_;
+  std::function<void()> on_validation_started_;
   Ssl::ValidateResultCallbackPtr callback_;
   std::vector<std::string> cert_chain_in_str_;
   std::optional<std::string> expected_host_name_;

@@ -155,10 +155,48 @@ genrule(
     tools = ["//tools/windows:gen_dynamic_modules_exports"],
 )
 
+bool_flag(
+    name = "shared_unwind",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "shared_unwind_enabled",
+    flag_values = {":shared_unwind": "True"},
+)
+
+selects.config_setting_group(
+    name = "linux_x86_64_shared_unwind",
+    match_all = [
+        ":shared_unwind_enabled",
+        ":linux_x86_64",
+    ],
+)
+
+# By default, Linux builds use the toolchain's libunwind.a, selected by -unwindlib=libunwind
+# in MODULE.bazel's extra_link_flags. Clang reuses -static-libgcc to link the unwinder
+# statically even when it is LLVM libunwind, not libgcc; the misleading name is intentional.
+# --//bazel:shared_unwind=true (set by build:asan in .bazelrc) disables that unwinder with
+# -unwindlib=none and uses @unwind_libs//:libunwind from envoy_toolshed's unwind_extension
+# instead, on Linux x86_64 only because unwind_libs only ships x86_64.
+# ASAN's dlsym(RTLD_NEXT) lookup cannot see a static unwinder, risking mixed LLVM/libgcc_s
+# unwinders and broken Rust dynamic-module panics.
+# The toolshed build supports our sysroot's older glibc; LLVM's shipped .so requires newer glibc.
+# See https://github.com/envoyproxy/toolshed/blob/bazel-v0.5.6/bazel/compile/README.md#L88-L99
+# With -unwindlib=none clang has nothing to apply the toolchain's -static-libgcc to and warns
+# "argument unused during compilation" on every link, so that warning is silenced here.
 cc_library(
     name = "static_stdlib",
     linkopts = select({
-        "//bazel:linux": ["-static-libgcc"],
+        ":linux_x86_64_shared_unwind": [
+            "-unwindlib=none",
+            "-Wno-unused-command-line-argument",
+        ],
+        ":linux": ["-static-libgcc"],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        ":linux_x86_64_shared_unwind": ["@unwind_libs//:libunwind"],
         "//conditions:default": [],
     }),
 )
@@ -173,40 +211,47 @@ config_setting(
 
 config_setting(
     name = "windows_opt_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "opt",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "opt"},
 )
 
 config_setting(
     name = "windows_dbg_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "dbg",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "dbg"},
 )
 
 config_setting(
     name = "windows_fastbuild_build",
-    values = {
-        "cpu": "x64_windows",
-        "compilation_mode": "fastbuild",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"compilation_mode": "fastbuild"},
 )
 
 config_setting(
     name = "clang_cl_build",
-    values = {
-        "cpu": "x64_windows",
-        "define": "clang_cl=1",
-    },
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+    values = {"define": "clang_cl=1"},
 )
 
 config_setting(
     name = "clang_cl_opt_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "opt",
     },
@@ -214,8 +259,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_dbg_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "dbg",
     },
@@ -223,8 +271,11 @@ config_setting(
 
 config_setting(
     name = "clang_cl_fastbuild_build",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
     values = {
-        "cpu": "x64_windows",
         "define": "clang_cl=1",
         "compilation_mode": "fastbuild",
     },
@@ -638,17 +689,40 @@ label_flag(
     visibility = ["//visibility:public"],
 )
 
-# wee8 engine: envoy_toolshed prebuilt by default, source for configs the
-# prebuilt is incompatible with (gcc libstdc++ ABI; sanitizers need instrumented deps).
+# Use prebuilt artifacts for dependencies that offer them (currently wee8). Set to False to
+# build every such dependency from source, e.g. in environments that disallow prebuilt
+# artifacts: --//bazel:use_prebuilt_libs=False
+# Toolchain components (compiler, sysroot, libc++/libunwind runtimes) are not covered.
+bool_flag(
+    name = "use_prebuilt_libs",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "prebuilt_libs_disabled",
+    flag_values = {":use_prebuilt_libs": "False"},
+)
+
+selects.config_setting_group(
+    name = "wee8_source_build",
+    match_any = [
+        ":prebuilt_libs_disabled",
+        ":asan_build",
+        ":msan_build",
+        ":tsan_build",
+    ],
+)
+
+# wee8 engine: envoy_toolshed prebuilt by default, source when :use_prebuilt_libs is False
+# or for configs the prebuilt is incompatible with (sanitizers need instrumented deps).
+# envoy_toolshed itself falls back to source on unsupported platforms.
 alias(
     name = "wee8_engine",
     actual = select({
-        ":gcc_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":asan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":msan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
-        ":tsan_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
+        ":wee8_source_build": "@proxy-wasm-cpp-host//bazel:wee8_no_pointer_compression",
         "//conditions:default": "@envoy_toolshed//v8:wee8",
     }),
+    visibility = ["//visibility:public"],
 )
 
 bool_flag(
@@ -796,14 +870,19 @@ config_setting(
 
 config_setting(
     name = "windows_x86_64",
-    values = {"cpu": "x64_windows"},
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
 )
 
 # Configuration settings to make doing selects for Apple vs non-Apple platforms
 # easier. More details: https://docs.bazel.build/versions/master/configurable-attributes.html#config_settingaliasing
 config_setting(
     name = "darwin",
-    values = {"cpu": "darwin"},
+    constraint_values = [
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
@@ -824,37 +903,65 @@ config_setting(
 
 config_setting(
     name = "ios_i386",
-    values = {"cpu": "ios_i386"},
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_x86_64",
-    values = {"cpu": "ios_x86_64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:x86_64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_armv7",
-    values = {"cpu": "ios_armv7"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
+# armv7s has no platforms constraint, so this matches the same platforms as `ios_armv7`.
 config_setting(
     name = "ios_armv7s",
-    values = {"cpu": "ios_armv7s"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:armv7",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64",
-    values = {"cpu": "ios_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_sim_arm64",
-    values = {"cpu": "ios_sim_arm64"},
+    constraint_values = [
+        "@apple_support//constraints:simulator",
+        "@platforms//cpu:arm64",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(
     name = "ios_arm64e",
-    values = {"cpu": "ios_arm64e"},
+    constraint_values = [
+        "@apple_support//constraints:device",
+        "@platforms//cpu:arm64e",
+        "@platforms//os:ios",
+    ],
 )
 
 config_setting(

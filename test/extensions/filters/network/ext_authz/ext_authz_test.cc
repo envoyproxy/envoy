@@ -28,7 +28,6 @@ using testing::_;
 using testing::A;
 using testing::Contains;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 using testing::WithArgs;
@@ -76,10 +75,9 @@ public:
     filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(addr_);
     EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-        .WillOnce(
-            WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-              request_callbacks_ = &callbacks;
-            })));
+        .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+          request_callbacks_ = &callbacks;
+        }));
 
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
@@ -108,14 +106,14 @@ public:
     (*fields)["ext_authz_duration"] = ValueUtil::numberValue(10);
 
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&response](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
               EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
               EXPECT_THAT(returned_dynamic_metadata.fields(),
                           Contains(IsStructNumber("ext_authz_duration", 10)));
               EXPECT_TRUE(
                   TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-            }));
+            });
 
     EXPECT_CALL(filter_callbacks_, continueReading());
     request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
@@ -158,10 +156,9 @@ stat_prefix: name
     filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(addr_);
     EXPECT_CALL(*client_, check(_, _, _, _))
-        .WillOnce(
-            WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-              request_callbacks_ = &callbacks;
-            })));
+        .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+          request_callbacks_ = &callbacks;
+        }));
 
     EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
     Buffer::OwnedImpl data("hello");
@@ -259,10 +256,9 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   // Confirm that the invocation of onNewConnection did NOT increment the active or total count!
@@ -307,10 +303,9 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -343,10 +338,9 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -381,10 +375,9 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -418,10 +411,9 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       addr_);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -462,20 +454,19 @@ TEST_F(ExtAuthzFilterTest, ImmediateOK) {
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            request_callbacks_ = &callbacks;
-            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
 
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const Protobuf::Struct& returned_dynamic_metadata) {
+      .WillOnce([&dynamic_metadata](const std::string& ns,
+                                    const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
         EXPECT_THAT(returned_dynamic_metadata.fields(),
                     Contains(IsStructNumber("ext_authz_duration", 0)));
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
-      }));
+      });
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
@@ -508,21 +499,20 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(15);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            Filters::Common::ExtAuthz::Response response{};
-            response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
-            response.dynamic_metadata = dynamic_metadata;
-            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+        response.dynamic_metadata = dynamic_metadata;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const Protobuf::Struct& returned_dynamic_metadata) {
+      .WillOnce([&dynamic_metadata](const std::string& ns,
+                                    const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
         EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_FALSE(dynamic_metadata.fields().contains("ext_authz_duration"));
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
-      }));
+      });
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_CALL(
@@ -553,10 +543,9 @@ TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
       addr_);
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -669,12 +658,12 @@ TEST_F(ExtAuthzFilterTest, MetadataContext) {
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest& check_param,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         check_request = check_param;
         request_callbacks_ = &callbacks;
-      }));
+      });
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -752,12 +741,12 @@ TEST_F(ExtAuthzFilterTest, MetadataContextNoMatch) {
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest& check_param,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         check_request = check_param;
         request_callbacks_ = &callbacks;
-      }));
+      });
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -803,12 +792,12 @@ TEST_F(ExtAuthzFilterTest, NoMetadataContextNamespaces) {
 
   envoy::service::auth::v3::CheckRequest check_request;
   EXPECT_CALL(*client_, check(_, _, A<Tracing::Span&>(), _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest& check_param,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+      .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                    const envoy::service::auth::v3::CheckRequest& check_param, Tracing::Span&,
+                    const StreamInfo::StreamInfo&) -> void {
         check_request = check_param;
         request_callbacks_ = &callbacks;
-      }));
+      });
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
@@ -986,10 +975,9 @@ TEST_F(ExtAuthzFilterTest, ShadowModeImmediateDenied) {
   expectConnectionNotClosed();
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(
-          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
-            callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
-          })));
+      .WillOnce(WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+        callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+      }));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");

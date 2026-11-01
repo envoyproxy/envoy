@@ -110,14 +110,13 @@ public:
     EXPECT_CALL(
         context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
         newConnection(_))
-        .WillOnce(
-            Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                  .newConnectionImpl(cb);
-              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                  .poolReady(upstream_connection_);
-              return nullptr;
-            }));
+        .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+              .newConnectionImpl(cb);
+          context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+              .poolReady(upstream_connection_);
+          return nullptr;
+        });
     router_->sendRequestToUpstream(*active_message_);
   }
 
@@ -169,9 +168,9 @@ TEST_F(RocketmqRouterTest, PoolRemoteConnectionFailure) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*remote connection failure*."));
-      }));
+      });
 
   startRequest();
   context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
@@ -184,9 +183,9 @@ TEST_F(RocketmqRouterTest, PoolTimeout) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*timeout*."));
-      }));
+      });
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
@@ -200,9 +199,9 @@ TEST_F(RocketmqRouterTest, PoolLocalConnectionFailure) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*local connection failure*."));
-      }));
+      });
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
@@ -216,9 +215,9 @@ TEST_F(RocketmqRouterTest, PoolOverflowFailure) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*overflow*."));
-      }));
+      });
   EXPECT_CALL(*active_message_, onReset());
 
   startRequest();
@@ -232,9 +231,9 @@ TEST_F(RocketmqRouterTest, ClusterMaintenanceMode) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*Cluster under maintenance*."));
-      }));
+      });
   EXPECT_CALL(
       *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_,
       maintenanceMode())
@@ -250,9 +249,9 @@ TEST_F(RocketmqRouterTest, NoHealthyHosts) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*No host available*."));
-      }));
+      });
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_,
               tcpConnPool(_, _))
       .WillOnce(Return(std::nullopt));
@@ -267,9 +266,9 @@ TEST_F(RocketmqRouterTest, NoRouteForRequest) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*No route for current request*."));
-      }));
+      });
   EXPECT_CALL(*active_message_, route()).WillRepeatedly(Return(nullptr));
   EXPECT_CALL(*active_message_, onReset());
 
@@ -368,9 +367,9 @@ TEST_F(RocketmqRouterTest, ReceivedSendMessageResponseWithDecodeError) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*Failed to decode response*."));
-      }));
+      });
 
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -390,9 +389,9 @@ TEST_F(RocketmqRouterTest, ReceivedSendMessageResponseWithDecodeError) {
   buffer.writeBEInt<int32_t>(json.size());
   buffer.add(json);
 
-  EXPECT_CALL(*active_message_, onReset()).WillRepeatedly(Invoke([&]() -> void {
+  EXPECT_CALL(*active_message_, onReset()).WillRepeatedly([&]() -> void {
     conn_manager_->deferredDelete(**conn_manager_->activeMessageList().begin());
-  }));
+  });
   EXPECT_CALL(*active_message_, onReset());
 
   LinkedList::moveIntoList(std::move(active_message_), conn_manager_->activeMessageList());
@@ -420,9 +419,9 @@ TEST_F(RocketmqRouterTest, UpstreamRemoteCloseMidResponse) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*Connection to upstream is closed*."));
-      }));
+      });
 
   startRequest();
   connectUpstream();
@@ -439,9 +438,9 @@ TEST_F(RocketmqRouterTest, UpstreamLocalCloseMidResponse) {
 
   EXPECT_CALL(*active_message_, onError(_))
       .Times(1)
-      .WillOnce(Invoke([&](absl::string_view error_message) -> void {
+      .WillOnce([&](absl::string_view error_message) -> void {
         EXPECT_THAT(error_message, ContainsRegex(".*Connection to upstream has been closed*."));
-      }));
+      });
 
   startRequest();
   connectUpstream();

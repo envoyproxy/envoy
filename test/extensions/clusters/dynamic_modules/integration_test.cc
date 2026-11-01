@@ -60,6 +60,9 @@ class DynamicModuleClusterIntegrationTest
 public:
   DynamicModuleClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
+  // Sets ClusterConfig.use_persistent_host_partitions on the DEC cluster.
+  bool use_persistent_host_partitions_{};
+
   void configureUpstreamTlsForLogicalHostname() {
     upstream_tls_ = true;
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -103,6 +106,7 @@ public:
       envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
       dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
       dec_config.set_cluster_name(cluster_name);
+      dec_config.set_use_persistent_host_partitions(use_persistent_host_partitions_);
 
       // Pass the upstream address via the cluster config so the Rust module knows
       // where to add hosts.
@@ -415,6 +419,140 @@ TEST_P(DynamicModuleClusterIntegrationTest, HealthyHostsBulkRebuild) {
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Drives adds, a removal and health flips from the module. Each worker counts once its healthy
+// partition holds just the upstream out of two hosts, and requests route only to that upstream.
+TEST_P(DynamicModuleClusterIntegrationTest, HostChurnConverges) {
+  concurrency_ = 2;
+  initializeWithDecCluster("host_churn");
+
+  test_server_->waitForCounter("dynamicmodulescustom.host_churn_converged_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Without persistent host partitions Envoy cannot report which hosts changed health.
+  EXPECT_EQ(0,
+            test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value());
+}
+
+// Runs the host update flows with the DEC cluster patching persistent host partitions by delta, on
+// the main thread and on the workers that adopt its snapshots.
+class DynamicModuleClusterPersistentPartitionsIntegrationTest
+    : public DynamicModuleClusterIntegrationTest {
+public:
+  DynamicModuleClusterPersistentPartitionsIntegrationTest() {
+    use_persistent_host_partitions_ = true;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DynamicModuleClusterPersistentPartitionsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, SyncHostSelection) {
+  initializeWithDecCluster("sync_host_selection");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, WorkerLocalPrioritySetRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("worker_local_rebuild");
+
+  test_server_->waitForCounter("dynamicmodulescustom.membership_hosts_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthyHostsBulkRebuild) {
+  concurrency_ = 2;
+  initializeWithDecCluster("healthy_hosts_rebuild");
+
+  test_server_->waitForCounter("dynamicmodulescustom.healthy_hosts_rebuilt_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HostChurnConverges) {
+  concurrency_ = 2;
+  initializeWithDecCluster("host_churn");
+
+  test_server_->waitForCounter("dynamicmodulescustom.host_churn_converged_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  // Envoy reports the health flips merged into each worker's later updates.
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
+}
+
+// Two health flips inside one update_merge_window, followed by a removal that cancels the merged
+// update. Each load balancer patches its healthy set only from the reported deltas, so it matches
+// Envoy's healthy hosts only if the removal's update carries both flips.
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthChangesMergedIntoRemoval) {
+  concurrency_ = 2;
+  initializeWithDecCluster("health_patch_removal");
+
+  // Stop here if the load balancers never converge, rather than waiting on a request with no host.
+  ASSERT_NO_FATAL_FAILURE(test_server_->waitForCounter(
+      "dynamicmodulescustom.health_patch_converged_total", testing::Ge(2)));
+  EXPECT_EQ(0, test_server_->counter("dynamicmodulescustom.health_patch_unknown_total")->value());
+  EXPECT_GE(test_server_->counter("cluster_manager.update_merge_cancelled")->value(), 1);
+  EXPECT_EQ(3, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Three health flips inside one update_merge_window, delivered together when the merge timer fires.
+TEST_P(DynamicModuleClusterPersistentPartitionsIntegrationTest, HealthChangesMergedByWindow) {
+  concurrency_ = 2;
+  initializeWithDecCluster("health_patch_window");
+
+  // Stop here if the load balancers never converge, rather than waiting on a request with no host.
+  ASSERT_NO_FATAL_FAILURE(test_server_->waitForCounter(
+      "dynamicmodulescustom.health_patch_converged_total", testing::Ge(2)));
+  EXPECT_EQ(0, test_server_->counter("dynamicmodulescustom.health_patch_unknown_total")->value());
+  EXPECT_GE(test_server_->counter("cluster_manager.cluster_updated_via_merge")->value(), 1);
+  EXPECT_EQ(4, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 

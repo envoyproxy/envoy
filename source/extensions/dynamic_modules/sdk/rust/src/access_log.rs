@@ -335,20 +335,20 @@ pub struct DownstreamWireBytes {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum AccessLogType {
-  NotSet = 0,
+  NotSet               = 0,
   TcpUpstreamConnected = 1,
-  TcpPeriodic = 2,
-  TcpConnectionEnd = 3,
-  DownstreamStart = 4,
-  DownstreamPeriodic = 5,
-  DownstreamEnd = 6,
-  UpstreamPoolReady = 7,
-  UpstreamPeriodic = 8,
-  UpstreamEnd = 9,
+  TcpPeriodic          = 2,
+  TcpConnectionEnd     = 3,
+  DownstreamStart      = 4,
+  DownstreamPeriodic   = 5,
+  DownstreamEnd        = 6,
+  UpstreamPoolReady    = 7,
+  UpstreamPeriodic     = 8,
+  UpstreamEnd          = 9,
   DownstreamTunnelSuccessfullyEstablished = 10,
   UdpTunnelUpstreamConnected = 11,
-  UdpPeriodic = 12,
-  UdpSessionEnd = 13,
+  UdpPeriodic          = 12,
+  UdpSessionEnd        = 13,
 }
 
 impl AccessLogType {
@@ -1543,7 +1543,7 @@ ffi_export! {
 #[macro_export]
 macro_rules! declare_access_logger {
   ($config_type:ty) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       fn __single_access_logger_factory(
         ctx: &$crate::access_log::ConfigContext,

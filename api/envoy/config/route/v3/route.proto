@@ -139,7 +139,8 @@ message RouteConfiguration {
   // Normally, virtual host matching is done using the :authority (or
   // Host: in HTTP < 2) HTTP header. Setting this will instead, use a
   // different HTTP header for this purpose.
-  string vhost_header = 18;
+  string vhost_header = 18
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
 
   // Ignore path-parameters in path-matching.
   // Before RFC3986, URI were like(RFC1808): <scheme>://<net_loc>/<path>;<params>?<query>#<fragment>

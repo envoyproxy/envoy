@@ -67,6 +67,23 @@ In single-backend mode, no ``id`` rewriting is performed since there is only one
 No configuration is required. The gateway advertises ``elicitation`` capability to clients
 automatically and handles the request/response routing based on the client's declared capabilities.
 
+.. _config_http_filters_mcp_router_session_signing_key:
+
+Session integrity
+~~~~~~~~~~~~~~~~~
+
+Composite session IDs are stateless: the route, the bound subject, and the per-backend session IDs
+are packed into a single blob that the client presents back on subsequent requests. When
+``session_signing_key`` is set, every minted session ID carries an HMAC-SHA256 of the blob keyed
+by that secret, and a presented session ID whose MAC does not verify is rejected with a 400 error.
+This binds every field of the blob, including the subject checked by the ``ENFORCE`` validation
+mode of ``session_identity``, to the server-held key.
+
+When ``session_signing_key`` is not set, session IDs are Base64 encoded only and clients can read
+and modify them. In that mode the ``ENFORCE`` subject check compares two values that are both
+ultimately client-controlled, so it does not bind the session to the authenticated identity and
+should only be relied on as a consistency check.
+
 .. _config_http_filters_mcp_router_statistics:
 
 Statistics

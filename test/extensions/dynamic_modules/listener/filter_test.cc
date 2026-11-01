@@ -84,13 +84,12 @@ public:
     EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"callout_cluster"}))
         .WillOnce(testing::Return(cluster.get()));
     EXPECT_CALL(cluster->async_client_, send_(testing::_, testing::_, testing::_))
-        .WillOnce(testing::Invoke(
-            [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
-              complete(callbacks, req);
-              return nullptr;
-            }));
+        .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+          complete(callbacks, req);
+          return nullptr;
+        });
 
     // The callout path calls shared_from_this, so the filter must be held by a shared_ptr.
     // Production wraps it in the forwarding adapter that the listener manager owns as a unique_ptr.

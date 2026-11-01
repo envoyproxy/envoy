@@ -128,11 +128,12 @@ public:
                                 const envoy_dynamic_module_type_module_key_value_pair* entries,
                                 size_t entries_size);
 
-  // Set a string value in filter state. When life_span is set, it is passed to setData.
-  static bool
-  setFilterStateBytes(StreamInfo::StreamInfo& stream_info, absl::string_view key,
-                      absl::string_view value,
-                      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt);
+  // Set a string value in filter state. When life_span or stream_sharing is set, it is passed to
+  // setData.
+  static bool setFilterStateBytes(
+      StreamInfo::StreamInfo& stream_info, absl::string_view key, absl::string_view value,
+      std::optional<StreamInfo::FilterState::LifeSpan> life_span = std::nullopt,
+      std::optional<StreamInfo::StreamSharingMayImpactPooling> stream_sharing = std::nullopt);
 
   // Set a typed filter state object from serialized bytes using the registered ObjectFactory.
   static bool

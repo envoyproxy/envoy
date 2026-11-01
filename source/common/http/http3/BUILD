@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/http:conn_pool_base_lib",
         "//source/common/quic:client_connection_factory_lib",
         "@quiche//:quic_core_deterministic_connection_id_generator_lib",
+        "@quiche//:quic_platform_hostname_utils",
     ]),
 )
 

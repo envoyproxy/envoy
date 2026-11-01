@@ -28,7 +28,9 @@ statistics:
    ``downstream_cx_upgrades_active``, Gauge, Total active upgraded connections. These are also counted as active http1/http2 connections.
    ``downstream_cx_http1_soft_drain``, Gauge, Total active HTTP/1.x connections waiting for another downstream request to safely close the connection.
    ``downstream_cx_http2_active``, Gauge, Total active HTTP/2 connections
+   ``downstream_cx_http2_idle``, Gauge, Total idle HTTP/2 connections
    ``downstream_cx_http3_active``, Gauge, Total active HTTP/3 connections
+   ``downstream_cx_http3_idle``, Gauge, Total idle HTTP/3 connections
    ``downstream_cx_protocol_error``, Counter, Total protocol errors
    ``downstream_cx_length_ms``, Histogram, Connection length milliseconds
    ``downstream_cx_rx_bytes_total``, Counter, Total bytes received
@@ -176,6 +178,7 @@ On the upstream side all http2 statistics are rooted at ``cluster.<name>.http2.`
    ``inbound_priority_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type PRIORITY. The limit is configured by setting the :ref:`max_inbound_priority_frames_per_stream config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_priority_frames_per_stream>`.
    ``inbound_window_update_frames_flood``, Counter, Total number of connections terminated for exceeding the limit on inbound frames of type WINDOW_UPDATE. The limit is configured by setting the :ref:`max_inbound_window_updateframes_per_data_frame_sent config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_inbound_window_update_frames_per_data_frame_sent>`.
    ``keepalive_timeout``, Counter, Total number of connections closed due to :ref:`keepalive timeout <envoy_v3_api_field_config.core.v3.KeepaliveSettings.timeout>`
+   ``metadata_dropped``, Counter, Total number of outbound metadata maps dropped because ``allow_metadata`` is not enabled on the connection.
    ``metadata_empty_frames``, Counter, Total number of metadata frames that were received and contained empty maps.
    ``outbound_control_frames_active``, Gauge, "Total outbound control frames that are active."
    ``outbound_control_flood``, Counter, "Total number of connections terminated for exceeding the limit on outbound frames of types PING, SETTINGS and RST_STREAM. The limit is configured by setting the :ref:`max_outbound_control_frames config setting <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_outbound_control_frames>`."
