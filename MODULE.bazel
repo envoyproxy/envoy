@@ -164,6 +164,21 @@ single_version_override(
 #     strip_prefix = "bazel",
 # )
 
+# TESTING: toolshed cvelist CVE scanning (envoyproxy/toolshed#5562), do not merge
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "e95aa47c6294a048a45b7b425e334840ebcde025",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "bazel",
+)
+
+git_override(
+    module_name = "envoy_toolshed_jq",
+    commit = "e95aa47c6294a048a45b7b425e334840ebcde025",
+    remote = "https://github.com/phlax/toolshed",
+    strip_prefix = "jq",
+)
+
 ####################################################################################
 # setup: Compilers
 ####################################################################################
