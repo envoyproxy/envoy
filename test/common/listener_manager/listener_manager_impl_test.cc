@@ -477,8 +477,15 @@ filter_chains:
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+#ifdef __linux__
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+#else
+  // Without reuse port, the new version of the listener cannot bind '127.0.0.1:1000' while the
+  // existing version holds it.
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+                          "'foo' has duplicate address");
+#endif
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
@@ -1042,13 +1049,10 @@ filter_chains:
   envoy::config::listener::v3::Listener listener_config =
       parseListenerFromV3Yaml(fmt::format(listener_yaml_tmpl, namespace_path));
 
-  auto status = manager_->addOrUpdateListener(listener_config, "", true);
-#if defined(__linux__)
-  // On Linux, adding the listener should succeed.
-  EXPECT_OK(status);
-#else
-  EXPECT_THAT(status, Not(IsOk()));
-#endif
+  // Adding the listener succeeds on every platform: the network namespace is entered when the
+  // (mocked) listener factory creates the socket, and it has no effect on platforms other than
+  // Linux.
+  EXPECT_OK(manager_->addOrUpdateListener(listener_config, "", true));
 }
 
 #if defined(__linux__)
