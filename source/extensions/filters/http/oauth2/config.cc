@@ -156,9 +156,11 @@ OAuth2Config::createFilterFactory(const envoy::extensions::filters::http::oauth2
         callbacks.addStreamFilter(std::make_shared<OAuth2Filter>(
             config,
             [&cluster_manager](const FilterConfig& active_config) -> std::shared_ptr<OAuth2Client> {
-              return std::make_shared<OAuth2ClientImpl>(
+              auto client = std::make_shared<OAuth2ClientImpl>(
                   cluster_manager, active_config.oauthTokenEndpoint(), active_config.retryPolicy(),
                   active_config.defaultExpiresIn());
+              client->setParEndpoint(active_config.parEndpoint());
+              return client;
             },
             [](TimeSource& time_source,
                const FilterConfig& active_config) -> std::shared_ptr<CookieValidator> {

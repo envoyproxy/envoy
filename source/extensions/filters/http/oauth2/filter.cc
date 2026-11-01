@@ -784,6 +784,7 @@ FilterConfig::FilterConfig(
     std::shared_ptr<SecretReader> secret_reader, Stats::Scope& scope,
     const std::string& stats_prefix, absl::Status& creation_status)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
+      par_endpoint_(proto_config.par_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
       end_session_endpoint_(proto_config.end_session_endpoint()),
       disable_post_logout_redirect_uri_(proto_config.post_logout_redirect_uri().disabled()),

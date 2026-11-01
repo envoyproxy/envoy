@@ -230,6 +230,7 @@ public:
     return allow_failed_header_matchers_;
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
+  const HttpUri& parEndpoint() const { return par_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
   const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
   const Formatter::Formatter* postLogoutRedirectUri() const {
@@ -336,6 +337,7 @@ private:
                                    const std::string& filter_stats_prefix, Stats::Scope& scope);
 
   const HttpUri oauth_token_endpoint_;
+  const HttpUri par_endpoint_;
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
