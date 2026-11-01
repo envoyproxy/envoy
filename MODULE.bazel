@@ -159,7 +159,7 @@ single_version_override(
 #
 # git_override(
 #     module_name = "envoy_toolshed",
-#     commit = "326c791d55c69748f17079f0c5c2b859c0f35b2e",
+#     commit = "ee8722487ac054bb3d1b0f5c67982c3a4a34cf4f",
 #     remote = "https://github.com/envoyproxy/toolshed",
 #     strip_prefix = "bazel",
 # )
@@ -167,14 +167,14 @@ single_version_override(
 # TESTING: toolshed cvelist CVE scanning (envoyproxy/toolshed#5562), do not merge
 git_override(
     module_name = "envoy_toolshed",
-    commit = "326c791d55c69748f17079f0c5c2b859c0f35b2e",
+    commit = "ee8722487ac054bb3d1b0f5c67982c3a4a34cf4f",
     remote = "https://github.com/phlax/toolshed",
     strip_prefix = "bazel",
 )
 
 git_override(
     module_name = "envoy_toolshed_jq",
-    commit = "326c791d55c69748f17079f0c5c2b859c0f35b2e",
+    commit = "ee8722487ac054bb3d1b0f5c67982c3a4a34cf4f",
     remote = "https://github.com/phlax/toolshed",
     strip_prefix = "jq",
 )
@@ -182,7 +182,7 @@ git_override(
 # `rules_jq` is not in the registry commit pinned in .bazelrc
 git_override(
     module_name = "rules_jq",
-    commit = "326c791d55c69748f17079f0c5c2b859c0f35b2e",
+    commit = "ee8722487ac054bb3d1b0f5c67982c3a4a34cf4f",
     remote = "https://github.com/phlax/toolshed",
     strip_prefix = "rules_jq",
 )
