@@ -167,6 +167,11 @@ public:
     return reset_headers_;
   }
   bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
+  RetryStatePtr createRetryState(Http::RequestHeaderMap& request_headers,
+                                 const Upstream::ClusterInfo& cluster,
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override;
 
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
@@ -250,6 +255,7 @@ public:
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
   MOCK_METHOD(bool, wouldRetryFromRetriableStatusCode, (Http::Code code), (const));
   MOCK_METHOD(DoRetryType, doRetryType, (), (const));
+  MOCK_METHOD(bool, isAutomaticallyConfiguredForHttp3, (), (const));
 
   DoRetryCallback callback_;
 };

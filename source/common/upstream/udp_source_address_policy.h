@@ -30,7 +30,8 @@ public:
   static UdpSourceAddressPolicy
   fromUpstreamLocalAddress(UpstreamLocalAddress upstream_local_address);
   static UdpSourceAddressPolicy
-  transparent(Network::Address::InstanceConstSharedPtr source_address);
+  transparent(Network::Address::InstanceConstSharedPtr source_address,
+              Network::Address::InstanceConstSharedPtr bind_address = nullptr);
 
   Mode mode() const { return mode_; }
   bool shouldConnect() const { return mode_ != Mode::Transparent; }

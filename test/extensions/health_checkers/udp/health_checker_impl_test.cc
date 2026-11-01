@@ -33,7 +33,6 @@ namespace {
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -178,14 +177,14 @@ protected:
 
   void expectSend(SocketState& state, const std::string& expected) {
     EXPECT_CALL(*state.io_handle_, send(_, expected.size()))
-        .WillOnce(Invoke([expected](const void* data, size_t length) {
+        .WillOnce([expected](const void* data, size_t length) {
           if (length == 0) {
             EXPECT_TRUE(expected.empty());
           } else {
             EXPECT_EQ(expected, std::string(static_cast<const char*>(data), length));
           }
           return ioSuccess(length);
-        }));
+        });
     EXPECT_CALL(*state.io_handle_,
                 enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Closed));
   }
@@ -250,16 +249,16 @@ TEST_F(UdpHealthCheckerTest, ReleasesPreviousSocketBeforeRebindingFixedLocalPort
   startAndSend(first);
 
   EXPECT_CALL(*first.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(first.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_FALSE(*first.destroyed_);
 
   SocketState& second = queueSocket();
   EXPECT_CALL(*second.socket_, bind(cluster_->info_->source_address_))
-      .WillOnce(Invoke([destroyed = first.destroyed_](const auto&) {
+      .WillOnce([destroyed = first.destroyed_](const auto&) {
         EXPECT_TRUE(*destroyed);
         return Api::SysCallIntResult{0, 0};
-      }));
+      });
   expectSend(second, std::string("\x01\x02", 2));
   interval_timer_->invokeCallback();
   deferred_callback_->invokeCallback();
@@ -271,7 +270,7 @@ TEST_F(UdpHealthCheckerTest, ExactDatagramSucceeds) {
   startAndSend(state);
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
 
   EXPECT_EQ(1, counter("success"));
@@ -288,7 +287,7 @@ TEST_F(UdpHealthCheckerTest, SentBytesSelectRegularInterval) {
   startAndSend(state);
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
@@ -305,7 +304,7 @@ TEST_F(UdpHealthCheckerTest, ReceivedBytesSelectRegularInterval) {
   startAndSend(state);
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(1000), _));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
@@ -319,18 +318,18 @@ TEST_F(UdpHealthCheckerTest, IgnoresMismatchesUntilExactDatagramArrives) {
   startAndSend(state);
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x05", 2))))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03", 1))))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04\x05", 3))))
-      .WillOnce(Invoke([](void*, size_t, int) { return ioMessageTooBig(); }))
-      .WillOnce(Invoke([](void*, size_t, int) { return ioAgain(); }));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x05", 2)))
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03", 1)))
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04\x05", 3)))
+      .WillOnce([](void*, size_t, int) { return ioMessageTooBig(); })
+      .WillOnce([](void*, size_t, int) { return ioAgain(); });
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_EQ(0, counter("success"));
   EXPECT_EQ(0, counter("failure"));
   EXPECT_TRUE(timeout_timer_->enabled());
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_EQ(1, counter("success"));
 }
@@ -339,8 +338,8 @@ TEST_F(UdpHealthCheckerTest, RetriesWouldBlockSendWithoutSendingTwice) {
   initialize();
   SocketState& state = queueSocket();
   EXPECT_CALL(*state.io_handle_, send(_, 2))
-      .WillOnce(Invoke([](const void*, size_t) { return ioAgain(); }))
-      .WillOnce(Invoke([](const void*, size_t length) { return ioSuccess(length); }));
+      .WillOnce([](const void*, size_t) { return ioAgain(); })
+      .WillOnce([](const void*, size_t length) { return ioSuccess(length); });
   EXPECT_CALL(*state.io_handle_,
               enableFileEvents(Event::FileReadyType::Write | Event::FileReadyType::Closed));
   EXPECT_CALL(*state.io_handle_,
@@ -353,7 +352,7 @@ TEST_F(UdpHealthCheckerTest, RetriesWouldBlockSendWithoutSendingTwice) {
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Write).ok());
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_EQ(1, counter("success"));
 }
@@ -362,8 +361,8 @@ TEST_F(UdpHealthCheckerTest, RetriesInterruptedSendAndReceive) {
   initialize();
   SocketState& state = queueSocket();
   EXPECT_CALL(*state.io_handle_, send(_, 2))
-      .WillOnce(Invoke([](const void*, size_t) { return ioInterrupt(); }))
-      .WillOnce(Invoke([](const void*, size_t length) { return ioSuccess(length); }));
+      .WillOnce([](const void*, size_t) { return ioInterrupt(); })
+      .WillOnce([](const void*, size_t length) { return ioSuccess(length); });
   EXPECT_CALL(*state.io_handle_,
               enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Closed));
   expectSession();
@@ -371,8 +370,8 @@ TEST_F(UdpHealthCheckerTest, RetriesInterruptedSendAndReceive) {
   deferred_callback_->invokeCallback();
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke([](void*, size_t, int) { return ioInterrupt(); }))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce([](void*, size_t, int) { return ioInterrupt(); })
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_EQ(1, counter("success"));
 }
@@ -382,7 +381,7 @@ TEST_F(UdpHealthCheckerTest, ReactivatesWriteAfterBoundedInterrupts) {
   SocketState& state = queueSocket();
   EXPECT_CALL(*state.io_handle_, send(_, 2))
       .Times(MaxSendAttemptsPerInvocation)
-      .WillRepeatedly(Invoke([](const void*, size_t) { return ioInterrupt(); }));
+      .WillRepeatedly([](const void*, size_t) { return ioInterrupt(); });
   EXPECT_CALL(*state.io_handle_,
               enableFileEvents(Event::FileReadyType::Write | Event::FileReadyType::Closed));
   EXPECT_CALL(*state.io_handle_, activateFileEvents(Event::FileReadyType::Write));
@@ -401,12 +400,12 @@ TEST_F(UdpHealthCheckerTest, ReactivatesReadAfterBoundedBatch) {
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
       .Times(Network::NUM_DATAGRAMS_PER_RECEIVE)
-      .WillRepeatedly(Invoke(makeReceiveDatagramAction(std::string("\x03\x05", 2))));
+      .WillRepeatedly(makeReceiveDatagramAction(std::string("\x03\x05", 2)));
   EXPECT_CALL(*state.io_handle_, activateFileEvents(Event::FileReadyType::Read));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_EQ(1, counter("success"));
 }
@@ -463,9 +462,9 @@ TEST_F(UdpHealthCheckerTest, ClosedEventIsNetworkFailure) {
 TEST_F(UdpHealthCheckerTest, PartialSendIsNetworkFailure) {
   initialize();
   SocketState& state = queueSocket();
-  EXPECT_CALL(*state.io_handle_, send(_, 2)).WillOnce(Invoke([](const void*, size_t) {
+  EXPECT_CALL(*state.io_handle_, send(_, 2)).WillOnce([](const void*, size_t) {
     return ioSuccess(1);
-  }));
+  });
   expectSession();
   health_checker_->start();
   expectNetworkFailureLogs();
@@ -563,9 +562,9 @@ TEST_F(UdpHealthCheckerTest, ConnectFailureIsDeferredAndReportedOnce) {
 TEST_F(UdpHealthCheckerTest, SendFailureIsDeferredAndReportedOnce) {
   initialize();
   SocketState& state = queueSocket();
-  EXPECT_CALL(*state.io_handle_, send(_, 2)).WillOnce(Invoke([](const void*, size_t) {
+  EXPECT_CALL(*state.io_handle_, send(_, 2)).WillOnce([](const void*, size_t) {
     return ioError();
-  }));
+  });
   expectSession();
 
   health_checker_->start();
@@ -583,9 +582,9 @@ TEST_F(UdpHealthCheckerTest, ReceiveSocketErrorIsNetworkFailure) {
   SocketState& state = queueSocket();
   startAndSend(state);
 
-  EXPECT_CALL(*state.io_handle_, recv(_, 3, 0)).WillOnce(Invoke([](void*, size_t, int) {
+  EXPECT_CALL(*state.io_handle_, recv(_, 3, 0)).WillOnce([](void*, size_t, int) {
     return ioError();
-  }));
+  });
   expectNetworkFailureLogs();
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
 
@@ -600,7 +599,7 @@ TEST_F(UdpHealthCheckerTest, StaleReadEventAfterSuccessIsIgnored) {
   startAndSend(state);
 
   EXPECT_CALL(*state.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
 
@@ -615,7 +614,7 @@ TEST_F(UdpHealthCheckerTest, CreatesFreshSocketForEveryAttempt) {
   startAndSend(first);
 
   EXPECT_CALL(*first.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(first.file_ready_cb_(Event::FileReadyType::Read).ok());
 
   SocketState& second = queueSocket();
@@ -635,7 +634,7 @@ TEST_F(UdpHealthCheckerTest, RetainsPreviousSocketAcrossReplacementConnectFailur
   startAndSend(first);
 
   EXPECT_CALL(*first.io_handle_, recv(_, 3, 0))
-      .WillOnce(Invoke(makeReceiveDatagramAction(std::string("\x03\x04", 2))));
+      .WillOnce(makeReceiveDatagramAction(std::string("\x03\x04", 2)));
   EXPECT_TRUE(first.file_ready_cb_(Event::FileReadyType::Read).ok());
 
   SocketState& second = queueSocket({-1, SOCKET_ERROR_CONNRESET});
@@ -656,7 +655,7 @@ TEST_F(UdpHealthCheckerTest, SupportsEmptyBinaryDatagrams) {
   SocketState& state = queueSocket();
   startAndSend(state, "");
 
-  EXPECT_CALL(*state.io_handle_, recv(_, 1, 0)).WillOnce(Invoke(makeReceiveDatagramAction("")));
+  EXPECT_CALL(*state.io_handle_, recv(_, 1, 0)).WillOnce(makeReceiveDatagramAction(""));
   EXPECT_TRUE(state.file_ready_cb_(Event::FileReadyType::Read).ok());
   EXPECT_EQ(1, counter("success"));
 }

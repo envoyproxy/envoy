@@ -23,9 +23,12 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/stats:stats_macros",
+        "//source/common/config:well_known_names",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/common/stats:utility_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/network/local_ratelimit/v3:pkg_cc_proto",
     ],
 )

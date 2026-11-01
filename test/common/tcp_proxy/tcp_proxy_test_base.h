@@ -41,7 +41,6 @@ namespace TcpProxy {
 
 namespace {
 using ::testing::_;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::ReturnPointee;
 using ::testing::SaveArg;
@@ -62,9 +61,9 @@ public:
     ON_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_, write(_))
         .WillByDefault(SaveArg<0>(&access_log_data_));
     ON_CALL(filter_callbacks_.connection_.stream_info_, setUpstreamClusterInfo(_))
-        .WillByDefault(Invoke([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
+        .WillByDefault([this](const Upstream::ClusterInfoConstSharedPtr& cluster_info) {
           upstream_cluster_ = cluster_info;
-        }));
+        });
     ON_CALL(filter_callbacks_.connection_.stream_info_, upstreamClusterInfo())
         .WillByDefault([this]() -> OptRef<const Upstream::ClusterInfo> {
           return makeOptRefFromPtr<const Upstream::ClusterInfo>(upstream_cluster_.get());
@@ -140,13 +139,13 @@ public:
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
     }
     EXPECT_CALL(*upstream_connection_data_.at(conn_index), addUpstreamCallbacks(_))
-        .WillOnce(Invoke([=, this](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
+        .WillOnce([=, this](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
 
           // Simulate TCP conn pool upstream callbacks. This is safe because the TCP proxy never
           // releases a connection so all events go to the same UpstreamCallbacks instance.
           upstream_connections_.at(conn_index)->addConnectionCallbacks(cb);
-        }));
+        });
     EXPECT_CALL(*upstream_connections_.at(conn_index), enableHalfClose(true));
     conn_pool_callbacks_.at(conn_index)
         ->onPoolReady(std::move(upstream_connection_data_.at(conn_index)),

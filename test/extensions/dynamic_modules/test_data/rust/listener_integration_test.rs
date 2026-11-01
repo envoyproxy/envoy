@@ -94,7 +94,7 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for BufferReadFilter {
     let chunk = envoy_filter
       .get_buffer_chunk()
       .expect("expected buffer chunk");
-    assert_eq!(&chunk.as_slice()[..4], b"ping");
+    assert_eq!(&chunk.as_slice()[.. 4], b"ping");
     assert_eq!(envoy_filter.max_read_bytes(), 4);
     abi::envoy_dynamic_module_type_on_listener_filter_status::Continue
   }
@@ -163,8 +163,8 @@ impl<ELF: EnvoyListenerFilter> ListenerFilter<ELF> for HttpCalloutOnAcceptFilter
 // =============================================================================
 
 // Issues an HTTP callout on accept and increments a counter from on_http_callout_done. The unit
-// tests complete the callout inline, so the gate must keep on_http_callout_done from running and the
-// counter must stay at zero.
+// tests complete the callout inline, so the gate must keep on_http_callout_done from running and
+// the counter must stay at zero.
 struct HttpCalloutReentrancyProbeFilterConfig {
   callout_done_total: EnvoyCounterId,
 }

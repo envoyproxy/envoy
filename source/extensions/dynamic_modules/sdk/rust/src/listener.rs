@@ -1,7 +1,14 @@
 use crate::buffer::EnvoyBuffer;
 use crate::{
-  abi, drop_wrapped_c_void_ptr, ffi_export, str_to_module_buffer, wrap_into_c_void_ptr,
-  EnvoyCounterId, EnvoyGaugeId, EnvoyHistogramId, NewListenerFilterConfigFunction,
+  abi,
+  drop_wrapped_c_void_ptr,
+  ffi_export,
+  str_to_module_buffer,
+  wrap_into_c_void_ptr,
+  EnvoyCounterId,
+  EnvoyGaugeId,
+  EnvoyHistogramId,
+  NewListenerFilterConfigFunction,
   NEW_LISTENER_FILTER_CONFIG_FUNCTION,
 };
 #[cfg(any(test, feature = "mock"))]

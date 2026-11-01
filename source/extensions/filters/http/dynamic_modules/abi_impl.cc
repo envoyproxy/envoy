@@ -536,6 +536,20 @@ toFilterStateLifeSpan(envoy_dynamic_module_type_filter_state_life_span life_span
   return StreamInfo::FilterState::LifeSpan::FilterChain;
 }
 
+StreamInfo::StreamSharingMayImpactPooling
+toFilterStateStreamSharing(envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing) {
+  switch (stream_sharing) {
+  case envoy_dynamic_module_type_filter_state_stream_sharing_None:
+    return StreamInfo::StreamSharingMayImpactPooling::None;
+  case envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnection:
+    return StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection;
+  case envoy_dynamic_module_type_filter_state_stream_sharing_SharedWithUpstreamConnectionOnce:
+    return StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnectionOnce;
+  }
+  IS_ENVOY_BUG("unknown filter state stream_sharing");
+  return StreamInfo::StreamSharingMayImpactPooling::None;
+}
+
 } // namespace
 
 extern "C" {
@@ -1032,8 +1046,13 @@ void envoy_dynamic_module_callback_http_send_response(
     details_view = "dynamic_module";
   }
 
-  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers, 0,
-                         details_view);
+  // For gRPC requests, keep a 200 reply as OK and let Envoy map any other code to a gRPC status.
+  const std::optional<Grpc::Status::GrpcStatus> grpc_status =
+      status_code == enumToInt(Http::Code::OK)
+          ? std::optional<Grpc::Status::GrpcStatus>(Grpc::Status::WellKnownGrpcStatus::Ok)
+          : std::nullopt;
+  filter->sendLocalReply(static_cast<Http::Code>(status_code), body_view, modify_headers,
+                         grpc_status, details_view);
 }
 
 void envoy_dynamic_module_callback_http_send_response_headers(
@@ -1632,6 +1651,24 @@ bool envoy_dynamic_module_callback_http_set_filter_state_bytes(
   }
   return ContextAccessor::setFilterStateBytes(*stream_info, absl::string_view(key.ptr, key.length),
                                               absl::string_view(value.ptr, value.length));
+}
+
+bool envoy_dynamic_module_callback_http_set_filter_state_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value,
+    envoy_dynamic_module_type_filter_state_life_span life_span,
+    envoy_dynamic_module_type_filter_state_stream_sharing stream_sharing) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (!stream_info) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "stream info is not available");
+    return false;
+  }
+  return ContextAccessor::setFilterStateBytes(*stream_info, absl::string_view(key.ptr, key.length),
+                                              absl::string_view(value.ptr, value.length),
+                                              toFilterStateLifeSpan(life_span),
+                                              toFilterStateStreamSharing(stream_sharing));
 }
 
 bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
@@ -2889,6 +2926,23 @@ bool envoy_dynamic_module_callback_http_get_upstream_remote_address(
   return true;
 }
 
+bool envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_envoy_buffer* result) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* stream_info = filter->streamInfo();
+  if (stream_info == nullptr) {
+    return false;
+  }
+  const auto& remote_address = stream_info->downstreamAddressProvider().directRemoteAddress();
+  if (remote_address == nullptr) {
+    return false;
+  }
+  const auto address = remote_address->asStringView();
+  *result = {.ptr = const_cast<char*>(address.data()), .length = address.size()};
+  return true;
+}
+
 size_t envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
@@ -3028,6 +3082,16 @@ void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     return;
   }
   downstream_callbacks->refreshRouteCluster();
+}
+
+void envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* stream_info = filter->streamInfo();
+  if (stream_info == nullptr) {
+    return;
+  }
+  stream_info->setShouldDrainConnectionUponCompletion(true);
 }
 
 } // extern "C"

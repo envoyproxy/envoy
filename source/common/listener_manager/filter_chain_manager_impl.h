@@ -251,6 +251,8 @@ public:
     return default_filter_chain_;
   }
 
+  const std::vector<FcdsSubscriptionHandleSharedPtr>& fcdsHandles() const { return fcds_handles_; }
+
 private:
   absl::Status convertIPsToTries();
   const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
@@ -482,6 +484,8 @@ public:
   // True when the subscribed chain is committed (active) in the shared manager, using the same
   // active-state test that publishes the worker TLS set.
   virtual bool isActive() const PURE;
+  // The committed chain that this handle subscribes to, or nullptr.
+  virtual Network::DrainableFilterChainSharedPtr activeFilterChain() const PURE;
 };
 using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
 
@@ -523,6 +527,10 @@ public:
   // True if the named subscription's committed (active) filter chain is present, using the same
   // active-state test that updateTlsState() publishes to workers. Main-thread only.
   bool isFilterChainActive(const std::string& filter_chain_name) const;
+
+  // The committed filter chain of the named subscription, or nullptr. Main-thread only.
+  Network::DrainableFilterChainSharedPtr
+  activeFilterChain(const std::string& filter_chain_name) const;
 
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;

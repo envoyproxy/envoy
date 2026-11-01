@@ -32,7 +32,6 @@
 using testing::_;
 using testing::Contains;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::IsSupersetOf;
 using testing::Key;
 using testing::NiceMock;
@@ -842,7 +841,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogCallsLoggers) {
 
   // Expect log() to be called once.
   EXPECT_CALL(*mock_log, log(_, _))
-      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         // Verify metadata was populated correctly.
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
@@ -856,7 +855,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogCallsLoggers) {
                 IsStructString("connection_key", "conn-123"),
                 IsStructString("worker_id", "worker_1"), IsStructString("connection_id", "555"),
                 IsStructString("error", "")));
-      }));
+      });
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
                             "my_upstream", "10.0.0.1:443", "conn-123", "worker_1", "555", "");
@@ -871,13 +870,13 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithError) {
 
   // Expect log() to be called with error metadata.
   EXPECT_CALL(*mock_log, log(_, _))
-      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
         EXPECT_THAT(metadata.fields(),
                     IsSupersetOf(StructMatchers(IsStructString("event", "handshake_failure"),
                                                 IsStructString("error", "connection refused"))));
-      }));
+      });
 
   extension_->emitAccessLog(time_system, "handshake_failure", "node1", "cluster1", "tenant1",
                             "my_upstream", "10.0.0.1:443", "conn-456", "worker_1", "456",
@@ -908,7 +907,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogConnectionClosedFullMet
   Event::SimulatedTimeSystem time_system;
 
   EXPECT_CALL(*mock_log, log(_, _))
-      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
         EXPECT_THAT(metadata.fields(),
@@ -922,7 +921,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogConnectionClosedFullMet
                                          IsStructString("worker_id", "worker_3"),
                                          IsStructString("connection_id", "1001"),
                                          IsStructString("error", "")));
-      }));
+      });
 
   extension_->emitAccessLog(time_system, "connection_closed", "node-abc", "cluster-xyz",
                             "tenant-123", "us-west-cluster", "192.168.1.100:8443", "conn-close-001",
@@ -936,7 +935,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithEmptyOptionalFields
   Event::SimulatedTimeSystem time_system;
 
   EXPECT_CALL(*mock_log, log(_, _))
-      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
         EXPECT_THAT(
@@ -949,7 +948,7 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogWithEmptyOptionalFields
                                  IsStructString("upstream_cluster", "my_upstream"),
                                  IsStructString("host_address", "10.0.0.1:443"),
                                  IsStructString("connection_key", "conn-empty")));
-      }));
+      });
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "",
                             "my_upstream", "10.0.0.1:443", "conn-empty", "", "", "");
@@ -962,10 +961,10 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogVerifiesMetadataNamespa
   Event::SimulatedTimeSystem time_system;
 
   EXPECT_CALL(*mock_log, log(_, _))
-      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& filter_metadata = stream_info.dynamicMetadata().filter_metadata();
         EXPECT_THAT(filter_metadata, UnorderedElementsAre(Key("envoy.reverse_tunnel.initiator")));
-      }));
+      });
 
   extension_->emitAccessLog(time_system, "handshake_success", "n", "c", "t", "u", "h", "k", "w",
                             "1", "");
@@ -978,11 +977,11 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, EmitAccessLogErrorFieldAlwaysPresent
   Event::SimulatedTimeSystem time_system;
 
   EXPECT_CALL(*mock_log, log(_, _))
-      .WillOnce(Invoke([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata =
             stream_info.dynamicMetadata().filter_metadata().at("envoy.reverse_tunnel.initiator");
         EXPECT_THAT(metadata.fields(), Contains(IsStructString("error", "")));
-      }));
+      });
 
   extension_->emitAccessLog(time_system, "handshake_success", "node1", "cluster1", "tenant1",
                             "upstream", "10.0.0.1:443", "conn-1", "worker_0", "1", "");

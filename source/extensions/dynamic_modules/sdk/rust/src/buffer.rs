@@ -312,7 +312,7 @@ mod tests {
     // The total is summed across many chunks so a fragmented buffer sizes correctly.
     static DATA: [u8; 1] = *b"a";
     let (chunks, total) = read_buffer_chunks(6, |ptr| {
-      for i in 0..6 {
+      for i in 0 .. 6 {
         unsafe {
           *ptr.add(i) = crate::abi::envoy_dynamic_module_type_envoy_buffer {
             ptr: DATA.as_ptr() as _,

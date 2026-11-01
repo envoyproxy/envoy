@@ -189,6 +189,9 @@ void GeoipProviderConfig::registerGeoDbStats(const absl::string_view& db_type) {
 
 void GeoipProviderConfig::setFieldKey(GeoField field, const std::string& value) {
   field_keys_[enumToInt(field)] = getOptionalString(value);
+  if (!value.empty()) {
+    field_key_names_.emplace_back(value);
+  }
 }
 
 void GeoipProviderConfig::incCounter(Stats::StatName name) {

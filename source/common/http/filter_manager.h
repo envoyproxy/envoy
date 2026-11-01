@@ -937,7 +937,9 @@ public:
   uint64_t streamId() const { return stream_id_; }
   Buffer::BufferMemoryAccountSharedPtr account() const { return account_; }
 
-  Buffer::InstancePtr& bufferedRequestData() { return buffered_request_data_; }
+  // Drains all request body buffered in the filter chain, in original stream order. Used to proxy
+  // the already-received body when the stream is recreated.
+  Buffer::InstancePtr takeBufferedRequestData();
 
   void contextOnContinue(ScopeTrackedObjectStack& tracked_object_stack);
 

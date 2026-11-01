@@ -1,3 +1,4 @@
+#include <cmath>
 #include <limits>
 #include <numeric>
 
@@ -53,6 +54,25 @@ Protobuf::Value parseYamlNode(const YAML::Node& node) {
       value.set_string_value(node.as<std::string>());
       break;
     }
+    // Untagged float literals stay strings (see fallback below); only explicit `!!float` is parsed
+    // as a number. Checked before the bool/int64 decoders, which ignore tags, so the tag wins.
+    if (node.Tag() == "tag:yaml.org,2002:float") {
+      double double_value;
+      if (!YAML::convert<double>::decode(node, double_value)) {
+        throw EnvoyException(fmt::format("Invalid !!float value '{}' at line {}, column {}",
+                                         node.Scalar(), node.Mark().line + 1,
+                                         node.Mark().column + 1));
+      }
+      if (std::isfinite(double_value)) {
+        value.set_number_value(double_value);
+      } else if (std::isnan(double_value)) {
+        // JSON numbers cannot encode NaN/Infinity, so use the proto3 JSON string forms instead.
+        value.set_string_value("NaN");
+      } else {
+        value.set_string_value(double_value > 0 ? "Infinity" : "-Infinity");
+      }
+      break;
+    }
     bool bool_value;
     if (YAML::convert<bool>::decode(node, bool_value)) {
       value.set_bool_value(bool_value);
@@ -72,8 +92,9 @@ Protobuf::Value parseYamlNode(const YAML::Node& node) {
       }
       break;
     }
-    // Fall back on string, including float/double case. When protobuf parse the JSON into a message
-    // it will convert based on the type in the message definition.
+    // Fall back on string for anything else, including untagged float/double literals. When
+    // protobuf parses the JSON into a message it will convert based on the type in the message
+    // definition.
     value.set_string_value(node.as<std::string>());
     break;
   }

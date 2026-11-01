@@ -226,7 +226,8 @@ def envoy_cc_test(
         flaky = False,
         env = {},
         rbe_pool = None,
-        exec_properties = {}):
+        exec_properties = {},
+        target_compatible_with = []):
     coverage_tags = tags + ([] if coverage else ["nocoverage"])
     exec_properties = envoy_exec_properties(rbe_pool, exec_properties)
     cc_test(
@@ -258,6 +259,7 @@ def envoy_cc_test(
         flaky = flaky,
         env = envoy_test_env(env),
         exec_properties = exec_properties,
+        target_compatible_with = target_compatible_with,
     )
 
 # Envoy C++ test targets loading dynamic modules should be specified with this macro.

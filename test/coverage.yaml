@@ -79,6 +79,7 @@ directories:
   source/extensions/stat_sinks/graphite_statsd: 82.8  # Death tests don't report LCOV
   source/extensions/stat_sinks/statsd: 85.2  # Death tests don't report LCOV
   source/extensions/tracers/zipkin: 96.2
+  source/extensions/transport_sockets/dynamic_modules: 84.0  # kTLS splice paths need the kernel tls module, absent in the coverage image.
   source/extensions/transport_sockets/proxy_protocol: 96.6
   source/extensions/transport_sockets/tls/cert_mappers/filter_state_override: 96.4
   source/extensions/transport_sockets/tls/cert_validator/spiffe: 96.7

@@ -113,7 +113,7 @@ public:
 
     if (!trust_bundle_file.empty()) {
       EXPECT_CALL(factory_context_.dispatcher_, createFilesystemWatcher_())
-          .WillRepeatedly(testing::Invoke([trust_bundle_file] {
+          .WillRepeatedly([trust_bundle_file] {
             Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
             EXPECT_CALL(*mock_watcher, addWatch(TestEnvironment::substitute(
                                                     "{{ test_rundir }}/test/common/tls/test_data/" +
@@ -121,7 +121,7 @@ public:
                                                 _, _))
                 .WillRepeatedly(testing::Return(absl::OkStatus()));
             return mock_watcher;
-          }));
+          });
     }
 
     absl::Status creation_status = absl::OkStatus();

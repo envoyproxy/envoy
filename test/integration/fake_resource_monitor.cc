@@ -16,6 +16,7 @@ absl::StatusOr<Server::ResourceMonitorPtr> FakeResourceMonitorFactory::createRes
     const Protobuf::Message&, Server::Configuration::ResourceMonitorFactoryContext& context) {
   auto monitor = std::make_unique<FakeResourceMonitor>(context.mainThreadDispatcher(), *this);
   monitor_ = monitor.get();
+  monitors_.push_back(monitor.get());
   return monitor;
 }
 

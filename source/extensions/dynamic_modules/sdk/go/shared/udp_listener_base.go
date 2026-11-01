@@ -1,3 +1,4 @@
+//go:generate mockgen -source=udp_listener_base.go -destination=mocks/mock_udp_listener_base.go -package=mocks
 package shared
 
 // UdpListenerFilterStatus controls whether Envoy continues UDP listener filter iteration.

@@ -57,6 +57,16 @@ public:
       parent_.invokeCallbackFromItem(name_, item_weak_ptr_, cluster_status);
     }
 
+    /**
+     * Invoke and drop every callback this worker has queued for the cluster name, not just the
+     * one this invoker was created for. Used when the main thread answers the request without
+     * leaving anything pending there: no later notification will reach this worker, so no
+     * callback for the name may be left behind waiting for one.
+     */
+    void invokeAllCallbacks(ClusterDiscoveryStatus cluster_status) const {
+      parent_.processClusterName(name_, cluster_status);
+    }
+
   private:
     friend class ClusterDiscoveryManager;
 

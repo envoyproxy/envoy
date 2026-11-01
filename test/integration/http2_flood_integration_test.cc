@@ -1255,7 +1255,9 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) 
   EXPECT_EQ(kResponseSize, body_bytes);
 
   const bool is_oghttp2 = std::get<1>(GetParam()) == Http2Impl::Oghttp2;
-  if (is_oghttp2) {
+  const bool cap_data_frames = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.http2_oghttp2_cap_data_frame_payload");
+  if (is_oghttp2 && !cap_data_frames) {
     // Frame size = min(connection window, stream window, peer SETTINGS_MAX_FRAME_SIZE) = 1 MiB.
     EXPECT_EQ(1, data_frames);
   } else {
@@ -1281,7 +1283,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) 
     }
   }
 
-  if (is_oghttp2) {
+  if (is_oghttp2 && !cap_data_frames) {
     // Legitimate flow-control replenishment is misclassified as a WINDOW_UPDATE flood and Envoy
     // terminates the connection.
     tcp_client_->waitForDisconnect();

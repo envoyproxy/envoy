@@ -26,6 +26,7 @@ namespace Http2 {
   COUNTER(inbound_priority_frames_flood)                                                           \
   COUNTER(inbound_window_update_frames_flood)                                                      \
   COUNTER(keepalive_timeout)                                                                       \
+  COUNTER(metadata_dropped)                                                                        \
   COUNTER(metadata_empty_frames)                                                                   \
   COUNTER(oghttp2_downstream_connections)                                                          \
   COUNTER(oghttp2_upstream_connections)                                                            \

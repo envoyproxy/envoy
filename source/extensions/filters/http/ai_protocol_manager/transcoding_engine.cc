@@ -1147,6 +1147,12 @@ StreamGrammar anthropicStreamFromIr() {
   };
 }
 
+// A binding Envoy defines. Its pattern is a constant, so it parses.
+LlmBindingConstSharedPtr builtInBinding(absl::string_view pattern,
+                                        std::vector<LlmBinding::Mutation>&& mutations) {
+  return std::make_shared<const LlmBinding>(*UriPattern::parse(pattern), std::move(mutations));
+}
+
 // Builds the declarative transcoding pack for Anthropic Messages <-> IR (OpenAI Chat).
 DialectTranscodePack createAnthropicTranscodePack() {
   return DialectTranscodePack{
@@ -1154,7 +1160,20 @@ DialectTranscodePack createAnthropicTranscodePack() {
       .request = {.to_ir = anthropicRequestToIr(), .from_ir = anthropicRequestFromIr()},
       .response = {.to_ir = anthropicResponseToIr(), .from_ir = anthropicResponseFromIr()},
       .stream = {.to_ir = anthropicStreamToIr(), .from_ir = anthropicStreamFromIr()},
+      // Claude on Vertex AI: the model in the path alone, and the Vertex API version in the body.
+      .client_bindings = {builtInBinding(
+          "/{version}/projects/{project}/locations/{location}/publishers/anthropic/models/"
+          "{model}:{rawPredict|streamRawPredict}",
+          {{.body_field = "model"},
+           {.body_field = "anthropic_version",
+            .value = nlohmann::json("vertex-2023-10-16"),
+            .keep_existing = true}})},
   };
+}
+
+// Gemini names the model and the streaming mode in the path alone.
+std::vector<LlmBinding::Mutation> geminiMutations() {
+  return {{.body_field = "model"}, {.body_field = "stream"}};
 }
 
 // Gemini GenerateContent request -> IR request.
@@ -1281,7 +1300,7 @@ TranscodeRuleSet geminiRequestFromIr() {
           TranscodeRule::move("tool_choice.type", "toolConfig.functionCallingConfig.mode"),
           TranscodeRule::drop("tool_choice"),
           // 5. Gemini has no stream options: it reports usage in every stream. `model` and
-          //    `stream` go in the request path instead; see the pack's `envelope`.
+          //    `stream` go in the request path instead; see the pack's `binding`.
           TranscodeRule::drop("stream_options"),
       });
 }
@@ -1499,14 +1518,15 @@ DialectTranscodePack createGeminiTranscodePack() {
       .request = {.to_ir = geminiRequestToIr(), .from_ir = geminiRequestFromIr()},
       .response = {.to_ir = geminiResponseToIr(), .from_ir = geminiResponseFromIr()},
       .stream = {.to_ir = geminiStreamToIr(), .from_ir = geminiStreamFromIr()},
-      // The Gemini API's layout. A route in front of another, such as Vertex AI's, rewrites the
-      // `/v1beta/models/` prefix.
-      .envelope =
-          PathTemplate{
-              .prefix = "/v1beta/models/",
-              .unary_method = ":generateContent",
-              .stream_method = ":streamGenerateContent?alt=sse",
-          },
+      // The Gemini API's layout. A request leaves in it unless a binding names another, such as
+      // Vertex AI's, which nests the same methods under a project and a location.
+      .binding =
+          builtInBinding("/v1beta/models/{model}:{generateContent|streamGenerateContent?alt=sse}",
+                         geminiMutations()),
+      .client_bindings = {builtInBinding(
+          "/{version}/projects/{project}/locations/{location}/publishers/google/models/"
+          "{model}:{generateContent|streamGenerateContent?alt=sse}",
+          geminiMutations())},
   };
 }
 
@@ -2371,18 +2391,21 @@ absl::Status TranscodeRule::apply(nlohmann::json& json, TranscodeContext* ctx) c
   }
 
   case Op::SetFromContext: {
-    const nlohmann::json* existing = findNodeByPath(json, target_segments_);
-    if (ctx == nullptr || (existing != nullptr && !existing->is_null())) {
+    if (ctx == nullptr) {
       return absl::OkStatus();
     }
+    const nlohmann::json* existing = findNodeByPath(json, target_segments_);
+    const bool unset = existing == nullptr || existing->is_null();
     switch (context_field_) {
     case ContextField::RequestModel:
+      // Replaces a model the backend named too: the client gets back the one it asked for, and
+      // which backend the gateway chose stays with the gateway.
       if (!ctx->request_model.empty()) {
         setNodeByPath(json, target_segments_, std::string(ctx->request_model));
       }
       break;
     case ContextField::NowUnixSeconds:
-      if (ctx->now_unix_seconds > 0) {
+      if (unset && ctx->now_unix_seconds > 0) {
         setNodeByPath(json, target_segments_, ctx->now_unix_seconds);
       }
       break;
@@ -2697,89 +2720,6 @@ absl::StatusOr<const DialectTranscodePack*> TranscodingEngine::findPack(LLMProto
 
 namespace {
 
-// What a request path names, per a dialect's `PathTemplate`.
-struct PathTarget {
-  std::string model;
-  bool stream{false};
-};
-
-// A method as a parsed path names it: without the query a rendered path adds.
-absl::string_view methodPath(absl::string_view method) {
-  return method.substr(0, method.find('?'));
-}
-
-// Parses `path` as one of `envelope`'s model methods: `.../{collection}/{model}{method}`, where
-// the collection is the last segment of the envelope's prefix.
-//
-// TODO(ginama): `readGeminiTarget()` in the request_info AI filter's extractor.cc parses the same
-// paths for the same reason. Have it read them through the engine rather than keep its own copy.
-std::optional<PathTarget> parseRequestPath(const PathTemplate& envelope, absl::string_view path) {
-  path = path.substr(0, path.find('?'));
-  const absl::string_view prefix = envelope.prefix;
-  const size_t collection = absl::StripSuffix(prefix, "/").rfind('/');
-  const size_t last_slash = path.rfind('/');
-  if (last_slash == absl::string_view::npos ||
-      !absl::EndsWith(path.substr(0, last_slash + 1),
-                      collection == absl::string_view::npos ? prefix : prefix.substr(collection))) {
-    return std::nullopt;
-  }
-  // The model is the segment's resource name, up to the colon that starts its custom method.
-  const absl::string_view segment = path.substr(last_slash + 1);
-  const size_t colon = segment.find(':');
-  if (colon == 0 || colon == absl::string_view::npos) {
-    return std::nullopt;
-  }
-  const absl::string_view method = segment.substr(colon);
-  const bool stream = method == methodPath(envelope.stream_method);
-  if (!stream && method != methodPath(envelope.unary_method)) {
-    return std::nullopt;
-  }
-  return PathTarget{std::string(segment.substr(0, colon)), stream};
-}
-
-// The model becomes a path segment, so anything that could escape one is refused.
-bool isModelId(absl::string_view model) {
-  return !model.empty() && std::all_of(model.begin(), model.end(), [](char c) {
-    return absl::ascii_isalnum(c) || c == '-' || c == '.' || c == '_';
-  });
-}
-
-// Request `ToIr`: writes what `request_path` names into the IR body, where the body does not name
-// it itself.
-void liftFromRequestPath(const PathTemplate& envelope, absl::string_view request_path,
-                         nlohmann::json& json) {
-  const std::optional<PathTarget> target = parseRequestPath(envelope, request_path);
-  if (!target.has_value() || !json.is_object()) {
-    return;
-  }
-  if (!json.contains(envelope.model_field)) {
-    json[envelope.model_field] = target->model;
-  }
-  if (target->stream && !json.contains(envelope.stream_field)) {
-    json[envelope.stream_field] = true;
-  }
-}
-
-// Request `FromIr`: moves what `envelope` names in the path out of the IR body, and returns the
-// path that names it.
-absl::StatusOr<std::string> renderRequestPath(const PathTemplate& envelope, LLMProtocol dialect,
-                                              nlohmann::json& json) {
-  const auto model = json.find(envelope.model_field);
-  if (model == json.end() || !model->is_string() ||
-      !isModelId(model->get_ref<const std::string&>())) {
-    return absl::InvalidArgumentError(absl::StrCat(llmProtocolName(dialect),
-                                                   " names the model in the request path, so `",
-                                                   envelope.model_field, "` must be a model id"));
-  }
-  const auto stream = json.find(envelope.stream_field);
-  const bool streaming = stream != json.end() && stream->is_boolean() && stream->get<bool>();
-  std::string path = absl::StrCat(envelope.prefix, model->get_ref<const std::string&>(),
-                                  streaming ? envelope.stream_method : envelope.unary_method);
-  json.erase(envelope.model_field);
-  json.erase(envelope.stream_field);
-  return path;
-}
-
 // The IR's `model`, which a request leg reports back through `TranscodeContext::ir_model`.
 std::string irModel(const nlohmann::json& json) {
   if (!json.is_object()) {
@@ -2789,18 +2729,22 @@ std::string irModel(const nlohmann::json& json) {
   return model != json.end() && model->is_string() ? model->get<std::string>() : "";
 }
 
-// Runs a request leg, moving what the dialect names in the request path (`pack.envelope`) between
-// the path and the body.
+// Runs a request leg, reading the client's binding into the body before the rules (`ToIr`), or
+// applying the backend's to the body after them (`FromIr`).
 absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirection direction,
                               TranscodeContext& ctx, nlohmann::json& json) {
-  const std::optional<PathTemplate>& envelope = pack.envelope;
   const bool is_ir = pack.protocol == TranscodingEngine::kIrProtocol;
   ctx.rewritten_path.reset();
+  ctx.read.reset();
+  ctx.unresolved = false;
   if (direction == TranscodeDirection::ToIr) {
     // The rules then see what the path names as if the body had named it.
-    if (envelope.has_value()) {
-      liftFromRequestPath(*envelope, ctx.request_path, json);
-    }
+    //
+    // TODO(ginama): `readGeminiTarget()` in the request_info AI filter's extractor.cc parses the
+    // same paths for the same reason. Have it read them through the engine rather than keep its own
+    // copy.
+    ctx.read = readClientPath(ctx.request_binding, pack.binding, pack.client_bindings,
+                              ctx.request_path, json);
     if (!is_ir) {
       absl::Status status = pack.request.to_ir.execute(json, &ctx);
       if (!status.ok()) {
@@ -2811,29 +2755,38 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
     return absl::OkStatus();
   }
 
+  const LlmBinding* binding =
+      ctx.response_binding != nullptr ? ctx.response_binding : pack.binding.get();
+  // What the client asked for is reported back first: the response echoes it, and the gateway
+  // keeps the backend it chose to itself. The resolved model then replaces it before the rules
+  // run, so it reaches the body or the path, whichever the dialect carries it in.
   ctx.ir_model = irModel(json);
+  if (!ctx.resolved_model.empty() && json.is_object()) {
+    json["model"] = std::string(ctx.resolved_model);
+  }
   if (!is_ir) {
     absl::Status status = pack.request.from_ir.execute(json, &ctx);
     if (!status.ok()) {
       return status;
     }
   }
-  // Rendered before validation, so what is validated is the body the upstream gets.
-  std::optional<std::string> path;
-  if (envelope.has_value()) {
-    absl::StatusOr<std::string> rendered = renderRequestPath(*envelope, pack.protocol, json);
-    if (!rendered.ok()) {
-      return rendered.status();
-    }
-    path = *std::move(rendered);
-  }
+  // Validated before the binding edits the body: a binding may move a field the schema requires
+  // into the path, as Claude on Vertex AI does with `model`.
   if (pack.dialect_schema != nullptr) {
     absl::Status status = pack.dialect_schema->validateRequest(json);
     if (!status.ok()) {
       return status;
     }
   }
-  ctx.rewritten_path = std::move(path);
+  if (binding == nullptr) {
+    return absl::OkStatus();
+  }
+  absl::StatusOr<std::optional<std::string>> path =
+      writeRequest(*binding, pack.binding.get(), ctx.arrived, json, ctx.unresolved);
+  if (!path.ok()) {
+    return path.status();
+  }
+  ctx.rewritten_path = *std::move(path);
   return absl::OkStatus();
 }
 
@@ -3077,14 +3030,15 @@ TranscodingEngine::finishStream(const TranscodeLeg& leg, TranscodeContext& ctx) 
   return emitted;
 }
 
-std::string TranscodingEngine::modelFromRequestPath(LLMProtocol dialect,
-                                                    absl::string_view path) const {
+std::string TranscodingEngine::modelFromRequestPath(LLMProtocol dialect, absl::string_view path,
+                                                    const LlmBindingConstSharedPtr& binding) const {
   const auto pack = packs_.find(dialect);
-  if (pack == packs_.end() || !pack->second.envelope.has_value()) {
-    return "";
-  }
-  std::optional<PathTarget> target = parseRequestPath(*pack->second.envelope, path);
-  return target.has_value() ? std::move(target->model) : "";
+  nlohmann::json scratch = nlohmann::json::object();
+  std::optional<LlmBindingRead> read =
+      pack != packs_.end() ? readClientPath(binding, pack->second.binding,
+                                            pack->second.client_bindings, path, scratch)
+                           : readClientPath(binding, nullptr, {}, path, scratch);
+  return read.has_value() ? std::move(read->model) : "";
 }
 
 } // namespace AiProtocolManager

@@ -19,4 +19,4 @@ url = "2"
 [lib]
 name = "envoy_dynamic_modules_builtin_extensions"
 path = "lib.rs"
-crate-type = ["staticlib"]
+crate-type = ["rlib"]

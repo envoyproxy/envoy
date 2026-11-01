@@ -194,7 +194,6 @@ envoy_cc_library(
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
@@ -250,6 +249,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:linked_object",
         "//source/common/network:connection_lib",
+        "//source/common/network:listen_socket_lib",
         "//source/common/network:listener_lib",
         "//source/common/stats:timespan_lib",
         "//source/server:active_listener_base",

@@ -78,12 +78,16 @@ public:
    * @param tags The tags associated with the tagged name.
    * @param name The tagged name, which is used to create the tagged stat name. If tags is empty,
    * this is ignored and base_name is used for both forms.
+   * @param sanitize Whether Utility::sanitizeStatsName is run over the names and tags while they
+   * are encoded. `false` exists only for backward compatibility: call sites whose stats predate
+   * this helper and were created from raw strings pass it to keep their historical flat names
+   * (e.g. a ':' in a configured prefix) unchanged. New stats must keep the default.
    *
    * Note: the names and tags are copied into a private pool, so the caller does not need to
    * maintain their lifetime after this constructor returns.
    */
   TaggedStatName(SymbolTable& symbol_table, absl::string_view base_name, TagStringViewSpan tags,
-                 absl::string_view name);
+                 absl::string_view name, bool sanitize = true);
 
   StatName name() const { return name_; }
   StatName baseName() const { return base_name_; }
@@ -131,12 +135,16 @@ public:
    * @param base_prefix The tag-extracted prefix to add to the stat names.
    * @param tags The tags to add to the stats.
    * @param prefix The flat prefix with the tag values interleaved. Ignored if tags is empty.
+   * @param sanitize Whether the names and tags are sanitized while they are encoded; `false` is
+   * only for backward compatibility with stat names that predate this helper. See the
+   * TaggedStatName constructor.
    *
    * The names and tags are encoded into, and owned by, a private pool.
    */
   LiteScopeHelper(Scope& scope, absl::string_view base_prefix, TagStringViewSpan tags = {},
-                  absl::string_view prefix = {})
-      : scope_(scope), owned_prefix_(std::in_place, scope.symbolTable(), base_prefix, tags, prefix),
+                  absl::string_view prefix = {}, bool sanitize = true)
+      : scope_(scope),
+        owned_prefix_(std::in_place, scope.symbolTable(), base_prefix, tags, prefix, sanitize),
         base_prefix_(owned_prefix_->baseName()), prefix_(owned_prefix_->name()),
         tags_(owned_prefix_->tags()) {}
 
@@ -291,6 +299,22 @@ Counter& counterFromStatNames(Scope& scope, const StatNameVec& names,
                               StatNameTagVectorOptConstRef tags = std::nullopt);
 
 /**
+ * Creates a counter with explicit tags from spans of StatNames, mirroring
+ * Scope::counterFromTaggedName. The tag-extracted name is built from base_names (no tag
+ * values) and the flat name from names (tag values interleaved); tags carry one
+ * {tag_name, value} per interleaved value. With empty tags the joined base_names name the stat
+ * and names is ignored.
+ *
+ * @param scope The scope in which to create the counter.
+ * @param base_names The span of StatNames without tag values.
+ * @param tags The tags of the counter.
+ * @param names The span of StatNames with tag values interleaved; ignored if tags is empty.
+ * @return A counter named using the joined names.
+ */
+Counter& counterFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                    StatNameSpan names);
+
+/**
  * Creates a gauge from a vector of tokens which are used to create the
  * name. The tokens can be specified as DynamicName or StatName. For
  * tokens specified as DynamicName, a dynamic StatName will be created. See
@@ -359,6 +383,20 @@ Histogram& histogramFromElements(Scope& scope, const ElementVec& elements, Histo
  */
 Histogram& histogramFromStatNames(Scope& scope, const StatNameVec& elements, Histogram::Unit unit,
                                   StatNameTagVectorOptConstRef tags = std::nullopt);
+
+/**
+ * Creates a histogram with explicit tags from spans of StatNames, mirroring
+ * Scope::histogramFromTaggedName. See counterFromTaggedStatNames for the parameter semantics.
+ *
+ * @param scope The scope in which to create the histogram.
+ * @param base_names The span of StatNames without tag values.
+ * @param tags The tags of the histogram.
+ * @param names The span of StatNames with tag values interleaved; ignored if tags is empty.
+ * @param unit The unit of measurement.
+ * @return A histogram named using the joined names.
+ */
+Histogram& histogramFromTaggedStatNames(Scope& scope, StatNameSpan base_names, StatNameTagSpan tags,
+                                        StatNameSpan names, Histogram::Unit unit);
 
 /**
  * Creates a TextReadout from a vector of tokens which are used to create the

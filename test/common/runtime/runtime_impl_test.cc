@@ -34,8 +34,6 @@
 #endif
 
 using testing::_;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
@@ -49,17 +47,17 @@ protected:
   LoaderImplTest() : api_(Api::createApiForTest(store_)) { local_info_.node_.set_cluster(""); }
 
   virtual void setup() {
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([this] {
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([this] {
       Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
       EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
           .WillRepeatedly(
-              Invoke([this](absl::string_view path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+              [this](absl::string_view path, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 EXPECT_EQ(path, expected_watch_root_);
                 on_changed_cbs_.emplace_back(cb);
                 return absl::OkStatus();
-              }));
+              });
       return mock_watcher;
-    }));
+    });
   }
 
   Event::MockDispatcher dispatcher_;
@@ -334,12 +332,12 @@ TEST_F(DiskLoaderImplTest, OverrideFolderDoesNotExist) {
 }
 
 TEST_F(DiskLoaderImplTest, FileDoesNotExist) {
-  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly(InvokeWithoutArgs([] {
+  EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([] {
     Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
     EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
         .WillRepeatedly(Return(absl::InvalidArgumentError("file does not exist")));
     return mock_watcher;
-  }));
+  });
 
   EXPECT_THROW_WITH_MESSAGE(
       run("test/common/runtime/test_data/current", "envoy_override_does_not_exist"), EnvoyException,
@@ -937,15 +935,15 @@ public:
     }
     EXPECT_CALL(cm_, subscriptionFactory()).Times(layers_.size());
     ON_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-        .WillByDefault(testing::Invoke(
-            [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
-                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
-                   const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
-              auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
-              rtds_subscriptions_.push_back(ret.get());
-              rtds_callbacks_.push_back(&callbacks);
-              return ret;
-            }));
+        .WillByDefault([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                              Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                              Config::OpaqueResourceDecoderSharedPtr,
+                              const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
+          auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
+          rtds_subscriptions_.push_back(ret.get());
+          rtds_callbacks_.push_back(&callbacks);
+          return ret;
+        });
     absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader = Runtime::LoaderImpl::create(
         dispatcher_, tls_, config, local_info_, store_, generator_, validation_visitor_, *api_);
     THROW_IF_NOT_OK_REF(loader.status());
@@ -1292,10 +1290,10 @@ TEST_F(RtdsLoaderImplTest, MultipleRtdsLayers) {
 TEST_F(RtdsLoaderImplTest, BadConfigSource) {
   Upstream::MockClusterManager cm_;
   EXPECT_CALL(cm_.subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(InvokeWithoutArgs([]() -> Config::SubscriptionPtr {
+      .WillOnce([]() -> Config::SubscriptionPtr {
         throw EnvoyException("bad config");
         return nullptr;
-      }));
+      });
 
   envoy::config::bootstrap::v3::LayeredRuntime config;
   auto* layer = config.add_layers();
