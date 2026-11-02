@@ -600,6 +600,55 @@ TEST_P(OauthIntegrationTest, RefreshTokenFlow) {
   doRefreshTokenFlow("token_secret_1", "hmac_secret_1");
 }
 
+class OauthClientAssertionIntegrationTest : public OauthIntegrationTest {
+public:
+  void setOauthConfig() override {
+    OauthIntegrationTest::setOauthConfig();
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          auto* filter = hcm.mutable_http_filters(0);
+          envoy::extensions::filters::http::oauth2::v3::OAuth2 oauth2;
+          ASSERT_TRUE(filter->typed_config().UnpackTo(&oauth2));
+          oauth2.mutable_config()->set_auth_type(
+              envoy::extensions::filters::http::oauth2::v3::OAuth2Config::CLIENT_ASSERTION);
+          std::ignore = filter->mutable_typed_config()->PackFrom(oauth2);
+        });
+  }
+
+  void checkClientSecretInRequest(absl::string_view assertion) override {
+    const auto params = Http::Utility::QueryParamsMulti::parseParameters(
+        oauth2_request_->body().toString(), 0, true);
+    EXPECT_EQ("foo", params.getFirstValue("client_id").value_or(""));
+    EXPECT_EQ(assertion, params.getFirstValue("client_assertion").value_or(""));
+    EXPECT_EQ("urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+              params.getFirstValue("client_assertion_type").value_or(""));
+    EXPECT_FALSE(params.getFirstValue("client_secret").has_value());
+    EXPECT_TRUE(oauth2_request_->headers().get(Http::CustomHeaders::get().Authorization).empty());
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OauthClientAssertionIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS_WITH_GCM_FLAG,
+                         OauthIntegrationTest::oauthIntegrationParamsToString);
+
+TEST_P(OauthClientAssertionIntegrationTest, AuthenticationAndRefreshUseRotatedAssertion) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "initial");
+  };
+  initialize();
+
+  doAuthenticationFlow("token_secret", "hmac_secret", TEST_STATE_CSRF_TOKEN, TEST_ENCODED_STATE,
+                       TEST_ENCRYPTED_CODE_VERIFIER);
+
+  TestEnvironment::renameFile(TestEnvironment::temporaryPath("token_secret_1.yaml"),
+                              TestEnvironment::temporaryPath("token_secret.yaml"));
+  test_server_->waitForCounter("sds.token.update_success", Eq(2), std::chrono::milliseconds(5000));
+
+  doRefreshTokenFlow("token_secret_1", "hmac_secret");
+}
+
 // Verify the behavior when the callback param is missing the state query param.
 TEST_P(OauthIntegrationTest, MissingStateParam) {
   on_server_init_function_ = [&]() {
