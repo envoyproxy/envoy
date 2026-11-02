@@ -86,7 +86,7 @@ public:
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
          Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
-         bool persistent_host_partitions_allowed = false);
+         bool persistent_host_partitions_allowed);
 
   ~DynamicModuleClusterConfig();
 
@@ -118,8 +118,8 @@ public:
   bool use_persistent_host_partitions_ = false;
   // Whether the module may set use_persistent_host_partitions_, which requires CLUSTER_PROVIDED.
   const bool persistent_host_partitions_allowed_;
-
-  const std::string& clusterName() const { return cluster_name_; }
+  // Set when the module asked for persistent host partitions and was refused.
+  bool persistent_host_partitions_refused_ = false;
 
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
@@ -266,6 +266,8 @@ private:
 
   // The PersistentHostSet at `priority`, created if missing. Only valid with persistent partitions.
   PersistentHostSet& persistentHostSet(uint32_t priority);
+  // Whether the host sets are PersistentHostSet. The factory is fixed once a host set exists.
+  bool usesPersistentHostSets() const;
   // Hands `snapshot`, returned by a PersistentHostSet change, to the priority set with its delta.
   void updateHostsFromSnapshot(uint32_t priority, Upstream::HostSetSnapshotConstSharedPtr snapshot,
                                const Upstream::HostVector& hosts_added,

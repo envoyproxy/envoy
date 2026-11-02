@@ -10586,9 +10586,9 @@ void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
  * made then off the main thread is reported as a bug. A refusal for the lb_policy is logged.
  *
  * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
- * @return true if the cluster will keep persistent host partitions, false if called after
- * envoy_dynamic_module_on_cluster_config_new returned or if the cluster's lb_policy is not
- * CLUSTER_PROVIDED.
+ * @return true if the cluster will keep persistent host partitions. It returns false on a null
+ * pointer, after envoy_dynamic_module_on_cluster_config_new returned, off the main thread, and
+ * when the cluster's lb_policy is not CLUSTER_PROVIDED.
  */
 bool envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
     envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr);

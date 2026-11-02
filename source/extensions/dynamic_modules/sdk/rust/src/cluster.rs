@@ -1002,9 +1002,7 @@ pub trait EnvoyClusterMetrics: Send + Sync {
   /// This is optional and must be called during config creation, before the cluster and its host
   /// sets exist. Returns `false` if called later or if the cluster's `lb_policy` is not
   /// `CLUSTER_PROVIDED`.
-  fn use_persistent_host_partitions(&self) -> bool {
-    false
-  }
+  fn use_persistent_host_partitions(&self) -> bool;
 
   // -------------------------------------------------------------------------
   // Define metrics (call during config creation).

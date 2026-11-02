@@ -366,10 +366,7 @@ bool envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions
     return false;
   }
   if (!config->persistent_host_partitions_allowed_) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), warn,
-                        "dynamic module cluster '{}': persistent host partitions require lb_policy "
-                        "CLUSTER_PROVIDED",
-                        config->clusterName());
+    config->persistent_host_partitions_refused_ = true;
     return false;
   }
   config->use_persistent_host_partitions_ = true;

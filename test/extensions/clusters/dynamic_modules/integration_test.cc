@@ -108,7 +108,9 @@ public:
       envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
       dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
       dec_config.set_cluster_name(cluster_name);
-      dec_config.set_use_persistent_host_partitions(use_persistent_host_partitions_);
+      if (use_persistent_host_partitions_) {
+        dec_config.mutable_use_persistent_host_partitions()->set_value(true);
+      }
 
       // Pass the upstream address via the cluster config so the Rust module knows
       // where to add hosts.
@@ -939,7 +941,9 @@ public:
     envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
     dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
     dec_config.set_cluster_name(module_opt_in ? "host_churn_module_opt_in" : "host_churn");
-    dec_config.set_use_persistent_host_partitions(!module_opt_in);
+    if (!module_opt_in) {
+      dec_config.mutable_use_persistent_host_partitions()->set_value(true);
+    }
     Protobuf::StringValue config_proto;
     config_proto.set_value(fake_upstreams_[0]->localAddress()->asString());
     std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
@@ -988,7 +992,10 @@ public:
   // host but must not hang or crash Envoy.
   std::string sendRequest() {
     auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    EXPECT_TRUE(response->waitForEndStream());
+    if (!response->waitForEndStream()) {
+      ADD_FAILURE() << "request did not end";
+      return "";
+    }
     return std::string(response->headers().getStatusValue());
   }
 
@@ -1029,9 +1036,9 @@ TEST_P(DynamicModuleClusterCdsIntegrationTest, CdsClusterKeepsPersistentHostPart
             2);
 }
 
-// Replaces the cluster back to back, each push applied while the previous cluster may still be
-// initializing or have its host churn pending, with requests in between, then removes and re-adds
-// it. Envoy keeps serving and the last cluster settles.
+// Replaces the cluster back to back, each push applied while the previous cluster's merged health
+// update may still be pending, with requests in between, then removes and re-adds it. Envoy keeps
+// serving and the last cluster settles.
 TEST_P(DynamicModuleClusterCdsIntegrationTest, CdsReplaceAndRemoveWhileInitializing) {
   concurrency_ = 2;
   initializeWithCds();
