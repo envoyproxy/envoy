@@ -101,7 +101,7 @@ void ossl_dlopen(int expected_major, int expected_minor) {
   }
 
   // Load libcrypto.so first, because libssl.so depends on it.
-  if ((libcrypto = dlopen(libcrypto_path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) == NULL) {
+  if ((libcrypto = dlopen(libcrypto_path, RTLD_NOW | RTLD_LOCAL)) == NULL) {
     bssl_compat_error("dlopen(%s) : %s\n", libcrypto_path, dlerror());
     exit(ELIBACC);
   }
@@ -131,10 +131,9 @@ void ossl_dlopen(int expected_major, int expected_minor) {
   }
 
   // Tell OpenSSL to use the tcmalloc malloc/realloc/free functions from the
-  // main executable. Without this, RTLD_DEEPBIND causes OpenSSL's allocations
-  // to resolve to glibc's malloc/realloc/free instead, resulting in OpenSSL
-  // using a completely separate heap. This defeats tcmalloc's performance
-  // benefits on the TLS hot path, and also makes all OpenSSL allocations
+  // main executable. OpenSSL uses its own allocator wrappers internally, so
+  // without this, OpenSSL allocations bypass tcmalloc, defeating its
+  // performance benefits on the TLS hot path and making OpenSSL allocations
   // invisible to tcmalloc's heap dumps.
   typedef int (*CRYPTO_set_mem_functions_fn)(
       void *(*malloc_fn)(size_t, const char *, int),
@@ -154,7 +153,7 @@ void ossl_dlopen(int expected_major, int expected_minor) {
 
   // Load libssl.so *after* calling CRYPTO_set_mem_functions() just in case
   // libssl.so has any library constructors that call OPENSSL_malloc().
-  if ((libssl = dlopen(libssl_path, RTLD_NOW | RTLD_LOCAL | RTLD_DEEPBIND)) == NULL) {
+  if ((libssl = dlopen(libssl_path, RTLD_NOW | RTLD_LOCAL)) == NULL) {
     bssl_compat_error("dlopen(%s) : %s\n", libssl_path, dlerror());
     exit(ELIBACC);
   }
