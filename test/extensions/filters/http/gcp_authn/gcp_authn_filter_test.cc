@@ -46,11 +46,11 @@ public:
               (override));
   MOCK_METHOD(void, fetchBoundJwt,
               (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-               const std::string& fingerprint, Callbacks& callbacks),
+               const std::string& fingerprint, const std::string& cert_pem, Callbacks& callbacks),
               (override));
   MOCK_METHOD(void, fetchBoundAccessToken,
               (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
-               const std::string& fingerprint, Callbacks& callbacks),
+               const std::string& fingerprint, const std::string& cert_pem, Callbacks& callbacks),
               (override));
   MOCK_METHOD(void, fetchIamAccessToken,
               (const envoy::extensions::filters::http::gcp_authn::v3::Audience& audience,
@@ -125,8 +125,9 @@ public:
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
   }
 
-  std::optional<std::string> getClientCertFingerprint(Upstream::ThreadLocalCluster* cluster) {
-    return filter_->getClientCertFingerprint(cluster);
+  std::optional<GcpAuthnFilter::ClientCertData>
+  getClientCertData(Upstream::ThreadLocalCluster* cluster) {
+    return filter_->getClientCertData(cluster);
   }
 
   void setupMockFilterMetadata(bool valid, const std::string& audience_url = "test") {
@@ -351,10 +352,11 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithBoundAccessToken) {
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
-  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "GET");
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
   EXPECT_EQ(message_->headers().Path()->value().getStringView(),
-            "/computeMetadata/v1/instance/service-accounts/default/"
-            "token?bindCertificateFingerprint=mock%252Bfingerprint%252Fbase64%253D");
+            "/computeMetadata/v1/instance/service-accounts/default/token");
+  EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
+                                           R"({"certificate_chain":"dummy cert PEM"})"));
 
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "200"},
@@ -547,6 +549,12 @@ TEST_F(GcpAuthnFilterTest, BoundJwtCacheMissAndInsert) {
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
 
+  EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
+  EXPECT_EQ(message_->headers().Path()->value().getStringView(),
+            "/computeMetadata/v1/instance/service-accounts/default/identity?audience=test");
+  EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
+                                           R"({"certificate_chain":"dummy cert PEM"})"));
+
   // Mock successful async HTTP client response.
   Envoy::Http::ResponseHeaderMapPtr resp_headers(new Envoy::Http::TestResponseHeaderMapImpl({
       {":status", "200"},
@@ -646,9 +654,9 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
   EXPECT_EQ(filter_config_->stats().bound_token_fingerprint_unavailable_.value(), 1);
 }
 
-TEST_F(GcpAuthnFilterTest, GetClientCertFingerprintWithNullClusterReturnsNullopt) {
+TEST_F(GcpAuthnFilterTest, GetClientCertDataWithNullClusterReturnsNullopt) {
   setupFilterAndCallback();
-  EXPECT_EQ(getClientCertFingerprint(nullptr), std::nullopt);
+  EXPECT_FALSE(getClientCertData(nullptr).has_value());
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyTlsCertificatesFails) {
@@ -957,8 +965,9 @@ TEST_F(GcpAuthnFilterTest, AudiencePrecedenceBoundAccessToken) {
   testAudiencePrecedence(
       audience,
       [](MockGcpAuthnClient& client) {
-        EXPECT_CALL(client, fetchBoundAccessToken(_, "mock_fingerprint_base64", _));
-        EXPECT_CALL(client, fetchBoundJwt(_, _, _)).Times(0);
+        EXPECT_CALL(client,
+                    fetchBoundAccessToken(_, "mock_fingerprint_base64", "dummy cert PEM", _));
+        EXPECT_CALL(client, fetchBoundJwt(_, _, _, _)).Times(0);
         EXPECT_CALL(client, fetchUnboundAccessToken(_, _)).Times(0);
         EXPECT_CALL(client, fetchUnboundJwt(_, _)).Times(0);
       },
@@ -974,8 +983,8 @@ TEST_F(GcpAuthnFilterTest, AudiencePrecedenceBoundJwt) {
   testAudiencePrecedence(
       audience,
       [](MockGcpAuthnClient& client) {
-        EXPECT_CALL(client, fetchBoundJwt(_, "mock_fingerprint_base64", _));
-        EXPECT_CALL(client, fetchBoundAccessToken(_, _, _)).Times(0);
+        EXPECT_CALL(client, fetchBoundJwt(_, "mock_fingerprint_base64", "dummy cert PEM", _));
+        EXPECT_CALL(client, fetchBoundAccessToken(_, _, _, _)).Times(0);
         EXPECT_CALL(client, fetchUnboundAccessToken(_, _)).Times(0);
         EXPECT_CALL(client, fetchUnboundJwt(_, _)).Times(0);
       },
@@ -991,8 +1000,8 @@ TEST_F(GcpAuthnFilterTest, AudiencePrecedenceUnboundAccessToken) {
       audience,
       [](MockGcpAuthnClient& client) {
         EXPECT_CALL(client, fetchUnboundAccessToken(_, _));
-        EXPECT_CALL(client, fetchBoundAccessToken(_, _, _)).Times(0);
-        EXPECT_CALL(client, fetchBoundJwt(_, _, _)).Times(0);
+        EXPECT_CALL(client, fetchBoundAccessToken(_, _, _, _)).Times(0);
+        EXPECT_CALL(client, fetchBoundJwt(_, _, _, _)).Times(0);
         EXPECT_CALL(client, fetchUnboundJwt(_, _)).Times(0);
       },
       /*is_bound=*/false);
@@ -1346,8 +1355,8 @@ TEST_F(GcpAuthnFilterTest, AudiencePrecedenceIamAccessToken) {
   setClient(std::move(mock_client));
 
   EXPECT_CALL(*mock_client_ptr, fetchIamAccessToken(_, _, _));
-  EXPECT_CALL(*mock_client_ptr, fetchBoundAccessToken(_, _, _)).Times(0);
-  EXPECT_CALL(*mock_client_ptr, fetchBoundJwt(_, _, _)).Times(0);
+  EXPECT_CALL(*mock_client_ptr, fetchBoundAccessToken(_, _, _, _)).Times(0);
+  EXPECT_CALL(*mock_client_ptr, fetchBoundJwt(_, _, _, _)).Times(0);
   EXPECT_CALL(*mock_client_ptr, fetchUnboundAccessToken(_, _)).Times(0);
   EXPECT_CALL(*mock_client_ptr, fetchUnboundJwt(_, _)).Times(0);
 

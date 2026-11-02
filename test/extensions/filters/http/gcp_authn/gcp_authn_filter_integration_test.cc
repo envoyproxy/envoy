@@ -161,32 +161,35 @@ public:
     EXPECT_TRUE(request_->complete());
   }
 
-  void waitForGcpAuthnServerResponseBoundJwt(const std::string& expected_fingerprint) {
+  void waitForGcpAuthnServerResponseBoundJwt(const std::string& expected_cert_pem,
+                                             absl::string_view response_token = MockTokenString) {
     AssertionResult result =
         fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_);
     RELEASE_ASSERT(result, result.message());
     result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, request_);
     RELEASE_ASSERT(result, result.message());
 
-    std::string expected_path = absl::StrCat(
-        "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://test.com",
-        "&bindCertificateFingerprint=",
-        Http::Utility::PercentEncoding::urlEncode(
-            Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
-
-    // Need to wait for headers complete before reading headers value.
-    result = request_->waitForHeadersComplete();
+    result = request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
+    EXPECT_EQ(request_->headers().Method()->value(), "POST");
     EXPECT_EQ(request_->headers().Host()->value(), "metadata.google.internal");
-    EXPECT_EQ(request_->headers().Path()->value(), expected_path);
+    EXPECT_EQ(request_->headers().Path()->value(),
+              "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://"
+              "test.com");
+    EXPECT_EQ(request_->headers().ContentType()->value(), "application/json; charset=utf-8");
+
+    Protobuf::Struct expected_body_struct;
+    (*expected_body_struct.mutable_fields())["certificate_chain"].set_string_value(
+        expected_cert_pem);
+    std::string expected_body;
+    std::ignore = Protobuf::util::MessageToJsonString(expected_body_struct, &expected_body);
+    EXPECT_TRUE(TestUtility::jsonStringEqual(request_->body().toString(), expected_body));
 
     // Send response headers with end_stream false because we want to add response body next.
     request_->encodeHeaders(default_response_headers_, false);
     // Send response data with end_stream true.
-    request_->encodeData(std::string(MockTokenString), true);
-    result = request_->waitForEndStream(*dispatcher_);
-    RELEASE_ASSERT(result, result.message());
+    request_->encodeData(std::string(response_token), true);
     // Verify the proxied request was received upstream, as expected.
     EXPECT_TRUE(request_->complete());
   }
@@ -217,13 +220,39 @@ public:
     EXPECT_TRUE(request_->complete());
   }
 
-  void waitForGcpAuthnServerResponseBoundAccessToken(const std::string& expected_fingerprint) {
-    std::string expected_path =
-        absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
-                     "?bindCertificateFingerprint=",
-                     Http::Utility::PercentEncoding::urlEncode(
-                         Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
-    waitForGcpAuthnServerResponseToken(expected_path);
+  void waitForGcpAuthnServerResponseBoundAccessToken(
+      const std::string& expected_cert_pem,
+      const std::string& expected_path =
+          "/computeMetadata/v1/instance/service-accounts/default/token") {
+    AssertionResult result =
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, request_);
+    RELEASE_ASSERT(result, result.message());
+
+    result = request_->waitForEndStream(*dispatcher_);
+    RELEASE_ASSERT(result, result.message());
+
+    EXPECT_EQ(request_->headers().Method()->value(), "POST");
+    EXPECT_EQ(request_->headers().Host()->value(), "metadata.google.internal");
+    EXPECT_EQ(request_->headers().Path()->value(), expected_path);
+    EXPECT_EQ(request_->headers().ContentType()->value(), "application/json; charset=utf-8");
+
+    Protobuf::Struct expected_body_struct;
+    (*expected_body_struct.mutable_fields())["certificate_chain"].set_string_value(
+        expected_cert_pem);
+    std::string expected_body;
+    std::ignore = Protobuf::util::MessageToJsonString(expected_body_struct, &expected_body);
+    EXPECT_TRUE(TestUtility::jsonStringEqual(request_->body().toString(), expected_body));
+
+    // Send response headers with end_stream false because we want to add response body next.
+    request_->encodeHeaders(default_response_headers_, false);
+    // Send response data with end_stream true.
+    const std::string json_body = absl::StrCat(R"({"access_token": ")", MockTokenString,
+                                               R"(", "expires_in": 3600, "token_type": "Bearer"})");
+    request_->encodeData(json_body, true);
+    // Verify the proxied request was received upstream, as expected.
+    EXPECT_TRUE(request_->complete());
   }
 
   // Send the request to destination upstream cluster
@@ -408,7 +437,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtSuccess) {
 
   // Configure cluster_0 to use TLS with client cert, and add bound_jwt audience metadata.
   // The GCP Authn filter will statically retrieve Envoy's client certificate configuration
-  // from this UpstreamTlsContext to compute its fingerprint for the bound JWT.
+  // from this UpstreamTlsContext for the bound JWT request and token caching.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
@@ -437,16 +466,12 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtSuccess) {
   // Initiate client connection.
   initiateClientConnection();
 
-  // Compute the expected client certificate fingerprint.
-  CertFingerprinterImpl fingerprinter;
   const std::string cert_path =
       TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
   const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
-  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
 
-  // Wait for the metadata server call and verify the path contains the fingerprint query
-  // parameter.
-  waitForGcpAuthnServerResponseBoundJwt(expected_fingerprint);
+  // Wait for the metadata server call and verify the POST body contains the certificate chain.
+  waitForGcpAuthnServerResponseBoundJwt(cert_pem);
 
   // Verify the token is appended to cluster_0's upstream call, and clean up.
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
@@ -490,37 +515,15 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtCacheHit) {
   // Initialize the HTTP integration test framework.
   HttpIntegrationTest::initialize();
 
-  // Compute the expected client certificate fingerprint.
-  CertFingerprinterImpl fingerprinter;
   const std::string cert_path =
       TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
   const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
-  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
 
   // First request: Cache Miss.
   initiateClientConnection();
 
   // Wait for metadata server call and respond with GoodTokenStr (exp = 2033, valid/cached).
-  AssertionResult result =
-      fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_gcp_authn_connection_);
-  RELEASE_ASSERT(result, result.message());
-  result = fake_gcp_authn_connection_->waitForNewStream(*dispatcher_, request_);
-  RELEASE_ASSERT(result, result.message());
-
-  std::string expected_path = absl::StrCat(
-      "/computeMetadata/v1/instance/service-accounts/default/identity?audience=http://test.com",
-      "&bindCertificateFingerprint=",
-      Http::Utility::PercentEncoding::urlEncode(
-          Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)));
-
-  result = request_->waitForHeadersComplete();
-  RELEASE_ASSERT(result, result.message());
-  EXPECT_EQ(request_->headers().Path()->value(), expected_path);
-
-  request_->encodeHeaders(default_response_headers_, false);
-  request_->encodeData(std::string(GoodTokenStr), true);
-  result = request_->waitForEndStream(*dispatcher_);
-  RELEASE_ASSERT(result, result.message());
+  waitForGcpAuthnServerResponseBoundJwt(cert_pem, GoodTokenStr);
 
   // Verify the request header added to cluster_0's upstream call has GoodTokenStr.
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/true,
@@ -550,7 +553,7 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenSuccess) {
 
   // Configure cluster_0 to use TLS with client cert, and add bound_access_token audience metadata.
   // The GCP Authn filter will statically retrieve Envoy's client certificate configuration
-  // from this UpstreamTlsContext to compute its fingerprint for the bound Access Token.
+  // from this UpstreamTlsContext for the bound Access Token request and token caching.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
@@ -579,16 +582,12 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenSuccess) {
   // Initiate client connection.
   initiateClientConnection();
 
-  // Compute the expected client certificate fingerprint.
-  CertFingerprinterImpl fingerprinter;
   const std::string cert_path =
       TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
   const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
-  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
 
-  // Wait for the metadata server call and verify the path contains the fingerprint query
-  // parameter.
-  waitForGcpAuthnServerResponseBoundAccessToken(expected_fingerprint);
+  // Wait for the metadata server call and verify the POST body contains the certificate chain.
+  waitForGcpAuthnServerResponseBoundAccessToken(cert_pem);
 
   // Verify the token is appended to cluster_0's upstream call, and clean up.
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
@@ -632,19 +631,15 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenCacheHit) {
   // Initialize the HTTP integration test framework.
   HttpIntegrationTest::initialize();
 
-  // Compute the expected client certificate fingerprint.
-  CertFingerprinterImpl fingerprinter;
   const std::string cert_path =
       TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
   const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
-  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
 
   // First request: Cache Miss.
   initiateClientConnection();
 
-  // Wait for the metadata server call and verify the path contains the fingerprint query
-  // parameter.
-  waitForGcpAuthnServerResponseBoundAccessToken(expected_fingerprint);
+  // Wait for the metadata server call and verify the POST body contains the certificate chain.
+  waitForGcpAuthnServerResponseBoundAccessToken(cert_pem);
 
   // Verify the token is appended to cluster_0's upstream call, and clean up.
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
@@ -733,20 +728,15 @@ TEST_P(GcpAuthnFilterIntegrationTest, BoundAccessTokenWithScopesSuccess) {
 
   initiateClientConnection();
 
-  CertFingerprinterImpl fingerprinter;
   const std::string cert_path =
       TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem");
   const std::string cert_pem = TestEnvironment::readFileToStringForTest(cert_path);
-  const std::string expected_fingerprint = fingerprinter.getFingerprintFromPem(cert_pem).value();
 
   const std::string expected_path =
-      absl::StrCat("/computeMetadata/v1/instance/service-accounts/default/token"
-                   "?bindCertificateFingerprint=",
-                   Http::Utility::PercentEncoding::urlEncode(
-                       Http::Utility::PercentEncoding::urlEncode(expected_fingerprint)),
-                   "&scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
+      "/computeMetadata/v1/instance/service-accounts/default/"
+      "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid";
 
-  waitForGcpAuthnServerResponseToken(expected_path);
+  waitForGcpAuthnServerResponseBoundAccessToken(cert_pem, expected_path);
 
   // Verify the token is appended to cluster_0's upstream call, and clean up.
   sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
