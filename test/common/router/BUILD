@@ -81,6 +81,7 @@ envoy_cc_test_library(
 envoy_cc_test_binary(
     name = "config_impl_test_static",
     rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
     deps = [
         ":config_impl_test_lib",
         "//test:main",
@@ -90,6 +91,7 @@ envoy_cc_test_binary(
 sh_binary(
     name = "corpus_from_config_impl_sh",
     srcs = ["corpus_from_config_impl.sh"],
+    tags = ["skip_on_windows"],
 )
 
 corpus_from_test_binary(
@@ -100,6 +102,7 @@ corpus_from_test_binary(
         "//conditions:default": {},
     }),
     script = ":corpus_from_config_impl_sh",
+    tags = ["skip_on_windows"],
     # test_binary uses cfg = "target" (not "exec") to preserve host/target
     # distinction needed for oss-fuzz builds.
     test_binary = ":config_impl_test_static",
@@ -110,6 +113,7 @@ pkg_files(
     testonly = 1,
     srcs = [":corpus_from_config_impl_dir"],
     strip_prefix = "corpus_from_config_impl_dir",
+    tags = ["skip_on_windows"],
 )
 
 pkg_tar(
@@ -117,6 +121,7 @@ pkg_tar(
     testonly = 1,
     srcs = [":corpus_from_config_impl_files"],
     extension = "tar.gz",
+    tags = ["skip_on_windows"],
 )
 
 envoy_cc_test(

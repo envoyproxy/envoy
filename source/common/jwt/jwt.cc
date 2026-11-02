@@ -72,6 +72,11 @@ Status Jwt::parseFromString(const std::string& jwt) {
     return Status::JwtHeaderBadKid;
   }
 
+  // Header may contain "x5t#S256" and "x5t". They are only used to select a key, so a value that
+  // is not a string is ignored.
+  header_getter.GetString("x5t#S256", &x5t_s256_);
+  header_getter.GetString("x5t", &x5t_);
+
   // Parse payload json
   payload_str_base64url_ = std::string(jwt_split[1]);
   if (!absl::WebSafeBase64Unescape(payload_str_base64url_, &payload_str_)) {
