@@ -2,6 +2,7 @@
 
 #include <openssl/crypto.h>
 
+#include <cstdint>
 #include <functional>
 #include <list>
 #include <memory>
@@ -285,7 +286,7 @@ void EnvoyQuicDispatcher::updateListenerConfig(Network::ListenerConfig& new_list
 }
 
 // Close all connections currently in the idle list.
-size_t EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
+uint64_t EnvoyQuicDispatcher::closeIdleQuicConnections(bool is_saturated) {
   // This method is called from the worker thread, triggered by the
   // Overload Manager.
   ASSERT(session_idle_list_ != nullptr);

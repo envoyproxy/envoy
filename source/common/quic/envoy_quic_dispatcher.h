@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -101,7 +102,7 @@ public:
                      const quic::QuicSocketAddress& peer_address,
                      const quic::QuicReceivedPacket& packet);
 
-  size_t closeIdleQuicConnections(bool is_saturated);
+  uint64_t closeIdleQuicConnections(bool is_saturated);
 
 protected:
   // quic::QuicDispatcher

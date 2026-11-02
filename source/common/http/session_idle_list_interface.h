@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cstddef>
+#include <cstdint>
 
 namespace Envoy {
 namespace Http {
@@ -33,7 +33,7 @@ public:
   // called by the worker thread when the system is overloaded. Returns the
   // number of terminated sessions.
   // NOLINTNEXTLINE(readability-identifier-naming)
-  virtual size_t MaybeTerminateIdleSessions(bool is_saturated) = 0;
+  virtual uint64_t MaybeTerminateIdleSessions(bool is_saturated) = 0;
 };
 
 } // namespace Http
