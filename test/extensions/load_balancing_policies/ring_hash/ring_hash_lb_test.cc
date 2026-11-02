@@ -1472,6 +1472,29 @@ TEST_P(RingHashLoadBalancerTest, ValidateEndpointsSkipsNullPriorityEntries) {
   EXPECT_OK(typed_config.validateEndpoints(priorities));
 }
 
+TEST_P(RingHashLoadBalancerTest, HostWeightsExceedingUint32MaxWithPendingDynamicRemoval) {
+  HostSharedPtr retained_host = makeTestHost(info_, "tcp://127.0.0.1:80", 3000000000U);
+  retained_host->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+  HostSharedPtr new_host = makeTestHost(info_, "tcp://127.0.0.1:81", 3000000000U);
+  hostSet().hosts_ = {retained_host, new_host};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  init();
+  // Both hosts are normalized proportionally onto the ring even though their weights sum above
+  // UINT32_MAX.
+  EXPECT_EQ(1024, lb_->stats().size_.value());
+  EXPECT_EQ(512, lb_->stats().min_hashes_per_host_.value());
+  EXPECT_EQ(512, lb_->stats().max_hashes_per_host_.value());
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  TestLoadBalancerContext context(0);
+  EXPECT_NE(nullptr, lb->chooseHost(&context).host);
+
+  retained_host->healthFlagClear(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+  EXPECT_ENVOY_BUG(hostSet().runCallbacks({}, {}),
+                   "weights should have been previously validated in validateEndpoints()");
+}
+
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

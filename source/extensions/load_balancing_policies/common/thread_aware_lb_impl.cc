@@ -1,5 +1,6 @@
 #include "source/extensions/load_balancing_policies/common/thread_aware_lb_impl.h"
 
+#include <limits>
 #include <memory>
 #include <random>
 
@@ -18,15 +19,21 @@ namespace {
 void normalizeHostWeights(const HostVector& hosts, double normalized_locality_weight,
                           NormalizedHostWeightVector& normalized_host_weights,
                           double& min_normalized_weight, double& max_normalized_weight) {
-  // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
-  // and making sure there was no overflow
+  // sum should be at most uint32_t max value for validated endpoints, unless removed hosts are
+  // temporarily retained with PENDING_DYNAMIC_REMOVAL alongside newly added hosts.
   uint64_t sum = 0;
+  bool has_pending_dynamic_removal = false;
   for (const auto& host : hosts) {
     sum += host->weight();
-    if (sum > std::numeric_limits<uint32_t>::max()) {
-      IS_ENVOY_BUG("weights should have been previously validated in validateEndpoints()");
-      return;
-    }
+    has_pending_dynamic_removal = has_pending_dynamic_removal ||
+                                  host->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
+  }
+  if (sum > std::numeric_limits<uint32_t>::max() && !has_pending_dynamic_removal) {
+    IS_ENVOY_BUG("weights should have been previously validated in validateEndpoints()");
+    return;
+  }
+  if (sum == 0) {
+    return;
   }
 
   for (const auto& host : hosts) {
