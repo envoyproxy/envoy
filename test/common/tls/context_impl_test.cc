@@ -179,7 +179,7 @@ require_client_certificate: true
 }
 
 #ifndef ENVOY_SSL_OPENSSL
-// Uses BoringSSL-only APIs (CBB, SSL_parse_client_hello).
+// Uses BoringSSL-only ClientHello building and parsing APIs.
 namespace {
 
 // Builds a ClientHello body (starting at legacy_version) that lists ecdsa_secp256r1_sha256 first in
