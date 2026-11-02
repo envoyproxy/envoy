@@ -2093,6 +2093,15 @@ TEST_F(McpJsonParserTest, NoMethodNoResultInvalid) {
   EXPECT_FALSE(parser_->isResponse());
 }
 
+TEST_F(McpJsonParserTest, MethodWithResultOrErrorIsNotResponse) {
+  parseJson(R"({"jsonrpc":"2.0","result":{},"id":1,"method":"ping"})");
+  EXPECT_FALSE(parser_->isResponse());
+
+  parser_->reset();
+  parseJson(R"({"jsonrpc":"2.0","id":1,"method":"ping","error":{"code":1,"message":"x"}})");
+  EXPECT_FALSE(parser_->isResponse());
+}
+
 TEST(McpJsonParserMemoryTest, HeavyObjectFieldsMemory) {
   // Test object payload memory usage via Envoy Memory Stats.
   std::string body =

@@ -153,7 +153,7 @@ public:
 
   // MCP validation getters
   bool isValidMcp() const { return is_valid_mcp_; }
-  bool isResponse() const { return has_result_ || has_error_; }
+  bool isResponse() const { return !has_method_ && (has_result_ || has_error_); }
   const std::string& getMethod() const { return method_; }
 
 private:
