@@ -75,6 +75,7 @@ jobs:
     uses: ./.github/workflows/_check_build_openssl.yml
     if: >-
       fromJSON(needs.load.outputs.request).run.check-build-openssl
+      || fromJSON(needs.load.outputs.request).run.check-build-openssl-asan
       || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
     needs:
     - load
@@ -154,6 +155,7 @@ jobs:
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
       && (fromJSON(needs.load.outputs.request).run.check-build
           || fromJSON(needs.load.outputs.request).run.check-build-openssl
+          || fromJSON(needs.load.outputs.request).run.check-build-openssl-asan
           || fromJSON(needs.load.outputs.request).run.check-build-openssl-presubmit
           || fromJSON(needs.load.outputs.request).run.check-coverage
           || fromJSON(needs.load.outputs.request).run.check-san)

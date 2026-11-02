@@ -921,6 +921,18 @@ case $CI_TARGET in
         build_openssl_presubmit
         ;;
 
+    openssl.asan)
+        echo "bazel ASAN/UBSAN build with OpenSSL compat layer tests"
+        BAZEL_BUILD_OPTIONS+=("--config=openssl")
+        bazel_with_collection test \
+            --config=asan \
+            --dynamic_mode=off \
+            --copt=-fno-sanitize=function \
+            --linkopt=-fno-sanitize=function \
+            "${BAZEL_BUILD_OPTIONS[@]}" \
+            //compat/openssl/test/...
+        ;;
+
     publish)
         BUILD_SHA="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"

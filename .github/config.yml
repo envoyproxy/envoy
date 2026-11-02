@@ -35,6 +35,7 @@ checks:
     - check-build
     - check-build-execution-context
     - check-build-openssl
+    - check-build-openssl-asan
     - check-build-openssl-presubmit
     - check-coverage
     - check-runtime
@@ -196,6 +197,13 @@ run:
   check-build-openssl:
     paths:
     - "**/*"
+  check-build-openssl-asan:
+    paths:
+    - compat/openssl/**/*
+    - bazel/**/*
+    - .bazelrc
+    - ci/do_ci.sh
+    - ci/bazel_fun.sh
   check-build-openssl-presubmit:
     paths:
     - compat/openssl/**/*
