@@ -19,7 +19,7 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
   if (quic_stream_.write_side_closed()) {
     if (quic_stream_.rst_sent() || quic_stream_.rst_received() ||
         !quic_session_.connection()->connected()) {
-      // A response callback can already be in flight when a reset or connection close tears down
+      // A callback can already be in flight when a reset or connection close tears down
       // the stream. Drop the data in that case; it can no longer be delivered to the peer.
       data.drain(data.length());
       return;
