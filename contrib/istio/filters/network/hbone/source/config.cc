@@ -4,7 +4,6 @@
 
 #include "source/common/config/utility.h"
 #include "source/common/network/raw_buffer_socket.h"
-#include "source/common/tcp_proxy/tcp_proxy.h"
 
 #include "contrib/istio/filters/network/hbone/source/hbone.h"
 
@@ -22,24 +21,6 @@ metadataConfig(const SocketConfig& config) {
 }
 
 } // namespace
-
-absl::StatusOr<Network::FilterFactoryCb> FilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& config, Server::Configuration::FactoryContext& context) {
-  const auto& tcp = config.tcp_proxy();
-  if (!tcp.has_tunneling_config() || tcp.tunneling_config().use_post()) {
-    return absl::InvalidArgumentError("HBONE adapter requires HTTP CONNECT tunneling");
-  }
-  if (tcp.upstream_connect_mode() !=
-      envoy::extensions::filters::network::tcp_proxy::v3::IMMEDIATE) {
-    return absl::InvalidArgumentError(
-        "HBONE adapter requires immediate upstream connection establishment");
-  }
-  auto shared_config = std::make_shared<TcpProxy::Config>(tcp, context);
-  return Network::FilterFactoryCb([shared_config, &context](Network::FilterManager& manager) {
-    manager.addReadFilter(std::make_shared<TcpProxy::Filter>(
-        shared_config, context.serverFactoryContext().clusterManager()));
-  });
-}
 
 UpstreamSocketFactory::UpstreamSocketFactory(
     const SocketConfig& config, Stats::Scope& scope,
@@ -82,7 +63,6 @@ SocketConfigFactory::createTransportSocketFactory(
                                                  std::move(inner));
 }
 
-REGISTER_FACTORY(FilterConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
 REGISTER_FACTORY(SocketConfigFactory, Server::Configuration::UpstreamTransportSocketConfigFactory);
 
 } // namespace Hbone

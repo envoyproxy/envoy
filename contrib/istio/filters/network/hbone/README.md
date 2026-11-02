@@ -16,17 +16,12 @@ Inner TLS starts after the outer CONNECT succeeds.
 Each hop keeps separate readiness state; accepted streams retain normal TLS and
 forwarding behavior.
 
-The network configuration factory remains available as a validating alias for stock
-TCP proxy. CONNECT signaling lives in the pool adapter; there is no TCP proxy subclass.
-Pilot must configure the pool adapter on the HBONE clusters before using this version.
-
 See [configuration and retry semantics](../../../../../docs/root/configuration/other_features/istio_hbone.rst).
 
 Build and run the focused tests inside the repository's build container:
 
 ```sh
 bazel test -c fastbuild \
-  //contrib/istio/filters/network/hbone/test:config_test \
   //contrib/istio/filters/network/hbone/test:hbone_test \
   //contrib/istio/filters/network/hbone/test:pool_test \
   //contrib/istio/filters/network/hbone/test:hbone_integration_test

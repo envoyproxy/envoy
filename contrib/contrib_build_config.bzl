@@ -27,7 +27,6 @@ CONTRIB_EXTENSIONS = {
 
     "envoy.filters.network.client_ssl_auth":                    "//contrib/client_ssl_auth/filters/network/source:config",
     "envoy.filters.network.golang":                             "//contrib/golang/filters/network/source:config",
-    "envoy.filters.network.istio_hbone":                        "//contrib/istio/filters/network/hbone/source:config",
     "envoy.filters.network.kafka_broker":                       "//contrib/kafka/filters/network/source/broker:config_lib",
     "envoy.filters.network.kafka_mesh":                         "//contrib/kafka/filters/network/source/mesh:config_lib",
     "envoy.filters.network.metadata_exchange":                  "//contrib/istio/filters/network/metadata_exchange/source:config",

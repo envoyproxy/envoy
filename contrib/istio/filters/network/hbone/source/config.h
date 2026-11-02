@@ -3,7 +3,6 @@
 #include "envoy/server/transport_socket_config.h"
 
 #include "source/common/network/transport_socket_options_impl.h"
-#include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/transport_sockets/internal_upstream/config.h"
 
 #include "contrib/envoy/extensions/filters/network/istio_hbone/v3alpha/istio_hbone.pb.validate.h"
@@ -13,18 +12,7 @@ namespace Extensions {
 namespace Istio {
 namespace Hbone {
 
-using FilterConfig = envoy::extensions::filters::network::istio_hbone::v3alpha::Config;
 using SocketConfig = envoy::extensions::filters::network::istio_hbone::v3alpha::UpstreamConfig;
-
-class FilterConfigFactory : public NetworkFilters::Common::ExceptionFreeFactoryBase<FilterConfig> {
-public:
-  FilterConfigFactory() : ExceptionFreeFactoryBase("envoy.filters.network.istio_hbone", true) {}
-
-private:
-  absl::StatusOr<Network::FilterFactoryCb>
-  createFilterFactoryFromProtoTyped(const FilterConfig& config,
-                                    Server::Configuration::FactoryContext& context) override;
-};
 
 class UpstreamSocketFactory : public TransportSockets::PassthroughFactory {
 public:
