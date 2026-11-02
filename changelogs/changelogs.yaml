@@ -63,6 +63,8 @@ areas:
 
   basic_auth:
     title: basic_auth
+  bootstrap:
+    title: bootstrap
   build:
     title: build
 
@@ -87,6 +89,8 @@ areas:
   credential_injector:
     title: credential_injector
 
+  decompression:
+    title: decompression
   dns:
     title: dns
   dns_resolver:
@@ -125,6 +129,10 @@ areas:
 
   happy_eyeballs:
     title: happy_eyeballs
+  header_mutation:
+    title: header_mutation
+  health_check:
+    title: health_check
   http:
     title: http
   http2:
@@ -217,6 +225,8 @@ areas:
     title: sds
   server:
     title: server
+  set_filter_state:
+    title: set_filter_state
   set_metadata_filter:
     title: set_metadata_filter
   sockets:

@@ -10,7 +10,6 @@
 #include "openssl/ssl.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -76,10 +75,10 @@ TEST_F(IoHandleBioTest, ReadNullBuffer) {
 TEST_F(IoHandleBioTest, ReadSuccess) {
   char buf[16];
   EXPECT_CALL(io_handle_, readv(5, _, 1))
-      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "hello", 5);
         return makeSuccessResult(5);
-      }));
+      });
   EXPECT_EQ(5, BIO_read(bio_, buf, 5));
   EXPECT_EQ(std::string(buf, 5), "hello");
   // After a successful read, retry flags should be clear.
@@ -145,11 +144,11 @@ TEST_F(IoHandleBioTest, ReadInterrupt) {
 TEST_F(IoHandleBioTest, ReadOneByte) {
   char buf[1];
   EXPECT_CALL(io_handle_, readv(1, _, 1))
-      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         EXPECT_EQ(1, slices[0].len_);
         *static_cast<char*>(slices[0].mem_) = 'X';
         return makeSuccessResult(1);
-      }));
+      });
   EXPECT_EQ(1, BIO_read(bio_, buf, 1));
   EXPECT_EQ('X', buf[0]);
 }
@@ -158,11 +157,11 @@ TEST_F(IoHandleBioTest, ReadSliceSetup) {
   // Verify that the buffer pointer and length are correctly passed through to readv.
   char buf[64];
   EXPECT_CALL(io_handle_, readv(64, _, 1))
-      .WillOnce(Invoke([&buf](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce([&buf](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         EXPECT_EQ(buf, slices[0].mem_);
         EXPECT_EQ(64, slices[0].len_);
         return makeSuccessResult(10);
-      }));
+      });
   EXPECT_EQ(10, BIO_read(bio_, buf, 64));
 }
 
@@ -220,24 +219,22 @@ TEST_F(IoHandleBioTest, WriteErrorDoesNotSetRetry) {
 }
 
 TEST_F(IoHandleBioTest, WriteOneByte) {
-  EXPECT_CALL(io_handle_, writev(_, 1))
-      .WillOnce(Invoke([](const Buffer::RawSlice* slices, uint64_t) {
-        EXPECT_EQ(1, slices[0].len_);
-        EXPECT_EQ('Z', *static_cast<const char*>(slices[0].mem_));
-        return makeSuccessResult(1);
-      }));
+  EXPECT_CALL(io_handle_, writev(_, 1)).WillOnce([](const Buffer::RawSlice* slices, uint64_t) {
+    EXPECT_EQ(1, slices[0].len_);
+    EXPECT_EQ('Z', *static_cast<const char*>(slices[0].mem_));
+    return makeSuccessResult(1);
+  });
   EXPECT_EQ(1, BIO_write(bio_, "Z", 1));
 }
 
 TEST_F(IoHandleBioTest, WriteSliceSetup) {
   // Verify the data pointer and length are correctly passed through to writev.
   const char data[] = "test data";
-  EXPECT_CALL(io_handle_, writev(_, 1))
-      .WillOnce(Invoke([&data](const Buffer::RawSlice* slices, uint64_t) {
-        EXPECT_EQ(data, slices[0].mem_);
-        EXPECT_EQ(9, slices[0].len_);
-        return makeSuccessResult(9);
-      }));
+  EXPECT_CALL(io_handle_, writev(_, 1)).WillOnce([&data](const Buffer::RawSlice* slices, uint64_t) {
+    EXPECT_EQ(data, slices[0].mem_);
+    EXPECT_EQ(9, slices[0].len_);
+    return makeSuccessResult(9);
+  });
   EXPECT_EQ(9, BIO_write(bio_, data, 9));
 }
 
@@ -260,10 +257,10 @@ TEST_F(IoHandleBioTest, ReadThenWrite) {
 
   // Read some data.
   EXPECT_CALL(io_handle_, readv(5, _, 1))
-      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "hello", 5);
         return makeSuccessResult(5);
-      }));
+      });
   EXPECT_EQ(5, BIO_read(bio_, buf, 5));
 
   // Write some data.
@@ -310,10 +307,10 @@ TEST_F(IoHandleBioTest, ReadErrorCodeIsRecoverable) {
   // After an EAGAIN, subsequent successful read should work fine.
   EXPECT_CALL(io_handle_, readv(10, _, 1))
       .WillOnce(Return(testing::ByMove(makeAgainResult())))
-      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "data", 4);
         return makeSuccessResult(4);
-      }));
+      });
 
   EXPECT_EQ(-1, BIO_read(bio_, buf, 10));
   EXPECT_TRUE(BIO_should_retry(bio_));
@@ -387,10 +384,10 @@ TEST_F(IoHandleBioTest, WriteThenReadInterleaved) {
 
   // Read a response.
   EXPECT_CALL(io_handle_, readv(16, _, 1))
-      .WillOnce(Invoke([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
+      .WillOnce([](uint64_t, Buffer::RawSlice* slices, uint64_t) {
         memcpy(slices[0].mem_, "resp", 4);
         return makeSuccessResult(4);
-      }));
+      });
   EXPECT_EQ(4, BIO_read(bio_, rbuf, 16));
   EXPECT_EQ(std::string(rbuf, 4), "resp");
   EXPECT_FALSE(BIO_should_retry(bio_));

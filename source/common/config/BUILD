@@ -208,9 +208,12 @@ envoy_cc_library(
     srcs = ["singleton_subscription_adapter.cc"],
     hdrs = ["singleton_subscription_adapter.h"],
     deps = [
+        ":xds_resource_lib",
         "//envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
+        "@abseil-cpp//absl/memory",
         "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings:string_view",
     ],
 )

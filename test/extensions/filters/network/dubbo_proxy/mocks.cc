@@ -8,7 +8,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -57,7 +56,7 @@ MockFilterChainFactoryCallbacks::~MockFilterChainFactoryCallbacks() = default;
 MockDecoderFilter::MockDecoderFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
       .WillByDefault(
-          Invoke([this](DecoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+          [this](DecoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; });
 }
 MockDecoderFilter::~MockDecoderFilter() = default;
 
@@ -75,7 +74,7 @@ MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() = default;
 MockEncoderFilter::MockEncoderFilter() {
   ON_CALL(*this, setEncoderFilterCallbacks(_))
       .WillByDefault(
-          Invoke([this](EncoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; }));
+          [this](EncoderFilterCallbacks& callbacks) -> void { callbacks_ = &callbacks; });
 }
 MockEncoderFilter::~MockEncoderFilter() = default;
 
@@ -92,11 +91,11 @@ MockEncoderFilterCallbacks::~MockEncoderFilterCallbacks() = default;
 
 MockCodecFilter::MockCodecFilter() {
   ON_CALL(*this, setDecoderFilterCallbacks(_))
-      .WillByDefault(Invoke(
-          [this](DecoderFilterCallbacks& callbacks) -> void { decoder_callbacks_ = &callbacks; }));
+      .WillByDefault(
+          [this](DecoderFilterCallbacks& callbacks) -> void { decoder_callbacks_ = &callbacks; });
   ON_CALL(*this, setEncoderFilterCallbacks(_))
-      .WillByDefault(Invoke(
-          [this](EncoderFilterCallbacks& callbacks) -> void { encoder_callbacks_ = &callbacks; }));
+      .WillByDefault(
+          [this](EncoderFilterCallbacks& callbacks) -> void { encoder_callbacks_ = &callbacks; });
 }
 MockCodecFilter::~MockCodecFilter() = default;
 

@@ -195,10 +195,7 @@ protected:
   }
 
   void enableIdleTimer() {
-    // Bug fix (default): only enable idle timer when connection is established.
-    // Old behavior (when flag is disabled): enable idle timer even when connection is not yet
-    // established.
-    if (!connected_ && enable_idle_timer_only_when_connected_) {
+    if (!connected_) {
       return;
     }
     if (idle_timer_ != nullptr) {
@@ -214,7 +211,6 @@ protected:
   ClientConnectionPtr codec_;
   Event::TimerPtr idle_timer_;
   const std::optional<std::chrono::milliseconds> idle_timeout_;
-  const bool enable_idle_timer_only_when_connected_;
 
 private:
   /**

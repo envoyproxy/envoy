@@ -414,13 +414,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramWithExplicitAd
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
   // Expect send to be called with the right data.
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ("response data", send_data.buffer_.toString());
-        EXPECT_EQ("192.168.1.1", send_data.peer_address_.ip()->addressAsString());
-        EXPECT_EQ(7777, send_data.peer_address_.ip()->port());
-        return Api::IoCallUint64Result(13, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ("response data", send_data.buffer_.toString());
+    EXPECT_EQ("192.168.1.1", send_data.peer_address_.ip()->addressAsString());
+    EXPECT_EQ(7777, send_data.peer_address_.ip()->port());
+    return Api::IoCallUint64Result(13, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 
@@ -444,13 +443,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramToOriginalPeer
   auto mock_listener = std::make_shared<NiceMock<Network::MockUdpListener>>();
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ("echo back", send_data.buffer_.toString());
-        EXPECT_EQ("9.8.7.6", send_data.peer_address_.ip()->addressAsString());
-        EXPECT_EQ(4321, send_data.peer_address_.ip()->port());
-        return Api::IoCallUint64Result(9, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ("echo back", send_data.buffer_.toString());
+    EXPECT_EQ("9.8.7.6", send_data.peer_address_.ip()->addressAsString());
+    EXPECT_EQ(4321, send_data.peer_address_.ip()->port());
+    return Api::IoCallUint64Result(9, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 
@@ -473,11 +471,10 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramEmptyData) {
   auto mock_listener = std::make_shared<NiceMock<Network::MockUdpListener>>();
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ(0, send_data.buffer_.length());
-        return Api::IoCallUint64Result(0, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ(0, send_data.buffer_.length());
+    return Api::IoCallUint64Result(0, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 
@@ -560,13 +557,12 @@ TEST_F(DynamicModuleUdpListenerFilterAbiCallbackTest, SendDatagramIpv6) {
   auto mock_listener = std::make_shared<NiceMock<Network::MockUdpListener>>();
   EXPECT_CALL(callbacks_, udpListener()).WillRepeatedly(testing::ReturnRef(*mock_listener));
 
-  EXPECT_CALL(*mock_listener, send(testing::_))
-      .WillOnce(testing::Invoke([](const Network::UdpSendData& send_data) {
-        EXPECT_EQ("ipv6 data", send_data.buffer_.toString());
-        EXPECT_EQ("2001:db8::1", send_data.peer_address_.ip()->addressAsString());
-        EXPECT_EQ(9999, send_data.peer_address_.ip()->port());
-        return Api::IoCallUint64Result(9, Api::IoError::none());
-      }));
+  EXPECT_CALL(*mock_listener, send(testing::_)).WillOnce([](const Network::UdpSendData& send_data) {
+    EXPECT_EQ("ipv6 data", send_data.buffer_.toString());
+    EXPECT_EQ("2001:db8::1", send_data.peer_address_.ip()->addressAsString());
+    EXPECT_EQ(9999, send_data.peer_address_.ip()->port());
+    return Api::IoCallUint64Result(9, Api::IoError::none());
+  });
 
   filter_->setCurrentDataForTest(&data);
 

@@ -105,7 +105,7 @@ rules_jvm_external:
   project_name: "Java Rules for Bazel"
   project_desc: "Bazel rules for Java"
   project_url: "https://github.com/bazelbuild/rules_jvm_external"
-  release_date: "2026-07-23"
+  release_date: "2026-10-12"
   use_category:
   - build
   license: "Apache-2.0"

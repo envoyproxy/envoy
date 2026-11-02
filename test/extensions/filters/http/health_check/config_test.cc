@@ -14,7 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -166,9 +165,9 @@ void testHealthCheckHeaderMatch(
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   Http::StreamFilterSharedPtr health_check_filter;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_))
-      .WillRepeatedly(Invoke([&health_check_filter](Http::StreamFilterSharedPtr filter) {
+      .WillRepeatedly([&health_check_filter](Http::StreamFilterSharedPtr filter) {
         health_check_filter = filter;
-      }));
+      });
 
   cb(filter_callbacks);
   ASSERT_NE(health_check_filter, nullptr);

@@ -43,9 +43,9 @@ public:
     EXPECT_NO_THROW({ cb = factory_.createFilterFactoryFromProto(config, context_).value(); });
 
     Network::MockConnection connection;
-    EXPECT_CALL(connection, addReadFilter(_))
-        .WillOnce(testing::Invoke(
-            [this](Network::ReadFilterSharedPtr filter) { filter_ = std::move(filter); }));
+    EXPECT_CALL(connection, addReadFilter(_)).WillOnce([this](Network::ReadFilterSharedPtr filter) {
+      filter_ = std::move(filter);
+    });
 
     cb(connection);
 

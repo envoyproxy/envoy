@@ -76,7 +76,7 @@ envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
     rbe_pool = "linux_x64_small",
-    shard_count = 10,
+    shard_count = 16,
     deps = [
         ":listener_manager_impl_test_lib",
         "//envoy/network:socket_interface",
@@ -105,6 +105,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//test/integration/filters:test_listener_filter_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/config:config_mocks",
         "//test/mocks/server:listener_update_callbacks_mocks",
         "//test/server:utility_lib",
         "//test/test_common:network_utility_lib",

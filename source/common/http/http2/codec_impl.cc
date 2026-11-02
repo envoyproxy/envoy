@@ -2015,6 +2015,9 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
+  if (connection_->getStreamUnchecked(stream_id) == nullptr) {
+    return OnHeaderResult::HEADER_RST_STREAM;
+  }
   // We use reference counting to avoid copying well-known header names.
   // For common HTTP/2 headers (e.g., :method, :path, :status), we reference Envoy's
   // static LowerCaseString objects instead of allocating and copying the name string.
@@ -2191,6 +2194,11 @@ ConnectionImpl::Http2Options::Http2Options(
       !PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, disallow_obs_text, false);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_include_cookies_in_limits")) {
     og_options_.enforce_max_header_list_bytes = true;
+  }
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.http2_oghttp2_cap_data_frame_payload")) {
+    // Use the same value as nghttp2 to avoid window update frame flooding.
+    og_options_.max_outbound_data_frame_payload = 16u * 1024u;
   }
   if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, enable_huffman_encoding, true)) {
     if (http2_options.has_hpack_table_size() && http2_options.hpack_table_size().value() == 0) {
@@ -2526,13 +2534,19 @@ ServerConnectionImpl::ServerConnectionImpl(
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
           Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
       should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)) {
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)),
+      should_reset_stream_on_begin_headers_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerResetStreamOnBeginHeaders)) {
   ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
                     "found. Is it configured?");
   ENVOY_LOG_ONCE_IF(
       trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
       "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_reset_stream_on_begin_headers_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_reset_stream_on_begin_headers is not "
       "found. Is it configured?");
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
@@ -2569,6 +2583,12 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
   StreamImpl* stream_ptr = getStream(stream_id);
   if (stream_ptr != nullptr) {
     return stream_ptr->onBeginHeaders();
+  }
+  if (should_reset_stream_on_begin_headers_ != nullptr &&
+      should_reset_stream_on_begin_headers_->shouldShedLoad()) {
+    stats_.stream_refused_errors_.inc();
+    adapter_->SubmitRst(stream_id, http2::adapter::Http2ErrorCode::REFUSED_STREAM);
+    return okStatus();
   }
   ServerStreamImplPtr stream(new ServerStreamImpl(*this, per_stream_buffer_limit_));
   if (connection_.aboveHighWatermark()) {

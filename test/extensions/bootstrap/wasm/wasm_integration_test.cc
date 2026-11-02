@@ -55,6 +55,7 @@ typed_config:
         key_values:
           KEY: VALUE
       runtime: "envoy.wasm.runtime.{}"
+      allow_precompiled: true
       code:
         local:
           filename: {}

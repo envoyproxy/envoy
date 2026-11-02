@@ -1398,6 +1398,13 @@ TEST_P(GolangIntegrationTest, Async_DataBuffer_DecodeData) {
   testBasic("/test?async=1&databuffer=decode-data");
 }
 
+// Only DecodeData is async, and it sleeps so that the trailers arrive before it returns
+// StopAndBuffer. The trailers are then handled synchronously, and the buffered data must still be
+// forwarded before them.
+TEST_P(GolangIntegrationTest, AsyncData_DataBuffer_DecodeData_SyncTrailers) {
+  testBasic("/test?async_data=1&data_sleep=1&databuffer=decode-data");
+}
+
 // Go send local reply in decode header phase.
 TEST_P(GolangIntegrationTest, LocalReply_DecodeHeader) {
   testSendLocalReply("/test?localreply=decode-header", "decode-header");

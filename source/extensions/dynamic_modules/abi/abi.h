@@ -3876,6 +3876,18 @@ bool envoy_dynamic_module_callback_http_filter_recreate_stream(
 void envoy_dynamic_module_callback_http_clear_route_cluster_cache(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_http_drain_connection_upon_completion marks the downstream
+ * connection to be drained once the current HTTP stream completes. For HTTP/1.1 this adds a
+ * "Connection: close" header; for HTTP/2 and HTTP/3 this triggers a GOAWAY frame after the
+ * response is sent.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
 // =============================================================================
 // ============================= Network Filter ================================
 // =============================================================================
@@ -4885,6 +4897,40 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_struct is called by the module to
+ * merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing entries
+ * with the same key are overwritten. An empty struct is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_struct is the serialized google.protobuf.Struct owned by the module. Its
+ * pointer may be null only when its length is zero.
+ * @return true if the struct was merged, false if the buffer does not parse as a
+ * google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_typed_metadata is called by the module to set
+ * the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any, replacing
+ * an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_any is the serialized google.protobuf.Any owned by the module. Its pointer
+ * may be null only when its length is zero.
+ * @return true if the entry was set, false if the buffer does not parse as a google.protobuf.Any
+ * with a type URL.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 // ------------------------------ HTTP Callouts -------------------------------
 
@@ -6419,6 +6465,41 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_b
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct is called by the
+ * module to merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the dynamic metadata is not accessible or the
+ * buffer does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata is called by the module
+ * to set the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any,
+ * replacing an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the dynamic metadata is not accessible or the buffer
+ * does not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the
@@ -10577,6 +10658,11 @@ size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
  * envoy_dynamic_module_callback_cluster_lb_get_healthy_host returns a healthy host pointer by
  * index at the given priority level.
  *
+ * With use_persistent_host_partitions, the first index getter for a host list after an update
+ * builds that list, which is O(N) on the worker. The healthy, total and degraded host count getters
+ * and envoy_dynamic_module_callback_cluster_lb_get_healthy_hosts do not. The locality getters build
+ * the healthy per-locality list the same way.
+ *
  * @param lb_envoy_ptr is the pointer to the Envoy load balancer.
  * @param priority is the priority level.
  * @param index is the index of the host in the healthy host list.
@@ -11681,6 +11767,41 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct merges a serialized
+ * google.protobuf.Struct into the request's dynamic metadata under the given namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the request has no stream info or the buffer
+ * does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata sets the
+ * typed_filter_metadata entry of the request's dynamic metadata under the given namespace from a
+ * serialized google.protobuf.Any, replacing an existing entry.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the request has no stream info or the buffer does
+ * not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
  * to deliver the result of an asynchronous host selection. This must be called exactly once for
  * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
@@ -11827,6 +11948,54 @@ typedef struct envoy_dynamic_module_type_packed_address {
 bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_address(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, bool is_added,
     envoy_dynamic_module_type_packed_address* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count returns how
+ * many hosts changed health since the previous update this worker applied, so a module can patch
+ * its healthy set from the current envoy_dynamic_module_on_cluster_lb_on_host_membership_update
+ * call instead of rereading every host. Envoy merges updates within the cluster's
+ * update_merge_window, so one call can carry several health changes. Each host is listed once, and
+ * hosts removed since the previous update are reported only by the member update getters. It is
+ * only valid during
+ * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
+ *
+ * Envoy only knows this when the cluster keeps persistent host partitions, which requires
+ * use_persistent_host_partitions in the cluster's ClusterConfig, and no health refresh happened
+ * since the previous update. A refresh covers every host, and with an active health checker it
+ * precedes a worker's first update. Otherwise it returns false and the module must reread the hosts
+ * it tracks.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param result receives the count. Its contents are unspecified when the callback returns false.
+ * @return true if the count is known, false on a null pointer, outside the callback, or when Envoy
+ * does not know which hosts changed health.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t* result);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host returns a host
+ * whose health changed since the previous update this worker applied, with its priority and current
+ * health. The health is read when this is called, so it can be newer than the host lists of the
+ * same update. The host pointer stays valid while the host is in the cluster's host set. Valid
+ * indexes are below the count from
+ * envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count. It is only
+ * valid during envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread
+ * that runs it.
+ *
+ * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
+ * @param index is the index of the host in the health-changed list.
+ * @param priority receives the host's priority. Its contents are unspecified when the callback
+ * returns nullptr.
+ * @param health receives the host's current health. Its contents are unspecified when the callback
+ * returns nullptr.
+ * @return the host pointer, or nullptr on a null pointer, an out-of-bounds index, outside the
+ * callback, or when Envoy does not know which hosts changed health.
+ */
+envoy_dynamic_module_type_cluster_host_envoy_ptr
+envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+    envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, size_t index, uint32_t* priority,
+    envoy_dynamic_module_type_host_health* health);
 
 // =============================================================================
 // =============================== Load Balancer ===============================
@@ -16575,6 +16744,29 @@ bool envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(
 envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_health_checker_get_host_health(
     envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
 
+/**
+ * envoy_dynamic_module_callback_health_checker_set_health_metadata attaches a string key/value pair
+ * to the result of the health check currently in flight for the session. The accumulated pairs
+ * replace the host's health check metadata when the check resolves (a reported result or a
+ * timeout), so each check starts with an empty set. Envoy forwards the metadata to the management
+ * server in the HDS EndpointHealth.health_metadata field. Setting an existing key overwrites it.
+ *
+ * The key ``http_status_code`` is reserved for the HTTP health checker and is rejected.
+ *
+ * This must be called on the main thread during
+ * envoy_dynamic_module_on_health_checker_session_on_interval. The metadata applies to the check
+ * started by that interval, including when the check later times out.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param key is the metadata key. Envoy copies it.
+ * @param value is the metadata value. Envoy copies it.
+ * @return true if the pair was stored, false if the session pointer is null, the key is empty or
+ * reserved, or a buffer is invalid.
+ */
+bool envoy_dynamic_module_callback_health_checker_set_health_metadata(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
+
 // =============================================================================
 // ============================ Cluster Specifier ==============================
 // =============================================================================
@@ -17385,6 +17577,47 @@ typedef enum envoy_dynamic_module_type_route_specifier_header_append_action {
 } envoy_dynamic_module_type_route_specifier_header_append_action;
 
 /**
+ * envoy_dynamic_module_type_route_specifier_rewrite_span is the part of the request path that a
+ * rule recorded with envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule
+ * replaces.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_rewrite_span {
+  // A literal prefix of the path, which is what a prefix or a path route replaces with its
+  // prefix_rewrite.
+  envoy_dynamic_module_type_route_specifier_rewrite_span_Literal = 0,
+  // The whole path without its query string and fragment, which is what a regex route replaces
+  // with its prefix_rewrite.
+  envoy_dynamic_module_type_route_specifier_rewrite_span_WholePath = 1,
+  // Not a span. Pins the type to a stable 32 bit size and widens its value range, so that a span a
+  // newer ABI defines can be held and rejected by an Envoy that does not know it without undefined
+  // behavior.
+  envoy_dynamic_module_type_route_specifier_rewrite_span_Sentinel = 0x7FFFFFFF,
+} envoy_dynamic_module_type_route_specifier_rewrite_span;
+
+/**
+ * envoy_dynamic_module_type_route_specifier_built_route_lookup_result is what
+ * envoy_dynamic_module_callback_route_specifier_lookup_built_route finds for a request.
+ */
+typedef enum envoy_dynamic_module_type_route_specifier_built_route_lookup_result {
+  // The cache is not in effect, for example because the specifier configures none, no template is
+  // selected, the match of the selected template did not hold, or the template resolves its
+  // cluster per request. The module records the route as usual.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Disabled = 0,
+  // No route cached for the key serves the request. The module records the route as usual, and
+  // Envoy caches the route the decision builds unless a route is already cached for the key.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Miss = 1,
+  // A route cached for the key serves the request, which Envoy uses when the decision is left
+  // Unspecified. The module records nothing more, since Envoy ignores the overrides it records and
+  // hands its user data to envoy_dynamic_module_on_route_specifier_user_data_discard.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_Hit = 2,
+  // A route cached for the key serves the request, and the module records the route exactly as on
+  // a miss. When the decision is left Unspecified, Envoy uses the route the recording builds, and
+  // evicts the cached route when the decision fails or its recording depends on the path of the
+  // current request through Envoy or differs from the one the cached route was built from.
+  envoy_dynamic_module_type_route_specifier_built_route_lookup_result_HitVerify = 3,
+} envoy_dynamic_module_type_route_specifier_built_route_lookup_result;
+
+/**
  * envoy_dynamic_module_type_route_specifier_input_route holds the properties of the route the
  * module is resolving that are free to read, so that a module can take all of them in one call
  * instead of one call each. After a template is selected with
@@ -17505,6 +17738,28 @@ void envoy_dynamic_module_on_route_specifier_route_destroy(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     uint64_t user_data);
 
+/**
+ * envoy_dynamic_module_on_route_specifier_user_data_discard is called with the user data last
+ * recorded with envoy_dynamic_module_callback_route_specifier_set_route_user_data when the decision
+ * builds no route to carry it. That is the case for a decision other than Unspecified, a
+ * StopIterationAndSkipRoute status, a decision Envoy cannot honor, and a Hit from
+ * envoy_dynamic_module_callback_route_specifier_lookup_built_route, which uses the cached route. It
+ * is optional, resolved by Envoy with a nullable lookup, and absence is a no op.
+ *
+ * It is called on the thread that resolves the route, concurrently with other hooks, before the
+ * route specifier returns and always before envoy_dynamic_module_on_route_specifier_config_destroy
+ * for the owning configuration. It must not block, allocate heavily or call back into Envoy. With
+ * both hooks exported, the value set_route_user_data last records for a decision reaches either
+ * this hook or on_route_specifier_route_destroy, never both, so a module can release what it
+ * leased for the route in either.
+ *
+ * @param config_module_ptr is the pointer to the in-module route specifier configuration.
+ * @param user_data is the value recorded with set_route_user_data.
+ */
+void envoy_dynamic_module_on_route_specifier_user_data_discard(
+    envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
+    uint64_t user_data);
+
 // =============================================================================
 // Route Specifier Callbacks
 // =============================================================================
@@ -17604,6 +17859,18 @@ bool envoy_dynamic_module_callback_route_specifier_config_register_route_templat
 void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance_id(
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache returns whether the
+ * route specifier configuration sets built_route_cache, so that a module whose routes rely on the
+ * cache can reject a configuration without it from the config hook. This may be called from the
+ * config hook or from the request path, since it is immutable after configuration load.
+ *
+ * @param config_envoy_ptr is the pointer to the route specifier configuration.
+ * @return true if the configuration sets built_route_cache, false otherwise.
+ */
+bool envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr);
 
 // ------------------- Route Specifier Callbacks - Metrics ---------------------
 
@@ -18208,14 +18475,56 @@ bool envoy_dynamic_module_callback_route_specifier_unset_route_template(
     envoy_dynamic_module_type_module_buffer template_id);
 
 /**
+ * envoy_dynamic_module_callback_route_specifier_lookup_built_route looks up the route a previous
+ * request on this worker built for the key and the selected route template, so that a module whose
+ * routes are a function of a key builds each route once per worker. It is called after
+ * envoy_dynamic_module_callback_route_specifier_set_route_template and returns Disabled when no
+ * template is selected. A later call replaces the lookup, and selecting or unsetting a template
+ * discards it. The cache is configured with the built_route_cache field of the route specifier.
+ *
+ * On a miss Envoy caches the route the decision builds, unless a route is already cached for the
+ * key, the decision fails or its recording depends on the path of the current request through
+ * Envoy. A recording depends on it once the module calls
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite, or once
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule rejects a rule or replaces
+ * one it accepted. A cached route that carries a rule serves only the paths the rule applies to.
+ * For a decision the cache looks up, the regex rewrite of a selected route override applies when
+ * the request headers are finalized, so that the route serves later requests, and records
+ * x-envoy-original-path the way a configured route does.
+ *
+ * The route built for a key must be a function of the key, since it serves the later requests that
+ * look the key up, including those for other routes of a virtual host that shares the specifier.
+ * The key therefore covers whatever else the module reads to decide, and identifies the route
+ * exactly, since a collision serves the route of one key for the other. A module whose routes for a
+ * key change over time folds a version of what they depend on into the key.
+ *
+ * On a hit a decision other than Unspecified and a StopIterationAndSkipRoute status still apply,
+ * while the overrides the module records are ignored and its user data goes to
+ * envoy_dynamic_module_on_route_specifier_user_data_discard. A verified hit uses the route its
+ * recording builds instead, so the user data a miss or a verified hit records stays on a route of
+ * its own whenever the decision builds one, which fires
+ * envoy_dynamic_module_on_route_specifier_route_destroy once neither the cache nor a stream holds
+ * it.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param key is the key the module identifies the route with.
+ * @return what the cache found for the request.
+ */
+envoy_dynamic_module_type_route_specifier_built_route_lookup_result
+envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr, uint64_t key);
+
+/**
  * envoy_dynamic_module_callback_route_specifier_set_route_user_data records a u64 on the route this
  * decision produces. It forces the produced route to be wrapped even when no other override was
  * recorded, so that envoy_dynamic_module_on_route_specifier_route_destroy fires for it with this
- * value. It is effective when the decision is left Unspecified.
+ * value. It is effective when the decision is left Unspecified. A later call replaces the value,
+ * and the last value goes to envoy_dynamic_module_on_route_specifier_user_data_discard instead when
+ * no route ends up carrying it.
  *
  * @param context_envoy_ptr is the pointer to the route decision context.
  * @param user_data is the value passed to on_route_specifier_route_destroy when the route is
- * destroyed.
+ * destroyed, or to on_route_specifier_user_data_discard when no route carries it.
  */
 void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
@@ -18236,6 +18545,39 @@ void envoy_dynamic_module_callback_route_specifier_set_route_user_data(
  */
 bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite(
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer matched,
+    envoy_dynamic_module_type_module_buffer replacement);
+
+/**
+ * envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule records a prefix rewrite of
+ * the request path sent upstream as a rule. Envoy applies the rule to the path the request carries
+ * when the request headers are finalized, the way it applies the prefix_rewrite of a configured
+ * route, so the produced route is not specific to the current request.
+ *
+ * With the Literal span, matched must be a case insensitive prefix of the current path without its
+ * query string and fragment, and is replaced by replacement. With the WholePath span, matched must
+ * be empty and replacement replaces the whole path, keeping its query string and fragment. The
+ * replacement starts with a slash and carries no query string or fragment of its own.
+ *
+ * A path recorded with set_path or set_prefix_rewrite takes precedence over the rule, and the rule
+ * takes precedence over the regex rewrite of a selected route override and the rewrites of the
+ * route, whatever the call order. With a rule recorded, the regex rewrite applies when the request
+ * headers are finalized rather than when the decision resolves. A rule that does not apply to the
+ * path when the request headers are finalized leaves the next of these in effect. A later call
+ * replaces the rule of an earlier one.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param span is the part of the path the rule replaces.
+ * @param matched is the prefix to replace for the Literal span, and must be empty for the WholePath
+ * span. The buffer is owned by the module.
+ * @param replacement is the replacement. The buffer is owned by the module.
+ * @return true when the span is known and matched fits it, the replacement is a valid header value
+ * that starts with a slash and carries no query string or fragment, and the rule applies to the
+ * current path within the configured maximum, false otherwise, in which case nothing is recorded.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_route_specifier_rewrite_span span,
     envoy_dynamic_module_type_module_buffer matched,
     envoy_dynamic_module_type_module_buffer replacement);
 

@@ -21,7 +21,6 @@
 
 using ::testing::_;
 using ::testing::InSequence;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::Throw;
@@ -33,9 +32,9 @@ namespace {
 class LdsApiTest : public testing::Test {
 public:
   LdsApiTest() {
-    ON_CALL(init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
+    });
   }
 
   void setup() {
@@ -53,20 +52,18 @@ public:
                  bool updated) {
     if (!version) {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
-          .WillOnce(
-              Invoke([listener_name, updated](const envoy::config::listener::v3::Listener& config,
-                                              const std::string&, bool) -> bool {
-                EXPECT_EQ(listener_name, config.name());
-                return updated;
-              }));
+          .WillOnce([listener_name, updated](const envoy::config::listener::v3::Listener& config,
+                                             const std::string&, bool) -> bool {
+            EXPECT_EQ(listener_name, config.name());
+            return updated;
+          });
     } else {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, version.value(), true))
-          .WillOnce(
-              Invoke([listener_name, updated](const envoy::config::listener::v3::Listener& config,
-                                              const std::string&, bool) -> bool {
-                EXPECT_EQ(listener_name, config.name());
-                return updated;
-              }));
+          .WillOnce([listener_name, updated](const envoy::config::listener::v3::Listener& config,
+                                             const std::string&, bool) -> bool {
+            EXPECT_EQ(listener_name, config.name());
+            return updated;
+          });
     }
   }
 
@@ -149,7 +146,7 @@ TEST_F(LdsApiTest, EmptyListenersUpdate) {
       .WillOnce(Return(existing_listeners));
   EXPECT_CALL(listener_manager_, beginListenerUpdate());
   EXPECT_CALL(listener_manager_, endListenerUpdate(_))
-      .WillOnce(Invoke([](ListenerManager::FailureStates&& state) { EXPECT_EQ(0, state.size()); }));
+      .WillOnce([](ListenerManager::FailureStates&& state) { EXPECT_EQ(0, state.size()); });
   ;
   EXPECT_CALL(init_watcher_, ready());
 

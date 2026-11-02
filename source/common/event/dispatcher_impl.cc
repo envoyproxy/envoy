@@ -29,6 +29,8 @@
 #include "source/common/network/connection_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/prefix_utility.h"
+#include "source/common/stats/utility.h"
 
 #include "event2/event.h"
 
@@ -112,14 +114,18 @@ void DispatcherImpl::unregisterEvwatchObserver(Evwatch::Observer& observer) {
 
 void DispatcherImpl::initializeStats(Stats::Scope& scope,
                                      const std::optional<std::string>& prefix) {
-  const std::string effective_prefix = prefix.has_value() ? *prefix : absl::StrCat(name_, ".");
   // This needs to be run in the dispatcher's thread, so that we have a thread id to log.
-  post([this, &scope, effective_prefix] {
-    stats_prefix_ = effective_prefix + "dispatcher";
+  post([this, &scope, prefix] {
+    // An explicit prefix is already '.' suffixed and replaces the dispatcher's name entirely.
+    const Stats::TaggedStatName stats_prefix = Stats::workerStatPrefix(
+        scope.symbolTable(), prefix.value_or(""), prefix.has_value() ? "" : name_, "dispatcher.");
+    Stats::LiteScopeHelper helper(scope, stats_prefix.baseName(), stats_prefix.tags(),
+                                  stats_prefix.name());
     stats_ = std::make_unique<DispatcherStats>(
-        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM_PREFIX(scope, stats_prefix_ + "."))});
+        DispatcherStats{ALL_DISPATCHER_STATS(POOL_HISTOGRAM(helper))});
     base_scheduler_.initializeStats(stats_.get());
-    ENVOY_LOG(debug, "running {} on thread {}", stats_prefix_, run_tid_.debugString());
+    ENVOY_LOG(debug, "running {} on thread {}", scope.symbolTable().toString(stats_prefix.name()),
+              run_tid_.debugString());
   });
 }
 
