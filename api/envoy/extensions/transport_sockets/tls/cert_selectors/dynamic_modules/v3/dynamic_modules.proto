@@ -68,14 +68,14 @@ message DynamicModuleTlsCertificateSelector {
   // its certificate validation, and a handshake that selects one that is not provided yet can wait
   // until the module provides or removes it.
   //
-  // A downstream TLS context must set both
-  // :ref:`disable_stateless_session_resumption
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateless_session_resumption>`
-  // and :ref:`disable_stateful_session_resumption
-  // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.DownstreamTlsContext.disable_stateful_session_resumption>`,
-  // and an upstream TLS context must set :ref:`max_session_keys
+  // The module also selects the certificate of a downstream handshake that resumes a session. A
+  // session that a dynamic certificate established resumes only when the selected certificate has
+  // the same subject common name, subject alternative names and issuer, and the certificate
+  // validation of the TLS context has not changed since. An upstream TLS context must set
+  // :ref:`max_session_keys
   // <envoy_v3_api_field_extensions.transport_sockets.tls.v3.UpstreamTlsContext.max_session_keys>`
-  // to 0, since a resumed session reuses the certificate of the original handshake.
+  // to 0, since a resumed upstream session keeps the client certificate of its original handshake
+  // without asking the module.
   //
   // Defaults to false.
   bool allow_dynamic_certificates = 4;
