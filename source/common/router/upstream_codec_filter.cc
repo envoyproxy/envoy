@@ -29,6 +29,15 @@
 namespace Envoy {
 namespace Router {
 
+UpstreamCodecFilter::ScopedEncodingTracker::ScopedEncodingTracker(UpstreamCodecFilter* filter)
+    : filter_(filter) {
+  filter_->calling_encode_ = true;
+}
+
+UpstreamCodecFilter::ScopedEncodingTracker::~ScopedEncodingTracker() {
+  filter_->calling_encode_ = false;
+}
+
 void UpstreamCodecFilter::onBelowWriteBufferLowWatermark() {
   callbacks_->clusterInfo()->trafficStats()->upstream_flow_control_resumed_reading_total_.inc();
   callbacks_->upstreamCallbacks()->upstream()->readDisable(false);
@@ -61,23 +70,23 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
   }
 
   ENVOY_STREAM_LOG(trace, "proxying headers", *callbacks_);
-  calling_encode_headers_ = true;
-  const Http::Status status =
-      callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
-
-  calling_encode_headers_ = false;
-  if (!status.ok() || !deferred_reset_status_.ok()) {
+  Http::Status status;
+  {
+    ScopedEncodingTracker tracker(this);
+    status = callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
+  }
+  if (!status.ok() || deferred_reset_.has_value()) {
     // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
     // erroneously remove required headers.
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError);
     const std::string details =
-        deferred_reset_status_.ok()
+        !deferred_reset_.has_value()
             ? absl::StrCat(
                   StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders, "{",
                   StringUtil::replaceAllEmptySpace(status.message()), "}")
             : absl::StrCat(StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset, "{",
-                           StringUtil::replaceAllEmptySpace(deferred_reset_status_.message()), "}");
-    deferred_reset_status_ = absl::OkStatus();
+                           StringUtil::replaceAllEmptySpace(deferredResetDetails()), "}");
+    deferred_reset_.reset();
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                std::nullopt, details);
     return Http::FilterHeadersStatus::StopIteration;
@@ -103,7 +112,15 @@ Http::FilterDataStatus UpstreamCodecFilter::decodeData(Buffer::Instance& data, b
   ENVOY_STREAM_LOG(trace, "proxying {} bytes", *callbacks_, data.length());
   callbacks_->upstreamCallbacks()->upstreamStreamInfo().addBytesSent(data.length());
   // TODO(alyssawilk) test intermediate filters calling continue.
-  callbacks_->upstreamCallbacks()->upstream()->encodeData(data, end_stream);
+  {
+    ScopedEncodingTracker tracker(this);
+    callbacks_->upstreamCallbacks()->upstream()->encodeData(data, end_stream);
+  }
+
+  if (maybeHandleDeferredReset()) {
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+
   if (end_stream) {
     upstreamTiming().onLastUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
   }
@@ -114,7 +131,15 @@ Http::FilterDataStatus UpstreamCodecFilter::decodeData(Buffer::Instance& data, b
 Http::FilterTrailersStatus UpstreamCodecFilter::decodeTrailers(Http::RequestTrailerMap& trailers) {
   ASSERT(!callbacks_->upstreamCallbacks()->pausedForConnect());
   ENVOY_STREAM_LOG(trace, "proxying trailers", *callbacks_);
-  callbacks_->upstreamCallbacks()->upstream()->encodeTrailers(trailers);
+  {
+    ScopedEncodingTracker tracker(this);
+    callbacks_->upstreamCallbacks()->upstream()->encodeTrailers(trailers);
+  }
+
+  if (maybeHandleDeferredReset()) {
+    return Http::FilterTrailersStatus::StopIteration;
+  }
+
   upstreamTiming().onLastUpstreamTxByteSent(callbacks_->dispatcher().timeSource());
   return Http::FilterTrailersStatus::Continue;
 }
@@ -125,8 +150,41 @@ Http::FilterMetadataStatus UpstreamCodecFilter::decodeMetadata(Http::MetadataMap
   ENVOY_STREAM_LOG(trace, "proxying metadata", *callbacks_);
   Http::MetadataMapVector metadata_map_vector;
   metadata_map_vector.emplace_back(std::make_unique<Http::MetadataMap>(metadata_map));
-  callbacks_->upstreamCallbacks()->upstream()->encodeMetadata(metadata_map_vector);
+  {
+    ScopedEncodingTracker tracker(this);
+    callbacks_->upstreamCallbacks()->upstream()->encodeMetadata(metadata_map_vector);
+  }
+
+  if (maybeHandleDeferredReset()) {
+    return Http::FilterMetadataStatus::StopIterationForLocalReply;
+  }
+
   return Http::FilterMetadataStatus::Continue;
+}
+
+bool UpstreamCodecFilter::maybeHandleDeferredReset() {
+  if (!deferred_reset_.has_value()) {
+    return false;
+  }
+  Http::StreamResetReason reason = deferred_reset_->reason;
+  std::string failure_reason = deferred_reset_->transport_failure_reason;
+  if (reason == Http::StreamResetReason::LocalReset) {
+    absl::StrAppend(&failure_reason, "|codec_error");
+  }
+  deferred_reset_.reset();
+  callbacks_->resetStream(reason, failure_reason);
+  return true;
+}
+
+std::string UpstreamCodecFilter::deferredResetDetails() const {
+  if (!deferred_reset_.has_value()) {
+    return "";
+  }
+  if (deferred_reset_->transport_failure_reason.empty()) {
+    return Http::Utility::resetReasonToString(deferred_reset_->reason);
+  }
+  return absl::StrCat(Http::Utility::resetReasonToString(deferred_reset_->reason), "|",
+                      deferred_reset_->transport_failure_reason);
 }
 
 // Store the callbacks from the UpstreamFilterManager, for sending the response to.
@@ -274,14 +332,8 @@ void UpstreamCodecFilter::CodecBridge::maybeEndDecode(bool end_stream) {
 
 void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason reason,
                                                      absl::string_view transport_failure_reason) {
-  if (filter_.calling_encode_headers_) {
-    // If called while still encoding errors, the reset reason won't be appended to the details
-    // string through the reset stream call, so append it here.
-    std::string failure_reason(Http::Utility::resetReasonToString(reason));
-    if (!transport_failure_reason.empty()) {
-      absl::StrAppend(&failure_reason, "|", transport_failure_reason);
-    }
-    filter_.deferred_reset_status_ = absl::InternalError(failure_reason);
+  if (filter_.calling_encode_) {
+    filter_.deferred_reset_ = {reason, std::string(transport_failure_reason)};
     return;
   }
 
