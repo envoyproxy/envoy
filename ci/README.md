@@ -43,13 +43,14 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
 
-The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
+The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC, configured with `--config=gcc`, which builds the binary and runs the tests
+(`ci/do_ci.sh gcc`; `gcc.server_only` and `gcc.test_only` run just one of the two).
 
 # Supported compiler configurations
 
 Envoy supports the following compiler toolchain configurations:
 * No configuration flag - Clang compiler with libc++ standard library (default)
-* `--config=gcc` - GCC compiler with libstdc++ standard library
+* `--config=gcc` - Hermetic GCC compiler with libstdc++ standard library (Linux x86_64 only)
 
 # C++ standard library
 
