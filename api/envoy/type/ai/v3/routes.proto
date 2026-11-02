@@ -7,6 +7,7 @@ import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "xds/annotations/v3/status.proto";
 
+import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.type.ai.v3";
@@ -78,8 +79,9 @@ message LlmRoute {
   //
   // When this route is selected and ``api_key`` is non-empty, Envoy sets this value as the HTTP
   // ``Authorization`` header on the outgoing upstream request (e.g., ``Bearer sk-...``).
-  // When empty, the existing ``Authorization`` header is left untouched.
-  string api_key = 5;
+  // When empty, any existing ``Authorization`` header is cleared so client credentials are not
+  // forwarded upstream.
+  string api_key = 5 [(udpa.annotations.sensitive) = true];
 }
 
 // An ordered collection of candidate :ref:`LlmRoute <envoy_v3_api_msg_type.ai.v3.LlmRoute>`

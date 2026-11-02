@@ -24,7 +24,8 @@ ModelRouterFilterConfigFactory::createAiFilterFactory(
       config, context.messageValidationVisitor());
 
   ModelRouterFilterConfigSharedPtr filter_config;
-  ABSL_ASSIGN_OR_RETURN(filter_config, ModelRouterFilterConfig::create(proto, scope));
+  ABSL_ASSIGN_OR_RETURN(filter_config,
+                        ModelRouterFilterConfig::create(proto, context.api(), scope));
 
   return [filter_config](const HttpFilters::AiProtocolManager::AiFilterContext& stream_context)
              -> HttpFilters::AiProtocolManager::AiFilterSharedPtr {

@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/type/ai/v3/llm_binding.pb.h"
@@ -10,11 +13,13 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -25,10 +30,37 @@ namespace {
 
 using HttpFilters::AiProtocolManager::AiFilterConfigFactory;
 using HttpFilters::AiProtocolManager::AiFilterContext;
+using HttpFilters::AiProtocolManager::AiFilterFactoryCb;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using ModelRouterProto = envoy::extensions::http::ai_filters::model_router::v3::ModelRouter;
 
-TEST(ModelRouterConfigTest, IsRegistered) {
+class ModelRouterConfigTest : public testing::Test {
+public:
+  ModelRouterProto parseYaml(const std::string& yaml) {
+    ModelRouterProto proto;
+    TestUtility::loadFromYaml(yaml, proto);
+    return proto;
+  }
+
+  absl::StatusOr<std::shared_ptr<ModelRouterFilterConfig>> createConfig(const std::string& yaml) {
+    return ModelRouterFilterConfig::create(parseYaml(yaml), *api_, *stats_store_.rootScope());
+  }
+
+  absl::StatusOr<AiFilterFactoryCb> createFactory(const ModelRouterProto& proto) {
+    return factory_.createAiFilterFactory(proto, context_, *stats_store_.rootScope());
+  }
+
+  absl::StatusOr<AiFilterFactoryCb> createFactoryFromYaml(const std::string& yaml) {
+    return createFactory(parseYaml(yaml));
+  }
+
+  Api::ApiPtr api_{Api::createApiForTest()};
+  ModelRouterFilterConfigFactory factory_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+};
+
+TEST_F(ModelRouterConfigTest, IsRegistered) {
   auto* factory = Registry::FactoryRegistry<AiFilterConfigFactory>::getFactory(
       "envoy.http.ai_filters.model_router");
   ASSERT_NE(factory, nullptr);
@@ -37,15 +69,12 @@ TEST(ModelRouterConfigTest, IsRegistered) {
               testing::WhenDynamicCastTo<ModelRouterFilterConfigFactory*>(testing::NotNull()));
 }
 
-TEST(ModelRouterConfigTest, CreatesFilterFromEmptyConfig) {
-  ModelRouterFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  const auto empty_proto = factory.createEmptyConfigProto();
+TEST_F(ModelRouterConfigTest, CreatesFilterFromEmptyConfig) {
+  const auto empty_proto = factory_.createEmptyConfigProto();
   ASSERT_NE(empty_proto, nullptr);
 
   const auto factory_cb =
-      factory.createAiFilterFactory(*empty_proto, context, *stats_store.rootScope());
+      factory_.createAiFilterFactory(*empty_proto, context_, *stats_store_.rootScope());
   ASSERT_TRUE(factory_cb.ok());
 
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
@@ -54,159 +83,319 @@ TEST(ModelRouterConfigTest, CreatesFilterFromEmptyConfig) {
   EXPECT_NE((*factory_cb)(stream_context), nullptr);
 }
 
-TEST(ModelRouterConfigTest, BuildsRoutesMapFromConfig) {
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  ModelRouterProto proto;
-
-  auto* anthropic_prov = proto.add_providers();
-  anthropic_prov->set_name("anthropic");
-  anthropic_prov->set_llm_protocol(envoy::type::ai::v3::ANTHROPIC_MESSAGES);
-  anthropic_prov->set_host_and_port("api.anthropic.com");
-  anthropic_prov->mutable_binding()->set_uri_pattern("/v1/messages");
-
-  auto* openai_prov = proto.add_providers();
-  openai_prov->set_name("openai");
-  openai_prov->set_llm_protocol(envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-  openai_prov->set_host_and_port("api.openai.com:443");
-
-  auto* gemini_prov = proto.add_providers();
-  gemini_prov->set_name("gemini");
-  gemini_prov->set_llm_protocol(envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
-  gemini_prov->set_host_and_port("generativelanguage.googleapis.com");
-  gemini_prov->mutable_binding()->set_uri_pattern(
-      "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
-
-  auto* haiku_model = proto.add_models();
-  haiku_model->set_name("haiku");
-  haiku_model->set_provider("anthropic");
-  haiku_model->set_model("claude-haiku-4-5");
-  haiku_model->set_api_key("Bearer sk-ant");
-
-  auto* gpt4o_mini_model = proto.add_models();
-  gpt4o_mini_model->set_name("gpt4o_mini");
-  gpt4o_mini_model->set_provider("openai");
-  gpt4o_mini_model->set_model("gpt-4o-mini");
-  gpt4o_mini_model->set_api_key("Bearer sk-oai");
-
-  auto* gemini_pro_model = proto.add_models();
-  gemini_pro_model->set_name("gemini_pro");
-  gemini_pro_model->set_provider("gemini");
-  gemini_pro_model->set_model("gemini-2.5-pro");
-  gemini_pro_model->set_api_key("Bearer g-pro");
-
-  auto* gemini_flash_model = proto.add_models();
-  gemini_flash_model->set_name("gemini_flash");
-  gemini_flash_model->set_provider("gemini");
-  gemini_flash_model->set_model("gemini-2.5-flash");
-
-  auto* entry1 = proto.add_routes();
-  entry1->set_requested_model("fast-model");
-  entry1->add_targets()->set_model("haiku");
-  entry1->add_targets()->set_model("gpt4o_mini");
-
-  auto* entry2 = proto.add_routes();
-  entry2->set_requested_model("reasoning-model");
-  entry2->add_targets()->set_model("gemini_pro");
-
-  // A duplicate requested_model entry appends targets to the existing route list.
-  auto* entry3 = proto.add_routes();
-  entry3->set_requested_model("fast-model");
-  entry3->add_targets()->set_model("gemini_flash");
-
-  const auto config_or = ModelRouterFilterConfig::create(proto, *stats_store.rootScope());
+TEST_F(ModelRouterConfigTest, BuildsRoutesMapFromConfig) {
+  const auto config_or = createConfig(R"EOF(
+providers:
+  - name: anthropic
+    llm_protocol: ANTHROPIC_MESSAGES
+    host_and_port: api.anthropic.com
+    binding:
+      uri_pattern: /v1/messages
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com:443
+  - name: gemini
+    llm_protocol: GEMINI_GENERATE_CONTENT
+    host_and_port: generativelanguage.googleapis.com
+    binding:
+      uri_pattern: /v1beta/models/{model}:{generateContent|streamGenerateContent}
+models:
+  - name: haiku
+    provider: anthropic
+    model: claude-haiku-4-5
+    api_key:
+      inline_string: "Bearer sk-ant"
+  - name: gpt4o_mini
+    provider: openai
+    model: gpt-4o-mini
+    api_key:
+      inline_string: "Bearer sk-oai"
+  - name: gemini_pro
+    provider: gemini
+    model: gemini-2.5-pro
+    api_key:
+      inline_string: "Bearer g-pro"
+  - name: gemini_flash
+    provider: gemini
+    model: gemini-2.5-flash
+routes:
+  - requested_model: fast-model
+    targets:
+      - model: haiku
+      - model: gpt4o_mini
+  - requested_model: reasoning-model
+    targets:
+      - model: gemini_pro
+  # A duplicate requested_model entry appends targets to the existing route list.
+  - requested_model: fast-model
+    targets:
+      - model: gemini_flash
+)EOF");
   ASSERT_TRUE(config_or.ok()) << config_or.status();
-  const auto& config = *config_or.value();
-  ASSERT_EQ(config.routes().size(), 2);
+  const auto& routes = config_or.value()->routes();
+  ASSERT_EQ(routes.size(), 2);
 
-  const auto fast_it = config.routes().find("fast-model");
-  ASSERT_NE(fast_it, config.routes().end());
-  ASSERT_EQ(fast_it->second.routes_size(), 3);
-  EXPECT_EQ(fast_it->second.routes(0).llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
-  EXPECT_EQ(fast_it->second.routes(0).model(), "claude-haiku-4-5");
-  EXPECT_EQ(fast_it->second.routes(0).host_and_port(), "api.anthropic.com");
-  EXPECT_EQ(fast_it->second.routes(0).api_key(), "Bearer sk-ant");
-  ASSERT_TRUE(fast_it->second.routes(0).has_binding());
-  EXPECT_EQ(fast_it->second.routes(0).binding().uri_pattern(), "/v1/messages");
+  const auto fast_it = routes.find("fast-model");
+  ASSERT_NE(fast_it, routes.end());
+  ASSERT_EQ(fast_it->second.proto.routes_size(), 3);
+  ASSERT_EQ(fast_it->second.bindings.size(), 3);
 
-  EXPECT_EQ(fast_it->second.routes(1).llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-  EXPECT_EQ(fast_it->second.routes(1).model(), "gpt-4o-mini");
-  EXPECT_EQ(fast_it->second.routes(1).host_and_port(), "api.openai.com:443");
-  EXPECT_EQ(fast_it->second.routes(1).api_key(), "Bearer sk-oai");
-  EXPECT_FALSE(fast_it->second.routes(1).has_binding());
+  const auto& r0 = fast_it->second.proto.routes(0);
+  EXPECT_EQ(r0.llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
+  EXPECT_EQ(r0.model(), "claude-haiku-4-5");
+  EXPECT_EQ(r0.host_and_port(), "api.anthropic.com");
+  EXPECT_EQ(r0.api_key(), "Bearer sk-ant");
+  EXPECT_EQ(r0.binding().uri_pattern(), "/v1/messages");
+  ASSERT_NE(fast_it->second.bindings[0], nullptr);
+  EXPECT_EQ(fast_it->second.bindings[0]->pattern()->source(), "/v1/messages");
 
-  EXPECT_EQ(fast_it->second.routes(2).llm_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
-  EXPECT_EQ(fast_it->second.routes(2).model(), "gemini-2.5-flash");
-  EXPECT_EQ(fast_it->second.routes(2).host_and_port(), "generativelanguage.googleapis.com");
-  EXPECT_TRUE(fast_it->second.routes(2).api_key().empty());
-  ASSERT_TRUE(fast_it->second.routes(2).has_binding());
-  EXPECT_EQ(fast_it->second.routes(2).binding().uri_pattern(),
+  const auto& r1 = fast_it->second.proto.routes(1);
+  EXPECT_EQ(r1.llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
+  EXPECT_EQ(r1.model(), "gpt-4o-mini");
+  EXPECT_EQ(r1.host_and_port(), "api.openai.com:443");
+  EXPECT_EQ(r1.api_key(), "Bearer sk-oai");
+  EXPECT_FALSE(r1.has_binding());
+  EXPECT_EQ(fast_it->second.bindings[1], nullptr);
+
+  const auto& r2 = fast_it->second.proto.routes(2);
+  EXPECT_EQ(r2.llm_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+  EXPECT_EQ(r2.model(), "gemini-2.5-flash");
+  EXPECT_EQ(r2.host_and_port(), "generativelanguage.googleapis.com");
+  EXPECT_TRUE(r2.api_key().empty());
+  EXPECT_EQ(r2.binding().uri_pattern(),
+            "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
+  ASSERT_NE(fast_it->second.bindings[2], nullptr);
+  EXPECT_EQ(fast_it->second.bindings[2]->pattern()->source(),
             "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
 
-  const auto reasoning_it = config.routes().find("reasoning-model");
-  ASSERT_NE(reasoning_it, config.routes().end());
-  ASSERT_EQ(reasoning_it->second.routes_size(), 1);
-  EXPECT_EQ(reasoning_it->second.routes(0).llm_protocol(),
-            envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
-  EXPECT_EQ(reasoning_it->second.routes(0).model(), "gemini-2.5-pro");
-  EXPECT_EQ(reasoning_it->second.routes(0).host_and_port(), "generativelanguage.googleapis.com");
-  EXPECT_EQ(reasoning_it->second.routes(0).api_key(), "Bearer g-pro");
-  ASSERT_TRUE(reasoning_it->second.routes(0).has_binding());
-  EXPECT_EQ(reasoning_it->second.routes(0).binding().uri_pattern(),
-            "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
+  const auto reasoning_it = routes.find("reasoning-model");
+  ASSERT_NE(reasoning_it, routes.end());
+  ASSERT_EQ(reasoning_it->second.proto.routes_size(), 1);
+  ASSERT_EQ(reasoning_it->second.bindings.size(), 1);
+  EXPECT_EQ(reasoning_it->second.proto.routes(0).model(), "gemini-2.5-pro");
+  EXPECT_EQ(reasoning_it->second.proto.routes(0).api_key(), "Bearer g-pro");
+  ASSERT_NE(reasoning_it->second.bindings[0], nullptr);
 }
 
-TEST(ModelRouterConfigTest, RejectsUnknownModelReference) {
-  ModelRouterFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  ModelRouterProto proto;
+TEST_F(ModelRouterConfigTest, ReadsAndTrimsApiKeyFromDataSource) {
+  const std::string key_file = TestEnvironment::writeStringToFileForTest(
+      "model_router_api_key.txt", " \tBearer file-sk-123 \r\n");
 
-  auto* entry = proto.add_routes();
-  entry->set_requested_model("fast-model");
-  entry->add_targets()->set_model("nonexistent-model");
+  const auto config_or = createConfig(fmt::format(R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com:443
+models:
+  - name: file-key-model
+    provider: openai
+    model: gpt-4o
+    api_key:
+      filename: "{}"
+  - name: inline-key-model
+    provider: openai
+    model: gpt-4o-mini
+    api_key:
+      inline_string: "\n  Bearer inline-sk-456\t "
+routes:
+  - requested_model: fast-model
+    targets:
+      - model: file-key-model
+      - model: inline-key-model
+)EOF",
+                                                  key_file));
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
 
-  const auto factory_cb = factory.createAiFilterFactory(proto, context, *stats_store.rootScope());
-  ASSERT_FALSE(factory_cb.ok());
-  EXPECT_EQ(factory_cb.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(std::string(factory_cb.status().message()),
-              testing::HasSubstr("Unknown model nonexistent-model"));
+  const auto it = config_or.value()->routes().find("fast-model");
+  ASSERT_NE(it, config_or.value()->routes().end());
+  ASSERT_EQ(it->second.proto.routes_size(), 2);
+  EXPECT_EQ(it->second.proto.routes(0).api_key(), "Bearer file-sk-123");
+  EXPECT_EQ(it->second.proto.routes(1).api_key(), "Bearer inline-sk-456");
 }
 
-TEST(ModelRouterConfigTest, RejectsUnknownProviderReference) {
-  ModelRouterFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  ModelRouterProto proto;
-
-  auto* model = proto.add_models();
-  model->set_name("haiku");
-  model->set_provider("nonexistent-provider");
-  model->set_model("claude-haiku-4-5");
-
-  auto* entry = proto.add_routes();
-  entry->set_requested_model("fast-model");
-  entry->add_targets()->set_model("haiku");
-
-  const auto factory_cb = factory.createAiFilterFactory(proto, context, *stats_store.rootScope());
-  ASSERT_FALSE(factory_cb.ok());
-  EXPECT_EQ(factory_cb.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_THAT(std::string(factory_cb.status().message()),
-              testing::HasSubstr("Unknown provider nonexistent-provider"));
+TEST_F(ModelRouterConfigTest, FailsWhenApiKeyFileDoesNotExist) {
+  const auto config_or = createConfig(fmt::format(
+      R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com:443
+models:
+  - name: missing-file-model
+    provider: openai
+    model: gpt-4o
+    api_key:
+      filename: "{}"
+routes:
+  - requested_model: fast-model
+    targets:
+      - model: missing-file-model
+)EOF",
+      TestEnvironment::temporaryPath("nonexistent_model_router_api_key.txt")));
+  EXPECT_FALSE(config_or.ok());
 }
 
-TEST(ModelRouterConfigTest, RejectsInvalidLlmProtocolEnum) {
-  ModelRouterFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_store;
-  ModelRouterProto proto;
+TEST_F(ModelRouterConfigTest, RejectsSemanticConfigErrors) {
+  struct Case {
+    std::string yaml;
+    std::string expected_error;
+  };
+  const std::vector<Case> cases = {
+      // Duplicate provider name.
+      {R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: backup.openai.com
+)EOF",
+       "Duplicate provider name openai"},
+      // Unspecified provider llm_protocol.
+      {R"EOF(
+providers:
+  - name: unspecified-protocol-provider
+    llm_protocol: LLM_PROTOCOL_UNSPECIFIED
+    host_and_port: api.example.com
+)EOF",
+       "unspecified-protocol-provider"},
+      // Invalid provider binding URI pattern.
+      {R"EOF(
+providers:
+  - name: bad-binding-provider
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com
+    binding:
+      uri_pattern: invalid_uri_pattern_without_leading_slash
+)EOF",
+       ""},
+      // Duplicate model name.
+      {R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com
+models:
+  - name: gpt4o
+    provider: openai
+    model: gpt-4o
+  - name: gpt4o
+    provider: openai
+    model: gpt-4o-mini
+)EOF",
+       "Duplicate model name gpt4o"},
+      // Unknown model reference in route target.
+      {R"EOF(
+routes:
+  - requested_model: fast-model
+    targets:
+      - model: nonexistent-model
+)EOF",
+       "Unknown model nonexistent-model"},
+      // Unknown provider reference in model.
+      {R"EOF(
+models:
+  - name: haiku
+    provider: nonexistent-provider
+    model: claude-haiku-4-5
+routes:
+  - requested_model: fast-model
+    targets:
+      - model: haiku
+)EOF",
+       "Unknown provider nonexistent-provider"},
+  };
 
-  auto* provider = proto.add_providers();
-  provider->set_name("bad-provider");
-  provider->set_llm_protocol(static_cast<envoy::type::ai::v3::LLMProtocol>(999));
+  for (const auto& c : cases) {
+    const auto factory_cb = createFactoryFromYaml(c.yaml);
+    ASSERT_FALSE(factory_cb.ok()) << c.yaml;
+    EXPECT_EQ(factory_cb.status().code(), absl::StatusCode::kInvalidArgument);
+    if (!c.expected_error.empty()) {
+      EXPECT_THAT(std::string(factory_cb.status().message()), HasSubstr(c.expected_error));
+    }
+  }
+}
 
-  EXPECT_THROW_WITH_REGEX(
-      factory.createAiFilterFactory(proto, context, *stats_store.rootScope()).IgnoreError(),
-      EnvoyException, "value must be one of the defined enum values");
+TEST_F(ModelRouterConfigTest, RejectsProtoValidationViolations) {
+  // Out-of-range LLMProtocol enum value.
+  {
+    ModelRouterProto proto;
+    auto* provider = proto.add_providers();
+    provider->set_name("bad-provider");
+    provider->set_llm_protocol(static_cast<envoy::type::ai::v3::LLMProtocol>(999));
+    provider->set_host_and_port("api.example.com");
+    EXPECT_THROW_WITH_REGEX(createFactory(proto).IgnoreError(), EnvoyException,
+                            "value must be one of the defined enum values");
+  }
+
+  struct YamlCase {
+    std::string yaml;
+    std::string expected_regex;
+  };
+  const std::vector<YamlCase> cases = {
+      {R"EOF(
+providers:
+  - llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com
+)EOF",
+       "ProviderValidationError\\.Name:"},
+      {R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+)EOF",
+       "ProviderValidationError\\.HostAndPort:"},
+      {R"EOF(
+models:
+  - provider: openai
+    model: gpt-4o
+)EOF",
+       "ModelValidationError\\.Name:"},
+      {R"EOF(
+models:
+  - name: gpt4o
+    model: gpt-4o
+)EOF",
+       "ModelValidationError\\.Provider:"},
+      {R"EOF(
+models:
+  - name: gpt4o
+    provider: openai
+)EOF",
+       "ModelValidationError\\.Model:"},
+      {R"EOF(
+models:
+  - name: empty-datasource-model
+    provider: openai
+    model: gpt-4o
+    api_key: {}
+)EOF",
+       "ModelValidationError\\.ApiKey:.*field: \"specifier\", reason: is required"},
+      {R"EOF(
+routes:
+  - targets:
+      - model: gpt4o
+)EOF",
+       "RoutingEntryValidationError\\.RequestedModel:"},
+      {R"EOF(
+routes:
+  - requested_model: fast-model
+)EOF",
+       "RoutingEntryValidationError\\.Targets:"},
+      {R"EOF(
+routes:
+  - requested_model: fast-model
+    targets:
+      - {}
+)EOF",
+       "RoutingTargetValidationError\\.Model:"},
+  };
+
+  for (const auto& c : cases) {
+    EXPECT_THROW_WITH_REGEX(createFactoryFromYaml(c.yaml).IgnoreError(), EnvoyException,
+                            c.expected_regex);
+  }
 }
 
 } // namespace

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/api.h"
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -31,9 +32,14 @@ class ModelRouterFilterConfig {
 public:
   static absl::StatusOr<std::shared_ptr<ModelRouterFilterConfig>>
   create(const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
-         Stats::Scope& scope);
+         Api::Api& api, Stats::Scope& scope);
 
-  using ModelMap = absl::flat_hash_map<std::string, envoy::type::ai::v3::LlmRoutes>;
+  struct ResolvedModelRoutes {
+    envoy::type::ai::v3::LlmRoutes proto;
+    LlmRoutesFilterStateObject::Bindings bindings;
+  };
+
+  using ModelMap = absl::flat_hash_map<std::string, ResolvedModelRoutes>;
 
   ModelRouterFilterConfig(ModelMap&& routes, Stats::Scope& scope);
   const ModelMap& routes() const { return routes_; }
@@ -41,7 +47,8 @@ public:
 
 private:
   static absl::StatusOr<ModelMap>
-  buildModelMap(const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto);
+  buildModelMap(const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
+                Api::Api& api);
 
   const ModelMap routes_;
   const ModelRouterFilterStats stats_;

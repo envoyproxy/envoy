@@ -4,7 +4,6 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/filter_state.h"
-#include "envoy/type/ai/v3/routes.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
@@ -12,7 +11,6 @@
 #include "source/extensions/http/ai_filters/common/sync_filter.h"
 
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -51,9 +49,6 @@ public:
                           HttpFilters::AiProtocolManager::LocalReplier reply_locally) override;
 
 private:
-  static absl::StatusOr<std::shared_ptr<HttpFilters::AiProtocolManager::LlmBindingObject>>
-  createBinding(const envoy::type::ai::v3::LLMBinding& binding);
-
   RouteSelectorFilterConfigSharedPtr config_;
   HttpFilters::AiProtocolManager::AiFilterContext context_;
 };

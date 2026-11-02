@@ -1,9 +1,15 @@
 #include "source/extensions/http/ai_filters/model_router/filter.h"
 
+#include "source/common/config/datasource.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
 #include "source/extensions/http/ai_filters/model_router/route_wrapper.h"
+
+#include "absl/status/status_macros.h"
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,18 +17,16 @@ namespace AiFilters {
 namespace ModelRouter {
 
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
+using HttpFilters::AiProtocolManager::LlmBinding;
+using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
 using HttpFilters::AiProtocolManager::stringFromFilterState;
 
 absl::StatusOr<std::shared_ptr<ModelRouterFilterConfig>> ModelRouterFilterConfig::create(
-    const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
+    const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto, Api::Api& api,
     Stats::Scope& scope) {
-  absl::StatusOr<ModelMap> model_map = buildModelMap(proto);
+  ABSL_ASSIGN_OR_RETURN(ModelMap model_map, buildModelMap(proto, api));
 
-  if (!model_map.ok()) {
-    return model_map.status();
-  }
-
-  return std::make_shared<ModelRouterFilterConfig>(std::move(model_map).value(), scope);
+  return std::make_shared<ModelRouterFilterConfig>(std::move(model_map), scope);
 }
 
 ModelRouterFilterConfig::ModelRouterFilterConfig(ModelMap&& routes, Stats::Scope& scope)
@@ -31,25 +35,45 @@ ModelRouterFilterConfig::ModelRouterFilterConfig(ModelMap&& routes, Stats::Scope
           POOL_COUNTER_PREFIX(scope, "ai_protocol_manager.model_router."))}) {}
 
 absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::buildModelMap(
-    const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto) {
+    const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
+    Api::Api& api) {
   namespace Config = envoy::extensions::http::ai_filters::model_router::v3;
 
-  absl::flat_hash_map<std::string, Config::Provider> providers;
+  struct ParsedProvider {
+    Config::Provider proto;
+    LlmBindingConstSharedPtr binding;
+  };
+
+  absl::flat_hash_map<std::string, ParsedProvider> providers;
   for (const Config::Provider& entry : proto.providers()) {
-    providers[entry.name()] = entry;
+    if (providers.contains(entry.name())) {
+      return absl::InvalidArgumentError("Duplicate provider name " + entry.name());
+    }
+    if (entry.llm_protocol() == envoy::type::ai::v3::LLM_PROTOCOL_UNSPECIFIED) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Provider ", entry.name(), " must specify a valid llm_protocol"));
+    }
+    LlmBindingConstSharedPtr binding;
+    if (entry.has_binding()) {
+      ABSL_ASSIGN_OR_RETURN(binding, LlmBinding::create(entry.binding()));
+    }
+    providers.emplace(entry.name(), ParsedProvider{entry, std::move(binding)});
   }
 
   absl::flat_hash_map<std::string, Config::Model> models;
   for (const Config::Model& entry : proto.models()) {
+    if (models.contains(entry.name())) {
+      return absl::InvalidArgumentError("Duplicate model name " + entry.name());
+    }
     models[entry.name()] = entry;
   }
 
   ModelRouterFilterConfig::ModelMap model_map;
   for (const Config::RoutingEntry& entry : proto.routes()) {
-    envoy::type::ai::v3::LlmRoutes& routes = model_map[entry.requested_model()];
+    ResolvedModelRoutes& resolved = model_map[entry.requested_model()];
 
     for (const Config::RoutingTarget& target : entry.targets()) {
-      envoy::type::ai::v3::LlmRoute* route = routes.add_routes();
+      envoy::type::ai::v3::LlmRoute* route = resolved.proto.add_routes();
 
       auto model_it = models.find(target.model());
       if (model_it == models.end()) {
@@ -60,14 +84,20 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
         return absl::InvalidArgumentError("Unknown provider " + model_it->second.provider());
       }
 
-      route->set_llm_protocol(provider_it->second.llm_protocol());
+      route->set_llm_protocol(provider_it->second.proto.llm_protocol());
       route->set_model(model_it->second.model());
-      route->set_host_and_port(provider_it->second.host_and_port());
-      route->set_api_key(model_it->second.api_key());
-
-      if (provider_it->second.has_binding()) {
-        *route->mutable_binding() = provider_it->second.binding();
+      route->set_host_and_port(provider_it->second.proto.host_and_port());
+      if (model_it->second.has_api_key()) {
+        ABSL_ASSIGN_OR_RETURN(
+            std::string api_key,
+            Envoy::Config::DataSource::read(model_it->second.api_key(), /*allow_empty=*/true, api));
+        route->set_api_key(std::string(absl::StripAsciiWhitespace(api_key)));
       }
+
+      if (provider_it->second.proto.has_binding()) {
+        *route->mutable_binding() = provider_it->second.proto.binding();
+      }
+      resolved.bindings.push_back(provider_it->second.binding);
     }
   }
 
@@ -78,34 +108,39 @@ ModelRouterFilter::ModelRouterFilter(ModelRouterFilterConfigSharedPtr config,
                                      const HttpFilters::AiProtocolManager::AiFilterContext& context)
     : config_(std::move(config)), context_(context) {}
 
-absl::Status ModelRouterFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
-                                           HttpFilters::AiProtocolManager::LocalReplier) {
+absl::Status
+ModelRouterFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
+                              HttpFilters::AiProtocolManager::LocalReplier reply_locally) {
   const StreamInfo::FilterStateSharedPtr& filter_state = context_.stream_info.filterState();
   auto model_name = stringFromFilterState(*filter_state, FilterStateKeys::ModelRequest);
 
   if (!model_name) {
+    std::move(reply_locally)(Http::Code::NotFound, "Model name not found in filter state");
     config_->stats().model_name_missing_.inc();
     return absl::OkStatus();
   }
 
   auto it = config_->routes().find(*model_name);
   if (it == config_->routes().end()) {
+    std::move(reply_locally)(Http::Code::NotFound, "Unknown model");
     config_->stats().route_not_found_.inc();
     return absl::OkStatus();
   }
 
-  filter_state->setData(FilterStateKeys::ResolvedRoutes,
-                        std::make_shared<LlmRoutesFilterStateObject>(it->second),
-                        StreamInfo::FilterState::LifeSpan::Request);
+  filter_state->setData(
+      FilterStateKeys::ResolvedRoutes,
+      std::make_shared<LlmRoutesFilterStateObject>(it->second.proto, it->second.bindings),
+      StreamInfo::FilterState::LifeSpan::Request);
 
   config_->stats().success_.inc();
 
-  // Temporary fix, until the router and DFP filter support ResolvedRoutes.
-  // Assumes that all routes point to the same host.
-  if (!it->second.routes().empty()) {
+  // Temporary fix to support DFP cluster, until the router and DFP filter support ResolvedRoutes.
+  // Assumes that all routes point to the same host. There is no such requirement with STATIC_DNS
+  // clusters.
+  if (!it->second.proto.routes().empty()) {
     Envoy::Http::Utility::updateAuthority(context_.request_headers,
-                                          it->second.routes(0).host_and_port(), false, false);
-    context_.request_headers.setEnvoyMaxRetries(it->second.routes().size() - 1);
+                                          it->second.proto.routes(0).host_and_port(), false, false);
+    context_.request_headers.setEnvoyMaxRetries(it->second.proto.routes().size() - 1);
   }
 
   return absl::OkStatus();

@@ -101,6 +101,7 @@ public:
 class LlmBindingObject : public Router::StringAccessor {
 public:
   explicit LlmBindingObject(absl::string_view value);
+  explicit LlmBindingObject(LlmBindingConstSharedPtr binding);
 
   // The binding at `key`: null when no object is set, or the error of one that does not parse. Any
   // other object, such as a string set without the key's object factory, is an error.
@@ -111,13 +112,15 @@ public:
   const absl::StatusOr<LlmBindingConstSharedPtr>& binding() const { return binding_; }
 
   // Router::StringAccessor
-  absl::string_view asString() const override { return source_; }
+  absl::string_view asString() const override {
+    return source_.has_value() ? absl::string_view(*source_) : absl::string_view{};
+  }
 
   // StreamInfo::FilterState::Object
   std::optional<std::string> serializeAsString() const override { return source_; }
 
 private:
-  const std::string source_;
+  const std::optional<std::string> source_;
   const absl::StatusOr<LlmBindingConstSharedPtr> binding_;
 };
 
