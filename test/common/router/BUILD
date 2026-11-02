@@ -97,12 +97,12 @@ sh_binary(
 corpus_from_test_binary(
     name = "corpus_from_config_impl_dir",
     testonly = 1,
-    tags = ["skip_on_windows"],
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {"Pool": "linux_x64_small"},
         "//conditions:default": {},
     }),
     script = ":corpus_from_config_impl_sh",
+    tags = ["skip_on_windows"],
     # test_binary uses cfg = "target" (not "exec") to preserve host/target
     # distinction needed for oss-fuzz builds.
     test_binary = ":config_impl_test_static",
