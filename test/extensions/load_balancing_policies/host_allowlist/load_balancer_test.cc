@@ -610,11 +610,46 @@ TEST_F(HostAllowlistLoadBalancerTest, ChildPickRejectedIfNotOnAllowlist) {
                                  std::make_unique<InspectingFallbackLb>(state, false));
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);
-  EXPECT_EQ(nullptr, response.host);
-  EXPECT_EQ("lb_attempt_exhausted", response.details);
-  ASSERT_TRUE(response.failure_status.has_value());
-  EXPECT_EQ(Http::Code::TooManyRequests, *response.failure_status);
-  EXPECT_EQ(1, counterValue("host_allowlist.rq_lb_attempt_exhausted"));
+  ASSERT_NE(nullptr, response.host);
+  EXPECT_EQ(live.get(), response.host.get());
+  EXPECT_FALSE(response.failure_status.has_value());
+  EXPECT_EQ(0, counterValue("host_allowlist.rq_lb_attempt_exhausted"));
+}
+
+// Verify that when the allowlist is empty, the locality weighted load balancer never
+// 429s when an unstamped host exists.
+TEST_F(HostAllowlistLoadBalancerTest, LocalityWeightedEmptyListNever429WhenUnstampedExists) {
+  auto loc50 = makeHost("tcp://127.0.0.1:80", "dc1/svc-a/member/0");
+  auto loc30 = makeHost("tcp://127.0.0.1:81", "dc1/svc-b/member/0");
+  auto loc15 = makeHost("tcp://127.0.0.1:82", "dc1/svc-c/member/0");
+  auto loc5 = makeHostNoMetadata("tcp://127.0.0.1:83");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {loc50, loc30, loc15, loc5};
+  host_set->healthy_hosts_ = host_set->hosts_;
+  host_set->hosts_per_locality_ =
+      Upstream::makeHostsPerLocality({{loc50}, {loc30}, {loc15}, {loc5}});
+  host_set->healthy_hosts_per_locality_ = host_set->hosts_per_locality_;
+  host_set->locality_weights_ = Upstream::makeLocalityWeights({50, 30, 15, 5});
+
+  setCandidates({});
+
+  HostAllowlist config = makeConfig();
+  auto* typed_extension_config =
+      config.mutable_child_policy()->mutable_policies(0)->mutable_typed_extension_config();
+  RoundRobin rr;
+  rr.mutable_locality_lb_config()->mutable_locality_weighted_lb_config();
+  std::ignore = typed_extension_config->mutable_typed_config()->PackFrom(rr);
+
+  createLoadBalancer(config);
+
+  for (int i = 0; i < 50; ++i) {
+    auto response = load_balancer_->chooseHost(&load_balancer_context_);
+    ASSERT_NE(nullptr, response.host) << "pick " << i;
+    EXPECT_EQ(loc5.get(), response.host.get()) << "pick " << i;
+    EXPECT_FALSE(response.failure_status.has_value());
+  }
+  EXPECT_EQ(0, counterValue("host_allowlist.rq_lb_attempt_exhausted"));
 }
 
 TEST_F(HostAllowlistLoadBalancerTest, RecreatesLegacyFallbackOnHostUpdate) {
