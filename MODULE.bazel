@@ -168,21 +168,44 @@ single_version_override(
 # setup: Compilers
 ####################################################################################
 
-# GCC toolchain configuration
-register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain")
+# GCC is opt-in (`--config=gcc`): hermetic, linking with hermetic lld, unless the root module
+# sets `gcc.host(path = ..., toolchains = ["gcc_linux_x86_64"])`. Downstreams register their own
+# GCC toolchains.
+gcc = use_extension("@envoy_toolshed//toolchains/gcc:extensions.bzl", "gcc_extension", dev_dependency = True)
+gcc.toolchain(
+    name = "gcc_linux_x86_64",
+    arch = "x86_64",
+    dwp = "@llvm_minimal_linux_x64//:bin/llvm-dwp",
+    lld = "@llvm_minimal_linux_x64//:bin/lld",
+    sysroot = "@sysroot_linux_amd64//sysroot",
+)
+use_repo(gcc, "gcc_linux_x86_64")
+
+# Hermetic libstdc++ for //compat/openssl/prefixer. Not dev-only, as the prefixer is also built
+# when Envoy is a dependency, and kept out of any host GCC override. Only fetched when used.
+gcc_runtime = use_extension("@envoy_toolshed//toolchains/gcc:extensions.bzl", "gcc_extension")
+gcc_runtime.toolchain(
+    name = "gcc_runtime_linux_x86_64",
+    arch = "x86_64",
+    dwp = "@llvm_minimal_linux_x64//:bin/llvm-dwp",
+    lld = "@llvm_minimal_linux_x64//:bin/lld",
+    sysroot = "@sysroot_linux_amd64//sysroot",
+)
+use_repo(gcc_runtime, "gcc_runtime_linux_x86_64")
+
+register_toolchains(
+    "//bazel/gcc:linux_x86_64_toolchain",
+    "//bazel/gcc:unavailable_linux_toolchain",
+    "//bazel/gcc:unavailable_macos_toolchain",
+    "//bazel/gcc:unavailable_windows_toolchain",
+    dev_dependency = True,
+)
 
 # LLVM toolchain configuration
 sysroot_ext = use_extension("@envoy_toolshed//sysroot:extensions.bzl", "sysroot_extension")
 sysroot_ext.setup()
-
-# TODO(phlax): remove once the hermetic gcc toolchain provides libstdc++ for //compat/openssl/prefixer
-sysroot_ext.setup(
-    name_prefix = "libstdcxx",
-    stdcc_version = "13",
-)
 use_repo(
     sysroot_ext,
-    "libstdcxx_sysroot_linux_amd64",
     "sysroot_linux_amd64",
     "sysroot_linux_arm64",
 )

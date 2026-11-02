@@ -866,17 +866,21 @@ case $CI_TARGET in
             --test_arg="-runs=10"
         ;;
 
-    gcc)
+    gcc|gcc.test_only|gcc.server_only)
         BAZEL_BUILD_OPTIONS+=("--config=gcc")
         echo "gcc toolchain configured: gcc"
-        echo "bazel fastbuild build with gcc..."
-        bazel_envoy_binary_build fastbuild
-        echo "Testing ${TEST_TARGETS[*]}"
-        bazel_with_collection \
-            test "${BAZEL_BUILD_OPTIONS[@]}" \
-            -c fastbuild  \
-            --remote_download_minimal \
-            -- "${TEST_TARGETS[@]}"
+        if [[ "$CI_TARGET" != "gcc.test_only" ]]; then
+            echo "bazel fastbuild build with gcc..."
+            bazel_envoy_binary_build fastbuild
+        fi
+        if [[ "$CI_TARGET" != "gcc.server_only" ]]; then
+            echo "Testing ${TEST_TARGETS[*]}"
+            bazel_with_collection \
+                test "${BAZEL_BUILD_OPTIONS[@]}" \
+                -c fastbuild  \
+                --remote_download_minimal \
+                -- "${TEST_TARGETS[@]}"
+        fi
         ;;
 
     info)
