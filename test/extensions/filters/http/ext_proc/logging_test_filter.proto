@@ -9,4 +9,5 @@ message LoggingTestFilterConfig {
   string upstream_cluster_name = 2;
   bool check_received_bytes = 3;
   string http_rcd = 4;
+  uint32 expected_response_body_call_count = 5;
 }
