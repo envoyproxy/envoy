@@ -321,6 +321,25 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "retry_policy_impl_test",
+    srcs = ["retry_policy_impl_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//envoy/registry",
+        "//envoy/router:retry_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf:message_validator_lib",
+        "//source/common/router:retry_policy_lib",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:status_utility_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "retry_state_impl_test",
     srcs = ["retry_state_impl_test.cc"],
     rbe_pool = "linux_x64_small",
