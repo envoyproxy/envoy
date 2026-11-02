@@ -48,8 +48,12 @@ public:
     }
     audiences_ = std::make_unique<JwtVerify::CheckAudience>(audiences);
 
-    allowed_algorithms_.insert(jwt_provider_.allowed_algorithms().begin(),
-                               jwt_provider_.allowed_algorithms().end());
+    for (const int alg : jwt_provider_.allowed_algorithms()) {
+      allowed_algorithms_.insert(
+          alg == JwtProvider::EDDSA
+              ? "EdDSA"
+              : JwtProvider::Algorithm_Name(static_cast<JwtProvider::Algorithm>(alg)));
+    }
 
     if (jwt_provider_.has_subjects()) {
       sub_matcher_.emplace(jwt_provider_.subjects(), context);

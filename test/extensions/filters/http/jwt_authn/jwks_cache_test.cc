@@ -277,6 +277,7 @@ providers:
     allowed_algorithms:
     - RS256
     - ES256
+    - EDDSA
   provider2:
     issuer: issuer2
 )");
@@ -284,6 +285,7 @@ providers:
   auto* data1 = cache_->findByIssuer("issuer1");
   EXPECT_TRUE(data1->isAlgorithmAllowed("RS256"));
   EXPECT_TRUE(data1->isAlgorithmAllowed("ES256"));
+  EXPECT_TRUE(data1->isAlgorithmAllowed("EdDSA"));
   EXPECT_FALSE(data1->isAlgorithmAllowed("HS256"));
 
   // Without allowed_algorithms, any algorithm is allowed.

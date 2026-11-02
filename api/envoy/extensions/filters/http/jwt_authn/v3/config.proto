@@ -59,6 +59,48 @@ message JwtProvider {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
 
+  // JWS signing algorithms, named as in the JWT ``alg`` header.
+  enum Algorithm {
+    // ``RSASSA-PKCS1-v1_5`` using SHA-256.
+    RS256 = 0;
+
+    // ``RSASSA-PKCS1-v1_5`` using SHA-384.
+    RS384 = 1;
+
+    // ``RSASSA-PKCS1-v1_5`` using SHA-512.
+    RS512 = 2;
+
+    // ECDSA using P-256 and SHA-256.
+    ES256 = 3;
+
+    // ECDSA using P-384 and SHA-384.
+    ES384 = 4;
+
+    // ECDSA using P-521 and SHA-512.
+    ES512 = 5;
+
+    // ``RSASSA-PSS`` using SHA-256.
+    PS256 = 6;
+
+    // ``RSASSA-PSS`` using SHA-384.
+    PS384 = 7;
+
+    // ``RSASSA-PSS`` using SHA-512.
+    PS512 = 8;
+
+    // HMAC using SHA-256.
+    HS256 = 9;
+
+    // HMAC using SHA-384.
+    HS384 = 10;
+
+    // HMAC using SHA-512.
+    HS512 = 11;
+
+    // EdDSA using Ed25519. Matches ``EdDSA`` in the JWT header.
+    EDDSA = 12;
+  }
+
   // Alters the payload representation in the request dynamic metadata to facilitate its use in matching.
   message NormalizePayload {
     // Each claim in this list will be interpreted as a space-delimited string
@@ -163,26 +205,8 @@ message JwtProvider {
   //     - RS256
   //     - ES256
   //
-  repeated string allowed_algorithms = 22 [(validate.rules).repeated = {
-    unique: true
-    items {
-      string {
-        in: "ES256"
-        in: "ES384"
-        in: "ES512"
-        in: "HS256"
-        in: "HS384"
-        in: "HS512"
-        in: "RS256"
-        in: "RS384"
-        in: "RS512"
-        in: "PS256"
-        in: "PS384"
-        in: "PS512"
-        in: "EdDSA"
-      }
-    }
-  }];
+  repeated Algorithm allowed_algorithms = 22
+      [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.

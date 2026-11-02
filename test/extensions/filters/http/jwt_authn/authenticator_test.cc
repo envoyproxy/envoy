@@ -17,6 +17,7 @@
 #include "gtest/gtest.h"
 
 using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using envoy::extensions::filters::http::jwt_authn::v3::RemoteJwks;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
@@ -167,7 +168,7 @@ TEST_F(AuthenticatorTest, TestAllowedAlgorithms) {
 
   {
     // GoodToken is signed with RS256, so it is rejected before the Jwks is fetched.
-    provider.add_allowed_algorithms("ES256");
+    provider.add_allowed_algorithms(JwtProvider::ES256);
     createAuthenticator();
     EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
     Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(GoodToken)}};
@@ -175,7 +176,7 @@ TEST_F(AuthenticatorTest, TestAllowedAlgorithms) {
   }
 
   {
-    provider.add_allowed_algorithms("RS256");
+    provider.add_allowed_algorithms(JwtProvider::RS256);
     createAuthenticator();
     EXPECT_CALL(*raw_fetcher_, fetch(_, _))
         .WillOnce([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
