@@ -1458,7 +1458,7 @@
     "@@envoy_toolshed+//git:extensions.bzl%git_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "M7D+TyDFtj8vtEEroS9GW8gZqxRN4waZC2Yhtlqa39k=",
-        "usagesDigest": "raRYNL8mxuLor36UD26wfx9au+e5b6NobZG7cbX2pYs=",
+        "usagesDigest": "/AMBNFvC7ixAF7qblp3ztWU2H/NmfcxvkEt6ZZNADl4=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "cacert": {
