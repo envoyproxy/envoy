@@ -203,8 +203,10 @@ void Wasm::registerCallbacks() {
       &proxy_wasm::ConvertFunctionWordToUint32<decltype(_fn), _fn>::convertFunctionWordToUint32)
   _REGISTER(resolve_dns);
 #undef _REGISTER
-  wasm_vm_->addFailCallback([this](proxy_wasm::FailState fail_state) {
-    if (fail_state == proxy_wasm::FailState::RuntimeError) {
+  // Count each VM once: a few host calls (e.g. foreign functions) still call into a failed VM.
+  wasm_vm_->addFailCallback([this, crashed = false](proxy_wasm::FailState fail_state) mutable {
+    if (fail_state == proxy_wasm::FailState::RuntimeError && !crashed) {
+      crashed = true;
       lifecycle_stats_handler_.onEvent(WasmEvent::VmCrashed);
     }
   });
