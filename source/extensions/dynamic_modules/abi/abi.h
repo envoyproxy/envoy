@@ -10644,6 +10644,25 @@ void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
 
 /**
+ * envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions makes the cluster
+ * keep persistent host partitions, as if its ClusterConfig set use_persistent_host_partitions. This
+ * lets the module choose the host set storage without the cluster's configuration carrying the
+ * field. The same costs apply, so pair it with
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
+ *
+ * This is optional and must be called on the main thread during
+ * envoy_dynamic_module_on_cluster_config_new, before the cluster and its host sets exist. A call
+ * made then off the main thread is reported as a bug. A refusal for the lb_policy is logged.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @return true if the cluster will keep persistent host partitions. It returns false on a null
+ * pointer, after envoy_dynamic_module_on_cluster_config_new returned, off the main thread, and
+ * when the cluster's lb_policy is not CLUSTER_PROVIDED.
+ */
+bool envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count returns the number of healthy
  * hosts at the given priority level in the cluster's host set.
  *
@@ -11960,10 +11979,11 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
  * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
  *
  * Envoy only knows this when the cluster keeps persistent host partitions, which requires
- * use_persistent_host_partitions in the cluster's ClusterConfig, and no health refresh happened
- * since the previous update. A refresh covers every host, and with an active health checker it
- * precedes a worker's first update. Otherwise it returns false and the module must reread the hosts
- * it tracks.
+ * use_persistent_host_partitions in the cluster's ClusterConfig or a call to
+ * envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions, and no health
+ * refresh happened since the previous update. A refresh covers every host, and with an active
+ * health checker it precedes a worker's first update. Otherwise it returns false and the module
+ * must reread the hosts it tracks.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
  * @param result receives the count. Its contents are unspecified when the callback returns false.

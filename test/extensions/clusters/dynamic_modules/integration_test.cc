@@ -1,6 +1,7 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stream_info/filter_state.h"
@@ -11,6 +12,7 @@
 #include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
+#include "test/config/utility.h"
 #include "test/extensions/dynamic_modules/util.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/logging.h"
@@ -106,7 +108,9 @@ public:
       envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
       dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
       dec_config.set_cluster_name(cluster_name);
-      dec_config.set_use_persistent_host_partitions(use_persistent_host_partitions_);
+      if (use_persistent_host_partitions_) {
+        dec_config.mutable_use_persistent_host_partitions()->set_value(true);
+      }
 
       // Pass the upstream address via the cluster config so the Rust module knows
       // where to add hosts.
@@ -442,6 +446,27 @@ TEST_P(DynamicModuleClusterIntegrationTest, HostChurnConverges) {
   // Without persistent host partitions Envoy cannot report which hosts changed health.
   EXPECT_EQ(0,
             test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value());
+}
+
+// The module opts the cluster into persistent host partitions during on_cluster_config_new, with
+// the config field unset, so Envoy reports the health flips as it does with the field set.
+TEST_P(DynamicModuleClusterIntegrationTest, HostChurnWithModuleOptIn) {
+  concurrency_ = 2;
+  initializeWithDecCluster("host_churn_module_opt_in");
+
+  test_server_->waitForCounter("dynamicmodulescustom.host_churn_converged_total", testing::Ge(2));
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+  EXPECT_EQ(2, test_server_->gauge("cluster.cluster_0.membership_total")->value());
+  EXPECT_EQ(1, test_server_->gauge("cluster.cluster_0.membership_healthy")->value());
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
 }
 
 // Runs the host update flows with the DEC cluster patching persistent host partitions by delta, on
@@ -887,6 +912,162 @@ TEST_P(DynamicModuleClusterNativeLbIntegrationTest, NativeLbWithLeastRequestPoli
   // native_lb_requests counter is unincremented (absent or 0).
   auto choose_host = test_server_->counter("dynamicmodulescustom.native_lb_requests");
   EXPECT_TRUE(choose_host == nullptr || choose_host->value() == 0);
+}
+
+// Delivers the DEC cluster over filesystem CDS, so cluster adds, replacements and removals run
+// while the cluster keeps persistent host partitions. The parameter picks how the cluster opts in:
+// the module during on_cluster_config_new, or the ClusterConfig field.
+class DynamicModuleClusterCdsIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
+public:
+  DynamicModuleClusterCdsIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
+
+  static std::string
+  paramsToString(const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& p) {
+    return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(p.param)),
+                        std::get<1>(p.param) ? "ModuleOptIn" : "ConfigField");
+  }
+
+  // Each generation changes the connect timeout, so every push replaces the cluster.
+  envoy::config::cluster::v3::Cluster decCluster(uint32_t generation) {
+    const bool module_opt_in = std::get<1>(GetParam());
+    envoy::config::cluster::v3::Cluster cluster;
+    cluster.set_name("cluster_0");
+    cluster.mutable_connect_timeout()->CopyFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(1000 + generation));
+    cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
+
+    envoy::extensions::clusters::dynamic_modules::v3::ClusterConfig dec_config;
+    dec_config.mutable_dynamic_module_config()->set_name("cluster_integration_test");
+    dec_config.set_cluster_name(module_opt_in ? "host_churn_module_opt_in" : "host_churn");
+    if (!module_opt_in) {
+      dec_config.mutable_use_persistent_host_partitions()->set_value(true);
+    }
+    Protobuf::StringValue config_proto;
+    config_proto.set_value(fake_upstreams_[0]->localAddress()->asString());
+    std::ignore = dec_config.mutable_cluster_config()->PackFrom(config_proto);
+    cluster.mutable_cluster_type()->set_name("envoy.clusters.dynamic_modules");
+    std::ignore = cluster.mutable_cluster_type()->mutable_typed_config()->PackFrom(dec_config);
+    return cluster;
+  }
+
+  // Writes the cluster and waits until Envoy has applied this CDS update, without waiting for the
+  // cluster to warm or for its posted host churn to run.
+  void pushCluster(uint32_t generation) {
+    const uint64_t applied = test_server_->counter("cluster_manager.cds.update_success")->value();
+    cds_helper_.setCds({decCluster(generation)});
+    test_server_->waitForCounter("cluster_manager.cds.update_success", testing::Ge(applied + 1));
+  }
+
+  void removeCluster() {
+    const uint64_t applied = test_server_->counter("cluster_manager.cds.update_success")->value();
+    cds_helper_.setCds({});
+    test_server_->waitForCounter("cluster_manager.cds.update_success", testing::Ge(applied + 1));
+  }
+
+  void initializeWithCds() {
+    TestEnvironment::setEnvVar(
+        "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
+        TestEnvironment::runfilesPath("test/extensions/dynamic_modules/test_data/rust"), 1);
+    autonomous_upstream_ = true;
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
+          envoy::config::core::v3::ApiVersion::V3);
+      bootstrap.mutable_dynamic_resources()
+          ->mutable_cds_config()
+          ->mutable_path_config_source()
+          ->set_path(cds_helper_.cdsPath());
+      bootstrap.mutable_static_resources()->clear_clusters();
+      // The upstreams exist by now, so the first generation can carry their address.
+      cds_helper_.setCds({decCluster(0)});
+    });
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
+    HttpIntegrationTest::initialize();
+  }
+
+  // Sends one request and waits for any response, so a request that lands mid-churn may see no
+  // host but must not hang or crash Envoy.
+  std::string sendRequest() {
+    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+    if (!response->waitForEndStream()) {
+      ADD_FAILURE() << "request did not end";
+      return "";
+    }
+    return std::string(response->headers().getStatusValue());
+  }
+
+  // The cluster finishes warming before the module adds its hosts, and a replaced cluster shares
+  // the stats of the one it replaces, so wait until the current cluster serves before requiring
+  // that it keeps serving.
+  void expectSettledAndServing() {
+    test_server_->waitForGauge("cluster_manager.warming_clusters", testing::Eq(0));
+    test_server_->waitForGauge("cluster.cluster_0.membership_total", testing::Eq(2));
+    test_server_->waitForGauge("cluster.cluster_0.membership_healthy", testing::Eq(1));
+    const auto deadline = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
+    while (sendRequest() != "200") {
+      ASSERT_LT(timeSystem().monotonicTime(), deadline) << "cluster_0 never served";
+      timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
+    }
+    for (int i = 0; i < 3; ++i) {
+      EXPECT_EQ("200", sendRequest());
+    }
+  }
+
+  CdsHelper cds_helper_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsAndOptIn, DynamicModuleClusterCdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    DynamicModuleClusterCdsIntegrationTest::paramsToString);
+
+// A CDS-delivered cluster keeps persistent host partitions, so workers learn health changes from
+// the reported deltas.
+TEST_P(DynamicModuleClusterCdsIntegrationTest, CdsClusterKeepsPersistentHostPartitions) {
+  concurrency_ = 2;
+  initializeWithCds();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  expectSettledAndServing();
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
+}
+
+// Replaces the cluster back to back, each push applied while the previous cluster's merged health
+// update may still be pending, with requests in between, then removes and re-adds it. Envoy keeps
+// serving and the last cluster settles.
+TEST_P(DynamicModuleClusterCdsIntegrationTest, CdsReplaceAndRemoveWhileInitializing) {
+  concurrency_ = 2;
+  initializeWithCds();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  expectSettledAndServing();
+  const uint64_t modified = test_server_->counter("cluster_manager.cluster_modified")->value();
+
+  constexpr uint32_t kReplacements = 20;
+  for (uint32_t generation = 1; generation <= kReplacements; ++generation) {
+    pushCluster(generation);
+    sendRequest();
+  }
+  EXPECT_EQ(modified + kReplacements,
+            test_server_->counter("cluster_manager.cluster_modified")->value());
+  expectSettledAndServing();
+
+  // Remove the cluster, then re-add it and remove it again before its churn can run.
+  removeCluster();
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(1));
+  EXPECT_EQ("503", sendRequest());
+  pushCluster(kReplacements + 1);
+  removeCluster();
+  test_server_->waitForCounter("cluster_manager.cluster_removed", testing::Ge(2));
+
+  pushCluster(kReplacements + 2);
+  expectSettledAndServing();
+  EXPECT_GE(test_server_->counter("dynamicmodulescustom.host_churn_health_changes_total")->value(),
+            2);
 }
 
 } // namespace DynamicModules

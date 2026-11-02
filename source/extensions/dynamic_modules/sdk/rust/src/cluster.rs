@@ -1010,6 +1010,15 @@ impl EnvoyResolvedHistogram {
 #[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyClusterMetrics: Send + Sync {
+  /// Make the cluster keep persistent host partitions, as if its `ClusterConfig` set
+  /// `use_persistent_host_partitions`. The same costs apply, so pair it with
+  /// [`EnvoyCluster::use_persistent_host_map`].
+  ///
+  /// This is optional and must be called during config creation, before the cluster and its host
+  /// sets exist. Returns `false` if called later or if the cluster's `lb_policy` is not
+  /// `CLUSTER_PROVIDED`.
+  fn use_persistent_host_partitions(&self) -> bool;
+
   // -------------------------------------------------------------------------
   // Define metrics (call during config creation).
   // -------------------------------------------------------------------------
@@ -2185,6 +2194,12 @@ fn cluster_metric_result_to_rust(
 }
 
 impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
+  fn use_persistent_host_partitions(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(self.raw)
+    }
+  }
+
   fn define_counter(
     &self,
     name: &str,
@@ -3523,6 +3538,19 @@ mod tests {
       crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
       2
     );
+  }
+
+  // The stub in `lib_test.rs` accepts any non-null config.
+  #[test]
+  fn use_persistent_host_partitions_forwards_to_envoy() {
+    let config = EnvoyClusterMetricsImpl {
+      raw: 0x1 as abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+    };
+    assert!(config.use_persistent_host_partitions());
+    let null_config = EnvoyClusterMetricsImpl {
+      raw: std::ptr::null_mut(),
+    };
+    assert!(!null_config.use_persistent_host_partitions());
   }
 
   // The stubs in `lib_test.rs` report two health-changed hosts for a null load balancer and an

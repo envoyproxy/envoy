@@ -350,6 +350,30 @@ void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
   getCluster(cluster_envoy_ptr)->usePersistentHostMap();
 }
 
+bool envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr) {
+  if (cluster_config_envoy_ptr == nullptr) {
+    return false;
+  }
+  auto* config = getConfig(cluster_config_envoy_ptr);
+  // The cluster creates its host sets right after on_cluster_config_new returns, which is also when
+  // stat creation freezes.
+  if (config->stat_creation_frozen_) {
+    return false;
+  }
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions must "
+                 "be called on the main thread");
+    return false;
+  }
+  if (!config->persistent_host_partitions_allowed_) {
+    config->persistent_host_partitions_refused_ = true;
+    return false;
+  }
+  config->use_persistent_host_partitions_ = true;
+  return true;
+}
+
 size_t envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count(
     envoy_dynamic_module_type_cluster_lb_envoy_ptr lb_envoy_ptr, uint32_t priority) {
   if (lb_envoy_ptr == nullptr) {

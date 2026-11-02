@@ -6432,6 +6432,13 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_use_persistent_host_map(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+  cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+) -> bool {
+  !cluster_config_envoy_ptr.is_null()
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_update_host_health(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
