@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package envoy.extensions.queue_policy.fair_queue.v3;
+
+import "envoy/type/metadata/v3/metadata.proto";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.queue_policy.fair_queue.v3";
+option java_outer_classname = "FairQueueProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/queue_policy/fair_queue/v3;fair_queuev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Fair Queue Policy]
+// [#extension: envoy.queue_policy.fair_queue]
+
+// Configuration for the Stochastic Fair Queuing (SFQ) pending requests queue policy.
+//
+// This policy isolates tenant or traffic classes waiting in a cluster's upstream connection pool
+// pending stream queue. Each queued request is hashed into one of :ref:`num_buckets
+// <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.num_buckets>`
+// FIFO sub-queues based on the dynamic metadata value at :ref:`class_metadata_key
+// <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.class_metadata_key>`.
+// Active buckets are dequeued in round-robin order so that a burst from a single noisy-neighbor
+// class cannot starve other classes waiting for an upstream connection.
+//
+// To prevent sustained hash collisions between two classes, the bucket hash function perturbs its
+// seed at every :ref:`perturbation_interval
+// <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.perturbation_interval>`
+// using the request's enqueue timestamp.
+message FairQueuePolicyConfig {
+  // Specifies the dynamic metadata key in ``StreamInfo::dynamicMetadata()`` used to classify
+  // queued requests into fair-queue buckets.
+  //
+  // If a request does not carry a metadata value at ``class_metadata_key`` (or the value is null),
+  // it is mapped to a single shared default class so that unclassified bursts cannot pollute
+  // buckets belonging to classified tenants.
+  type.metadata.v3.MetadataKey class_metadata_key = 1 [(validate.rules).message = {required: true}];
+
+  // The number of hash buckets used to partition queued requests across classes.
+  // Defaults to 1024 if unset.
+  google.protobuf.UInt32Value num_buckets = 2 [(validate.rules).uint32 = {gt: 0}];
+
+  // The time interval at which the bucket hash function perturbs its seed to break hash collisions
+  // among classes. Newly arriving requests use the updated hash seed while already-queued requests
+  // remain in their assigned bucket.
+  //
+  // Defaults to 1 second if unset. Setting this to ``0s`` disables hash perturbation.
+  google.protobuf.Duration perturbation_interval = 3 [(validate.rules).duration = {gte {}}];
+}
