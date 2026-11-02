@@ -37,10 +37,12 @@ namespace {
 // selection. The "dynamic" selector uses the dynamic certificate named by the server name and lets
 // Envoy select the certificate for a server name with the "www." prefix. Its config lines provide
 // the "prefetch" certificates when the config is created, the "sync" certificates when they are
-// requested, the "fetch" certificates from another thread when they are requested, and the "hold"
-// certificates only when a name with the "release." prefix is requested, and it declines other
-// names.
-std::string selectorConfig(absl::string_view selector_name, absl::string_view config) {
+// requested, the "fetch" certificates from another thread when they are requested, the "hold"
+// certificates only when a name with the "release." prefix is requested, and the "init"
+// certificates from another thread before it signals that its initialization is complete. It
+// declines other names. The extra fields are added to the DynamicModuleTlsCertificateSelector.
+std::string selectorConfig(absl::string_view selector_name, absl::string_view config,
+                           absl::string_view extra_fields = "") {
   // The module runs its own threads, so it stays loaded.
   return fmt::format(R"EOF(
 name: envoy.tls.certificate_selectors.dynamic_modules
@@ -54,12 +56,14 @@ typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
     value: "{}"
   allow_dynamic_certificates: {}
+  {}
 )EOF",
-                     selector_name, config, selector_name == "dynamic");
+                     selector_name, config, selector_name == "dynamic", extra_fields);
 }
 
-std::string dynamicSelectorConfig(const std::vector<std::string>& certificates) {
-  return selectorConfig("dynamic", absl::StrJoin(certificates, "\\n"));
+std::string dynamicSelectorConfig(const std::vector<std::string>& certificates,
+                                  absl::string_view extra_fields = "") {
+  return selectorConfig("dynamic", absl::StrJoin(certificates, "\\n"), extra_fields);
 }
 
 // Returns a config line of the "dynamic" selector for a certificate of the test certificates, with
@@ -118,9 +122,10 @@ public:
     SslIntegrationTestBase::initialize();
   }
 
-  // Initializes the listener with the "dynamic" selector.
-  void initializeWithDynamicCertificates(const std::vector<std::string>& certificates) {
-    tls_cert_selector_yaml_ = dynamicSelectorConfig(certificates);
+  // Initializes the listener with the "dynamic" selector and the extra fields.
+  void initializeWithDynamicCertificates(const std::vector<std::string>& certificates,
+                                         absl::string_view extra_fields = "") {
+    tls_cert_selector_yaml_ = dynamicSelectorConfig(certificates, extra_fields);
     initialize();
   }
 
@@ -231,6 +236,12 @@ public:
   // value.
   void waitForOcspResponseExpiration(testing::Matcher<uint64_t> matcher) {
     test_server_->waitForGauge("server.seconds_until_first_ocsp_response_expiring", matcher);
+  }
+
+  // Waits for a stats flush that sets the days until the first certificate expires to a matching
+  // value.
+  void waitForCertificateExpiration(testing::Matcher<uint64_t> matcher) {
+    test_server_->waitForGauge("server.days_until_first_cert_expiring", matcher);
   }
 
   // Applies the modifier to the TLS context of the listener.
@@ -478,6 +489,35 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, PendingHandshakeTimes
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+// A request that the module does not answer in time fails its handshake, and the next handshake
+// requests the certificate again.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, CertificateRequestTimesOut) {
+  initializeWithDynamicCertificates({dynamicCertificate("hold", "hold.lyft.com", "server2")},
+                                    "dynamic_certificate_request_timeout: 0.2s");
+  expectFailedHandshake(ClientSslTransportOptions().setSni("hold.lyft.com"));
+  test_server_->waitForCounter(listenerStatPrefix("dynamic_certificates.request_timeout"),
+                               testing::Eq(1));
+  expectFailedHandshake(ClientSslTransportOptions().setSni("hold.lyft.com"));
+  test_server_->waitForCounter(listenerStatPrefix("dynamic_certificates.request_timeout"),
+                               testing::Eq(2));
+  waitForModuleCounter("requested", 2);
+}
+
+// The listener warms until the module provides its certificates and signals that its
+// initialization is complete, so the first handshake does not wait for the module.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ListenerWaitsForModuleInitialization) {
+  initializeWithDynamicCertificates({dynamicCertificate("init", "init.lyft.com", "server2")});
+  expectServedCertificate("init.lyft.com", TEST_SERVER2_CERT_HASH);
+  EXPECT_EQ(0U, test_server_->counter("dynamicmodulescustom.requested")->value());
+}
+
+// A module that signals while its configuration is created does not keep the listener warming.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ModuleSignalsDuringConfigCreation) {
+  initializeWithDynamicCertificates(
+      {dynamicCertificate("prefetch", "prefetch.lyft.com", "server2")});
+  expectServedCertificate("prefetch.lyft.com", TEST_SERVER2_CERT_HASH);
+}
+
 // The listener only accepts the RSA client certificate, and so does its dynamic certificate.
 TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
        DynamicCertificateValidatesClientCertificate) {
@@ -584,6 +624,43 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
   // The module removes the certificate whose name follows the "remove." prefix.
   expectFailedHandshake(ClientSslTransportOptions().setSni("remove.ocsp.lyft.com"));
   waitForOcspResponseExpiration(testing::Eq(0));
+}
+
+// An expired dynamic certificate sets the days until the first certificate expires to 0, and
+// replacing it restores the days of the other certificates. They can be one less if a day passes
+// while the test runs.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       ReplacingExpiredCertificateRestoresCertificateExpiration) {
+  flushStatsOften();
+  initializeWithDynamicCertificates({dynamicCertificate("sync", "expired.lyft.com", "expired_"),
+                                     dynamicCertificate("hold", "expired.lyft.com", "server2")});
+  waitForCertificateExpiration(testing::Gt(0));
+  const uint64_t initial_days =
+      test_server_->gauge("server.days_until_first_cert_expiring")->value();
+  // The client rejects the expired certificate, which the module provides when it is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("expired.lyft.com"));
+  waitForCertificateExpiration(testing::Eq(0));
+  // The module provides the held certificate when the release name is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("release.lyft.com"));
+  waitForCertificateExpiration(testing::AllOf(testing::Gt(0), testing::Le(initial_days)));
+}
+
+// An expired dynamic certificate sets the days until the first certificate expires to 0, and
+// removing it restores the days of the other certificates. They can be one less if a day passes
+// while the test runs.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       RemovingExpiredCertificateRestoresCertificateExpiration) {
+  flushStatsOften();
+  initializeWithDynamicCertificates({dynamicCertificate("hold", "expired.lyft.com", "expired_")});
+  waitForCertificateExpiration(testing::Gt(0));
+  const uint64_t initial_days =
+      test_server_->gauge("server.days_until_first_cert_expiring")->value();
+  // The module provides the held certificate when the release name is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("release.lyft.com"));
+  waitForCertificateExpiration(testing::Eq(0));
+  // The module removes the certificate whose name follows the "remove." prefix.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("remove.expired.lyft.com"));
+  waitForCertificateExpiration(testing::AllOf(testing::Gt(0), testing::Le(initial_days)));
 }
 
 // The dynamic certificates are listed by /certs without the trusted certificate, which only the TLS
@@ -733,6 +810,17 @@ TEST_P(DynamicModuleUpstreamTlsCertificateSelectorIntegrationTest, ServesDynamic
   test_server_->waitForCounter("dynamicmodulescustom.requested", testing::Eq(1));
   test_server_->waitForCounter("cluster.cluster_0.dynamic_certificates.provided", testing::Eq(1));
   test_server_->waitForGauge("cluster.cluster_0.dynamic_certificates.active", testing::Eq(1));
+}
+
+// The cluster warms until the module provides its client certificate and signals that its
+// initialization is complete, so the first upstream handshake does not wait for the module.
+TEST_P(DynamicModuleUpstreamTlsCertificateSelectorIntegrationTest,
+       ClusterWaitsForModuleInitialization) {
+  initializeWithSelector(dynamicSelectorConfig({dynamicCertificate(
+                             "init", default_request_headers_.getHostValue(), "client_ecdsa")}),
+                         {});
+  expectClientCertificate(TEST_CLIENT_ECDSA_CERT_HASH, default_request_headers_);
+  EXPECT_EQ(0U, test_server_->counter("dynamicmodulescustom.requested")->value());
 }
 
 } // namespace

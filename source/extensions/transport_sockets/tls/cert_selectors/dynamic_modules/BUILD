@@ -20,6 +20,8 @@ envoy_cc_library(
     deps = [
         "//envoy/common:optref_lib",
         "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/init:manager_interface",
         "//envoy/network:transport_socket_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/ssl:context_config_interface",
@@ -33,6 +35,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:statusor_lib",
         "//source/common/common:thread_lib",
+        "//source/common/init:target_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",

@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/init/manager.h"
 
 #include "source/common/common/thread.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
@@ -95,15 +96,20 @@ DynamicModuleTlsCertificateSelectorConfig::DynamicModuleTlsCertificateSelectorCo
     Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Server::Configuration::GenericFactoryContext& factory_context,
     const Ssl::ContextConfig& tls_config, absl::string_view metrics_namespace,
+    std::chrono::milliseconds certificate_request_timeout,
     AsyncContextFactory dynamic_context_factory)
     : main_thread_dispatcher_(factory_context.serverFactoryContext().mainThreadDispatcher()),
       dynamic_module_(std::move(dynamic_module)),
       server_context_(factory_context.serverFactoryContext()),
       context_manager_(server_context_.sslContextManager()), tls_config_(&tls_config),
+      certificate_request_timeout_(certificate_request_timeout),
+      init_target_(
+          std::make_unique<Init::TargetImpl>("dynamic_modules_tls_certificate_selector", [] {})),
       dynamic_context_factory_(std::move(dynamic_context_factory)),
       context_scope_(factory_context.scope().createScope("")),
       stats_scope_(server_context_.scope().createScope(absl::StrCat(metrics_namespace, "."))),
       metrics_(*stats_scope_) {
+  factory_context.initManager().add(*init_target_);
   if (dynamic_context_factory_ != nullptr) {
     // The socket factory is created right after the configuration, and installs a TLS context built
     // from it if it is ready.
@@ -208,6 +214,7 @@ DynamicModuleTlsCertificateSelectorConfig::storeProvidedCertificate(
   DynamicCertificate& certificate = it->second;
   if (!inserted && !certificate.certificate_config.has_value()) {
     stats_->pending_.dec();
+    certificate.request_timer.reset();
   }
   certificate.certificate_config.emplace(std::move(certificate_config));
   return certificate;
@@ -278,12 +285,36 @@ void DynamicModuleTlsCertificateSelectorConfig::onConfigUpdate() {
 
 void DynamicModuleTlsCertificateSelectorConfig::detachTlsConfig() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
-  // The context manager is main thread state, and the configuration may be destroyed on a worker.
+  // The context manager, the timers and the init target are main thread state, and the
+  // configuration may be destroyed on a worker.
   for (auto& [_, certificate] : dynamic_certificates_) {
     replaceManagedContext(certificate, nullptr);
+    certificate.request_timer.reset();
   }
+  init_target_.reset();
   tls_config_ = nullptr;
   dynamic_context_factory_ = nullptr;
+}
+
+void DynamicModuleTlsCertificateSelectorConfig::signalInitComplete() {
+  if (!Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(
+        "envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete must "
+        "be called on the main thread");
+    return;
+  }
+  if (init_target_ == nullptr) {
+    return;
+  }
+  // A selector hook can signal while a TLS context of the listener is built, and finishing the
+  // warming of the listener can destroy it, so the target is marked ready in a separate event.
+  main_thread_dispatcher_.post([weak_config = weak_from_this()] {
+    if (const auto config = weak_config.lock();
+        config != nullptr && config->init_target_ != nullptr) {
+      config->init_target_->ready();
+      config->init_target_.reset();
+    }
+  });
 }
 
 Ssl::SelectionResult DynamicModuleTlsCertificateSelectorConfig::selectDynamicCertificate(
@@ -351,9 +382,23 @@ void DynamicModuleTlsCertificateSelectorConfig::requestCertificate(
     ENVOY_LOG(debug, "requesting TLS certificate '{}' from the dynamic module", name);
     stats_->requested_.inc();
     stats_->pending_.inc();
+    // No timer starts once the TLS context is removed, since the configuration may then be
+    // destroyed on a worker.
+    if (certificate_request_timeout_.count() > 0 && tls_config_ != nullptr) {
+      certificate.request_timer =
+          main_thread_dispatcher_.createTimer([this, name] { onRequestTimeout(name); });
+      certificate.request_timer->enableTimer(certificate_request_timeout_);
+    }
     // The hook can provide or remove the certificate, so the entry is not used after it returns.
     on_certificate_requested_(this, in_module_config_, {name.data(), name.size()});
   }
+}
+
+void DynamicModuleTlsCertificateSelectorConfig::onRequestTimeout(std::string name) {
+  ENVOY_LOG(debug, "dynamic module did not answer the request for TLS certificate '{}' in time",
+            name);
+  stats_->request_timeout_.inc();
+  failRequestedCertificate(name);
 }
 
 absl::StatusOr<AsyncContextSharedPtr> DynamicModuleTlsCertificateSelectorConfig::buildContext(
@@ -418,7 +463,7 @@ void DynamicModuleTlsCertificateSelectorConfig::updateWorkers(const std::string&
 absl::StatusOr<DynamicModuleTlsCertificateSelectorConfigSharedPtr>
 newDynamicModuleTlsCertificateSelectorConfig(
     absl::string_view selector_name, absl::string_view selector_config, bool is_upstream,
-    absl::string_view metrics_namespace,
+    absl::string_view metrics_namespace, std::chrono::milliseconds certificate_request_timeout,
     Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Server::Configuration::GenericFactoryContext& factory_context,
     const Ssl::ContextConfig& tls_config, AsyncContextFactory dynamic_context_factory) {
@@ -453,7 +498,7 @@ newDynamicModuleTlsCertificateSelectorConfig(
 
   auto config = std::make_shared<DynamicModuleTlsCertificateSelectorConfig>(
       std::move(dynamic_module), factory_context, tls_config, metrics_namespace,
-      std::move(dynamic_context_factory));
+      certificate_request_timeout, std::move(dynamic_context_factory));
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_new_ = on_new.value();
   config->on_destroy_ = on_destroy.value();
