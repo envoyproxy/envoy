@@ -112,7 +112,7 @@ static void BM_IntrusiveListRemoveAll(benchmark::State& state) {
     state.ResumeTiming();
 
     for (IntrusiveObject* p : ptrs) {
-      benchmark::DoNotOptimize(p->removeFromList(list));
+      benchmark::DoNotOptimize(p->removeFromList());
     }
   }
 }
