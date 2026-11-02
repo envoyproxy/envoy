@@ -42,6 +42,16 @@ TEST(FaultConfigTest, FaultAbortResponseBody) {
   FaultAbortConfig config(proto_config);
 
   EXPECT_EQ("custom response body", config.responseBody());
+  EXPECT_FALSE(config.dryRun());
+}
+
+TEST(FaultConfigTest, FaultAbortDryRun) {
+  envoy::extensions::filters::http::fault::v3::FaultAbort proto_config;
+  proto_config.set_http_status(503);
+  proto_config.set_dry_run(true);
+  FaultAbortConfig config(proto_config);
+
+  EXPECT_TRUE(config.dryRun());
 }
 
 TEST(FaultConfigTest, FaultAbortGrpcHeaderConfig) {

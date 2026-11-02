@@ -86,6 +86,7 @@ FaultFilterConfig::FaultFilterConfig(
     : settings_(fault, context), runtime_(context.runtime()),
       stats_(generateStats(stats_prefix, scope)), scope_(scope), time_source_(context.timeSource()),
       stat_name_set_(scope.symbolTable().makeSet("Fault")),
+      aborts_dry_run_(stat_name_set_->add("aborts_dry_run")),
       aborts_injected_(stat_name_set_->add("aborts_injected")),
       delays_injected_(stat_name_set_->add("delays_injected")),
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
@@ -185,9 +186,15 @@ bool FaultFilter::maybeDoAbort(const Http::RequestHeaderMap& request_headers) {
   std::optional<Grpc::Status::GrpcStatus> grpc_status;
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
-  if (http_status.has_value() && tryIncActiveFaults()) {
-    abortWithStatus(http_status.value(), grpc_status);
-    return true;
+  if (http_status.has_value()) {
+    if (isAbortDryRun()) {
+      recordAbortDryRun();
+      return false;
+    }
+    if (tryIncActiveFaults()) {
+      abortWithStatus(http_status.value(), grpc_status);
+      return true;
+    }
   }
 
   return false;
@@ -252,6 +259,10 @@ bool FaultFilter::isDelayEnabled(const Http::RequestHeaderMap& request_headers) 
   }
   return config_->runtime().snapshot().featureEnabled(fault_settings_->delayPercentRuntime(),
                                                       request_delay->percentage(&request_headers));
+}
+
+bool FaultFilter::isAbortDryRun() const {
+  return fault_settings_->requestAbort() != nullptr && fault_settings_->requestAbort()->dryRun();
 }
 
 bool FaultFilter::isAbortEnabled(const Http::RequestHeaderMap& request_headers) {
@@ -379,6 +390,15 @@ void FaultFilter::recordDelaysInjectedStats() {
   config_->stats().delays_injected_.inc();
 }
 
+void FaultFilter::recordAbortsDryRunStats() {
+  // Downstream specific stats.
+  if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
+    config_->incAbortsDryRun(downstream_cluster_storage_->statName());
+  }
+
+  config_->stats().aborts_dry_run_.inc();
+}
+
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty() && !fault_settings_->disableDownstreamClusterStats()) {
@@ -452,9 +472,12 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   std::optional<Grpc::Status::GrpcStatus> grpc_status;
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
-  if (http_status.has_value()) {
+  if (http_status.has_value() && !isAbortDryRun()) {
     abortWithStatus(http_status.value(), grpc_status);
   } else {
+    if (http_status.has_value()) {
+      recordAbortDryRun();
+    }
     // Should not continue to count as an active fault after the delay has elapsed if no other type
     // of fault is active. As the delay timer is always done at this point and followed abort faults
     // have been checked earlier, here we just check if there's a response rate limit configured.
@@ -484,6 +507,13 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
   }
   decoder_callbacks_->sendLocalReply(http_status_code, body, nullptr, grpc_status,
                                      RcDetails::get().FaultAbort);
+}
+
+void FaultFilter::recordAbortDryRun() {
+  recordAbortsDryRunStats();
+  auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
+  (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
+      fault_settings_->filterMetadata();
 }
 
 bool FaultFilter::matchesTargetUpstreamCluster() {
