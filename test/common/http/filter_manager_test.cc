@@ -182,9 +182,9 @@ TEST_F(FilterManagerTest, LowWatermarkWithoutHighWatermark) {
 TEST_F(FilterManagerTest, EncoderFilterLowWatermarkWithoutHighWatermark) {
   initialize();
 
-  EXPECT_ENVOY_BUG(
-      filter_manager_->callEncoderFilterLowWatermarkCallbacks(),
-      "HTTP filter manager low watermark callback without a preceding high watermark callback");
+  EXPECT_ENVOY_BUG(filter_manager_->callEncoderFilterLowWatermarkCallbacks(),
+                   "HTTP filter manager encoder filter low watermark callback without a preceding "
+                   "high watermark callback");
   EXPECT_FALSE(filter_manager_->aboveHighWatermark());
   filter_manager_->destroyFilters();
 }

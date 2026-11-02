@@ -1787,8 +1787,8 @@ void FilterManager::callEncoderFilterHighWatermarkCallbacks() {
 
 void FilterManager::callEncoderFilterLowWatermarkCallbacks() {
   if (encoder_filter_high_watermark_count_ == 0) {
-    IS_ENVOY_BUG("HTTP filter manager low watermark callback without a preceding high watermark "
-                 "callback");
+    IS_ENVOY_BUG("HTTP filter manager encoder filter low watermark callback without a preceding "
+                 "high watermark callback");
     return;
   }
   --encoder_filter_high_watermark_count_;
