@@ -50,8 +50,6 @@ using testing::_;
 using testing::AtLeast;
 using testing::AtMost;
 using testing::Eq;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::IsEmpty;
 using testing::NiceMock;
 using testing::Not;
@@ -71,8 +69,7 @@ using TestMetadata = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
 // Use in EXPECT_CALL(foo, bar(_)).WillExitIfNeeded() to exit dispatcher loop if
 // there are no longer any pending events in DispatcherHelper.
-#define WillExitIfNeeded()                                                                         \
-  WillOnce(InvokeWithoutArgs([this] { dispatcher_helper_.exitDispatcherIfNeeded(); }))
+#define WillExitIfNeeded() WillOnce([this] { dispatcher_helper_.exitDispatcherIfNeeded(); })
 
 // Utility to assist with keeping track of pending gmock expected events when
 // deferring execution to the dispatcher. The dispatcher can be run using this
@@ -138,26 +135,25 @@ public:
   void expectInitialMetadata(const TestMetadata& metadata,
                              std::optional<TestMetadata> encoded_metadata = std::nullopt) {
     EXPECT_CALL(*this, onReceiveInitialMetadata_(_))
-        .WillOnce(Invoke([this, metadata,
-                          encoded_metadata](const Http::HeaderMap& received_headers) {
+        .WillOnce([this, metadata, encoded_metadata](const Http::HeaderMap& received_headers) {
           Http::TestResponseHeaderMapImpl stream_headers(received_headers);
           for (const auto& value : encoded_metadata.has_value() ? *encoded_metadata : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
-        }));
+        });
     dispatcher_helper_.setStreamEventPending();
   }
 
   void expectTrailingMetadata(const TestMetadata& metadata) {
     EXPECT_CALL(*this, onReceiveTrailingMetadata_(_))
-        .WillOnce(Invoke([this, metadata](const Http::HeaderMap& received_headers) {
+        .WillOnce([this, metadata](const Http::HeaderMap& received_headers) {
           Http::TestResponseTrailerMapImpl stream_headers(received_headers);
           for (auto& value : metadata) {
             EXPECT_EQ(value.second, stream_headers.get_(value.first));
           }
           dispatcher_helper_.exitDispatcherIfNeeded();
-        }));
+        });
     dispatcher_helper_.setStreamEventPending();
   }
 
@@ -179,7 +175,7 @@ public:
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
     EXPECT_CALL(*this, onReceiveMessage_(HelloworldReplyEq(HELLO_REPLY)))
-        .WillOnce(Invoke([this, check_response_size](const helloworld::HelloReply& reply_msg) {
+        .WillOnce([this, check_response_size](const helloworld::HelloReply& reply_msg) {
           if (check_response_size) {
             auto recv_buf = Common::serializeMessage(reply_msg);
             // gRPC message in Envoy gRPC mode is prepended with a frame header.
@@ -199,7 +195,7 @@ public:
           }
           response_received_ = true;
           dispatcher_helper_.exitDispatcherIfNeeded();
-        }));
+        });
     dispatcher_helper_.setStreamEventPending();
     fake_stream_->sendGrpcMessage<helloworld::HelloReply>(reply);
   }
@@ -400,9 +396,9 @@ public:
     http_conn_pool_ = Http::Http2::allocateConnPool(
         *dispatcher_, api_->randomGenerator(), host_ptr_, Upstream::ResourcePriority::Default,
         nullptr, nullptr, state_, server_factory_context_.overloadManager());
-    EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillRepeatedly(Invoke([this] {
+    EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillRepeatedly([this] {
       return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
-    }));
+    });
     EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
         .WillRepeatedly(Return(Upstream::HttpPoolData([]() {}, http_conn_pool_.get())));
     router_config_ = std::make_shared<Router::FilterConfig>(
@@ -498,11 +494,11 @@ public:
                                      bool expect_upstream_request = true) {
     auto request = std::make_unique<HelloworldRequest>(dispatcher_helper_);
     EXPECT_CALL(*request, onCreateInitialMetadata(_))
-        .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
+        .WillOnce([&initial_metadata](Http::HeaderMap& headers) {
           for (const auto& value : initial_metadata) {
             headers.addReference(value.first, value.second);
           }
-        }));
+        });
     helloworld::HelloRequest request_msg;
     request_msg.set_name(HELLO_REQUEST);
 
@@ -552,11 +548,11 @@ public:
                                    std::optional<TestMetadata> encoded_metadata = std::nullopt) {
     auto stream = std::make_unique<HelloworldStream>(dispatcher_helper_);
     EXPECT_CALL(*stream, onCreateInitialMetadata(_))
-        .WillOnce(Invoke([&initial_metadata](Http::HeaderMap& headers) {
+        .WillOnce([&initial_metadata](Http::HeaderMap& headers) {
           for (const auto& value : initial_metadata) {
             headers.addReference(value.first, value.second);
           }
-        }));
+        });
 
     auto options = Http::AsyncClient::StreamOptions();
     envoy::config::core::v3::Metadata m;

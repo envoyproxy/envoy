@@ -142,17 +142,15 @@ TEST_P(DynamicModulesListenerSdkIntegrationTest, HttpCalloutOnAcceptDoesNotCrash
   tcp_client->close();
 }
 
-TEST_P(DynamicModulesListenerSdkIntegrationTest, DynamicMetadataBatch) {
-  if (GetParam() != "rust") {
-    GTEST_SKIP() << "the dynamic_metadata filter is only in the rust test module";
-  }
+TEST_P(DynamicModulesListenerSdkIntegrationTest, DynamicMetadata) {
   initializeFilter("dynamic_metadata");
 
-  // The filter sets batch metadata and reads it back on accept, asserting in the module. A failure
-  // there stops the chain and the echo upstream never returns the payload.
+  // The filter sets dynamic metadata and reads the untyped values back on accept, checking them in
+  // the module. A failure there stops the chain and the echo upstream never returns the payload.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write("ping"));
   tcp_client->waitForData("ping");
+  EXPECT_EQ("ping", tcp_client->data());
   tcp_client->close();
 }
 

@@ -95,9 +95,9 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestHeaderMapImpl headers = {
         {"flag-header", "flag-header-value"},
@@ -210,9 +210,9 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseHeaderMapImpl headers = {
         {"flag-header", "flag-header-value"},
@@ -263,9 +263,9 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseHeaderMapImpl headers = {
         {"flag-header", "flag-header-value"},
@@ -388,9 +388,9 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -450,9 +450,9 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestResponseTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -563,9 +563,9 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestHeaderMapImpl request_headers = {
         {"flag-header", "flag-header-value"},
@@ -695,9 +695,9 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestHeaderMapImpl headers = {
         {"another-flag-query", "another-flag-query-value"},
@@ -814,9 +814,9 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
         .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -869,9 +869,9 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
-        }));
+        });
 
     Envoy::Http::TestRequestTrailerMapImpl trailers = {
         {"flag-header", "flag-header-value"},
@@ -938,8 +938,7 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationUrlEncodingTest) {
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-        .WillOnce(
-            Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+        .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; });
 
     // Malicious header value attempting to inject an "admin=true" parameter.
     Envoy::Http::TestRequestHeaderMapImpl headers = {{"x-user", "injected&admin=true"},
@@ -1019,8 +1018,7 @@ TEST(HeaderMutationFilterTest, CustomFormatterTest) {
   filter.setEncoderFilterCallbacks(encoder_callbacks);
 
   EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
-      .WillOnce(
-          Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; }));
+      .WillOnce([&](absl::string_view) -> Router::RouteSpecificFilterConfigs { return {}; });
 
   Envoy::Http::TestRequestHeaderMapImpl request_headers = {
       {":method", "GET"}, {":path", "/path"}, {":scheme", "http"}, {":authority", "host"}};

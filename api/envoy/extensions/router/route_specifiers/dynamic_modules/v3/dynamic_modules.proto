@@ -8,6 +8,7 @@ import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 import "envoy/type/matcher/v3/regex.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -140,8 +141,36 @@ message RouteOverride {
   config.core.v3.Metadata metadata = 11;
 }
 
+// A per worker cache of the routes the module builds from route templates.
+//
+// After selecting a template, a module looks the route up by a key with ``lookup_built_route``. On
+// a hit Envoy uses the route a previous request on the worker built for the key and the template,
+// so the module records nothing more. The route built for a key must be a function of the key. A
+// template whose cluster is resolved per request, such as one with weighted clusters, a cluster
+// header or a cluster specifier plugin, is not cached, and neither is a recording that depends on
+// the path of the request through Envoy. For a decision the cache looks up, the regex rewrite of a
+// selected route override applies when the request headers are finalized.
+message BuiltRouteCache {
+  // The maximum number of routes each worker keeps. When a worker is full, a route it has not used
+  // recently is evicted to make room. This field is required and must be greater than zero.
+  uint32 max_entries_per_worker = 1 [(validate.rules).uint32 = {gt: 0}];
+
+  // How long a worker keeps a route it no longer uses. The route is evicted between this duration
+  // and 1.25 times it after its last use, also on an idle worker. Must be at least one second. If
+  // not specified, defaults to 600 seconds.
+  google.protobuf.Duration max_idle_time = 2 [(validate.rules).duration = {gte {seconds: 1}}];
+
+  // A cache hit is verified with a chance of one in this many, for which ``lookup_built_route``
+  // returns ``HitVerify``. The module then records the route exactly as on a miss and Envoy uses
+  // the route the recording builds. When the decision fails or its recording depends on the path of
+  // the request through Envoy or differs from the one the cached route was built from, Envoy counts
+  // ``built_route_cache_verify_mismatch`` and evicts the cached route. Zero disables verification.
+  // If not specified, defaults to 1024.
+  google.protobuf.UInt32Value verify_one_in = 3;
+}
+
 // Configuration for the dynamic modules route specifier.
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message DynamicModuleRouteSpecifier {
   // Specifies the shared object level configuration. This field is required.
   //
@@ -215,4 +244,8 @@ message DynamicModuleRouteSpecifier {
   // convenience for the module and Envoy enforces nothing about it. If not specified, defaults to
   // an empty string.
   string specifier_instance_id = 11 [(validate.rules).string = {max_len: 256}];
+
+  // A per worker cache of the routes the module builds from route templates. It requires a
+  // specifier configured on a virtual host or a route. If not specified, no route is cached.
+  BuiltRouteCache built_route_cache = 12;
 }

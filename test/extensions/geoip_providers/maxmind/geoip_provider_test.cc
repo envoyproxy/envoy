@@ -18,7 +18,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::ReturnRef;
 using testing::SaveArg;
@@ -167,24 +166,23 @@ public:
   void initializeProvider(const std::string& yaml,
                           std::optional<ConditionalInitializer>& conditional) {
     EXPECT_CALL(server_factory_context_, scope()).WillRepeatedly(ReturnRef(*scope_));
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
-        .WillRepeatedly(Invoke([this, &conditional] {
-          Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
-          EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
-              .WillRepeatedly(Invoke([this, &conditional](absl::string_view, uint32_t,
-                                                          Filesystem::Watcher::OnChangedCb cb) {
-                {
-                  absl::WriterMutexLock lock(mutex_);
-                  on_changed_cbs_.reserve(1);
-                  on_changed_cbs_.emplace_back(std::move(cb));
-                }
-                if (conditional.has_value()) {
-                  conditional->setReady();
-                }
-                return absl::OkStatus();
-              }));
-          return mock_watcher;
-        }));
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillRepeatedly([this, &conditional] {
+      Filesystem::MockWatcher* mock_watcher = new NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, Filesystem::Watcher::Events::MovedTo, _))
+          .WillRepeatedly([this, &conditional](absl::string_view, uint32_t,
+                                               Filesystem::Watcher::OnChangedCb cb) {
+            {
+              absl::WriterMutexLock lock(mutex_);
+              on_changed_cbs_.reserve(1);
+              on_changed_cbs_.emplace_back(std::move(cb));
+            }
+            if (conditional.has_value()) {
+              conditional->setReady();
+            }
+            return absl::OkStatus();
+          });
+      return mock_watcher;
+    });
     EXPECT_CALL(server_factory_context_, mainThreadDispatcher())
         .WillRepeatedly(ReturnRef(dispatcher_));
     envoy::extensions::geoip_providers::maxmind::v3::MaxMindConfig config;

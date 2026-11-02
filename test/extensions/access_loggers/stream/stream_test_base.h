@@ -50,13 +50,13 @@ protected:
     stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
     stream_info_.setResponseCode(200);
 
-    EXPECT_CALL(*file, write(_)).WillOnce(Invoke([expected, is_json](absl::string_view got) {
+    EXPECT_CALL(*file, write(_)).WillOnce([expected, is_json](absl::string_view got) {
       if (is_json) {
         EXPECT_TRUE(TestUtility::jsonStringEqual(std::string(got), std::string(expected)));
       } else {
         EXPECT_EQ(got, expected);
       }
-    }));
+    });
     logger->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   }
 
@@ -75,13 +75,12 @@ public:
     ON_CALL(context_.server_factory_context_, accessLogManager())
         .WillByDefault(ReturnRef(log_manager_));
     EXPECT_CALL(log_manager_, createAccessLog(_))
-        .WillOnce(
-            Invoke([this, expected_file_type](const Envoy::Filesystem::FilePathAndType& file_info)
-                       -> absl::StatusOr<AccessLog::AccessLogFileSharedPtr> {
-              EXPECT_EQ(file_info.path_, "");
-              EXPECT_EQ(file_info.file_type_, expected_file_type);
-              return file_;
-            }));
+        .WillOnce([this, expected_file_type](const Envoy::Filesystem::FilePathAndType& file_info)
+                      -> absl::StatusOr<AccessLog::AccessLogFileSharedPtr> {
+          EXPECT_EQ(file_info.path_, "");
+          EXPECT_EQ(file_info.file_type_, expected_file_type);
+          return file_;
+        });
     envoy::config::accesslog::v3::AccessLog access_log;
     TestUtility::loadFromYamlAndValidate(yaml, access_log);
     EXPECT_NO_THROW(AccessLog::AccessLogFactory::fromProto(access_log, context_));

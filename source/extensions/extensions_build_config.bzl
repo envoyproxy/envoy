@@ -633,6 +633,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
     "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
+    "envoy.load_balancing_policies.host_allowlist":    "//source/extensions/load_balancing_policies/host_allowlist:config",
     "envoy.load_balancing_policies.wrr_locality":      "//source/extensions/load_balancing_policies/wrr_locality:config",
     "envoy.load_balancing_policies.dynamic_modules":   "//source/extensions/load_balancing_policies/dynamic_modules:config",
 
@@ -705,6 +706,7 @@ EXTENSIONS = {
     #
     # Queue policy
     #
+    "envoy.queue_policy.adaptive_lifo": "//source/extensions/queue_policy/adaptive_lifo:adaptive_lifo_queue_policy_impl",
     "envoy.queue_policy.fifo":   "//source/extensions/queue_policy/fifo:fifo_queue_policy_impl",
 }
 

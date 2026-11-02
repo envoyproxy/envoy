@@ -907,9 +907,10 @@ bool Filter::continueDecodeHeaders(Http::RequestHeaderMap& headers, bool end_str
   // will never transition from false to true.
   bool can_use_http3 =
       !transport_socket_options_ || !transport_socket_options_->http11ProxyInfo().has_value();
+  maybeEnableUpstreamHalfClose(*generic_conn_pool);
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
-      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
+      static_cast<bool>(upstream_half_close_enabled_) /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
 
@@ -1048,6 +1049,27 @@ GenericConnPoolPtr Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
 
   return factory->createGenericConnPool(host, cluster, upstream_protocol, route_entry_->priority(),
                                         callbacks_->streamInfo().protocol(), this, *message);
+}
+
+void Filter::maybeEnableUpstreamHalfClose(const GenericConnPool& conn_pool) {
+  if (upstream_half_close_enabled_ || !conn_pool.supportsIndependentHalfClose() ||
+      !Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close")) {
+    return;
+  }
+  // HTTP/1 can only signal the end of a CONNECT response by closing the connection.
+  const std::optional<Http::Protocol> downstream_protocol = callbacks_->streamInfo().protocol();
+  if (!downstream_protocol.has_value() || *downstream_protocol < Http::Protocol::Http2) {
+    return;
+  }
+  // The downstream stream must enable it too, or it closes when the response completes.
+  OptRef<Http::DownstreamStreamFilterCallbacks> downstream_callbacks =
+      callbacks_->downstreamCallbacks();
+  if (!downstream_callbacks.has_value()) {
+    return;
+  }
+  downstream_callbacks->enableHalfClose();
+  upstream_half_close_enabled_ = true;
 }
 
 void Filter::removeShadowStream(Http::AsyncClient::OngoingRequest* shadow_stream) {
@@ -2180,7 +2202,7 @@ void Filter::onUpstreamMetadata(Http::MetadataMapPtr&& metadata_map) {
 
 void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   if (!downstream_end_stream_) {
-    if (allow_multiplexed_upstream_half_close_) {
+    if (upstream_half_close_enabled_) {
       // Continue request if downstream is not done yet.
       return;
     }
@@ -2522,9 +2544,10 @@ void Filter::doRetry(bool can_send_early_data, bool can_use_http3, TimeoutRetry 
 void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
                              TimeoutRetry is_timeout_retry, GenericConnPoolPtr generic_conn_pool) {
   ASSERT(generic_conn_pool != nullptr);
+  maybeEnableUpstreamHalfClose(*generic_conn_pool);
   UpstreamRequestPtr upstream_request = std::make_unique<UpstreamRequest>(
       *this, std::move(generic_conn_pool), can_send_early_data, can_use_http3,
-      allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
+      static_cast<bool>(upstream_half_close_enabled_) /*enable_half_close*/);
 
   if (include_attempt_count_in_request_) {
     downstream_headers_->setEnvoyAttemptCount(attempt_count_);

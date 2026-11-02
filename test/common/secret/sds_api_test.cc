@@ -31,8 +31,6 @@
 
 using ::testing::_;
 using ::testing::InSequence;
-using ::testing::Invoke;
-using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::Throw;
@@ -50,9 +48,9 @@ protected:
 
   void initialize() { init_target_handle_->initialize(init_watcher_); }
   void setupMocks() {
-    EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    EXPECT_CALL(init_manager_, add(_)).WillOnce([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
+    });
   }
 
   Api::ApiPtr api_;
@@ -133,15 +131,14 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
   envoy::config::core::v3::ConfigSource config_source;
 
   EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([this, &sds_config_path, &resource_decoder,
-                        &stats](const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                                Stats::Scope&, Config::SubscriptionCallbacks& cbs,
-                                Config::OpaqueResourceDecoderSharedPtr,
-                                const Config::SubscriptionOptions&) {
+      .WillOnce([this, &sds_config_path, &resource_decoder, &stats](
+                    const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+                    Config::SubscriptionCallbacks& cbs, Config::OpaqueResourceDecoderSharedPtr,
+                    const Config::SubscriptionOptions&) {
         return std::make_unique<Config::FilesystemSubscriptionImpl>(
             *dispatcher_, Config::makePathConfigSource(sds_config_path), cbs, resource_decoder,
             stats, validation_visitor_, *api_);
-      }));
+      });
 
   auto init_manager = Init::ManagerImpl("testing");
   auto noop_init_target =
@@ -162,11 +159,10 @@ TEST_F(SdsApiTest, InitManagerInitialised) {
 TEST_F(SdsApiTest, BadConfigSource) {
   ::testing::InSequence s;
   envoy::config::core::v3::ConfigSource config_source;
-  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(InvokeWithoutArgs([]() {
-        throw EnvoyException("bad config");
-        return nullptr;
-      }));
+  EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _)).WillOnce([]() {
+    throw EnvoyException("bad config");
+    return nullptr;
+  });
   EXPECT_THROW_WITH_MESSAGE(TlsCertificateSdsApi(
                                 config_source, "abc.com", subscription_factory_, time_system_,
                                 validation_visitor_, stats_, []() {}, *dispatcher_, *api_, true),
@@ -238,10 +234,9 @@ protected:
     api_ = Api::createApiForTest(filesystem_);
     setupMocks();
     EXPECT_CALL(filesystem_, splitPathFromFilename(_))
-        .WillRepeatedly(
-            Invoke([](absl::string_view path) -> absl::StatusOr<Filesystem::PathSplitResult> {
-              return Filesystem::fileSystemForTest().splitPathFromFilename(path);
-            }));
+        .WillRepeatedly([](absl::string_view path) -> absl::StatusOr<Filesystem::PathSplitResult> {
+          return Filesystem::fileSystemForTest().splitPathFromFilename(path);
+        });
   }
 
   Secret::MockSecretCallbacks secret_callback_;
@@ -463,22 +458,20 @@ protected:
       // The callback is set immediately in setSecret() to enable recovery if loadFiles() fails.
       EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
       EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
-          .WillOnce(
-              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                watch_cbs_.push_back(cb);
-                return absl::OkStatus();
-              }));
+          .WillOnce([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+            watch_cbs_.push_back(cb);
+            return absl::OkStatus();
+          });
     } else {
       // Without watched_directory, per-file watchers are created before loadFiles() to enable
       // auto-recovery when files appear after initial load failure.
       EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
       EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
           .Times(2)
-          .WillRepeatedly(
-              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                watch_cbs_.push_back(cb);
-                return absl::OkStatus();
-              }));
+          .WillRepeatedly([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+            watch_cbs_.push_back(cb);
+            return absl::OkStatus();
+          });
     }
     EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return(cert_value));
     EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
@@ -533,15 +526,15 @@ protected:
     // Per-file watchers are created before loadFiles() to enable auto-recovery.
     EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
     EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
-        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+        .WillOnce([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
           watch_cbs_.push_back(cb);
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(*watcher, addWatch(watch_path, Filesystem::Watcher::Events::MovedTo, _))
-        .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+        .WillOnce([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
           watch_cbs_.push_back(cb);
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(filesystem_, fileReadToEnd(trusted_ca_path)).WillOnce(Return(trusted_ca_value));
     EXPECT_CALL(filesystem_, fileReadToEnd(crl_path)).WillOnce(Return(crl_value));
     EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
@@ -774,10 +767,10 @@ TEST_F(TlsCertificateWatchedDirectoryAutoRecoveryTest, InitialLoadFailsAutoRecov
   // The callback is set immediately, enabling recovery if loadFiles() fails.
   EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
-      .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+      .WillOnce([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
         watch_cbs_.push_back(cb);
         return absl::OkStatus();
-      }));
+      });
   // Initial file read fails because the files don't exist yet.
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
       .WillOnce(Throw(EnvoyException("file not found")));
@@ -842,10 +835,10 @@ TEST_F(TlsCertificateWatchedDirectoryAutoRecoveryTest, AutoRecoveryAfterMultiple
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(trigger_path_ + "/", Filesystem::Watcher::Events::MovedTo, _))
-      .WillOnce(Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+      .WillOnce([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
         watch_cbs_.push_back(cb);
         return absl::OkStatus();
-      }));
+      });
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
       .WillOnce(Throw(EnvoyException("file not found")));
 
@@ -926,11 +919,10 @@ TEST_F(TlsCertificatePerFileWatcherAutoRecoveryTest, InitialLoadFailsAutoRecover
   EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-            watch_cbs_.push_back(cb);
-            return absl::OkStatus();
-          }));
+      .WillRepeatedly([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+        watch_cbs_.push_back(cb);
+        return absl::OkStatus();
+      });
   // Initial file read fails because the files don't exist yet.
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
       .WillOnce(Throw(EnvoyException("file not found")));
@@ -994,11 +986,10 @@ TEST_F(TlsCertificatePerFileWatcherAutoRecoveryTest, AutoRecoveryAfterMultipleFa
   EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-            watch_cbs_.push_back(cb);
-            return absl::OkStatus();
-          }));
+      .WillRepeatedly([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+        watch_cbs_.push_back(cb);
+        return absl::OkStatus();
+      });
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
       .WillOnce(Throw(EnvoyException("file not found")));
 
@@ -1052,11 +1043,10 @@ TEST_F(TlsCertificatePerFileWatcherAutoRecoveryTest, RecoveryFromSecondWatchCall
   EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
   EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
       .Times(2)
-      .WillRepeatedly(
-          Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-            watch_cbs_.push_back(cb);
-            return absl::OkStatus();
-          }));
+      .WillRepeatedly([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+        watch_cbs_.push_back(cb);
+        return absl::OkStatus();
+      });
   EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_))
       .WillOnce(Throw(EnvoyException("file not found")));
 

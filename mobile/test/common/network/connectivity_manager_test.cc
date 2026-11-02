@@ -39,11 +39,11 @@ public:
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.mobile_use_network_observer_registry")) {
       EXPECT_CALL(cm_, createNetworkObserverRegistries(_))
-          .WillOnce(Invoke([this](Quic::EnvoyQuicNetworkObserverRegistryFactory& registry_factory) {
+          .WillOnce([this](Quic::EnvoyQuicNetworkObserverRegistryFactory& registry_factory) {
             registry_.reset(static_cast<Quic::EnvoyMobileQuicNetworkObserverRegistry*>(
                 registry_factory.createQuicNetworkObserverRegistry(dispatcher_).release()));
             registry_->registerObserver(observer_);
-          }));
+          });
     }
     connectivity_manager_ = std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_);
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
@@ -103,21 +103,20 @@ TEST_F(ConnectivityManagerTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefre
   Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks* dns_completion_callback{
       nullptr};
   EXPECT_CALL(*dns_cache_, addUpdateCallbacks_(_))
-      .WillOnce(Invoke([&dns_completion_callback](
-                           Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks& cb) {
+      .WillOnce([&dns_completion_callback](
+                    Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks& cb) {
         dns_completion_callback = &cb;
         return nullptr;
-      }));
+      });
   connectivity_manager_->setDrainPostDnsRefreshEnabled(true);
 
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
   EXPECT_CALL(*dns_cache_, iterateHostMap(_))
-      .WillOnce(
-          Invoke([&](Extensions::Common::DynamicForwardProxy::DnsCache::IterateHostMapCb callback) {
-            callback("cached.example.com", host_info);
-            callback("cached2.example.com", host_info);
-            callback("cached3.example.com", host_info);
-          }));
+      .WillOnce([&](Extensions::Common::DynamicForwardProxy::DnsCache::IterateHostMapCb callback) {
+        callback("cached.example.com", host_info);
+        callback("cached2.example.com", host_info);
+        callback("cached3.example.com", host_info);
+      });
 
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();

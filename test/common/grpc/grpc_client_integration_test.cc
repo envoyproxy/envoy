@@ -843,9 +843,9 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestHandshakeFailure) {
   EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("13")));
   EXPECT_CALL(*request->child_span_,
               setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
-  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillOnce(InvokeWithoutArgs([this]() {
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillOnce([this]() {
     dispatcher_helper_.dispatcher_.exit();
-  }));
+  });
   EXPECT_CALL(*request->child_span_, finishSpan());
   FakeRawConnectionPtr fake_connection;
   ASSERT_TRUE(fake_upstream_->waitForRawConnection(fake_connection));

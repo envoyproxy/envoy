@@ -134,6 +134,14 @@ public:
                               Ssl::ServerContextSharedPtr));
     auto cleanup = cleanUpHelper(server_ctx);
   }
+  // Returns the contexts that the manager reports.
+  std::vector<const Envoy::Ssl::Context*> managedContexts() {
+    std::vector<const Envoy::Ssl::Context*> managed;
+    manager_.iterateContexts([&managed](const Envoy::Ssl::Context& managed_context) {
+      managed.push_back(&managed_context);
+    });
+    return managed;
+  }
 
 protected:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
@@ -472,6 +480,41 @@ TEST_F(SslContextImplTest, TestContextUpdate) {
 
   EXPECT_EQ(updated_context->daysUntilFirstCertExpires(), std::nullopt);
   EXPECT_EQ(manager_.daysUntilFirstCertExpires(), std::nullopt);
+}
+
+// A context that is built outside of the manager is managed from addContext() to removeContext().
+TEST_F(SslContextImplTest, AddedContextIsManagedUntilRemoved) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  Envoy::Ssl::ContextSharedPtr context = *ServerContextImpl::create(
+      *store_.rootScope(), *server_context_config, server_factory_context_, nullptr);
+
+  manager_.addContext(context);
+  EXPECT_THAT(managedContexts(), testing::ElementsAre(context.get()));
+  auto cert_expiry = TestUtility::parseTime(TEST_UNITTEST_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
+  const uint32_t days_until_expiry = 30;
+  time_system_.setSystemTime(absl::ToChronoTime(cert_expiry - absl::Hours(24 * days_until_expiry)));
+  EXPECT_EQ(manager_.daysUntilFirstCertExpires().value(), days_until_expiry);
+
+  manager_.removeContext(context);
+  EXPECT_THAT(managedContexts(), testing::IsEmpty());
+}
+
+// A null context is ignored, so registering one twice reports no context.
+TEST_F(SslContextImplTest, AddedNullContextIsIgnored) {
+  manager_.addContext(nullptr);
+  manager_.addContext(nullptr);
+  EXPECT_THAT(managedContexts(), testing::IsEmpty());
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformation) {
