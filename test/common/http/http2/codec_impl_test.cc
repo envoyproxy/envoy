@@ -2006,7 +2006,12 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
   EXPECT_OK(client_wrapper_->status_);
 }
 
-TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndStreamBeforeReset) {
+// With `http2_deferred_reset_waits_for_end_stream` disabled, the deferred reset is sent as soon as
+// the window is exhausted and the remaining data frames are dropped.
+TEST_P(Http2CodecImplDeferredResetTest,
+       LargeDataDeferredResetServerIfLocalEndStreamBeforeResetRuntimeDisabled) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http2_deferred_reset_waits_for_end_stream", "false"}});
   initialize();
 
   InSequence s;
@@ -2051,6 +2056,101 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
   EXPECT_OK(client_wrapper_->status_);
 }
 
+// The deferred reset waits until the data frames blocked by flow control have been sent, so the
+// whole body reaches the client before the stream is reset with NO_ERROR.
+TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndStreamBeforeReset) {
+  initialize();
+
+  const uint64_t body_size = 1024 * 1024;
+  Event::MockTimer* flush_timer = nullptr;
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl body(std::string(body_size, 'a'));
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    EXPECT_CALL(server_stream_callbacks_, onBelowWriteBufferLowWatermark()).Times(AnyNumber());
+    flush_timer = new Event::MockTimer();
+    EXPECT_CALL(server_connection_.dispatcher_,
+                createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+          flush_timer->callback_ = cb;
+          return flush_timer;
+        }));
+    EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
+    response_encoder_->encodeData(body, true);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  driveClient();
+  driveServer();
+  // The window is exhausted, so the reset is still pending.
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  uint64_t received = 0;
+  auto count_data = [&received](Buffer::Instance& data, bool) { received += data.length(); };
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder_, decodeData(_, false))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(count_data));
+  EXPECT_CALL(response_decoder_, decodeData(_, true)).WillOnce(Invoke(count_data));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(*flush_timer, disableTimer());
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  driveToCompletion();
+  EXPECT_OK(client_wrapper_->status_);
+  EXPECT_EQ(body_size, received);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_flush_timeout").value());
+}
+
+// A deferred reset that waits for window is still bounded by the stream flush timeout, which
+// sends a single reset.
+TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerFlushTimeout) {
+  initialize();
+
+  MockStreamCallbacks client_stream_callbacks;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks);
+  auto flush_timer = new NiceMock<Event::MockTimer>();
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false)).WillOnce(InvokeWithoutArgs([&]() {
+    TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    response_encoder_->encodeHeaders(response_headers, false);
+    Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+    EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    EXPECT_CALL(server_connection_.dispatcher_,
+                createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+          flush_timer->callback_ = cb;
+          return flush_timer;
+        }));
+    response_encoder_->encodeData(body, true);
+    EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
+    response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+  }));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  // Drive the client only once after the server, so no WINDOW_UPDATE reaches the server.
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AnyNumber());
+  driveClient();
+  driveServer();
+  driveClient();
+  EXPECT_EQ(0, server_stats_store_.counter("http2.tx_reset").value());
+
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  flush_timer->invokeCallback();
+  driveToCompletion();
+  EXPECT_OK(client_wrapper_->status_);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
+}
+
 TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalEndStream) {
   initialize();
 
@@ -2084,6 +2184,107 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalE
   EXPECT_CALL(response_decoder_, decodeData(_, _)).Times(0);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   driveToCompletion();
+  EXPECT_OK(client_wrapper_->status_);
+}
+
+// Uses a large connection window, so that a stream whose window the client does not open cannot
+// block the other streams.
+class Http2CodecImplDeferredResetMultiStreamTest : public Http2CodecImplTest {};
+
+// Two streams wait for a deferred reset. The client opens the window of the first stream only, so
+// only the first stream sends END_STREAM and is reset.
+TEST_P(Http2CodecImplDeferredResetMultiStreamTest, OnlyStreamWithEndStreamSentIsReset) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.http2_deferred_reset_waits_for_end_stream", "true"}});
+  initialize();
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .Times(2)
+      .WillRepeatedly(Invoke(
+          [](Event::ScaledTimerType, Event::TimerCb) { return new NiceMock<Event::MockTimer>(); }));
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder_->encodeHeaders(request_headers, false));
+  driveToCompletion();
+  ResponseEncoder* response_encoder1 = response_encoder_;
+
+  MockResponseDecoder response_decoder2;
+  RequestEncoder* request_encoder2 = &client_->newStream(response_decoder2);
+  ResponseEncoder* response_encoder2 = nullptr;
+  MockStreamCallbacks server_stream_callbacks2;
+  NiceMock<MockCodecEventCallbacks> server_codec_event_callbacks2;
+  MockRequestDecoder request_decoder2;
+  setupRequestDecoderMock(request_decoder2);
+  EXPECT_CALL(server_callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+        response_encoder2 = &encoder;
+        encoder.getStream().addCallbacks(server_stream_callbacks2);
+        encoder.getStream().registerCodecEventCallbacks(&server_codec_event_callbacks2);
+        encoder.getStream().setFlushTimeout(std::chrono::milliseconds(30000));
+        return request_decoder2;
+      }));
+  EXPECT_CALL(request_decoder2, decodeHeaders_(_, false));
+  EXPECT_OK(request_encoder2->encodeHeaders(request_headers, false));
+  driveToCompletion();
+  ASSERT_NE(nullptr, response_encoder2);
+
+  // The client does not consume the data of the second stream, so it sends no WINDOW_UPDATE for
+  // that stream.
+  request_encoder2->getStream().readDisable(true);
+
+  MockStreamCallbacks client_stream_callbacks1;
+  request_encoder_->getStream().addCallbacks(client_stream_callbacks1);
+  MockStreamCallbacks client_stream_callbacks2;
+  request_encoder2->getStream().addCallbacks(client_stream_callbacks2);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  for (auto [response_encoder, server_stream_callbacks] :
+       {std::pair<ResponseEncoder*, MockStreamCallbacks*>{response_encoder1,
+                                                          &server_stream_callbacks_},
+        std::pair<ResponseEncoder*, MockStreamCallbacks*>{response_encoder2,
+                                                          &server_stream_callbacks2}}) {
+    response_encoder->encodeHeaders(response_headers, false);
+    EXPECT_CALL(*server_stream_callbacks, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
+    Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+    response_encoder->encodeData(body, true);
+    EXPECT_CALL(*server_stream_callbacks, onResetStream(StreamResetReason::LocalReset, _));
+    response_encoder->getStream().resetStream(StreamResetReason::LocalReset);
+  }
+
+  uint64_t received1 = 0;
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, false));
+  EXPECT_CALL(response_decoder_, decodeData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { received1 += data.length(); }));
+  EXPECT_CALL(client_stream_callbacks1, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(response_decoder2, decodeHeaders_(_, false)).Times(AnyNumber());
+  EXPECT_CALL(response_decoder2, decodeData(_, false)).Times(AnyNumber());
+  EXPECT_CALL(response_decoder2, decodeData(_, true)).Times(0);
+  EXPECT_CALL(client_stream_callbacks2, onResetStream(_, _)).Times(0);
+  driveToCompletion();
+  EXPECT_EQ(1024 * 1024, received1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.tx_reset").value());
+  EXPECT_FALSE(server_->getStream(3)->local_end_stream_sent_);
+  testing::Mock::VerifyAndClearExpectations(&response_decoder2);
+  testing::Mock::VerifyAndClearExpectations(&client_stream_callbacks2);
+
+  // The client opens the window of the second stream. That stream completes and is reset.
+  uint64_t received2 = 0;
+  EXPECT_CALL(response_decoder2, decodeData(_, _))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { received2 += data.length(); }));
+  EXPECT_CALL(client_stream_callbacks2, onResetStream(StreamResetReason::RemoteResetNoError, _));
+  ON_CALL(client_connection_.dispatcher_, trackedObjectStackIsEmpty()).WillByDefault(Return(true));
+  auto* process_buffered_data_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&client_connection_.dispatcher_);
+  request_encoder2->getStream().readDisable(false);
+  while (process_buffered_data_callback->enabled_) {
+    process_buffered_data_callback->invokeCallback();
+    driveToCompletion();
+  }
+  EXPECT_EQ(1024 * 1024, received2);
+  EXPECT_EQ(2, server_stats_store_.counter("http2.tx_reset").value());
   EXPECT_OK(client_wrapper_->status_);
 }
 
@@ -2851,6 +3052,18 @@ INSTANTIATE_TEST_SUITE_P(
     Http2CodecImplDeferredResetTest, Http2CodecImplDeferredResetTest,
     ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE, HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
                        ::testing::Values(Http2Impl::Nghttp2, Http2Impl::Oghttp2)));
+
+INSTANTIATE_TEST_SUITE_P(
+    Http2CodecImplDeferredResetMultiStreamTest, Http2CodecImplDeferredResetMultiStreamTest,
+    ::testing::Combine(
+        ::testing::Combine(
+            ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_HPACK_TABLE_SIZE),
+            ::testing::Values(CommonUtility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS),
+            ::testing::Values(CommonUtility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE),
+            ::testing::Values(
+                CommonUtility::OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE)),
+        HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
+        ::testing::Values(Http2Impl::Nghttp2, Http2Impl::Oghttp2)));
 
 // Flow control tests only use only small windows so that we can test certain conditions.
 INSTANTIATE_TEST_SUITE_P(
