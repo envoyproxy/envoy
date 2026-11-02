@@ -121,7 +121,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptr) {
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
-      /*metadata_config=*/nullptr, creation_status);
+      DrainDelayConfig{}, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -146,7 +146,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptrDrai
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
-      /*metadata_config=*/nullptr, creation_status);
+      DrainDelayConfig{}, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -190,7 +190,7 @@ hcm_config:
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
-      /*metadata_config=*/nullptr, creation_status);
+      DrainDelayConfig{}, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -234,7 +234,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledNonReverseSocket) {
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
-      /*metadata_config=*/nullptr, creation_status);
+      DrainDelayConfig{}, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -265,7 +265,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
-      /*metadata_config=*/nullptr, creation_status);
+      DrainDelayConfig{}, creation_status);
   ASSERT_OK(creation_status);
 
   // Build a real initiator IoHandle to act as the tunnel's parent. The extension is unused during
@@ -308,63 +308,77 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
   codec->shutdownNotice();
 }
 
-TEST_F(DrainAwareConfigTest, DrainConnectionMetadataRequiresEnableDrainWithGoaway) {
+TEST_F(DrainAwareConfigTest, DelaysRequireEnableDrainWithGoaway) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
-drain_connection_metadata:
-  delay: 2s
+shutdown_notice_delay: 2s
 )EOF"));
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
               HasStatus(absl::StatusCode::kInvalidArgument,
                         HasSubstr("requires enable_drain_with_goaway")));
 }
 
-TEST_F(DrainAwareConfigTest, DrainConnectionMetadataRequiresAllowMetadata) {
+TEST_F(DrainAwareConfigTest, MetadataDelayRequiresAllowMetadata) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
 enable_drain_with_goaway: true
-drain_connection_metadata:
-  delay: 2s
+metadata_delay: 2s
 )EOF"));
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
               HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("allow_metadata")));
 }
 
-TEST_F(DrainAwareConfigTest, DrainConnectionMetadataDelayMustBeLessThanShutdownNoticeDelay) {
+TEST_F(DrainAwareConfigTest, MetadataDelayMustBeLessThanDrainTimeout) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
 enable_drain_with_goaway: true
-drain_connection_metadata:
-  delay: 3s
+metadata_delay: 5s
 )EOF"));
   proto_config.mutable_hcm_config()->mutable_http2_protocol_options()->set_allow_metadata(true);
-  // delay (3s) == default shutdown_notice_delay (3s) violates the strict ordering.
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("metadata_delay must be less than hcm_config.drain_timeout")));
+}
+
+TEST_F(DrainAwareConfigTest, MetadataDelayMustBeLessThanShutdownNoticeDelay) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
+enable_drain_with_goaway: true
+metadata_delay: 3s
+shutdown_notice_delay: 3s
+)EOF"));
+  proto_config.mutable_hcm_config()->mutable_http2_protocol_options()->set_allow_metadata(true);
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
               HasStatus(absl::StatusCode::kInvalidArgument,
                         HasSubstr("must be less than shutdown_notice_delay")));
 }
 
-TEST_F(DrainAwareConfigTest, DrainConnectionMetadataShutdownNoticeDelayMustBeLessThanDrainTimeout) {
+TEST_F(DrainAwareConfigTest, ShutdownNoticeDelayMustBeLessThanDrainTimeout) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
 enable_drain_with_goaway: true
-drain_connection_metadata:
-  delay: 1s
-  shutdown_notice_delay: 5s
+shutdown_notice_delay: 5s
 )EOF"));
-  proto_config.mutable_hcm_config()->mutable_http2_protocol_options()->set_allow_metadata(true);
-  // shutdown_notice_delay (5s) == default drain_timeout (5s) violates the strict ordering.
-  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        HasSubstr("must be less than hcm_config.drain_timeout")));
+  EXPECT_THAT(
+      factory.createFilterFactoryFromProto(proto_config, context_),
+      HasStatus(absl::StatusCode::kInvalidArgument,
+                HasSubstr("shutdown_notice_delay must be less than hcm_config.drain_timeout")));
 }
 
-TEST_F(DrainAwareConfigTest, DrainConnectionMetadataValidConfig) {
+TEST_F(DrainAwareConfigTest, ZeroDrainTimeoutWithoutDelaysIsValid) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(kMinimalConfig);
+  proto_config.mutable_hcm_config()->mutable_drain_timeout()->set_seconds(0);
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
+              IsOkAndHolds(::testing::NotNull()));
+}
+
+TEST_F(DrainAwareConfigTest, DelaysValidConfig) {
   DrainAwareHttpConnectionManagerFilterConfigFactory factory;
   auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
 enable_drain_with_goaway: true
-drain_connection_metadata:
-  delay: 2s
+metadata_delay: 2s
+shutdown_notice_delay: 3s
 )EOF"));
   proto_config.mutable_hcm_config()->mutable_http2_protocol_options()->set_allow_metadata(true);
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),

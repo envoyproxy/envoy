@@ -7,14 +7,13 @@
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/http_connection_manager/config.h"
+#include "source/extensions/filters/network/reverse_tunnel/drain_aware_hcm/drain_aware_server_connection.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
-
-struct ConnectionMetadataConfig;
 
 class DrainAwareHttpConnectionManagerConfig
     : public HttpConnectionManager::HttpConnectionManagerConfig {
@@ -27,14 +26,14 @@ public:
       Config::ConfigProviderManager* scoped_routes_config_provider_manager,
       Tracing::TracerManager& tracer_manager,
       HttpConnectionManager::FilterConfigProviderManager& filter_config_provider_manager,
-      bool enable_drain_with_goaway, std::shared_ptr<ConnectionMetadataConfig> metadata_config,
+      bool enable_drain_with_goaway, const DrainDelayConfig drain_delay_config,
       absl::Status& creation_status)
       : HttpConnectionManager::HttpConnectionManagerConfig(
             config, context, date_provider, route_config_provider_manager,
             scoped_routes_config_provider_manager, tracer_manager, filter_config_provider_manager,
             creation_status),
         factory_context_(context), enable_drain_with_goaway_(enable_drain_with_goaway),
-        metadata_config_(metadata_config) {}
+        drain_delay_config_(drain_delay_config) {}
 
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,
@@ -52,7 +51,7 @@ protected:
 private:
   Server::Configuration::FactoryContext& factory_context_;
   const bool enable_drain_with_goaway_;
-  std::shared_ptr<ConnectionMetadataConfig> metadata_config_;
+  const DrainDelayConfig drain_delay_config_;
 };
 
 class DrainAwareHttpConnectionManagerFilterConfigFactory

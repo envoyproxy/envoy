@@ -157,9 +157,8 @@ public:
 
     auto cluster = getUpstreamCluster(localhost);
     addCluster(getHttp2Cluster(cluster), config_helper_);
-    addCluster(metadata_key_.empty()
-                   ? getRevConnCluster(enable_tenant_isolation_)
-                   : getRevConnClusterWithMetadata(metadata_key_, enable_tenant_isolation_),
+    addCluster(enable_drain_metadata_ ? getRevConnClusterWithMetadata(enable_tenant_isolation_)
+                                      : getRevConnCluster(enable_tenant_isolation_),
                config_helper_);
     HttpIntegrationTest::initialize();
 
@@ -313,9 +312,9 @@ protected:
 
   ConfigHelper current_config_{version_, config_helper_.bootstrap()};
   bool enable_tenant_isolation_{false};
-  // When non-empty, initialize() installs the reverse-connection cluster with this drain metadata
-  // key on the upstream codec, so received connection-metadata triggers a redial + reporter event.
-  std::string metadata_key_;
+  // When true, initialize() enables metadata on the reverse-connection cluster's upstream codec, so
+  // a received drain metadata frame triggers a redial + reporter event.
+  bool enable_drain_metadata_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcClientIntegrationTest,
@@ -624,7 +623,7 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainMaxDuration) {
 // the idle old tunnel right after the soft GOAWAY, before drain_timeout, and the final GOAWAY is
 // never sent.
 TEST_P(GrpcClientIntegrationTest, ListenerDrainMetadataThreePhase) {
-  metadata_key_ = "drain_reverse_tunnel";
+  enable_drain_metadata_ = true;
   initialize();
   makeNewServer();
 
@@ -638,9 +637,8 @@ TEST_P(GrpcClientIntegrationTest, ListenerDrainMetadataThreePhase) {
   // of margin for slow CI machines.
   constexpr std::chrono::seconds inFlightRequestDelay{15};
   addListenerLds(getDownstreamListenerWithMetadata(
-      "node-1", 1, std::chrono::seconds(20), "drain_reverse_tunnel",
-      std::chrono::milliseconds(1000), std::chrono::milliseconds(5000), std::chrono::seconds(10),
-      inFlightRequestDelay));
+      "node-1", 1, std::chrono::seconds(20), std::chrono::milliseconds(1000),
+      std::chrono::milliseconds(5000), std::chrono::seconds(10), inFlightRequestDelay));
   waitForActiveTunnels(1);
   validateEqual(std::chrono::milliseconds(sendInterval * 3), getConns({"node-1"}));
 

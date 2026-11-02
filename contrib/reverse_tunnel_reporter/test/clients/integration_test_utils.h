@@ -163,10 +163,9 @@ inline Cluster getRevConnCluster(bool enable_tenant_isolation = false) {
   return cluster;
 }
 
-// Same as getRevConnCluster but configures the drain metadata key on the upstream (client) codec
-// so a received connection-metadata frame with that key triggers a redial + reporter event.
-inline Cluster getRevConnClusterWithMetadata(const std::string& metadata_key,
-                                             bool enable_tenant_isolation = false) {
+// Same as getRevConnCluster but enables metadata on the upstream (client) codec so a received drain
+// metadata frame triggers a redial + reporter event.
+inline Cluster getRevConnClusterWithMetadata(bool enable_tenant_isolation = false) {
   Cluster cluster;
   cluster.set_name(revConnCluster);
   cluster.set_lb_policy(Cluster::CLUSTER_PROVIDED);
@@ -194,7 +193,6 @@ inline Cluster getRevConnClusterWithMetadata(const std::string& metadata_key,
 
   ReverseTunnelUpstreamCodecOptions codec_options;
   codec_options.set_enable_drain_with_goaway(true);
-  codec_options.set_metadata_key(metadata_key);
   std::ignore = (*cluster.mutable_typed_extension_protocol_options())
                     ["envoy.extensions.upstreams.http.reverse_tunnel.v3."
                      "ReverseTunnelUpstreamCodecOptions"]
@@ -305,16 +303,15 @@ getDownstreamListener(const std::string& name, int num_listeners,
   return listener;
 }
 
-// Same as getDownstreamListener but enables the three-phase metadata drain: METADATA at `delay`,
-// soft GOAWAY (shutdownNotice) at `shutdown_notice_delay`, final GOAWAY at `drain_timeout`.
-// Requires delay < shutdown_notice_delay < drain_timeout. http2 allow_metadata is enabled so the
-// METADATA frame can be emitted on stream 0. The ``/slow`` route answers after
-// `slow_route_delay`, so a test can keep a stream in flight across the whole drain.
+// Same as getDownstreamListener but enables the three-phase metadata drain: METADATA at
+// `metadata_delay`, soft GOAWAY (shutdownNotice) at `shutdown_notice_delay`, final GOAWAY at
+// `drain_timeout`. Requires metadata_delay < shutdown_notice_delay < drain_timeout. http2
+// allow_metadata is enabled so the METADATA frame can be emitted on stream 0. The ``/slow`` route
+// answers after `slow_route_delay`, so a test can keep a stream in flight across the whole drain.
 inline Listener getDownstreamListenerWithMetadata(
     const std::string& name, int num_listeners,
     std::chrono::seconds max_conn_duration = std::chrono::seconds(1),
-    const std::string& metadata_key = "drain_reverse_tunnel",
-    std::chrono::milliseconds delay = std::chrono::milliseconds(1000),
+    std::chrono::milliseconds metadata_delay = std::chrono::milliseconds(1000),
     std::chrono::milliseconds shutdown_notice_delay = std::chrono::milliseconds(5000),
     std::chrono::seconds drain_timeout = std::chrono::seconds(10),
     std::chrono::seconds slow_route_delay = slowRouteDelay) {
@@ -366,19 +363,10 @@ inline Listener getDownstreamListenerWithMetadata(
       drain_aware_hcm;
   *drain_aware_hcm.mutable_hcm_config() = std::move(hcm);
   drain_aware_hcm.set_enable_drain_with_goaway(true);
-  auto* metadata = drain_aware_hcm.mutable_drain_connection_metadata();
-  metadata->set_metadata_key(metadata_key);
-  metadata->mutable_delay()->set_seconds(
-      std::chrono::duration_cast<std::chrono::seconds>(delay).count());
-  metadata->mutable_delay()->set_nanos(
-      std::chrono::duration_cast<std::chrono::nanoseconds>(delay % std::chrono::seconds(1))
-          .count());
-  metadata->mutable_shutdown_notice_delay()->set_seconds(
-      std::chrono::duration_cast<std::chrono::seconds>(shutdown_notice_delay).count());
-  metadata->mutable_shutdown_notice_delay()->set_nanos(
-      std::chrono::duration_cast<std::chrono::nanoseconds>(shutdown_notice_delay %
-                                                           std::chrono::seconds(1))
-          .count());
+  *drain_aware_hcm.mutable_metadata_delay() =
+      Protobuf::util::TimeUtil::MillisecondsToDuration(metadata_delay.count());
+  *drain_aware_hcm.mutable_shutdown_notice_delay() =
+      Protobuf::util::TimeUtil::MillisecondsToDuration(shutdown_notice_delay.count());
 
   std::ignore = filter->mutable_typed_config()->PackFrom(drain_aware_hcm);
   return listener;

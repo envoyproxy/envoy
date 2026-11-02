@@ -12,6 +12,7 @@
 #include "envoy/http/codec.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/upstreams/http/reverse_tunnel/drain_aware_http2_client_connection.h"
@@ -27,20 +28,15 @@ namespace Http {
 namespace ReverseTunnel {
 
 /**
- * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY: the
- * event is forwarded to the reverse-tunnel socket manager for reporter notification, then passed
- * through to the pool's normal drain handling.
+ * Wraps the codec connection callbacks so the upstream (client) side observes a peer GOAWAY or a
+ * drain METADATA frame: the event is forwarded to the reverse-tunnel socket manager for reporter
+ * notification, then passed through to the pool's normal handling.
  */
 class DrainAwareClientCallbacks : public Envoy::Http::ConnectionCallbacks,
                                   public Logger::Loggable<Logger::Id::client> {
 public:
-  // `metadata_key` is the connection-metadata key the upstream watches for a drain signal from the
-  // peer. When null, every received connection-metadata map is forwarded to the inner callbacks
-  // unchanged (no reporter notification). Defaults to null so non-reverse-tunnel callers that do
-  // not care about drain metadata can construct the wrapper without it.
-  DrainAwareClientCallbacks(Envoy::Http::ConnectionCallbacks& inner, int fd,
-                            std::shared_ptr<std::string> metadata_key = nullptr)
-      : inner_(inner), fd_(fd), metadata_key_(std::move(metadata_key)) {}
+  DrainAwareClientCallbacks(Envoy::Http::ConnectionCallbacks& inner, int fd)
+      : inner_(inner), fd_(fd) {}
 
   // Envoy::Http::ConnectionCallbacks
   void onGoAway(Envoy::Http::GoAwayErrorCode error_code) override {
@@ -74,11 +70,8 @@ public:
   void onMetadata(Envoy::Http::MetadataMapPtr&& metadata_map_ptr) override {
     ENVOY_LOG(debug, "reverse_tunnel upstream codec: received connection metadata ({} entries)",
               metadata_map_ptr->size());
-    if (!metadata_key_) {
-      return inner_.onMetadata(std::move(metadata_map_ptr));
-    }
-
-    auto it = metadata_map_ptr->find(*metadata_key_);
+    auto it = metadata_map_ptr->find(
+        Bootstrap::ReverseConnection::ReverseConnectionUtility::DRAIN_METADATA_KEY);
     if (it != metadata_map_ptr->end() && it->second == metadata_val) {
       notifyReporter();
       metadata_map_ptr->erase(it);
@@ -91,7 +84,6 @@ private:
   Envoy::Http::ConnectionCallbacks& inner_;
   int fd_;
   bool notified_{false};
-  std::shared_ptr<std::string> metadata_key_;
   constexpr static absl::string_view metadata_val{"true"};
 };
 
