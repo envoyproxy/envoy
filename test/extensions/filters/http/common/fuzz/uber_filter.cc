@@ -137,6 +137,8 @@ void UberFilterFuzzer::fuzz(
 
 void UberFilterFuzzer::reset() {
   destroy_filters_();
+  // The fuzzer is reused across inputs, and the next one may add no filter at all.
+  destroy_filters_ = []() {};
   decoder_filter_.reset();
   encoder_filter_.reset();
 
