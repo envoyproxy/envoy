@@ -112,7 +112,7 @@ public:
     return std::make_unique<envoy::config::route::v3::RetryPolicy>();
   }
 
-  std::string name() const override { return "envoy.retry_policy.default"; }
+  std::string name() const override { return "envoy.router.retry_policy.default"; }
 };
 
 DECLARE_FACTORY(DefaultRetryPolicyFactory);

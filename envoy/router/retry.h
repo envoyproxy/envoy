@@ -381,7 +381,7 @@ public:
                     Server::Configuration::CommonFactoryContext& context) PURE;
 
   // Config::UntypedFactory
-  std::string category() const override { return "envoy.retry_policy"; }
+  std::string category() const override { return "envoy.router.retry_policy"; }
 };
 
 } // namespace Router
