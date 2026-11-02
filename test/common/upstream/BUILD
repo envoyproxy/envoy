@@ -862,6 +862,7 @@ envoy_cc_test_library(
     srcs = ["health_check_fuzz.cc"],
     hdrs = ["health_check_fuzz.h"],
     rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
     deps = [
         ":health_check_fuzz_proto_cc_proto",
         ":health_check_fuzz_utils_lib",
