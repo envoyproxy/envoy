@@ -50,7 +50,7 @@ The default toolchain uses the Clang compiler with libc++ for all Linux CI runs 
 
 Envoy supports the following compiler toolchain configurations:
 * No configuration flag - Clang compiler with libc++ standard library (default)
-* `--config=gcc` - GCC compiler with libstdc++ standard library
+* `--config=gcc` - Hermetic GCC compiler with libstdc++ standard library (Linux x86_64 only)
 
 # C++ standard library
 
