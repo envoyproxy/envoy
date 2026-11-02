@@ -181,6 +181,8 @@ envoy_cc_test(
     }),
 )
 
+# The test is entirely Windows-only (see the WIN32 guard), so skip it elsewhere rather than
+# building an empty test that reruns whenever envoy-static (in `data`) changes.
 envoy_cc_test(
     name = "win32_scm_test",
     srcs = ["win32_scm_test.cc"],
@@ -190,6 +192,7 @@ envoy_cc_test(
         "//test/config/integration:google_com_proxy_port_0",
     ],
     rbe_pool = "linux_x64_small",
+    target_compatible_with = ["@platforms//os:windows"],
     deps = [
         "//source/common/api:api_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
