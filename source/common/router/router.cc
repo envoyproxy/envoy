@@ -439,9 +439,9 @@ Http::FilterHeadersStatus Filter::checkStrictHeaders(const Http::RequestHeaderMa
       [this](const FilterUtility::StrictHeaderChecker::HeaderCheckResult& res) {
         callbacks_->streamInfo().setResponseFlag(
             StreamInfo::CoreResponseFlag::InvalidEnvoyRequestHeaders);
-        const std::string body = fmt::format("invalid header '{}' with value '{}'",
-                                             std::string(res.entry_->key().getStringView()),
-                                             std::string(res.entry_->value().getStringView()));
+        const std::string body =
+            fmt::format("invalid header '{}' with value '{}'", res.entry_->key().getStringView(),
+                        res.entry_->value().getStringView());
         const std::string details =
             absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
                          StringUtil::replaceAllEmptySpace(res.entry_->key().getStringView()), "}");

@@ -8,6 +8,8 @@
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Router {
@@ -34,8 +36,8 @@ DynamicModuleClusterSpecifierPluginFactoryConfig::createClusterSpecifierPlugin(
   if (!specifier_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, specifier_name, Extensions::DynamicModules::ConfigInitErrorStat);
-    throw EnvoyException("Failed to create cluster specifier config: " +
-                         std::string(specifier_config.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to create cluster specifier config: ",
+                                      specifier_config.status().message()));
   }
 
   return std::make_shared<DynamicModuleClusterSpecifierPlugin>(std::move(specifier_config.value()));
