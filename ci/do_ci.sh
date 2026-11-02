@@ -34,6 +34,8 @@ _realpath() {
 # shellcheck source=ci/bazel_fun.sh
 . "${CURRENT_SCRIPT_DIR}"/bazel_fun.sh
 
+hermetic_git
+
 echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
@@ -429,8 +431,8 @@ function build_openssl_test_affected() {
     # the target branch itself when history is too shallow for a merge base.
     local merge_base
     if [[ -n "${CI_TARGET_BRANCH}" ]]; then
-        git fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
-        merge_base="$(git merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
+        "${GIT_BIN}" fetch origin "${CI_TARGET_BRANCH}" 2>/dev/null || true
+        merge_base="$("${GIT_BIN}" merge-base "origin/${CI_TARGET_BRANCH}" HEAD 2>/dev/null || echo "origin/${CI_TARGET_BRANCH}")"
     else
         merge_base="HEAD~1"
     fi
@@ -438,7 +440,7 @@ function build_openssl_test_affected() {
     # A failed diff is fatal: an empty file list would otherwise select no tests
     # and report a green job that tested nothing.
     local changed_files
-    if ! changed_files="$(git diff --name-only "$merge_base" HEAD)"; then
+    if ! changed_files="$("${GIT_BIN}" diff --name-only "$merge_base" HEAD)"; then
         echo "ERROR: unable to diff ${merge_base}..HEAD; cannot determine affected tests." >&2
         return 1
     fi
@@ -564,7 +566,8 @@ case $CI_TARGET in
     api_compat)
         echo "Checking API for breaking changes to protobuf backwards compatibility..."
         BASE_BRANCH_REF=$("${ENVOY_SRCDIR}"/tools/git/last_github_commit.sh)
-        COMMIT_TITLE=$(git log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' "${BASE_BRANCH_REF}")
+        COMMIT_TITLE=$("${GIT_BIN}" log -n 1 --pretty='format:%C(auto)%h (%s, %ad)' \
+            "${BASE_BRANCH_REF}")
         echo -e "\tUsing base commit ${COMMIT_TITLE}"
         # BAZEL_BUILD_OPTIONS needed for setting the repository_cache param.
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -850,7 +853,7 @@ case $CI_TARGET in
             exit 1
         fi
         if [[ -z "$CI_SHA1" ]]; then
-            CI_SHA1="$(git rev-parse HEAD~1)"
+            CI_SHA1="$("${GIT_BIN}" rev-parse HEAD~1)"
             export CI_SHA1
         fi
         ENVOY_ARCH_DIR="$(dirname "${ENVOY_BUILD_DIR}")"
@@ -1052,7 +1055,7 @@ case $CI_TARGET in
         ;;
 
     publish)
-        BUILD_SHA="$(git rev-parse HEAD)"
+        BUILD_SHA="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${BUILD_SHA}}"
         ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         VERSION_DEV="$(cut -d- -f2 < VERSION.txt)"
@@ -1270,7 +1273,7 @@ case $CI_TARGET in
         # `ENVOY_COMMIT`: The actual last commit of branch/PR
         # `ENVOY_HEAD_REF`: must also be set in PRs to provide a unique key for job grouping,
         #   cancellation, and to discriminate from other branch CI
-        COMMIT="$(git rev-parse HEAD)"
+        COMMIT="$("${GIT_BIN}" rev-parse HEAD)"
         ENVOY_COMMIT="${ENVOY_COMMIT:-${COMMIT}}"
         ENVOY_REPO="${ENVOY_REPO:-envoyproxy/envoy}"
         echo "Trigger workflow (${WORKFLOW})"
