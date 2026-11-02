@@ -99,11 +99,12 @@ function cp_binary_for_image_build() {
   fi
 
   # Tools for the tools image. Strip to save size.
-  strip bazel-bin/test/tools/schema_validator/schema_validator_tool \
+  hermetic_strip
+  "${STRIP_BIN}" bazel-bin/test/tools/schema_validator/schema_validator_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
-  strip bazel-bin/test/tools/router_check/router_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
-  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+  "${STRIP_BIN}" bazel-bin/test/tools/config_load_check/config_load_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
@@ -111,7 +112,7 @@ function cp_binary_for_image_build() {
 
   # Stripped binaries for the debug image.
   mkdir -p "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped
-  strip "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
+  "${STRIP_BIN}" "${FINAL_DELIVERY_DIR}"/envoy -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"_stripped/envoy
 
   # only if BUILD_REASON exists (running in AZP)
   if [[ "${BUILD_REASON}" ]]; then
@@ -652,6 +653,7 @@ case $CI_TARGET in
         bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
               //tools/dependency:validate_reachability_test
         echo "dependency graph structure..."
+        hermetic_jq
         "${ENVOY_SRCDIR}/tools/dependency/validate_graph_structure.sh"
         echo "Check bazel registry ..."
         registry_check
@@ -1111,15 +1113,9 @@ case $CI_TARGET in
         DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
         bazel test \
               --config=ci \
-              --keep_going \
+              --config=examples \
               --action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
               --host_action_env="DEV_CONTAINER_ID=${DEV_CONTAINER_ID}" \
-              --action_env="CARGO_BAZEL_REPIN=true" \
-              --host_action_env="CARGO_BAZEL_REPIN=true" \
-              --action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-              --host_action_env="BUILDX_BAKE_ENTITLEMENTS_FS=0" \
-              --sandbox_writable_path="${HOME}/.docker/" \
-              --sandbox_writable_path="$HOME" \
               @envoy-examples//:verify_examples
         popd
         ;;

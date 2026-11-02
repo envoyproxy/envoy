@@ -1226,9 +1226,10 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) 
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers.responseStatus());
   EXPECT_FALSE(headers.endStream());
 
-  // Wait until the whole response has arrived from upstream, i.e. the full 1 MiB body is sitting
-  // in the downstream codec's send buffer waiting for the client's window to open.
-  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_completed", Ge(1));
+  // Wait until the full 1 MiB body is sitting in the downstream codec's send buffer waiting for the
+  // client's window to open. upstream_rq_completed is charged when the response headers arrive, so
+  // it says nothing about how much of the body has been proxied.
+  test_server_->waitForGauge("http2.pending_send_bytes", Eq(kResponseSize));
 
   // The client is ready to read: grow the connection window (65,535 bytes initially per RFC 9113)
   // and open the stream window to 1 MiB.

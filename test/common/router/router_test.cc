@@ -4368,11 +4368,6 @@ TEST_F(RouterTest, RetryHttp3UpstreamReset) {
 }
 
 TEST_F(RouterTest, NoRetryWithBodyLimit) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
-
-  recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -4403,11 +4398,6 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
 }
 
 TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "false"}});
-
-  recreateFilter();
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
@@ -4438,44 +4428,6 @@ TEST_F(RouterTest, EnableRedirectAndRetryButNoRetryWithBodyLimit) {
   Http::ResponseHeaderMapPtr response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), true);
-}
-
-TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
-  // This test half closes upstream connection before downstream. Enabling the
-  // allow_multiplexed_upstream_half_close flag causes the clean-up sequence to
-  // change and this requires explicit destruction of the filter before mock
-  // objects. This test was added to validate that the old behavior is preserved
-  // when allow_multiplexed_upstream_half_close is false.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true"}});
-  recreateFilter();
-  NiceMock<Http::MockRequestEncoder> encoder1;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
-
-  // Set a per route body limit which disallows any buffering.
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
-  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-  // Unlike RetryUpstreamReset above the data won't be buffered as the body exceeds the buffer limit
-  EXPECT_CALL(*router_->retry_state_, enabled()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
-  Buffer::OwnedImpl body("t");
-  router_->decodeData(body, false);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, std::optional<uint64_t>(200)));
-
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  // router filter no longer resets the stream due to upstream half closing first
-  router_->onDestroy();
 }
 
 // Verifies that when the request fails with an upstream reset (per try timeout in this case)
@@ -8079,6 +8031,8 @@ TEST_F(RouterTest, ConnectPauseNoResume) {
 
   expectResponseTimerCreate();
 
+  // CONNECT proxied to an HTTP upstream does not get independent half close.
+  EXPECT_CALL(callbacks_.downstream_callbacks_, enableHalfClose()).Times(0);
   EXPECT_CALL(encoder, encodeHeaders(_, false));
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -8108,8 +8062,57 @@ TEST_F(RouterTest, ConnectExplicitTcpUpstream) {
           tcp_config);
   callbacks_.route_->route_entry_.connect_config_ = std::make_optional<RouteEntry::ConnectConfig>();
 
+  callbacks_.stream_info_.protocol_ = Http::Protocol::Http2;
+
   // Make sure newConnection is called on the TCP pool, not newStream on the HTTP pool.
   EXPECT_CALL(cm_.thread_local_cluster_.tcp_conn_pool_, newConnection(_));
+  // A TCP upstream gets independent half close.
+  EXPECT_CALL(callbacks_.downstream_callbacks_, enableHalfClose());
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  headers.removePath();
+  router_->decodeHeaders(headers, false);
+
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, ConnectExplicitTcpUpstreamHalfCloseDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tcp_tunnel_allow_upstream_half_close", "false"}});
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+  std::ignore =
+      cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+          tcp_config);
+  callbacks_.route_->route_entry_.connect_config_ = std::make_optional<RouteEntry::ConnectConfig>();
+  callbacks_.stream_info_.protocol_ = Http::Protocol::Http2;
+
+  EXPECT_CALL(cm_.thread_local_cluster_.tcp_conn_pool_, newConnection(_));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, enableHalfClose()).Times(0);
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setMethod("CONNECT");
+  headers.removePath();
+  router_->decodeHeaders(headers, false);
+
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, ConnectExplicitTcpUpstreamHttp1Downstream) {
+  cm_.thread_local_cluster_.cluster_.info_->upstream_config_ =
+      std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  envoy::extensions::upstreams::http::tcp::v3::TcpConnectionPoolProto tcp_config;
+  std::ignore =
+      cm_.thread_local_cluster_.cluster_.info_->upstream_config_->mutable_typed_config()->PackFrom(
+          tcp_config);
+  callbacks_.route_->route_entry_.connect_config_ = std::make_optional<RouteEntry::ConnectConfig>();
+  callbacks_.stream_info_.protocol_ = Http::Protocol::Http11;
+
+  EXPECT_CALL(cm_.thread_local_cluster_.tcp_conn_pool_, newConnection(_));
+  EXPECT_CALL(callbacks_.downstream_callbacks_, enableHalfClose()).Times(0);
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   headers.setMethod("CONNECT");

@@ -81,6 +81,28 @@ TEST(XdsResourceIdentifierTest, ColonNotEncodedInPath) {
   }
 }
 
+TEST(XdsResourceIdentifierTest, NormalizeResourceName) {
+  // Non-xdstp resource name returned unchanged.
+  {
+    auto result = XdsResourceIdentifier::normalizeResourceName("my_resource");
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ("my_resource", result.value());
+  }
+  // xdstp resource name with sorted context params.
+  {
+    auto result = XdsResourceIdentifier::normalizeResourceName(
+        "xdstp://authority/envoy.type.v3.TokenBucket/bucket?b=2&a=1");
+    EXPECT_TRUE(result.ok());
+    EXPECT_EQ("xdstp://authority/envoy.type.v3.TokenBucket/bucket?a=1&b=2", result.value());
+  }
+  // Invalid xdstp URN returns an error status.
+  {
+    auto result = XdsResourceIdentifier::normalizeResourceName("xdstp://foo");
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ("Resource type missing from /", result.status().message());
+  }
+}
+
 // Corner cases around path-identifier encoding/decoding.
 TEST(XdsResourceIdentifierTest, PathDividerEscape) {
   {

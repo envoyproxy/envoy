@@ -554,6 +554,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_outlier_detection_test",
     srcs = ["router_outlier_detection_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":router_test_base_lib",
         "//source/common/router:router_lib",

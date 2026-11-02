@@ -1160,14 +1160,21 @@ DialectTranscodePack createAnthropicTranscodePack() {
       .request = {.to_ir = anthropicRequestToIr(), .from_ir = anthropicRequestFromIr()},
       .response = {.to_ir = anthropicResponseToIr(), .from_ir = anthropicResponseFromIr()},
       .stream = {.to_ir = anthropicStreamToIr(), .from_ir = anthropicStreamFromIr()},
-      // Claude on Vertex AI: the model in the path alone, and the Vertex API version in the body.
+      // The Anthropic API's layout: a fixed path, with the API version in a header rather than in
+      // the body or the path. A request leaves in it unless a binding names another.
+      .binding = builtInBinding("/v1/messages", {{.header = "anthropic-version",
+                                                  .value = nlohmann::json("2023-06-01"),
+                                                  .keep_existing = true}}),
+      // Claude on Vertex AI: the model in the path alone, and the Vertex API version in the body
+      // rather than in the API's header, which is removed so it does not leak to Vertex.
       .client_bindings = {builtInBinding(
           "/{version}/projects/{project}/locations/{location}/publishers/anthropic/models/"
           "{model}:{rawPredict|streamRawPredict}",
           {{.body_field = "model"},
            {.body_field = "anthropic_version",
             .value = nlohmann::json("vertex-2023-10-16"),
-            .keep_existing = true}})},
+            .keep_existing = true},
+           {.header = "anthropic-version"}})},
   };
 }
 
@@ -2729,14 +2736,25 @@ std::string irModel(const nlohmann::json& json) {
   return model != json.end() && model->is_string() ? model->get<std::string>() : "";
 }
 
+// The request header lookup a leg reads under: `ctx`'s, or one that finds nothing when the caller
+// set none.
+HeaderLookup headerLookup(const TranscodeContext& ctx) {
+  if (ctx.request_header) {
+    return ctx.request_header;
+  }
+  return [](absl::string_view) { return std::optional<std::string>(); };
+}
+
 // Runs a request leg, reading the client's binding into the body before the rules (`ToIr`), or
 // applying the backend's to the body after them (`FromIr`).
 absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirection direction,
                               TranscodeContext& ctx, nlohmann::json& json) {
   const bool is_ir = pack.protocol == TranscodingEngine::kIrProtocol;
   ctx.rewritten_path.reset();
+  ctx.header_mutations.clear();
   ctx.read.reset();
   ctx.unresolved = false;
+  const HeaderLookup header = headerLookup(ctx);
   if (direction == TranscodeDirection::ToIr) {
     // The rules then see what the path names as if the body had named it.
     //
@@ -2744,7 +2762,7 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
     // same paths for the same reason. Have it read them through the engine rather than keep its own
     // copy.
     ctx.read = readClientPath(ctx.request_binding, pack.binding, pack.client_bindings,
-                              ctx.request_path, json);
+                              ctx.request_path, json, header);
     if (!is_ir) {
       absl::Status status = pack.request.to_ir.execute(json, &ctx);
       if (!status.ok()) {
@@ -2752,6 +2770,14 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
       }
     }
     ctx.ir_model = irModel(json);
+    // The headers the arrived binding writes are the provider's, like the body fields it writes,
+    // which `readClientPath` took out of the body: they leave with the request only if it goes
+    // back out in the same binding, which restores them.
+    if (ctx.read.has_value()) {
+      for (const auto& [name, sent] : ctx.read->written_headers) {
+        ctx.header_mutations.push_back({name, std::nullopt});
+      }
+    }
     return absl::OkStatus();
   }
 
@@ -2782,7 +2808,8 @@ absl::Status transcodeRequest(const DialectTranscodePack& pack, TranscodeDirecti
     return absl::OkStatus();
   }
   absl::StatusOr<std::optional<std::string>> path =
-      writeRequest(*binding, pack.binding.get(), ctx.arrived, json, ctx.unresolved);
+      writeRequest(*binding, pack.binding.get(), ctx.arrived, json, header, ctx.header_mutations,
+                   ctx.unresolved);
   if (!path.ok()) {
     return path.status();
   }
@@ -3034,10 +3061,12 @@ std::string TranscodingEngine::modelFromRequestPath(LLMProtocol dialect, absl::s
                                                     const LlmBindingConstSharedPtr& binding) const {
   const auto pack = packs_.find(dialect);
   nlohmann::json scratch = nlohmann::json::object();
+  // Only the model is wanted, so the request's headers do not matter here.
+  const HeaderLookup no_headers = [](absl::string_view) { return std::optional<std::string>(); };
   std::optional<LlmBindingRead> read =
       pack != packs_.end() ? readClientPath(binding, pack->second.binding,
-                                            pack->second.client_bindings, path, scratch)
-                           : readClientPath(binding, nullptr, {}, path, scratch);
+                                            pack->second.client_bindings, path, scratch, no_headers)
+                           : readClientPath(binding, nullptr, {}, path, scratch, no_headers);
   return read.has_value() ? std::move(read->model) : "";
 }
 

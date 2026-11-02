@@ -975,6 +975,42 @@ TEST_F(McpFilterTest, MissingProtocolVersionMetaContinues) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 }
 
+TEST_F(McpFilterTest, MissingProtocolVersionMetaRejects) {
+  envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
+  proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
+  proto_config.mutable_max_supported_protocol_version()->set_value("2026-07-28");
+
+  config_ = std::make_shared<McpFilterConfig>(proto_config, "test.", factory_context_.scope());
+  filter_ = std::make_unique<McpFilter>(config_);
+  filter_->setDecoderFilterCallbacks(decoder_callbacks_);
+  filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl headers{{":method", "POST"},
+                                         {"content-type", "application/json"},
+                                         {"accept", "application/json"},
+                                         {"accept", "text/event-stream"},
+                                         {"mcp-protocol-version", "2026-07-28"},
+                                         {"mcp-method", "tasks/get"},
+                                         {"mcp-name", "task-123"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
+
+  Buffer::OwnedImpl buffer(
+      R"({"jsonrpc":"2.0","id":1,"method":"tasks/get","params":{"taskId":"task-123"}})");
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(Http::Code::BadRequest,
+                     testing::AllOf(testing::HasSubstr("\"code\":-32602"),
+                                    testing::HasSubstr("Missing or invalid params._meta field: "
+                                                       "io.modelcontextprotocol/protocolVersion")),
+                     _, _, _));
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
+}
+
 TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
   envoy::extensions::filters::http::mcp::v3::Mcp proto_config;
   proto_config.set_traffic_mode(envoy::extensions::filters::http::mcp::v3::Mcp::REJECT_NO_MCP);
@@ -1001,14 +1037,14 @@ TEST_F(McpFilterTest, NonStringProtocolVersionMetaRejects) {
   EXPECT_CALL(
       decoder_callbacks_,
       sendLocalReply(Http::Code::BadRequest,
-                     testing::AllOf(testing::HasSubstr("\"code\":-32020"),
-                                    testing::HasSubstr(
-                                        "MCP-Protocol-Version header does not match request body")),
+                     testing::AllOf(testing::HasSubstr("\"code\":-32602"),
+                                    testing::HasSubstr("Missing or invalid params._meta field: "
+                                                       "io.modelcontextprotocol/protocolVersion")),
                      _, _, _));
 
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(buffer, true));
 
-  EXPECT_EQ(1u, config_->stats().header_mismatch_.value());
+  EXPECT_EQ(0u, config_->stats().header_mismatch_.value());
 }
 
 constexpr absl::string_view kTasksGetWithEmptyClientCapabilities =

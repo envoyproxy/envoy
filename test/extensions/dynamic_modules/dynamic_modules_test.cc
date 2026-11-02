@@ -477,16 +477,24 @@ TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
   std::filesystem::remove(temp_path);
 
+#ifdef WIN32
+  // Windows cannot delete a loaded DLL, so let the module unload once both handles are released
+  // instead of pinning it for the rest of the process.
+  constexpr bool do_not_close = false;
+#else
+  constexpr bool do_not_close = true;
+#endif
+
   // First load writes and loads the module.
   absl::StatusOr<DynamicModulePtr> module1 =
-      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+      newDynamicModuleFromBytes(module_bytes, sha256, do_not_close, false);
   ASSERT_OK(module1);
   ASSERT_TRUE(std::filesystem::exists(temp_path));
 
   // Second load with the same sha256 — writes again but the RTLD_NOLOAD check in
   // newDynamicModule returns the existing handle, so the init function is not called twice.
   absl::StatusOr<DynamicModulePtr> module2 =
-      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+      newDynamicModuleFromBytes(module_bytes, sha256, do_not_close, false);
   ASSERT_OK(module2);
 
   // Cleanup.
@@ -611,12 +619,18 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitLoads) {
   std::filesystem::create_directories(cached.parent_path());
   std::filesystem::copy_file(module_path, cached,
                              std::filesystem::copy_options::overwrite_existing);
+  // The copy keeps the read-only attribute of the Bazel output on Windows, which would prevent
+  // removing or overwriting the cached file later.
+  std::filesystem::permissions(cached, std::filesystem::perms::owner_write,
+                               std::filesystem::perm_options::add);
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
   ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 
+  // Unload the module first, since Windows cannot delete a loaded DLL.
+  result->loaded.reset();
   std::filesystem::remove(cached);
 }
 

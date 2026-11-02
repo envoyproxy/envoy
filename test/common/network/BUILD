@@ -433,6 +433,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:base_includes",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//test/mocks/api:api_mocks",
@@ -451,6 +452,7 @@ envoy_cc_test(
     srcs = ["ip_address_parsing_test.cc"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//envoy/common:base_includes",
         "//source/common/network:ip_address_parsing_lib",
         "//test/test_common:status_utility_lib",
     ],

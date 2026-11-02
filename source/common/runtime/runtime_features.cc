@@ -52,7 +52,6 @@ RUNTIME_GUARD(envoy_reloadable_features_default_client_tls_max_version_is_1_3);
 // address are drained. Disable to restore the previous behavior of mutating the existing host's
 // address in place, which keeps already-established connections to the old address alive.
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_replace_host_on_address_change);
-RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_direct_local_reply_flush_saved_response_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_redirect_prefix_rewrite_with_path_match_policy);
@@ -180,12 +179,14 @@ RUNTIME_GUARD(envoy_reloadable_features_scope_upstream_tls_session_cache_by_sni)
 RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_dynamic_metadata);
 RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
+RUNTIME_GUARD(envoy_reloadable_features_spiffe_validator_reject_empty_trust_bundle);
 RUNTIME_GUARD(envoy_reloadable_features_spiffe_validator_use_upstream_subject_alt_names);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_socket_report_connection_reset);
 RUNTIME_GUARD(envoy_reloadable_features_strip_dotdot_segments_with_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_strip_path_parameters_per_segment);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_strip_upgrade_header_on_failed_websocket_upgrades);
 RUNTIME_GUARD(envoy_reloadable_features_tap_honor_tap_enabled);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_tunnel_allow_upstream_half_close);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_tls_inspector_enforce_client_tls_version);
 RUNTIME_GUARD(envoy_reloadable_features_udp_hot_restart_session_handoff);
@@ -212,6 +213,9 @@ RUNTIME_GUARD(envoy_reloadable_features_use_stats_prefix_scope_for_http_filter);
 // route configuration instead of sending another VHDS request and waiting for the response.
 RUNTIME_GUARD(envoy_reloadable_features_vhds_answered_alias_cache);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
+// This is only needed if sharing c-ares query cache across dns clusters.
+// Disabled by default for now to prevent behavior changes.
+FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
 RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
@@ -288,6 +292,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_ma
 // TODO(adisuissa): flip to true after all xDS types use the new subscription
 // method, and this is tested extensively.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
+// TODO(yanjunxiang-google): flip to true after canarying the feature internally.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_async_client_downstream_flow_control2);
 // TODO(abeyad): Flip to true after prod testing.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_disable_quic_rx_queue_overflow_socket_options);
 // TODO(abeyad): Flip to true after prod testing.
@@ -300,11 +306,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 // TODO(jwendell): Flip to true to make gRPC timeout responses return DEADLINE_EXCEEDED
 // instead of UNAVAILABLE.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_grpc_timeout_returns_deadline_exceeded);
-
-// TODO(yanavlasov): Flip to true after prod testing.
-// Controls whether a stream stays open when HTTP/2 or HTTP/3 upstream half closes
-// before downstream.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
@@ -351,10 +352,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_http2_record_histograms);
 // validated in production. When disabled, QUIC retains zlib-only compression while TCP TLS has
 // no certificate compression.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_tls_certificate_compression_brotli);
-
-// DnsFilter created resolver on the worker thread which could lead to race when sharing resolvers
-// Do not turn this on if DnsFilter is used or until the race is fixed
-FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 
 // When an on-demand cluster discovery asks for a cluster its config source has already answered
 // as missing, answer the request immediately from that remembered answer instead of starting
