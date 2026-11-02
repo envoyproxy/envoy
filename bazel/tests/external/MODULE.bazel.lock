@@ -6273,8 +6273,8 @@
             "https://files.pythonhosted.org/packages/f6/d2/5beee64d3e4e747f316bae86b55943f51e82bb86ecd325883ef65741e7da/sphinxcontrib_devhelp-2.0.0.tar.gz": "sha256:411f5d96d445d1d73bb5d52133377b4248ec79db5c793ce7dbe59e074b4dd1ad"
           },
           "sphinxcontrib-googleanalytics": {
-            "https://files.pythonhosted.org/packages/6b/c7/e68a33ba7b8a4a697c8ad278a37d7bc8521c4175b0f9248fec80ae6fed4f/sphinxcontrib_googleanalytics-0.5-py3-none-any.whl": "sha256:437e529c33c441bcccceabe3ead1585115e6ba83fe90e23bd42e42521333cc0a",
-            "https://files.pythonhosted.org/packages/b5/78/ad9a210c24499ccfd97f0eccc902576b587af82ae2dc27021e0662929940/sphinxcontrib_googleanalytics-0.5.tar.gz": "sha256:a2ac6df9d16b9c124febf6b44e714c1fd9725e692b73ee84ec6b52b377ff5561"
+            "https://files.pythonhosted.org/packages/84/24/bdd9ae42b7017fcea870fe24ee1815793289219644010a015253b9b21ce6/sphinxcontrib_googleanalytics-0.6.tar.gz": "sha256:dc8740342331ff523b5eda8f5d1ea6176acfa86bbd195e8d67f642db8f2b22c7",
+            "https://files.pythonhosted.org/packages/ca/4a/516e8cfabfe1760ac1ea5e310779e2a0986174c2f7ba95499f9d5bf46e1c/sphinxcontrib_googleanalytics-0.6-py3-none-any.whl": "sha256:9264640a9a0449a088cadaca6794946e60059345752221dae2c6ad986723d3d4"
           },
           "sphinxcontrib-htmlhelp": {
             "https://files.pythonhosted.org/packages/0a/7b/18a8c0bcec9182c05a0b3ec2a776bba4ead82750a55ff798e8d406dae604/sphinxcontrib_htmlhelp-2.1.0-py3-none-any.whl": "sha256:166759820b47002d22914d64a075ce08f4c46818e17cfc9470a9786b759b19f8",
