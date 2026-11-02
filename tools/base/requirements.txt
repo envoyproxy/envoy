@@ -1440,9 +1440,9 @@ six==1.16.0 \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
     # via python-dateutil
-slack-sdk==3.45.0 \
-    --hash=sha256:1ab794452f238b59db0d8a4d346263d65190288add53ec67a05751d8e7402486 \
-    --hash=sha256:6356d4486d1a3ad156462c5544ab1b9c076ff426a250495c08f51b7ad71eb8fb
+slack-sdk==3.46.0 \
+    --hash=sha256:25215ca293d2954ed759b87573b4c833cb3f82ebff371355936515c688411dbb \
+    --hash=sha256:6286d89da97ea193c853609131515e6f1b3edf86866d6e5aad0dba9dcf1cb72d
     # via -r requirements.in
 smmap==5.0.1 \
     --hash=sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62 \
