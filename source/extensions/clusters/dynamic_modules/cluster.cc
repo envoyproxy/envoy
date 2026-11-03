@@ -59,9 +59,11 @@ struct DynamicModuleThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBa
 
 absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleClusterConfig::create(
     const std::string& cluster_name, const std::string& cluster_config,
-    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope) {
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
+    bool persistent_host_partitions_allowed) {
   auto config = std::shared_ptr<DynamicModuleClusterConfig>(
-      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope));
+      new DynamicModuleClusterConfig(cluster_name, cluster_config, std::move(module), stats_scope,
+                                     persistent_host_partitions_allowed));
 
   // Resolve all required function pointers from the dynamic module.
 #define RESOLVE_SYMBOL(name, type, member)                                                         \
@@ -161,8 +163,10 @@ absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>> DynamicModuleCluster
 
 DynamicModuleClusterConfig::DynamicModuleClusterConfig(
     const std::string& cluster_name, const std::string& cluster_config,
-    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope)
-    : stats_scope_(stats_scope.createScope("dynamicmodulescustom.")), metrics_(*stats_scope_),
+    Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
+    bool persistent_host_partitions_allowed)
+    : persistent_host_partitions_allowed_(persistent_host_partitions_allowed),
+      stats_scope_(stats_scope.createScope("dynamicmodulescustom.")), metrics_(*stats_scope_),
       cluster_name_(cluster_name), cluster_config_(cluster_config),
       dynamic_module_(std::move(module)) {}
 
@@ -291,7 +295,7 @@ void DynamicModuleCluster::registerLifecycleCallbacks() {
 }
 
 void DynamicModuleCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) {
-  if (!config_->use_persistent_host_partitions_) {
+  if (!usesPersistentHostSets()) {
     ClusterImplBase::reloadHealthyHostsHelper(host);
     return;
   }
@@ -307,8 +311,12 @@ void DynamicModuleCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPt
   }
 }
 
+bool DynamicModuleCluster::usesPersistentHostSets() const {
+  return priority_set_.hostSetFactory() == &PersistentHostSet::create;
+}
+
 PersistentHostSet& DynamicModuleCluster::persistentHostSet(uint32_t priority) {
-  ASSERT(config_->use_persistent_host_partitions_);
+  ASSERT(usesPersistentHostSets());
   priority_set_.getOrCreateHostSet(priority);
   return static_cast<PersistentHostSet&>(*priority_set_.hostSetsPerPriority()[priority]);
 }
@@ -325,8 +333,7 @@ void DynamicModuleCluster::updateHostsFromSnapshot(uint32_t priority,
 
 bool DynamicModuleCluster::applyPersistentHealthChange(const Upstream::HostSharedPtr& host) {
   // Hosts keep the priority they were added at.
-  if (!config_->use_persistent_host_partitions_ ||
-      host->priority() >= priority_set_.hostSetsPerPriority().size()) {
+  if (!usesPersistentHostSets() || host->priority() >= priority_set_.hostSetsPerPriority().size()) {
     return false;
   }
   auto snapshot = persistentHostSet(host->priority()).applyHostHealthChange(host);
@@ -546,7 +553,7 @@ bool DynamicModuleCluster::addHosts(
     }
   }
 
-  if (config_->use_persistent_host_partitions_) {
+  if (usesPersistentHostSets()) {
     updateHostsFromSnapshot(priority,
                             persistentHostSet(priority).applyMembershipDelta(result_hosts, {}),
                             result_hosts, {});
@@ -594,7 +601,7 @@ bool DynamicModuleCluster::updateHostHealth(Upstream::HostSharedPtr host,
 
   // A persistent host set re-partitions just this host. Callers resolve the host through
   // `host_map_`, so it is a member.
-  if (config_->use_persistent_host_partitions_) {
+  if (usesPersistentHostSets()) {
     if (!applyPersistentHealthChange(host)) {
       IS_ENVOY_BUG("health update for a host the persistent host set does not hold");
       return false;
@@ -667,7 +674,7 @@ size_t DynamicModuleCluster::removeHosts(const std::vector<Upstream::HostSharedP
     return 0;
   }
 
-  if (config_->use_persistent_host_partitions_) {
+  if (usesPersistentHostSets()) {
     // Hosts keep the priority they were added at, so grouping by it finds each host's set without
     // scanning the priorities.
     std::vector<Upstream::HostVector> removed_by_priority(
@@ -1070,7 +1077,9 @@ DynamicModuleClusterFactory::createClusterWithConfig(
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy)));
   }
   // Native policies read the flat host vectors on every update, which this option exists to avoid.
-  if (proto_config.use_persistent_host_partitions() && !is_module_lb) {
+  const bool config_enables_persistent_host_partitions =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, use_persistent_host_partitions, false);
+  if (config_enables_persistent_host_partitions && !is_module_lb) {
     return absl::InvalidArgumentError(
         fmt::format("cluster: use_persistent_host_partitions requires LB policy CLUSTER_PROVIDED, "
                     "got {}.",
@@ -1103,16 +1112,23 @@ DynamicModuleClusterFactory::createClusterWithConfig(
   auto dynamic_module = std::move(load_result->loaded);
 
   // Create the cluster configuration.
-  auto config_or_error = DynamicModuleClusterConfig::create(
-      proto_config.cluster_name(), cluster_config_bytes, std::move(dynamic_module), server_scope);
+  auto config_or_error =
+      DynamicModuleClusterConfig::create(proto_config.cluster_name(), cluster_config_bytes,
+                                         std::move(dynamic_module), server_scope, is_module_lb);
   if (!config_or_error.ok()) {
     Envoy::Extensions::DynamicModules::incrementLoadFailure(
         server_context, proto_config.cluster_name(),
         Envoy::Extensions::DynamicModules::ConfigInitErrorStat);
     return config_or_error.status();
   }
-  config_or_error.value()->use_persistent_host_partitions_ =
-      proto_config.use_persistent_host_partitions();
+  auto& config = *config_or_error.value();
+  config.use_persistent_host_partitions_ |= config_enables_persistent_host_partitions;
+  if (config.persistent_host_partitions_refused_) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        "dynamic module cluster '{}': persistent host partitions require lb_policy "
+                        "CLUSTER_PROVIDED, got {}",
+                        cluster.name(), envoy::config::cluster::v3::Cluster::LbPolicy_Name(policy));
+  }
 
   // Create the cluster.
   absl::Status creation_status = absl::OkStatus();

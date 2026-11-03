@@ -3466,6 +3466,94 @@ TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStringBatchEdgeCases
       static_cast<Upstream::LoadBalancerContext*>(&no_info_context), ns_buf, nullptr, 0));
 }
 
+// The struct setter merges a serialized google.protobuf.Struct into the namespace and treats an
+// empty struct as a no-op. A buffer that does not parse and a missing context or stream info fail.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicMetadataStruct) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string ns = "dynamic_modules.test";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+  // Only the non-empty struct that parses reaches the stream info.
+  EXPECT_CALL(stream_info, setDynamicMetadata(ns, _));
+
+  Protobuf::Struct value;
+  (*value.mutable_fields())["key"].set_string_value("value");
+  std::string serialized;
+  ASSERT_TRUE(value.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      context_ptr, ns_buf, {serialized.data(), serialized.size()}));
+  EXPECT_THAT(stream_info.metadata_.filter_metadata().at(ns).fields(),
+              Contains(IsStructString("key", "value")));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      context_ptr, {"empty.ns", 8}, {nullptr, 0}));
+  EXPECT_FALSE(stream_info.metadata_.filter_metadata().contains("empty.ns"));
+
+  const std::string invalid = serialized + '\x0f';
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      context_ptr, ns_buf, {invalid.data(), invalid.size()}));
+
+  // A null pointer with a non-zero length violates the ABI contract and is rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      context_ptr, ns_buf, {nullptr, 8}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      context_ptr, {nullptr, 8}, {serialized.data(), serialized.size()}));
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      nullptr, ns_buf, {serialized.data(), serialized.size()}));
+  NiceMock<Upstream::MockLoadBalancerContext> no_info_context;
+  ON_CALL(no_info_context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+      static_cast<Upstream::LoadBalancerContext*>(&no_info_context), ns_buf,
+      {serialized.data(), serialized.size()}));
+}
+
+// The typed setter sets the typed metadata of the namespace from a serialized
+// google.protobuf.Any. An Any without a type URL, a buffer that does not parse and a missing
+// context or stream info fail.
+TEST_F(DynamicModuleClusterTest, LbContextSetDynamicTypedMetadata) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(context, requestStreamInfo()).WillByDefault(Return(&stream_info));
+  auto* context_ptr = static_cast<Upstream::LoadBalancerContext*>(&context);
+  std::string ns = "dynamic_modules.test";
+  envoy_dynamic_module_type_module_buffer ns_buf = {ns.data(), ns.size()};
+
+  Protobuf::StringValue payload;
+  payload.set_value("hello");
+  Protobuf::Any any;
+  ASSERT_TRUE(any.PackFrom(payload));
+  std::string serialized;
+  ASSERT_TRUE(any.SerializeToString(&serialized));
+  EXPECT_TRUE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      context_ptr, ns_buf, {serialized.data(), serialized.size()}));
+  Protobuf::StringValue unpacked;
+  ASSERT_TRUE(stream_info.metadata_.typed_filter_metadata().at(ns).UnpackTo(&unpacked));
+  EXPECT_EQ("hello", unpacked.value());
+
+  const std::string invalid = serialized + '\x0f';
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      context_ptr, ns_buf, {nullptr, 0}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      context_ptr, ns_buf, {invalid.data(), invalid.size()}));
+
+  // A null pointer with a non-zero length violates the ABI contract and is rejected.
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      context_ptr, ns_buf, {nullptr, 8}));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      context_ptr, {nullptr, 8}, {serialized.data(), serialized.size()}));
+
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      nullptr, ns_buf, {serialized.data(), serialized.size()}));
+  NiceMock<Upstream::MockLoadBalancerContext> no_info_context;
+  ON_CALL(no_info_context, requestStreamInfo()).WillByDefault(Return(nullptr));
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+      static_cast<Upstream::LoadBalancerContext*>(&no_info_context), ns_buf,
+      {serialized.data(), serialized.size()}));
+}
+
 // =================================================================================================
 // Async Host Selection Tests
 // =================================================================================================
@@ -5452,6 +5540,60 @@ TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthUpdateForForeignHost)
                        foreign_host, envoy_dynamic_module_type_host_health_Unhealthy)),
                    "health update for a host the persistent host set does not hold");
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[0]->hostCounts().healthy);
+}
+
+// The module opts the cluster in from on_cluster_config_new, without the config field.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, ModuleOptInDuringConfigNew) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op", "use_persistent_host_partitions"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  clusters_.push_back(std::move(*result));
+
+  EXPECT_EQ(reinterpret_cast<envoy_dynamic_module_type_cluster_config_module_ptr>(0x5),
+            cluster->config()->in_module_config_);
+  EXPECT_TRUE(cluster->config()->use_persistent_host_partitions_);
+  EXPECT_TRUE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[0]));
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts, 1));
+  EXPECT_TRUE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[1]));
+  EXPECT_NE(nullptr, cluster->prioritySet().hostSetsPerPriority()[1]->snapshot());
+}
+
+// The host sets exist once on_cluster_config_new returns, so a later request is refused.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, ModuleOptInAfterConfigNewIsRefused) {
+  auto cluster = createDecCluster();
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+      cluster->config().get()));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(nullptr));
+  EXPECT_FALSE(cluster->config()->use_persistent_host_partitions_);
+  EXPECT_FALSE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[0]));
+}
+
+// Native load balancing policies read the flat host vectors on every update, so the module's
+// request is refused and the cluster keeps flat host sets.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, ModuleOptInRefusedForNativeLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: ROUND_ROBIN
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: use_persistent_host_partitions
+)EOF";
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  clusters_.push_back(std::move(*result));
+
+  EXPECT_EQ(reinterpret_cast<envoy_dynamic_module_type_cluster_config_module_ptr>(0x6),
+            cluster->config()->in_module_config_);
+  EXPECT_FALSE(cluster->config()->use_persistent_host_partitions_);
+  EXPECT_FALSE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[0]));
 }
 
 // Native load balancing policies read the flat host vectors on every update, so the option is

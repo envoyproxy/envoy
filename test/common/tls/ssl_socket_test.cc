@@ -6168,6 +6168,69 @@ TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertDifferentSAN) {
                               version_);
 }
 
+// Returns the config of a server that issues session tickets with ticket_key_a, with the
+// certificate and the key of the given name in the test data.
+std::string sessionTicketServerCtxYaml(absl::string_view certificate_name) {
+  return fmt::format(R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/{0}_cert.pem"
+      private_key:
+        filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/{0}_key.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/ticket_key_a"
+)EOF",
+                     certificate_name);
+}
+
+// Runs testTicketSessionResumption() for two servers whose names differ but concatenate to the
+// same bytes. Sessions resume across them only when the runtime guard is disabled, which leaves
+// the type and the length of each name out of the session context ID.
+void testTicketSessionResumptionAcrossConcatenatedNames(
+    const std::string& server_ctx_yaml1, const std::vector<std::string>& server_names1,
+    const std::string& server_ctx_yaml2, const std::vector<std::string>& server_names2,
+    const Network::Address::IpVersion ip_version) {
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.unambiguous_tls_session_context_id", "false"}});
+    testTicketSessionResumption(server_ctx_yaml1, server_names1, server_ctx_yaml2, server_names2,
+                                client_ctx_yaml, /*expect_reuse=*/true, ip_version);
+  }
+  testTicketSessionResumption(server_ctx_yaml1, server_names1, server_ctx_yaml2, server_names2,
+                              client_ctx_yaml, /*expect_reuse=*/false, ip_version);
+}
+
+// Sessions cannot be resumed because the SANs of the server certificates are different, even
+// though the two SANs of one certificate concatenate to the SAN of the other.
+TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertConcatenatedSans) {
+  testTicketSessionResumptionAcrossConcatenatedNames(
+      sessionTicketServerCtxYaml("san_multiple_dns"), {},
+      sessionTicketServerCtxYaml("san_concatenated_dns"), {}, version_);
+}
+
+// Sessions cannot be resumed because the SAN of one server certificate is a DNS SAN, while the SAN
+// of the other is a URI SAN with the same name.
+TEST_P(SslSocketTest, TicketSessionResumptionDifferentServerCertSanType) {
+  testTicketSessionResumptionAcrossConcatenatedNames(
+      sessionTicketServerCtxYaml("san_dns"), {},
+      sessionTicketServerCtxYaml("san_uri_with_dns_name"), {}, version_);
+}
+
+// Sessions cannot be resumed because the server names are different, even though the two server
+// names of one server concatenate to the server name of the other.
+TEST_P(SslSocketTest, TicketSessionResumptionConcatenatedServerNames) {
+  const std::string server_ctx_yaml = sessionTicketServerCtxYaml("san_dns");
+  testTicketSessionResumptionAcrossConcatenatedNames(
+      server_ctx_yaml, {"server1.example.com", "server2.example.com"}, server_ctx_yaml,
+      {"server1.example.comserver2.example.com"}, version_);
+}
+
 TEST_P(SslSocketTest, SessionResumptionDisabled) {
   const std::string server_ctx_yaml = R"EOF(
   common_tls_context:

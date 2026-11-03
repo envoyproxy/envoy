@@ -9,6 +9,8 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/formatter/dynamic_modules/formatter.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Formatter {
@@ -27,8 +29,8 @@ namespace DynamicModules {
       module_config.name(), module_config.do_not_close(), module_config.load_globally(),
       context.serverFactoryContext(), proto_config.formatter_name());
   if (!dynamic_module_or_error.ok()) {
-    throw EnvoyException("Failed to load dynamic module: " +
-                         std::string(dynamic_module_or_error.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to load dynamic module: ",
+                                      dynamic_module_or_error.status().message()));
   }
 
   // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
@@ -36,8 +38,8 @@ namespace DynamicModules {
   if (proto_config.has_formatter_config()) {
     auto config_or_error = MessageUtil::knownAnyToBytes(proto_config.formatter_config());
     if (!config_or_error.ok()) {
-      throw EnvoyException("Failed to parse formatter config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(
+          absl::StrCat("Failed to parse formatter config: ", config_or_error.status().message()));
     }
     formatter_config_str = std::move(config_or_error.value());
   }
@@ -46,8 +48,8 @@ namespace DynamicModules {
       newDynamicModuleFormatterConfig(proto_config.formatter_name(), formatter_config_str,
                                       std::move(dynamic_module_or_error.value()));
   if (!formatter_config.ok()) {
-    throw EnvoyException("Failed to create formatter config: " +
-                         std::string(formatter_config.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to create formatter config: ", formatter_config.status().message()));
   }
 
   return std::make_unique<DynamicModuleCommandParser>(std::move(formatter_config.value()));

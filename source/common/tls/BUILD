@@ -234,6 +234,7 @@ envoy_cc_library(
     ],
     deps = [
         ":context_lib",
+        "//source/common/common:byte_order_lib",
         "//source/common/tls/ocsp:ocsp_lib",
         "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",

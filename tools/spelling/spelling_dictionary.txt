@@ -1680,6 +1680,7 @@ varchar
 variadic
 varint
 Vcluster
+vcluster
 vec
 vectorize
 VBC
@@ -1848,3 +1849,6 @@ cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
 vendored
+reparent
+reparents
+reparenting

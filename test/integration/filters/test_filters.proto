@@ -118,3 +118,5 @@ message AddHeaderEmptyFilterConfig {
 }
 message LocalReplyDuringHostSelectionConfig {
 }
+message StatsPrefixFilterConfig {
+}

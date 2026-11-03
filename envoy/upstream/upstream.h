@@ -29,6 +29,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
@@ -365,6 +366,19 @@ public:
    * 0 if no response has been recorded.
    */
   virtual std::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
+
+  /**
+   * Replace the string metadata attached to the host by the last active health check. Used by HDS
+   * to forward health checker supplied details to the control plane. Main thread only.
+   */
+  virtual void
+  setHealthCheckMetadata(absl::flat_hash_map<std::string, std::string>&& metadata) PURE;
+
+  /**
+   * @return the string metadata attached to the host by the last active health check. Main thread
+   * only.
+   */
+  virtual const absl::flat_hash_map<std::string, std::string>& healthCheckMetadata() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;

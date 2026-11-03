@@ -84,14 +84,6 @@ DynamicModuleTlsCertificateSelectorConfigFactory::createTlsCertificateSelectorFa
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const DynamicModuleTlsCertificateSelectorProto&>(
           config, factory_context.messageValidationVisitor());
-  // The session resumption context of the TLS context does not cover the dynamic certificates.
-  if (proto_config.allow_dynamic_certificates() &&
-      (!tls_config.disableStatelessSessionResumption() ||
-       !tls_config.disableStatefulSessionResumption())) {
-    return absl::InvalidArgumentError(
-        "Dynamic certificates require both stateless and stateful session resumption to be "
-        "disabled");
-  }
   auto selector_config = loadSelectorConfig(
       proto_config, factory_context, tls_config, false,
       [&tls_config](Stats::Scope& scope,

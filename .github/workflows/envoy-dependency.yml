@@ -249,7 +249,6 @@ jobs:
             sha-ci
             sha-devtools
             sha-docker
-            sha-gcc
             sha-mobile
             sha-worker
             mobile-sha
@@ -298,7 +297,6 @@ jobs:
            sha-ci: docker.io/envoyproxy/envoy-build:ci-${{ steps.build-tools.outputs.tag }}
            sha-devtools: docker.io/envoyproxy/envoy-build:devtools-${{ steps.build-tools.outputs.tag }}
            sha-docker: docker.io/envoyproxy/envoy-build:docker-${{ steps.build-tools.outputs.tag }}
-           sha-gcc: docker.io/envoyproxy/envoy-build:gcc-${{ steps.build-tools.outputs.tag }}
            sha-mobile: docker.io/envoyproxy/envoy-build:mobile-${{ steps.build-tools.outputs.tag }}
            sha-worker: docker.io/envoyproxy/envoy-build:worker-${{ steps.build-tools.outputs.tag }}
 
@@ -308,7 +306,6 @@ jobs:
             "$CURRENT_ENVOY_SHA_CI:${{ fromJSON(steps.build-images.outputs.shas).sha-ci }}"
             "$CURRENT_ENVOY_SHA_DEVTOOLS:${{ fromJSON(steps.build-images.outputs.shas).sha-devtools }}"
             "$CURRENT_ENVOY_SHA_DOCKER:${{ fromJSON(steps.build-images.outputs.shas).sha-docker }}"
-            "$CURRENT_ENVOY_SHA_GCC:${{ fromJSON(steps.build-images.outputs.shas).sha-gcc }}"
             "$CURRENT_ENVOY_SHA_MOBILE:${{ fromJSON(steps.build-images.outputs.shas).sha-mobile }}"
             "$CURRENT_ENVOY_SHA_WORKER:${{ fromJSON(steps.build-images.outputs.shas).sha-worker }}")
         echo "replace=${SHA_REPLACE[*]}" >> "$GITHUB_OUTPUT"
@@ -320,7 +317,6 @@ jobs:
         CURRENT_ENVOY_SHA_CI: ${{ steps.current.outputs.sha-ci }}
         CURRENT_ENVOY_SHA_DEVTOOLS: ${{ steps.current.outputs.sha-devtools }}
         CURRENT_ENVOY_SHA_DOCKER: ${{ steps.current.outputs.sha-docker }}
-        CURRENT_ENVOY_SHA_GCC: ${{ steps.current.outputs.sha-gcc }}
         CURRENT_ENVOY_SHA_MOBILE: ${{ steps.current.outputs.sha-mobile }}
         CURRENT_ENVOY_SHA_WORKER: ${{ steps.current.outputs.sha-worker }}
     - run: |

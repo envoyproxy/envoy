@@ -55,6 +55,7 @@ public:
 TEST_F(TcpConnPoolTest, Basic) {
   NiceMock<Network::MockClientConnection> connection;
 
+  EXPECT_TRUE(conn_pool_->supportsIndependentHalfClose());
   EXPECT_CALL(mock_pool_, newConnection(_)).WillOnce(Return(&cancellable_));
   conn_pool_->newStream(&mock_generic_callbacks_);
 
