@@ -131,7 +131,7 @@ public:
   TimeSource& timeSource() { return time_source_; }
 
   void incAbortsDryRun(Stats::StatName downstream_cluster) {
-    incCounter(downstream_cluster, aborts_dry_run_);
+    incCounter(downstream_cluster, aborts_dry_run_, aborts_dry_run_base_);
   }
 
   void incDelays(Stats::StatName downstream_cluster) {
@@ -161,6 +161,7 @@ private:
   const Stats::StatName downstream_cluster_tag_;
   // The tag-extracted names of the per-cluster stats, pre-joined once so that charging a stat
   // only joins the full name with the dynamic cluster segment.
+  const Stats::StatName aborts_dry_run_base_;
   const Stats::StatName aborts_injected_base_;
   const Stats::StatName delays_injected_base_;
 };

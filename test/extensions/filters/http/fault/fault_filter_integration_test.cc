@@ -474,6 +474,11 @@ typed_config:
   EXPECT_EQ(0UL, test_server_->gauge("http.config_test.fault.active_faults")->value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.fault.superman.aborts_dry_run")->value());
   EXPECT_EQ(nullptr, test_server_->counter("http.config_test.fault.superman.aborts_injected"));
+
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  expectStat("http.config_test.fault.superman.aborts_dry_run", "http.fault.aborts_dry_run",
+             {{hcm_prefix, "config_test"},
+              {Config::TagNames::get().FAULT_DOWNSTREAM_CLUSTER, "superman"}});
 }
 
 // Fault integration tests that run with HTTP/2 only, used for fully testing trailers.

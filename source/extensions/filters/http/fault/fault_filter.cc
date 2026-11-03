@@ -92,6 +92,7 @@ FaultFilterConfig::FaultFilterConfig(
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))),
       downstream_cluster_tag_(
           stat_name_set_->add(Envoy::Config::TagNames::get().FAULT_DOWNSTREAM_CLUSTER)),
+      aborts_dry_run_base_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault.aborts_dry_run"))),
       aborts_injected_base_(
           stat_name_set_->add(absl::StrCat(stats_prefix, "fault.aborts_injected"))),
       delays_injected_base_(

@@ -1751,6 +1751,9 @@ TEST_F(FaultFilterTest, StatsAreTagged) {
                            *store.rootScope(), context_);
 
   // The plain filter stats carry no tags of their own.
+  EXPECT_EQ("prefix.fault.aborts_dry_run", config.stats().aborts_dry_run_.name());
+  EXPECT_EQ("prefix.fault.aborts_dry_run", config.stats().aborts_dry_run_.tagExtractedName());
+  EXPECT_TRUE(config.stats().aborts_dry_run_.tags().empty());
   EXPECT_EQ("prefix.fault.aborts_injected", config.stats().aborts_injected_.name());
   EXPECT_EQ("prefix.fault.aborts_injected", config.stats().aborts_injected_.tagExtractedName());
   EXPECT_TRUE(config.stats().aborts_injected_.tags().empty());
@@ -1758,8 +1761,17 @@ TEST_F(FaultFilterTest, StatsAreTagged) {
   // The per-downstream-cluster stats carry the cluster as a tag and drop it from the
   // tag-extracted name.
   Stats::StatNameDynamicStorage cluster("cluster", store.symbolTable());
+  config.incAbortsDryRun(cluster.statName());
   config.incAborts(cluster.statName());
   config.incDelays(cluster.statName());
+  const Stats::CounterSharedPtr aborts_dry_run =
+      TestUtility::findCounter(store, "prefix.fault.cluster.aborts_dry_run");
+  ASSERT_NE(aborts_dry_run, nullptr);
+  EXPECT_EQ(1U, aborts_dry_run->value());
+  EXPECT_EQ("prefix.fault.aborts_dry_run", aborts_dry_run->tagExtractedName());
+  ASSERT_EQ(1U, aborts_dry_run->tags().size());
+  EXPECT_EQ("envoy.fault_downstream_cluster", aborts_dry_run->tags()[0].name_);
+  EXPECT_EQ("cluster", aborts_dry_run->tags()[0].value_);
   const Stats::CounterSharedPtr aborts =
       TestUtility::findCounter(store, "prefix.fault.cluster.aborts_injected");
   ASSERT_NE(aborts, nullptr);
