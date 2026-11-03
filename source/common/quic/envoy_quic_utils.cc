@@ -67,6 +67,27 @@ getLoopbackAddress(Network::Address::InstanceConstSharedPtr peer_address) {
                                                           &peer_address->socketInterface());
 }
 
+Network::ConnectionSocketPtr
+createDatagramSocket(const Network::Address::InstanceConstSharedPtr& local_addr,
+                     const Network::Address::InstanceConstSharedPtr& peer_addr,
+                     const Network::SocketCreationOptions& options) {
+  auto create_socket = [&]() {
+    return std::make_unique<Network::ConnectionSocketImpl>(Network::Socket::Type::Datagram,
+                                                           local_addr, peer_addr, options);
+  };
+#if defined(__linux__)
+  if (const auto netns = local_addr->networkNamespace(); netns.has_value()) {
+    auto result = Network::Utility::execInNetworkNamespace(create_socket, netns->c_str());
+    // The packet writer requires a non-null socket even on namespace failure.
+    return result.ok()
+               ? *std::move(result)
+               : std::make_unique<Network::ConnectionSocketImpl>(
+                     std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
+  }
+#endif
+  return create_socket();
+}
+
 } // namespace
 
 // TODO(danzh): this is called on each write. Consider to return an address instance on the stack if
@@ -236,27 +257,11 @@ Network::ConnectionSocketPtr createConnectionSocket(
   // `recent_received_addresses_` cache in
   // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   constexpr size_t max_addresses_cache_size = 4u;
-  Network::ConnectionSocketPtr connection_socket;
-  auto create_socket = [&]() {
-    return std::make_unique<Network::ConnectionSocketImpl>(
-        Network::Socket::Type::Datagram,
-        // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
-        // create the IoHandle, without having to make the more expensive `getifaddrs` call.
-        local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
-        Network::SocketCreationOptions{false, max_addresses_cache_size});
-  };
-  connection_socket =
-#if defined(__linux__)
-      netns ? Network::Utility::execInNetworkNamespace(create_socket, netns->c_str())
-                  .value_or(nullptr)
-            :
-#endif
-            create_socket();
-  if (!connection_socket) {
-    // The packet writer requires a non-null socket even on namespace failure.
-    connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-        std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
-  }
+  auto connection_socket = createDatagramSocket(
+      // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
+      // create the IoHandle, without having to make the more expensive `getifaddrs` call.
+      local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
+      Network::SocketCreationOptions{false, max_addresses_cache_size});
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
