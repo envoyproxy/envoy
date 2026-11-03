@@ -154,7 +154,7 @@ protected:
   }
 
   void wireTlsRegistry(ReverseTunnelAcceptorExtension& extension) {
-    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, &extension);
+    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension);
     socket_manager_ = thread_local_registry_->socketManager();
     RELEASE_ASSERT(socket_manager_ != nullptr, "socket manager not created");
 
