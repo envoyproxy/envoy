@@ -81,15 +81,23 @@ Http::FilterHeadersStatus BasicAuthFilter::decodeHeaders(Http::RequestHeaderMap&
     auth_header = headers.get(Http::CustomHeaders::get().Authorization);
   }
 
-  if (auth_header.empty()) {
+  // Preserve the authentication value before removing the forwarding header.
+  // This is necessary when both configured headers have the same name.
+  const std::string auth_value =
+      auth_header.empty() ? "" : std::string(auth_header[0]->value().getStringView());
+
+  // Remove any client-supplied username header before processing authentication.
+  if (!config_->forwardUsernameHeader().empty()) {
+    headers.remove(Http::LowerCaseString(config_->forwardUsernameHeader()));
+  }
+
+  if (auth_value.empty()) {
     if (config_->allowMissing()) {
       return Http::FilterHeadersStatus::Continue;
     }
     return onDenied("User authentication failed. Missing username and password.",
                     "no_credential_for_basic_auth", effective_realm);
   }
-
-  absl::string_view auth_value = auth_header[0]->value().getStringView();
 
   if (!absl::StartsWith(auth_value, "Basic ")) {
     if (config_->allowMissing()) {
