@@ -230,7 +230,7 @@ headers:
     Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags",
                                   useExplicitStatsTags());
     setupTest(absl::StrCat(R"EOF(
-virtual_cluster_selection:
+virtual_cluster_override:
   virtual_host_name: integration
   names: [rides, bikes, other]
   verify_one_in: 0

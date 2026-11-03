@@ -43,8 +43,8 @@ namespace DynamicModules {
 
 using DynamicModuleRouteSpecifierProto =
     envoy::extensions::router::route_specifiers::dynamic_modules::v3::DynamicModuleRouteSpecifier;
-using VirtualClusterSelectionProto =
-    envoy::extensions::router::route_specifiers::dynamic_modules::v3::VirtualClusterSelection;
+using VirtualClusterOverrideProto =
+    envoy::extensions::router::route_specifiers::dynamic_modules::v3::VirtualClusterOverride;
 
 // Type aliases for function pointers resolved from the module.
 using OnRouteSpecifierConfigNewType = decltype(&envoy_dynamic_module_on_route_specifier_config_new);
@@ -239,7 +239,7 @@ class DeclaredVirtualClusterRegistry;
 class DeclaredVirtualClusterSet {
 public:
   DeclaredVirtualClusterSet(std::shared_ptr<DeclaredVirtualClusterRegistry> registry,
-                            const VirtualClusterSelectionProto& selection,
+                            const VirtualClusterOverrideProto& declaration,
                             Server::Configuration::ServerFactoryContext& context);
 
   /**
@@ -248,8 +248,8 @@ public:
    */
   const Envoy::Router::VirtualCluster* find(absl::string_view name) const;
 
-  // Whether the selection declares exactly these names, given that its names are unique.
-  bool declares(const VirtualClusterSelectionProto& selection) const;
+  // Whether these are exactly the virtual clusters of the declaration, whose names are unique.
+  bool declares(const VirtualClusterOverrideProto& declaration) const;
 
   const std::string& virtualHostName() const { return virtual_host_name_; }
   Stats::StatName virtualHostStatName() const { return virtual_host_stat_name_.statName(); }
@@ -277,14 +277,14 @@ using DeclaredVirtualClusterSetConstSharedPtr = std::shared_ptr<const DeclaredVi
 class DeclaredVirtualClusterRegistry : public Singleton::Instance {
 public:
   /**
-   * Returns the virtual clusters a selection declares, built on first use. Must be called on the
-   * main thread.
-   * @param selection the virtual clusters a route specifier declares, with unique names.
+   * Returns the virtual clusters of a declaration, built on first use. Must be called on the main
+   * thread.
+   * @param declaration the virtual clusters a route specifier declares, with unique names.
    * @param context the server factory context.
    * @return the declared virtual clusters.
    */
   static DeclaredVirtualClusterSetConstSharedPtr
-  getOrCreate(const VirtualClusterSelectionProto& selection,
+  getOrCreate(const VirtualClusterOverrideProto& declaration,
               Server::Configuration::ServerFactoryContext& context);
 
 private:
@@ -292,7 +292,7 @@ private:
 
   // The name of the virtual host and a fingerprint of the declared names.
   using Key = std::pair<std::string, uint64_t>;
-  static Key keyOf(const VirtualClusterSelectionProto& selection);
+  static Key keyOf(const VirtualClusterOverrideProto& declaration);
 
   // Store as weak_ptr to allow release after xDS unload.
   absl::flat_hash_map<Key, std::vector<std::weak_ptr<const DeclaredVirtualClusterSet>>>

@@ -363,15 +363,15 @@ DeclaredVirtualCluster::DeclaredVirtualCluster(
 
 DeclaredVirtualClusterSet::DeclaredVirtualClusterSet(
     std::shared_ptr<DeclaredVirtualClusterRegistry> registry,
-    const VirtualClusterSelectionProto& selection,
+    const VirtualClusterOverrideProto& declaration,
     Server::Configuration::ServerFactoryContext& context)
-    : registry_(std::move(registry)), virtual_host_name_(selection.virtual_host_name()),
+    : registry_(std::move(registry)), virtual_host_name_(declaration.virtual_host_name()),
       virtual_host_stat_name_(virtual_host_name_, context.scope().symbolTable()),
       scope_(context.scope().scopeFromStatName(Stats::StatName())) {
   const Envoy::Router::VirtualClusterStatNames& stat_names =
       context.routerContext().virtualClusterStatNames();
-  clusters_.reserve(selection.names_size());
-  for (const std::string& name : selection.names()) {
+  clusters_.reserve(declaration.names_size());
+  for (const std::string& name : declaration.names()) {
     auto cluster = std::make_unique<const DeclaredVirtualCluster>(
         name, *scope_, stat_names, virtual_host_stat_name_.statName());
     const absl::string_view key = declaredName(*cluster);
@@ -384,16 +384,16 @@ const Envoy::Router::VirtualCluster* DeclaredVirtualClusterSet::find(absl::strin
   return it != clusters_.end() ? it->second.get() : nullptr;
 }
 
-bool DeclaredVirtualClusterSet::declares(const VirtualClusterSelectionProto& selection) const {
-  return static_cast<size_t>(selection.names_size()) == clusters_.size() &&
-         absl::c_all_of(selection.names(),
+bool DeclaredVirtualClusterSet::declares(const VirtualClusterOverrideProto& declaration) const {
+  return static_cast<size_t>(declaration.names_size()) == clusters_.size() &&
+         absl::c_all_of(declaration.names(),
                         [this](const std::string& name) { return clusters_.contains(name); });
 }
 
 SINGLETON_MANAGER_REGISTRATION(dynamic_module_route_specifier_virtual_clusters);
 
 DeclaredVirtualClusterSetConstSharedPtr
-DeclaredVirtualClusterRegistry::getOrCreate(const VirtualClusterSelectionProto& selection,
+DeclaredVirtualClusterRegistry::getOrCreate(const VirtualClusterOverrideProto& declaration,
                                             Server::Configuration::ServerFactoryContext& context) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto registry = context.singletonManager().getTyped<DeclaredVirtualClusterRegistry>(
@@ -411,28 +411,28 @@ DeclaredVirtualClusterRegistry::getOrCreate(const VirtualClusterSelectionProto& 
     absl::erase_if(registry->declarations_, [](const auto& entry) { return entry.second.empty(); });
     registry->swept_size_ = registry->declarations_.size();
   }
-  auto& shared = registry->declarations_[keyOf(selection)];
+  auto& shared = registry->declarations_[keyOf(declaration)];
   std::erase_if(shared, expired);
   for (const auto& weak_clusters : shared) {
     auto clusters = weak_clusters.lock();
-    if (clusters != nullptr && clusters->declares(selection)) {
+    if (clusters != nullptr && clusters->declares(declaration)) {
       return clusters;
     }
   }
   DeclaredVirtualClusterSetConstSharedPtr clusters =
-      std::make_shared<DeclaredVirtualClusterSet>(registry, selection, context);
+      std::make_shared<DeclaredVirtualClusterSet>(registry, declaration, context);
   shared.push_back(clusters);
   return clusters;
 }
 
 DeclaredVirtualClusterRegistry::Key
-DeclaredVirtualClusterRegistry::keyOf(const VirtualClusterSelectionProto& selection) {
+DeclaredVirtualClusterRegistry::keyOf(const VirtualClusterOverrideProto& declaration) {
   // A sum of hashes does not depend on the order of the names.
   uint64_t fingerprint = 0;
-  for (const std::string& name : selection.names()) {
+  for (const std::string& name : declaration.names()) {
     fingerprint += absl::Hash<absl::string_view>{}(name);
   }
-  return {selection.virtual_host_name(), fingerprint};
+  return {declaration.virtual_host_name(), fingerprint};
 }
 
 DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
@@ -453,10 +453,9 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       continue_matching_on_failure_(
           proto_config.failure_policy() ==
           envoy::extensions::router::route_specifiers::dynamic_modules::v3::CONTINUE_MATCHING),
-      prefer_virtual_cluster_selection_(
-          proto_config.virtual_cluster_selection().prefer_selection()),
+      prefer_virtual_cluster_selection_(proto_config.virtual_cluster_override().prefer_selection()),
       virtual_cluster_verify_one_in_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          proto_config.virtual_cluster_selection(), verify_one_in, 1024)),
+          proto_config.virtual_cluster_override(), verify_one_in, 1024)),
       cluster_manager_(context.serverFactoryContext().clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       time_source_(context.serverFactoryContext().timeSource()),
@@ -538,7 +537,7 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
         "built_route_cache requires a route specifier configured on a virtual host or a route");
   }
   // The PGV unique rule takes quadratic time, so uniqueness is checked here.
-  const auto& virtual_cluster_names = proto_config.virtual_cluster_selection().names();
+  const auto& virtual_cluster_names = proto_config.virtual_cluster_override().names();
   absl::flat_hash_set<absl::string_view> unique_virtual_cluster_names;
   unique_virtual_cluster_names.reserve(virtual_cluster_names.size());
   for (const std::string& name : virtual_cluster_names) {
@@ -661,9 +660,9 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   if (config->in_module_config_ == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module route specifier config");
   }
-  if (proto_config.has_virtual_cluster_selection()) {
+  if (proto_config.has_virtual_cluster_override()) {
     config->virtual_clusters_ = DeclaredVirtualClusterRegistry::getOrCreate(
-        proto_config.virtual_cluster_selection(), context.serverFactoryContext());
+        proto_config.virtual_cluster_override(), context.serverFactoryContext());
   }
   return config;
 }

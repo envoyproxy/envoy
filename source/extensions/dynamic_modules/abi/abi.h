@@ -18702,8 +18702,8 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_name(
 
 /**
  * envoy_dynamic_module_callback_route_specifier_set_virtual_cluster selects the virtual cluster of
- * the request by one of the names that the virtual_cluster_selection of the route specifier
- * declares, or selects none with an empty name. The virtual_cluster_selection configures how the
+ * the request by one of the names that the virtual_cluster_override of the route specifier
+ * declares, or selects none with an empty name. The virtual_cluster_override configures how the
  * router uses the selection. A later call replaces the selection.
  *
  * Like the recorded overrides, the selection takes effect only when the decision is left

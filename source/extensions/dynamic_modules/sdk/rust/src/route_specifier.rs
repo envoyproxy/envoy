@@ -1187,8 +1187,8 @@ impl RouteSpecifierContext {
   }
 
   /// Select the virtual cluster of the request by one of the names that the
-  /// `virtual_cluster_selection` of the route specifier declares, or none with an empty name. The
-  /// `virtual_cluster_selection` configures how the router uses the selection. A later call
+  /// `virtual_cluster_override` of the route specifier declares, or none with an empty name. The
+  /// `virtual_cluster_override` configures how the router uses the selection. A later call
   /// replaces the selection.
   ///
   /// Like the recorded overrides, the selection takes effect only when the decision is left

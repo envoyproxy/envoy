@@ -175,10 +175,11 @@ message BuiltRouteCache {
 // <envoy_v3_api_field_config.route.v3.VirtualHost.virtual_clusters>` in order, and the router
 // counts the request in the :ref:`statistics <config_http_filters_router_vcluster_stats>` of the
 // first one that matches. A module that knows which virtual cluster a request belongs to can select
-// it instead. A selected virtual cluster uses the statistics of the virtual cluster of the same
-// name on the virtual host, with the same names and tags even when the virtual host does not
-// configure that name.
-message VirtualClusterSelection {
+// it instead. Like route overrides, the virtual clusters are declared here and built when the
+// configuration loads rather than on the request path. A selected virtual cluster uses the
+// statistics of the virtual cluster of the same name on the virtual host, with the same names and
+// tags even when the virtual host does not configure that name.
+message VirtualClusterOverride {
   // The :ref:`name <envoy_v3_api_field_config.route.v3.VirtualHost.name>` of the virtual host whose
   // statistics the selected virtual clusters use. The statistics of every declared name are created
   // under this virtual host when the configuration loads. A virtual cluster selected for a route of
@@ -290,5 +291,5 @@ message DynamicModuleRouteSpecifier {
   // The virtual clusters the module may select for a request. If not specified,
   // ``set_virtual_cluster`` rejects every name and the router counts every request in the virtual
   // cluster the virtual host matches.
-  VirtualClusterSelection virtual_cluster_selection = 13;
+  VirtualClusterOverride virtual_cluster_override = 13;
 }

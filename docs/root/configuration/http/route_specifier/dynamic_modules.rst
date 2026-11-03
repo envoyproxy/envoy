@@ -141,16 +141,16 @@ A virtual host matches a request against its
 and the router counts the request in the
 :ref:`statistics <config_http_filters_router_vcluster_stats>` of the first one that matches. A
 module that knows which virtual cluster a request belongs to can select it with
-``set_virtual_cluster`` from the names that :ref:`virtual_cluster_selection
-<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.virtual_cluster_selection>`
+``set_virtual_cluster`` from the names that :ref:`virtual_cluster_override
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.virtual_cluster_override>`
 declares. The selected virtual cluster uses the statistics of the virtual cluster of the same name
 on the virtual host, so the statistics keep their names when the module takes over.
 
 When :ref:`prefer_selection
-<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterSelection.prefer_selection>`
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterOverride.prefer_selection>`
 is ``true``, the router counts the request in the selected virtual cluster, which
 ``%VIRTUAL_CLUSTER_NAME%`` reports, and with a chance of one in :ref:`verify_one_in
-<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterSelection.verify_one_in>`
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterOverride.verify_one_in>`
 also compares it with the one the virtual host matches. Otherwise the router counts the request in
 the virtual cluster the virtual host matches and compares the two. A virtual host without virtual
 clusters leaves nothing to compare with, so in either mode the router counts the request in the
@@ -305,7 +305,7 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   virtual_cluster_none, Counter, Requests for which the module selected none and that the virtual host then matched against its virtual clusters.
   virtual_cluster_agree, Counter, Compared requests whose selection agreed with the virtual cluster the virtual host matched.
   virtual_cluster_disagree, Counter, Compared requests whose selection disagreed with the virtual cluster the virtual host matched.
-  virtual_cluster_unknown, Counter, Virtual cluster selections rejected because the name is not declared or the buffer is null with a non-zero length. Nothing is counted when ``virtual_cluster_selection`` is not set.
+  virtual_cluster_unknown, Counter, Virtual cluster selections rejected because the name is not declared or the buffer is null with a non-zero length. Nothing is counted when ``virtual_cluster_override`` is not set.
   virtual_cluster_vhost_mismatch, Counter, Virtual cluster selections dropped because the route belongs to a virtual host other than ``virtual_host_name``.
   built_route_cache_entries, Gauge, Routes cached by the workers of the specifiers that share the stat prefix.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.

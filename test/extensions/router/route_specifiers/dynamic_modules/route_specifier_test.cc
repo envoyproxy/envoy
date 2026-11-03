@@ -45,11 +45,11 @@ public:
   static size_t entryCount(const DeclaredVirtualClusterSet& clusters) {
     return clusters.registry_->declarations_.size();
   }
-  // Files the virtual clusters under the entry of the selection, like a colliding fingerprint.
+  // Files the virtual clusters under the entry of the declaration, like a colliding fingerprint.
   static void collide(const DeclaredVirtualClusterSetConstSharedPtr& clusters,
-                      const VirtualClusterSelectionProto& selection) {
-    clusters->registry_->declarations_[DeclaredVirtualClusterRegistry::keyOf(selection)].push_back(
-        clusters);
+                      const VirtualClusterOverrideProto& declaration) {
+    clusters->registry_->declarations_[DeclaredVirtualClusterRegistry::keyOf(declaration)]
+        .push_back(clusters);
   }
   // The number of declarations, released ones included, that the registry keeps entries for.
   static size_t declarationCount(const DeclaredVirtualClusterSet& clusters) {
@@ -2004,7 +2004,7 @@ INSTANTIATE_TEST_SUITE_P(Fields, VerifiedHitFieldTest,
 TEST_P(VerifiedHitFieldTest, DifferenceEvictsTheRoute) {
   const auto config = loadConfig(builtRouteCacheModuleYaml(
       "vary", absl::StrCat(builtRouteCacheYaml(16, "        verify_one_in: 1\n"),
-                           R"EOF(      virtual_cluster_selection:
+                           R"EOF(      virtual_cluster_override:
         virtual_host_name: test_vhost
         names: [vcluster_1, vcluster_2]
 )EOF")));
@@ -2350,11 +2350,11 @@ constexpr absl::string_view RidesAndTripsVirtualClusters = R"EOF(  virtual_clust
 
 constexpr absl::string_view PreferSelection = "        prefer_selection: true\n";
 
-// A virtual_cluster_selection block that declares rides, trips, bikes and the catch all virtual
+// A virtual_cluster_override block that declares rides, trips, bikes and the catch all virtual
 // cluster for the virtual host, followed by the given fields.
-std::string virtualClusterSelectionYaml(absl::string_view fields = "",
-                                        absl::string_view virtual_host_name = "test_vhost") {
-  return fmt::format(R"EOF(      virtual_cluster_selection:
+std::string virtualClusterOverrideYaml(absl::string_view fields = "",
+                                       absl::string_view virtual_host_name = "test_vhost") {
+  return fmt::format(R"EOF(      virtual_cluster_override:
         virtual_host_name: {}
         names: [rides, trips, bikes, other]
 {})EOF",
@@ -2457,7 +2457,7 @@ public:
 // while the route keeps the virtual host it wraps for everything else.
 TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionIsTheVirtualClusterOfTheRequest) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   const auto route = resolve(*config.value(), "/trips", {{"x-virtual-cluster", "rides"}});
   ASSERT_NE(nullptr, route);
@@ -2486,7 +2486,7 @@ TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionIsTheVirtualClusterOfT
 // configuration loads. Only the virtual host creates rides and only the declaration creates bikes,
 // so the expectations for bikes follow the virtual host.
 TEST_F(DynamicModuleVirtualClusterTest, DeclaredVirtualClusterStatisticsMatchTheVirtualHost) {
-  const auto config = loadRaw(virtualClusterConfigYaml(R"EOF(      virtual_cluster_selection:
+  const auto config = loadRaw(virtualClusterConfigYaml(R"EOF(      virtual_cluster_override:
         virtual_host_name: test_vhost
         names: [bikes]
         prefer_selection: true
@@ -2524,7 +2524,7 @@ TEST_F(DynamicModuleVirtualClusterTest, DeclaredVirtualClusterStatisticsMatchThe
 // its catch all virtual cluster included.
 TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionOfNoneLeavesTheRequestToTheVirtualHost) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   const auto route = resolve(*config.value(), "/rides", {{"x-virtual-cluster", ""}});
   ASSERT_NE(nullptr, route);
@@ -2541,7 +2541,7 @@ TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionOfNoneLeavesTheRequest
 // matches and compares the selection with it, where other is the catch all virtual cluster, while a
 // selection of none is left to the virtual host without a comparison.
 TEST_F(DynamicModuleVirtualClusterTest, ComparedSelectionLeavesTheRequestToTheVirtualHost) {
-  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml()));
+  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml()));
   ASSERT_TRUE(config.ok());
   struct TestCase {
     std::string path;
@@ -2582,7 +2582,7 @@ TEST_F(DynamicModuleVirtualClusterTest, ComparedSelectionLeavesTheRequestToTheVi
 // of the catch all virtual cluster of the virtual host.
 TEST_F(DynamicModuleVirtualClusterTest, OtherSelectsTheCatchAllVirtualCluster) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   const auto route = resolve(*config.value(), "/trips", {{"x-virtual-cluster", "other"}});
   ASSERT_NE(nullptr, route);
@@ -2604,7 +2604,7 @@ TEST_F(DynamicModuleVirtualClusterTest, OtherSelectsTheCatchAllVirtualCluster) {
 // in the same statistics, so the catch all agrees with a virtual cluster the virtual host names
 // other.
 TEST_F(DynamicModuleVirtualClusterTest, SelectionAgreesWhenTheStatisticsAreTheSame) {
-  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(),
+  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(),
                                                        R"EOF(  virtual_clusters:
   - name: other
     headers:
@@ -2622,7 +2622,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionAgreesWhenTheStatisticsAreTheSa
 // A disagreement is logged at debug level with the method and path of the request, naming the
 // catch all virtual cluster other.
 TEST_F(DynamicModuleVirtualClusterTest, DisagreementIsLoggedWithTheRequest) {
-  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml()));
+  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml()));
   ASSERT_TRUE(config.ok());
   const auto route = resolve(*config.value(), "/unmatched", {{"x-virtual-cluster", "bikes"}});
   ASSERT_NE(nullptr, route);
@@ -2636,7 +2636,7 @@ TEST_F(DynamicModuleVirtualClusterTest, DisagreementIsLoggedWithTheRequest) {
 // A virtual host without virtual clusters counts a request in none, which leaves nothing to compare
 // a selection with, so the router counts the request in the selection instead, in either mode.
 TEST_F(DynamicModuleVirtualClusterTest, SelectionOnAVirtualHostWithoutVirtualClusters) {
-  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(), ""));
+  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(), ""));
   ASSERT_TRUE(config.ok());
   const auto rides = resolve(*config.value(), "/rides", {{"x-virtual-cluster", "rides"}});
   ASSERT_NE(nullptr, rides);
@@ -2648,7 +2648,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionOnAVirtualHostWithoutVirtualClu
   EXPECT_EQ(1, counterValue("virtual_cluster_none"));
 
   const auto sampled = loadRaw(virtualClusterConfigYaml(
-      virtualClusterSelectionYaml("        prefer_selection: true\n        verify_one_in: 1\n"),
+      virtualClusterOverrideYaml("        prefer_selection: true\n        verify_one_in: 1\n"),
       ""));
   ASSERT_TRUE(sampled.ok());
   const auto preferred = resolve(*sampled.value(), "/rides", {{"x-virtual-cluster", "rides"}});
@@ -2663,7 +2663,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionOnAVirtualHostWithoutVirtualClu
 // request when it is compared, and a selection of none is never compared.
 TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionIsComparedWithAChanceOfOneInVerifyOneIn) {
   const auto sampled = loadRaw(virtualClusterConfigYaml(
-      virtualClusterSelectionYaml("        prefer_selection: true\n        verify_one_in: 3\n")));
+      virtualClusterOverrideYaml("        prefer_selection: true\n        verify_one_in: 3\n")));
   ASSERT_TRUE(sampled.ok());
   const auto rides = resolve(*sampled.value(), "/trips", {{"x-virtual-cluster", "rides"}});
   ASSERT_NE(nullptr, rides);
@@ -2680,7 +2680,7 @@ TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionIsComparedWithAChanceO
   EXPECT_EQ(1, counterValue("virtual_cluster_none"));
 
   const auto defaulted =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(defaulted.ok());
   const auto defaulted_rides =
       resolve(*defaulted.value(), "/rides", {{"x-virtual-cluster", "rides"}});
@@ -2695,7 +2695,7 @@ TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionIsComparedWithAChanceO
   EXPECT_EQ(1, counterValue("virtual_cluster_agree"));
 
   const auto uncompared = loadRaw(virtualClusterConfigYaml(
-      virtualClusterSelectionYaml("        prefer_selection: true\n        verify_one_in: 0\n")));
+      virtualClusterOverrideYaml("        prefer_selection: true\n        verify_one_in: 0\n")));
   ASSERT_TRUE(uncompared.ok());
   const auto uncompared_rides =
       resolve(*uncompared.value(), "/trips", {{"x-virtual-cluster", "rides"}});
@@ -2710,7 +2710,7 @@ TEST_F(DynamicModuleVirtualClusterTest, PreferredSelectionIsComparedWithAChanceO
 // configuration declares no virtual clusters.
 TEST_F(DynamicModuleVirtualClusterTest, UnknownVirtualClusterIsRejected) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   Envoy::Router::RouteConstSharedPtr route;
   EXPECT_LOG_CONTAINS(
@@ -2735,7 +2735,7 @@ TEST_F(DynamicModuleVirtualClusterTest, UnknownVirtualClusterIsRejected) {
 // leaves the earlier one in place.
 TEST_F(DynamicModuleVirtualClusterTest, LaterSelectionReplacesTheEarlierOne) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   struct TestCase {
     std::string later;
@@ -2763,7 +2763,7 @@ TEST_F(DynamicModuleVirtualClusterTest, LaterSelectionReplacesTheEarlierOne) {
 // than selecting none, and the earlier selection stays.
 TEST_F(DynamicModuleVirtualClusterTest, NullBufferWithALengthIsRejected) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   Envoy::Router::RouteConstSharedPtr route;
   EXPECT_LOG_CONTAINS(
@@ -2781,7 +2781,7 @@ TEST_F(DynamicModuleVirtualClusterTest, NullBufferWithALengthIsRejected) {
 // A configuration that declares a name twice, or an empty name, is rejected.
 TEST_F(DynamicModuleVirtualClusterTest, InvalidVirtualClusterNamesAreRejected) {
   const auto config_declaring = [](absl::string_view names) {
-    return virtualClusterConfigYaml(fmt::format(R"EOF(      virtual_cluster_selection:
+    return virtualClusterConfigYaml(fmt::format(R"EOF(      virtual_cluster_override:
         virtual_host_name: test_vhost
         names: {}
 )EOF",
@@ -2797,7 +2797,7 @@ TEST_F(DynamicModuleVirtualClusterTest, InvalidVirtualClusterNamesAreRejected) {
 // answers the request directly drops it rather than failing like a route entry property.
 TEST_F(DynamicModuleVirtualClusterTest, SelectionAppliesToTheRouteEntryTheDecisionProduces) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   const auto direct = resolve(*config.value(), "/trips",
                               {{"x-template", "direct"}, {"x-virtual-cluster", "rides"}});
@@ -2821,7 +2821,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionAppliesToTheRouteEntryTheDecisi
 // counts the request in without the selection statistics.
 TEST_F(DynamicModuleVirtualClusterTest, RouteWithoutASelectionKeepsTheVirtualHost) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   const auto given = resolve(*config.value(), "/trips");
   ASSERT_NE(nullptr, given);
@@ -2842,7 +2842,7 @@ TEST_F(DynamicModuleVirtualClusterTest, RouteWithoutASelectionKeepsTheVirtualHos
 // A selection only labels the request, so a decision left Unspecified drops it without failing when
 // route matching resolved no route.
 TEST_F(DynamicModuleVirtualClusterTest, SelectionWithoutARouteIsDropped) {
-  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection),
+  const auto config = loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection),
                                                        RidesAndTripsVirtualClusters, "/api"));
   ASSERT_TRUE(config.ok());
   EXPECT_EQ(nullptr, resolve(*config.value(), "/other", {{"x-virtual-cluster", "rides"}}));
@@ -2854,7 +2854,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionWithoutARouteIsDropped) {
 // the failure policy passes the route through for an Error.
 TEST_F(DynamicModuleVirtualClusterTest, OtherDecisionsIgnoreTheSelection) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   const auto given = resolve(*config.value(), "/trips");
   ASSERT_NE(nullptr, given);
@@ -2874,7 +2874,7 @@ TEST_F(DynamicModuleVirtualClusterTest, OtherDecisionsIgnoreTheSelection) {
 // the built route cache looks the route up and needs them to compare.
 TEST_F(DynamicModuleVirtualClusterTest, SelectionAloneBuildsAVirtualClusterRoute) {
   const auto config = loadRaw(virtualClusterConfigYaml(
-      absl::StrCat(virtualClusterSelectionYaml(PreferSelection), builtRouteCacheYaml(16))));
+      absl::StrCat(virtualClusterOverrideYaml(PreferSelection), builtRouteCacheYaml(16))));
   ASSERT_TRUE(config.ok());
   const auto selection_only = resolve(*config.value(), "/trips", {{"x-virtual-cluster", "rides"}});
   EXPECT_NE(nullptr,
@@ -2891,7 +2891,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionAloneBuildsAVirtualClusterRoute
 // records is ignored.
 TEST_F(DynamicModuleVirtualClusterTest, ReusedPreviousRouteKeepsItsSelection) {
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   stream_info_.route_ = resolve(*config.value(), "/trips", {{"x-virtual-cluster", "rides"}});
   ASSERT_NE(nullptr, stream_info_.route_);
@@ -2906,8 +2906,8 @@ TEST_F(DynamicModuleVirtualClusterTest, ReusedPreviousRouteKeepsItsSelection) {
 // nothing else then passes the route through, while a selection of none names no statistics and is
 // kept.
 TEST_F(DynamicModuleVirtualClusterTest, SelectionForAnotherVirtualHostIsDropped) {
-  const auto config = loadRaw(
-      virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection, "other_vhost")));
+  const auto config =
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection, "other_vhost")));
   ASSERT_TRUE(config.ok());
   const auto given = resolve(*config.value(), "/trips");
   ASSERT_NE(nullptr, given);
@@ -2937,7 +2937,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionForAnotherVirtualHostIsDropped)
 // request in the virtual cluster of the miss.
 TEST_F(DynamicModuleVirtualClusterTest, HitServesTheSelectionOfTheMiss) {
   const auto config = loadRaw(virtualClusterConfigYaml(
-      absl::StrCat(virtualClusterSelectionYaml(PreferSelection), builtRouteCacheYaml(16))));
+      absl::StrCat(virtualClusterOverrideYaml(PreferSelection), builtRouteCacheYaml(16))));
   ASSERT_TRUE(config.ok());
   const auto miss =
       resolve(*config.value(), "/trips",
@@ -2962,7 +2962,7 @@ TEST_F(DynamicModuleVirtualClusterTest, RouteKeepsItsSelectionAfterTheConfigurat
   for (const auto& extra_headers : std::vector<std::vector<std::pair<std::string, std::string>>>{
            {}, {{"x-cluster", "selected_cluster"}}}) {
     SCOPED_TRACE(extra_headers.size());
-    auto config = loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+    auto config = loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
     ASSERT_TRUE(config.ok());
     auto headers = extra_headers;
     headers.emplace_back("x-virtual-cluster", "bikes");
@@ -2987,7 +2987,7 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionAloneIsTimedLikeAnyBuiltRoute) 
   NiceMock<MockTimeSystem> time_system;
   ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system));
   const auto config =
-      loadRaw(virtualClusterConfigYaml(virtualClusterSelectionYaml(PreferSelection)));
+      loadRaw(virtualClusterConfigYaml(virtualClusterOverrideYaml(PreferSelection)));
   ASSERT_TRUE(config.ok());
   EXPECT_CALL(time_system, monotonicTime()).Times(3);
   resolve(*config.value(), "/trips", {{"x-virtual-cluster", "rides"}});
@@ -3002,9 +3002,9 @@ TEST_F(DynamicModuleVirtualClusterTest, SelectionAloneIsTimedLikeAnyBuiltRoute) 
 // host share their statistics either way.
 TEST_F(DynamicModuleRouteSpecifierTest, IdenticalDeclarationsShareTheirVirtualClusters) {
   const auto get = [this](absl::string_view yaml) {
-    VirtualClusterSelectionProto selection;
-    TestUtility::loadFromYaml(std::string(yaml), selection);
-    return DeclaredVirtualClusterRegistry::getOrCreate(selection, context_);
+    VirtualClusterOverrideProto declaration;
+    TestUtility::loadFromYaml(std::string(yaml), declaration);
+    return DeclaredVirtualClusterRegistry::getOrCreate(declaration, context_);
   };
   const auto clusters = get("{virtual_host_name: test_vhost, names: [rides, trips]}");
   ASSERT_NE(nullptr, clusters);
@@ -3043,10 +3043,10 @@ TEST_F(DynamicModuleRouteSpecifierTest, IdenticalDeclarationsShareTheirVirtualCl
 // released once it holds twice as many entries as its last sweep left.
 TEST_F(DynamicModuleRouteSpecifierTest, RegistrySweepsReleasedDeclarations) {
   const auto get = [this](absl::string_view virtual_host_name, absl::string_view names) {
-    VirtualClusterSelectionProto selection;
+    VirtualClusterOverrideProto declaration;
     TestUtility::loadFromYaml(
-        fmt::format("{{virtual_host_name: {}, names: {}}}", virtual_host_name, names), selection);
-    return DeclaredVirtualClusterRegistry::getOrCreate(selection, context_);
+        fmt::format("{{virtual_host_name: {}, names: {}}}", virtual_host_name, names), declaration);
+    return DeclaredVirtualClusterRegistry::getOrCreate(declaration, context_);
   };
   const auto first = get("first", "[rides]");
   const auto second = get("second", "[rides]");
@@ -3070,9 +3070,9 @@ TEST_F(DynamicModuleRouteSpecifierTest, RegistrySweepsReleasedDeclarations) {
 // Declarations whose fingerprints collide keep virtual clusters of their own, a declaration of a
 // subset of the names of another included.
 TEST_F(DynamicModuleRouteSpecifierTest, CollidingDeclarationsKeepTheirOwnVirtualClusters) {
-  VirtualClusterSelectionProto rides;
+  VirtualClusterOverrideProto rides;
   TestUtility::loadFromYaml("{virtual_host_name: test_vhost, names: [rides]}", rides);
-  VirtualClusterSelectionProto trips;
+  VirtualClusterOverrideProto trips;
   TestUtility::loadFromYaml("{virtual_host_name: test_vhost, names: [trips]}", trips);
   const auto rides_clusters = DeclaredVirtualClusterRegistry::getOrCreate(rides, context_);
   DeclaredVirtualClusterRegistryPeer::collide(rides_clusters, trips);
@@ -3081,11 +3081,11 @@ TEST_F(DynamicModuleRouteSpecifierTest, CollidingDeclarationsKeepTheirOwnVirtual
   EXPECT_NE(nullptr, trips_clusters->find("trips"));
   EXPECT_EQ(trips_clusters, DeclaredVirtualClusterRegistry::getOrCreate(trips, context_));
 
-  VirtualClusterSelectionProto superset_selection;
+  VirtualClusterOverrideProto superset_declaration;
   TestUtility::loadFromYaml("{virtual_host_name: other_vhost, names: [rides, trips]}",
-                            superset_selection);
-  const auto superset = DeclaredVirtualClusterRegistry::getOrCreate(superset_selection, context_);
-  VirtualClusterSelectionProto subset;
+                            superset_declaration);
+  const auto superset = DeclaredVirtualClusterRegistry::getOrCreate(superset_declaration, context_);
+  VirtualClusterOverrideProto subset;
   TestUtility::loadFromYaml("{virtual_host_name: other_vhost, names: [rides]}", subset);
   DeclaredVirtualClusterRegistryPeer::collide(superset, subset);
   EXPECT_NE(superset, DeclaredVirtualClusterRegistry::getOrCreate(subset, context_));
@@ -3149,8 +3149,8 @@ TEST_F(DynamicModuleRouteSpecifierTest, SelectionConsultsTheVirtualHostOnlyToCom
     ASSERT_TRUE(module.ok());
     DynamicModuleRouteSpecifierProto proto_config;
     proto_config.set_stat_prefix(prefer_selection ? "preferred" : "compared");
-    proto_config.mutable_virtual_cluster_selection()->set_prefer_selection(prefer_selection);
-    proto_config.mutable_virtual_cluster_selection()->mutable_verify_one_in()->set_value(3);
+    proto_config.mutable_virtual_cluster_override()->set_prefer_selection(prefer_selection);
+    proto_config.mutable_virtual_cluster_override()->mutable_verify_one_in()->set_value(3);
     configs.push_back(std::make_unique<const DynamicModuleRouteSpecifierConfig>(
         proto_config, "", std::move(module.value()), factory_context, DefaultMetricsNamespace));
   }
