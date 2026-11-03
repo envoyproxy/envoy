@@ -98,8 +98,7 @@ message RoutingEntry {
 // Configuration for the Model Router AI filter.
 //
 // The Model Router AI filter maps the client's requested model (from ``envoy.ai.model.request``
-// filter state) to an ordered list of resolved upstream routes (:ref:`LlmRoutes
-// <envoy_v3_api_msg_type.ai.v3.LlmRoutes>`).
+// filter state) to an ordered list of resolved upstream routes.
 //
 // The resolved routes combine provider endpoints, model parameters, bindings, and credentials,
 // and are published to the ``envoy.ai.routes`` filter state object for consumption by the

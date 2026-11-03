@@ -13,7 +13,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/http/ai_filters/model_router/filter.h"
-#include "source/extensions/http/ai_filters/model_router/route_wrapper.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
@@ -32,6 +31,7 @@ using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
+using HttpFilters::AiProtocolManager::LlmRoutesFilterStateObject;
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 using ModelRouterProto = envoy::extensions::http::ai_filters::model_router::v3::ModelRouter;
 
@@ -184,11 +184,10 @@ TEST_F(ModelRouterFilterTest, SingleTargetRouteResolved) {
 
   const auto* routes_obj = resolvedRoutes();
   ASSERT_NE(routes_obj, nullptr);
-  ASSERT_EQ(routes_obj->proto().routes_size(), 1);
-  EXPECT_EQ(routes_obj->proto().routes(0).model(), "claude-haiku-4-5");
-  ASSERT_EQ(routes_obj->bindings().size(), 1);
-  ASSERT_NE(routes_obj->bindings()[0], nullptr);
-  EXPECT_EQ(routes_obj->bindings()[0]->pattern()->source(), "/v1/messages");
+  ASSERT_EQ(routes_obj->routes().size(), 1);
+  EXPECT_EQ(routes_obj->routes()[0].model, "claude-haiku-4-5");
+  ASSERT_NE(routes_obj->routes()[0].binding, nullptr);
+  EXPECT_EQ(routes_obj->routes()[0].binding->pattern()->source(), "/v1/messages");
 
   EXPECT_EQ(request_headers_.getHostValue(), "api.anthropic.com");
   EXPECT_EQ(request_headers_.getEnvoyMaxRetriesValue(), "0");
@@ -205,15 +204,17 @@ TEST_F(ModelRouterFilterTest, MultipleTargetsRouteSetsMaxRetriesAndPrimaryAuthor
 
   const auto* routes_obj = resolvedRoutes();
   ASSERT_NE(routes_obj, nullptr);
-  ASSERT_EQ(routes_obj->proto().routes_size(), 3);
-  EXPECT_EQ(routes_obj->proto().routes(0).model(), "gpt-4o");
-  EXPECT_EQ(routes_obj->proto().routes(1).model(), "claude-sonnet-4-5");
-  EXPECT_EQ(routes_obj->proto().routes(2).model(), "gemini-2.5-pro");
+  ASSERT_EQ(routes_obj->routes().size(), 3);
+  EXPECT_EQ(routes_obj->routes()[0].model, "gpt-4o");
+  EXPECT_EQ(routes_obj->routes()[1].model, "claude-sonnet-4-5");
+  EXPECT_EQ(routes_obj->routes()[2].model, "gemini-2.5-pro");
 
-  ASSERT_EQ(routes_obj->bindings().size(), 3);
-  EXPECT_EQ(routes_obj->bindings()[0]->pattern()->source(), "/v1/chat/completions");
-  EXPECT_EQ(routes_obj->bindings()[1]->pattern()->source(), "/v1/messages");
-  EXPECT_EQ(routes_obj->bindings()[2]->pattern()->source(),
+  ASSERT_NE(routes_obj->routes()[0].binding, nullptr);
+  ASSERT_NE(routes_obj->routes()[1].binding, nullptr);
+  ASSERT_NE(routes_obj->routes()[2].binding, nullptr);
+  EXPECT_EQ(routes_obj->routes()[0].binding->pattern()->source(), "/v1/chat/completions");
+  EXPECT_EQ(routes_obj->routes()[1].binding->pattern()->source(), "/v1/messages");
+  EXPECT_EQ(routes_obj->routes()[2].binding->pattern()->source(),
             "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
 
   EXPECT_EQ(request_headers_.getHostValue(), "primary.llm.example.com:8443");

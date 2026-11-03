@@ -4,12 +4,11 @@
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/type/ai/v3/routes.pb.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
+#include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/http/ai_filters/common/sync_filter.h"
-#include "source/extensions/http/ai_filters/model_router/route_wrapper.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -34,12 +33,9 @@ public:
   create(const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
          Api::Api& api, Stats::Scope& scope);
 
-  struct ResolvedModelRoutes {
-    envoy::type::ai::v3::LlmRoutes proto;
-    LlmRoutesFilterStateObject::Bindings bindings;
-  };
-
-  using ModelMap = absl::flat_hash_map<std::string, ResolvedModelRoutes>;
+  using ModelMap =
+      absl::flat_hash_map<std::string,
+                          HttpFilters::AiProtocolManager::LlmRoutesFilterStateObjectSharedPtr>;
 
   ModelRouterFilterConfig(ModelMap&& routes, Stats::Scope& scope);
   const ModelMap& routes() const { return routes_; }

@@ -10,22 +10,10 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
-    name = "route_wrapper_lib",
-    hdrs = ["route_wrapper.h"],
-    deps = [
-        "//envoy/stream_info:filter_state_interface",
-        "//source/common/common:assert_lib",
-        "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
-        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        ":route_wrapper_lib",
         "//envoy/api:api_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
@@ -37,6 +25,7 @@ envoy_cc_library(
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
+        "//source/extensions/filters/http/ai_protocol_manager:llm_protocol_conversion_lib",
         "//source/extensions/filters/http/ai_protocol_manager:uri_pattern_lib",
         "//source/extensions/http/ai_filters/common:sync_filter_lib",
         "@abseil-cpp//absl/status:status",
@@ -45,7 +34,6 @@ envoy_cc_library(
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/types:span",
         "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
         "@nlohmann_json//:json",
     ],
 )

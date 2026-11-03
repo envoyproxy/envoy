@@ -43,7 +43,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/http/ai_filters/model_router:filter_lib",
-        "//source/extensions/http/ai_filters/model_router:route_wrapper_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",

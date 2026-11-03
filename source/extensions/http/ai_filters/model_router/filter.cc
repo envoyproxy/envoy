@@ -5,7 +5,7 @@
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
-#include "source/extensions/http/ai_filters/model_router/route_wrapper.h"
+#include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_conversion.h"
 
 #include "absl/status/status_macros.h"
 #include "absl/strings/ascii.h"
@@ -19,6 +19,9 @@ namespace ModelRouter {
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 using HttpFilters::AiProtocolManager::LlmBinding;
 using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
+using HttpFilters::AiProtocolManager::LlmRoute;
+using HttpFilters::AiProtocolManager::LlmRoutesFilterStateObject;
+using HttpFilters::AiProtocolManager::protocolFromProto;
 using HttpFilters::AiProtocolManager::stringFromFilterState;
 
 absl::StatusOr<std::shared_ptr<ModelRouterFilterConfig>> ModelRouterFilterConfig::create(
@@ -68,13 +71,11 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
     models[entry.name()] = entry;
   }
 
-  ModelRouterFilterConfig::ModelMap model_map;
+  absl::flat_hash_map<std::string, std::vector<LlmRoute>> routes_by_model;
   for (const Config::RoutingEntry& entry : proto.routes()) {
-    ResolvedModelRoutes& resolved = model_map[entry.requested_model()];
+    std::vector<LlmRoute>& resolved = routes_by_model[entry.requested_model()];
 
     for (const Config::RoutingTarget& target : entry.targets()) {
-      envoy::type::ai::v3::LlmRoute* route = resolved.proto.add_routes();
-
       auto model_it = models.find(target.model());
       if (model_it == models.end()) {
         return absl::InvalidArgumentError("Unknown model " + target.model());
@@ -84,21 +85,26 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
         return absl::InvalidArgumentError("Unknown provider " + model_it->second.provider());
       }
 
-      route->set_llm_protocol(provider_it->second.proto.llm_protocol());
-      route->set_model(model_it->second.model());
-      route->set_host_and_port(provider_it->second.proto.host_and_port());
+      LlmRoute route;
+      route.llm_protocol = protocolFromProto(provider_it->second.proto.llm_protocol());
+      route.model = model_it->second.model();
+      route.host_and_port = provider_it->second.proto.host_and_port();
+      route.binding = provider_it->second.binding;
       if (model_it->second.has_api_key()) {
         ABSL_ASSIGN_OR_RETURN(
             std::string api_key,
             Envoy::Config::DataSource::read(model_it->second.api_key(), /*allow_empty=*/true, api));
-        route->set_api_key(std::string(absl::StripAsciiWhitespace(api_key)));
+        route.api_key = std::string(absl::StripAsciiWhitespace(api_key));
       }
-
-      if (provider_it->second.proto.has_binding()) {
-        *route->mutable_binding() = provider_it->second.proto.binding();
-      }
-      resolved.bindings.push_back(provider_it->second.binding);
+      resolved.push_back(std::move(route));
     }
+  }
+
+  ModelRouterFilterConfig::ModelMap model_map;
+  model_map.reserve(routes_by_model.size());
+  for (auto& [requested_model, routes] : routes_by_model) {
+    model_map.emplace(requested_model,
+                      std::make_shared<LlmRoutesFilterStateObject>(std::move(routes)));
   }
 
   return model_map;
@@ -127,20 +133,18 @@ ModelRouterFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
     return absl::OkStatus();
   }
 
-  filter_state->setData(
-      FilterStateKeys::ResolvedRoutes,
-      std::make_shared<LlmRoutesFilterStateObject>(it->second.proto, it->second.bindings),
-      StreamInfo::FilterState::LifeSpan::Request);
+  filter_state->setData(FilterStateKeys::ResolvedRoutes, it->second,
+                        StreamInfo::FilterState::LifeSpan::Request);
 
   config_->stats().success_.inc();
 
   // Temporary fix to support DFP cluster, until the router and DFP filter support ResolvedRoutes.
   // Assumes that all routes point to the same host. There is no such requirement with STATIC_DNS
   // clusters.
-  if (!it->second.proto.routes().empty()) {
+  if (!it->second->routes().empty()) {
     Envoy::Http::Utility::updateAuthority(context_.request_headers,
-                                          it->second.proto.routes(0).host_and_port(), false, false);
-    context_.request_headers.setEnvoyMaxRetries(it->second.proto.routes().size() - 1);
+                                          it->second->routes()[0].host_and_port, false, false);
+    context_.request_headers.setEnvoyMaxRetries(it->second->routes().size() - 1);
   }
 
   return absl::OkStatus();

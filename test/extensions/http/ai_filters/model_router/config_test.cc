@@ -137,44 +137,40 @@ routes:
 
   const auto fast_it = routes.find("fast-model");
   ASSERT_NE(fast_it, routes.end());
-  ASSERT_EQ(fast_it->second.proto.routes_size(), 3);
-  ASSERT_EQ(fast_it->second.bindings.size(), 3);
+  ASSERT_NE(fast_it->second, nullptr);
+  ASSERT_EQ(fast_it->second->routes().size(), 3);
 
-  const auto& r0 = fast_it->second.proto.routes(0);
-  EXPECT_EQ(r0.llm_protocol(), envoy::type::ai::v3::ANTHROPIC_MESSAGES);
-  EXPECT_EQ(r0.model(), "claude-haiku-4-5");
-  EXPECT_EQ(r0.host_and_port(), "api.anthropic.com");
-  EXPECT_EQ(r0.api_key(), "Bearer sk-ant");
-  EXPECT_EQ(r0.binding().uri_pattern(), "/v1/messages");
-  ASSERT_NE(fast_it->second.bindings[0], nullptr);
-  EXPECT_EQ(fast_it->second.bindings[0]->pattern()->source(), "/v1/messages");
+  const auto& r0 = fast_it->second->routes()[0];
+  EXPECT_EQ(r0.llm_protocol, LLMProtocol::AnthropicMessages);
+  EXPECT_EQ(r0.model, "claude-haiku-4-5");
+  EXPECT_EQ(r0.host_and_port, "api.anthropic.com");
+  EXPECT_EQ(r0.api_key, "Bearer sk-ant");
+  ASSERT_NE(r0.binding, nullptr);
+  EXPECT_EQ(r0.binding->pattern()->source(), "/v1/messages");
 
-  const auto& r1 = fast_it->second.proto.routes(1);
-  EXPECT_EQ(r1.llm_protocol(), envoy::type::ai::v3::OPENAI_CHAT_COMPLETIONS);
-  EXPECT_EQ(r1.model(), "gpt-4o-mini");
-  EXPECT_EQ(r1.host_and_port(), "api.openai.com:443");
-  EXPECT_EQ(r1.api_key(), "Bearer sk-oai");
-  EXPECT_FALSE(r1.has_binding());
-  EXPECT_EQ(fast_it->second.bindings[1], nullptr);
+  const auto& r1 = fast_it->second->routes()[1];
+  EXPECT_EQ(r1.llm_protocol, LLMProtocol::OpenAiChatCompletions);
+  EXPECT_EQ(r1.model, "gpt-4o-mini");
+  EXPECT_EQ(r1.host_and_port, "api.openai.com:443");
+  EXPECT_EQ(r1.api_key, "Bearer sk-oai");
+  EXPECT_EQ(r1.binding, nullptr);
 
-  const auto& r2 = fast_it->second.proto.routes(2);
-  EXPECT_EQ(r2.llm_protocol(), envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
-  EXPECT_EQ(r2.model(), "gemini-2.5-flash");
-  EXPECT_EQ(r2.host_and_port(), "generativelanguage.googleapis.com");
-  EXPECT_TRUE(r2.api_key().empty());
-  EXPECT_EQ(r2.binding().uri_pattern(),
-            "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
-  ASSERT_NE(fast_it->second.bindings[2], nullptr);
-  EXPECT_EQ(fast_it->second.bindings[2]->pattern()->source(),
+  const auto& r2 = fast_it->second->routes()[2];
+  EXPECT_EQ(r2.llm_protocol, LLMProtocol::GeminiGenerateContent);
+  EXPECT_EQ(r2.model, "gemini-2.5-flash");
+  EXPECT_EQ(r2.host_and_port, "generativelanguage.googleapis.com");
+  EXPECT_TRUE(r2.api_key.empty());
+  ASSERT_NE(r2.binding, nullptr);
+  EXPECT_EQ(r2.binding->pattern()->source(),
             "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
 
   const auto reasoning_it = routes.find("reasoning-model");
   ASSERT_NE(reasoning_it, routes.end());
-  ASSERT_EQ(reasoning_it->second.proto.routes_size(), 1);
-  ASSERT_EQ(reasoning_it->second.bindings.size(), 1);
-  EXPECT_EQ(reasoning_it->second.proto.routes(0).model(), "gemini-2.5-pro");
-  EXPECT_EQ(reasoning_it->second.proto.routes(0).api_key(), "Bearer g-pro");
-  ASSERT_NE(reasoning_it->second.bindings[0], nullptr);
+  ASSERT_NE(reasoning_it->second, nullptr);
+  ASSERT_EQ(reasoning_it->second->routes().size(), 1);
+  EXPECT_EQ(reasoning_it->second->routes()[0].model, "gemini-2.5-pro");
+  EXPECT_EQ(reasoning_it->second->routes()[0].api_key, "Bearer g-pro");
+  ASSERT_NE(reasoning_it->second->routes()[0].binding, nullptr);
 }
 
 TEST_F(ModelRouterConfigTest, ReadsAndTrimsApiKeyFromDataSource) {
@@ -208,9 +204,10 @@ routes:
 
   const auto it = config_or.value()->routes().find("fast-model");
   ASSERT_NE(it, config_or.value()->routes().end());
-  ASSERT_EQ(it->second.proto.routes_size(), 2);
-  EXPECT_EQ(it->second.proto.routes(0).api_key(), "Bearer file-sk-123");
-  EXPECT_EQ(it->second.proto.routes(1).api_key(), "Bearer inline-sk-456");
+  ASSERT_NE(it->second, nullptr);
+  ASSERT_EQ(it->second->routes().size(), 2);
+  EXPECT_EQ(it->second->routes()[0].api_key, "Bearer file-sk-123");
+  EXPECT_EQ(it->second->routes()[1].api_key, "Bearer inline-sk-456");
 }
 
 TEST_F(ModelRouterConfigTest, FailsWhenApiKeyFileDoesNotExist) {

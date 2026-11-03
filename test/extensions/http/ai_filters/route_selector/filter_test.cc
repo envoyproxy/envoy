@@ -6,9 +6,6 @@
 #include <vector>
 
 #include "envoy/extensions/http/ai_filters/route_selector/v3/route_selector.pb.h"
-#include "envoy/type/ai/v3/llm_binding.pb.h"
-#include "envoy/type/ai/v3/llm_protocol.pb.h"
-#include "envoy/type/ai/v3/routes.pb.h"
 
 #include "source/common/http/headers.h"
 #include "source/common/stream_info/stream_info_impl.h"
@@ -16,7 +13,6 @@
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_binding.h"
-#include "source/extensions/http/ai_filters/model_router/route_wrapper.h"
 #include "source/extensions/http/ai_filters/route_selector/filter.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -36,9 +32,12 @@ using HttpFilters::AiProtocolManager::AiFilterContext;
 using HttpFilters::AiProtocolManager::AiRequest;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LlmBinding;
+using HttpFilters::AiProtocolManager::LlmBindingConstSharedPtr;
 using HttpFilters::AiProtocolManager::LlmBindingObject;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LlmProtocolFilterState;
+using HttpFilters::AiProtocolManager::LlmRoute;
+using HttpFilters::AiProtocolManager::LlmRoutesFilterStateObject;
 using HttpFilters::AiProtocolManager::stringFromFilterState;
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 using RouteSelectorProto = envoy::extensions::http::ai_filters::route_selector::v3::RouteSelector;
@@ -51,55 +50,54 @@ public:
         config_(std::make_shared<const RouteSelectorFilterConfig>(RouteSelectorProto{},
                                                                   *stats_store_.rootScope())) {}
 
-  void setRoutesInFilterState(const envoy::type::ai::v3::LlmRoutes& routes) {
-    ModelRouter::LlmRoutesFilterStateObject::Bindings bindings;
-    bindings.reserve(routes.routes_size());
-    for (const auto& route : routes.routes()) {
-      if (route.has_binding()) {
-        auto parsed = LlmBinding::create(route.binding());
-        ASSERT_TRUE(parsed.ok()) << parsed.status();
-        bindings.push_back(*std::move(parsed));
-      } else {
-        bindings.push_back(nullptr);
-      }
-    }
-    stream_info_.filterState()->setData(
-        FilterStateKeys::ResolvedRoutes,
-        std::make_shared<ModelRouter::LlmRoutesFilterStateObject>(routes, std::move(bindings)),
-        StreamInfo::FilterState::LifeSpan::Request);
+  LlmBindingConstSharedPtr parseBinding(absl::string_view pattern) {
+    auto parsed = LlmBinding::parse(pattern);
+    EXPECT_TRUE(parsed.ok()) << parsed.status();
+    return parsed.ok() ? *std::move(parsed) : nullptr;
   }
 
   void populateRoutesInFilterState() {
-    envoy::type::ai::v3::LlmRoutes routes;
-    TestUtility::loadFromYaml(R"EOF(
-routes:
-  - llm_protocol: OPENAI_CHAT_COMPLETIONS
-    model: gpt-4o
-    host_and_port: api.openai.com
-    binding:
-      uri_pattern: /v1/chat/completions
-    api_key: "Bearer sk-openai-1"
-  - llm_protocol: OPENAI_RESPONSES
-    model: gpt-4.1
-    host_and_port: api.openai.com
-  - llm_protocol: ANTHROPIC_MESSAGES
-    model: claude-haiku-4-5
-    host_and_port: api.anthropic.com
-    binding:
-      uri_pattern: /v1/messages
-    api_key: "Bearer sk-anthropic"
-  - llm_protocol: GEMINI_GENERATE_CONTENT
-    model: gemini-2.5-pro
-    host_and_port: generativelanguage.googleapis.com:443
-    binding:
-      uri_pattern: /v1beta/models/{model}:{generateContent|streamGenerateContent}
-    api_key: "gemini-key-123"
-  - llm_protocol: LLM_PROTOCOL_UNSPECIFIED
-    model: custom-model
-    host_and_port: custom.llm.local
-)EOF",
-                              routes);
-    setRoutesInFilterState(routes);
+    std::vector<LlmRoute> routes = {
+        LlmRoute{
+            LLMProtocol::OpenAiChatCompletions,
+            "gpt-4o",
+            "api.openai.com",
+            parseBinding("/v1/chat/completions"),
+            "Bearer sk-openai-1",
+        },
+        LlmRoute{
+            LLMProtocol::OpenAiResponses,
+            "gpt-4.1",
+            "api.openai.com",
+            nullptr,
+            "",
+        },
+        LlmRoute{
+            LLMProtocol::AnthropicMessages,
+            "claude-haiku-4-5",
+            "api.anthropic.com",
+            parseBinding("/v1/messages"),
+            "Bearer sk-anthropic",
+        },
+        LlmRoute{
+            LLMProtocol::GeminiGenerateContent,
+            "gemini-2.5-pro",
+            "generativelanguage.googleapis.com:443",
+            parseBinding("/v1beta/models/{model}:{generateContent|streamGenerateContent}"),
+            "gemini-key-123",
+        },
+        LlmRoute{
+            LLMProtocol::Unspecified,
+            "custom-model",
+            "custom.llm.local",
+            nullptr,
+            "",
+        },
+    };
+    stream_info_.filterState()->setData(
+        FilterStateKeys::ResolvedRoutes,
+        std::make_shared<LlmRoutesFilterStateObject>(std::move(routes)),
+        StreamInfo::FilterState::LifeSpan::Request);
   }
 
   void run(std::optional<uint32_t> attempt_count = 1,

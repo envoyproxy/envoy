@@ -41,11 +41,9 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:llm_binding_lib",
-        "//source/extensions/http/ai_filters/model_router:route_wrapper_lib",
         "//source/extensions/http/ai_filters/route_selector:filter_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/http/ai_filters/route_selector/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/ai/v3:pkg_cc_proto",
     ],
 )

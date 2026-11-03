@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "envoy/router/string_accessor.h"
 #include "envoy/stream_info/filter_state.h"
@@ -146,6 +147,27 @@ private:
 // The string a Router::StringAccessor at `key` holds; nullopt when no object is set.
 std::optional<absl::string_view> stringFromFilterState(const StreamInfo::FilterState& filter_state,
                                                        absl::string_view key);
+
+// A single candidate target for an LLM request.
+struct LlmRoute {
+  LLMProtocol llm_protocol{LLMProtocol::Unspecified};
+  std::string model;
+  std::string host_and_port;
+  LlmBindingConstSharedPtr binding;
+  std::string api_key;
+};
+
+// An ordered list of candidate routes stored at `FilterStateKeys::ResolvedRoutes`.
+class LlmRoutesFilterStateObject : public StreamInfo::FilterState::Object {
+public:
+  explicit LlmRoutesFilterStateObject(std::vector<LlmRoute> routes) : routes_(std::move(routes)) {}
+
+  const std::vector<LlmRoute>& routes() const { return routes_; }
+
+private:
+  const std::vector<LlmRoute> routes_;
+};
+using LlmRoutesFilterStateObjectSharedPtr = std::shared_ptr<LlmRoutesFilterStateObject>;
 
 } // namespace AiProtocolManager
 } // namespace HttpFilters
