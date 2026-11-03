@@ -42,7 +42,6 @@ using ::Envoy::Upstream::HostSharedPtr;
 using ::Envoy::Upstream::MockHostSet;
 using ::testing::_;
 using ::testing::AtLeast;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
@@ -150,10 +149,10 @@ public:
   void SetUp() override {
     ON_CALL(load_balancer_context_, requestStreamInfo()).WillByDefault(Return(&stream_info_));
     ON_CALL(load_balancer_context_, determinePriorityLoad(_, _, _))
-        .WillByDefault(Invoke([](const Upstream::PrioritySet&,
-                                 const Upstream::HealthyAndDegradedLoad& original,
-                                 const Upstream::RetryPriority::PriorityMappingFunc&)
-                                  -> const Upstream::HealthyAndDegradedLoad& { return original; }));
+        .WillByDefault([](const Upstream::PrioritySet&,
+                          const Upstream::HealthyAndDegradedLoad& original,
+                          const Upstream::RetryPriority::PriorityMappingFunc&)
+                           -> const Upstream::HealthyAndDegradedLoad& { return original; });
     ON_CALL(load_balancer_context_, shouldSelectAnotherHost(_)).WillByDefault(Return(false));
     ON_CALL(load_balancer_context_, hostSelectionRetryCount()).WillByDefault(Return(1));
   }
@@ -395,7 +394,7 @@ TEST_F(HostAllowlistLoadBalancerTest, InnerRetryPredicateStillFires) {
   setHosts(0, {east, west});
   setCandidates({{"dc1/svc-a", ""}, {"dc1/svc-b", ""}});
   ON_CALL(load_balancer_context_, shouldSelectAnotherHost(_))
-      .WillByDefault(Invoke([east](const Upstream::Host& host) { return &host == east.get(); }));
+      .WillByDefault([east](const Upstream::Host& host) { return &host == east.get(); });
   createLoadBalancer(makeConfig());
 
   auto response = load_balancer_->chooseHost(&load_balancer_context_);

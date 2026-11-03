@@ -17,6 +17,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "envoy/router/string_accessor.h"
@@ -479,18 +480,20 @@ public:
 };
 
 // Parameterized wrapper that selects the hand-off path (registry vs. legacy
-// data-stream preamble) and provides path-aware delivery helpers.
-class PeerMetadataUpstreamFilterTest : public PeerMetadataUpstreamFilterTestBase,
-                                       public ::testing::WithParamInterface<ExchangePath> {
+// data-stream preamble) and the supported origination listener name.
+class PeerMetadataUpstreamFilterTest
+    : public PeerMetadataUpstreamFilterTestBase,
+      public ::testing::WithParamInterface<std::tuple<ExchangePath, std::string>> {
 public:
   void initialize() {
-    PeerMetadataUpstreamFilterTestBase::initialize(GetParam() == ExchangePath::ThreadLocalRegistry);
+    PeerMetadataUpstreamFilterTestBase::initialize(std::get<0>(GetParam()) ==
+                                                   ExchangePath::ThreadLocalRegistry);
   }
 
   void deliverPeerMetadata(Buffer::Instance& data, absl::string_view baggage,
                            absl::string_view identity) {
     const std::string serialized = encodePeerMetadata(baggage, identity);
-    if (GetParam() == ExchangePath::ThreadLocalRegistry) {
+    if (std::get<0>(GetParam()) == ExchangePath::ThreadLocalRegistry) {
       registry_->setValue(registry_key_, serialized);
       return;
     }
@@ -507,7 +510,7 @@ public:
 
 TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataConsumedAndPropagated) {
   initialize();
-  setUpstreamHost(makeInternalListenerHost("connect_originate"));
+  setUpstreamHost(makeInternalListenerHost(std::get<1>(GetParam())));
 
   Buffer::OwnedImpl data;
   data.add("application data");
@@ -564,7 +567,7 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedForExternalHos
 
 TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledViaHostMetadata) {
   initialize();
-  setUpstreamHost(makeInternalListenerHost("connect_originate"));
+  setUpstreamHost(makeInternalListenerHost(std::get<1>(GetParam())));
 
   Protobuf::Struct metadata; // NOLINT(google.protobuf)
   auto fields = metadata.mutable_fields();
@@ -587,7 +590,7 @@ TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledVi
 
 TEST_P(PeerMetadataUpstreamFilterTest, TestPeerMetadataNotConsumedWhenDisabledViaClusterMetadata) {
   initialize();
-  setUpstreamHost(makeInternalListenerHost("connect_originate"));
+  setUpstreamHost(makeInternalListenerHost(std::get<1>(GetParam())));
 
   Protobuf::Struct metadata2;
   auto fields2 = metadata2.mutable_fields();
@@ -628,10 +631,13 @@ TEST_F(PeerMetadataUpstreamFilterTestBase, TestNoPeerPopulatedWhenRegistryEmpty)
   EXPECT_EQ(data.toString(), payload);
 }
 
-INSTANTIATE_TEST_SUITE_P(Modes, PeerMetadataUpstreamFilterTest,
-                         ::testing::Values(ExchangePath::DataStreamPreamble,
-                                           ExchangePath::ThreadLocalRegistry),
-                         modeName);
+INSTANTIATE_TEST_SUITE_P(
+    Modes, PeerMetadataUpstreamFilterTest,
+    ::testing::Combine(
+        ::testing::Values(ExchangePath::DataStreamPreamble, ExchangePath::ThreadLocalRegistry),
+        ::testing::Values("connect_originate", "inner_connect_originate",
+                          "connect_originate_hbone_adapter",
+                          "inner_connect_originate_hbone_adapter", "internal_outbound")));
 
 } // namespace
 } // namespace PeerMetadata

@@ -1248,6 +1248,12 @@ public:
    * @return returns if the connection pool was initialized successfully.
    */
   virtual bool valid() const PURE;
+
+  /**
+   * @return true if the upstream can end the response before the request without the stream being
+   * reset, as with TCP upstreams.
+   */
+  virtual bool supportsIndependentHalfClose() const { return false; }
 };
 
 using GenericConnPoolPtr = std::unique_ptr<GenericConnPool>;

@@ -372,6 +372,21 @@ pub trait ClusterLbContext {
     entries: &'a [(&'a str, &'a str)],
   ) -> bool;
 
+  /// Merges a serialized `google.protobuf.Struct` into the request's dynamic metadata under
+  /// `namespace`. Existing entries with the same key are overwritten. An empty struct is a no-op
+  /// and does not create the namespace.
+  ///
+  /// Returns `true` if the struct was merged, `false` if the request has no stream info or the
+  /// buffer does not parse as a `google.protobuf.Struct`.
+  fn set_dynamic_metadata_struct(&self, namespace: &str, serialized_struct: &[u8]) -> bool;
+
+  /// Sets the `typed_filter_metadata` entry of the request's dynamic metadata under `namespace`
+  /// from a serialized `google.protobuf.Any`, replacing an existing entry.
+  ///
+  /// Returns `true` if the entry was set, `false` if the request has no stream info or the buffer
+  /// does not parse as a `google.protobuf.Any` with a type URL.
+  fn set_dynamic_typed_metadata(&self, namespace: &str, serialized_any: &[u8]) -> bool;
+
   /// Creates a per-worker timer on this request's worker dispatcher.
   ///
   /// The worker dispatcher is captured on this load balancer for the duration of host selection,
@@ -849,6 +864,37 @@ pub trait EnvoyClusterLoadBalancer: Send {
     index: usize,
     is_added: bool,
   ) -> Option<PackedAddress>;
+
+  /// Returns how many hosts changed health since the previous update this worker applied, so the
+  /// module can patch its healthy set from the current [`ClusterLb::on_host_membership_update`]
+  /// call instead of rereading every host. Envoy merges updates within the cluster's
+  /// `update_merge_window`, so one call can carry several health changes. Each host is listed
+  /// once, and hosts removed since the previous update are reported only by
+  /// [`EnvoyClusterLoadBalancer::get_member_update_host`]. It is only valid during the
+  /// `on_host_membership_update` callback.
+  ///
+  /// Returns `None` outside the callback, or when Envoy does not know which hosts changed health:
+  /// the cluster does not keep persistent host partitions, or a health refresh happened since the
+  /// previous update. A refresh covers every host, and with an active health checker it precedes a
+  /// worker's first update. The module must then reread the hosts it tracks.
+  fn get_member_update_health_changed_host_count(&self) -> Option<usize>;
+
+  /// Returns a host whose health changed since the previous update this worker applied, with its
+  /// priority and current health. The health is read when this is called, so it can be newer than
+  /// the host lists of the same update. The host pointer stays valid while the host is in the
+  /// cluster's host set. Valid indexes are below
+  /// [`EnvoyClusterLoadBalancer::get_member_update_health_changed_host_count`]. It is only valid
+  /// during the `on_host_membership_update` callback.
+  ///
+  /// Returns `None` when the index is out of bounds or the count is unknown.
+  fn get_member_update_health_changed_host(
+    &self,
+    index: usize,
+  ) -> Option<(
+    abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    u32,
+    abi::envoy_dynamic_module_type_host_health,
+  )>;
 }
 
 /// A per-worker timer handle, created via [`EnvoyClusterLoadBalancer::worker_timer_new`].
@@ -964,6 +1010,15 @@ impl EnvoyResolvedHistogram {
 #[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyClusterMetrics: Send + Sync {
+  /// Make the cluster keep persistent host partitions, as if its `ClusterConfig` set
+  /// `use_persistent_host_partitions`. The same costs apply, so pair it with
+  /// [`EnvoyCluster::use_persistent_host_map`].
+  ///
+  /// This is optional and must be called during config creation, before the cluster and its host
+  /// sets exist. Returns `false` if called later or if the cluster's `lb_policy` is not
+  /// `CLUSTER_PROVIDED`.
+  fn use_persistent_host_partitions(&self) -> bool;
+
   // -------------------------------------------------------------------------
   // Define metrics (call during config creation).
   // -------------------------------------------------------------------------
@@ -1987,6 +2042,41 @@ impl EnvoyClusterLoadBalancer for EnvoyClusterLoadBalancerImpl {
       _ => None,
     }
   }
+
+  fn get_member_update_health_changed_host_count(&self) -> Option<usize> {
+    let mut count = 0usize;
+    let known = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+        self.raw, &mut count,
+      )
+    };
+    known.then_some(count)
+  }
+
+  fn get_member_update_health_changed_host(
+    &self,
+    index: usize,
+  ) -> Option<(
+    abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
+    u32,
+    abi::envoy_dynamic_module_type_host_health,
+  )> {
+    let mut priority = 0u32;
+    let mut health = abi::envoy_dynamic_module_type_host_health::Unhealthy;
+    let host = unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+        self.raw,
+        index,
+        &mut priority,
+        &mut health,
+      )
+    };
+    if host.is_null() {
+      None
+    } else {
+      Some((host, priority, health))
+    }
+  }
 }
 
 /// Owning implementation of [`EnvoyClusterWorkerTimer`]. Calls `worker_timer_delete` on drop.
@@ -2104,6 +2194,12 @@ fn cluster_metric_result_to_rust(
 }
 
 impl EnvoyClusterMetrics for EnvoyClusterMetricsImpl {
+  fn use_persistent_host_partitions(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(self.raw)
+    }
+  }
+
   fn define_counter(
     &self,
     name: &str,
@@ -2754,6 +2850,26 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
     }
   }
 
+  fn set_dynamic_metadata_struct(&self, namespace: &str, serialized_struct: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_struct),
+      )
+    }
+  }
+
+  fn set_dynamic_typed_metadata(&self, namespace: &str, serialized_any: &[u8]) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+        self.raw_context,
+        str_to_module_buffer(namespace),
+        bytes_to_module_buffer(serialized_any),
+      )
+    }
+  }
+
   fn worker_timer_new(&self) -> Option<Box<dyn EnvoyClusterWorkerTimer>> {
     let raw_ptr =
       unsafe { abi::envoy_dynamic_module_callback_cluster_worker_timer_new(self.raw_lb) };
@@ -3249,6 +3365,24 @@ mod tests {
       .is_empty());
   }
 
+  // Checks the struct and typed wrappers forward the context, namespace and buffer unchanged.
+  #[test]
+  fn set_dynamic_metadata_struct_and_typed_forward_their_buffers() {
+    let context = ClusterLbContextRef::new(0x1 as _, std::ptr::null_mut());
+
+    assert!(context.set_dynamic_metadata_struct("dec", b"struct-bytes"));
+    assert!(context.set_dynamic_typed_metadata("dec", b"any-bytes"));
+    assert_eq!(
+      *crate::mod_test::MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+        .lock()
+        .unwrap(),
+      vec![
+        ("struct", 0x1, "dec".to_owned(), b"struct-bytes".to_vec()),
+        ("typed", 0x1, "dec".to_owned(), b"any-bytes".to_vec()),
+      ]
+    );
+  }
+
   // The stub in `lib_test.rs` maps each priority to a scenario, so this drives the real wrapper's
   // size-then-fill handshake rather than a mock.
   #[test]
@@ -3404,6 +3538,41 @@ mod tests {
       crate::mod_test::MOCK_CLUSTER_ADD_HOSTS_CALLS.load(Ordering::SeqCst),
       2
     );
+  }
+
+  // The stub in `lib_test.rs` accepts any non-null config.
+  #[test]
+  fn use_persistent_host_partitions_forwards_to_envoy() {
+    let config = EnvoyClusterMetricsImpl {
+      raw: 0x1 as abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+    };
+    assert!(config.use_persistent_host_partitions());
+    let null_config = EnvoyClusterMetricsImpl {
+      raw: std::ptr::null_mut(),
+    };
+    assert!(!null_config.use_persistent_host_partitions());
+  }
+
+  // The stubs in `lib_test.rs` report two health-changed hosts for a null load balancer and an
+  // unknown count for any other.
+  #[test]
+  fn get_member_update_health_changed_hosts_reads_count_and_hosts() {
+    let lb = EnvoyClusterLoadBalancerImpl::new(std::ptr::null_mut());
+    assert_eq!(lb.get_member_update_health_changed_host_count(), Some(2));
+
+    let (host, priority, health) = lb.get_member_update_health_changed_host(0).unwrap();
+    assert_eq!(host as usize, 0xAB);
+    assert_eq!(priority, 1);
+    assert_eq!(health, abi::envoy_dynamic_module_type_host_health::Degraded);
+    let (host, priority, health) = lb.get_member_update_health_changed_host(1).unwrap();
+    assert_eq!(host as usize, 0xCD);
+    assert_eq!(priority, 0);
+    assert_eq!(health, abi::envoy_dynamic_module_type_host_health::Healthy);
+    assert!(lb.get_member_update_health_changed_host(2).is_none());
+
+    let unknown =
+      EnvoyClusterLoadBalancerImpl::new(0x1 as abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr);
+    assert_eq!(unknown.get_member_update_health_changed_host_count(), None);
   }
 
   // The per-request accessor callbacks are satisfied by the link-time stubs in lib_test.rs.

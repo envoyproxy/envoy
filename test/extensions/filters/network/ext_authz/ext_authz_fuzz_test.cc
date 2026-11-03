@@ -95,11 +95,11 @@ DEFINE_PROTO_FUZZER(const envoy::extensions::filters::network::ext_authz::ExtAut
       // Optional input field to set default authorization check result for the following "onData()"
       if (action.on_data().has_result()) {
         ON_CALL(*client, check(_, _, _, _))
-            .WillByDefault(WithArgs<0>(
-                Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            .WillByDefault(
+                WithArgs<0>([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
                   callbacks.onComplete(makeAuthzResponse(
                       resultCaseToCheckStatus(action.on_data().result().result_selector_case())));
-                })));
+                }));
       }
       Buffer::OwnedImpl buffer(action.on_data().data());
       filter->onData(buffer, action.on_data().end_stream());

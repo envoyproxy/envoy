@@ -88,7 +88,7 @@ namespace {
 template <class T>
 std::unique_ptr<StreamInfo::FilterState::Object> protocolFromBytes(absl::string_view data) {
   envoy::type::ai::v3::LLMProtocol protocol;
-  if (!envoy::type::ai::v3::LLMProtocol_Parse(std::string(data), &protocol)) {
+  if (!envoy::type::ai::v3::LLMProtocol_Parse(data, &protocol)) {
     return nullptr;
   }
   return std::make_unique<T>(protocolFromProto(protocol));

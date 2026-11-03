@@ -58,6 +58,7 @@ ECN
 ECS
 EdDSA
 EKS
+LEB
 Millicores
 NID
 NIST
@@ -331,6 +332,7 @@ JWT
 JWTs
 alg
 aud
+audiobook
 crv
 iat
 iss
@@ -1672,13 +1674,16 @@ util
 utils
 va
 valgrind
+valkey
 validator
 validators
+valkey
 vanishingly
 varchar
 variadic
 varint
 Vcluster
+vcluster
 vec
 vectorize
 VBC
@@ -1847,3 +1852,6 @@ cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
 vendored
+reparent
+reparents
+reparenting

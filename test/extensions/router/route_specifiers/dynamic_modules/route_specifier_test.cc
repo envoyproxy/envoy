@@ -9,10 +9,12 @@
 #include "source/common/config/metadata.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/stats/custom_stat_namespaces_impl.h"
+#include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/router/route_specifiers/dynamic_modules/config.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -20,8 +22,11 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
+#include "absl/cleanup/cleanup.h"
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -1511,6 +1516,8 @@ TEST_F(DynamicModuleBuiltRouteCacheTest, HitIgnoresTheRecording) {
   EXPECT_EQ(first, second);
   EXPECT_EQ("cached_cluster", second->routeEntry()->clusterName());
   EXPECT_EQ(0, counterValue("route_destroy"));
+  // The module exports no user data discard hook, so the value the hit ignores is dropped.
+  EXPECT_EQ(0, counterValue("user_data_discard"));
 }
 
 // A template whose cluster is picked per request builds a route specific to the request, so the
@@ -1680,6 +1687,58 @@ TEST_F(DynamicModuleBuiltRouteCacheTest, StreamHoldingACachedRouteReleasesItLast
   EXPECT_EQ(routes_before + 1, moduleValue("getRouteDestroyCount"));
 }
 
+// The last reference to a route configuration can drop on a worker, which destroys the slot of the
+// built route cache there. The slot is removed on the main thread, which releases what each worker
+// cached on that worker.
+TEST_F(DynamicModuleBuiltRouteCacheTest, ConfigurationReleasedOnAWorkerReleasesItsCachedRoutes) {
+  Api::ApiPtr api = Api::createApiForTest();
+  Event::DispatcherPtr main_dispatcher = api->allocateDispatcher("test_main_thread");
+  Event::DispatcherPtr worker_dispatcher = api->allocateDispatcher("test_worker_thread");
+  ThreadLocal::InstanceImpl tls;
+  absl::Cleanup shutdown_tls = [&tls]() {
+    tls.shutdownGlobalThreading();
+    tls.shutdownThread();
+  };
+  tls.registerThread(*main_dispatcher, true);
+  tls.registerThread(*worker_dispatcher, false);
+  // Running the main dispatcher binds it to this thread, so a slot destroyed on the worker posts
+  // its removal here.
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  ON_CALL(context_, threadLocal()).WillByDefault(testing::ReturnRef(tls));
+  const int routes_before = moduleValue("getRouteDestroyCount");
+  const int configs_before = moduleValue("getConfigDestroyCount");
+  auto loaded = loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16)));
+  ASSERT_TRUE(loaded.ok());
+  std::shared_ptr<Envoy::Router::ConfigImpl> config = std::move(loaded.value());
+
+  // One worker thread for the whole test, since a thread that exits destroys what it holds in
+  // thread local storage.
+  Thread::ThreadPtr worker = Thread::threadFactoryForTest().createThread(
+      [&]() { worker_dispatcher->run(Event::Dispatcher::RunType::RunUntilExit); });
+  const auto on_worker = [&worker_dispatcher](const auto& work) {
+    absl::Notification done;
+    worker_dispatcher->post([&]() {
+      work();
+      done.Notify();
+    });
+    done.WaitForNotification();
+  };
+  on_worker([&]() {
+    resolve(*config, 1);
+    EXPECT_EQ(CacheMiss, lastCacheResult());
+    config.reset();
+  });
+  EXPECT_EQ(routes_before, moduleValue("getRouteDestroyCount"));
+
+  main_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  on_worker([]() {});
+  EXPECT_EQ(routes_before + 1, moduleValue("getRouteDestroyCount"));
+  EXPECT_EQ(configs_before + 1, moduleValue("getConfigDestroyCount"));
+
+  worker_dispatcher->exit();
+  worker->join();
+}
+
 // A module that sets no key builds a route per request as it does without a cache.
 TEST_F(DynamicModuleBuiltRouteCacheTest, DecisionWithoutAKeyIsNotCached) {
   const auto config = loadConfig(builtRouteCacheModuleYaml("no-key", builtRouteCacheYaml(16)));
@@ -1705,6 +1764,22 @@ TEST_F(DynamicModuleBuiltRouteCacheTest, CacheIsDisabledWithoutATemplateOrAConfi
   EXPECT_EQ(CacheDisabled, lastCacheResult());
   EXPECT_NE(first, resolve(*without_cache.value(), 1));
   EXPECT_EQ(3, counterValue("built_route_cache_disabled"));
+}
+
+// A module reads from its configuration hook whether the configuration caches built routes.
+TEST_F(DynamicModuleBuiltRouteCacheTest, ConfigurationReportsWhetherItCachesBuiltRoutes) {
+  ASSERT_TRUE(loadConfig(builtRouteCacheModuleYaml("cached", builtRouteCacheYaml(16))).ok());
+  EXPECT_EQ(1, moduleValue("getConfigHasBuiltRouteCache"));
+  ASSERT_TRUE(loadConfig(builtRouteCacheModuleYaml("cached", "")).ok());
+  EXPECT_EQ(0, moduleValue("getConfigHasBuiltRouteCache"));
+}
+
+// A module whose routes rely on the cache rejects a configuration without it.
+TEST_F(DynamicModuleBuiltRouteCacheTest, ModuleRejectsAConfigurationWithoutTheCache) {
+  EXPECT_TRUE(
+      loadConfig(builtRouteCacheModuleYaml("requires-cache", builtRouteCacheYaml(16))).ok());
+  EXPECT_THAT(loadConfig(builtRouteCacheModuleYaml("requires-cache", "")).status(),
+              HasStatusMessage(HasSubstr("Failed to initialize dynamic module")));
 }
 
 // The cache is not in effect on a thread that thread local storage does not know, nor on a worker
@@ -1917,6 +1992,317 @@ TEST_P(VerifiedHitFieldTest, DifferenceEvictsTheRoute) {
   EXPECT_NE(first, second);
   EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
   EXPECT_EQ(0, entries());
+}
+
+// The user data module with the templates its outcomes select and a built route cache that
+// verifies a hit with a chance of one in verify_one_in. Its default of zero verifies none.
+std::string userDataModuleYaml(uint32_t verify_one_in = 0) {
+  const std::string cache =
+      builtRouteCacheYaml(16, fmt::format("        verify_one_in: {}\n", verify_one_in));
+  return specifierYaml("route_specifier_user_data",
+                       fmt::format(R"EOF(      failure_policy: PASS_THROUGH
+{}      route_templates:
+      - template_id: only
+        route:
+          match: {{prefix: "/"}}
+          route: {{cluster: module_cluster}}
+      - template_id: never
+        route:
+          match: {{prefix: "/never"}}
+          route: {{cluster: module_cluster}}
+      - template_id: direct
+        route:
+          match: {{prefix: "/"}}
+          direct_response: {{status: 204}}
+)EOF",
+                                   cache));
+}
+
+class DynamicModuleUserDataTest : public DynamicModuleRouteSpecifierTest {
+public:
+  void SetUp() override {
+    auto module = Extensions::DynamicModules::newDynamicModule(
+        Extensions::DynamicModules::testSharedObjectPath("route_specifier_user_data", "c"),
+        /*do_not_close=*/true);
+    ASSERT_TRUE(module.ok());
+    module_ = std::move(module.value());
+    discards_before_ = moduleValue("getUserDataDiscardCount");
+    destroys_before_ = moduleValue("getRouteDestroyCount");
+  }
+
+  int moduleValue(const std::string& getter) {
+    auto function = module_->getFunctionPointer<int (*)(void)>(getter);
+    EXPECT_TRUE(function.ok());
+    return function.ok() ? function.value()() : -1;
+  }
+  // The values the module got back through each hook since the test started.
+  int discards() { return moduleValue("getUserDataDiscardCount") - discards_before_; }
+  int destroys() { return moduleValue("getRouteDestroyCount") - destroys_before_; }
+  uint64_t lastDiscarded() {
+    auto function = module_->getFunctionPointer<uint64_t (*)(void)>("getLastDiscardedUserData");
+    EXPECT_TRUE(function.ok());
+    return function.ok() ? function.value()() : 0;
+  }
+
+  // Resolves the route of a request for which the module records the user data, if any, and then
+  // ends the decision the way the outcome names.
+  Envoy::Router::RouteConstSharedPtr resolve(const Envoy::Router::ConfigImpl& config,
+                                             absl::string_view outcome,
+                                             std::optional<uint64_t> user_data,
+                                             absl::string_view path = "/") {
+    auto headers = requestHeaders(path);
+    headers.addCopy(Http::LowerCaseString("x-outcome"), outcome);
+    if (user_data.has_value()) {
+      headers.addCopy(Http::LowerCaseString("x-user-data"), absl::StrCat(*user_data));
+    }
+    return config.route(headers, stream_info_, 0).route;
+  }
+
+  Extensions::DynamicModules::DynamicModulePtr module_;
+  int discards_before_{0};
+  int destroys_before_{0};
+};
+
+// A route built with the user data carries it, so only the route destroy hook receives it, once the
+// route is released.
+TEST_F(DynamicModuleUserDataTest, RouteThatCarriesTheUserDataFiresTheDestroyHook) {
+  const auto config = loadConfig(userDataModuleYaml());
+  ASSERT_TRUE(config.ok());
+  int destroyed = 0;
+  for (const absl::string_view outcome : {"template", "refine"}) {
+    auto route = resolve(*config.value(), outcome, 7);
+    ASSERT_NE(nullptr, route);
+    EXPECT_EQ(destroyed, destroys());
+    route.reset();
+    EXPECT_EQ(++destroyed, destroys());
+  }
+  EXPECT_EQ(0, discards());
+  EXPECT_EQ(0, counterValue("user_data_discard"));
+}
+
+// A decision that builds no route for the user data hands the value back through the user data
+// discard hook. The counter names the path the decision took.
+class UserDataDiscardTest
+    : public DynamicModuleUserDataTest,
+      public testing::WithParamInterface<std::pair<std::string, std::string>> {};
+
+INSTANTIATE_TEST_SUITE_P(
+    Outcomes, UserDataDiscardTest,
+    testing::Values(std::make_pair("pass-through", "decision_pass_through"),
+                    std::make_pair("no-route", "decision_no_route"),
+                    std::make_pair("error", "decision_error"),
+                    std::make_pair("reuse-previous", "reuse_previous_rejected"),
+                    std::make_pair("unknown-decision", "decision_error"),
+                    std::make_pair("unknown-status", "unknown_status"),
+                    std::make_pair("missing-template", "failure_template_not_selected"),
+                    std::make_pair("unmatched-template", "failure_template_match_failed"),
+                    std::make_pair("direct-entry", "failure_override_on_non_route_entry")));
+
+TEST_P(UserDataDiscardTest, HandsTheUserDataBack) {
+  const auto config = loadConfig(userDataModuleYaml());
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), GetParam().first, 42);
+  EXPECT_EQ(1, counterValue(GetParam().second));
+  EXPECT_EQ(1, discards());
+  EXPECT_EQ(42, lastDiscarded());
+  EXPECT_EQ(1, counterValue("user_data_discard"));
+  EXPECT_EQ(0, destroys());
+}
+
+// A skipped route builds nothing for the user data, while matching carries on with the next route.
+TEST_F(DynamicModuleUserDataTest, SkippedRouteHandsTheUserDataBack) {
+  const auto config = loadRaw(catchAllRouteConfigYaml("route_specifier_user_data", "PASS_THROUGH"));
+  ASSERT_TRUE(config.ok());
+  const auto route = resolve(*config.value(), "skip", 42, "/specific");
+  ASSERT_NE(nullptr, route);
+  EXPECT_EQ("specific_cluster", route->routeEntry()->clusterName());
+  EXPECT_EQ(1, counterValue("route_skipped"));
+  EXPECT_EQ(1, discards());
+  EXPECT_EQ(42, lastDiscarded());
+}
+
+// Reusing the previous route builds nothing for the user data recorded with the decision.
+TEST_F(DynamicModuleUserDataTest, ReusedPreviousRouteHandsTheUserDataBack) {
+  const auto config = loadConfig(userDataModuleYaml());
+  ASSERT_TRUE(config.ok());
+  stream_info_.route_ = resolve(*config.value(), "template", 1);
+  EXPECT_EQ(stream_info_.route_, resolve(*config.value(), "reuse-previous", 42));
+  EXPECT_EQ(1, counterValue("decision_reuse_previous"));
+  EXPECT_EQ(1, discards());
+  EXPECT_EQ(42, lastDiscarded());
+}
+
+// Metadata a typed metadata factory rejects fails the decision after the module returned, so no
+// route carries the user data.
+TEST_F(DynamicModuleUserDataTest, RejectedRouteMetadataHandsTheUserDataBack) {
+  RejectingRouteMetadataFactory factory;
+  Registry::InjectFactory<Envoy::Router::HttpRouteTypedMetadataFactory> injection(factory);
+  const auto config = loadConfig(userDataModuleYaml());
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), "rejected-metadata", 42);
+  EXPECT_EQ(1, counterValue("failure_route_metadata"));
+  EXPECT_EQ(1, discards());
+  EXPECT_EQ(42, lastDiscarded());
+}
+
+// The user data needs a route to be recorded on, so it is handed back when no route matched.
+TEST_F(DynamicModuleUserDataTest, UserDataWithoutARouteIsHandedBack) {
+  const auto config = loadRaw(R"EOF(
+name: test_route_config
+virtual_hosts:
+- name: test_vhost
+  domains: ["*"]
+  routes:
+  - match: {prefix: "/api"}
+    route: {cluster: matched_cluster}
+  route_specifiers:
+  - name: envoy.router.route_specifiers.dynamic_modules
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier
+      dynamic_module_config:
+        name: route_specifier_user_data
+        do_not_close: true
+      specifier_name: test_route_specifier
+      stat_prefix: test
+      failure_policy: PASS_THROUGH
+)EOF");
+  ASSERT_TRUE(config.ok());
+  EXPECT_EQ(nullptr, resolve(*config.value(), "refine", 42, "/other"));
+  EXPECT_EQ(1, counterValue("failure_override_without_route"));
+  EXPECT_EQ(1, discards());
+  EXPECT_EQ(42, lastDiscarded());
+}
+
+// A hit serves the route a miss built, so the user data the hit records is handed back while the
+// cached route keeps the value of the miss.
+TEST_F(DynamicModuleUserDataTest, HitHandsTheUserDataBack) {
+  const auto config = loadConfig(userDataModuleYaml());
+  ASSERT_TRUE(config.ok());
+  const auto first = resolve(*config.value(), "cached", 1);
+  EXPECT_EQ(0, discards());
+  EXPECT_EQ(first, resolve(*config.value(), "cached", 2));
+  EXPECT_EQ(1, counterValue("built_route_cache_hit"));
+  EXPECT_EQ(1, discards());
+  EXPECT_EQ(2, lastDiscarded());
+  EXPECT_EQ(0, destroys());
+}
+
+// A later value replaces the one the module recorded before, so only the last one is handed back.
+TEST_F(DynamicModuleUserDataTest, LastRecordedUserDataIsHandedBack) {
+  const auto config = loadConfig(userDataModuleYaml());
+  ASSERT_TRUE(config.ok());
+  resolve(*config.value(), "recorded-twice", 42);
+  EXPECT_EQ(1, discards());
+  EXPECT_EQ(43, lastDiscarded());
+}
+
+// A verified hit uses the route its recording builds, which carries the user data, so nothing is
+// handed back whether or not the recording matches the cached route.
+TEST_F(DynamicModuleUserDataTest, VerifiedHitKeepsTheUserDataOnTheRouteItBuilds) {
+  const auto config = loadConfig(userDataModuleYaml(1));
+  ASSERT_TRUE(config.ok());
+  const auto cached = resolve(*config.value(), "cached", 1);
+  auto same = resolve(*config.value(), "cached", 1);
+  ASSERT_NE(nullptr, same);
+  EXPECT_NE(cached, same);
+  EXPECT_EQ(0, counterValue("built_route_cache_verify_mismatch"));
+  same.reset();
+  EXPECT_EQ(1, destroys());
+
+  auto different = resolve(*config.value(), "cached", 2);
+  ASSERT_NE(nullptr, different);
+  EXPECT_EQ(1, counterValue("built_route_cache_verify_mismatch"));
+  different.reset();
+  EXPECT_EQ(2, destroys());
+  EXPECT_EQ(2, counterValue("built_route_cache_verify"));
+  EXPECT_EQ(0, discards());
+  EXPECT_EQ(0, counterValue("user_data_discard"));
+}
+
+// The specifier reads the clock before and after the module, and once more only for a decision that
+// builds a route, fails or hands its user data back, or whose lookup in the built route cache
+// misses or is verified.
+TEST_F(DynamicModuleUserDataTest, SpecifierDurationEndsWithTheModuleUnlessTheDecisionDoesMore) {
+  NiceMock<MockTimeSystem> time_system;
+  ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system));
+  const auto config = loadConfig(userDataModuleYaml());
+  ASSERT_TRUE(config.ok());
+  const auto verified = loadConfig(userDataModuleYaml(1));
+  ASSERT_TRUE(verified.ok());
+  const auto histogram = [](absl::string_view name) {
+    return testing::Property(&Stats::Metric::name,
+                             absl::StrCat("dynamicmodulescustom.route_specifier.test.", name));
+  };
+  // The module takes 2 microseconds, and a decision that does more after it takes 5 more.
+  const auto expect_durations = [&](const Envoy::Router::ConfigImpl& route_config,
+                                    absl::string_view outcome, std::optional<uint64_t> user_data,
+                                    bool does_more) {
+    SCOPED_TRACE(absl::StrCat(outcome, user_data.has_value() ? " with user data" : ""));
+    auto& reads = EXPECT_CALL(time_system, monotonicTime())
+                      .WillOnce(testing::Return(MonotonicTime(std::chrono::microseconds(10))))
+                      .WillOnce(testing::Return(MonotonicTime(std::chrono::microseconds(12))));
+    // The last read follows everything the specifier does, the discard hook included.
+    int discards_at_end = discards();
+    if (does_more) {
+      reads.WillOnce([&]() {
+        discards_at_end = discards();
+        return MonotonicTime(std::chrono::microseconds(17));
+      });
+    }
+    EXPECT_CALL(context_.store_, deliverHistogramToSinks(histogram("on_route_duration"), 2));
+    EXPECT_CALL(context_.store_,
+                deliverHistogramToSinks(histogram("specifier_duration"), does_more ? 7 : 2));
+    resolve(route_config, outcome, user_data);
+    EXPECT_EQ(discards(), discards_at_end);
+    testing::Mock::VerifyAndClearExpectations(&time_system);
+    testing::Mock::VerifyAndClearExpectations(&context_.store_);
+  };
+  expect_durations(*config.value(), "pass-through", std::nullopt, false);
+  expect_durations(*config.value(), "template", std::nullopt, false);
+  expect_durations(*config.value(), "template", 1, true);
+  expect_durations(*config.value(), "pass-through", 1, true);
+  expect_durations(*config.value(), "error", std::nullopt, true);
+  // The miss fills the cache and the hit serves what it cached.
+  expect_durations(*config.value(), "cached", std::nullopt, true);
+  expect_durations(*config.value(), "cached", std::nullopt, false);
+  expect_durations(*verified.value(), "cached", std::nullopt, true);
+  expect_durations(*verified.value(), "cached", std::nullopt, true);
+}
+
+// A request outside runtime_fraction never reaches the module, so the specifier reads no clock and
+// records no duration for it, while a request inside it is timed.
+TEST_F(DynamicModuleUserDataTest, OnlyARequestInsideTheRuntimeFractionIsTimed) {
+  NiceMock<MockTimeSystem> time_system;
+  ON_CALL(context_, timeSource()).WillByDefault(testing::ReturnRef(time_system));
+  const auto config =
+      loadConfig(specifierYaml("route_specifier_user_data", R"EOF(      failure_policy: PASS_THROUGH
+      runtime_fraction:
+        default_value: {numerator: 50}
+        runtime_key: test.fraction
+)EOF"));
+  ASSERT_TRUE(config.ok());
+  const auto expect_fraction = [this](bool inside) {
+    EXPECT_CALL(
+        context_.runtime_loader_.snapshot_,
+        featureEnabled("test.fraction", testing::A<const envoy::type::v3::FractionalPercent&>(), 0))
+        .WillOnce(testing::Return(inside));
+  };
+
+  expect_fraction(false);
+  EXPECT_CALL(time_system, monotonicTime()).Times(0);
+  EXPECT_CALL(context_.store_, deliverHistogramToSinks(_, _)).Times(0);
+  resolve(*config.value(), "pass-through", std::nullopt);
+  EXPECT_EQ(1, counterValue("runtime_skipped"));
+  EXPECT_EQ(0, counterValue("decision_pass_through"));
+  testing::Mock::VerifyAndClearExpectations(&time_system);
+  testing::Mock::VerifyAndClearExpectations(&context_.store_);
+
+  expect_fraction(true);
+  EXPECT_CALL(time_system, monotonicTime()).Times(2);
+  EXPECT_CALL(context_.store_, deliverHistogramToSinks(_, _)).Times(2);
+  resolve(*config.value(), "pass-through", std::nullopt);
+  EXPECT_EQ(1, counterValue("runtime_skipped"));
+  EXPECT_EQ(1, counterValue("decision_pass_through"));
 }
 
 } // namespace

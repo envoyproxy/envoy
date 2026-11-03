@@ -3,11 +3,14 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/ssl_utility.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
@@ -229,17 +232,40 @@ public:
     return filter_chain;
   }
 
+  // Builds a filter chain like buildFilterChain() whose TLS transport socket loads its certificate
+  // over SDS from the given file.
+  envoy::config::listener::v3::FilterChain buildSdsTlsFilterChain(const std::string& name,
+                                                                  int direct_response_status,
+                                                                  const std::string& sds_path) {
+    envoy::config::listener::v3::FilterChain filter_chain =
+        buildFilterChain(name, direct_response_status);
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    auto* secret_config =
+        tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
+    secret_config->set_name("server_cert");
+    auto* sds_config = secret_config->mutable_sds_config();
+    sds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    sds_config->mutable_path_config_source()->set_path(sds_path);
+    auto* transport_socket = filter_chain.mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    std::ignore = transport_socket->mutable_typed_config()->PackFrom(tls_context);
+    return filter_chain;
+  }
+
   void
   sendFcdsResponse(const std::vector<envoy::config::listener::v3::FilterChain>& added_or_updated,
                    const std::vector<std::string>& removed, const std::string& version) {
     if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
         this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      sendDeltaDiscoveryResponse(Config::TestTypeUrl::get().FilterChain, added_or_updated, removed,
-                                 version, fcds_stream_.get());
+      auto response = createDeltaDiscoveryResponse(Config::TestTypeUrl::get().FilterChain,
+                                                   added_or_updated, removed, version, {}, {});
+      response.set_nonce(version);
+      fcds_stream_->sendGrpcMessage(response);
     } else {
       envoy::service::discovery::v3::DiscoveryResponse response;
       response.set_version_info(version);
       response.set_type_url(Config::TestTypeUrl::get().FilterChain);
+      response.set_nonce(version);
       for (const auto& filter_chain : added_or_updated) {
         std::ignore = response.add_resources()->PackFrom(filter_chain);
       }
@@ -250,6 +276,33 @@ public:
   void sendFcdsResponse(const std::vector<envoy::config::listener::v3::FilterChain>& filter_chains,
                         const std::string& version) {
     sendFcdsResponse(filter_chains, {}, version);
+  }
+
+  // For chains that warm synchronously, the FCDS ACK is held until the coalesced TLS update
+  // has been posted. update_success only records acceptance and can precede that post.
+  AssertionResult waitForFcdsUpdate(const std::string& version) {
+    auto wait_for_ack = [this, &version](auto request) -> AssertionResult {
+      do {
+        const auto result = fcds_stream_->waitForGrpcMessage(*dispatcher_, request);
+        if (!result) {
+          return result;
+        }
+      } while (request.response_nonce() != version);
+      if (request.has_error_detail()) {
+        return AssertionFailure() << request.DebugString();
+      }
+      return AssertionSuccess();
+    };
+    const auto result = (sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                         sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                            ? wait_for_ack(envoy::service::discovery::v3::DeltaDiscoveryRequest{})
+                            : wait_for_ack(envoy::service::discovery::v3::DiscoveryRequest{});
+    if (!result) {
+      return result;
+    }
+    // An ACK guarantees the TLS update was posted, but workers may not have processed it yet.
+    test_server_->waitForWorkerThreads();
+    return AssertionSuccess();
   }
 
   // A matcher that selects the first filter chain for the connections to port 1, and the second
@@ -410,10 +463,9 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
   // Perform in-place FCDS update modifying the direct response status code to 404!
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
-  // Wait for the new config to take effect. Since there's no listener reconstruction,
-  // we just make a new connection.
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
+  // A new connection uses the updated chain without reconstructing the listener.
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
   IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response2->waitForEndStream());
@@ -423,6 +475,49 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
   // Assert that the listener was NOT added or created again (meaning no reconstruction).
   // Total added must remain 1.
   EXPECT_EQ(1, test_server_->counter("listener_manager.listener_added")->value());
+}
+
+// A filter chain that FCDS updates after startup loads the SDS secret of its TLS context before it
+// serves, since its transport socket warms with the filter chain instead of the started server.
+TEST_P(ListenerFcdsIntegrationTest, FcdsUpdateAfterStartupLoadsSdsSecret) {
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  sendRequest(*codec_client);
+  codec_client->close();
+
+  const std::string sds_path = TestEnvironment::writeStringToFileForTest(
+      "fcds_server_cert.sds.yaml",
+      fmt::format(R"EOF(
+resources:
+- "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+  name: server_cert
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+)EOF",
+                  TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
+                  TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")));
+  sendFcdsResponse({buildSdsTlsFilterChain("dynamic_filter_chain_1", 404, sds_path)}, "2");
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
+
+  Network::UpstreamTransportSocketFactoryPtr tls_client_factory =
+      Ssl::createClientSslTransportSocketFactory({}, context_manager_, *api_,
+                                                 &server_factory_context_.serverScope());
+  IntegrationCodecClientPtr tls_codec_client =
+      makeHttpConnection(dispatcher_->createClientConnection(
+          Ssl::getSslAddress(version_, lookupPort(listener_name_)),
+          Network::Address::InstanceConstSharedPtr(),
+          tls_client_factory->createTransportSocket(nullptr, nullptr), nullptr, nullptr));
+  sendRequest(*tls_codec_client, "404");
+  tls_codec_client->close();
 }
 
 // Tests that a single FCDS push warming several filter chains leaves every chain serving traffic,
@@ -478,10 +573,12 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsBatchWarmsMultipleFilterChains) {
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   registerTestServerPorts({listener_name_});
 
-  // Every chain in the batch warms.
+  ASSERT_TRUE(waitForFcdsUpdate("1"));
+
+  // Verify that every chain in the batch was accepted.
   for (const std::string& name : chain_names) {
-    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
-                                 Eq(1));
+    EXPECT_EQ(1, test_server_->counter(fmt::format("filter_chain_manager.{}.update_success", name))
+                     ->value());
   }
 
   // The on_no_match chain serves live traffic.
@@ -499,9 +596,10 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsBatchWarmsMultipleFilterChains) {
                     buildFilterChain("dynamic_filter_chain_3", 212),
                     buildFilterChain("dynamic_filter_chain_4", 213)},
                    "2");
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
   for (const std::string& name : chain_names) {
-    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
-                                 Eq(2));
+    EXPECT_EQ(2, test_server_->counter(fmt::format("filter_chain_manager.{}.update_success", name))
+                     ->value());
   }
 
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
@@ -546,8 +644,8 @@ TEST_P(ListenerFcdsIntegrationTest, TwoListenersSharedFilterChain) {
   // Perform in-place FCDS update modifying the direct response status code to 404!
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Verify both listeners serve HTTP 404 correctly.
   IntegrationCodecClientPtr codec_client1_updated = makeHttpConnection(lookupPort(listener_name_));
@@ -613,8 +711,8 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   // We send an empty list of filter chains, which means dynamic_filter_chain_1 is removed.
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Check that the filter chain is now in draining state!
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
@@ -682,8 +780,8 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainRemovalAndDraining) {
   // Now perform in-place FCDS update removing the filter chain.
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Check that the filter chain is now draining.
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
@@ -746,7 +844,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainGracefulDrainClose) {
 
   // Now perform in-place FCDS update removing the filter chain.
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
 
   // Upstream data on the draining connection triggers the per-connection drain close.
@@ -826,7 +924,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsAddRemoveAdd) {
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
   // Wait for update.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Verify connection is rejected.
   {
@@ -840,7 +938,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsAddRemoveAdd) {
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "3");
 
   // Wait for update.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(3));
+  ASSERT_TRUE(waitForFcdsUpdate("3"));
 
   // Verify connection works again.
   {
@@ -1189,7 +1287,7 @@ TEST_P(ListenerFcdsIntegrationTest, InPlaceAddressUpdateKeepsFcdsFilterChainConn
   codec_client->close();
 
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
   IntegrationCodecClientPtr updated_codec_client = makeHttpConnection(port);
   sendRequest(*updated_codec_client, "404");
   updated_codec_client->close();

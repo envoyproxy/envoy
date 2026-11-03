@@ -39,7 +39,6 @@ using ::testing::_;
 using ::testing::AssertionFailure;
 using ::testing::AssertionResult;
 using ::testing::AssertionSuccess;
-using ::testing::Invoke;
 using ::testing::IsSubstring;
 using ::testing::NiceMock;
 using ::testing::ReturnRef;
@@ -74,12 +73,11 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
   // necessary right now.
   timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(10));
   ON_CALL(*mock_buffer_factory_, createBuffer_(_, _, _))
-      .WillByDefault(
-          Invoke([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
-                    absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
-            return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
-                                               std::move(above_overflow));
-          }));
+      .WillByDefault([](absl::AnyInvocable<void()> below_low, absl::AnyInvocable<void()> above_high,
+                        absl::AnyInvocable<void()> above_overflow) -> Buffer::Instance* {
+        return new Buffer::WatermarkBuffer(std::move(below_low), std::move(above_high),
+                                           std::move(above_overflow));
+      });
   ON_CALL(factory_context_storage_->server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(*factory_context_storage_, statsScope())
       .WillByDefault(ReturnRef(*stats_store_.rootScope()));

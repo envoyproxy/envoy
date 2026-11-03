@@ -51,7 +51,6 @@ using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 
 using ::testing::Eq;
-using ::testing::Invoke;
 using ::testing::Unused;
 
 // Test suite for failure_mode_allow override.
@@ -69,8 +68,7 @@ failure_mode_allow: true)EOF";
   route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
   FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-      .WillRepeatedly(
-          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+      .WillRepeatedly([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
@@ -79,10 +77,9 @@ failure_mode_allow: true)EOF";
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce([&immediate_response_headers](
+                    Unused, Unused, std::function<void(ResponseHeaderMap & headers)> modify_headers,
+                    Unused, Unused) { modify_headers(immediate_response_headers); });
 
   server_closed_stream_ = true; // Simulate stream close without proper gRPC response
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
@@ -101,8 +98,7 @@ failure_mode_allow: false)EOF";
   route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
   FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-      .WillRepeatedly(
-          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+      .WillRepeatedly([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
@@ -161,10 +157,9 @@ failure_mode_allow: false)EOF";
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce([&immediate_response_headers](
+                    Unused, Unused, std::function<void(ResponseHeaderMap & headers)> modify_headers,
+                    Unused, Unused) { modify_headers(immediate_response_headers); });
 
   server_closed_stream_ = true; // Simulate stream close without proper gRPC response
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
@@ -185,8 +180,7 @@ failure_mode_allow: true)EOF";
       ProcessingMode::SKIP);
   FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-      .WillRepeatedly(
-          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+      .WillRepeatedly([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
@@ -224,9 +218,9 @@ failure_mode_allow: true)EOF";
                                                   factory_context_);
 
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-      .WillRepeatedly(testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs {
+      .WillRepeatedly([&]() -> Router::RouteSpecificFilterConfigs {
         return {&route_config_less_specific, &route_config_more_specific};
-      }));
+      });
 
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
@@ -235,10 +229,9 @@ failure_mode_allow: true)EOF";
   EXPECT_CALL(encoder_callbacks_,
               sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(std::nullopt),
                              "ext_proc_error_gRPC_error_13{error_message}"))
-      .WillOnce(Invoke([&immediate_response_headers](
-                           Unused, Unused,
-                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
-                           Unused) { modify_headers(immediate_response_headers); }));
+      .WillOnce([&immediate_response_headers](
+                    Unused, Unused, std::function<void(ResponseHeaderMap & headers)> modify_headers,
+                    Unused, Unused) { modify_headers(immediate_response_headers); });
 
   server_closed_stream_ = true; // Simulate stream close without proper gRPC response
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
@@ -263,7 +256,7 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
 
   std::shared_ptr<MockStreamDecoderFilter> mock_filter(new NiceMock<MockStreamDecoderFilter>());
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+      .WillOnce([&](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         // Add ext_proc filter.
         callbacks.setFilterConfigName("");
         callbacks.addStreamDecoderFilter(filter_);
@@ -271,9 +264,9 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
         callbacks.setFilterConfigName("");
         callbacks.addStreamDecoderFilter(mock_filter);
         return true;
-      }));
+      });
   EXPECT_CALL(*mock_filter, decodeHeaders(_, false))
-      .WillOnce(Invoke([&](RequestHeaderMap& headers, bool end_stream) {
+      .WillOnce([&](RequestHeaderMap& headers, bool end_stream) {
         // The next decoder filter should be able to see the mutations made by the external server.
         EXPECT_FALSE(end_stream);
         EXPECT_EQ(headers.Path()->value().getStringView(), "/mutated_path/bluh");
@@ -283,45 +276,43 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
                                                 "Direct response from mock filter.", nullptr,
                                                 std::nullopt, "");
         return FilterHeadersStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(response_encoder_, encodeHeaders(_, _))
-      .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool end_stream) -> void {
+      .WillOnce([&](const ResponseHeaderMap& headers, bool end_stream) -> void {
         EXPECT_FALSE(end_stream);
         EXPECT_EQ(headers.Status()->value().getStringView(), "200");
-      }));
+      });
   EXPECT_CALL(response_encoder_, encodeData(_, _))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+      .WillOnce([&](Buffer::Instance& data, bool end_stream) -> void {
         EXPECT_TRUE(end_stream);
         EXPECT_EQ(data.toString(), "Direct response from mock filter.");
-      }));
+      });
   // Start the request.
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> ::Envoy::Http::Status {
-        EXPECT_EQ(data.length(), 5);
-        data.drain(5);
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce([&](Buffer::Instance& data) -> ::Envoy::Http::Status {
+    EXPECT_EQ(data.length(), 5);
+    data.drain(5);
 
-        HttpConnectionManagerImplMixin::decoder_ = &conn_manager_->newStream(response_encoder_);
-        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-            {":authority", "host"}, {":path", "/bluh"}, {":method", "GET"}}};
-        HttpConnectionManagerImplMixin::decoder_->decodeHeaders(std::move(headers), false);
-        Buffer::OwnedImpl request_body("Definitely more than 10 bytes data.");
-        HttpConnectionManagerImplMixin::decoder_->decodeData(request_body, true);
-        // Now external server returns the request header response.
-        auto response = std::make_unique<ProcessingResponse>();
-        auto* headers_response = response->mutable_request_headers();
-        auto* hdr =
-            headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
-        hdr->mutable_append()->set_value(false);
-        hdr->mutable_header()->set_key("foo");
-        hdr->mutable_header()->set_raw_value("gift-from-external-server");
-        hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
-        hdr->mutable_append()->set_value(false);
-        hdr->mutable_header()->set_key(":path");
-        hdr->mutable_header()->set_raw_value("/mutated_path/bluh");
-        HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
+    HttpConnectionManagerImplMixin::decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/bluh"}, {":method", "GET"}}};
+    HttpConnectionManagerImplMixin::decoder_->decodeHeaders(std::move(headers), false);
+    Buffer::OwnedImpl request_body("Definitely more than 10 bytes data.");
+    HttpConnectionManagerImplMixin::decoder_->decodeData(request_body, true);
+    // Now external server returns the request header response.
+    auto response = std::make_unique<ProcessingResponse>();
+    auto* headers_response = response->mutable_request_headers();
+    auto* hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+    hdr->mutable_append()->set_value(false);
+    hdr->mutable_header()->set_key("foo");
+    hdr->mutable_header()->set_raw_value("gift-from-external-server");
+    hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+    hdr->mutable_append()->set_value(false);
+    hdr->mutable_header()->set_key(":path");
+    hdr->mutable_header()->set_raw_value("/mutated_path/bluh");
+    HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
 
-        return ::Envoy::Http::okStatus();
-      }));
+    return ::Envoy::Http::okStatus();
+  });
 
   Buffer::OwnedImpl fake_input("hello");
   conn_manager_->onData(fake_input, false);
@@ -355,7 +346,7 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
       new NiceMock<MockStreamDecoderFilter>());
 
   EXPECT_CALL(*mock_encode_filter, encodeHeaders(_, _))
-      .WillOnce(Invoke([&](ResponseHeaderMap& headers, bool end_stream) {
+      .WillOnce([&](ResponseHeaderMap& headers, bool end_stream) {
         EXPECT_FALSE(end_stream);
         // The last encode filter will see the mutations from ext server.
         // NOTE: Without raising a high watermark when end_stream is true in onData(), if the stream
@@ -369,16 +360,16 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
                   "bluh");
 
         return FilterHeadersStatus::Continue;
-      }));
+      });
   EXPECT_CALL(*mock_encode_filter, encodeData(_, true))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) {
+      .WillOnce([&](Buffer::Instance& data, bool end_stream) {
         EXPECT_TRUE(end_stream);
         EXPECT_EQ(data.toString(),
                   "Direct response from mock filter, Definitely more than 10 bytes data.");
         return FilterDataStatus::Continue;
-      }));
+      });
   EXPECT_CALL(filter_factory_, createFilterChain(_))
-      .WillOnce(Invoke([&](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+      .WillOnce([&](::Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> bool {
         // Add the mock-encoder filter.
         callbacks.setFilterConfigName("");
         callbacks.addStreamEncoderFilter(mock_encode_filter);
@@ -391,9 +382,9 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
         callbacks.addStreamDecoderFilter(mock_decode_filter);
 
         return true;
-      }));
+      });
   EXPECT_CALL(*mock_decode_filter, decodeHeaders(_, _))
-      .WillOnce(Invoke([&](RequestHeaderMap& headers, bool end_stream) {
+      .WillOnce([&](RequestHeaderMap& headers, bool end_stream) {
         EXPECT_TRUE(end_stream);
         EXPECT_EQ(headers.Path()->value().getStringView(), "/bluh");
         // Direct response from decode filter.
@@ -421,18 +412,17 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
         hdr->mutable_header()->set_raw_value("bluh");
         HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
         return FilterHeadersStatus::StopIteration;
-      }));
+      });
   // Start the request.
-  EXPECT_CALL(*codec_, dispatch(_))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> ::Envoy::Http::Status {
-        EXPECT_EQ(data.length(), 5);
-        data.drain(5);
-        HttpConnectionManagerImplMixin::decoder_ = &conn_manager_->newStream(response_encoder_);
-        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
-            {":authority", "host"}, {":path", "/bluh"}, {":method", "GET"}}};
-        HttpConnectionManagerImplMixin::decoder_->decodeHeaders(std::move(headers), true);
-        return ::Envoy::Http::okStatus();
-      }));
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce([&](Buffer::Instance& data) -> ::Envoy::Http::Status {
+    EXPECT_EQ(data.length(), 5);
+    data.drain(5);
+    HttpConnectionManagerImplMixin::decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+        {":authority", "host"}, {":path", "/bluh"}, {":method", "GET"}}};
+    HttpConnectionManagerImplMixin::decoder_->decodeHeaders(std::move(headers), true);
+    return ::Envoy::Http::okStatus();
+  });
 
   Buffer::OwnedImpl fake_input("hello");
   conn_manager_->onData(fake_input, false);

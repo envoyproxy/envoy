@@ -30,8 +30,6 @@
 #include "quiche/common/platform/api/quiche_test.h"
 
 using testing::_;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 
 namespace Envoy {
 namespace Http {
@@ -180,47 +178,47 @@ public:
         context_(context) {
     request_.request_encoder_ = &client.newStream(response_.response_decoder_);
 
-    ON_CALL(request_.stream_callbacks_, onResetStream(_, _))
-        .WillByDefault(InvokeWithoutArgs([this] {
-          ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
-          resetStream();
-          stream_reset_callback_();
-        }));
-    ON_CALL(response_.stream_callbacks_, onResetStream(_, _))
-        .WillByDefault(InvokeWithoutArgs([this] {
-          ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
-          // Reset the client stream when we know the server stream has been reset. This ensures
-          // that the internal book keeping resetStream() below is consistent with the state of the
-          // client codec state, which is necessary to prevent multiple simultaneous streams for the
-          // HTTP/1 codec.
-          if (response_.stream_state_ != StreamState::Closed) {
-            request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-          }
-          resetStream();
-          stream_reset_callback_();
-        }));
-    ON_CALL(request_.request_decoder_, decodeHeaders_(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] {
-          // The HTTP/1 codec needs this to cleanup any latent stream resources.
-          response_.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
-          request_.closeRemote();
-        }));
-    ON_CALL(request_.request_decoder_, decodeData(_, true)).WillByDefault(InvokeWithoutArgs([this] {
+    ON_CALL(request_.stream_callbacks_, onResetStream(_, _)).WillByDefault([this] {
+      ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
+      resetStream();
+      stream_reset_callback_();
+    });
+    ON_CALL(response_.stream_callbacks_, onResetStream(_, _)).WillByDefault([this] {
+      ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
+      // Reset the client stream when we know the server stream has been reset. This ensures
+      // that the internal book keeping resetStream() below is consistent with the state of the
+      // client codec state, which is necessary to prevent multiple simultaneous streams for the
+      // HTTP/1 codec.
+      if (response_.stream_state_ != StreamState::Closed) {
+        request_.request_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+      }
+      resetStream();
+      stream_reset_callback_();
+    });
+    ON_CALL(request_.request_decoder_, decodeHeaders_(_, true)).WillByDefault([this] {
       // The HTTP/1 codec needs this to cleanup any latent stream resources.
       response_.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
-    }));
-    ON_CALL(request_.request_decoder_, decodeTrailers_(_)).WillByDefault(InvokeWithoutArgs([this] {
+    });
+    ON_CALL(request_.request_decoder_, decodeData(_, true)).WillByDefault([this] {
       // The HTTP/1 codec needs this to cleanup any latent stream resources.
       response_.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       request_.closeRemote();
-    }));
-    ON_CALL(response_.response_decoder_, decodeHeaders_(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
-    ON_CALL(response_.response_decoder_, decodeData(_, true))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
-    ON_CALL(response_.response_decoder_, decodeTrailers_(_))
-        .WillByDefault(InvokeWithoutArgs([this] { response_.closeLocalAndRemote(); }));
+    });
+    ON_CALL(request_.request_decoder_, decodeTrailers_(_)).WillByDefault([this] {
+      // The HTTP/1 codec needs this to cleanup any latent stream resources.
+      response_.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
+      request_.closeRemote();
+    });
+    ON_CALL(response_.response_decoder_, decodeHeaders_(_, true)).WillByDefault([this] {
+      response_.closeLocalAndRemote();
+    });
+    ON_CALL(response_.response_decoder_, decodeData(_, true)).WillByDefault([this] {
+      response_.closeLocalAndRemote();
+    });
+    ON_CALL(response_.response_decoder_, decodeTrailers_(_)).WillByDefault([this] {
+      response_.closeLocalAndRemote();
+    });
     if (!end_stream) {
       request_.request_encoder_->getStream().addCallbacks(request_.stream_callbacks_);
     }
@@ -388,12 +386,12 @@ public:
           ASSERT(dispatcher != nullptr);
           state.created_schedulable_callback_ = true;
           ON_CALL(*dispatcher, createSchedulableCallback_(_))
-              .WillByDefault(testing::Invoke([dispatcher](std::function<void()> cb) {
+              .WillByDefault([dispatcher](std::function<void()> cb) {
                 // The unique pointer of this object will be returned in
                 // createSchedulableCallback_ of dispatcher, so there is no risk of this object
                 // leaking.
                 return new Event::MockSchedulableCallback(dispatcher, cb);
-              }));
+              });
         }
 
         encoder->getStream().readDisable(disable);
@@ -421,13 +419,13 @@ public:
                        streamStateToString(response_.stream_state_));
         auto request_action = stream_action.dispatching_action().directional_action_selector_case();
         if (request_action == test::common::http::DirectionalAction::kHeaders) {
-          EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _))
-              .WillOnce(InvokeWithoutArgs(
-                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+          EXPECT_CALL(request_.request_decoder_, decodeHeaders_(_, _)).WillOnce([&] {
+            directionalAction(response_, stream_action.dispatching_action());
+          });
         } else if (request_action == test::common::http::DirectionalAction::kData) {
           EXPECT_CALL(request_.request_decoder_, decodeData(_, _))
               .Times(testing::AtLeast(1))
-              .WillRepeatedly(InvokeWithoutArgs([&] {
+              .WillRepeatedly([&] {
                 // Only simulate response action if the stream action is active
                 // otherwise the expectation could trigger in other moments
                 // causing the fuzzer to OOM.
@@ -438,11 +436,11 @@ public:
                 if (stream_action_active_) {
                   directionalAction(response_, stream_action.dispatching_action());
                 }
-              }));
+              });
         } else if (request_action == test::common::http::DirectionalAction::kTrailers) {
-          EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_))
-              .WillOnce(InvokeWithoutArgs(
-                  [&] { directionalAction(response_, stream_action.dispatching_action()); }));
+          EXPECT_CALL(request_.request_decoder_, decodeTrailers_(_)).WillOnce([&] {
+            directionalAction(response_, stream_action.dispatching_action());
+          });
         }
       }
       // Perform the stream action.
@@ -640,16 +638,14 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   ReorderBuffer client_write_buf{*server, should_close_connection};
   ReorderBuffer server_write_buf{*client, should_close_connection};
 
-  ON_CALL(client_connection, write(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-        ENVOY_LOG_MISC(trace, "client -> server {} bytes", data.length());
-        client_write_buf.add(data);
-      }));
-  ON_CALL(server_connection, write(_, _))
-      .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
-        ENVOY_LOG_MISC(trace, "server -> client {} bytes: {}", data.length(), data.toString());
-        server_write_buf.add(data);
-      }));
+  ON_CALL(client_connection, write(_, _)).WillByDefault([&](Buffer::Instance& data, bool) -> void {
+    ENVOY_LOG_MISC(trace, "client -> server {} bytes", data.length());
+    client_write_buf.add(data);
+  });
+  ON_CALL(server_connection, write(_, _)).WillByDefault([&](Buffer::Instance& data, bool) -> void {
+    ENVOY_LOG_MISC(trace, "server -> client {} bytes: {}", data.length(), data.toString());
+    server_write_buf.add(data);
+  });
 
   // We hold Streams in pending_streams between the request encodeHeaders in the
   // Stream constructor and server newStream() callback, where we learn about
@@ -660,7 +656,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
   NiceMock<MockRequestDecoder> orphan_request_decoder;
 
   ON_CALL(server_callbacks, newStream(_, _))
-      .WillByDefault(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
+      .WillByDefault([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         if (pending_streams.empty()) {
           return orphan_request_decoder;
         }
@@ -671,7 +667,7 @@ void codecFuzz(const test::common::http::CodecImplFuzzTestCase& input, HttpVersi
         encoder.getStream().addCallbacks(stream->response_.stream_callbacks_);
         stream->stream_index_ = streams.size() - 1;
         return stream->request_.request_decoder_;
-      }));
+      });
 
   auto client_server_buf_drain = [&client_write_buf, &server_write_buf] {
     Http::Status status = Http::okStatus();

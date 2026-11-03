@@ -147,9 +147,7 @@ class RawAsyncClientCacheTestBusyLoop : public testing::Test {
 public:
   RawAsyncClientCacheTestBusyLoop() {
     timer_ = new Event::MockTimer();
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb) {
-      return timer_;
-    }));
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb) { return timer_; });
     client_cache_ = std::make_unique<AsyncClientManagerImpl::RawAsyncClientCache>(
         dispatcher_, std::chrono::milliseconds(50000));
     EXPECT_CALL(*timer_, enableTimer(testing::Not(std::chrono::milliseconds(0)), _))
@@ -354,9 +352,9 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcInvalid) {
   initialize();
   envoy::config::core::v3::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
-  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce(Invoke([](absl::string_view) {
+  EXPECT_CALL(cm_, checkActiveStaticCluster("foo")).WillOnce([](absl::string_view) {
     return absl::InvalidArgumentError("failure");
-  }));
+  });
   EXPECT_EQ(
       async_client_manager_->factoryForGrpcService(grpc_service, scope_, false).status().message(),
       "failure");

@@ -29,7 +29,8 @@
 //!   `x-prefix-rewrite` a `matched=replacement` pair recorded as a prefix rewrite of the path.
 //!   `x-prefix-rewrite-rule` a `matched=replacement` pair recorded as a prefix rewrite rule, over
 //!                      the whole path when `matched` is empty.
-//!   `x-user-data`      a u64 recorded on the produced route, so the route destroy hook fires.
+//!   `x-user-data`      a u64 recorded on the produced route, so the route destroy hook fires,
+//!                      or the user data discard hook when no route carries it.
 //!   `x-append-action`  `append`, `add-if-absent`, `overwrite` or `overwrite-if-exists`, how an
 //!                      added header combines with one of the same name. Defaults to `overwrite`.
 //!   `x-add-request-header`  a `key=value` pair added to the request sent upstream.
@@ -52,6 +53,10 @@
 //!                      the ABI boundary.
 //!   `x-query-cluster`  the cluster whose host counts the `cluster-host-count` echo reads.
 //!   `x-query-priority` the priority the `cluster-host-count` echo reads, defaulting to 0.
+//!   `x-metadata-namespace`  the namespace the route metadata echoes read, defaulting to
+//!                      `envoy.test.route`.
+//!   `x-metadata-key`   the key the route metadata echoes read, defaulting to `key` for a string
+//!                      and `number` for a number.
 //!
 //! A scalar header holding `max` selects the largest value the SDK type can express, which
 //! exercises the saturating conversion at the ABI boundary.
@@ -66,6 +71,10 @@ use std::time::Duration;
 // the destroy-count echo. It is a process global because the hook may run on any thread and after
 // the stream that installed the route is gone.
 static ROUTE_DESTROY_COUNT: AtomicU64 = AtomicU64::new(0);
+
+// Counts the user data Envoy handed back because no route carried it, so a test can observe the
+// user data discard hook through the discard-count echo.
+static USER_DATA_DISCARD_COUNT: AtomicU64 = AtomicU64::new(0);
 
 declare_all_init_functions!(init, route_specifier: new_route_specifier_config_fn);
 
@@ -179,6 +188,13 @@ fn buffer_to_string(buffer: EnvoyBuffer) -> String {
 
 fn buffer_to_string_or_absent(buffer: Option<EnvoyBuffer>) -> String {
   buffer.map_or_else(|| ABSENT.to_owned(), buffer_to_string)
+}
+
+/// The value of the request header, or the default when the request does not carry it.
+fn header_or(ctx: &RouteSpecifierContext, name: &str, default: &str) -> String {
+  ctx
+    .get_request_header(name)
+    .map_or_else(|| default.to_owned(), buffer_to_string)
 }
 
 fn read_u64_header(ctx: &RouteSpecifierContext, key: &str) -> Option<u64> {
@@ -332,11 +348,15 @@ fn read_echoed_value(ctx: &RouteSpecifierContext, name: &[u8]) -> String {
     b"route-response-code" => ctx
       .input_route_response_code()
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
-    b"route-metadata" => {
-      buffer_to_string_or_absent(ctx.input_route_metadata_string("envoy.test.route", "key"))
-    },
+    b"route-metadata" => buffer_to_string_or_absent(ctx.input_route_metadata_string(
+      &header_or(ctx, "x-metadata-namespace", "envoy.test.route"),
+      &header_or(ctx, "x-metadata-key", "key"),
+    )),
     b"route-metadata-number" => ctx
-      .input_route_metadata_number("envoy.test.route", "number")
+      .input_route_metadata_number(
+        &header_or(ctx, "x-metadata-namespace", "envoy.test.route"),
+        &header_or(ctx, "x-metadata-key", "number"),
+      )
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
     b"selected-template" => buffer_to_string_or_absent(ctx.selected_template_id()),
     // Reads the previous route of the stream, the route the connection manager last installed.
@@ -344,10 +364,12 @@ fn read_echoed_value(ctx: &RouteSpecifierContext, name: &[u8]) -> String {
       .previous_route()
       .and_then(|route| route.cluster_name.map(buffer_to_string))
       .unwrap_or_else(|| ABSENT.to_owned()),
-    b"previous-route-metadata" => {
-      buffer_to_string_or_absent(ctx.previous_route_metadata_string("envoy.test.route", "key"))
-    },
+    b"previous-route-metadata" => buffer_to_string_or_absent(ctx.previous_route_metadata_string(
+      &header_or(ctx, "x-metadata-namespace", "envoy.test.route"),
+      &header_or(ctx, "x-metadata-key", "key"),
+    )),
     b"destroy-count" => ROUTE_DESTROY_COUNT.load(Ordering::Relaxed).to_string(),
+    b"discard-count" => USER_DATA_DISCARD_COUNT.load(Ordering::Relaxed).to_string(),
     _ => ABSENT.to_owned(),
   }
 }
@@ -396,6 +418,10 @@ impl TestRouteSpecifierConfig {
 impl RouteSpecifierConfig for TestRouteSpecifierConfig {
   fn on_route_destroy(&self, _user_data: u64) {
     ROUTE_DESTROY_COUNT.fetch_add(1, Ordering::Relaxed);
+  }
+
+  fn on_user_data_discard(&self, _user_data: u64) {
+    USER_DATA_DISCARD_COUNT.fetch_add(1, Ordering::Relaxed);
   }
 
   fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
@@ -570,6 +596,7 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     if let Some(name) = ctx.get_request_header("x-echo") {
       let value = match name.as_slice() {
         b"template-ids" => self.envoy_config.template_ids().join(","),
+        b"has-built-route-cache" => self.envoy_config.has_built_route_cache().to_string(),
         name => read_echoed_value(ctx, name),
       };
       let _ = ctx.add_response_header(

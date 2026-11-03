@@ -67,8 +67,7 @@ protected:
             [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
             server_.quic_stat_names_) {
     ON_CALL(server_context_.api_, threadFactory())
-        .WillByDefault(
-            Invoke([this]() -> Thread::ThreadFactory& { return api_->threadFactory(); }));
+        .WillByDefault([this]() -> Thread::ThreadFactory& { return api_->threadFactory(); });
     ON_CALL(server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
   }
 

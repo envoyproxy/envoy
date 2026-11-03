@@ -77,14 +77,26 @@ Envoy::Stats::StatNameTagVector buildTagsForRouteSpecifierMetric(
   return tags;
 }
 
+// Looks up a route metadata value by namespace and key, or nullptr if absent.
+const Protobuf::Value* routeMetadataValue(const envoy::config::core::v3::Metadata& metadata,
+                                          envoy_dynamic_module_type_module_buffer ns,
+                                          envoy_dynamic_module_type_module_buffer key) {
+  const auto filter_it = metadata.filter_metadata().find(toStringView(ns));
+  if (filter_it == metadata.filter_metadata().end()) {
+    return nullptr;
+  }
+  const auto& fields = filter_it->second.fields();
+  const auto field_it = fields.find(toStringView(key));
+  return field_it != fields.end() ? &field_it->second : nullptr;
+}
+
 // Returns a mutable handle to the route metadata value the module is setting, creating the
 // namespace and key when they are absent.
 Protobuf::Value& mutableRouteMetadataValue(RouteSpecifierContext& context,
                                            envoy_dynamic_module_type_module_buffer ns,
                                            envoy_dynamic_module_type_module_buffer key) {
   return Envoy::Config::Metadata::mutableMetadataValue(context.overrides.route_metadata,
-                                                       std::string(toStringView(ns)),
-                                                       std::string(toStringView(key)));
+                                                       toStringView(ns), toStringView(key));
 }
 
 bool knownAppendAction(envoy_dynamic_module_type_route_specifier_header_append_action action) {
@@ -224,6 +236,11 @@ void envoy_dynamic_module_callback_route_specifier_config_get_specifier_instance
     envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer* result) {
   setEnvoyBuffer(result, routeSpecifierConfig(config_envoy_ptr)->specifierInstanceId());
+}
+
+bool envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+    envoy_dynamic_module_type_route_specifier_config_envoy_ptr config_envoy_ptr) {
+  return routeSpecifierConfig(config_envoy_ptr)->hasBuiltRouteCache();
 }
 
 // ---------------------------------- Metrics ----------------------------------
@@ -610,12 +627,11 @@ bool envoy_dynamic_module_callback_route_specifier_get_previous_route_metadata(
   if (previous == nullptr) {
     return false;
   }
-  const auto& value = Envoy::Config::Metadata::metadataValue(
-      &previous->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
-  if (value.kind_case() != Protobuf::Value::kStringValue) {
+  const Protobuf::Value* value = routeMetadataValue(previous->metadata(), ns, key);
+  if (value == nullptr || value->kind_case() != Protobuf::Value::kStringValue) {
     return false;
   }
-  setEnvoyBuffer(result, value.string_value());
+  setEnvoyBuffer(result, value->string_value());
   return true;
 }
 
@@ -713,12 +729,11 @@ bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata(
   if (route == nullptr) {
     return false;
   }
-  const auto& value = Envoy::Config::Metadata::metadataValue(
-      &route->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
-  if (value.kind_case() != Protobuf::Value::kStringValue) {
+  const Protobuf::Value* value = routeMetadataValue(route->metadata(), ns, key);
+  if (value == nullptr || value->kind_case() != Protobuf::Value::kStringValue) {
     return false;
   }
-  setEnvoyBuffer(result, value.string_value());
+  setEnvoyBuffer(result, value->string_value());
   return true;
 }
 
@@ -730,12 +745,11 @@ bool envoy_dynamic_module_callback_route_specifier_get_input_route_metadata_numb
   if (route == nullptr) {
     return false;
   }
-  const auto& value = Envoy::Config::Metadata::metadataValue(
-      &route->metadata(), std::string(toStringView(ns)), std::string(toStringView(key)));
-  if (value.kind_case() != Protobuf::Value::kNumberValue) {
+  const Protobuf::Value* value = routeMetadataValue(route->metadata(), ns, key);
+  if (value == nullptr || value->kind_case() != Protobuf::Value::kNumberValue) {
     return false;
   }
-  *result = value.number_value();
+  *result = value->number_value();
   return true;
 }
 
