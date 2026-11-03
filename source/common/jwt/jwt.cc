@@ -8,6 +8,7 @@
 
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/escaping.h"
@@ -26,6 +27,28 @@ bool isImplemented(absl::string_view alg) {
   };
 
   return implemented_algs.contains(alg);
+}
+
+// "crit" must be a non-empty list of extension parameters that are present in the header.
+// https://tools.ietf.org/html/rfc7515#section-4.1.11
+bool parseCrit(const Protobuf::Value& value, const Protobuf::Struct& header,
+               std::vector<std::string>* crit) {
+  static const absl::flat_hash_set<absl::string_view> registered_params = {
+      {"alg"}, {"jku"},      {"jwk"}, {"kid"}, {"x5u"},  {"x5c"},
+      {"x5t"}, {"x5t#S256"}, {"typ"}, {"cty"}, {"crit"},
+  };
+  if (value.kind_case() != Protobuf::Value::kListValue || value.list_value().values().empty()) {
+    return false;
+  }
+  for (const auto& param : value.list_value().values()) {
+    if (param.kind_case() != Protobuf::Value::kStringValue ||
+        registered_params.contains(param.string_value()) ||
+        !header.fields().contains(param.string_value())) {
+      return false;
+    }
+    crit->push_back(param.string_value());
+  }
+  return true;
 }
 
 } // namespace
@@ -76,6 +99,13 @@ Status Jwt::parseFromString(const std::string& jwt) {
   // is not a string is ignored.
   header_getter.GetString("x5t#S256", &x5t_s256_);
   header_getter.GetString("x5t", &x5t_);
+
+  const Protobuf::Value* crit;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.jwt_validate_crit_header") &&
+      header_getter.GetValue("crit", crit) == StructUtils::OK &&
+      !parseCrit(*crit, header_pb_, &crit_)) {
+    return Status::JwtHeaderBadCrit;
+  }
 
   // Parse payload json
   payload_str_base64url_ = std::string(jwt_split[1]);

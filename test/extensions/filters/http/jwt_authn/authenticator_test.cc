@@ -187,6 +187,30 @@ TEST_F(AuthenticatorTest, TestAllowedAlgorithms) {
   }
 }
 
+// Test authenticator constraints for "crit" header parameters
+TEST_F(AuthenticatorTest, TestAllowedCriticalHeaders) {
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+
+  {
+    // The token lists "exp-extension" in "crit", which the provider does not allow.
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(CritToken)}};
+    expectVerifyStatus(Status::JwtCritHeaderNotAllowed, headers);
+  }
+
+  {
+    provider.add_allowed_critical_headers("exp-extension");
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+        .WillOnce([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+          receiver.onJwksSuccess(std::move(jwks_));
+        });
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(CritToken)}};
+    expectVerifyStatus(Status::Ok, headers);
+  }
+}
+
 // This test validates a good JWT authentication with a remote Jwks.
 // It also verifies Jwks cache with 10 JWT authentications, but only one Jwks fetch.
 TEST_F(AuthenticatorTest, TestOkJWTandCache) {

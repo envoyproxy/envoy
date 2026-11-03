@@ -293,6 +293,30 @@ providers:
   EXPECT_TRUE(data2->isAlgorithmAllowed("HS256"));
 }
 
+// Test "crit" header constraints for JwtProvider
+TEST_F(JwksCacheTest, TestAllowedCriticalHeaders) {
+  setupCache(R"(
+providers:
+  provider1:
+    issuer: issuer1
+    allowed_critical_headers:
+    - exp-a
+    - exp-b
+  provider2:
+    issuer: issuer2
+)");
+
+  auto* data1 = cache_->findByIssuer("issuer1");
+  EXPECT_TRUE(data1->areCriticalHeadersAllowed({}));
+  EXPECT_TRUE(data1->areCriticalHeadersAllowed({"exp-a", "exp-b"}));
+  EXPECT_FALSE(data1->areCriticalHeadersAllowed({"exp-a", "exp-c"}));
+
+  // Without allowed_critical_headers, no "crit" parameter is allowed.
+  auto* data2 = cache_->findByIssuer("issuer2");
+  EXPECT_TRUE(data2->areCriticalHeadersAllowed({}));
+  EXPECT_FALSE(data2->areCriticalHeadersAllowed({"exp-a"}));
+}
+
 // Test lifetime constraints for JwtProvider
 TEST_F(JwksCacheTest, TestLifetime) {
   setupCache(ExpirationConfig);

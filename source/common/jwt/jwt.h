@@ -47,6 +47,8 @@ struct Jwt {
   // x5t#S256 and x5t certificate thumbprints
   std::string x5t_s256_;
   std::string x5t_;
+  // "crit" extension parameters
+  std::vector<std::string> crit_;
   // iss
   std::string iss_;
   // audiences

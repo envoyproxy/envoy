@@ -9,6 +9,8 @@
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "test/test_common/test_runtime.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -242,6 +244,58 @@ TEST(JwtParseTest, TestParseHeaderNonStringX5tIgnored) {
   ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
   EXPECT_EQ(jwt.x5t_s256_, "");
   EXPECT_EQ(jwt.x5t_, "");
+}
+
+TEST(JwtParseTest, TestParseHeaderCrit) {
+  // Header:  {"alg":"RS256","crit":["exp-extension"],"exp-extension":true}
+  const std::string jwt_text =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsiZXhwLWV4dGVuc2lvbiJdLCJleHAtZXh0ZW5zaW9uIjp0cnVlfQ."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  Jwt jwt;
+  ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+  EXPECT_EQ(jwt.crit_, std::vector<std::string>{"exp-extension"});
+}
+
+TEST(JwtParseTest, TestParseHeaderBadCrit) {
+  // Header:  {"alg":"RS256","crit":"exp-extension","exp-extension":true}
+  const std::string bad_crit_not_list =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOiJleHAtZXh0ZW5zaW9uIiwiZXhwLWV4dGVuc2lvbiI6dHJ1ZX0."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":[]}
+  const std::string bad_crit_empty =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOltdfQ."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":[1]}
+  const std::string bad_crit_not_string =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsxXX0."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":["kid"],"kid":"abc"}
+  const std::string bad_crit_registered =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsia2lkIl0sImtpZCI6ImFiYyJ9."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+  // Header:  {"alg":"RS256","crit":["exp-extension"]}
+  const std::string bad_crit_missing =
+      "eyJhbGciOiJSUzI1NiIsImNyaXQiOlsiZXhwLWV4dGVuc2lvbiJdfQ."
+      "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIs"
+      "ImV4cCI6MTUwMTI4MTA1OH0.VGVzdFNpZ25hdHVyZQ";
+
+  for (const auto& jwt_text : {bad_crit_not_list, bad_crit_empty, bad_crit_not_string,
+                               bad_crit_registered, bad_crit_missing}) {
+    Jwt jwt;
+    EXPECT_EQ(jwt.parseFromString(jwt_text), Status::JwtHeaderBadCrit);
+  }
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.jwt_validate_crit_header", "false"}});
+  Jwt jwt;
+  EXPECT_EQ(jwt.parseFromString(bad_crit_missing), Status::Ok);
+  EXPECT_TRUE(jwt.crit_.empty());
 }
 
 TEST(JwtParseTest, TestParsePayloadBadBase64) {

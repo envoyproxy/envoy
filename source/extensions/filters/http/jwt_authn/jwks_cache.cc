@@ -1,5 +1,6 @@
 #include "source/extensions/filters/http/jwt_authn/jwks_cache.h"
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -54,6 +55,9 @@ public:
               ? "EdDSA"
               : JwtProvider::Algorithm_Name(static_cast<JwtProvider::Algorithm>(alg)));
     }
+
+    allowed_critical_headers_.insert(jwt_provider_.allowed_critical_headers().begin(),
+                                     jwt_provider_.allowed_critical_headers().end());
 
     if (jwt_provider_.has_subjects()) {
       sub_matcher_.emplace(jwt_provider_.subjects(), context);
@@ -202,6 +206,12 @@ public:
     return allowed_algorithms_.empty() || allowed_algorithms_.contains(alg);
   }
 
+  bool areCriticalHeadersAllowed(const std::vector<std::string>& crit) const override {
+    return std::all_of(crit.begin(), crit.end(), [this](const std::string& param) {
+      return allowed_critical_headers_.contains(param);
+    });
+  }
+
   const Jwks* getJwksObj() const override { return tls_->jwks_.get(); }
 
   bool isExpired() const override { return time_source_.monotonicTime() >= tls_->expire_; }
@@ -258,6 +268,7 @@ private:
   std::optional<Matchers::StringMatcherImpl> sub_matcher_;
   std::optional<absl::Duration> max_exp_;
   absl::flat_hash_set<std::string> allowed_algorithms_;
+  absl::flat_hash_set<std::string> allowed_critical_headers_;
 };
 
 using JwksDataImplPtr = std::unique_ptr<JwksDataImpl>;
