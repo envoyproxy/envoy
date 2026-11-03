@@ -47,7 +47,6 @@ std::optional<Socket::Option::Details> SocketTagSocketOptionImpl::getOptionDetai
     return std::nullopt;
   }
 
-  static std::string name = "socket_tag";
   Socket::Option::Details details;
   details.name_ = optname_;
   std::vector<uint8_t> data;

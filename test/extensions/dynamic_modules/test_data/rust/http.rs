@@ -309,6 +309,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.clear_route_cache();
     envoy_filter.clear_route_cluster_cache();
+    envoy_filter.drain_connection_upon_completion();
 
     // Test single getter API.
     let single_value = envoy_filter
@@ -917,7 +918,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
       .set_dynamic_metadata_string_batch("ns_req_header_batch", &[("k1", "v1"), ("k2", "v2")]);
     envoy_filter.set_dynamic_metadata_string_batch("ns_req_header_batch_empty", &[]);
 
-    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in filter_test.cc.
+    // Set a non-UTF-8 byte value, asserted end-to-end by the C++ integration test in
+    // filter_test.cc.
     envoy_filter.set_dynamic_metadata_bytes("ns_req_header_bytes", "key", &[0xff, 0x00, 0xfe]);
 
     // Set a whole namespace from a serialized google.protobuf.Struct { "k": "v" }, asserted
@@ -1429,7 +1431,7 @@ impl std::io::Read for BodyReader<'_> {
       let slice = self.data[self.vec_idx].as_slice();
       let remaining = slice.len() - self.buf_idx;
       let to_copy = std::cmp::min(remaining, buf.len() - n);
-      buf[n..n + to_copy].copy_from_slice(&slice[self.buf_idx..self.buf_idx + to_copy]);
+      buf[n .. n + to_copy].copy_from_slice(&slice[self.buf_idx .. self.buf_idx + to_copy]);
       n += to_copy;
       self.buf_idx += to_copy;
       if self.buf_idx >= slice.len() {
@@ -1540,7 +1542,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
+        self.request_body.borrow_mut().extend_from_slice(&buf[.. n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 
@@ -1559,7 +1561,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
         let mut reader = BodyReader::new(body);
         let mut buf = vec![0; 1024];
         let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-        self.request_body.borrow_mut().extend_from_slice(&buf[..n]);
+        self.request_body.borrow_mut().extend_from_slice(&buf[.. n]);
         // Drop the reader and try writing to the writer.
         drop(reader);
 

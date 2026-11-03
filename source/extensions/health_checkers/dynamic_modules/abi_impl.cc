@@ -14,6 +14,9 @@ using ::Envoy::Extensions::HealthCheckers::DynamicModules::DynamicModuleHealthCh
 using ::Envoy::Extensions::HealthCheckers::DynamicModules::DynamicModuleHealthCheckerScheduler;
 using Session = DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession;
 
+// Written by the HTTP health checker, so a module may not set it.
+constexpr absl::string_view kReservedHealthMetadataKey = "http_status_code";
+
 Session* getSession(envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr) {
   return static_cast<Session*>(session_envoy_ptr);
 }
@@ -152,6 +155,23 @@ envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_health_check
     return envoy_dynamic_module_type_host_health_Healthy;
   }
   return envoy_dynamic_module_type_host_health_Unhealthy;
+}
+
+bool envoy_dynamic_module_callback_health_checker_set_health_metadata(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value) {
+  if (session_envoy_ptr == nullptr || key.ptr == nullptr || key.length == 0 ||
+      (value.ptr == nullptr && value.length != 0)) {
+    return false;
+  }
+  const absl::string_view key_view(key.ptr, key.length);
+  if (key_view == kReservedHealthMetadataKey) {
+    return false;
+  }
+  getSession(session_envoy_ptr)
+      ->setHealthMetadata(key_view,
+                          absl::string_view(value.ptr == nullptr ? "" : value.ptr, value.length));
+  return true;
 }
 
 } // extern "C"

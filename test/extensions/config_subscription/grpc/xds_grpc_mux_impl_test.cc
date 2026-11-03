@@ -22,6 +22,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/upstream/load_stats_reporter.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/simulated_time_system.h"
@@ -37,7 +38,6 @@ using ::Envoy::StatusHelpers::IsOk;
 using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
-using testing::Invoke;
 using testing::IsSubstring;
 using testing::NiceMock;
 using ::testing::Not;
@@ -287,13 +287,13 @@ TEST_P(GrpcMuxImplTest, TypeUrlMismatch) {
     invalid_response->set_version_info("foo-version");
     invalid_response->mutable_resources()->Add()->set_type_url("type_url_bar");
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
-        .WillOnce(Invoke([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
+        .WillOnce([](Envoy::Config::ConfigUpdateFailureReason, const EnvoyException* e) {
           EXPECT_TRUE(
               IsSubstring("", "",
                           "type URL type_url_bar embedded in an individual Any does not match the "
                           "message-wide type URL type_url_foo in DiscoveryResponse",
                           e->what()));
-        }));
+        });
 
     expectSendMessage(
         "type_url_foo", {"x", "y"}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Internal,
@@ -321,15 +321,15 @@ TEST_P(GrpcMuxImplTest, RpcErrorMessageTruncated) {
     invalid_response->set_version_info("invalid");
     invalid_response->mutable_resources()->Add()->set_type_url(very_large_type_url);
     EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _))
-        .WillOnce(Invoke([&very_large_type_url](Envoy::Config::ConfigUpdateFailureReason,
-                                                const EnvoyException* e) {
+        .WillOnce([&very_large_type_url](Envoy::Config::ConfigUpdateFailureReason,
+                                         const EnvoyException* e) {
           EXPECT_TRUE(
               IsSubstring("", "",
                           fmt::format("type URL {} embedded in an individual Any does not match "
                                       "the message-wide type URL type_url_foo in DiscoveryResponse",
                                       very_large_type_url), // Local error message is not truncated.
                           e->what()));
-        }));
+        });
     expectSendMessage("type_url_foo", {"x", "y"}, "", false, "",
                       Grpc::Status::WellKnownGrpcStatus::Internal,
                       fmt::format("type URL {}...(truncated)", std::string(4087, 'A')));
@@ -397,10 +397,10 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(1000), _));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -418,10 +418,10 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
           return absl::OkStatus();
-        }));
+        });
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
@@ -437,10 +437,10 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
 
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_TRUE(resources.empty());
           return absl::OkStatus();
-        }));
+        });
 
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
@@ -458,10 +458,10 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
 
     EXPECT_CALL(*ttl_timer, disableTimer());
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -479,22 +479,21 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
     EXPECT_CALL(*ttl_timer, enabled());
     EXPECT_CALL(*ttl_timer, enableTimer(std::chrono::milliseconds(10000), _));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
           return absl::OkStatus();
-        }));
+        });
     // No update, just a change in TTL.
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
 
   time_system_.setSystemTime(std::chrono::seconds(11));
-  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, ""))
-      .WillOnce(Invoke([](auto, const auto& removed, auto) {
-        EXPECT_EQ(1, removed.size());
-        EXPECT_EQ("x", removed.Get(0));
-        return absl::OkStatus();
-      }));
+  EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "")).WillOnce([](auto, const auto& removed, auto) {
+    EXPECT_EQ(1, removed.size());
+    EXPECT_EQ("x", removed.Get(0));
+    return absl::OkStatus();
+  });
   // Fire the TTL timer.
   EXPECT_CALL(*ttl_timer, disableTimer());
   ttl_timer->invokeCallback();
@@ -554,14 +553,14 @@ TEST_P(GrpcMuxImplTest, WildcardWatch) {
     load_assignment.set_cluster_name("x");
     std::ignore = response->add_resources()->PackFrom(load_assignment);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                     const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -593,14 +592,14 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
     std::ignore = response->add_resources()->PackFrom(load_assignment);
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                     const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {"y", "z", "x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -621,8 +620,8 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
     load_assignment_z.set_cluster_name("z");
     std::ignore = response->add_resources()->PackFrom(load_assignment_z);
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment_y, &load_assignment_z](
-                             const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([&load_assignment_y, &load_assignment_z](
+                      const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(2, resources.size());
           const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
@@ -631,10 +630,10 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[1].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_z));
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment_x, &load_assignment_y](
-                             const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([&load_assignment_x, &load_assignment_y](
+                      const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(2, resources.size());
           const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
@@ -643,7 +642,7 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[1].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment_1, load_assignment_y));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {"y", "z", "x"}, "2");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -691,10 +690,10 @@ TEST_P(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   response->set_version_info("1");
   // Validate that onConfigUpdate is called with empty resources.
   EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
-      .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+      .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
         EXPECT_TRUE(resources.empty());
         return absl::OkStatus();
-      }));
+      });
   expectSendMessage(type_url, {}, "1");
   grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
 }
@@ -1002,14 +1001,14 @@ TEST_P(GrpcMuxImplTest, ValidResourceDecoderAfterRemoval) {
       load_assignment.set_cluster_name("x");
       std::ignore = response->add_resources()->PackFrom(load_assignment);
       EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
-          .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                              const std::string&) {
+          .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                       const std::string&) {
             EXPECT_EQ(1, resources.size());
             const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
                 envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
             EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             return absl::OkStatus();
-          }));
+          });
       expectSendMessage(type_url, {"x"}, "1");
       grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
     }
@@ -1036,14 +1035,14 @@ TEST_P(GrpcMuxImplTest, ValidResourceDecoderAfterRemoval) {
     load_assignment.set_cluster_name("y");
     std::ignore = response->add_resources()->PackFrom(load_assignment);
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                     const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {"y"}, "2");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -1142,10 +1141,10 @@ TEST_P(GrpcMuxImplTest, CacheEdsResource) {
     std::ignore = response->add_resources()->PackFrom(load_assignment);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
@@ -1184,10 +1183,10 @@ TEST_P(GrpcMuxImplTest, UpdateCacheEdsResource) {
     std::ignore = response->add_resources()->PackFrom(load_assignment);
 
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+        .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
           EXPECT_EQ(1, resources.size());
           return absl::OkStatus();
-        }));
+        });
     EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
     expectSendMessage(type_url, {"x"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
@@ -1233,11 +1232,10 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
       std::ignore = response->add_resources()->PackFrom(load_assignment);
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-          .WillOnce(
-              Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
-                EXPECT_EQ(1, resources.size());
-                return absl::OkStatus();
-              }));
+          .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+            EXPECT_EQ(1, resources.size());
+            return absl::OkStatus();
+          });
       EXPECT_CALL(*eds_resources_cache_, setResource("x", ProtoEq(load_assignment)));
       expectSendMessage(type_url, {"x"}, "1"); // Ack.
       grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
@@ -1264,11 +1262,10 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
       std::ignore = response->add_resources()->PackFrom(load_assignment);
 
       EXPECT_CALL(callbacks_, onConfigUpdate(_, "2"))
-          .WillOnce(
-              Invoke([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
-                EXPECT_EQ(1, resources.size());
-                return absl::OkStatus();
-              }));
+          .WillOnce([](const std::vector<DecodedResourceRef>& resources, const std::string&) {
+            EXPECT_EQ(1, resources.size());
+            return absl::OkStatus();
+          });
       EXPECT_CALL(*eds_resources_cache_, setResource("y", ProtoEq(load_assignment)));
       expectSendMessage(type_url, {"y"}, "2"); // Ack.
       grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
@@ -1283,6 +1280,10 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
 
 // Updating the mux object while being connected sends the correct requests.
 TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
+  TestScopedRuntime scoped_runtime;
+  // This is needed to validate that the LRS-factory is updated.
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "true"}});
+
   replaced_async_client_ = new Grpc::MockAsyncClient();
   setup();
   InSequence s;
@@ -1307,6 +1308,12 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
                     "", &replaced_async_stream_);
   expectSendMessage("type_url_bar", {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     &replaced_async_stream_);
+  bool factory_called = false;
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+
   EXPECT_OK(grpc_mux_->updateMuxSource(
       /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
       /*failover_async_client=*/nullptr,
@@ -1314,7 +1321,12 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementWhenConnected) {
       /*backoff_strategy=*/
       std::make_unique<JitteredExponentialBackOffStrategy>(
           SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
-      empty_ads_config));
+      empty_ads_config, lrs_factory));
+
+  // Verify that the factory is stored and used.
+  EXPECT_FALSE(factory_called);
+  grpc_mux_->maybeCreateLoadStatsReporter();
+  EXPECT_TRUE(factory_called);
   // Ending test, removing subscriptions for type_url_foo.
   expectSendMessage("type_url_foo", {}, "", false, "", Grpc::Status::WellKnownGrpcStatus::Ok, "",
                     &replaced_async_stream_);
@@ -1341,14 +1353,14 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     load_assignment.set_cluster_name("x");
     std::ignore = response->add_resources()->PackFrom(load_assignment);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                     const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {"x", "y"}, "1");
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
   }
@@ -1381,14 +1393,14 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
     load_assignment.set_cluster_name("y");
     std::ignore = response->add_resources()->PackFrom(load_assignment);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "2"))
-        .WillOnce(Invoke([&load_assignment](const std::vector<DecodedResourceRef>& resources,
-                                            const std::string&) {
+        .WillOnce([&load_assignment](const std::vector<DecodedResourceRef>& resources,
+                                     const std::string&) {
           EXPECT_EQ(1, resources.size());
           const auto& expected_assignment = Envoy::Protobuf::DynamicCastMessage<
               envoy::config::endpoint::v3::ClusterLoadAssignment>(resources[0].get().resource());
           EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
           return absl::OkStatus();
-        }));
+        });
     expectSendMessage(type_url, {"x", "y"}, "2", false, "", Grpc::Status::WellKnownGrpcStatus::Ok,
                       "", &replaced_async_stream_);
     grpc_mux_->onDiscoveryResponse(std::move(response), control_plane_stats_);
@@ -1437,12 +1449,110 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
                     &async_stream_);
 }
 
-// A temp test to increase coverage. The test will be modified once the
-// implementation will be added.
-TEST_P(GrpcMuxImplTest, LrsCoverageIncrease) {
-  setup();
-  EXPECT_EQ(grpc_mux_->loadStatsReporter(), nullptr);
-  EXPECT_EQ(grpc_mux_->maybeCreateLoadStatsReporter(), nullptr);
+// Ensures that the load-stats-reporter is created if enabled.
+TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporter) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "true"}});
+
+  bool factory_called = false;
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+
+  grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
+
+  // Initial state: not created.
+  EXPECT_EQ(nullptr, grpc_mux_->loadStatsReporter());
+  EXPECT_FALSE(factory_called);
+
+  // First call to maybeCreate: creates it.
+  Upstream::LoadStatsReporter* reporter = grpc_mux_->maybeCreateLoadStatsReporter();
+  EXPECT_NE(nullptr, reporter);
+  EXPECT_TRUE(factory_called);
+  EXPECT_EQ(reporter, grpc_mux_->loadStatsReporter());
+
+  // Second call: returns existing one, doesn't call factory again.
+  factory_called = false;
+  EXPECT_EQ(reporter, grpc_mux_->maybeCreateLoadStatsReporter());
+  EXPECT_FALSE(factory_called);
+
+  // Updating the mux source when the reporter already exists recreates it using the new factory.
+  replaced_async_client_ = new Grpc::MockAsyncClient();
+  EXPECT_CALL(*replaced_async_client_, startRaw(_, _, _, _))
+      .WillOnce(Return(&replaced_async_stream_));
+  bool new_factory_called = false;
+  auto new_lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    new_factory_called = true;
+    return std::make_unique<Upstream::MockLoadStatsReporter>();
+  };
+  envoy::config::core::v3::ApiConfigSource empty_ads_config;
+  EXPECT_OK(grpc_mux_->updateMuxSource(
+      /*primary_async_client=*/std::unique_ptr<Grpc::MockAsyncClient>(replaced_async_client_),
+      /*failover_async_client=*/nullptr,
+      /*scope=*/*stats_.rootScope(),
+      /*backoff_strategy=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      empty_ads_config, new_lrs_factory));
+  EXPECT_TRUE(new_factory_called);
+  EXPECT_NE(nullptr, grpc_mux_->loadStatsReporter());
+}
+
+// Ensures that the load-stats-reporter is not created if disabled.
+TEST_P(GrpcMuxImplTest, MaybeCreateLoadStatsReporterRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_lrs_server_self_ads", "false"}});
+
+  auto lrs_factory = [&]() -> std::unique_ptr<Upstream::LoadStatsReporter> {
+    return nullptr; // Should not be called.
+  };
+
+  GrpcMuxContext grpc_mux_context{
+      /*async_client_=*/std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
+      /*failover_async_client_=*/nullptr,
+      /*dispatcher_=*/dispatcher_,
+      /*service_method_=*/
+      *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources"),
+      /*local_info_=*/local_info_,
+      /*rate_limit_settings_=*/rate_limit_settings_,
+      /*scope_=*/*stats_.rootScope(),
+      /*config_validators_=*/std::move(config_validators_),
+      /*xds_resources_delegate_=*/XdsResourcesDelegateOptRef(),
+      /*xds_config_tracker_=*/XdsConfigTrackerOptRef(),
+      /*backoff_strategy_=*/
+      std::make_unique<JitteredExponentialBackOffStrategy>(
+          SubscriptionFactory::RetryInitialDelayMs, SubscriptionFactory::RetryMaxDelayMs, random_),
+      /*target_xds_authority_=*/"",
+      /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
+      /*skip_subsequent_node_=*/true,
+      /*load_stats_reporter_factory_=*/lrs_factory};
+
+  grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
+
+  EXPECT_EQ(nullptr, grpc_mux_->maybeCreateLoadStatsReporter());
 }
 
 class NullGrpcMuxImplTest : public testing::Test {
@@ -1477,7 +1587,7 @@ TEST_F(NullGrpcMuxImplTest, AddWatchRaisesException) {
 
 TEST_F(NullGrpcMuxImplTest, NoEdsResourcesCache) { EXPECT_EQ({}, null_mux_->edsResourcesCache()); }
 
-TEST_F(NullGrpcMuxImplTest, LrsCoverageIncrease) {
+TEST_F(NullGrpcMuxImplTest, LrsReturnsNull) {
   EXPECT_EQ(null_mux_->loadStatsReporter(), nullptr);
   EXPECT_EQ(null_mux_->maybeCreateLoadStatsReporter(), nullptr);
 }

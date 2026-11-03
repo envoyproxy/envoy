@@ -22,7 +22,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -382,7 +381,7 @@ TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
   writeHessianHeartbeatRequestMessage(buffer_, 0x0F);
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+      .WillOnce([&](Buffer::Instance& buffer, bool) -> void {
         ProtocolPtr protocol = conn_manager_->config().createProtocol();
         MessageMetadataSharedPtr metadata(std::make_shared<MessageMetadata>());
         auto result = protocol->decodeHeader(buffer, metadata);
@@ -395,7 +394,7 @@ TEST_F(ConnectionManagerTest, OnDataHandlesHeartbeatEvent) {
         EXPECT_EQ(metadata->responseStatus(), ResponseStatus::Ok);
         EXPECT_EQ(metadata->messageType(), MessageType::HeartbeatResponse);
         buffer.drain(ctx.headerSize());
-      }));
+      });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, buffer_.length());
@@ -457,7 +456,7 @@ TEST_F(ConnectionManagerTest, OnDataHandlesProtocolErrorOnWrite) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -512,7 +511,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponse) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -549,7 +548,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseContainExceptionInfo) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -584,7 +583,7 @@ TEST_F(ConnectionManagerTest, HandlesResponseError) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -616,7 +615,7 @@ TEST_F(ConnectionManagerTest, OnWriteHandlesResponseException) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -651,7 +650,7 @@ TEST_F(ConnectionManagerTest, OnDataResumesWithNextFilter) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*first_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
   EXPECT_CALL(*second_filter, setDecoderFilterCallbacks(_));
 
   // First filter stops iteration.
@@ -707,8 +706,8 @@ TEST_F(ConnectionManagerTest, PipelinedRequestAndResponse) {
 
   std::list<DubboFilters::DecoderFilterCallbacks*> callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillRepeatedly(Invoke(
-          [&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks.push_back(&cb); }));
+      .WillRepeatedly(
+          [&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks.push_back(&cb); });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(2U, store_.gauge("test.request_active", Stats::Gauge::ImportMode::Accumulate).value());
@@ -748,7 +747,7 @@ TEST_F(ConnectionManagerTest, ResetDownstreamConnection) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -840,7 +839,7 @@ TEST_F(ConnectionManagerTest, ResponseWithUnknownSequenceID) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   writeHessianRequestMessage(buffer_, false, false, 1);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -864,31 +863,31 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*first_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
   EXPECT_CALL(*second_filter, setDecoderFilterCallbacks(_));
 
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
-                           Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+      .WillOnce([&](MessageMetadata& metadata, Protocol&,
+                    Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
         // Validate request id.
         EXPECT_EQ(metadata.requestId(), 233333);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::SuccessReply;
-      }));
+      });
 
   // First filter sends local reply.
   EXPECT_CALL(*first_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         callbacks->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::AbortIteration;
-      }));
+      });
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+      .WillOnce([&](Buffer::Instance& buffer, bool) -> void {
         EXPECT_EQ(fake_response, buffer.toString());
-      }));
+      });
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(SerializationType::Hessian2, callbacks->serializationType());
@@ -912,30 +911,30 @@ TEST_F(ConnectionManagerTest, OnDataWithFilterSendsLocalErrorReply) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*first_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
   EXPECT_CALL(*second_filter, setDecoderFilterCallbacks(_));
 
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata& metadata, Protocol&,
-                           Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+      .WillOnce([&](MessageMetadata& metadata, Protocol&,
+                    Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
         // Validate request id.
         EXPECT_EQ(metadata.requestId(), 233334);
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::ErrorReply;
-      }));
+      });
 
   // First filter sends local reply.
   EXPECT_CALL(*first_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::AbortIteration;
-      }));
+      });
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
-      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+      .WillOnce([&](Buffer::Instance& buffer, bool) -> void {
         EXPECT_EQ(fake_response, buffer.toString());
-      }));
+      });
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -955,9 +954,9 @@ TEST_F(ConnectionManagerTest, TwoWayRequestWithEndStream) {
   auto& decoder_filter = config_->decoder_filters_[0];
 
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         return FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -974,9 +973,9 @@ TEST_F(ConnectionManagerTest, OneWayRequestWithEndStream) {
   auto& decoder_filter = config_->decoder_filters_[0];
 
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         return FilterStatus::StopIteration;
-      }));
+      });
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(conn_manager_->onData(buffer_, true), Network::FilterStatus::StopIteration);
@@ -1001,9 +1000,9 @@ TEST_F(ConnectionManagerTest, StopHandleRequest) {
   auto& decoder_filter = config_->decoder_filters_[0];
 
   ON_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillByDefault(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
+      .WillByDefault([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         return FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
       .Times(0);
@@ -1034,11 +1033,11 @@ TEST_F(ConnectionManagerTest, SendsLocalReplyWithCloseConnection) {
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
-                           Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+      .WillOnce([&](MessageMetadata&, Protocol&,
+                    Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::ErrorReply;
-      }));
+      });
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   MessageMetadata metadata;
@@ -1060,7 +1059,7 @@ TEST_F(ConnectionManagerTest, RoutingSuccess) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1083,7 +1082,7 @@ TEST_F(ConnectionManagerTest, RoutingFailure) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1102,7 +1101,7 @@ TEST_F(ConnectionManagerTest, ResetStream) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1121,7 +1120,7 @@ TEST_F(ConnectionManagerTest, NeedMoreDataForHandleResponse) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(1U, store_.counter("test.request").value());
@@ -1145,11 +1144,11 @@ TEST_F(ConnectionManagerTest, PendingMessageEnd) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         return FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
@@ -1185,15 +1184,15 @@ multiple_route_config:
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
         auto invo = static_cast<const RpcInvocationBase*>(&metadata->invocationInfo());
         auto data = const_cast<RpcInvocationBase*>(invo);
         data->setServiceName("org.apache.dubbo.demo.DemoService");
         data->setMethodName("test");
         return FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
@@ -1214,7 +1213,7 @@ TEST_F(ConnectionManagerTest, TransportEndWithConnectionClose) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   writeHessianRequestMessage(buffer_, false, false, 1);
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -1238,7 +1237,7 @@ TEST_F(ConnectionManagerTest, MessageDecodedReturnStopIteration) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   // The sendLocalReply is not called and the message type is not oneway,
   // the ActiveMessage object is not destroyed.
@@ -1248,10 +1247,10 @@ TEST_F(ConnectionManagerTest, MessageDecodedReturnStopIteration) {
 
   size_t buf_size = buffer_.length();
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr ctx) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr, ContextSharedPtr ctx) -> FilterStatus {
         EXPECT_EQ(ctx->messageSize(), buf_size);
         return FilterStatus::StopIteration;
-      }));
+      });
 
   EXPECT_EQ(conn_manager_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -1271,23 +1270,23 @@ TEST_F(ConnectionManagerTest, SendLocalReplyInMessageDecoded) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   const std::string fake_response("mock dubbo response");
   NiceMock<DubboFilters::MockDirectResponse> direct_response;
   EXPECT_CALL(direct_response, encode(_, _, _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
-                           Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
+      .WillOnce([&](MessageMetadata&, Protocol&,
+                    Buffer::Instance& buffer) -> DubboFilters::DirectResponse::ResponseType {
         buffer.add(fake_response);
         return DubboFilters::DirectResponse::ResponseType::ErrorReply;
-      }));
+      });
   EXPECT_CALL(*decoder_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr, ContextSharedPtr) -> FilterStatus {
         EXPECT_EQ(1, conn_manager_->getActiveMessagesForTest().size());
         EXPECT_NE(nullptr, conn_manager_->getActiveMessagesForTest().front()->metadata());
         callbacks->sendLocalReply(direct_response, false);
         return FilterStatus::AbortIteration;
-      }));
+      });
 
   // The sendLocalReply is called, the ActiveMessage object should be destroyed.
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
@@ -1315,7 +1314,7 @@ TEST_F(ConnectionManagerTest, HandleResponseWithEncoderFilter) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*decoder_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
 
   EXPECT_CALL(*encoder_filter, setEncoderFilterCallbacks(_));
 
@@ -1335,12 +1334,11 @@ TEST_F(ConnectionManagerTest, HandleResponseWithEncoderFilter) {
 
   size_t expect_response_length = write_buffer_.length();
   EXPECT_CALL(*encoder_filter, onMessageEncoded(_, _))
-      .WillOnce(
-          Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
-            EXPECT_EQ(metadata->requestId(), request_id);
-            EXPECT_EQ(ctx->messageSize(), expect_response_length);
-            return FilterStatus::Continue;
-          }));
+      .WillOnce([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
+        EXPECT_EQ(metadata->requestId(), request_id);
+        EXPECT_EQ(ctx->messageSize(), expect_response_length);
+        return FilterStatus::Continue;
+      });
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
@@ -1362,12 +1360,12 @@ TEST_F(ConnectionManagerTest, HandleResponseWithCodecFilter) {
 
   DubboFilters::DecoderFilterCallbacks* callbacks{};
   EXPECT_CALL(*mock_codec_filter, setDecoderFilterCallbacks(_))
-      .WillOnce(Invoke([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+      .WillOnce([&](DubboFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; });
   EXPECT_CALL(*mock_codec_filter, onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
         EXPECT_EQ(metadata->requestId(), request_id);
         return FilterStatus::Continue;
-      }));
+      });
 
   EXPECT_CALL(*mock_codec_filter, setEncoderFilterCallbacks(_));
 
@@ -1385,12 +1383,11 @@ TEST_F(ConnectionManagerTest, HandleResponseWithCodecFilter) {
 
   size_t expect_response_length = write_buffer_.length();
   EXPECT_CALL(*mock_codec_filter, onMessageEncoded(_, _))
-      .WillOnce(
-          Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
-            EXPECT_EQ(metadata->requestId(), request_id);
-            EXPECT_EQ(ctx->messageSize(), expect_response_length);
-            return FilterStatus::Continue;
-          }));
+      .WillOnce([&](MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) -> FilterStatus {
+        EXPECT_EQ(metadata->requestId(), request_id);
+        EXPECT_EQ(ctx->messageSize(), expect_response_length);
+        return FilterStatus::Continue;
+      });
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_));
   EXPECT_EQ(DubboFilters::UpstreamResponseStatus::Complete, callbacks->upstreamData(write_buffer_));
@@ -1410,10 +1407,10 @@ TEST_F(ConnectionManagerTest, AddDataWithStopAndContinue) {
   uint64_t request_id = 100;
 
   EXPECT_CALL(*config_->decoder_filters_[0], onMessageDecoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
         EXPECT_EQ(metadata->requestId(), request_id);
         return FilterStatus::Continue;
-      }));
+      });
   EXPECT_CALL(*config_->decoder_filters_[1], onMessageDecoded(_, _))
       .WillOnce(Return(FilterStatus::StopIteration))
       .WillOnce(Return(FilterStatus::Continue));
@@ -1425,10 +1422,10 @@ TEST_F(ConnectionManagerTest, AddDataWithStopAndContinue) {
 
   // For encode direction
   EXPECT_CALL(*config_->encoder_filters_[0], onMessageEncoded(_, _))
-      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
+      .WillOnce([&](MessageMetadataSharedPtr metadata, ContextSharedPtr) -> FilterStatus {
         EXPECT_EQ(metadata->requestId(), request_id);
         return FilterStatus::Continue;
-      }));
+      });
   EXPECT_CALL(*config_->encoder_filters_[1], onMessageEncoded(_, _))
       .WillOnce(Return(FilterStatus::StopIteration))
       .WillOnce(Return(FilterStatus::Continue));

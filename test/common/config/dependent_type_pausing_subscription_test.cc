@@ -17,7 +17,6 @@ namespace Config {
 namespace {
 
 using testing::Eq;
-using testing::Invoke;
 using testing::Matcher;
 using testing::Ref;
 using testing::StrictMock;
@@ -42,10 +41,10 @@ public:
   // destroyed. paused_ reflects whether the pause is currently active.
   void expectPause(const std::vector<std::string>& type_urls) {
     EXPECT_CALL(xds_manager_, pause(Matcher<const std::vector<std::string>&>(Eq(type_urls))))
-        .WillOnce(Invoke([this](const std::vector<std::string>&) -> ScopedResume {
+        .WillOnce([this](const std::vector<std::string>&) -> ScopedResume {
           paused_ = true;
           return std::make_unique<Cleanup>([this]() { paused_ = false; });
-        }));
+        });
   }
 
   StrictMock<MockXdsManager> xds_manager_;
@@ -103,10 +102,10 @@ TEST_F(DependentTypePausingSubscriptionTest, SotwUpdatePausesDependentTypes) {
   const std::vector<DecodedResourceRef> resources;
   expectPause(dependentTypeUrls(type_url));
   EXPECT_CALL(callbacks_, onConfigUpdate(Ref(resources), "v1"))
-      .WillOnce(Invoke([this](const std::vector<DecodedResourceRef>&, const std::string&) {
+      .WillOnce([this](const std::vector<DecodedResourceRef>&, const std::string&) {
         EXPECT_TRUE(paused_);
         return absl::InvalidArgumentError("rejected");
-      }));
+      });
   EXPECT_EQ(inner_callbacks_->onConfigUpdate(resources, "v1"),
             absl::InvalidArgumentError("rejected"));
   EXPECT_FALSE(paused_);
@@ -121,11 +120,11 @@ TEST_F(DependentTypePausingSubscriptionTest, DeltaUpdatePausesDependentTypes) {
   const Protobuf::RepeatedPtrField<std::string> removed_resources;
   expectPause(dependentTypeUrls(type_url));
   EXPECT_CALL(callbacks_, onConfigUpdate(Ref(added_resources), Ref(removed_resources), "v1"))
-      .WillOnce(Invoke([this](const std::vector<DecodedResourceRef>&,
-                              const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+      .WillOnce([this](const std::vector<DecodedResourceRef>&,
+                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
         EXPECT_TRUE(paused_);
         return absl::OkStatus();
-      }));
+      });
   EXPECT_TRUE(inner_callbacks_->onConfigUpdate(added_resources, removed_resources, "v1").ok());
   EXPECT_FALSE(paused_);
 }
