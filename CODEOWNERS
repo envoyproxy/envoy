@@ -175,7 +175,7 @@
 /*/extensions/filters/network/echo @yanavlasov @UNOWNED
 /*/extensions/filters/udp/dns_filter @mattklein123 @yanjunxiang-google
 /*/extensions/filters/network/direct_response @kyessenov @UNOWNED
-/*/extensions/filters/udp/udp_proxy @mattklein123 @danzh2010 @nezdolik
+/*/extensions/filters/udp/udp_proxy @mattklein123 @nezdolik @antonkanug
 /*/extensions/clusters/aggregate @yxue @mattklein123
 /*/extensions/clusters/composite @agrawroh @yanavlasov @wbpcode
 /*/extensions/clusters/mcp_multicluster @yanavlasov @botengyao @agrawroh
@@ -401,6 +401,7 @@
 /*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 /*/extensions/load_balancing_policies/wrr_locality @wbpcode @efimki
 /*/extensions/load_balancing_policies/load_aware_locality @tonya11en @jukie @nezdolik
+/*/extensions/load_balancing_policies/host_allowlist @soumya-acharya @yanavlasov
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions
@@ -477,6 +478,7 @@
 /*/extensions/router/cluster_specifiers/priority_group @wbpcode @kanurag94
 
 # Queue policy
+/*/extensions/queue_policy/adaptive_lifo @nezdolik @tonya11en @yanavlasov
 /*/extensions/queue_policy/common @nezdolik @yanavlasov @tonya11en @balrawi-figma
 /*/extensions/queue_policy/fifo @nezdolik @yanavlasov @tonya11en @balrawi-figma
 

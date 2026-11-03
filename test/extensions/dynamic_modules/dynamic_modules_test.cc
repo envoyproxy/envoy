@@ -6,6 +6,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -204,6 +205,10 @@ TEST(CreateDynamicModulesByName, EnvoyDynamicModulesSearchPathNotSetFallbackToCw
   std::filesystem::copy(test_lib, staged_lib);
   absl::StatusOr<DynamicModulePtr> module = newDynamicModuleByName("foo", false);
   EXPECT_OK(module) << "Failed to load module";
+  // Unload the module first, since Windows cannot delete a loaded DLL.
+  if (module.ok()) {
+    module->reset();
+  }
   std::filesystem::remove(staged_lib);
 }
 
@@ -218,6 +223,10 @@ TEST(CreateDynamicModulesByName, DlopenDefaultSearchPath) {
   EXPECT_OK(module) << "Failed to load module";
 
   TestEnvironment::unsetEnvVar("ENVOY_DYNAMIC_MODULES_SEARCH_PATH");
+  // Unload the module first, since Windows cannot delete a loaded DLL.
+  if (module.ok()) {
+    module->reset();
+  }
   std::filesystem::remove(staged_lib);
 }
 
@@ -256,6 +265,49 @@ TEST(StaticModule, MultipleLoads) {
   absl::StatusOr<DynamicModulePtr> c_module_2 =
       newDynamicModuleByName("matcher_no_op_static", /*do_not_close=*/false);
   EXPECT_OK(c_module_2);
+}
+
+TEST(StaticModule, MultipleRustModules) {
+  auto http_module = newDynamicModuleByName("no_op_static", /*do_not_close=*/true);
+  ASSERT_OK(http_module);
+  auto listener_module = newDynamicModuleByName("listener_no_op_static", /*do_not_close=*/true);
+  ASSERT_OK(listener_module);
+
+  // These hooks live in the SDK, not in the module crates. Each module must have
+  // its own SDK hooks and factory state, while sharing the Rust runtime.
+  using NewHttpConfig = decltype(&envoy_dynamic_module_on_http_filter_config_new);
+  const auto http_config_new = http_module.value()->getFunctionPointer<NewHttpConfig>(
+      "envoy_dynamic_module_on_http_filter_config_new");
+  ASSERT_OK(http_config_new);
+  const auto other_http_config_new = listener_module.value()->getFunctionPointer<NewHttpConfig>(
+      "envoy_dynamic_module_on_http_filter_config_new");
+  ASSERT_OK(other_http_config_new);
+  EXPECT_NE(http_config_new.value(), other_http_config_new.value());
+
+  const envoy_dynamic_module_type_envoy_buffer name = {"foo", 3};
+  const envoy_dynamic_module_type_envoy_buffer config = {"bar", 3};
+  auto http_config = http_config_new.value()(nullptr, name, config);
+  ASSERT_NE(http_config, nullptr);
+  const auto http_config_destroy =
+      http_module.value()
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_config_destroy)>(
+              "envoy_dynamic_module_on_http_filter_config_destroy");
+  ASSERT_OK(http_config_destroy);
+  http_config_destroy.value()(http_config);
+
+  const auto listener_config_new =
+      listener_module.value()
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_listener_filter_config_new)>(
+              "envoy_dynamic_module_on_listener_filter_config_new");
+  ASSERT_OK(listener_config_new);
+  auto listener_config = listener_config_new.value()(nullptr, name, config);
+  ASSERT_NE(listener_config, nullptr);
+  const auto listener_config_destroy =
+      listener_module.value()
+          ->getFunctionPointer<decltype(&envoy_dynamic_module_on_listener_filter_config_destroy)>(
+              "envoy_dynamic_module_on_listener_filter_config_destroy");
+  ASSERT_OK(listener_config_destroy);
+  listener_config_destroy.value()(listener_config);
 }
 
 TEST(CreateDynamicModulesByName, ModuleNotFound) {
@@ -425,16 +477,24 @@ TEST(NewDynamicModuleFromBytes, RepeatedLoadReusesDlopenHandle) {
       std::filesystem::temp_directory_path() / fmt::format("envoy_dynamic_module_{}.so", sha256);
   std::filesystem::remove(temp_path);
 
+#ifdef WIN32
+  // Windows cannot delete a loaded DLL, so let the module unload once both handles are released
+  // instead of pinning it for the rest of the process.
+  constexpr bool do_not_close = false;
+#else
+  constexpr bool do_not_close = true;
+#endif
+
   // First load writes and loads the module.
   absl::StatusOr<DynamicModulePtr> module1 =
-      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+      newDynamicModuleFromBytes(module_bytes, sha256, do_not_close, false);
   ASSERT_OK(module1);
   ASSERT_TRUE(std::filesystem::exists(temp_path));
 
   // Second load with the same sha256 — writes again but the RTLD_NOLOAD check in
   // newDynamicModule returns the existing handle, so the init function is not called twice.
   absl::StatusOr<DynamicModulePtr> module2 =
-      newDynamicModuleFromBytes(module_bytes, sha256, true, false);
+      newDynamicModuleFromBytes(module_bytes, sha256, do_not_close, false);
   ASSERT_OK(module2);
 
   // Cleanup.
@@ -559,12 +619,18 @@ TEST_F(NewDynamicModuleByConfigTest, RemoteCacheHitLoads) {
   std::filesystem::create_directories(cached.parent_path());
   std::filesystem::copy_file(module_path, cached,
                              std::filesystem::copy_options::overwrite_existing);
+  // The copy keeps the read-only attribute of the Bazel output on Windows, which would prevent
+  // removing or overwriting the cached file later.
+  std::filesystem::permissions(cached, std::filesystem::perms::owner_write,
+                               std::filesystem::perm_options::add);
 
   auto result = newDynamicModuleByConfig(makeRemoteConfig(sha), "test_module", context_);
   ASSERT_OK(result);
   EXPECT_NE(result->loaded, nullptr);
   EXPECT_EQ(result->async, nullptr);
 
+  // Unload the module first, since Windows cannot delete a loaded DLL.
+  result->loaded.reset();
   std::filesystem::remove(cached);
 }
 

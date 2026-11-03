@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/network/address.h"
@@ -15,6 +16,8 @@
 #include "envoy/server/overload/thread_local_overload_state.h"
 
 #include "source/common/common/interval_value.h"
+
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Network {
@@ -72,7 +75,10 @@ public:
   virtual void decNumConnections() PURE;
 
   /**
-   * Adds a listener to the handler, optionally replacing the existing listener.
+   * Adds a listener to the handler, optionally replacing the existing listener. When replacing with
+   * a config that has more addresses than the existing listener listens on, it also adds listeners
+   * for the addresses that the existing listener does not listen on. The addresses that the new
+   * config removes must therefore be stopped by stopListenerAddresses() beforehand.
    * @param overridden_listener tag of the existing listener. nullopt if no previous listener.
    * @param config listener configuration options.
    * @param runtime the runtime for the server.
@@ -127,6 +133,35 @@ public:
    * @param drain_event describes the drain sequence (start time and strategy).
    */
   virtual void onListenerDrain(uint64_t listener_tag, ConnectionDrainEvent drain_event) PURE;
+
+  /**
+   * Stop accepting new connections on the addresses that an in place update removed from a
+   * listener. The listeners of the addresses keep using the replaced listener config, which must
+   * outlive them, until removeListenerAddresses() or removeListeners() removes them.
+   * onListenerAddressesDrain() notifies their connections that they are being drained, and
+   * removeFilterChains() also closes their connections that use the removed filter chains.
+   * @param listener supplies the listener config that the in place update replaced.
+   * @param addresses supplies the removed addresses.
+   */
+  virtual void
+  stopListenerAddresses(const ListenerConfig& listener,
+                        const std::vector<Address::InstanceConstSharedPtr>& addresses) PURE;
+
+  /**
+   * Notify the connections of the addresses that stopListenerAddresses() stopped for the listener
+   * config that they are being drained. Does not close any connections.
+   * @param listener supplies the listener config passed to stopListenerAddresses().
+   * @param drain_event describes the drain sequence (start time and strategy).
+   */
+  virtual void onListenerAddressesDrain(const ListenerConfig& listener,
+                                        ConnectionDrainEvent drain_event) PURE;
+
+  /**
+   * Remove the listeners of the addresses that stopListenerAddresses() stopped for the listener
+   * config. All connections accepted on them are closed.
+   * @param listener supplies the listener config passed to stopListenerAddresses().
+   */
+  virtual void removeListenerAddresses(const ListenerConfig& listener) PURE;
 
   /**
    * Stop all listeners. This will not close any connections and is used for draining.
@@ -349,6 +384,17 @@ public:
    * @return socket options specific to this factory that should be applied to all sockets.
    */
   virtual const Network::Socket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
+   * Initializes routing of UDP packets to the correct worker. Called once when a listener is added
+   * or updated, after the listen sockets are created. Implementations may register init targets
+   * with the listener's init manager.
+   * Only called if envoy.restart_features.defer_worker_routing_init is enabled.
+   * @param listen_socket_factories the listener's socket factories, one per address.
+   * @return a status indicating if an error occurred.
+   */
+  virtual absl::Status initializeWorkerRouting(
+      absl::Span<const Network::ListenSocketFactoryPtr> listen_socket_factories) PURE;
 };
 
 using ActiveUdpListenerFactoryPtr = std::unique_ptr<ActiveUdpListenerFactory>;

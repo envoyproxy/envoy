@@ -10,7 +10,6 @@ namespace Envoy {
 namespace Upstream {
 
 using ::testing::_;
-using ::testing::Invoke;
 using ::testing::ReturnPointee;
 using ::testing::ReturnRef;
 
@@ -19,13 +18,13 @@ MockPrioritySet::MockPrioritySet() {
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(testing::Const(*this), hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
   ON_CALL(*this, addMemberUpdateCb(_))
-      .WillByDefault(Invoke([this](PrioritySet::MemberUpdateCb cb) -> Common::CallbackHandlePtr {
+      .WillByDefault([this](PrioritySet::MemberUpdateCb cb) -> Common::CallbackHandlePtr {
         return member_update_cb_helper_.add(cb);
-      }));
+      });
   ON_CALL(*this, addPriorityUpdateCb(_))
-      .WillByDefault(Invoke([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandlePtr {
+      .WillByDefault([this](PrioritySet::PriorityUpdateCb cb) -> Common::CallbackHandlePtr {
         return priority_update_cb_helper_.add(cb);
-      }));
+      });
   ON_CALL(*this, crossPriorityHostMap()).WillByDefault(ReturnPointee(&cross_priority_host_map_));
 }
 

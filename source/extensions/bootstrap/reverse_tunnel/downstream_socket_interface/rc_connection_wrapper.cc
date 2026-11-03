@@ -137,9 +137,9 @@ absl::Status RCConnectionWrapper::connect(const std::string& src_tenant_id,
                              ::Envoy::Extensions::Bootstrap::ReverseConnection::
                                  ReverseConnectionUtility::REVERSE_TUNNEL_UPGRADE_PROTOCOL);
   }
-  headers->addCopy(node_hdr, std::string(node_id));
-  headers->addCopy(cluster_hdr, std::string(cluster_id));
-  headers->addCopy(tenant_hdr, std::string(tenant_id));
+  headers->addCopy(node_hdr, node_id);
+  headers->addCopy(cluster_hdr, cluster_id);
+  headers->addCopy(tenant_hdr, tenant_id);
   headers->addCopy(upstream_cluster_hdr, cluster_name_);
 
   const Http::LowerCaseString& initiation_time_hdr =

@@ -237,7 +237,8 @@ public:
 
   // Offloads `data` into the external buffer (batching small frames). The caller
   // holds the filter chain (returns StopIteration*) while the body is buffered.
-  void onData(Buffer::Instance& data);
+  // `end_stream` marks `data` as the last frame of the body.
+  void onData(Buffer::Instance& data, bool end_stream = false);
 
   // Signals that the full body has been offloaded, flushing any batched backlog to
   // the buffer so all of it becomes durable, and is ready to replay.
@@ -372,7 +373,7 @@ private:
   // we never inject/error reentrantly from within it).
   Event::SchedulableCallbackPtr replay_cb_;
 
-  // True once endStream() has been called; gates flushing the batched backlog (the
+  // True once the body has ended; gates flushing the batched backlog (the
   // tail is written even if it is below WriteFlushThreshold).
   bool end_stream_seen_{false};
   // True once a write carrying end_stream has been issued.

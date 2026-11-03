@@ -3,6 +3,7 @@
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
 
+aarch
 AI
 Allshard
 FCS
@@ -57,6 +58,7 @@ ECN
 ECS
 EdDSA
 EKS
+LEB
 Millicores
 NID
 NIST
@@ -1334,6 +1336,7 @@ quantiles
 querydetails
 quiesce
 quitquitquit
+quota
 qvalue
 radix
 radixtree
@@ -1389,6 +1392,7 @@ rele
 releasor
 reloadable
 remoting
+renormalize
 renderers
 reparse
 repeatability
@@ -1678,6 +1682,8 @@ vanishingly
 varchar
 variadic
 varint
+Vcluster
+vcluster
 vec
 vectorize
 VBC
@@ -1845,3 +1851,7 @@ X25519MLKEM768
 cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
+vendored
+reparent
+reparents
+reparenting

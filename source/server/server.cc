@@ -287,13 +287,8 @@ void InstanceBase::updateServerStats() {
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       ssl_context_manager_->daysUntilFirstCertExpires().value_or(0));
-
-  auto secs_until_ocsp_response_expires =
-      ssl_context_manager_->secondsUntilFirstOcspResponseExpires();
-  if (secs_until_ocsp_response_expires) {
-    server_stats_->seconds_until_first_ocsp_response_expiring_.set(
-        secs_until_ocsp_response_expires.value());
-  }
+  server_stats_->seconds_until_first_ocsp_response_expiring_.set(
+      ssl_context_manager_->secondsUntilFirstOcspResponseExpires().value_or(0));
   server_stats_->state_.set(enumToInt(Utility::serverState(init_manager_.state(), !live_.load())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
@@ -305,7 +300,21 @@ void InstanceBase::flushStatsInternal() {
   ASSERT(config_.clusterManager() != nullptr);
   InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, *config_.clusterManager(),
                                     time_source_);
-  if (const auto evict_on_flush = stats_config.evictOnFlush(); evict_on_flush > 0) {
+  uint32_t evict_on_flush = stats_config.evictOnFlush();
+  if (const auto& runtime_key = stats_config.evictionIntervalRuntimeKey();
+      !runtime_key.empty() && runtime_ != nullptr) {
+    const uint64_t flush_ms = stats_config.flushInterval().count();
+    const uint64_t evict_ms =
+        runtime_->snapshot().getInteger(runtime_key, evict_on_flush * flush_ms);
+    if (flush_ms != 0 && evict_ms % flush_ms == 0 && evict_ms / flush_ms <= UINT32_MAX) {
+      evict_on_flush = evict_ms / flush_ms;
+    } else {
+      ENVOY_LOG(debug,
+                "ignoring invalid stats eviction interval {}ms from runtime key {}, using default",
+                evict_ms, runtime_key);
+    }
+  }
+  if (evict_on_flush > 0) {
     stats_eviction_counter_ = (stats_eviction_counter_ + 1) % evict_on_flush;
     if (stats_eviction_counter_ == 0) {
       stats_store_.evictUnused();

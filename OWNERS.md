@@ -104,6 +104,8 @@ without further review.
 * Jonh Wendell ([jwendell](https://github.com/jwendell)) (jwendell@redhat.com)
 * Adi (Suissa) Peleg ([adisuissa](https://github.com/adisuissa)) (adip@google.com)
 * Ignasi Barrera ([nacx](https://github.com/nacx)) (nacx@apache.org)
+* Carlos Chavez ([charz87](https://github.com/charz87)) (cchavezperez@google.com)
+* Aliaksei Khilko ([alekskhilko](https://github.com/alekskhilko)) (khilko@google.com)
 
 # Emeritus maintainers
 

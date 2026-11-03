@@ -2,7 +2,8 @@ use crate::abi;
 
 /// Stream timing from Envoy. `start_time_unix_ns` is a Unix timestamp in nanoseconds; all other
 /// fields are nanosecond offsets from request start. Each field is `None` when unavailable; zero is
-/// valid. Connection and handshake offsets can be negative when the connection predates the request.
+/// valid. Connection and handshake offsets can be negative when the connection predates the
+/// request.
 #[derive(Debug, Clone)]
 pub struct TimingInfo {
   /// Request start time as Unix timestamp in nanoseconds.

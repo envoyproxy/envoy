@@ -14,6 +14,8 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/grpc_stats/response_frame_counter.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -29,8 +31,9 @@ class GrpcServiceMethodToRequestNamesMap {
 public:
   // Construct a map populated with the services/methods in method_list.
   GrpcServiceMethodToRequestNamesMap(Stats::SymbolTable& symbol_table,
-                                     const envoy::config::core::v3::GrpcMethodList& method_list)
-      : stat_name_pool_(symbol_table), map_(populate(method_list)) {}
+                                     const envoy::config::core::v3::GrpcMethodList& method_list,
+                                     bool replace_dots_in_service_name)
+      : stat_name_pool_(symbol_table), map_(populate(method_list, replace_dots_in_service_name)) {}
 
   std::optional<Grpc::Context::RequestStatNames>
   lookup(const Grpc::Common::RequestNames& request_names) const {
@@ -72,10 +75,14 @@ private:
   using MapType = absl::flat_hash_map<OwningKey, Grpc::Context::RequestStatNames, MapHash, MapEq>;
 
   // Helper for generating a populated MapType so that `map_` can be const.
-  MapType populate(const envoy::config::core::v3::GrpcMethodList& method_list) {
+  MapType populate(const envoy::config::core::v3::GrpcMethodList& method_list,
+                   bool replace_dots_in_service_name) {
     MapType map;
     for (const auto& service : method_list.services()) {
-      Stats::StatName stat_name_service = stat_name_pool_.add(service.name());
+      // The map is keyed by the original service name; only the stat name has dots replaced.
+      Stats::StatName stat_name_service = stat_name_pool_.add(
+          replace_dots_in_service_name ? absl::StrReplaceAll(service.name(), {{".", "_"}})
+                                       : service.name());
 
       for (const auto& method_name : service.method_names()) {
         Stats::StatName stat_name_method = stat_name_pool_.add(method_name);
@@ -103,7 +110,8 @@ struct Config {
         envoy::extensions::filters::http::grpc_stats::v3::FilterConfig::
             kIndividualMethodStatsAllowlist) {
       allowlist_.emplace(context.scope().symbolTable(),
-                         proto_config.individual_method_stats_allowlist());
+                         proto_config.individual_method_stats_allowlist(),
+                         replace_dots_in_grpc_service_name_);
     }
   }
   Grpc::Context& context_;

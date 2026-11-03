@@ -39,7 +39,7 @@ fn new_tls_certificate_selector_config(
 /// every test certificate is.
 fn is_der_certificate(certificate: &[u8]) -> bool {
   certificate.len() > 4
-    && certificate[..2] == [0x30, 0x82]
+    && certificate[.. 2] == [0x30, 0x82]
     && usize::from(u16::from_be_bytes([certificate[2], certificate[3]])) + 4 == certificate.len()
 }
 
@@ -153,7 +153,8 @@ impl Certificate {
 /// certificate is provided when the config is created, a "sync" certificate is provided when it is
 /// requested, and a "fetch" certificate is provided from another thread when it is requested. A
 /// "hold" certificate is not provided when it is requested, but when a name with the "release."
-/// prefix is requested, which is then declined. Other names are declined.
+/// prefix is requested, which is then declined. A requested name with the "remove." prefix removes
+/// the certificate named by the rest of it, and is then declined. Other names are declined.
 struct DynamicSelectorConfig {
   envoy_config: Arc<dyn EnvoyTlsCertificateSelectorConfig>,
   scheduler: Arc<dyn EnvoyTlsCertificateSelectorConfigScheduler>,
@@ -232,6 +233,9 @@ impl TlsCertificateSelectorConfig for DynamicSelectorConfig {
       for certificate in &self.held {
         certificate.provide(envoy_config);
       }
+      envoy_config.remove_certificate(name);
+    } else if let Some(removed_name) = name.strip_prefix("remove.") {
+      envoy_config.remove_certificate(removed_name);
       envoy_config.remove_certificate(name);
     } else if let Some(certificate) = self.synced.iter().find(|c| is_named(c)) {
       certificate.provide(envoy_config);

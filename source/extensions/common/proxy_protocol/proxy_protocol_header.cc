@@ -167,44 +167,19 @@ bool generateV2Header(const Network::ProxyProtocolData& proxy_proto_data, Buffer
   std::vector<Envoy::Network::ProxyProtocolTLV> final_tlvs;
   combined_tlv_vector.reserve(custom_tlvs.size() + proxy_proto_data.tlv_vector_.size());
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.proxy_protocol_allow_duplicate_tlvs")) {
-    absl::flat_hash_set<uint8_t> config_specified_types;
-    for (const auto& tlv : custom_tlvs) {
-      combined_tlv_vector.emplace_back(tlv);
-      config_specified_types.insert(tlv.type);
-    }
+  absl::flat_hash_set<uint8_t> config_specified_types;
+  for (const auto& tlv : custom_tlvs) {
+    combined_tlv_vector.emplace_back(tlv);
+    config_specified_types.insert(tlv.type);
+  }
 
-    // Combine TLVs from the proxy_proto_data with the custom TLVs.
-    for (const auto& tlv : proxy_proto_data.tlv_vector_) {
-      if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
-        // Skip any TLV that is not in the set of passthrough TLVs.
-        continue;
-      }
-      if (!config_specified_types.contains(tlv.type)) {
-        combined_tlv_vector.emplace_back(tlv);
-      }
+  // Combine TLVs from the proxy_proto_data with the custom TLVs.
+  for (const auto& tlv : proxy_proto_data.tlv_vector_) {
+    if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
+      // Skip any TLV that is not in the set of passthrough TLVs.
+      continue;
     }
-  } else {
-    absl::flat_hash_set<uint8_t> seen_types;
-    for (const auto& tlv : custom_tlvs) {
-      ASSERT(!seen_types.contains(tlv.type));
-      combined_tlv_vector.emplace_back(tlv);
-      seen_types.insert(tlv.type);
-    }
-
-    // Combine TLVs from the proxy_proto_data with the custom TLVs.
-    for (const auto& tlv : proxy_proto_data.tlv_vector_) {
-      if (!pass_all_tlvs && !pass_through_tlvs.contains(tlv.type)) {
-        // Skip any TLV that is not in the set of passthrough TLVs.
-        continue;
-      }
-      if (seen_types.contains(tlv.type)) {
-        // Skip any duplicate TLVs from being added to the combined TLV vector.
-        ENVOY_LOG_EVERY_POW_2_MISC(info, "Skipping duplicate TLV type {}", tlv.type);
-        continue;
-      }
-      seen_types.insert(tlv.type);
+    if (!config_specified_types.contains(tlv.type)) {
       combined_tlv_vector.emplace_back(tlv);
     }
   }

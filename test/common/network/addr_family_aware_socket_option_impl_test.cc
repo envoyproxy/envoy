@@ -15,10 +15,9 @@ namespace {
 class AddrFamilyAwareSocketOptionImplTest : public SocketOptionTest {
 protected:
   void SetUp() override {
-    EXPECT_CALL(os_sys_calls_, socket)
-        .WillRepeatedly(Invoke([this](int domain, int type, int protocol) {
-          return os_sys_calls_actual_.socket(domain, type, protocol);
-        }));
+    EXPECT_CALL(os_sys_calls_, socket).WillRepeatedly([this](int domain, int type, int protocol) {
+      return os_sys_calls_actual_.socket(domain, type, protocol);
+    });
     EXPECT_CALL(os_sys_calls_, close(_)).Times(testing::AnyNumber());
   }
 };

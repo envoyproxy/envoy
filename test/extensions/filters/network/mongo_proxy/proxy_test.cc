@@ -24,6 +24,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/struct_matchers.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -32,7 +33,6 @@ using testing::_;
 using testing::AtLeast;
 using testing::Contains;
 using testing::ElementsAre;
-using testing::Invoke;
 using testing::Key;
 using testing::Matcher;
 using testing::NiceMock;
@@ -150,50 +150,50 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_query").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query").value());
 
   // Requests during active delay.
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(2U, store_.counter("test.op_query").value());
+  EXPECT_EQ(2U, store_.counter("mongo.test.op_query").value());
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->cursorId(1);
     filter_->callbacks_->decodeGetMore(std::move(message));
-  }));
+  });
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_get_more").value());
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
     message->numberOfCursorIds(1);
     message->cursorIds({1});
     filter_->callbacks_->decodeKillCursors(std::move(message));
-  }));
+  });
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_kill_cursors").value());
 
   EXPECT_CALL(read_filter_callbacks_, continueReading());
   delay_timer->invokeCallback();
-  EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.delays_injected").value());
 }
 
 TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
@@ -203,16 +203,16 @@ TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
   EXPECT_CALL(dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(fake_data_, false));
-  EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.delays_injected").value());
 }
 
 TEST_F(MongoProxyFilterTest, DynamicMetadata) {
@@ -220,13 +220,13 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
 
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   auto& metadata =
@@ -234,18 +234,18 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
   EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructList(
                                      "db.test", ElementsAre(IsStructValueString("query")))));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     InsertMessagePtr message(new InsertMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->documents().push_back(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeInsert(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   EXPECT_THAT(metadata.fields(), UnorderedElementsAre(IsStructList(
                                      "db.test", ElementsAre(IsStructValueString("insert")))));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message1(new QueryMessageImpl(0, 0));
     message1->fullCollectionName("db1.test1");
     message1->flags(0b1110010);
@@ -256,7 +256,7 @@ TEST_F(MongoProxyFilterTest, DynamicMetadata) {
     message2->fullCollectionName("db2.test2");
     message2->documents().push_back(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeInsert(std::move(message2));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   EXPECT_THAT(
@@ -270,24 +270,24 @@ TEST_F(MongoProxyFilterTest, DynamicMetadataDisabled) {
 
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
                    NetworkFilterNames::get().MongoProxy));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     InsertMessagePtr message(new InsertMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->documents().push_back(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeInsert(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   EXPECT_EQ(0, stream_info_.dynamicMetadata().filter_metadata().count(
@@ -299,129 +299,134 @@ TEST_F(MongoProxyFilterTest, Stats) {
 
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_CALL(store_,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_num_docs"), 1));
-  EXPECT_CALL(store_,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_size"), 22));
-  EXPECT_CALL(store_,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_time_ms"), _));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "mongo.test.collection.test.query.reply_num_docs"), 1));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "mongo.test.collection.test.query.reply_size"), 22));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "mongo.test.collection.test.query.reply_time_ms"), _));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
     message->flags(0b11);
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-  }));
+  });
   filter_->onWrite(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.op_query").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_tailable_cursor").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_no_cursor_timeout").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_await_data").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_exhaust").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_no_max_time").value());
-  EXPECT_EQ(1U, store_.counter("test.op_query_scatter_get").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query_tailable_cursor").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query_no_cursor_timeout").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query_await_data").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query_exhaust").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query_no_max_time").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query_scatter_get").value());
 
-  EXPECT_EQ(1U, store_.counter("test.collection.test.query.total").value());
-  EXPECT_EQ(1U, store_.counter("test.collection.test.query.scatter_get").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.collection.test.query.total").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.collection.test.query.scatter_get").value());
 
-  EXPECT_EQ(1U, store_.counter("test.op_reply").value());
-  EXPECT_EQ(1U, store_.counter("test.op_reply_cursor_not_found").value());
-  EXPECT_EQ(1U, store_.counter("test.op_reply_query_failure").value());
-  EXPECT_EQ(1U, store_.counter("test.op_reply_valid_cursor").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_reply").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_reply_cursor_not_found").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_reply_query_failure").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_reply_valid_cursor").value());
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->cursorId(1);
     filter_->callbacks_->decodeGetMore(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     InsertMessagePtr message(new InsertMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->documents().push_back(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeInsert(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
     message->numberOfCursorIds(1);
     message->cursorIds({1});
     filter_->callbacks_->decodeKillCursors(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     CommandMessagePtr message(new CommandMessageImpl(0, 0));
     message->database(std::string("Test database"));
     message->commandName(std::string("Test command name"));
     message->metadata(Bson::DocumentImpl::create());
     message->commandArgs(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeCommand(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     CommandReplyMessagePtr message(new CommandReplyMessageImpl(0, 0));
     message->metadata(Bson::DocumentImpl::create());
     message->commandReply(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeCommandReply(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
-  EXPECT_EQ(1U, store_.counter("test.op_insert").value());
-  EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
-  EXPECT_EQ(0U, store_.counter("test.delays_injected").value());
-  EXPECT_EQ(1U, store_.counter("test.op_command").value());
-  EXPECT_EQ(1U, store_.counter("test.op_command_reply").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_get_more").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_insert").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_kill_cursors").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.delays_injected").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_command").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_command_reply").value());
 }
 
 TEST_F(MongoProxyFilterTest, CommandStats) {
   initializeFilter();
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addString("insert", "bar"));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "mongo.test.cmd.insert.reply_num_docs"), 1));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.insert.reply_num_docs"), 1));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.insert.reply_size"), 22));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.insert.reply_time_ms"), _));
+                          Property(&Stats::Metric::name, "mongo.test.cmd.insert.reply_size"), 22));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "mongo.test.cmd.insert.reply_time_ms"), _));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
     message->flags(0b11);
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-  }));
+  });
   filter_->onWrite(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.cmd.insert.total").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.cmd.insert.total").value());
 }
 
 TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
@@ -435,114 +440,120 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
     }
   )EOF";
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addString("$comment", std::move(json)));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.collection.test.query.total").value());
-  EXPECT_EQ(1U, store_.counter("test.collection.test.query.scatter_get").value());
-  EXPECT_EQ(1U, store_.counter("test.collection.test.callsite.getByMongoId.query.total").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.collection.test.query.total").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.collection.test.query.scatter_get").value());
   EXPECT_EQ(1U,
-            store_.counter("test.collection.test.callsite.getByMongoId.query.scatter_get").value());
+            store_.counter("mongo.test.collection.test.callsite.getByMongoId.query.total").value());
+  EXPECT_EQ(
+      1U,
+      store_.counter("mongo.test.collection.test.callsite.getByMongoId.query.scatter_get").value());
 
-  EXPECT_CALL(store_,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_num_docs"), 1));
-  EXPECT_CALL(store_,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_size"), 22));
-  EXPECT_CALL(store_,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "test.collection.test.query.reply_time_ms"), _));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "mongo.test.collection.test.query.reply_num_docs"), 1));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "mongo.test.collection.test.query.reply_size"), 22));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "mongo.test.collection.test.query.reply_time_ms"), _));
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name,
-                           "test.collection.test.callsite.getByMongoId.query.reply_num_docs"),
+                           "mongo.test.collection.test.callsite.getByMongoId.query.reply_num_docs"),
                   1));
-  EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name,
-                                   "test.collection.test.callsite.getByMongoId.query.reply_size"),
-                          22));
   EXPECT_CALL(store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name,
-                           "test.collection.test.callsite.getByMongoId.query.reply_time_ms"),
+                           "mongo.test.collection.test.callsite.getByMongoId.query.reply_size"),
+                  22));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name,
+                           "mongo.test.collection.test.callsite.getByMongoId.query.reply_time_ms"),
                   _));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
     message->flags(0b11);
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-  }));
+  });
   filter_->onWrite(fake_data_, false);
 }
 
 TEST_F(MongoProxyFilterTest, MultiGet) {
   initializeFilter();
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addDocument(
         "_id", Bson::DocumentImpl::create()->addArray("$in", Bson::DocumentImpl::create())));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.op_query_multi_get").value());
-  EXPECT_EQ(1U, store_.counter("test.collection.test.query.multi_get").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.op_query_multi_get").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.collection.test.query.multi_get").value());
 }
 
 TEST_F(MongoProxyFilterTest, MaxTime) {
   initializeFilter();
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addInt32("$maxTimeMS", 100));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.op_query_no_max_time").value());
 }
 
 TEST_F(MongoProxyFilterTest, MaxTimeCursor) {
   initializeFilter();
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addInt32("maxTimeMS", 500));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(0U, store_.counter("test.op_query_no_max_time").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.op_query_no_max_time").value());
 }
 
 TEST_F(MongoProxyFilterTest, DecodeError) {
   initializeFilter();
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     throw EnvoyException("bad decode");
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   // Should not call decode again.
   filter_->onData(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.decoding_error").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.decoding_error").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
@@ -551,7 +562,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
   scoped_runtime.mergeValues({{"envoy.reloadable_features.use_connection_event_drain", "false"}});
   initializeFilter();
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(1, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
@@ -563,12 +574,13 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
-  EXPECT_EQ(2U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(
+      2U, store_.gauge("mongo.test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   Event::MockTimer* drain_timer = nullptr;
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 1));
     message->flags(0b11);
     message->cursorId(1);
@@ -585,15 +597,16 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0), _));
     filter_->callbacks_->decodeReply(std::move(message));
-  }));
+  });
   filter_->onWrite(fake_data_, false);
 
   EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
 
-  EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
-  EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
+  EXPECT_EQ(
+      0U, store_.gauge("mongo.test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.cx_drain_close").value());
 }
 
 // Equivalent of ConcurrentQueryWithDrainClose exercising the connection-level drain path: instead
@@ -608,18 +621,19 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithConnectionLevelDrainClose) {
   read_filter_callbacks_.connection_.raiseConnectionDrain(
       Network::ConnectionDrainEvent{{}, Server::DrainStrategy::Immediate});
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(1, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create());
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
-  EXPECT_EQ(1U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(
+      1U, store_.gauge("mongo.test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   Event::MockTimer* drain_timer = nullptr;
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 1));
     message->flags(0b11);
     message->cursorId(1);
@@ -629,40 +643,41 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithConnectionLevelDrainClose) {
     drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0), _));
     filter_->callbacks_->decodeReply(std::move(message));
-  }));
+  });
   filter_->onWrite(fake_data_, false);
 
   EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->invokeCallback();
 
-  EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
-  EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
+  EXPECT_EQ(
+      0U, store_.gauge("mongo.test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.cx_drain_close").value());
 }
 
 TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
   initializeFilter();
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addString("query", "bar"));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
     message->flags(0b11);
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-  }));
+  });
   filter_->onWrite(fake_data_, false);
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.cx_destroy_remote_with_active_rq").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
@@ -673,20 +688,20 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addDocument(
         "_id", Bson::DocumentImpl::create()->addArray("$in", Bson::DocumentImpl::create())));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.cx_destroy_remote_with_active_rq").value());
 }
 
 TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
@@ -697,20 +712,71 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
 
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.test");
     message->flags(0b1110010);
     message->query(Bson::DocumentImpl::create()->addDocument(
         "_id", Bson::DocumentImpl::create()->addArray("$in", Bson::DocumentImpl::create())));
     filter_->callbacks_->decodeQuery(std::move(message));
-  }));
+  });
   filter_->onData(fake_data_, false);
 
   EXPECT_CALL(*delay_timer, disableTimer());
   read_filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
-  EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
-  EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+  EXPECT_EQ(0U, store_.counter("mongo.test.cx_destroy_remote_with_active_rq").value());
+  EXPECT_EQ(1U, store_.counter("mongo.test.cx_destroy_local_with_active_rq").value());
+}
+
+// The dynamic stats carry the command, collection and callsite as explicit per-stat tags. The
+// isolated test store drops scope-level tags, so the prefix tag and its removal from the
+// tag-extracted names are only observable in the integration test, which covers both stats modes.
+TEST_F(MongoProxyFilterTest, StatsAreTagged) {
+  initializeFilter();
+
+  std::string json = R"EOF(
+    {
+      "callingFunction":"getByMongoId"
+    }
+  )EOF";
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(0, 0));
+    message->fullCollectionName("db.test");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create()->addString("$comment", std::move(json)));
+    filter_->callbacks_->decodeQuery(std::move(message));
+  });
+  filter_->onData(fake_data_, false);
+
+  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce([&](Buffer::Instance&) -> void {
+    QueryMessagePtr message(new QueryMessageImpl(1, 0));
+    message->fullCollectionName("db.$cmd");
+    message->flags(0b1110010);
+    message->query(Bson::DocumentImpl::create()->addString("insert", "bar"));
+    filter_->callbacks_->decodeQuery(std::move(message));
+  });
+  filter_->onData(fake_data_, false);
+
+  auto expect_tags = [&](const std::string& name, const std::string& tag_extracted_name,
+                         const std::vector<std::pair<std::string, std::string>>& expected_tags) {
+    const Stats::CounterSharedPtr counter = TestUtility::findCounter(store_, name);
+    ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
+    EXPECT_EQ(tag_extracted_name, counter->tagExtractedName()) << " for stat '" << name << "'";
+    std::vector<std::pair<std::string, std::string>> actual_tags;
+    for (const Stats::Tag& tag : counter->tags()) {
+      actual_tags.emplace_back(tag.name_, tag.value_);
+    }
+    EXPECT_EQ(expected_tags, actual_tags) << " for stat '" << name << "'";
+  };
+
+  expect_tags("mongo.test.cmd.insert.total", "mongo.test.cmd.total",
+              {{"envoy.mongo_cmd", "insert"}});
+  expect_tags("mongo.test.collection.test.query.total", "mongo.test.collection.query.total",
+              {{"envoy.mongo_collection", "test"}});
+  expect_tags("mongo.test.collection.test.callsite.getByMongoId.query.total",
+              "mongo.test.collection.callsite.query.total",
+              {{"envoy.mongo_collection", "test"}, {"envoy.mongo_callsite", "getByMongoId"}});
 }
 
 } // namespace MongoProxy

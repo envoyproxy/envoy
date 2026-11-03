@@ -9,9 +9,12 @@
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
+#include "envoy/ssl/context_manager.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/assert.h"
@@ -53,6 +56,19 @@ using OnTlsCertificateSelectorConfigScheduledType =
 // The default custom stat namespace which prepends all user-defined metrics.
 // This can be overridden via the ``metrics_namespace`` field in ``DynamicModuleConfig``.
 constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
+
+#define ALL_DYNAMIC_CERTIFICATE_STATS(COUNTER, GAUGE)                                              \
+  COUNTER(provided)                                                                                \
+  COUNTER(rejected)                                                                                \
+  COUNTER(removed)                                                                                 \
+  COUNTER(requested)                                                                               \
+  GAUGE(active, Accumulate)                                                                        \
+  GAUGE(pending, Accumulate)
+
+// Stats of the dynamic certificates, in the scope of the TLS context.
+struct DynamicCertificateStats {
+  ALL_DYNAMIC_CERTIFICATE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+};
 
 /**
  * Selection handle of a dynamic certificate. It keeps the certificate alive for the handshake that
@@ -123,8 +139,9 @@ public:
   void onConfigUpdate();
 
   /**
-   * Stops using the TLS context configuration, which is destroyed with the selector factory. Must
-   * be called on the main thread.
+   * Stops using the TLS context configuration, which is destroyed with the selector factory, and
+   * stops reporting the dynamic certificates in the context manager. Must be called on the main
+   * thread.
    */
   void detachTlsConfig();
 
@@ -173,6 +190,9 @@ private:
     std::optional<Ssl::TlsCertificateConfigImpl> certificate_config;
     // Set once the certificate is built, which waits for the validation context of the TLS context.
     AsyncContextConstSharedPtr context;
+    // The view of the certificate that the context manager reports while the TLS context is ready,
+    // until the certificate changes or the TLS context is removed.
+    Ssl::ContextSharedPtr managed_context;
     std::vector<std::weak_ptr<DynamicCertificateHandle>> waiting_handles;
   };
 
@@ -182,21 +202,33 @@ private:
 
   absl::Status addCertificate(const std::string& name, absl::string_view certificate_chain,
                               absl::string_view private_key, absl::string_view ocsp_staple);
+  // Stores the certificate that the module provides, which ends its pending request.
+  DynamicCertificate& storeProvidedCertificate(const std::string& name,
+                                               Ssl::TlsCertificateConfigImpl&& certificate_config);
   // Fails the handshakes that wait for a requested certificate that the module could not provide.
   void failRequestedCertificate(absl::string_view name);
   void requestCertificate(const std::string& name,
                           const std::weak_ptr<DynamicCertificateHandle>& weak_handle);
-  absl::StatusOr<AsyncContextConstSharedPtr>
+  absl::StatusOr<AsyncContextSharedPtr>
   buildContext(const Ssl::TlsCertificateConfig& certificate_config);
   void activateCertificate(const std::string& name, DynamicCertificate& certificate,
-                           AsyncContextConstSharedPtr context);
+                           AsyncContextSharedPtr context);
+  // Replaces the context that the context manager reports for the certificate. A null context only
+  // removes it.
+  void replaceManagedContext(DynamicCertificate& certificate, Ssl::ContextSharedPtr&& context);
   void updateWorkers(const std::string& name, AsyncContextConstSharedPtr context);
 
   const Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
   Server::Configuration::ServerFactoryContext& server_context_;
+  // Held directly, since the selector factory can be destroyed after the server factory context.
+  Ssl::ContextManager& context_manager_;
   // Null once the selector factory is destroyed.
   const Ssl::ContextConfig* tls_config_;
   AsyncContextFactory dynamic_context_factory_;
+  // Whether the socket factory installed a TLS context built from the configuration, which it does
+  // when the configuration is ready at creation and on each accepted update. A rejected update can
+  // leave the configuration not ready while the installed TLS context keeps serving.
+  bool tls_context_installed_{};
   // Scope of the dynamic certificate TLS contexts, so their stats aggregate with the stats of the
   // TLS context.
   const Stats::ScopeSharedPtr context_scope_;
@@ -208,6 +240,8 @@ private:
   // Lock-free lookups of the built dynamic certificates on the worker threads. Allocated only when
   // dynamic certificates are allowed.
   ThreadLocal::TypedSlotPtr<ThreadLocalCertificates> thread_local_certificates_;
+  // Allocated only when dynamic certificates are allowed.
+  std::unique_ptr<DynamicCertificateStats> stats_;
 };
 
 using DynamicModuleTlsCertificateSelectorConfigSharedPtr =

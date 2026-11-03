@@ -133,6 +133,16 @@ expensive benchmarks to quickly verify that the binary is able to run to
 completion. In order to collect meaningful bechmarks, `bazel run -c opt` the
 benchmark binary target on a quiescent machine.
 
+The header-presence optimization has two benchmark targets:
+`//test/common/http:header_utility_speed_test` (the `HeaderDataPresentMatch` predicate, with
+exact-match controls) and `//test/common/router:router_ratelimit_speed_test` (the
+`HeaderValueMatchAction` rate-limit action). Their compatibility coverage is in
+`MatchHeadersTest.HeaderPresenceWithEmptyAndRepeatedValues` and
+`MatchHeadersTest.ImplicitHeaderPresenceWithInversionAndMissingAsEmpty` in
+`test/common/http/header_utility_test.cc`. These tests must pass both before and after the
+optimization. Compare CPU time of identical benchmark binaries built from the original and the
+optimized `HeaderDataPresentMatch::matchesHeaders`; these are not end-to-end HTTP numbers.
+
 `envoy_cc_benchmark_binary` targets must list `@benchmark` in their `deps`; the macro
 deliberately does not inject it. Downstream bzlmod consumers must therefore declare
 `bazel_dep(name = "google_benchmark", version = "1.9.5", repo_name = "benchmark")` and
