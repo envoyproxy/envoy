@@ -178,6 +178,8 @@ namespace DynamicModules {
 DynamicModuleStatsSinkRetainedSnapshot::DynamicModuleStatsSinkRetainedSnapshot(
     DynamicModuleStatsSinkFlushContext& source)
     : snapshot_time_(source.snapshot_.snapshotTime()) {
+  // The flush hook's histogram statistics are only stable on the main thread.
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   // Each RefcountPtr built from a raw stat pointer takes one reference through the stat's intrusive
   // count, exactly as Envoy's own snapshot does. The snapshot only hands out const references, and
   // taking a reference does not change anything the snapshot exposes, so casting away const is
@@ -256,8 +258,6 @@ extern "C" {
 envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr
 envoy_dynamic_module_callback_stat_sink_snapshot_retain(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr) {
-  // The flush hook's histogram statistics are only stable on the main thread.
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto* retained = new DynamicModuleStatsSinkRetainedSnapshot(*toFlushContext(snapshot_envoy_ptr));
   return &retained->context();
 }
