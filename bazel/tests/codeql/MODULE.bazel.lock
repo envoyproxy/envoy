@@ -1461,7 +1461,7 @@
     "@@envoy_toolshed+//hunspell:extensions.bzl%hunspell_prebuilt_extension": {
       "general": {
         "bzlTransitiveDigest": "n2ltSvOiPtPZ8e0W1jjYuxslbhValInvmiEZaIg9tpI=",
-        "usagesDigest": "dtNnjFQ3nImxBFesF4Gkl7JB0I02ihu4w7ooEN+Jyx4=",
+        "usagesDigest": "CqRd+Py0x4sLokX4SHACIRg4dZaOadGMVDtZk6BohfY=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "hunspell_prebuilt_linux_aarch64": {

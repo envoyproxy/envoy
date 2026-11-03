@@ -1,0 +1,3 @@
+// Words with non-ASCII letters are skipped whole (café, François, naïve) rather than checked
+// in fragments, a typo next to them is still found (mistaek), as is one between non-ASCII
+// punctuation: «mistaak» — and Japanese text (日本語) separates words.

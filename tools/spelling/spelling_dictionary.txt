@@ -329,6 +329,7 @@ JWT
 JWTs
 alg
 aud
+audiobook
 crv
 iat
 iss
@@ -1665,8 +1666,10 @@ util
 utils
 va
 valgrind
+valkey
 validator
 validators
+valkey
 vanishingly
 varchar
 variadic
