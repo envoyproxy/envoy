@@ -8,7 +8,6 @@
 
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/escaping.h"
@@ -100,13 +99,6 @@ Status Jwt::parseFromString(const std::string& jwt) {
   header_getter.GetString("x5t#S256", &x5t_s256_);
   header_getter.GetString("x5t", &x5t_);
 
-  const Protobuf::Value* crit;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.jwt_validate_crit_header") &&
-      header_getter.GetValue("crit", crit) == StructUtils::OK &&
-      !parseCrit(*crit, header_pb_, &crit_)) {
-    return Status::JwtHeaderBadCrit;
-  }
-
   // Parse payload json
   payload_str_base64url_ = std::string(jwt_split[1]);
   if (!absl::WebSafeBase64Unescape(payload_str_base64url_, &payload_str_)) {
@@ -175,6 +167,14 @@ Status Jwt::verifyTimeConstraint(uint64_t now, uint64_t clock_skew) const {
   // Check JWT has not expired (exp).
   if (exp_ && now > exp_ + clock_skew) {
     return Status::JwtExpired;
+  }
+  return Status::Ok;
+}
+
+Status Jwt::getCriticalHeaders(std::vector<std::string>* crit) const {
+  const auto it = header_pb_.fields().find("crit");
+  if (it != header_pb_.fields().end() && !parseCrit(it->second, header_pb_, crit)) {
+    return Status::JwtHeaderBadCrit;
   }
   return Status::Ok;
 }

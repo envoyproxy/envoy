@@ -188,11 +188,23 @@ TEST_F(AuthenticatorTest, TestAllowedAlgorithms) {
 }
 
 // Test authenticator constraints for "crit" header parameters
-TEST_F(AuthenticatorTest, TestAllowedCriticalHeaders) {
+TEST_F(AuthenticatorTest, TestCriticalHeaders) {
   auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
 
   {
+    // Without critical_headers, "crit" is ignored.
+    createAuthenticator();
+    EXPECT_CALL(*raw_fetcher_, fetch(_, _))
+        .WillOnce([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {
+          receiver.onJwksSuccess(std::move(jwks_));
+        });
+    Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(CritToken)}};
+    expectVerifyStatus(Status::Ok, headers);
+  }
+
+  {
     // The token lists "exp-extension" in "crit", which the provider does not allow.
+    provider.mutable_critical_headers();
     createAuthenticator();
     EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
     Http::TestRequestHeaderMapImpl headers{{"Authorization", "Bearer " + std::string(CritToken)}};
@@ -200,7 +212,7 @@ TEST_F(AuthenticatorTest, TestAllowedCriticalHeaders) {
   }
 
   {
-    provider.add_allowed_critical_headers("exp-extension");
+    provider.mutable_critical_headers()->add_allowed("exp-extension");
     createAuthenticator();
     EXPECT_CALL(*raw_fetcher_, fetch(_, _))
         .WillOnce([this](Tracing::Span&, JwksFetcher::JwksReceiver& receiver) {

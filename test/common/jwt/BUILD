@@ -32,7 +32,6 @@ envoy_cc_test(
     deps = [
         "//source/common/jwt:jwt_lib",
         "//source/common/protobuf",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -248,8 +248,9 @@ void AuthenticatorImpl::startVerify() {
     return;
   }
 
-  if (!jwks_data_->areCriticalHeadersAllowed(jwt_->crit_)) {
-    doneWithStatus(Status::JwtCritHeaderNotAllowed);
+  status = jwks_data_->verifyCriticalHeaders(*jwt_);
+  if (status != Status::Ok) {
+    doneWithStatus(status);
     return;
   }
 

@@ -47,8 +47,6 @@ struct Jwt {
   // x5t#S256 and x5t certificate thumbprints
   std::string x5t_s256_;
   std::string x5t_;
-  // "crit" extension parameters
-  std::vector<std::string> crit_;
   // iss
   std::string iss_;
   // audiences
@@ -97,6 +95,13 @@ struct Jwt {
    * @return the verification status.
    */
   Status verifyTimeConstraint(uint64_t now, uint64_t clock_skew = kClockSkewInSecond) const;
+
+  /**
+   * Get the extension parameters listed in the "crit" header, none if it is absent.
+   * @return JwtHeaderBadCrit if "crit" is not a non-empty list of extension parameters present in
+   * the header.
+   */
+  Status getCriticalHeaders(std::vector<std::string>* crit) const;
 };
 
 } // namespace JwtVerify

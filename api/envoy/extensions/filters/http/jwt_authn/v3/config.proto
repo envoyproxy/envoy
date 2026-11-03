@@ -101,6 +101,14 @@ message JwtProvider {
     EDDSA = 12;
   }
 
+  // Validation of the JWT ``crit`` header.
+  message CriticalHeaders {
+    // Extension header parameters a JWT may list in ``crit``. Envoy does not process any extension
+    // parameter itself, so list only those the upstream handles. If empty, any JWT with ``crit``
+    // is rejected.
+    repeated string allowed = 1 [(validate.rules).repeated = {items {string {min_len: 1}}}];
+  }
+
   // Alters the payload representation in the request dynamic metadata to facilitate its use in matching.
   message NormalizePayload {
     // Each claim in this list will be interpreted as a space-delimited string
@@ -208,20 +216,21 @@ message JwtProvider {
   repeated Algorithm allowed_algorithms = 22
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 
-  // Extension header parameters a JWT may list in its ``crit`` header
-  // (`RFC 7515 <https://tools.ietf.org/html/rfc7515#section-4.1.11>`_). Envoy does not process
-  // any extension parameter itself, so list only those the upstream handles. A JWT whose ``crit``
-  // lists a parameter outside this list is rejected. If empty, any JWT with ``crit`` is rejected.
+  // If set, a JWT with a ``crit`` header
+  // (`RFC 7515 <https://tools.ietf.org/html/rfc7515#section-4.1.11>`_) is only accepted if
+  // ``crit`` is a non-empty list of extension parameters present in the header, each listed in
+  // :ref:`allowed <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.CriticalHeaders.allowed>`.
+  // A JWT without ``crit`` is not affected. If not set, ``crit`` is ignored.
   //
   // Example:
   //
   // .. code-block:: yaml
   //
-  //     allowed_critical_headers:
-  //     - exp-extension
+  //     critical_headers:
+  //       allowed:
+  //       - exp-extension
   //
-  repeated string allowed_critical_headers = 23
-      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+  CriticalHeaders critical_headers = 23;
 
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.

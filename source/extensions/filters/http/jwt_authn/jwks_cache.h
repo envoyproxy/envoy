@@ -75,8 +75,8 @@ public:
     // Check if a signing algorithm is allowed.
     virtual bool isAlgorithmAllowed(absl::string_view alg) const PURE;
 
-    // Check if every header parameter listed in "crit" is allowed.
-    virtual bool areCriticalHeadersAllowed(const std::vector<std::string>& crit) const PURE;
+    // Check the "crit" header if the provider sets critical_headers.
+    virtual JwtVerify::Status verifyCriticalHeaders(const JwtVerify::Jwt& jwt) const PURE;
 
     // Get the cached config: JWT rule.
     virtual const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider&

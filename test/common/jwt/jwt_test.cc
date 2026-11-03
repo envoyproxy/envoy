@@ -9,8 +9,6 @@
 #include "source/common/jwt/struct_utils.h"
 #include "source/common/protobuf/protobuf.h"
 
-#include "test/test_common/test_runtime.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -255,7 +253,15 @@ TEST(JwtParseTest, TestParseHeaderCrit) {
 
   Jwt jwt;
   ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
-  EXPECT_EQ(jwt.crit_, std::vector<std::string>{"exp-extension"});
+  std::vector<std::string> crit;
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::Ok);
+  EXPECT_EQ(crit, std::vector<std::string>{"exp-extension"});
+
+  // A JWT without "crit" has no critical headers.
+  ASSERT_EQ(jwt.parseFromString(good_jwt), Status::Ok);
+  crit.clear();
+  EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::Ok);
+  EXPECT_TRUE(crit.empty());
 }
 
 TEST(JwtParseTest, TestParseHeaderBadCrit) {
@@ -287,15 +293,12 @@ TEST(JwtParseTest, TestParseHeaderBadCrit) {
 
   for (const auto& jwt_text : {bad_crit_not_list, bad_crit_empty, bad_crit_not_string,
                                bad_crit_registered, bad_crit_missing}) {
+    // Parsing ignores "crit", so only getCriticalHeaders reports it.
     Jwt jwt;
-    EXPECT_EQ(jwt.parseFromString(jwt_text), Status::JwtHeaderBadCrit);
+    ASSERT_EQ(jwt.parseFromString(jwt_text), Status::Ok);
+    std::vector<std::string> crit;
+    EXPECT_EQ(jwt.getCriticalHeaders(&crit), Status::JwtHeaderBadCrit);
   }
-
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.jwt_validate_crit_header", "false"}});
-  Jwt jwt;
-  EXPECT_EQ(jwt.parseFromString(bad_crit_missing), Status::Ok);
-  EXPECT_TRUE(jwt.crit_.empty());
 }
 
 TEST(JwtParseTest, TestParsePayloadBadBase64) {
