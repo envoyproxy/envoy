@@ -265,7 +265,7 @@ void McpParserConfig::buildMethodRequirements(
     }
   }
 
-  if (!required_set.contains(std::string(Paths::PARAMS_META))) {
+  if (!required_set.contains(Paths::PARAMS_META)) {
     requirements.optional.push_back(std::string(Paths::PARAMS_META));
   }
 }
@@ -488,7 +488,7 @@ std::string McpFieldExtractor::buildFullPath(absl::string_view name) const {
       full_path += ".";
       full_path += name;
     } else {
-      full_path = std::string(name);
+      full_path = name;
     }
   } else {
     full_path = current_path_cache_;
@@ -534,7 +534,7 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
   if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
     // Store in temp storage
     Protobuf::Value proto_value;
-    proto_value.set_string_value(std::string(value));
+    proto_value.set_string_value(value);
     storeField(full_path, name, proto_value);
   }
 

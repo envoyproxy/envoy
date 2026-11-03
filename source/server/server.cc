@@ -287,13 +287,8 @@ void InstanceBase::updateServerStats() {
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
       ssl_context_manager_->daysUntilFirstCertExpires().value_or(0));
-
-  auto secs_until_ocsp_response_expires =
-      ssl_context_manager_->secondsUntilFirstOcspResponseExpires();
-  if (secs_until_ocsp_response_expires) {
-    server_stats_->seconds_until_first_ocsp_response_expiring_.set(
-        secs_until_ocsp_response_expires.value());
-  }
+  server_stats_->seconds_until_first_ocsp_response_expiring_.set(
+      ssl_context_manager_->secondsUntilFirstOcspResponseExpires().value_or(0));
   server_stats_->state_.set(enumToInt(Utility::serverState(init_manager_.state(), !live_.load())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));

@@ -52,9 +52,9 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
 
     EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
                 getOrCreateRawAsyncClientWithHashKey(_, _, _))
-        .WillOnce(Invoke([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
+        .WillOnce([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
-        }));
+        });
 
     RateLimitFilterConfig factory;
     Http::FilterFactoryCb cb =
@@ -95,9 +95,9 @@ TEST(RateLimitFilterConfigTest, FilterLevelRateLimitsWithLimitOverride) {
 
   EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
               getOrCreateRawAsyncClientWithHashKey(_, _, _))
-      .WillOnce(Invoke([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
+      .WillOnce([](const Grpc::GrpcServiceConfigWithHashKey&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClient>>();
-      }));
+      });
 
   RateLimitFilterConfig factory;
   Http::FilterFactoryCb cb =

@@ -1,6 +1,7 @@
 #include "source/extensions/router/route_specifiers/dynamic_modules/route_specifier.h"
 
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include "envoy/common/exception.h"
@@ -11,6 +12,7 @@
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/header_utility.h"
+#include "source/common/http/path_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
@@ -19,6 +21,8 @@
 #include "source/common/router/retry_policy_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/runtime/runtime_features.h"
+
+#include "absl/strings/match.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,6 +33,14 @@ namespace {
 using RouteKind = envoy_dynamic_module_type_route_specifier_route_kind;
 using RouteOverrideProto =
     envoy::extensions::router::route_specifiers::dynamic_modules::v3::RouteOverride;
+
+// Whether every match of a route template returns the same route, which the built route cache
+// requires. Weighted clusters, a cluster header and a cluster specifier plugin resolve the cluster
+// per request, and so does any way to name a cluster added later.
+bool matchesTheSameRoute(const envoy::config::route::v3::Route& route) {
+  return !route.has_route() ||
+         route.route().cluster_specifier_case() == envoy::config::route::v3::RouteAction::kCluster;
+}
 
 absl::StatusOr<RouteOverride>
 buildRouteOverride(const RouteOverrideProto& proto_override,
@@ -182,13 +194,20 @@ void applySelectedRouteOverride(RouteSpecifierContext& context) {
     return;
   }
   if (entry->regex_rewrite != nullptr && !context.overrides.path.has_value()) {
-    // A result over the bound or an empty rewrite leaves the path alone, the same way
-    // set_prefix_rewrite does.
-    std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
-        context.headers.getPathValue(), "", "", entry->regex_rewrite.get(),
-        entry->regex_rewrite_substitution, context.config.maxRewrittenPathBytes());
-    if (rewritten.has_value()) {
-      context.overrides.path = std::move(*rewritten);
+    if (context.overrides.prefix_rewrite_rule.has_value() ||
+        context.built_route_lookup.has_value()) {
+      // A rule applies when the request headers are finalized, with the regex rewrite as its
+      // fallback then, and a route the built route cache may hold serves later requests.
+      context.overrides.finalize_regex_rewrite = true;
+    } else {
+      // A result over the bound or an empty rewrite leaves the path alone, the same way
+      // set_prefix_rewrite does.
+      std::optional<std::string> rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
+          context.headers.getPathValue(), "", "", entry->regex_rewrite.get(),
+          entry->regex_rewrite_substitution, context.config.maxRewrittenPathBytes());
+      if (rewritten.has_value()) {
+        context.overrides.path = std::move(*rewritten);
+      }
     }
   }
   for (const auto& [name, fields] : entry->metadata.filter_metadata()) {
@@ -226,16 +245,51 @@ void appendHeaderTransforms(Http::HeaderTransforms& transforms,
   }
 }
 
+// The part of the path a rule replaces. A literal span carries no '?' or '#', so it ends before the
+// query string and fragment, and the whole path excludes them like the part a regex route matches.
+absl::string_view replacedSpan(const PrefixRewriteRule& rule, absl::string_view path) {
+  return rule.matched.has_value() ? absl::string_view(*rule.matched)
+                                  : Http::PathUtil::removeQueryAndFragment(path);
+}
+
 } // namespace
+
+std::optional<std::string> PrefixRewriteRule::apply(absl::string_view path,
+                                                    size_t max_bytes) const {
+  return Envoy::Router::rewritePathByPrefixOrRegex(path, replacedSpan(*this, path), replacement,
+                                                   nullptr, "", max_bytes);
+}
+
+bool PrefixRewriteRule::appliesTo(absl::string_view path, size_t max_bytes) const {
+  const absl::string_view span = replacedSpan(*this, path);
+  // The checks rewritePathByPrefixOrRegex makes for a prefix rewrite, without building the path.
+  return !replacement.empty() && absl::StartsWithIgnoreCase(path, span) &&
+         replacement.size() <= max_bytes &&
+         path.size() - span.size() <= max_bytes - replacement.size();
+}
 
 bool RouteOverrides::hasRouteEntryOverrides() const {
   return !cluster_name.empty() || timeout.has_value() || idle_timeout.has_value() ||
          max_stream_duration.has_value() || request_body_buffer_limit.has_value() ||
          priority.has_value() || cluster_not_found_response_code.has_value() ||
          (route_override != nullptr && route_override->hasRouteEntryProperties()) ||
-         path.has_value() || host.has_value() || !request_headers_to_add.empty() ||
-         !request_headers_to_remove.empty() || !response_headers_to_add.empty() ||
-         !response_headers_to_remove.empty();
+         path.has_value() || prefix_rewrite_rule.has_value() || host.has_value() ||
+         !request_headers_to_add.empty() || !request_headers_to_remove.empty() ||
+         !response_headers_to_add.empty() || !response_headers_to_remove.empty();
+}
+
+bool RouteOverrides::operator==(const RouteOverrides& other) const {
+  const auto fields = [](const RouteOverrides& overrides) {
+    return std::tie(overrides.cluster_name, overrides.timeout, overrides.idle_timeout,
+                    overrides.max_stream_duration, overrides.request_body_buffer_limit,
+                    overrides.priority, overrides.cluster_not_found_response_code,
+                    overrides.route_override, overrides.filter_disabled, overrides.route_name,
+                    overrides.path, overrides.prefix_rewrite_rule, overrides.finalize_regex_rewrite,
+                    overrides.host, overrides.request_headers_to_add,
+                    overrides.request_headers_to_remove, overrides.response_headers_to_add,
+                    overrides.response_headers_to_remove);
+  };
+  return fields(*this) == fields(other) && MessageUtil()(route_metadata, other.route_metadata);
 }
 
 bool RouteOverrides::hasRouteOverrides() const {
@@ -257,6 +311,7 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       runtime_fraction_(buildRuntimeFraction(proto_config)),
       max_rewritten_path_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_rewritten_path_bytes, 65536)),
+      has_built_route_cache_(proto_config.has_built_route_cache()),
       fail_closed_(proto_config.failure_policy() ==
                    envoy::extensions::router::route_specifiers::dynamic_modules::v3::NO_ROUTE),
       continue_matching_on_failure_(
@@ -267,8 +322,8 @@ DynamicModuleRouteSpecifierConfig::DynamicModuleRouteSpecifierConfig(
       time_source_(context.serverFactoryContext().timeSource()),
       stats_scope_(context.serverFactoryContext().serverScope().createScope(
           absl::StrCat(metrics_namespace, ".route_specifier.", proto_config.stat_prefix(), "."))),
-      stats_{ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(POOL_COUNTER(*stats_scope_),
-                                                      POOL_HISTOGRAM(*stats_scope_))} {}
+      stats_{ALL_DYNAMIC_MODULE_ROUTE_SPECIFIER_STATS(
+          POOL_COUNTER(*stats_scope_), POOL_GAUGE(*stats_scope_), POOL_HISTOGRAM(*stats_scope_))} {}
 
 DynamicModuleRouteSpecifierConfig::~DynamicModuleRouteSpecifierConfig() {
   if (in_module_config_ != nullptr) {
@@ -310,7 +365,8 @@ bool DynamicModuleRouteSpecifierConfig::registerRouteTemplate(absl::string_view 
   const RouteKind kind = route.has_redirect() || route.has_direct_response()
                              ? envoy_dynamic_module_type_route_specifier_route_kind_DirectResponse
                              : envoy_dynamic_module_type_route_specifier_route_kind_RouteEntry;
-  templates_.emplace(std::string(id), Template{std::string(id), std::move(built.value()), kind});
+  templates_.emplace(std::string(id), Template{std::string(id), std::move(built.value()), kind,
+                                               matchesTheSameRoute(route)});
   template_ids_.emplace_back(id);
   return true;
 }
@@ -329,6 +385,11 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
     return absl::InvalidArgumentError(
         "route templates require a route specifier configured on a virtual host or a route");
   }
+  // Only routes built from templates are cached, and templates need a route builder.
+  if (proto_config.has_built_route_cache() && !context.routeBuilder().has_value()) {
+    return absl::InvalidArgumentError(
+        "built_route_cache requires a route specifier configured on a virtual host or a route");
+  }
 
   auto on_config_new = dynamic_module->getFunctionPointer<OnRouteSpecifierConfigNewType>(
       "envoy_dynamic_module_on_route_specifier_config_new");
@@ -342,10 +403,13 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
       "envoy_dynamic_module_on_route_specifier_on_route");
   RETURN_IF_NOT_OK_REF(on_route.status());
 
-  // The route destroy hook is optional, so a module built with an older SDK that does not export it
-  // is accepted and the hook is a no op.
+  // The route destroy and user data discard hooks are optional, so a module built with an older
+  // SDK that does not export them is accepted and each hook is a no op.
   auto on_route_destroy = dynamic_module->getFunctionPointer<OnRouteSpecifierRouteDestroyType>(
       "envoy_dynamic_module_on_route_specifier_route_destroy");
+  auto on_user_data_discard =
+      dynamic_module->getFunctionPointer<OnRouteSpecifierUserDataDiscardType>(
+          "envoy_dynamic_module_on_route_specifier_user_data_discard");
 
   // Use knownAnyToBytes() to properly handle StringValue/BytesValue/Struct types.
   std::string specifier_config;
@@ -370,6 +434,8 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
   config->on_config_destroy_ = on_config_destroy.value();
   config->on_route_ = on_route.value();
   config->on_route_destroy_ = on_route_destroy.ok() ? on_route_destroy.value() : nullptr;
+  config->on_user_data_discard_ =
+      on_user_data_discard.ok() ? on_user_data_discard.value() : nullptr;
 
   const bool validate_clusters =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, validate_clusters, false);
@@ -390,7 +456,8 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
             ? envoy_dynamic_module_type_route_specifier_route_kind_DirectResponse
             : envoy_dynamic_module_type_route_specifier_route_kind_RouteEntry;
     config->templates_.emplace(
-        id, DynamicModuleRouteSpecifierConfig::Template{id, std::move(built.value()), kind});
+        id, DynamicModuleRouteSpecifierConfig::Template{
+                id, std::move(built.value()), kind, matchesTheSameRoute(route_template.route())});
     config->template_ids_.push_back(id);
   }
 
@@ -439,6 +506,133 @@ newDynamicModuleRouteSpecifierConfig(const DynamicModuleRouteSpecifierProto& pro
     return absl::InvalidArgumentError("Failed to initialize dynamic module route specifier config");
   }
   return config;
+}
+
+namespace {
+
+// A worker sweeps its built route cache every quarter of the entry age and evicts the entries idle
+// for more sweeps than this, which is between the entry age and 1.25 times it after their last use.
+constexpr uint32_t SweepsPerEntryAge = 4;
+
+// Whether a cached route serves a request for the path. A module only records a rule for a path it
+// applies to, so a route that carries one serves only those paths.
+bool servesPath(const CachedRoute& cached, absl::string_view path, size_t max_bytes) {
+  return cached.recorded == nullptr || !cached.recorded->prefix_rewrite_rule.has_value() ||
+         cached.recorded->prefix_rewrite_rule->appliesTo(path, max_bytes);
+}
+
+// Whether a decision recorded the route the cached route was built from.
+bool recordsTheCachedRoute(const CachedRoute& cached, const RouteOverrides* recorded,
+                           const std::optional<uint64_t>& user_data) {
+  if (cached.user_data != user_data) {
+    return false;
+  }
+  // A route built without a wrapper was recorded with nothing that needs one.
+  if (cached.recorded == nullptr || recorded == nullptr) {
+    return cached.recorded == recorded;
+  }
+  return *cached.recorded == *recorded;
+}
+
+} // namespace
+
+BuiltRouteCache::BuiltRouteCache(Event::Dispatcher& dispatcher,
+                                 DynamicModuleRouteSpecifierConfigSharedPtr config,
+                                 const BuiltRouteCacheSettings& settings,
+                                 Random::RandomGenerator& random)
+    : config_(std::move(config)), settings_(settings), random_(random),
+      sweep_timer_(dispatcher.createTimer([this]() { sweep(); })) {}
+
+BuiltRouteCache::~BuiltRouteCache() {
+  config_->stats().built_route_cache_entries_.sub(entries_.size());
+}
+
+const CachedRoute* BuiltRouteCache::lookup(uint64_t key, const Envoy::Router::Route* base,
+                                           absl::string_view path) {
+  const auto it = index_.find(Key{key, base});
+  if (it == index_.end() ||
+      !servesPath(entries_[it->second].value, path, config_->maxRewrittenPathBytes())) {
+    config_->stats().built_route_cache_miss_.inc();
+    return nullptr;
+  }
+  Entry& entry = entries_[it->second];
+  entry.last_used_tick = tick_;
+  entry.referenced = true;
+  config_->stats().built_route_cache_hit_.inc();
+  return &entry.value;
+}
+
+void BuiltRouteCache::insert(uint64_t key, const Envoy::Router::Route* base, CachedRoute route) {
+  const Key entry_key{key, base};
+  // A route cached for the key stays, also when its rule does not apply to the path of the miss.
+  if (index_.contains(entry_key)) {
+    return;
+  }
+  Entry entry{entry_key, std::move(route), tick_, true};
+  if (entries_.size() < settings_.max_entries) {
+    index_.emplace(entry_key, entries_.size());
+    entries_.push_back(std::move(entry));
+    config_->stats().built_route_cache_entries_.inc();
+    if (!sweep_timer_->enabled()) {
+      sweep_timer_->enableTimer(settings_.sweep_interval);
+    }
+    return;
+  }
+  const size_t victim = clockVictim();
+  index_.erase(entries_[victim].key);
+  index_.emplace(entry_key, victim);
+  entries_[victim] = std::move(entry);
+  config_->stats().built_route_cache_evict_.inc();
+}
+
+void BuiltRouteCache::erase(uint64_t key, const Envoy::Router::Route* base) {
+  const auto it = index_.find(Key{key, base});
+  if (it != index_.end()) {
+    removeAt(it->second);
+  }
+}
+
+bool BuiltRouteCache::sampleVerification() {
+  return settings_.verify_one_in != 0 && random_.random() % settings_.verify_one_in == 0;
+}
+
+size_t BuiltRouteCache::clockVictim() {
+  const auto advance = [this]() {
+    if (++hand_ == entries_.size()) {
+      hand_ = 0;
+    }
+  };
+  while (entries_[hand_].referenced) {
+    entries_[hand_].referenced = false;
+    advance();
+  }
+  const size_t victim = hand_;
+  advance();
+  return victim;
+}
+
+void BuiltRouteCache::sweep() {
+  ++tick_;
+  // Walking down lets removeAt move the last entry into a slot that was already visited.
+  for (size_t i = entries_.size(); i > 0; --i) {
+    if (tick_ - entries_[i - 1].last_used_tick > SweepsPerEntryAge) {
+      removeAt(i - 1);
+      config_->stats().built_route_cache_evict_.inc();
+    }
+  }
+  if (!entries_.empty()) {
+    sweep_timer_->enableTimer(settings_.sweep_interval);
+  }
+}
+
+void BuiltRouteCache::removeAt(size_t index) {
+  index_.erase(entries_[index].key);
+  if (index + 1 != entries_.size()) {
+    entries_[index] = std::move(entries_.back());
+    index_[entries_[index].key] = index;
+  }
+  entries_.pop_back();
+  config_->stats().built_route_cache_entries_.dec();
 }
 
 DynamicModuleRoute::DynamicModuleRoute(
@@ -611,17 +805,53 @@ const Envoy::Router::CorsPolicy* DynamicModuleRouteEntry::corsPolicy() const {
                                                            : DelegatingRouteEntry::corsPolicy();
 }
 
+bool DynamicModuleRouteEntry::hasFinalizationRewrite() const {
+  return overrides_.prefix_rewrite_rule.has_value() || overrides_.finalize_regex_rewrite;
+}
+
+std::optional<std::string>
+DynamicModuleRouteEntry::finalizationRewrite(absl::string_view path) const {
+  const size_t max_bytes = config_->maxRewrittenPathBytes();
+  std::optional<std::string> rewritten;
+  if (overrides_.prefix_rewrite_rule.has_value()) {
+    rewritten = overrides_.prefix_rewrite_rule->apply(path, max_bytes);
+  }
+  if (!rewritten.has_value() && overrides_.finalize_regex_rewrite) {
+    const RouteOverride& entry = *overrides_.route_override;
+    rewritten = Envoy::Router::rewritePathByPrefixOrRegex(
+        path, "", "", entry.regex_rewrite.get(), entry.regex_rewrite_substitution, max_bytes);
+  }
+  return rewritten;
+}
+
 std::string DynamicModuleRouteEntry::currentUrlPathAfterRewrite(
     const Http::RequestHeaderMap& headers, const Formatter::Context& context,
     const StreamInfo::StreamInfo& stream_info) const {
-  return overrides_.path.value_or(
-      DelegatingRouteEntry::currentUrlPathAfterRewrite(headers, context, stream_info));
+  if (overrides_.path.has_value()) {
+    return *overrides_.path;
+  }
+  std::optional<std::string> rewritten = finalizationRewrite(headers.getPathValue());
+  return rewritten.has_value()
+             ? std::move(*rewritten)
+             : DelegatingRouteEntry::currentUrlPathAfterRewrite(headers, context, stream_info);
 }
 
 void DynamicModuleRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                      const Formatter::Context& context,
                                                      const StreamInfo::StreamInfo& stream_info,
                                                      bool insert_envoy_original_path) const {
+  // A finalization rewrite applies to the path before the rewrites of the route, which stay in
+  // effect when it yields nothing. A recorded path takes precedence over both.
+  std::optional<std::string> rewritten;
+  std::string original_path;
+  if (!overrides_.path.has_value() && hasFinalizationRewrite()) {
+    rewritten = finalizationRewrite(headers.getPathValue());
+    if (!rewritten.has_value()) {
+      config_->stats().rewrite_not_applied_.inc();
+    } else if (insert_envoy_original_path) {
+      original_path = std::string(headers.getPathValue());
+    }
+  }
   DelegatingRouteEntry::finalizeRequestHeaders(headers, context, stream_info,
                                                insert_envoy_original_path);
   applyHeaderMutations(headers, overrides_.request_headers_to_add,
@@ -637,6 +867,11 @@ void DynamicModuleRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& hea
       headers.setEnvoyOriginalPath(headers.getPathValue());
     }
     headers.setPath(*overrides_.path);
+  } else if (rewritten.has_value()) {
+    if (insert_envoy_original_path) {
+      headers.setEnvoyOriginalPath(original_path);
+    }
+    headers.setPath(*rewritten);
   }
 }
 
@@ -668,43 +903,74 @@ DynamicModuleRouteEntry::responseHeaderTransforms(const StreamInfo::StreamInfo& 
   return transforms;
 }
 
+DynamicModuleRouteSpecifier::DynamicModuleRouteSpecifier(
+    DynamicModuleRouteSpecifierConfigSharedPtr config,
+    const DynamicModuleRouteSpecifierProto& proto_config, ThreadLocal::SlotAllocator& tls,
+    Random::RandomGenerator& random)
+    : config_(std::move(config)) {
+  if (!proto_config.has_built_route_cache()) {
+    return;
+  }
+  const auto& cache = proto_config.built_route_cache();
+  const BuiltRouteCacheSettings settings{
+      cache.max_entries_per_worker(),
+      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cache, max_idle_time, 600000)) /
+          SweepsPerEntryAge,
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(cache, verify_one_in, 1024)};
+  built_route_cache_ = ThreadLocal::TypedSlot<BuiltRouteCache>::makeUnique(tls);
+  built_route_cache_->set([config = config_, settings, &random](Event::Dispatcher& dispatcher) {
+    return std::make_shared<BuiltRouteCache>(dispatcher, config, settings, random);
+  });
+}
+
 Envoy::Router::OnRouteResult
 DynamicModuleRouteSpecifier::onRoute(Envoy::Router::RouteConstSharedPtr route,
                                      const Http::RequestHeaderMap& headers,
                                      const StreamInfo::StreamInfo& stream_info, uint64_t random,
                                      Envoy::Router::OnRouteInputStatus) const {
-  const MonotonicTime start = config_->timeSource().monotonicTime();
-  const auto record_duration = [&](Stats::Histogram& histogram) {
-    histogram.recordValue(std::chrono::duration_cast<std::chrono::microseconds>(
-                              config_->timeSource().monotonicTime() - start)
-                              .count());
-  };
-
   const auto& runtime_fraction = config_->runtimeFraction();
   if (runtime_fraction.has_value() &&
       !config_->runtime().snapshot().featureEnabled(runtime_fraction->key,
                                                     runtime_fraction->default_value, random)) {
     config_->stats().runtime_skipped_.inc();
-    record_duration(config_->stats().specifier_duration_);
     return {std::move(route)};
   }
 
+  const MonotonicTime start = config_->timeSource().monotonicTime();
+  const auto record_duration = [start](Stats::Histogram& histogram, MonotonicTime end) {
+    histogram.recordValue(
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+  };
   RouteSpecifierContext context{*config_, route, headers, stream_info, random};
+  context.built_route_cache_slot = built_route_cache_.get();
   // The module can return a status this build does not know, for example from a newer ABI, so it
   // is read as its underlying integer. Loading an out of range enum value is undefined behavior.
   const uint32_t on_route_status = static_cast<uint32_t>(
       config_->on_route_(config_->in_module_config_, static_cast<void*>(&context)));
   // Reading the clock is the most expensive thing this method does that is not the module itself,
-  // so the start of the specifier doubles as the start of the module. Only the runtime fraction
-  // check and the context construction sit between the two, which is why on_route_duration is
-  // measured from there rather than read again.
+  // so the start of the specifier doubles as the start of the module, with only the context
+  // construction between the two.
   const MonotonicTime module_end = config_->timeSource().monotonicTime();
-  config_->stats().on_route_duration_.recordValue(
-      std::chrono::duration_cast<std::chrono::microseconds>(module_end - start).count());
+  record_duration(config_->stats().on_route_duration_, module_end);
 
   Decision result = resolve(context, on_route_status);
+  // User data no route carries never reaches the route destroy hook, so it is handed back here.
+  const bool discard = context.user_data.has_value() && result.recorded == nullptr &&
+                       config_->onUserDataDiscard() != nullptr;
+  if (discard) {
+    config_->stats().user_data_discard_.inc();
+    config_->onUserDataDiscard()(config_->in_module_config_, *context.user_data);
+  }
 
-  record_duration(config_->stats().specifier_duration_);
+  // A decision reads the clock again when it builds a route, fails or hands its user data back, or
+  // when its lookup in the built route cache misses or is verified. Any other decision ends with
+  // the module, since only a few branches follow it.
+  const auto& lookup = context.built_route_lookup;
+  const bool ends_with_module =
+      !discard && result.recorded == nullptr && result.failure == Failure::None &&
+      (!lookup.has_value() || (lookup->hit.has_value() && !lookup->verify));
+  record_duration(config_->stats().specifier_duration_,
+                  ends_with_module ? module_end : config_->timeSource().monotonicTime());
   return {std::move(result.route), result.status};
 }
 
@@ -781,7 +1047,6 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
     config_->stats().decision_error_.inc();
     return fail(Failure::ModuleError);
   case envoy_dynamic_module_type_route_specifier_decision_Unspecified: {
-    applySelectedRouteOverride(context);
     if (context.selected_template != nullptr) {
       // The two ways the default decision generates its route keep their own statistic, so
       // selecting a template stays distinguishable from refining the resolved route.
@@ -791,8 +1056,27 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
       if (context.selected_route == nullptr) {
         return fail(Failure::TemplateMatchFailed);
       }
+      BuiltRouteLookup* lookup =
+          context.built_route_lookup.has_value() ? &*context.built_route_lookup : nullptr;
+      // A hit serves the cached route, so what the module recorded is not applied.
+      if (lookup != nullptr && lookup->hit.has_value() && !lookup->verify) {
+        return {std::move(lookup->hit->route), status};
+      }
+      applySelectedRouteOverride(context);
       Decision wrapped = wrap(context.selected_route, context, status);
-      return wrapped.failure == Failure::None ? wrapped : fail(wrapped.failure);
+      if (lookup != nullptr && lookup->hit.has_value()) {
+        // A verified hit serves the route the module recorded, which keeps the user data the
+        // module records on a route of its own whenever the recording builds one.
+        verifyCachedRoute(context, wrapped, *lookup);
+      } else if (lookup != nullptr && recordsACacheableRoute(context, wrapped)) {
+        // Even the template cached as it is spares the module its recording on a hit.
+        lookup->cache->insert(lookup->key, context.selected_route.get(),
+                              {wrapped.route, wrapped.recorded, context.user_data});
+      }
+      if (wrapped.failure != Failure::None) {
+        return fail(wrapped.failure);
+      }
+      return wrapped;
     }
     if (context.template_selection_failed) {
       // A selection that failed must not silently fall back to the route the specifier was
@@ -801,6 +1085,7 @@ DynamicModuleRouteSpecifier::resolve(RouteSpecifierContext& context,
       return fail(Failure::TemplateNotSelected);
     }
     config_->stats().decision_has_override_.inc();
+    applySelectedRouteOverride(context);
     if (context.input_route == nullptr) {
       // With nothing recorded the default decision passes the route through unchanged, which is
       // what makes it safe when the module records none: the run with no route stays a run with
@@ -859,15 +1144,41 @@ DynamicModuleRouteSpecifier::wrap(Envoy::Router::RouteConstSharedPtr route,
   }
   Decision decision{nullptr, status};
   if (route_entry_overrides) {
-    decision.route = std::make_shared<DynamicModuleRouteEntry>(
+    auto entry = std::make_shared<DynamicModuleRouteEntry>(
         std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()),
         context.user_data);
+    decision.recorded = &entry->recordedOverrides();
+    decision.route = std::move(entry);
   } else {
-    decision.route = std::make_shared<DynamicModuleRoute>(
+    auto wrapper = std::make_shared<DynamicModuleRoute>(
         std::move(route), config_, std::move(context.overrides), std::move(metadata_pack.value()),
         context.user_data);
+    decision.recorded = &wrapper->recordedOverrides();
+    decision.route = std::move(wrapper);
   }
   return decision;
+}
+
+bool DynamicModuleRouteSpecifier::recordsACacheableRoute(const RouteSpecifierContext& context,
+                                                         const Decision& decision) {
+  return decision.failure == Failure::None && !context.depends_on_request_path;
+}
+
+void DynamicModuleRouteSpecifier::verifyCachedRoute(const RouteSpecifierContext& context,
+                                                    const Decision& decision,
+                                                    const BuiltRouteLookup& lookup) const {
+  config_->stats().built_route_cache_verify_.inc();
+  // A recording the cache could not hold, such as one that depends on the request path, cannot
+  // confirm the cached route even when it records the same route for this request.
+  if (recordsACacheableRoute(context, decision) &&
+      recordsTheCachedRoute(*lookup.hit, decision.recorded, context.user_data)) {
+    return;
+  }
+  config_->stats().built_route_cache_verify_mismatch_.inc();
+  lookup.cache->erase(lookup.key, context.selected_route.get());
+  ENVOY_LOG_EVERY_POW_2(
+      warn,
+      "dynamic module route specifier evicted a cached route its verification did not confirm");
 }
 
 } // namespace DynamicModules

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <memory>
@@ -84,11 +85,25 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
     : token_bucket_(max_tokens, time_source,
                     // Calculate the fill rate in tokens per second.
                     tokens_per_fill / std::chrono::duration<double>(fill_interval).count()),
-      fill_interval_(fill_interval), shadow_mode_(shadow_mode) {}
+      fill_interval_(fill_interval), shadow_mode_(shadow_mode),
+      preserve_one_request_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request")) {}
 bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume, bool allow_partial) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
-  auto cb = [tokens = to_consume / factor, allow_partial](double total) {
-    return allow_partial ? std::max(0.0, std::min(total, tokens)) : (total < tokens ? 0.0 : tokens);
+  const double max_tokens = token_bucket_.maxTokens();
+  const double tokens = to_consume / factor;
+  // Sharing can make the cost of a request larger than the bucket. If the request fits in the
+  // bucket without sharing, admit it when the bucket holds max_tokens, but still consume the full
+  // shared cost. The bucket goes below zero and the next request waits for the refill, so the
+  // aggregate rate across the local cluster stays at the configured rate.
+  const double threshold = preserve_one_request_ && max_tokens > 0 && to_consume <= max_tokens
+                               ? std::min(tokens, max_tokens)
+                               : tokens;
+  auto cb = [tokens, threshold, allow_partial](double total) {
+    if (allow_partial) {
+      return std::max(0.0, std::min(total, tokens));
+    }
+    return total < threshold ? 0.0 : tokens;
   };
   return token_bucket_.consume(cb) != 0.0;
 }

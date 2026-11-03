@@ -230,7 +230,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                                    stream_info.startTime(), span_context.value(),
                                                    trace_context, span_kind));
     } else {
-      ENVOY_LOG(trace, "Unable to extract span context: ", span_context.status());
+      ENVOY_LOG(debug, "Unable to extract span context, returning null span: {}",
+                span_context.status());
       return std::make_unique<Tracing::NullSpan>();
     }
   }

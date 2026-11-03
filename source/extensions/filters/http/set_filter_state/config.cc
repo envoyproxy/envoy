@@ -85,7 +85,11 @@ absl::StatusOr<Http::FilterFactoryCb> SetFilterStateConfig::createHttpFilterFact
   };
 }
 
+using UpstreamSetFilterStateConfig = SetFilterStateConfig;
+
 REGISTER_FACTORY(SetFilterStateConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(UpstreamSetFilterStateConfig,
+                 Server::Configuration::UpstreamHttpFilterConfigFactory);
 
 } // namespace SetFilterState
 } // namespace HttpFilters

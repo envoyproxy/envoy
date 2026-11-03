@@ -141,10 +141,9 @@ decompressor_library:
                            bool end_with_data) {
     EXPECT_CALL(*decompressor_ptr, decompress(_, _))
         .Times(2)
-        .WillRepeatedly(
-            Invoke([&](const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) {
-              TestUtility::feedBufferWithRandomCharacters(output_buffer, 2 * input_buffer.length());
-            }));
+        .WillRepeatedly([&](const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) {
+          TestUtility::feedBufferWithRandomCharacters(output_buffer, 2 * input_buffer.length());
+        });
     Buffer::OwnedImpl buffer;
     TestUtility::feedBufferWithRandomCharacters(buffer, 10);
     EXPECT_EQ(10, buffer.length());

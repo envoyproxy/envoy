@@ -98,26 +98,26 @@ public:
                     Eq(envoy::config::endpoint::v3::LbEndpoint().GetDescriptor()->full_name()), _,
                     _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke(
-            [this, &leds_config](const xds::core::v3::ResourceLocator& locator_url,
-                                 const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                                 Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                                 Envoy::Config::OpaqueResourceDecoderSharedPtr) {
-              // Verify that the locator is correct.
-              Config::XdsResourceIdentifier::EncodeOptions encode_options;
-              encode_options.sort_context_params_ = true;
-              EXPECT_EQ(leds_config.leds_collection_name(),
-                        Config::XdsResourceIdentifier::encodeUrl(locator_url, encode_options));
-              // Set the callbacks, and verify that start() is called correctly.
-              auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-              leds_callbacks_ = &callbacks;
-              EXPECT_CALL(*ret, start(_))
-                  .WillOnce(Invoke([](const absl::flat_hash_set<std::string>& resource_names) {
-                    // No resource names for a glob collection.
-                    EXPECT_EQ(resource_names.size(), 0);
-                  }));
-              return ret;
-            }));
+        .WillRepeatedly([this, &leds_config](const xds::core::v3::ResourceLocator& locator_url,
+                                             const envoy::config::core::v3::ConfigSource&,
+                                             absl::string_view, Stats::Scope&,
+                                             Envoy::Config::SubscriptionCallbacks& callbacks,
+                                             Envoy::Config::OpaqueResourceDecoderSharedPtr) {
+          // Verify that the locator is correct.
+          Config::XdsResourceIdentifier::EncodeOptions encode_options;
+          encode_options.sort_context_params_ = true;
+          EXPECT_EQ(leds_config.leds_collection_name(),
+                    Config::XdsResourceIdentifier::encodeUrl(locator_url, encode_options));
+          // Set the callbacks, and verify that start() is called correctly.
+          auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+          leds_callbacks_ = &callbacks;
+          EXPECT_CALL(*ret, start(_))
+              .WillOnce([](const absl::flat_hash_set<std::string>& resource_names) {
+                // No resource names for a glob collection.
+                EXPECT_EQ(resource_names.size(), 0);
+              });
+          return ret;
+        });
 
     leds_subscription_ = std::make_unique<LedsSubscription>(leds_config, "xds_cluster",
                                                             factory_context, *cluster_scope_.get(),

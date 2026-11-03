@@ -25,9 +25,9 @@ namespace {
 class TracerTest : public testing::Test {
 public:
   void setupTracer(const std::string& yaml_string) {
-    EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce(Invoke([](Event::TimerCb) {
+    EXPECT_CALL(mock_dispatcher_, createTimer_(_)).WillOnce([](Event::TimerCb) {
       return new NiceMock<Event::MockTimer>();
-    }));
+    });
 
     auto mock_client_factory = std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
 
