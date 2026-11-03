@@ -172,7 +172,8 @@ absl::StatusOr<std::optional<Http::Utility::QueryParamsMulti>> modifyQueryParame
 } // namespace
 
 FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
-                           Stats::Scope& scope, const std::string& stats_prefix,
+                           Stats::Scope& scope, Stats::Scope& stats_scope,
+                           const std::string& stats_prefix,
                            Server::Configuration::ServerFactoryContext& factory_context,
                            absl::Status& creation_status)
     : allow_partial_message_(config.with_request_body().allow_partial_message()),
@@ -218,7 +219,6 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
                            ? std::optional<Runtime::FeatureFlag>(
                                  Runtime::FeatureFlag(config.deny_at_disable(), runtime_))
                            : std::nullopt),
-      pool_(scope_.symbolTable()),
       metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                    config.metadata_context_namespaces().end()),
       typed_metadata_context_namespaces_(config.typed_metadata_context_namespaces().begin(),
@@ -233,13 +233,13 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
       emit_client_span_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, emit_client_span, true)),
-      stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
-      ext_authz_ok_(pool_.add(createPoolStatName(config.stat_prefix(), "ok"))),
-      ext_authz_denied_(pool_.add(createPoolStatName(config.stat_prefix(), "denied"))),
-      ext_authz_error_(pool_.add(createPoolStatName(config.stat_prefix(), "error"))),
-      ext_authz_invalid_(pool_.add(createPoolStatName(config.stat_prefix(), "invalid"))),
+      stats_(generateStats(stats_prefix, config.stat_prefix(), stats_scope)),
+      ext_authz_ok_(createTaggedPoolStatName(config.stat_prefix(), "ok")),
+      ext_authz_denied_(createTaggedPoolStatName(config.stat_prefix(), "denied")),
+      ext_authz_error_(createTaggedPoolStatName(config.stat_prefix(), "error")),
+      ext_authz_invalid_(createTaggedPoolStatName(config.stat_prefix(), "invalid")),
       ext_authz_failure_mode_allowed_(
-          pool_.add(createPoolStatName(config.stat_prefix(), "failure_mode_allowed"))) {
+          createTaggedPoolStatName(config.stat_prefix(), "failure_mode_allowed")) {
   auto bootstrap = factory_context.bootstrap();
   auto labels_key_it =
       bootstrap.node().metadata().fields().find(config.bootstrap_metadata_labels_key());
