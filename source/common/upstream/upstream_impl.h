@@ -1088,6 +1088,7 @@ public:
   }
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
+  bool gracefulHostRemoval() const override { return graceful_host_removal_; }
   bool connectionPoolPerDownstreamConnection() const override {
     return connection_pool_per_downstream_connection_;
   }
@@ -1259,6 +1260,7 @@ private:
   const std::optional<uint16_t> max_response_headers_kb_;
   const envoy::config::cluster::v3::Cluster::DiscoveryType type_;
   const bool drain_connections_on_host_removal_ : 1;
+  const bool graceful_host_removal_ : 1;
   const bool connection_pool_per_downstream_connection_ : 1;
   const bool warm_hosts_ : 1;
   const bool wait_for_warm_on_init_ : 1;
