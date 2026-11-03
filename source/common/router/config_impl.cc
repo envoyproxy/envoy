@@ -2143,6 +2143,16 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     host_header_value = headers.getHostValue();
   }
 
+  return findVirtualHost(host_header_value);
+}
+
+const VirtualHostImpl* RouteMatcher::findVirtualHost(absl::string_view host_header_value) const {
+  // Fast path the case where we only have a default virtual host.
+  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
+      wildcard_virtual_host_prefixes_.empty()) {
+    return default_virtual_host_.get();
+  }
+
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
   if (ignorePortInHostMatching()) {
     if (const absl::string_view::size_type port_start =
