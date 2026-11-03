@@ -12,6 +12,8 @@
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
 #include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
 #include "source/common/network/utility.h"
 #include "source/common/upstream/outlier_detection_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -3351,6 +3353,10 @@ struct ThreadJoiner {
 struct SingleThreadJoiner {
   std::thread& thread;
   std::atomic<bool>* stop_signal{nullptr};
+
+  SingleThreadJoiner(std::thread& t, std::atomic<bool>* stop = nullptr)
+      : thread(t), stop_signal(stop) {}
+
   ~SingleThreadJoiner() {
     if (stop_signal != nullptr) {
       stop_signal->store(true, std::memory_order_release);
@@ -3365,9 +3371,16 @@ TEST(OutlierSuccessRateMonitorTest, ConcurrentMixedAccountingAndRotation) {
   SuccessRateMonitor monitor(envoy::data::cluster::v3::SUCCESS_RATE);
   constexpr int num_workers = 4;
   constexpr int requests_per_worker = 25000;
+  constexpr uint64_t total_requests = num_workers * requests_per_worker;
+  constexpr int num_rotations = 15;
+  constexpr uint64_t rotation_interval = total_requests / (num_rotations + 1);
+
   std::atomic<uint64_t> total_success_submitted{0};
   std::atomic<uint64_t> total_failed_submitted{0};
+  std::atomic<uint64_t> completed_requests{0};
   std::atomic<bool> start{false};
+  Thread::MutexBasicLockable progress_mutex;
+  Thread::CondVar progress_cond;
 
   std::vector<std::thread> workers;
   workers.reserve(num_workers);
@@ -3376,6 +3389,7 @@ TEST(OutlierSuccessRateMonitorTest, ConcurrentMixedAccountingAndRotation) {
   for (int w = 0; w < num_workers; ++w) {
     workers.emplace_back([&, w] {
       while (!start.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
       }
       for (int i = 0; i < requests_per_worker; ++i) {
         const bool success = ((i + w) % 3 != 0); // 2/3 success, 1/3 failure
@@ -3385,6 +3399,10 @@ TEST(OutlierSuccessRateMonitorTest, ConcurrentMixedAccountingAndRotation) {
           total_failed_submitted.fetch_add(1, std::memory_order_relaxed);
         }
         monitor.incReqCounters(success);
+        const uint64_t c = completed_requests.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (c % 1000 == 0 || c == total_requests) {
+          progress_cond.notifyOne();
+        }
       }
     });
   }
@@ -3393,8 +3411,14 @@ TEST(OutlierSuccessRateMonitorTest, ConcurrentMixedAccountingAndRotation) {
   uint64_t total_recorded_success = 0;
   start.store(true, std::memory_order_release);
 
-  for (int r = 0; r < 15; ++r) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  for (int r = 0; r < num_rotations; ++r) {
+    const uint64_t target = (r + 1) * rotation_interval;
+    {
+      Thread::LockGuard lock(progress_mutex);
+      while (completed_requests.load(std::memory_order_relaxed) < target) {
+        progress_cond.wait(progress_mutex);
+      }
+    }
     monitor.updateCurrentSuccessRateBucket();
     const auto [tot, succ] =
         SuccessRateAccumulatorTestPeer::unpackSnapshot(monitor.successRateAccumulator());
@@ -3435,7 +3459,7 @@ TEST(OutlierSuccessRateMonitorTest, ConcurrentMixedAccountingAndRotation) {
   }
 
   const uint64_t total_submitted = total_success_submitted.load() + total_failed_submitted.load();
-  EXPECT_EQ(num_workers * requests_per_worker, total_submitted);
+  EXPECT_EQ(total_requests, total_submitted);
   EXPECT_EQ(total_submitted, total_recorded_volume);
   EXPECT_EQ(total_success_submitted.load(), total_recorded_success);
 }
@@ -3526,7 +3550,7 @@ TEST(OutlierSuccessRateMonitorTest, ValidIntervalFollowingSaturatedInterval) {
 
   // Saturated Interval 1
   SuccessRateAccumulatorTestPeer::setCounters(monitor.successRateAccumulator(),
-                                              ((uint64_t)limit << 32) | limit);
+                                              (static_cast<uint64_t>(limit) << 32) | limit);
   monitor.incReqCounters(true);
   monitor.updateCurrentSuccessRateBucket();
   EXPECT_FALSE(monitor.successRateAccumulator().getSuccessRateAndVolume().has_value());
@@ -3550,7 +3574,7 @@ TEST(OutlierSuccessRateMonitorTest, DelayedWorkerIntervalAttribution) {
 
   // Window 1 at capacity
   SuccessRateAccumulatorTestPeer::setCounters(monitor.successRateAccumulator(),
-                                              ((uint64_t)limit << 32) | limit);
+                                              (static_cast<uint64_t>(limit) << 32) | limit);
 
   std::atomic<bool> worker_started{false};
   std::atomic<bool> allow_worker_record{false};
@@ -3601,25 +3625,42 @@ TEST(OutlierSuccessRateMonitorTest, StructuralAbsenceOfSplitAccountingAcrossRota
   std::atomic<bool> start{false};
   std::atomic<bool> stop{false};
   std::atomic<uint64_t> recorded{0};
+  Thread::MutexBasicLockable progress_mutex;
+  Thread::CondVar progress_cond;
+
+  constexpr int num_rotations = 50;
+  constexpr uint64_t batch_per_rotation = 50;
 
   std::thread writer([&] {
     while (!start.load(std::memory_order_acquire)) {
+      if (stop.load(std::memory_order_relaxed)) {
+        return;
+      }
+      std::this_thread::yield();
     }
     while (!stop.load(std::memory_order_relaxed)) {
       monitor.incReqCounters(true);
-      recorded.fetch_add(1, std::memory_order_relaxed);
+      const uint64_t current = recorded.fetch_add(1, std::memory_order_relaxed) + 1;
+      if (current % batch_per_rotation == 0) {
+        progress_cond.notifyOne();
+      }
     }
+    progress_cond.notifyOne();
   });
   SingleThreadJoiner writer_joiner(writer, &stop);
 
   start.store(true, std::memory_order_release);
-  while (recorded.load() == 0) {
-    std::this_thread::yield();
-  }
   uint64_t accumulated_volume = 0;
 
-  for (int i = 0; i < 50; ++i) {
-    std::this_thread::sleep_for(std::chrono::microseconds(200));
+  for (int i = 0; i < num_rotations; ++i) {
+    const uint64_t target = (i + 1) * batch_per_rotation;
+    {
+      Thread::LockGuard lock(progress_mutex);
+      while (recorded.load(std::memory_order_relaxed) < target) {
+        progress_cond.wait(progress_mutex);
+      }
+    }
+
     monitor.updateCurrentSuccessRateBucket();
     auto sample = monitor.successRateAccumulator().getSuccessRateAndVolume();
     if (sample.has_value()) {
@@ -3630,6 +3671,7 @@ TEST(OutlierSuccessRateMonitorTest, StructuralAbsenceOfSplitAccountingAcrossRota
   }
 
   stop.store(true, std::memory_order_release);
+  progress_cond.notifyOne();
   if (writer.joinable()) {
     writer.join();
   }
