@@ -1,0 +1,5 @@
+// A typo before sentence punctuation is still checked (mistaek.) and so is this one: mistaak...
+// Host names, URLs and stat name templates are skipped: example.com, https://example.com/path
+// and vhost.<name>.vcluster.[<cluster>.]upstream_rq*.
+// A dot before a capital is sentence punctuation (sentense.Next one), and a name joined by a
+// comma does not hide the word before it: speling,e.g. this one.
