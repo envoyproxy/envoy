@@ -37,6 +37,7 @@
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/common/cleanup.h"
 #include "source/common/common/dns_utils.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
@@ -1112,6 +1113,11 @@ void MainPrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& upd
                                overprovisioning_factor);
 }
 
+void MainPrioritySetImpl::batchHostUpdate(BatchUpdateCb& callback) {
+  Cleanup cleanup([this]() { pending_cross_priority_hosts_added_.clear(); });
+  PrioritySetImpl::batchHostUpdate(callback);
+}
+
 HostLookupMapConstSharedPtr MainPrioritySetImpl::crossPriorityHostMap() const {
   // Check if the host set in the main thread PrioritySet has been updated. This is only pending
   // for the flat backing. The persistent backing publishes a snapshot on every update.
@@ -1148,11 +1154,21 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(uint32_t priority,
       // from a higher priority value to a lower priority value.
       if (existing_host != nullptr && (*existing_host)->priority() == priority) {
         persistent_cross_priority_host_map_.erase(host_address);
+        if (!pending_cross_priority_hosts_added_.empty()) {
+          if (auto pending = pending_cross_priority_hosts_added_.find(host_address);
+              pending != pending_cross_priority_hosts_added_.end()) {
+            persistent_cross_priority_host_map_.insert(host_address, std::move(pending->second));
+            pending_cross_priority_hosts_added_.erase(pending);
+          }
+        }
       }
     }
 
     for (const auto& host : hosts_added) {
-      persistent_cross_priority_host_map_.insert(addressToString(host->address()), host);
+      const auto host_address = addressToString(host->address());
+      if (!persistent_cross_priority_host_map_.insert(host_address, host) && batchUpdateActive()) {
+        pending_cross_priority_hosts_added_.try_emplace(host_address, host);
+      }
     }
 
     // Snapshots share structure with the map, so publishing one is O(1).
@@ -1176,13 +1192,24 @@ void MainPrioritySetImpl::updateCrossPriorityHostMap(uint32_t priority,
       // the add operation was already executed and has already moved the metadata of the host
       // from a higher priority value to a lower priority value.
       if (existing_host->second->priority() == priority) {
-        mutable_cross_priority_host_map_->erase(host_address);
+        mutable_cross_priority_host_map_->erase(existing_host);
+        if (!pending_cross_priority_hosts_added_.empty()) {
+          if (auto pending = pending_cross_priority_hosts_added_.find(host_address);
+              pending != pending_cross_priority_hosts_added_.end()) {
+            mutable_cross_priority_host_map_->emplace(host_address, std::move(pending->second));
+            pending_cross_priority_hosts_added_.erase(pending);
+          }
+        }
       }
     }
   }
 
   for (const auto& host : hosts_added) {
-    mutable_cross_priority_host_map_->insert({addressToString(host->address()), host});
+    const auto host_address = addressToString(host->address());
+    if (!mutable_cross_priority_host_map_->emplace(host_address, host).second &&
+        batchUpdateActive()) {
+      pending_cross_priority_hosts_added_.try_emplace(host_address, host);
+    }
   }
 }
 
