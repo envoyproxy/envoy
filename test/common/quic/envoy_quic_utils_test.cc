@@ -2,6 +2,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -342,6 +343,109 @@ TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
   EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CANCELLED),
             Http::StreamResetReason::RemoteReset);
 }
+
+TEST(EnvoyQuicUtilsTest, CreateConnectionSocketBindFailure) {
+  Network::Address::InstanceConstSharedPtr local_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  Network::Address::InstanceConstSharedPtr peer_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321);
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
+  EXPECT_CALL(os_sys_calls, socket(_, _, _)).WillOnce(Return(Api::SysCallSocketResult{42, 0}));
+  ON_CALL(os_sys_calls, setsockopt_(_, _, _, _, _)).WillByDefault(Return(0));
+  EXPECT_CALL(os_sys_calls, bind(42, _, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, EADDRNOTAVAIL}));
+  EXPECT_CALL(os_sys_calls, connect(_, _, _)).Times(0);
+  EXPECT_CALL(os_sys_calls, close(42)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+
+  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  EXPECT_FALSE(connection_socket->isOpen());
+  EXPECT_FALSE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("127.0.0.1", local_addr->ip()->addressAsString());
+  EXPECT_EQ(0, local_addr->ip()->port());
+}
+
+#if defined(__linux__)
+TEST(EnvoyQuicUtilsTest, CreateConnectionSocketInNetworkNamespace) {
+  testing::StrictMock<Network::MockSocketInterface> socket_interface(
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4});
+  Network::Address::InstanceConstSharedPtr local_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", &socket_interface,
+                                                       "/proc/thread-self/ns/net");
+  Network::Address::InstanceConstSharedPtr peer_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321);
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls{&linux_os_sys_calls};
+  bool in_namespace = false;
+  testing::InSequence sequence;
+  EXPECT_CALL(linux_os_sys_calls, setns(_, CLONE_NEWNET))
+      .WillOnce([&](int, int) -> Api::SysCallIntResult {
+        in_namespace = true;
+        return {0, 0};
+      });
+  EXPECT_CALL(socket_interface, socket(Network::Socket::Type::Datagram, local_addr, _))
+      .WillOnce([&](Network::Socket::Type type, Network::Address::InstanceConstSharedPtr address,
+                    const Network::SocketCreationOptions& options) {
+        EXPECT_TRUE(in_namespace);
+        return socket_interface.SocketInterfaceImpl::socket(type, address, options);
+      });
+  EXPECT_CALL(linux_os_sys_calls, setns(_, CLONE_NEWNET))
+      .WillOnce([&](int, int) -> Api::SysCallIntResult {
+        in_namespace = false;
+        return {0, 0};
+      });
+
+  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_FALSE(in_namespace);
+  EXPECT_EQ("/proc/thread-self/ns/net", local_addr->networkNamespace());
+  EXPECT_EQ(local_addr, connection_socket->connectionInfoProvider().localAddress());
+  connection_socket->close();
+}
+
+class QuicSocketNetworkNamespaceFailureTest : public testing::TestWithParam<int> {};
+
+TEST_P(QuicSocketNetworkNamespaceFailureTest, ReturnsClosedSocketWithoutFallback) {
+  Network::Address::InstanceConstSharedPtr local_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", nullptr, "/test/netns");
+  Network::Address::InstanceConstSharedPtr peer_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321);
+  testing::StrictMock<Api::MockOsSysCalls> os_sys_calls;
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls};
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls{&linux_os_sys_calls};
+  EXPECT_CALL(os_sys_calls, socket(_, _, _)).Times(0);
+  if (GetParam() == 0) {
+    EXPECT_CALL(os_sys_calls, open(testing::StrEq("/proc/thread-self/ns/net"), O_RDONLY))
+        .WillOnce(Return(Api::SysCallIntResult{-1, EACCES}));
+  } else {
+    EXPECT_CALL(os_sys_calls, open(testing::StrEq("/proc/thread-self/ns/net"), O_RDONLY))
+        .WillOnce(Return(Api::SysCallIntResult{10, 0}));
+    EXPECT_CALL(os_sys_calls, close(10)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    if (GetParam() == 1) {
+      EXPECT_CALL(os_sys_calls, open(testing::StrEq("/test/netns"), O_RDONLY))
+          .WillOnce(Return(Api::SysCallIntResult{-1, ENOENT}));
+    } else {
+      EXPECT_CALL(os_sys_calls, open(testing::StrEq("/test/netns"), O_RDONLY))
+          .WillOnce(Return(Api::SysCallIntResult{11, 0}));
+      EXPECT_CALL(linux_os_sys_calls, setns(11, CLONE_NEWNET))
+          .WillOnce(Return(Api::SysCallIntResult{-1, EPERM}));
+      EXPECT_CALL(os_sys_calls, close(11)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+    }
+  }
+
+  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  ASSERT_NE(nullptr, connection_socket);
+  EXPECT_FALSE(connection_socket->isOpen());
+  EXPECT_FALSE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("quic", connection_socket->detectedTransportProtocol());
+  EXPECT_EQ("/test/netns", local_addr->networkNamespace());
+}
+
+INSTANTIATE_TEST_SUITE_P(NamespaceFailures, QuicSocketNetworkNamespaceFailureTest,
+                         testing::Values(0, 1, 2));
+#endif
 
 TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
   Network::Address::InstanceConstSharedPtr local_addr =

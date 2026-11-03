@@ -23,7 +23,9 @@
 #include "source/common/http/http_option_limits.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_option_factory.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/runtime/runtime_features.h"
@@ -233,12 +235,33 @@ Network::ConnectionSocketPtr createConnectionSocket(
   // `recent_received_addresses_` cache in
   // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   constexpr size_t max_addresses_cache_size = 4u;
-  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram,
-      // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
-      // create the IoHandle, without having to make the more expensive `getifaddrs` call.
-      local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
-      Network::SocketCreationOptions{false, max_addresses_cache_size});
+  auto create_socket = [&]() -> Network::ConnectionSocketPtr {
+    return std::make_unique<Network::ConnectionSocketImpl>(
+        Network::Socket::Type::Datagram,
+        // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
+        // create the IoHandle, without having to make the more expensive `getifaddrs` call.
+        local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
+        Network::SocketCreationOptions{false, max_addresses_cache_size});
+  };
+  Network::ConnectionSocketPtr connection_socket;
+#if defined(__linux__)
+  if (local_addr && local_addr->networkNamespace().has_value()) {
+    auto result = Network::Utility::execInNetworkNamespace(create_socket,
+                                                           local_addr->networkNamespace()->c_str());
+    if (!result.ok()) {
+      ENVOY_LOG_MISC(error, "Failed to create quic socket in network namespace {}: {}",
+                     local_addr->networkNamespace().value(), result.status().ToString());
+      // Callers require a socket with an IoHandle even when socket creation fails.
+      connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+          std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
+    } else {
+      connection_socket = *std::move(result);
+    }
+  } else
+#endif
+  {
+    connection_socket = create_socket();
+  }
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
     ENVOY_LOG_MISC(error, "Failed to create quic socket");
@@ -286,7 +309,12 @@ Network::ConnectionSocketPtr createConnectionSocket(
   }
 
   if (local_addr != nullptr) {
-    connection_socket->bind(local_addr);
+    if (auto result = connection_socket->bind(local_addr); result.return_value_ == -1) {
+      connection_socket->close();
+      ENVOY_LOG_MISC(error, "Fail to bind quic socket: ({}) {}", result.errno_,
+                     errorDetails(result.errno_));
+      return connection_socket;
+    }
     ASSERT(local_addr->ip());
   } else if (network != quic::kInvalidNetworkHandle && custom_bind_func != nullptr) {
     custom_bind_func(*connection_socket, network);
@@ -303,7 +331,13 @@ Network::ConnectionSocketPtr createConnectionSocket(
     return connection_socket;
   }
 
+  const auto network_namespace = local_addr ? local_addr->networkNamespace() : std::nullopt;
   local_addr = connection_socket->connectionInfoProvider().localAddress();
+  if (local_addr && network_namespace.has_value()) {
+    // Port migration creates new sockets from this address and must retain the namespace.
+    local_addr = local_addr->withNetworkNamespace(network_namespace.value());
+    connection_socket->connectionInfoProvider().setLocalAddress(local_addr);
+  }
   ENVOY_LOG_MISC(trace, "connected to local address: {}",
                  local_addr != nullptr ? local_addr->asString() : "<none>");
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
