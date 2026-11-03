@@ -225,6 +225,14 @@ use_repo(git_prebuilt_ext, "git_toolchains")
 
 register_toolchains("@git_toolchains//:all")
 
+# Hermetic hunspell spell checker for //tools/spelling: prebuilt for Linux, built from source
+# (registered by envoy_toolshed as a fallback) elsewhere, eg macOS.
+hunspell_ext = use_extension("@envoy_toolshed//hunspell:extensions.bzl", "hunspell_prebuilt_extension")
+hunspell_ext.setup()
+use_repo(hunspell_ext, "hunspell_toolchains")
+
+register_toolchains("@hunspell_toolchains//:all")
+
 unwind_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "unwind_extension")
 unwind_ext.setup()
 use_repo(unwind_ext, "unwind_libs")
