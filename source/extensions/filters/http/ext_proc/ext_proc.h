@@ -52,7 +52,8 @@ namespace ExternalProcessing {
   COUNTER(clear_route_cache_upstream_ignored)                                                      \
   COUNTER(http_not_ok_resp_received)                                                               \
   COUNTER(immediate_responses_sent)                                                                \
-  COUNTER(server_half_closed)
+  COUNTER(server_half_closed)                                                                      \
+  COUNTER(logging_info_not_created)
 
 struct ExtProcFilterStats {
   ALL_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
