@@ -244,19 +244,17 @@ Network::ConnectionSocketPtr createConnectionSocket(
         local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
         Network::SocketCreationOptions{false, max_addresses_cache_size});
   };
-  Network::ConnectionSocketPtr connection_socket;
+  auto connection_socket =
 #if defined(__linux__)
-  if (netns.has_value()) {
-    auto result = Network::Utility::execInNetworkNamespace(create_socket, netns->c_str());
-    // The packet writer requires a non-null socket even on namespace failure.
-    connection_socket =
-        result.ok() ? *std::move(result)
-                    : std::make_unique<Network::ConnectionSocketImpl>(
-                          std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
-  } else
+      netns ? Network::Utility::execInNetworkNamespace(create_socket, netns->c_str())
+                  .value_or(nullptr)
+            :
 #endif
-  {
-    connection_socket = create_socket();
+            create_socket();
+  if (!connection_socket) {
+    // The packet writer requires a non-null socket even on namespace failure.
+    connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
+        std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
   }
   connection_socket->setDetectedTransportProtocol("quic");
   if (!connection_socket->isOpen()) {
