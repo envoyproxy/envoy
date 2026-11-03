@@ -24,7 +24,6 @@
 #include "opentelemetry/proto/resource/v1/resource.pb.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -60,10 +59,10 @@ public:
     opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest expected_message;
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
     EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-        .WillOnce(Invoke([expected_message, response_status, rejected_log_records](
-                             absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
-                             Grpc::RawAsyncRequestCallbacks& callback, Tracing::Span& span,
-                             const Http::AsyncClient::RequestOptions&) {
+        .WillOnce([expected_message, response_status, rejected_log_records](
+                      absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
+                      Grpc::RawAsyncRequestCallbacks& callback, Tracing::Span& span,
+                      const Http::AsyncClient::RequestOptions&) {
           opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest message;
 
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
@@ -77,7 +76,7 @@ public:
             callback.onSuccessRaw(Grpc::Common::serializeMessage(resp), span);
           }
           return nullptr; // We don't care about the returned request.
-        }));
+        });
   }
 
 private:
@@ -244,12 +243,12 @@ public:
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+        .WillOnce([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
-          }));
+          });
           return Grpc::AsyncClientFactoryPtr{factory_};
-        }));
+        });
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -377,12 +376,12 @@ public:
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, false) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+        .WillOnce([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
-          }));
+          });
           return Grpc::AsyncClientFactoryPtr{factory_};
-        }));
+        });
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -487,12 +486,12 @@ public:
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+        .WillOnce([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
-          }));
+          });
           return Grpc::AsyncClientFactoryPtr{factory_};
-        }));
+        });
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -559,12 +558,12 @@ public:
         logger_cache_(async_client_manager_, scope_, tls_, server_context_),
         grpc_access_logger_impl_test_helper_(server_context_.local_info_, async_client_, true) {
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+        .WillOnce([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
-          }));
+          });
           return Grpc::AsyncClientFactoryPtr{factory_};
-        }));
+        });
   }
 
   Grpc::MockAsyncClient* async_client_;

@@ -23,7 +23,6 @@ using testing::An;
 using testing::DoAll;
 using testing::Eq;
 using testing::InSequence;
-using testing::Invoke;
 using testing::Property;
 using testing::Ref;
 using testing::Return;
@@ -213,7 +212,7 @@ TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
 
   // Process the dummy request
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
@@ -221,7 +220,7 @@ TEST_F(RedisClientImplTest, BatchWithZeroBufferAndTimeout) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -270,7 +269,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
 
   // Process the dummy request
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
@@ -278,7 +277,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -313,7 +312,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
 
   // Process the dummy requests
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
@@ -328,7 +327,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -365,7 +364,7 @@ TEST_F(RedisClientImplTest, Basic) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
@@ -380,7 +379,7 @@ TEST_F(RedisClientImplTest, Basic) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -444,7 +443,7 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
   EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
 
     simTime().setMonotonicTime(std::chrono::microseconds(10));
@@ -460,7 +459,7 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
 
     callbacks_->onRespValue(std::move(response1));
-  }));
+  });
 
   upstream_read_filter_->onData(fake_data, false);
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -508,7 +507,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
 
     simTime().setMonotonicTime(std::chrono::microseconds(10));
@@ -546,7 +545,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
     EXPECT_EQ(1UL, stats_.counter("upstream_commands.get.success").value());
     EXPECT_EQ(1UL, stats_.counter("upstream_commands.get.failure").value());
     EXPECT_EQ(2UL, stats_.counter("upstream_commands.get.total").value());
-  }));
+  });
 
   upstream_read_filter_->onData(fake_data, false);
 
@@ -652,7 +651,7 @@ TEST_F(RedisClientImplTest, Cancel) {
   handle1->cancel();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
 
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
@@ -668,7 +667,7 @@ TEST_F(RedisClientImplTest, Cancel) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -787,9 +786,9 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   onConnected();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     throw Common::Redis::ProtocolError("error");
-  }));
+  });
   EXPECT_CALL(host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::ExtOriginRequestFailed, _));
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -817,21 +816,20 @@ TEST_F(RedisClientImplTest, UnsolicitedReplyIsDropped) {
   onConnected();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   Buffer::OwnedImpl unsolicited_data;
-  EXPECT_CALL(*decoder_, decode(Ref(unsolicited_data)))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> void {
-        callbacks_->onRespValue(std::make_unique<Common::Redis::RespValue>());
-      }));
+  EXPECT_CALL(*decoder_, decode(Ref(unsolicited_data))).WillOnce([&](Buffer::Instance&) -> void {
+    callbacks_->onRespValue(std::make_unique<Common::Redis::RespValue>());
+  });
   upstream_read_filter_->onData(unsolicited_data, false);
 
   EXPECT_EQ(Network::Connection::State::Open, upstream_connection_->state());
@@ -845,14 +843,14 @@ TEST_F(RedisClientImplTest, UnsolicitedReplyIsDropped) {
   client_->makeRequest(request2, callbacks2);
 
   Buffer::OwnedImpl fake_data2;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data2))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data2))).WillOnce([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-  }));
+  });
   upstream_read_filter_->onData(fake_data2, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -876,7 +874,7 @@ TEST_F(RedisClientImplTest, SurplusReplyInSameBufferIsDropped) {
   onConnected();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -885,7 +883,7 @@ TEST_F(RedisClientImplTest, SurplusReplyInSameBufferIsDropped) {
     callbacks_->onRespValue(std::move(response1));
 
     callbacks_->onRespValue(std::make_unique<Common::Redis::RespValue>());
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_EQ(Network::Connection::State::Open, upstream_connection_->state());
@@ -899,14 +897,14 @@ TEST_F(RedisClientImplTest, SurplusReplyInSameBufferIsDropped) {
   client_->makeRequest(request2, callbacks2);
 
   Buffer::OwnedImpl fake_data2;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data2))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data2))).WillOnce([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-  }));
+  });
   upstream_read_filter_->onData(fake_data2, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -936,10 +934,10 @@ TEST_F(RedisClientImplTest, ReplyAfterCloseInSameBufferIsDropped) {
   onConnected();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)))
-        .WillOnce(Invoke([&](Common::Redis::RespValuePtr&) { client_->close(); }));
+        .WillOnce([&](Common::Redis::RespValuePtr&) { client_->close(); });
     EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
     EXPECT_CALL(callbacks2, onFailure());
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -950,7 +948,7 @@ TEST_F(RedisClientImplTest, ReplyAfterCloseInSameBufferIsDropped) {
 
     // Dropped: the closed client has no outstanding request.
     callbacks_->onRespValue(std::make_unique<Common::Redis::RespValue>());
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
@@ -1110,7 +1108,7 @@ TEST_F(RedisClientImplTest, AskRedirection) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
@@ -1132,7 +1130,7 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1167,7 +1165,7 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
@@ -1189,7 +1187,7 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1224,7 +1222,7 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
 
     // Test an error that looks like it might be a MOVED or ASK redirection error except for the
@@ -1258,7 +1256,7 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
               host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
     EXPECT_EQ(0UL,
               host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1291,18 +1289,18 @@ TEST_F(RedisClientImplTest, UpstreamPushIsDroppedAndPipelineSurvives) {
 
   // Drive a Push frame. callbacks1 must NOT fire; no close; no protocol_error increment.
   Buffer::OwnedImpl push_data;
-  EXPECT_CALL(*decoder_, decode(Ref(push_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(push_data))).WillOnce([&](Buffer::Instance&) -> void {
     auto push = std::make_unique<Common::Redis::RespValue>();
     push->type(Common::Redis::RespType::Push);
     callbacks_->onRespValue(std::move(push));
-  }));
+  });
   upstream_read_filter_->onData(push_data, false);
   EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
 
   // Now drive the real reply for the still-pending request1. It must route to callbacks1 —
   // the Push above did not corrupt pending_requests_ framing.
   Buffer::OwnedImpl reply_data;
-  EXPECT_CALL(*decoder_, decode(Ref(reply_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(reply_data))).WillOnce([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
     response->type(Common::Redis::RespType::SimpleString);
     response->asString() = "OK";
@@ -1311,7 +1309,7 @@ TEST_F(RedisClientImplTest, UpstreamPushIsDroppedAndPipelineSurvives) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response));
-  }));
+  });
   upstream_read_filter_->onData(reply_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1338,7 +1336,7 @@ TEST_F(RedisClientImplTest, EmptyErrorReplyDoesNotCrashRedirectionParse) {
   onConnected();
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
     response->type(Common::Redis::RespType::Error);
     response->asString() = "";
@@ -1347,7 +1345,7 @@ TEST_F(RedisClientImplTest, EmptyErrorReplyDoesNotCrashRedirectionParse) {
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response));
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1382,7 +1380,7 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
@@ -1414,7 +1412,7 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
               host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
     EXPECT_EQ(0UL,
               host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1449,7 +1447,7 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
   Buffer::OwnedImpl fake_data;
-  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce([&](Buffer::Instance&) -> void {
     InSequence s;
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     response1->type(Common::Redis::RespType::Error);
@@ -1480,7 +1478,7 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
               host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
     EXPECT_EQ(0UL,
               host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
-  }));
+  });
   upstream_read_filter_->onData(fake_data, false);
 
   EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -1507,12 +1505,11 @@ TEST_F(RedisClientImplTest, RemoveFailedHealthCheck) {
   Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
   // Each call should result in either onResponse or onFailure, never both.
   EXPECT_CALL(callbacks1, onFailure()).Times(0);
-  EXPECT_CALL(callbacks1, onResponse_(Ref(response1)))
-      .WillOnce(Invoke([&](Common::Redis::RespValuePtr&) {
-        // The health checker might fail the active health check based on the response content, and
-        // result in removing the host and closing the client.
-        client_->close();
-      }));
+  EXPECT_CALL(callbacks1, onResponse_(Ref(response1))).WillOnce([&](Common::Redis::RespValuePtr&) {
+    // The health checker might fail the active health check based on the response content, and
+    // result in removing the host and closing the client.
+    client_->close();
+  });
   EXPECT_CALL(*connect_or_op_timer_, disableTimer()).Times(2);
   EXPECT_CALL(host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
@@ -1540,7 +1537,7 @@ TEST_F(RedisClientImplTest, RemoveFailedHost) {
 
   EXPECT_CALL(host_->outlier_detector_,
               putResult(Upstream::Outlier::Result::LocalOriginConnectFailed, _));
-  EXPECT_CALL(callbacks1, onFailure()).WillOnce(Invoke([&]() { client_->close(); }));
+  EXPECT_CALL(callbacks1, onFailure()).WillOnce([&]() { client_->close(); });
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);

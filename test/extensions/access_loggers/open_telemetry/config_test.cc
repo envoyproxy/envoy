@@ -14,7 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -37,9 +36,9 @@ public:
   void setupGrpcConfig() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
                 factoryForGrpcService(_, _, _))
-        .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+        .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
           return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-        }));
+        });
 
     access_log_config_.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("bar");
     access_log_config_.set_log_name("foo");
@@ -83,9 +82,9 @@ TEST_F(OpenTelemetryAccessLogConfigTest, HttpConfigOk) {
 TEST_F(OpenTelemetryAccessLogConfigTest, TopLevelGrpcServiceConfigOk) {
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
+      });
 
   envoy::extensions::access_loggers::open_telemetry::v3::OpenTelemetryAccessLogConfig config;
   config.mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name("otel_collector");

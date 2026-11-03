@@ -36,7 +36,7 @@ public:
   // removes itself on destruction.
   void add(absl::string_view cluster, DrainAwareClientConnection& codec) {
     if (auto reg = tls_->get(); reg.has_value()) {
-      reg->codecs_[std::string(cluster)].insert(&codec);
+      reg->codecs_[cluster].insert(&codec);
     }
   }
 

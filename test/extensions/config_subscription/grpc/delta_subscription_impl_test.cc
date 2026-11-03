@@ -115,16 +115,16 @@ TEST_P(DeltaSubscriptionImplTest, OnDemandUpdateRoutesResponseToWatch) {
 
   bool delivered_name2 = false;
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
-      .WillOnce(Invoke([&delivered_name2](const std::vector<DecodedResourceRef>& added_resources,
-                                          const Protobuf::RepeatedPtrField<std::string>&,
-                                          const std::string&) {
+      .WillOnce([&delivered_name2](const std::vector<DecodedResourceRef>& added_resources,
+                                   const Protobuf::RepeatedPtrField<std::string>&,
+                                   const std::string&) {
         EXPECT_EQ(1, added_resources.size());
         if (!added_resources.empty()) {
           EXPECT_EQ("name2", added_resources[0].get().name());
         }
         delivered_name2 = true;
         return absl::OkStatus();
-      }));
+      });
   expectSendMessage({}, version); // ACK
   onDiscoveryResponse(std::move(response));
   EXPECT_TRUE(delivered_name2);
@@ -166,16 +166,15 @@ TEST_P(DeltaSubscriptionImplTest, OnDemandUpdateOutsideAcceptGlobRoutesResponse)
 
   bool delivered = false;
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
-      .WillOnce(
-          Invoke([&delivered](const std::vector<DecodedResourceRef>& added_resources,
-                              const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-            EXPECT_EQ(1, added_resources.size());
-            if (!added_resources.empty()) {
-              EXPECT_EQ("rc2/vhost", added_resources[0].get().name());
-            }
-            delivered = true;
-            return absl::OkStatus();
-          }));
+      .WillOnce([&delivered](const std::vector<DecodedResourceRef>& added_resources,
+                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        if (!added_resources.empty()) {
+          EXPECT_EQ("rc2/vhost", added_resources[0].get().name());
+        }
+        delivered = true;
+        return absl::OkStatus();
+      });
   expectSendMessage({}, version); // ACK
   onDiscoveryResponse(std::move(response));
   EXPECT_TRUE(delivered);
@@ -207,16 +206,15 @@ TEST_P(DeltaSubscriptionImplTest, AcceptBeforeStartIsApplied) {
 
   bool delivered = false;
   EXPECT_CALL(callbacks_, onConfigUpdate(_, _, version))
-      .WillOnce(
-          Invoke([&delivered](const std::vector<DecodedResourceRef>& added_resources,
-                              const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
-            EXPECT_EQ(1, added_resources.size());
-            if (!added_resources.empty()) {
-              EXPECT_EQ("rc1/foo", added_resources[0].get().name());
-            }
-            delivered = true;
-            return absl::OkStatus();
-          }));
+      .WillOnce([&delivered](const std::vector<DecodedResourceRef>& added_resources,
+                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        EXPECT_EQ(1, added_resources.size());
+        if (!added_resources.empty()) {
+          EXPECT_EQ("rc1/foo", added_resources[0].get().name());
+        }
+        delivered = true;
+        return absl::OkStatus();
+      });
   expectSendMessage({}, version); // ACK
   onDiscoveryResponse(std::move(response));
   EXPECT_TRUE(delivered);
@@ -268,14 +266,14 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
-      .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
+      .WillRepeatedly([this](Buffer::InstancePtr& buffer, bool) {
         API_NO_BOOST(envoy::service::discovery::v3::DeltaDiscoveryRequest) message;
         EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
         const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
           nonce_acks_sent_.push(nonce);
         }
-      }));
+      });
   // DeltaSubscriptionTestHarness's dtor will check that all ACKs were sent with the correct nonces,
   // in the correct order.
 }

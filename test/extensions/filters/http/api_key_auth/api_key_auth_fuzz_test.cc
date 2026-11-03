@@ -38,9 +38,9 @@ DEFINE_PROTO_FUZZER(const ApiKeyAuthFuzzInput& input) {
 
   // Mock per route config.
   std::unique_ptr<RouteConfig> route_config;
-  ON_CALL(filter_callbacks, mostSpecificPerFilterConfig()).WillByDefault(Invoke([&]() {
+  ON_CALL(filter_callbacks, mostSpecificPerFilterConfig()).WillByDefault([&]() {
     return route_config.get();
-  }));
+  });
 
   absl::Status filter_config_creation_status = absl::OkStatus();
   std::shared_ptr<FilterConfig> filter_config = std::make_shared<FilterConfig>(

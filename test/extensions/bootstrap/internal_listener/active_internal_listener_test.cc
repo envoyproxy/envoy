@@ -23,7 +23,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -95,17 +94,17 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateListenerFilter) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
-      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+      .WillRepeatedly([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         manager.addAcceptFilter(listener_filter_matcher_,
                                 Network::ListenerFilterPtr{test_listener_filter});
         return true;
-      }));
+      });
   EXPECT_CALL(*test_listener_filter, onAccept(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+      .WillOnce([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
         cb.socket().connectionInfoProvider().restoreLocalAddress(original_dst_address);
         return Network::FilterStatus::Continue;
-      }));
+      });
   EXPECT_CALL(*test_listener_filter, destroy_());
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
@@ -122,15 +121,15 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerClosesActiveSocket) {
   EXPECT_CALL(io_handle, isOpen()).WillOnce(Return(true));
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
-      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+      .WillRepeatedly([&](Network::ListenerFilterManager& manager) -> bool {
         manager.addAcceptFilter(listener_filter_matcher_,
                                 Network::ListenerFilterPtr{test_listener_filter});
         return true;
-      }));
+      });
   EXPECT_CALL(*test_listener_filter, onAccept(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
+      .WillOnce([&](Network::ListenerFilterCallbacks&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 
@@ -151,17 +150,17 @@ TEST_F(ActiveInternalListenerTest, AcceptSocketAndCreateNetworkFilter) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
-      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager& manager) -> bool {
+      .WillRepeatedly([&](Network::ListenerFilterManager& manager) -> bool {
         // Insert the Mock filter.
         manager.addAcceptFilter(listener_filter_matcher_,
                                 Network::ListenerFilterPtr{test_listener_filter});
         return true;
-      }));
+      });
   EXPECT_CALL(*test_listener_filter, onAccept(_))
-      .WillOnce(Invoke([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
+      .WillOnce([&](Network::ListenerFilterCallbacks& cb) -> Network::FilterStatus {
         cb.socket().connectionInfoProvider().restoreLocalAddress(original_dst_address);
         return Network::FilterStatus::Continue;
-      }));
+      });
   EXPECT_CALL(*test_listener_filter, destroy_());
   auto filter_factory_callback = std::make_shared<Filter::NetworkFilterFactoriesList>();
   filter_chain_ = std::make_shared<NiceMock<Network::MockFilterChain>>();
@@ -198,7 +197,7 @@ TEST_F(ActiveInternalListenerTest, PausedListenerAcceptNewSocket) {
   Network::MockConnectionSocket* accepted_socket = new NiceMock<Network::MockConnectionSocket>();
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
-      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
+      .WillRepeatedly([&](Network::ListenerFilterManager&) -> bool { return true; });
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(nullptr));
   internal_listener_->onAccept(Network::ConnectionSocketPtr{accepted_socket});
 }
@@ -215,7 +214,7 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
   auto transport_socket_factory = Network::Test::createRawBufferDownstreamSocketFactory();
 
   EXPECT_CALL(filter_chain_factory_, createListenerFilterChain(_))
-      .WillRepeatedly(Invoke([&](Network::ListenerFilterManager&) -> bool { return true; }));
+      .WillRepeatedly([&](Network::ListenerFilterManager&) -> bool { return true; });
   EXPECT_CALL(manager_, findFilterChain(_, _)).WillOnce(Return(filter_chain_.get()));
   EXPECT_CALL(*filter_chain_, transportSocketFactory)
       .WillOnce(testing::ReturnRef(*transport_socket_factory));
@@ -230,10 +229,10 @@ TEST_F(ActiveInternalListenerTest, DestroyListenerCloseAllConnections) {
 
   EXPECT_CALL(conn_handler_, decNumConnections());
   EXPECT_CALL(*connection, close(_, _))
-      .WillOnce(Invoke([&connection](Network::ConnectionCloseType, absl::string_view details) {
+      .WillOnce([&connection](Network::ConnectionCloseType, absl::string_view details) {
         EXPECT_EQ(details, "Active Internal Listener destructor");
         connection->raiseEvent(Network::ConnectionEvent::LocalClose);
-      }));
+      });
   internal_listener_.reset();
 }
 
@@ -501,11 +500,11 @@ TEST_F(ConnectionHandlerTest, FindByAddressWhileDestroyingHandler) {
   Server::ConnectionHandlerImpl* raw_handler = handler_.get();
   bool looked_up_during_destruction = false;
   EXPECT_CALL(*connection, close(_, _))
-      .WillOnce(Invoke([&](Network::ConnectionCloseType, absl::string_view) {
+      .WillOnce([&](Network::ConnectionCloseType, absl::string_view) {
         EXPECT_FALSE(raw_handler->findByAddress(local_address).has_value());
         looked_up_during_destruction = true;
         connection->raiseEvent(Network::ConnectionEvent::LocalClose);
-      }));
+      });
   EXPECT_CALL(*access_log_, log(_, _));
   handler_.reset();
   EXPECT_TRUE(looked_up_during_destruction);

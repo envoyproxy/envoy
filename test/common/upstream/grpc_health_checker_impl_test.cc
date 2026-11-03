@@ -51,8 +51,6 @@
 using testing::_;
 using testing::DoAll;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -277,27 +275,26 @@ public:
 
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .Times(testing::AnyNumber())
-        .WillRepeatedly(InvokeWithoutArgs([&]() -> Network::ClientConnection* {
+        .WillRepeatedly([&]() -> Network::ClientConnection* {
           const uint32_t index = connection_index_.front();
           connection_index_.pop_front();
           return test_sessions_[index]->client_connection_;
-        }));
+        });
 
     EXPECT_CALL(*health_checker_, createCodecClient_(_))
-        .WillRepeatedly(
-            Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-              const uint32_t index = codec_index_.front();
-              codec_index_.pop_front();
-              TestSession& test_session = *test_sessions_[index];
-              std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                  new NiceMock<Upstream::MockClusterInfo>()};
-              Event::MockDispatcher dispatcher_;
+        .WillRepeatedly([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+          const uint32_t index = codec_index_.front();
+          codec_index_.pop_front();
+          TestSession& test_session = *test_sessions_[index];
+          std::shared_ptr<Upstream::MockClusterInfo> cluster{
+              new NiceMock<Upstream::MockClusterInfo>()};
+          Event::MockDispatcher dispatcher_;
 
-              test_session.codec_client_ = new CodecClientForTest(
-                  Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
-                  nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-              return test_session.codec_client_;
-            }));
+          test_session.codec_client_ = new CodecClientForTest(
+              Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
+              nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+          return test_session.codec_client_;
+        });
   }
 
   void expectStreamCreate(size_t index) {
@@ -421,7 +418,7 @@ public:
     expectHealthcheckStart(0);
 
     EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
-        .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+        .WillOnce([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
           EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, headers.getContentTypeValue());
           EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.getPathValue());
           EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.getSchemeValue());
@@ -430,9 +427,9 @@ public:
           EXPECT_EQ(std::chrono::milliseconds(1000).count(),
                     Envoy::Grpc::Common::getGrpcTimeout(headers).value().count());
           return Http::okStatus();
-        }));
+        });
     EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
-        .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        .WillOnce([&](Buffer::Instance& data, bool) {
           std::vector<Grpc::Frame> decoded_frames;
           Grpc::Decoder decoder;
           ASSERT_OK(decoder.decode(data, decoded_frames));
@@ -442,7 +439,7 @@ public:
           grpc::health::v1::HealthCheckRequest request;
           ASSERT_TRUE(request.ParseFromZeroCopyStream(&stream));
           EXPECT_EQ("service", request.service());
-        }));
+        });
     health_checker_->start();
 
     EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
@@ -571,7 +568,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
   expectHealthcheckStart(0);
 
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
-      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
+      .WillOnce([&](const Http::RequestHeaderMap& headers, bool) -> Http::Status {
         EXPECT_EQ(Http::Headers::get().ContentTypeValues.Grpc, headers.getContentTypeValue());
         EXPECT_EQ(std::string("/grpc.health.v1.Health/Check"), headers.getPathValue());
         EXPECT_EQ(Http::Headers::get().SchemeValues.Http, headers.getSchemeValue());
@@ -614,9 +611,9 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
         EXPECT_EQ(std::chrono::milliseconds(1000).count(),
                   Envoy::Grpc::Common::getGrpcTimeout(headers).value().count());
         return Http::okStatus();
-      }));
+      });
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
-      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+      .WillOnce([&](Buffer::Instance& data, bool) {
         std::vector<Grpc::Frame> decoded_frames;
         Grpc::Decoder decoder;
         ASSERT_OK(decoder.decode(data, decoded_frames));
@@ -626,7 +623,7 @@ TEST_F(GrpcHealthCheckerImplTest, SuccessWithAdditionalHeaders) {
         grpc::health::v1::HealthCheckRequest request;
         ASSERT_TRUE(request.ParseFromZeroCopyStream(&stream));
         EXPECT_EQ("service", request.service());
-      }));
+      });
 
   health_checker_->start();
 
@@ -838,10 +835,10 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFailViaRpcRemoveHostInCallback) {
   health_checker_->start();
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
-      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+      .WillOnce([&](HostSharedPtr host, HealthTransition) {
         cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
         cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
-      }));
+      });
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::NoError);
   respondServiceStatus(0, grpc::health::v1::HealthCheckResponse::NOT_SERVING);
@@ -859,10 +856,10 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFailViaGoawayRemoveHostInCallback) {
   health_checker_->start();
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
-      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+      .WillOnce([&](HostSharedPtr host, HealthTransition) {
         cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
         cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
-      }));
+      });
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
   test_sessions_[0]->codec_client_->raiseGoAway(Http::GoAwayErrorCode::Other);
 }
@@ -879,10 +876,10 @@ TEST_F(GrpcHealthCheckerImplTest, GrpcHealthFailViaBadResponseRemoveHostInCallba
   health_checker_->start();
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed))
-      .WillOnce(Invoke([&](HostSharedPtr host, HealthTransition) {
+      .WillOnce([&](HostSharedPtr host, HealthTransition) {
         cluster_->prioritySet().getMockHostSet(0)->hosts_ = {};
         cluster_->prioritySet().runUpdateCallbacks(0, {}, {host});
-      }));
+      });
   EXPECT_CALL(event_logger_, logEjectUnhealthy(_, _, _, _));
   std::unique_ptr<Http::TestResponseHeaderMapImpl> response_headers(
       new Http::TestResponseHeaderMapImpl{{":status", "500"}});

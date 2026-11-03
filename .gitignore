@@ -61,7 +61,7 @@ cscope.*
 /generated
 SOURCE_VERSION
 /test/coverage/BUILD
-/tools/spelling/.aspell.en.pws
+/tools/spelling/.hunspell.en.pws
 tags
 TAGS
 

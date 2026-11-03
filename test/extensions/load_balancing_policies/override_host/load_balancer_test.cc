@@ -51,10 +51,9 @@ public:
     ON_CALL(load_balancer_context_, downstreamHeaders())
         .WillByDefault(Return(&downstream_headers_));
     ON_CALL(stream_info_, setDynamicMetadata(testing::_, testing::_))
-        .WillByDefault(
-            testing::Invoke([this](const std::string& name, const Protobuf::Struct& value) {
-              (*metadata_.mutable_filter_metadata())[std::string(name)].MergeFrom(value);
-            }));
+        .WillByDefault([this](const std::string& name, const Protobuf::Struct& value) {
+          (*metadata_.mutable_filter_metadata())[std::string(name)].MergeFrom(value);
+        });
   }
 
 protected:

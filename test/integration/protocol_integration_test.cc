@@ -5861,125 +5861,8 @@ TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderNameStreamError) {
   ASSERT_TRUE(fake_upstream_connection_->connected());
 }
 
-// Validate that when allow_multiplexed_upstream_half_close is enabled a request with H/2 or H/3
-// upstream is not reset when upstream half closes before downstream and allows downstream to send
-// data even if upstream is half closed.
-// H/1 upstream always causes the stream to be closed if it responds before downstream.
-// This test also causes downstream connection to run out of stream window (in H/2 and H/3 case)
-// when processing END_STREAM from the server to make sure the data is not lost in the case.
-TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseData) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-
-  useAccessLog("%DURATION% %ROUNDTRIP_DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% "
-               "%RESPONSE_DURATION% %RESPONSE_TX_DURATION%");
-  constexpr uint32_t kStreamWindowSize = 64 * 1024;
-  // Set buffer limit large enough to accommodate H/2 stream window, so we can cause downstream
-  // codec to buffer data without pushing back on upstream.
-  config_helper_.setBufferLimits(kStreamWindowSize * 2, kStreamWindowSize * 2);
-
-  initialize();
-  envoy::config::core::v3::Http2ProtocolOptions http2_options =
-      ::Envoy::Http2::Utility::initializeAndValidateOptions(
-          envoy::config::core::v3::Http2ProtocolOptions())
-          .value();
-  http2_options.mutable_initial_stream_window_size()->set_value(kStreamWindowSize);
-  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
-
-  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
-      {":method", "POST"}, {":authority", "foo.lyft.com"}, {":path", "/"}, {":scheme", "http"}});
-  request_encoder_ = &encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Stop downstream client from updating the window (or reading for H/1)
-  request_encoder_->getStream().readDisable(true);
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  // Make downstream stream to run out of window
-  upstream_request_->encodeData(kStreamWindowSize, false);
-  // And cause the rest of data to the downstream to be buffered
-  upstream_request_->encodeData(kStreamWindowSize / 4, true);
-
-  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
-    // H/1 upstream always causes the stream to be closed if it responds before downstream.
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    if (downstreamProtocol() == Http::CodecType::HTTP1) {
-      request_encoder_->getStream().readDisable(false);
-      ASSERT_TRUE(codec_client_->waitForDisconnect());
-    } else if (downstreamProtocol() == Http::CodecType::HTTP2) {
-      ASSERT_TRUE(response->waitForReset());
-    } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
-      // Unlike H/2 codec H/3 codec attempts to send pending data before the reset
-      // So it needs window to push the data to the client and then the reset
-      // which just gets discarded since end_stream has been received just before
-      // reset.
-      request_encoder_->getStream().readDisable(false);
-      ASSERT_TRUE(response->waitForEndStream());
-      codec_client_->close();
-    }
-  } else if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP2 ||
-             fake_upstreams_[0]->httpType() == Http::CodecType::HTTP3) {
-    // H/2 or H/3 upstreams should allow downstream to send data even after upstream has half
-    // closed.
-    request_encoder_->getStream().readDisable(false);
-    if (downstreamProtocol() == Http::CodecType::HTTP1) {
-      ASSERT_TRUE(response->waitForEndStream());
-      ASSERT_TRUE(response->complete());
-      ASSERT_EQ(80 * 1024, response->body().length());
-      // Codec client does not allow us to gracefully finish the request, since
-      // as soon it observes completion on H/1 response it closes the entire stream.
-      // The H2UpstreamHalfCloseBeforeH1Downstream test that uses TCP client to fully
-      // test this case.
-      codec_client_->close();
-      ASSERT_TRUE(upstream_request_->waitForReset());
-    } else if (downstreamProtocol() == Http::CodecType::HTTP2 ||
-               downstreamProtocol() == Http::CodecType::HTTP3) {
-      ASSERT_TRUE(response->waitForEndStream());
-      std::string data(128, 'a');
-      ASSERT_TRUE(response->complete());
-      ASSERT_EQ(80 * 1024, response->body().length());
-      Buffer::OwnedImpl buffer(data);
-      request_encoder_->encodeData(buffer, true);
-      ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 128));
-      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-    }
-  }
-
-  std::string log = waitForAccessLog(access_log_name_);
-  std::vector<std::string> timings = absl::StrSplit(log, ' ');
-  ASSERT_EQ(timings.size(), 6);
-  if (fake_upstreams_[0]->httpType() != Http::CodecType::HTTP1 &&
-      downstreamProtocol() != Http::CodecType::HTTP1) {
-    // All duration values except for ROUNDTRIP_DURATION should be present (no '-' in the access
-    // log) when neither upstream nor downstream is H/1
-    EXPECT_GE(/* DURATION */ std::stoi(timings.at(0)), 0);
-    if (downstreamProtocol() == Http::CodecType::HTTP3) {
-      // Only H/3 populate this metric.
-      EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(timings.at(1)), 0);
-    }
-    EXPECT_GE(/* REQUEST_DURATION */ std::stoi(timings.at(2)), 0);
-    EXPECT_GE(/* REQUEST_TX_DURATION */ std::stoi(timings.at(3)), 0);
-    EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(timings.at(4)), 0);
-    EXPECT_GE(/* RESPONSE_TX_DURATION */ std::stoi(timings.at(5)), 0);
-  } else {
-    // When one the peers is H/1 the stream is reset and request duration values will be unset
-    EXPECT_GE(/* DURATION */ std::stoi(timings.at(0)), 0);
-    EXPECT_EQ(/* ROUNDTRIP_DURATION */ timings.at(1), "-");
-    EXPECT_EQ(/* REQUEST_DURATION */ timings.at(2), "-");
-    EXPECT_EQ(/* REQUEST_TX_DURATION */ timings.at(3), "-");
-    EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(timings.at(4)), 0);
-  }
-}
-
-// Verify that even with upstream half close enabled the error response from
-// upstream causes the request to be reset.
+// Verify that the error response from upstream causes the request to be reset.
 TEST_P(ProtocolIntegrationTest, ServerHalfCloseWithErrorBeforeClient) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-
   initialize();
   envoy::config::core::v3::Http2ProtocolOptions http2_options =
       ::Envoy::Http2::Utility::initializeAndValidateOptions(
@@ -6016,10 +5899,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseWithErrorBeforeClient) {
 }
 
 // Same as above but with data sent after the error response.
-// Note the behavior is the same as when the allow_multiplexed_upstream_half_close is false.
 TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedResponseData) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   constexpr uint32_t kStreamWindowSize = 64 * 1024;
   // Set buffer limit large enough to accommodate H/2 stream window
   config_helper_.setBufferLimits(kStreamWindowSize * 2, kStreamWindowSize * 2);
@@ -6081,53 +5961,6 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
     }
   }
   cleanupUpstreamAndDownstream();
-}
-
-TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Downstream) {
-  // This test is only for H/1 downstream and H/2 or H/3 upstream
-  // Other cases are covered by the ServerHalfCloseBeforeClientWithBufferedResponseData
-  // It verifies that H/1 downstream request is not reset when H/2 upstream completes the stream
-  // before the downstream and can still send data to the upstream.
-  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
-      upstreamProtocol() == Http::CodecType::HTTP1) {
-    return;
-  }
-
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  useAccessLog("%DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% %RESPONSE_DURATION% "
-               "%RESPONSE_TX_DURATION%");
-  constexpr uint32_t kStreamChunkSize = 64 * 1024;
-  config_helper_.setBufferLimits(kStreamChunkSize * 2, kStreamChunkSize * 2);
-  initialize();
-
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
-
-  ASSERT_TRUE(tcp_client->write(
-      "POST / HTTP/1.1\r\nHost: foo.lyft.com\r\nTransfer-Encoding: chunked\r\n\r\n", false, false));
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  upstream_request_->encodeData(kStreamChunkSize, false);
-  upstream_request_->encodeData(kStreamChunkSize / 4, true);
-
-  // Wait for the last chunk to arrive
-  tcp_client->waitForData("\r\n0\r\n\r\n", false);
-  ASSERT_TRUE(tcp_client->connected());
-
-  // Now write data into downstream client after upstream has completed its response and verify that
-  // upstream receives it.
-  ASSERT_TRUE(tcp_client->write(absl::StrCat("80\r\n", std::string(0x80, 'A'), "\r\n0\r\n\r\n"),
-                                false, false));
-
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 0x80));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-  tcp_client->close();
-  std::string timing = waitForAccessLog(access_log_name_);
-  // All duration values should be present (no '-' in the access log)
-  ASSERT_FALSE(absl::StrContains(timing, '-'));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
@@ -6464,12 +6297,6 @@ TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorAfterCompleteResponse) {
     // HTTP/1.1 upstream has no RST_STREAM concept.
     return;
   }
-  // Without this, onUpstreamComplete() preemptively sends a local RST_STREAM to the upstream
-  // when the complete response is received, closing the stream before the upstream's
-  // RST_STREAM(NO_ERROR) arrives. With this enabled, the upstream stream stays open (half-closed
-  // remote), allowing the RST_STREAM(NO_ERROR) to reach the router through RemoteResetNoError.
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -6513,10 +6340,8 @@ TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorAfterCompleteResponse) {
 // the connection buffer limit, trailers get buffered. The RST_STREAM(NO_ERROR) arrives before
 // the buffered trailers are delivered. The deferred close mechanism must ensure the complete
 // response (including trailers) is forwarded before handling the RST_STREAM.
-// Unlike UpstreamRstStreamNoErrorAfterCompleteResponse,
-// this does NOT need `allow_multiplexed_upstream_half_close` because the RST_STREAM arrives
-// while trailers are still buffered (before onUpstreamComplete), so no preemptive local
-// RST_STREAM has been sent yet.
+// The RST_STREAM arrives while trailers are still buffered (before onUpstreamComplete), so no
+// preemptive local RST_STREAM has been sent yet.
 TEST_P(ProtocolIntegrationTest, UpstreamRstStreamNoErrorWithBufferedTrailers) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     return;

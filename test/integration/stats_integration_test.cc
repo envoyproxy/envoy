@@ -3,6 +3,9 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
+#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
@@ -18,6 +21,7 @@
 #include "test/config/integration/certs/expired_cert_info.h"
 #include "test/config/integration/certs/servercert_info.h"
 #include "test/config/utility.h"
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -407,10 +411,9 @@ public:
          "listener.admin.http.downstream_rq_xx",
          {{hcm_prefix, "admin"}, {response_code_class, "2"}}},
 #endif
-        // The router filter, `source/extensions/filters/http/router/config.cc`. It creates its
-        // stats in the server's scope with the connection manager's prefix in the name, rather
-        // than in the connection manager's scope, because its virtual host and route level stats
-        // are documented to live at the root. So the prefix tag comes from name extraction here.
+        // The router filter, `source/common/router/router.cc`. Its own stats are created in the
+        // connection manager's scope, while its virtual host and route level stats stay at the
+        // root.
         {"http.config_test.no_route", "http.no_route", {{hcm_prefix, "config_test"}}},
         {"http.config_test.rq_total", "http.rq_total", {{hcm_prefix, "config_test"}}},
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
@@ -864,6 +867,62 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
     // EXPECT_MEMORY_EQ(m_per_host, 1380);
   }
   EXPECT_MEMORY_LE(m_per_host, 3500); // Round up to allow platform variations.
+}
+
+TEST_P(HttpStatsTagsModeIntegrationTest, RouterAndUpstreamFilterStatsAreIdenticalInBothModes) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto& router_filter = *hcm.mutable_http_filters()->rbegin();
+        ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
+        envoy::extensions::filters::http::router::v3::Router router;
+        std::ignore = router_filter.typed_config().UnpackTo(&router);
+
+        // Creates its stats with statsPrefixScopeOr() and statsPrefixOr().
+        auto* stats_prefix_filter = router.add_upstream_http_filters();
+        stats_prefix_filter->set_name("stats-prefix-filter");
+        std::ignore = stats_prefix_filter->mutable_typed_config()->PackFrom(
+            test::integration::filters::StatsPrefixFilterConfig());
+
+        auto* codec_filter = router.add_upstream_http_filters();
+        codec_filter->set_name("envoy.filters.http.upstream_codec");
+        std::ignore = codec_filter->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec());
+
+        std::ignore = router_filter.mutable_typed_config()->PackFrom(router);
+      });
+  initialize();
+
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_EQ(store->useExplicitTags(), explicitTags());
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  codec_client_->close();
+
+  test_server_->waitForCounter("http.config_test.rq_total", testing::Eq(1));
+  test_server_->waitForCounter("http.config_test.stats_prefix_filter.rq_total", testing::Eq(1));
+  // The upstream filter prefix used to lose its trailing dot.
+  EXPECT_EQ(nullptr, test_server_->counter("http.config_teststats_prefix_filter.rq_total"));
+
+  const std::string& hcm_prefix = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
+  const std::vector<StatExpectation> expectations{
+      {"http.config_test.rq_total", "http.rq_total", {{hcm_prefix, "config_test"}}},
+      {"http.config_test.no_route", "http.no_route", {{hcm_prefix, "config_test"}}},
+      {"http.config_test.rq_direct_response",
+       "http.rq_direct_response",
+       {{hcm_prefix, "config_test"}}},
+      {"http.config_test.stats_prefix_filter.rq_total",
+       "http.stats_prefix_filter.rq_total",
+       {{hcm_prefix, "config_test"}}},
+  };
+  for (const StatExpectation& expectation : expectations) {
+    checkExpectation(*test_server_, expectation);
+  }
 }
 
 } // namespace

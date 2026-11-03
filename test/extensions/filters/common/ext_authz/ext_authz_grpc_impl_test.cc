@@ -17,7 +17,6 @@
 
 using testing::_;
 using testing::Eq;
-using testing::Invoke;
 using testing::Ref;
 using testing::Return;
 using testing::WhenDynamicCastTo;
@@ -41,15 +40,14 @@ public:
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
     EXPECT_CALL(*async_client_,
                 sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-        .WillOnce(
-            Invoke([this](absl::string_view service_full_name, absl::string_view method_name,
-                          Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-              EXPECT_EQ("envoy.service.auth.v3.Authorization", service_full_name);
-              EXPECT_EQ("Check", method_name);
-              EXPECT_EQ(timeout_->count(), options.timeout->count());
-              return &async_request_;
-            }));
+        .WillOnce([this](absl::string_view service_full_name, absl::string_view method_name,
+                         Buffer::InstancePtr&&, Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                         const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+          EXPECT_EQ("envoy.service.auth.v3.Authorization", service_full_name);
+          EXPECT_EQ("Check", method_name);
+          EXPECT_EQ(timeout_->count(), options.timeout->count());
+          return &async_request_;
+        });
   }
 
   Grpc::MockAsyncClient* async_client_;
@@ -683,10 +681,10 @@ TEST_F(ExtAuthzGrpcClientTest, TestGrpcClientResetOnComplete) {
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
 
   EXPECT_CALL(span_, setTag(_, _)).Times(testing::AnyNumber());
-  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce(Invoke([this](ResponsePtr&) {
+  EXPECT_CALL(request_callbacks_, onComplete_(_)).WillOnce([this](ResponsePtr&) {
     // Synchronously destroy the client while inside onComplete()!
     client_.reset();
-  }));
+  });
 
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(), span_);
 }
@@ -698,13 +696,12 @@ TEST_F(ExtAuthzGrpcClientTest, EmitClientSpanDefault) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(*async_client_,
               sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-      .WillOnce(
-          Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-                        Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-            EXPECT_EQ(std::nullopt, options.sampled_);
-            return &async_request_;
-          }));
+      .WillOnce([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                       Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                       const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+        EXPECT_EQ(std::nullopt, options.sampled_);
+        return &async_request_;
+      });
 
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
   EXPECT_CALL(request_callbacks_, onComplete_(_));
@@ -720,13 +717,12 @@ TEST_F(ExtAuthzGrpcClientTest, EmitClientSpanDisabled) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(*async_client_,
               sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-      .WillOnce(
-          Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-                        Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-            EXPECT_EQ(std::make_optional(false), options.sampled_);
-            return &async_request_;
-          }));
+      .WillOnce([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                       Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                       const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+        EXPECT_EQ(std::make_optional(false), options.sampled_);
+        return &async_request_;
+      });
 
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
   EXPECT_CALL(request_callbacks_, onComplete_(_));
@@ -744,13 +740,12 @@ TEST_F(ExtAuthzGrpcClientTest, SetEmitClientSpan) {
   envoy::service::auth::v3::CheckRequest request;
   EXPECT_CALL(*async_client_,
               sendRaw(_, _, Grpc::ProtoBufferEq(request), Ref(*(client_.get())), _, _))
-      .WillOnce(
-          Invoke([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-                        Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-            EXPECT_EQ(std::make_optional(false), options.sampled_);
-            return &async_request_;
-          }));
+      .WillOnce([this](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                       Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                       const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+        EXPECT_EQ(std::make_optional(false), options.sampled_);
+        return &async_request_;
+      });
 
   client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
   EXPECT_CALL(request_callbacks_, onComplete_(_));

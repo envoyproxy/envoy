@@ -33,8 +33,8 @@ public:
     ON_CALL(mock_cm, getThreadLocalCluster(_)).WillByDefault(Return(&thread_local_cluster_));
     ON_CALL(thread_local_cluster_.async_client_, send_(_, _, _))
         .WillByDefault(
-            Invoke([this](const Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callback,
-                          const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            [this](const Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callback,
+                   const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
               if (remote_jwks_.empty()) {
                 callback.onFailure(jwks_request_, Http::AsyncClient::FailureReason::Reset);
               } else {
@@ -45,7 +45,7 @@ public:
                 callback.onSuccess(jwks_request_, std::move(response_message));
               }
               return &jwks_request_;
-            }));
+            });
   }
 
 private:

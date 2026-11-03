@@ -63,28 +63,26 @@ TEST_F(UpstreamConnTest, ConnectUpstream) {
   EXPECT_CALL(
       context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
       newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .newConnectionImpl(cb);
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .poolReady(upstream_connection_);
-            return nullptr;
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .newConnectionImpl(cb);
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .poolReady(upstream_connection_);
+        return nullptr;
+      });
   EXPECT_CALL(*dso_.get(), envoyGoFilterOnUpstreamConnectionReady(_, _));
   upConn_->connect();
 
   EXPECT_CALL(
       context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_,
       newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .newConnectionImpl(cb);
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
-                .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, true);
-            return nullptr;
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .newConnectionImpl(cb);
+        context_.server_factory_context_.cluster_manager_.thread_local_cluster_.tcp_conn_pool_
+            .poolFailure(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, true);
+        return nullptr;
+      });
   EXPECT_CALL(*dso_.get(),
               envoyGoFilterOnUpstreamConnectionFailure(
                   _, GoInt(ConnectionPool::PoolFailureReason::RemoteConnectionFailure), _));

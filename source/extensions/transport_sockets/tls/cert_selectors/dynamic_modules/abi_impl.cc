@@ -153,6 +153,11 @@ void envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certif
   toConfig(config_envoy_ptr)->removeCertificate(toStringView(name));
 }
 
+void envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+    envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr) {
+  toConfig(config_envoy_ptr)->signalInitComplete();
+}
+
 envoy_dynamic_module_type_metrics_result
 envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter(
     envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr,
