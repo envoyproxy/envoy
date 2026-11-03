@@ -62,6 +62,10 @@ jobs:
         config: |
           fetch-depth: ${{ startsWith(github.event_name, 'pull_request') && 1 || 2 }}
           path: requested
+          # actions/checkout >= 7 refuses to fetch a fork PR's merge commit from a
+          # `pull_request_target` workflow unless told to. This job fetches it on purpose, and
+          # only to read it: see below, nothing from the checkout is executed.
+          allow-unsafe-pr-checkout: true
     # This step *LOOKS AT* the repo at the point requested
     # Its essential that this _job_ *MUST NOT EXECUTE ANY CODE FROM THE CHECKED OUT REPO*
     # *ALL* variables collected should be treated as untrusted and should be sanitized before
