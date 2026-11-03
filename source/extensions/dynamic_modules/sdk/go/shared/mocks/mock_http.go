@@ -242,6 +242,42 @@ func (mr *MockDownstreamWatermarkCallbacksMockRecorder) OnBelowWriteBufferLowWat
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnBelowWriteBufferLowWatermark", reflect.TypeOf((*MockDownstreamWatermarkCallbacks)(nil).OnBelowWriteBufferLowWatermark))
 }
 
+// MockFilterStateObjectDestroyer is a mock of FilterStateObjectDestroyer interface.
+type MockFilterStateObjectDestroyer struct {
+	ctrl     *gomock.Controller
+	recorder *MockFilterStateObjectDestroyerMockRecorder
+	isgomock struct{}
+}
+
+// MockFilterStateObjectDestroyerMockRecorder is the mock recorder for MockFilterStateObjectDestroyer.
+type MockFilterStateObjectDestroyerMockRecorder struct {
+	mock *MockFilterStateObjectDestroyer
+}
+
+// NewMockFilterStateObjectDestroyer creates a new mock instance.
+func NewMockFilterStateObjectDestroyer(ctrl *gomock.Controller) *MockFilterStateObjectDestroyer {
+	mock := &MockFilterStateObjectDestroyer{ctrl: ctrl}
+	mock.recorder = &MockFilterStateObjectDestroyerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockFilterStateObjectDestroyer) EXPECT() *MockFilterStateObjectDestroyerMockRecorder {
+	return m.recorder
+}
+
+// OnFilterStateObjectDestroy mocks base method.
+func (m *MockFilterStateObjectDestroyer) OnFilterStateObjectDestroy() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "OnFilterStateObjectDestroy")
+}
+
+// OnFilterStateObjectDestroy indicates an expected call of OnFilterStateObjectDestroy.
+func (mr *MockFilterStateObjectDestroyerMockRecorder) OnFilterStateObjectDestroy() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnFilterStateObjectDestroy", reflect.TypeOf((*MockFilterStateObjectDestroyer)(nil).OnFilterStateObjectDestroy))
+}
+
 // MockSpan is a mock of Span interface.
 type MockSpan struct {
 	ctrl     *gomock.Controller
@@ -894,6 +930,21 @@ func (m *MockHttpFilterHandle) GetFilterState(key string) (shared.UnsafeEnvoyBuf
 func (mr *MockHttpFilterHandleMockRecorder) GetFilterState(key any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterState", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetFilterState), key)
+}
+
+// GetFilterStateObject mocks base method.
+func (m *MockHttpFilterHandle) GetFilterStateObject(key string) (any, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFilterStateObject", key)
+	ret0, _ := ret[0].(any)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetFilterStateObject indicates an expected call of GetFilterStateObject.
+func (mr *MockHttpFilterHandleMockRecorder) GetFilterStateObject(key any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFilterStateObject", reflect.TypeOf((*MockHttpFilterHandle)(nil).GetFilterStateObject), key)
 }
 
 // GetFilterStateTyped mocks base method.
@@ -1631,6 +1682,20 @@ func (m *MockHttpFilterHandle) SetFilterState(key string, value []byte) {
 func (mr *MockHttpFilterHandleMockRecorder) SetFilterState(key, value any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterState", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterState), key, value)
+}
+
+// SetFilterStateObject mocks base method.
+func (m *MockHttpFilterHandle) SetFilterStateObject(key string, value any, lifeSpan shared.FilterStateLifeSpan) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetFilterStateObject", key, value, lifeSpan)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetFilterStateObject indicates an expected call of SetFilterStateObject.
+func (mr *MockHttpFilterHandleMockRecorder) SetFilterStateObject(key, value, lifeSpan any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetFilterStateObject", reflect.TypeOf((*MockHttpFilterHandle)(nil).SetFilterStateObject), key, value, lifeSpan)
 }
 
 // SetFilterStateTyped mocks base method.
