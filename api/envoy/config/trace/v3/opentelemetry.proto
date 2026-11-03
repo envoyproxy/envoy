@@ -36,7 +36,8 @@ message OpenTelemetryConfig {
     // See `B3 propagation <https://github.com/openzipkin/b3-propagation>`_.
     //
     // When extracting, both the single header and the multiple header encodings are accepted, with
-    // the single header taking precedence. When injecting, only the single header is written.
+    // the single header taking precedence. When injecting, the single header is written, and any
+    // ``x-b3-*`` headers already on the request are rewritten so that they describe the same span.
     B3 = 1;
 
     // B3 multiple headers: the :ref:`x-b3-traceid <config_http_conn_man_headers_x-b3-traceid>`,
@@ -45,7 +46,8 @@ message OpenTelemetryConfig {
     //
     // When extracting, both the single header and the multiple header encodings are accepted, with
     // the single header taking precedence. When injecting, ``x-b3-traceid``, ``x-b3-spanid`` and
-    // ``x-b3-sampled`` are written.
+    // ``x-b3-sampled`` are written, and a ``b3`` header already on the request is rewritten so that
+    // it describes the same span.
     B3_MULTI = 2;
   }
 
@@ -123,12 +125,18 @@ message OpenTelemetryConfig {
   // B3 trace context without a sampling decision joins the trace, and the span's sampling
   // decision is made by Envoy as if it were the first span in the trace.
   //
+  // B3 headers that carry a decision not to sample but no trace context, such as ``b3: 0`` or
+  // ``x-b3-sampled: 0`` without ``x-b3-traceid`` and ``x-b3-spanid``, start a new trace that is
+  // not sampled, regardless of Envoy's tracing decision or the configured sampler. A decision to
+  // sample without trace context is ignored.
+  //
   // Each format may be listed at most once. If not specified, the default is ``[TRACE_CONTEXT]``.
   repeated TraceContextFormat incoming_trace_context = 11
       [(validate.rules).repeated = {items {enum {defined_only: true}}}];
 
   // The trace context formats to inject into upstream requests. Headers of formats that are not
-  // listed are left unchanged.
+  // listed are left unchanged, except that injecting either B3 encoding also rewrites headers of
+  // the other B3 encoding that are already on the request.
   //
   // Each format may be listed at most once. If not specified, the default is ``[TRACE_CONTEXT]``.
   repeated TraceContextFormat outgoing_trace_context = 12

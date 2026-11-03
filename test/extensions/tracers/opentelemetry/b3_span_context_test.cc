@@ -1,3 +1,4 @@
+#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/opentelemetry/b3_span_context.h"
 
 #include "test/test_common/status_utility.h"
@@ -179,14 +180,65 @@ TEST(B3SpanContextTest, SamplingOnlySingleHeaderUsesMultipleHeaders) {
   EXPECT_EQ(span_context->sampled, std::nullopt);
 }
 
+TEST(B3SpanContextTest, ExtractSamplingDecision) {
+  struct TestCase {
+    std::vector<std::pair<std::string, std::string>> headers;
+    std::optional<bool> expected_sampled;
+  };
+  const std::vector<TestCase> test_cases = {
+      {{}, std::nullopt},
+      {{{"b3", "0"}}, false},
+      {{{"b3", "1"}}, true},
+      {{{"b3", "d"}}, true},
+      {{{"b3", "x"}}, std::nullopt},
+      {{{"b3", "0"}, {"x-b3-sampled", "1"}}, false},
+      {{{"x-b3-sampled", "0"}}, false},
+      {{{"x-b3-sampled", "1"}}, true},
+      {{{"x-b3-sampled", "true"}}, true},
+      {{{"x-b3-flags", "1"}, {"x-b3-sampled", "0"}}, true},
+      {{{"x-b3-flags", "0"}}, std::nullopt},
+      {{{"x-b3-spanid", std::string(span_id)}, {"x-b3-sampled", "0"}}, false},
+  };
+  for (const auto& test_case : test_cases) {
+    Tracing::TestTraceContextImpl trace_context{};
+    std::string description;
+    for (const auto& [key, value] : test_case.headers) {
+      trace_context.set(key, value);
+      absl::StrAppend(&description, key, ": ", value, "; ");
+    }
+    SCOPED_TRACE(description);
+    EXPECT_EQ(extractB3SamplingDecision(trace_context), test_case.expected_sampled);
+  }
+}
+
 TEST(B3SpanContextTest, InjectSingleHeader) {
   Tracing::TestTraceContextImpl sampled_context{};
   injectB3SingleHeader(sampled_context, trace_id_128, span_id, true);
   EXPECT_EQ(sampled_context.get("b3"), absl::StrCat(trace_id_128, "-", span_id, "-1"));
+  EXPECT_FALSE(sampled_context.get("x-b3-traceid").has_value());
+  EXPECT_FALSE(sampled_context.get("x-b3-spanid").has_value());
+  EXPECT_FALSE(sampled_context.get("x-b3-sampled").has_value());
 
   Tracing::TestTraceContextImpl not_sampled_context{};
   injectB3SingleHeader(not_sampled_context, trace_id_128, span_id, false);
   EXPECT_EQ(not_sampled_context.get("b3"), absl::StrCat(trace_id_128, "-", span_id, "-0"));
+}
+
+TEST(B3SpanContextTest, InjectSingleHeaderRewritesMultipleHeaders) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-b3-traceid", "0000000000000000000000000000000a"},
+      {"x-b3-spanid", "000000000000000b"},
+      {"x-b3-parentspanid", std::string(parent_span_id)},
+      {"x-b3-sampled", "0"},
+      {"x-b3-flags", "1"}};
+  Tracing::HttpTraceContext trace_context(request_headers);
+  injectB3SingleHeader(trace_context, trace_id_128, span_id, true);
+  EXPECT_EQ(trace_context.get("b3"), absl::StrCat(trace_id_128, "-", span_id, "-1"));
+  EXPECT_EQ(trace_context.get("x-b3-traceid"), trace_id_128);
+  EXPECT_EQ(trace_context.get("x-b3-spanid"), span_id);
+  EXPECT_EQ(trace_context.get("x-b3-sampled"), "1");
+  EXPECT_FALSE(trace_context.get("x-b3-parentspanid").has_value());
+  EXPECT_FALSE(trace_context.get("x-b3-flags").has_value());
 }
 
 TEST(B3SpanContextTest, InjectMultipleHeaders) {
@@ -198,10 +250,22 @@ TEST(B3SpanContextTest, InjectMultipleHeaders) {
   EXPECT_EQ(trace_context.get("x-b3-sampled"), "1");
   EXPECT_FALSE(trace_context.get("x-b3-parentspanid").has_value());
   EXPECT_FALSE(trace_context.get("x-b3-flags").has_value());
+  EXPECT_FALSE(trace_context.get("b3").has_value());
 
   Tracing::TestTraceContextImpl not_sampled_context{};
   injectB3MultiHeaders(not_sampled_context, trace_id_128, span_id, false);
   EXPECT_EQ(not_sampled_context.get("x-b3-sampled"), "0");
+}
+
+TEST(B3SpanContextTest, InjectMultipleHeadersRewritesSingleHeader) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"b3", "0000000000000000000000000000000a-000000000000000b-1"}};
+  Tracing::HttpTraceContext trace_context(request_headers);
+  injectB3MultiHeaders(trace_context, trace_id_128, span_id, false);
+  EXPECT_EQ(trace_context.get("x-b3-traceid"), trace_id_128);
+  EXPECT_EQ(trace_context.get("x-b3-spanid"), span_id);
+  EXPECT_EQ(trace_context.get("x-b3-sampled"), "0");
+  EXPECT_EQ(trace_context.get("b3"), absl::StrCat(trace_id_128, "-", span_id, "-0"));
 }
 
 } // namespace

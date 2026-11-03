@@ -818,16 +818,79 @@ TEST_F(OpenTelemetryDriverTest, NullSpanWhenAllTraceContextMalformed) {
   EXPECT_EQ(typeid(null_span).name(), typeid(Tracing::NullSpan).name());
 }
 
-// Verifies a B3 single header with only a sampling decision starts a new trace.
-TEST_F(OpenTelemetryDriverTest, B3SamplingOnlyStartsNewTrace) {
-  setupValidDriverWithTraceContext("B3", "");
-  ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(5));
+// Verifies B3 headers that only deny sampling start a new trace that is not sampled.
+TEST_F(OpenTelemetryDriverTest, B3SamplingDenyStartsUnsampledTrace) {
+  for (const auto& [name, value] :
+       std::vector<std::pair<std::string, std::string>>{{"b3", "0"}, {"x-b3-sampled", "0"}}) {
+    SCOPED_TRACE(name);
+    setupValidDriverWithTraceContext("B3", "");
+    ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(5));
+    Tracing::TestTraceContextImpl request_headers{{name, value}};
+
+    Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                               operation_name_, {Tracing::Reason::Sampling, true});
+    EXPECT_EQ(span->getTraceId(), "00000000000000050000000000000005");
+    EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+    EXPECT_FALSE(span->useLocalDecision());
+  }
+}
+
+// Verifies a B3 decision not to sample overrides a configured sampler.
+TEST_F(OpenTelemetryDriverTest, B3SamplingDenyWithSampler) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    incoming_trace_context: [B3_MULTI]
+    sampler:
+      name: envoy.tracers.opentelemetry.samplers.always_on
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.AlwaysOnSamplerConfig
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  setup(opentelemetry_config);
   Tracing::TestTraceContextImpl request_headers{{"b3", "0"}};
 
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
-  EXPECT_EQ(span->getTraceId(), "00000000000000050000000000000005");
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
+  EXPECT_FALSE(span->useLocalDecision());
+}
+
+// Verifies a B3 decision to sample without trace context leaves the decision to Envoy.
+TEST_F(OpenTelemetryDriverTest, B3SamplingAcceptIgnored) {
+  setupValidDriverWithTraceContext("B3", "");
+  Tracing::TestTraceContextImpl request_headers{{"b3", "1"}};
+
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+  EXPECT_FALSE(dynamic_cast<Span*>(span.get())->sampled());
   EXPECT_TRUE(span->useLocalDecision());
+}
+
+// Verifies a B3 sampling decision is ignored when B3 is not an incoming format.
+TEST_F(OpenTelemetryDriverTest, B3SamplingDenyIgnoredByDefault) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{{"b3", "0"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
+  EXPECT_TRUE(span->useLocalDecision());
+}
+
+// Verifies valid trace context takes precedence over a B3 decision not to sample.
+TEST_F(OpenTelemetryDriverTest, TraceContextTakesPrecedenceOverB3SamplingDeny) {
+  setupValidDriverWithTraceContext("TRACE_CONTEXT, B3", "");
+  Tracing::TestTraceContextImpl request_headers{{"traceparent", w3c_traceparent}, {"b3", "0"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_EQ(span->getTraceId(), w3c_trace_id);
+  EXPECT_TRUE(dynamic_cast<Span*>(span.get())->sampled());
 }
 
 // Verifies only one of x-b3-traceid and x-b3-spanid is not trace context and starts a new trace.
@@ -918,6 +981,40 @@ TEST_F(OpenTelemetryDriverTest, InjectOnlyB3) {
   EXPECT_EQ(upstream_headers.get("b3"), absl::StrCat(b3_trace_id, "-0000000000000005-1"));
   EXPECT_FALSE(upstream_headers.get("traceparent").has_value());
   EXPECT_FALSE(upstream_headers.get("tracestate").has_value());
+}
+
+// Verifies a downstream b3 header is rewritten when only the B3 multiple headers are injected, so
+// the next hop doesn't parent to the downstream span.
+TEST_F(OpenTelemetryDriverTest, InjectB3MultiRewritesDownstreamSingleHeader) {
+  setupValidDriverWithTraceContext("B3", "B3_MULTI");
+  ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(5));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"b3", absl::StrCat(b3_trace_id, "-", b3_span_id, "-1")}};
+  Tracing::HttpTraceContext trace_context(request_headers);
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, trace_context, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->injectContext(trace_context, Tracing::UpstreamContext());
+  EXPECT_EQ(trace_context.get("x-b3-traceid"), b3_trace_id);
+  EXPECT_EQ(trace_context.get("x-b3-spanid"), "0000000000000005");
+  EXPECT_EQ(trace_context.get("b3"), absl::StrCat(b3_trace_id, "-0000000000000005-1"));
+}
+
+// Verifies downstream B3 multiple headers are rewritten when only the b3 header is injected.
+TEST_F(OpenTelemetryDriverTest, InjectB3RewritesDownstreamMultipleHeaders) {
+  setupValidDriverWithTraceContext("B3_MULTI", "B3");
+  ON_CALL(context_.server_factory_context_.api_.random_, random()).WillByDefault(Return(5));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"x-b3-traceid", b3_trace_id}, {"x-b3-spanid", b3_span_id}, {"x-b3-sampled", "1"}};
+  Tracing::HttpTraceContext trace_context(request_headers);
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, trace_context, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->injectContext(trace_context, Tracing::UpstreamContext());
+  EXPECT_EQ(trace_context.get("b3"), absl::StrCat(b3_trace_id, "-0000000000000005-1"));
+  EXPECT_EQ(trace_context.get("x-b3-traceid"), b3_trace_id);
+  EXPECT_EQ(trace_context.get("x-b3-spanid"), "0000000000000005");
+  EXPECT_EQ(trace_context.get("x-b3-sampled"), "1");
 }
 
 // Verifies the export happens after one span is created

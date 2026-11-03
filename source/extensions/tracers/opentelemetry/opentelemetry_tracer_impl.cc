@@ -297,6 +297,25 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
     // Trace context was present but could not be extracted, so the request is not traced.
     return std::make_unique<Tracing::NullSpan>();
   }
+  const bool b3_incoming =
+      std::any_of(incoming_trace_context_.begin(), incoming_trace_context_.end(),
+                  [](TraceContextFormat format) {
+                    return format == envoy::config::trace::v3::OpenTelemetryConfig::B3 ||
+                           format == envoy::config::trace::v3::OpenTelemetryConfig::B3_MULTI;
+                  });
+  const std::optional<bool> b3_sampled =
+      b3_incoming ? extractB3SamplingDecision(trace_context) : std::nullopt;
+  if (b3_sampled.has_value() && !b3_sampled.value()) {
+    // A B3 decision not to sample is honored even if a later route refresh would trace the request.
+    // A B3 decision to sample is ignored, so that Envoy's tracing decision can only turn tracing
+    // off.
+    tracing_decision.traced = false;
+    Tracing::SpanPtr span =
+        applyTracingDecision(tracer.startSpan(operation_name, stream_info, stream_info.startTime(),
+                                              tracing_decision, trace_context, span_kind));
+    span->disableLocalDecision();
+    return span;
+  }
   // No trace context, so we can create a fresh span with the given decision.
   return applyTracingDecision(tracer.startSpan(operation_name, stream_info, stream_info.startTime(),
                                                tracing_decision, trace_context, span_kind));

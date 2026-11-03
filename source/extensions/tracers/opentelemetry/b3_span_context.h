@@ -56,14 +56,23 @@ bool b3HeadersPresent(const Tracing::TraceContext& trace_context);
 absl::StatusOr<B3SpanContext> extractB3SpanContext(const Tracing::TraceContext& trace_context);
 
 /**
- * Writes the B3 single header.
+ * Extracts a sampling decision from B3 headers that carry no trace context: a single header that
+ * only carries a sampling decision, or x-b3-sampled or x-b3-flags without both ids. Only meaningful
+ * when b3HeadersPresent() is false.
+ * @return the sampling decision, or std::nullopt if there is none.
+ */
+std::optional<bool> extractB3SamplingDecision(const Tracing::TraceContext& trace_context);
+
+/**
+ * Writes the B3 single header. If any B3 multiple headers are present, they are rewritten too so
+ * that they don't describe a different span.
  */
 void injectB3SingleHeader(Tracing::TraceContext& trace_context, absl::string_view trace_id,
                           absl::string_view span_id, bool sampled);
 
 /**
  * Writes the B3 multiple headers. Any existing x-b3-parentspanid and x-b3-flags headers are
- * removed because they would describe a different span.
+ * removed, and an existing b3 header is rewritten, because they would describe a different span.
  */
 void injectB3MultiHeaders(Tracing::TraceContext& trace_context, absl::string_view trace_id,
                           absl::string_view span_id, bool sampled);

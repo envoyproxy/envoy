@@ -116,6 +116,30 @@ extractFromMultipleHeaders(const Tracing::TraceContext& trace_context) {
   return span_context;
 }
 
+bool anyMultipleHeaderPresent(const Tracing::TraceContext& trace_context) {
+  const B3ConstantValues& constants = B3Constants::get();
+  return constants.X_B3_TRACE_ID.get(trace_context).has_value() ||
+         constants.X_B3_SPAN_ID.get(trace_context).has_value() ||
+         constants.X_B3_PARENT_SPAN_ID.get(trace_context).has_value() ||
+         constants.X_B3_SAMPLED.get(trace_context).has_value() ||
+         constants.X_B3_FLAGS.get(trace_context).has_value();
+}
+
+void setSingleHeader(Tracing::TraceContext& trace_context, absl::string_view trace_id,
+                     absl::string_view span_id, bool sampled) {
+  B3Constants::get().B3.setRefKey(trace_context,
+                                  absl::StrCat(trace_id, "-", span_id, "-", sampled ? "1" : "0"));
+}
+
+void setMultipleHeaders(Tracing::TraceContext& trace_context, absl::string_view trace_id,
+                        absl::string_view span_id, bool sampled) {
+  B3Constants::get().X_B3_TRACE_ID.setRefKey(trace_context, trace_id);
+  B3Constants::get().X_B3_SPAN_ID.setRefKey(trace_context, span_id);
+  B3Constants::get().X_B3_SAMPLED.setRefKey(trace_context, sampled ? "1" : "0");
+  B3Constants::get().X_B3_PARENT_SPAN_ID.remove(trace_context);
+  B3Constants::get().X_B3_FLAGS.remove(trace_context);
+}
+
 } // namespace
 
 bool b3HeadersPresent(const Tracing::TraceContext& trace_context) {
@@ -137,19 +161,42 @@ absl::StatusOr<B3SpanContext> extractB3SpanContext(const Tracing::TraceContext& 
   return extractFromMultipleHeaders(trace_context);
 }
 
+std::optional<bool> extractB3SamplingDecision(const Tracing::TraceContext& trace_context) {
+  const auto b3 = B3Constants::get().B3.get(trace_context);
+  if (b3.has_value()) {
+    if (b3.value() == "0") {
+      return false;
+    }
+    if (b3.value() == "1" || b3.value() == "d") {
+      return true;
+    }
+    return std::nullopt;
+  }
+  const auto flags = B3Constants::get().X_B3_FLAGS.get(trace_context);
+  if (flags.has_value() && flags.value() == "1") {
+    return true;
+  }
+  const auto sampled = B3Constants::get().X_B3_SAMPLED.get(trace_context);
+  if (sampled.has_value()) {
+    return sampled.value() == "1" || sampled.value() == "true";
+  }
+  return std::nullopt;
+}
+
 void injectB3SingleHeader(Tracing::TraceContext& trace_context, absl::string_view trace_id,
                           absl::string_view span_id, bool sampled) {
-  B3Constants::get().B3.setRefKey(trace_context,
-                                  absl::StrCat(trace_id, "-", span_id, "-", sampled ? "1" : "0"));
+  setSingleHeader(trace_context, trace_id, span_id, sampled);
+  if (anyMultipleHeaderPresent(trace_context)) {
+    setMultipleHeaders(trace_context, trace_id, span_id, sampled);
+  }
 }
 
 void injectB3MultiHeaders(Tracing::TraceContext& trace_context, absl::string_view trace_id,
                           absl::string_view span_id, bool sampled) {
-  B3Constants::get().X_B3_TRACE_ID.setRefKey(trace_context, trace_id);
-  B3Constants::get().X_B3_SPAN_ID.setRefKey(trace_context, span_id);
-  B3Constants::get().X_B3_SAMPLED.setRefKey(trace_context, sampled ? "1" : "0");
-  B3Constants::get().X_B3_PARENT_SPAN_ID.remove(trace_context);
-  B3Constants::get().X_B3_FLAGS.remove(trace_context);
+  setMultipleHeaders(trace_context, trace_id, span_id, sampled);
+  if (B3Constants::get().B3.get(trace_context).has_value()) {
+    setSingleHeader(trace_context, trace_id, span_id, sampled);
+  }
 }
 
 } // namespace OpenTelemetry

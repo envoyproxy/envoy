@@ -84,6 +84,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tracers.opentelemetry"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
