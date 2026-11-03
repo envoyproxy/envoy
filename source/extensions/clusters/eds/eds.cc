@@ -807,6 +807,44 @@ void EdsClusterImpl::reloadHealthyHostsWithGracefulHostRemoval(const bool remove
   }
   info_->endpointStats().max_host_weight_.set(max_host_weight);
 
+  // Update the priorities with healthy (and then degraded) hosts first, so that removing hosts
+  // never leaves the cluster transiently without usable hosts.
+  const auto has_reachable_hosts = [&](const HostVector& eligible_hosts,
+                                       const HostsPerLocality& eligible_hosts_per_locality,
+                                       const LocalityWeightsConstSharedPtr& locality_weights) {
+    if (eligible_hosts.empty()) {
+      return false;
+    }
+    const bool has_positive_weight = locality_weights != nullptr &&
+                                     std::any_of(locality_weights->begin(), locality_weights->end(),
+                                                 [](uint32_t weight) { return weight != 0; });
+    if (!cluster_locality_weighted && !has_positive_weight) {
+      return true;
+    }
+    if (locality_weights == nullptr) {
+      return false;
+    }
+    const auto& buckets = eligible_hosts_per_locality.get();
+    for (size_t i = 0; i < buckets.size() && i < locality_weights->size(); ++i) {
+      if ((*locality_weights)[i] != 0 && !buckets[i].empty()) {
+        return true;
+      }
+    }
+    return false;
+  };
+  auto non_healthy_begin =
+      std::stable_partition(updates.begin(), updates.end(), [&](const PriorityUpdate& update) {
+        return has_reachable_hosts(update.update_hosts_params.healthy_hosts->get(),
+                                   *update.update_hosts_params.healthy_hosts_per_locality,
+                                   update.locality_weights);
+      });
+  std::stable_partition(non_healthy_begin, updates.end(), [&](const PriorityUpdate& update) {
+    return has_reachable_hosts(update.update_hosts_params.degraded_hosts->get(),
+                               *update.update_hosts_params.degraded_hosts_per_locality,
+                               update.locality_weights) ||
+           update.hosts_removed.empty();
+  });
+
   class RemoveHostsBatchUpdate : public PrioritySet::BatchUpdateCb {
   public:
     explicit RemoveHostsBatchUpdate(std::vector<PriorityUpdate>& updates) : updates_(updates) {}
@@ -915,6 +953,9 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
     // Whether the priority had hosts retained with PENDING_DYNAMIC_REMOVAL before the update.
     bool had_retained_hosts{};
     PriorityWarmupState warmup_state;
+    // Whether the priority has healthy or degraded serving hosts after retention.
+    bool has_healthy_host{};
+    bool has_degraded_host{};
     LocalityWeightsMap new_retained_weights;
     LocalityWeightsMap effective_locality_weights;
   };
@@ -1006,6 +1047,7 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
     }
   }
 
+  bool has_usable_priority = false;
   uint64_t max_host_weight = 1;
   for (uint32_t priority = 0; priority < updates.size(); ++priority) {
     PriorityUpdate& update = updates[priority];
@@ -1020,8 +1062,21 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
     if (!update.new_retained_weights.empty()) {
       scaleLocalityWeightsIfNeeded(update.effective_locality_weights);
     }
+    const bool locality_weighted =
+        cluster_locality_weighted || hasPositiveLocalityWeight(update.effective_locality_weights);
     for (const HostSharedPtr& host : *update.hosts) {
       max_host_weight = std::max<uint64_t>(max_host_weight, host->weight());
+      if (!isHostServingTraffic(*host) ||
+          !isHostInRoutableLocality(*host, update.effective_locality_weights, locality_weighted)) {
+        continue;
+      }
+      if (host->coarseHealth() == Host::Health::Healthy) {
+        update.has_healthy_host = true;
+        has_usable_priority = true;
+      } else if (host->coarseHealth() == Host::Health::Degraded) {
+        update.has_degraded_host = true;
+        has_usable_priority = true;
+      }
     }
   }
   // updateDynamicHostList() sets the maximum host weight of each priority in turn, without the
@@ -1058,8 +1113,28 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
         weighted_priority_health, overprovisioning_factor);
     cluster_rebuilt = true;
   };
-  for (uint32_t priority = 0; priority < updates.size(); ++priority) {
-    update_priority(priority);
+  // Update priorities with healthy (and then degraded) hosts first so that removing hosts never
+  // leaves the cluster transiently without usable hosts.
+  if (has_usable_priority) {
+    for (uint32_t priority = 0; priority < updates.size(); ++priority) {
+      if (updates[priority].has_healthy_host) {
+        update_priority(priority);
+      }
+    }
+    for (uint32_t priority = 0; priority < updates.size(); ++priority) {
+      if (!updates[priority].has_healthy_host && updates[priority].has_degraded_host) {
+        update_priority(priority);
+      }
+    }
+    for (uint32_t priority = 0; priority < updates.size(); ++priority) {
+      if (!updates[priority].has_healthy_host && !updates[priority].has_degraded_host) {
+        update_priority(priority);
+      }
+    }
+  } else {
+    for (uint32_t priority = 0; priority < updates.size(); ++priority) {
+      update_priority(priority);
+    }
   }
   return cluster_rebuilt;
 }

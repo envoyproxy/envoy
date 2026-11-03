@@ -220,7 +220,235 @@ public:
 
     return factory_.stats_.counter("cluster_manager.cluster_updated").value();
   }
+
+  // Validates that with graceful host removal, a host removal on one priority delivers an update
+  // held in a merge window for another priority (e.g. a host in it becoming healthy) together with
+  // the removal, so that worker threads never observe the removal without the held update.
+  void testGracefulHostRemovalDeliversMergedUpdates(bool batch_aware_update) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update",
+                                 batch_aware_update ? "true" : "false"}});
+
+    auto cluster = initRingHashCluster();
+    ON_CALL(*cluster->info_, gracefulHostRemoval()).WillByDefault(testing::Return(true));
+    auto& priority_set = cluster->priority_set_;
+
+    // Add a host to priority 1, which is delivered immediately.
+    HostVector p1_hosts = {makeTestHost(cluster->info_, "tcp://127.0.0.2:80")};
+    priority_set.getMockHostSet(1)->hosts_ = p1_hosts;
+    priority_set.getMockHostSet(1)->runCallbacks(p1_hosts, {});
+    const uint64_t cluster_updated =
+        factory_.stats_.counter("cluster_manager.cluster_updated").value();
+
+    const auto& worker_priority_set =
+        cluster_manager_->getThreadLocalCluster("cluster_0")->prioritySet();
+    ASSERT_EQ(2, worker_priority_set.hostSetsPerPriority().size());
+    EXPECT_TRUE(worker_priority_set.hostSetsPerPriority()[1]->healthyHosts().empty());
+
+    // A health change making the host of priority 1 healthy within the merge window is held.
+    Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+    priority_set.getMockHostSet(1)->healthy_hosts_ = p1_hosts;
+    priority_set.getMockHostSet(1)->runCallbacks({}, {});
+    EXPECT_TRUE(timer->enabled());
+    EXPECT_EQ(cluster_updated, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+    EXPECT_TRUE(worker_priority_set.hostSetsPerPriority()[1]->healthyHosts().empty());
+
+    // Removing the host of priority 0 delivers the held priority 1 update before removing
+    // priority 0's host on the worker thread.
+    std::vector<uint32_t> updated_priorities;
+    auto worker_update_cb =
+        const_cast<PrioritySet&>(worker_priority_set)
+            .addPriorityUpdateCb([&](uint32_t priority, const HostVector&, const HostVector&) {
+              updated_priorities.push_back(priority);
+              if (priority == 0) {
+                // The worker thread never observes the removal without the healthy host.
+                EXPECT_EQ(1, worker_priority_set.hostSetsPerPriority()[1]->healthyHosts().size());
+              }
+              return absl::OkStatus();
+            });
+    HostVector p0_hosts_removed = priority_set.getMockHostSet(0)->hosts_;
+    priority_set.getMockHostSet(0)->hosts_.clear();
+    priority_set.getMockHostSet(0)->runCallbacks({}, p0_hosts_removed);
+    EXPECT_FALSE(timer->enabled());
+    EXPECT_EQ(cluster_updated + (batch_aware_update ? 1 : 2),
+              factory_.stats_.counter("cluster_manager.cluster_updated").value());
+    EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+    EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+    EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
+
+    ASSERT_EQ(2, worker_priority_set.hostSetsPerPriority().size());
+    EXPECT_TRUE(worker_priority_set.hostSetsPerPriority()[0]->hosts().empty());
+    EXPECT_EQ(1, worker_priority_set.hostSetsPerPriority()[1]->hosts().size());
+    EXPECT_EQ(1, worker_priority_set.hostSetsPerPriority()[1]->healthyHosts().size());
+
+    factory_.tls_.shutdownThread();
+  }
+
+  // Validates that with graceful host removal, a batch update that does not remove any host (e.g.
+  // one that marks the hosts of priority 0 as draining in place) still delivers an update held in a
+  // merge window for another priority (e.g. a host in it becoming healthy) ahead of the batch, so
+  // that worker threads never observe the batch without the held update.
+  void
+  testGracefulHostRemovalBatchUpdateWithoutRemovalDeliversMergedUpdates(bool batch_aware_update) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update",
+                                 batch_aware_update ? "true" : "false"}});
+
+    auto cluster = initRingHashCluster();
+    ON_CALL(*cluster->info_, gracefulHostRemoval()).WillByDefault(testing::Return(true));
+    auto& priority_set = cluster->priority_set_;
+
+    // Add a host to priority 1, which is delivered immediately.
+    HostVector p1_hosts = {makeTestHost(cluster->info_, "tcp://127.0.0.2:80")};
+    priority_set.getMockHostSet(1)->hosts_ = p1_hosts;
+    priority_set.getMockHostSet(1)->runCallbacks(p1_hosts, {});
+
+    // A health change making the host of priority 1 healthy within the merge window is held.
+    Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+    priority_set.getMockHostSet(1)->healthy_hosts_ = p1_hosts;
+    priority_set.getMockHostSet(1)->runCallbacks({}, {});
+    EXPECT_TRUE(timer->enabled());
+
+    const auto& worker_priority_set =
+        cluster_manager_->getThreadLocalCluster("cluster_0")->prioritySet();
+    std::vector<uint32_t> updated_priorities;
+    auto worker_update_cb =
+        const_cast<PrioritySet&>(worker_priority_set)
+            .addPriorityUpdateCb([&](uint32_t priority, const HostVector&, const HostVector&) {
+              updated_priorities.push_back(priority);
+              if (priority == 0) {
+                EXPECT_EQ(1, worker_priority_set.hostSetsPerPriority()[1]->healthyHosts().size());
+              }
+              return absl::OkStatus();
+            });
+
+    // A batch update changes priority 0 in place, without adding or removing any host.
+    priority_set.batch_update_active_ = true;
+    priority_set.priority_update_cb_helper_.runCallbacks(0, HostVector{}, HostVector{});
+    priority_set.member_update_cb_helper_.runCallbacks(HostVector{}, HostVector{});
+    priority_set.batch_update_active_ = false;
+
+    EXPECT_FALSE(timer->enabled());
+    EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+    EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
+    EXPECT_EQ(1, worker_priority_set.hostSetsPerPriority()[1]->healthyHosts().size());
+
+    factory_.tls_.shutdownThread();
+  }
 };
+
+TEST_F(ClusterManagerImplThreadAwareLbTest, GracefulHostRemovalDeliversMergedUpdates) {
+  testGracefulHostRemovalDeliversMergedUpdates(false);
+}
+
+TEST_F(ClusterManagerImplThreadAwareLbTest, BatchAwareGracefulHostRemovalDeliversMergedUpdates) {
+  testGracefulHostRemovalDeliversMergedUpdates(true);
+}
+
+TEST_F(ClusterManagerImplThreadAwareLbTest,
+       GracefulHostRemovalBatchUpdateWithoutRemovalDeliversMergedUpdates) {
+  testGracefulHostRemovalBatchUpdateWithoutRemovalDeliversMergedUpdates(false);
+}
+
+TEST_F(ClusterManagerImplThreadAwareLbTest,
+       BatchAwareGracefulHostRemovalBatchUpdateWithoutRemovalDeliversMergedUpdates) {
+  testGracefulHostRemovalBatchUpdateWithoutRemovalDeliversMergedUpdates(true);
+}
+
+TEST_F(ClusterManagerImplThreadAwareLbTest,
+       GracefulHostRemovalBatchUpdateDoesNotDeferInPlaceUpdate) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "false"}});
+
+  auto cluster = initRingHashCluster();
+  ON_CALL(*cluster->info_, gracefulHostRemoval()).WillByDefault(testing::Return(true));
+  auto& priority_set = cluster->priority_set_;
+
+  // Add a host to priority 1 so subsequent in-place updates fall within the merge window.
+  HostVector p1_hosts = {makeTestHost(cluster->info_, "tcp://127.0.0.2:80")};
+  priority_set.getMockHostSet(1)->hosts_ = p1_hosts;
+  priority_set.getMockHostSet(1)->runCallbacks(p1_hosts, {});
+  const uint64_t cluster_updated =
+      factory_.stats_.counter("cluster_manager.cluster_updated").value();
+
+  const auto& worker_priority_set =
+      cluster_manager_->getThreadLocalCluster("cluster_0")->prioritySet();
+  std::vector<uint32_t> updated_priorities;
+  auto worker_update_cb =
+      const_cast<PrioritySet&>(worker_priority_set)
+          .addPriorityUpdateCb([&](uint32_t priority, const HostVector&, const HostVector&) {
+            updated_priorities.push_back(priority);
+            return absl::OkStatus();
+          });
+
+  // Inside a batch update, an in-place health change on priority 1 must be delivered immediately
+  // rather than deferred into a merge window, ahead of removing priority 0's host.
+  EXPECT_CALL(factory_.dispatcher_, createTimer_(_)).Times(0);
+  HostVector p0_hosts_removed = priority_set.getMockHostSet(0)->hosts_;
+  priority_set.getMockHostSet(0)->hosts_.clear();
+  priority_set.batch_update_active_ = true;
+  priority_set.priority_update_cb_helper_.runCallbacks(1, HostVector{}, HostVector{});
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1));
+  priority_set.priority_update_cb_helper_.runCallbacks(0, HostVector{}, p0_hosts_removed);
+  priority_set.member_update_cb_helper_.runCallbacks(HostVector{}, p0_hosts_removed);
+  priority_set.batch_update_active_ = false;
+
+  EXPECT_EQ(cluster_updated + 2,
+            factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
+
+  factory_.tls_.shutdownThread();
+}
+
+// Validates that with enable_batch_aware_update and graceful host removal, a host removed from one
+// priority and added to another priority in the same batch delivers an update held in a merge
+// window for a third priority ahead of the batch, even though the batch has no net removed hosts.
+TEST_F(ClusterManagerImplThreadAwareLbTest,
+       BatchAwareGracefulHostRemovalDeliversMergedUpdatesOnPriorityMove) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_batch_aware_update", "true"}});
+
+  auto cluster = initRingHashCluster();
+  ON_CALL(*cluster->info_, gracefulHostRemoval()).WillByDefault(testing::Return(true));
+  auto& priority_set = cluster->priority_set_;
+
+  // Add a host to priority 1, which is delivered immediately.
+  HostVector p1_hosts = {makeTestHost(cluster->info_, "tcp://127.0.0.2:80")};
+  priority_set.getMockHostSet(1)->hosts_ = p1_hosts;
+  priority_set.getMockHostSet(1)->runCallbacks(p1_hosts, {});
+
+  // A health change in priority 1 within the merge window is held.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  priority_set.getMockHostSet(1)->runCallbacks({}, {});
+  EXPECT_TRUE(timer->enabled());
+
+  const auto& worker_priority_set =
+      cluster_manager_->getThreadLocalCluster("cluster_0")->prioritySet();
+  std::vector<uint32_t> updated_priorities;
+  auto worker_update_cb =
+      const_cast<PrioritySet&>(worker_priority_set)
+          .addPriorityUpdateCb([&](uint32_t priority, const HostVector&, const HostVector&) {
+            updated_priorities.push_back(priority);
+            return absl::OkStatus();
+          });
+
+  // Move the host of priority 0 to priority 2 in a batch update.
+  HostVector moved_hosts = priority_set.getMockHostSet(0)->hosts_;
+  priority_set.getMockHostSet(0)->hosts_.clear();
+  priority_set.getMockHostSet(2)->hosts_ = moved_hosts;
+  priority_set.batch_update_active_ = true;
+  priority_set.priority_update_cb_helper_.runCallbacks(0, HostVector{}, moved_hosts);
+  priority_set.priority_update_cb_helper_.runCallbacks(2, moved_hosts, HostVector{});
+  priority_set.member_update_cb_helper_.runCallbacks(HostVector{}, HostVector{});
+  priority_set.batch_update_active_ = false;
+
+  EXPECT_FALSE(timer->enabled());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0, 2));
+
+  factory_.tls_.shutdownThread();
+}
 
 // With enable_batch_aware_update enabled, per-priority updates delivered during a main-thread batch
 // host update are coalesced into a single cross-thread post at the end of the batch, so

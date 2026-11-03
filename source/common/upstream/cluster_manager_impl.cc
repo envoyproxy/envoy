@@ -1,5 +1,6 @@
 #include "source/common/upstream/cluster_manager_impl.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -606,7 +607,8 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // This is used by cluster types such as EDS clusters to drain the connection pools of removed
   // hosts.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, &cluster_data_ref, this](const HostVector&, const HostVector& hosts_removed) {
+      [&cluster, &cluster_data_ref, batch_aware_update, this](const HostVector&,
+                                                              const HostVector& hosts_removed) {
         // If per-priority updates were accumulated during a main-thread batch host update (see the
         // priority update callback below), post them to the worker threads now as a single batched
         // update. This MemberUpdateCb fires once at the end of the batch, after the thread-aware
@@ -614,6 +616,38 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         // so workers never snapshot a stale factory. Posting here, before the connection draining
         // below, preserves the membership-update-then-drain ordering of the non-batch path.
         auto& pending = cluster_data_ref.pending_update_params_;
+        // Check the hosts removed from each priority rather than the net hosts removed by the
+        // batch, consistently with the non-batch path below: a host removed from one priority may
+        // also have been added to another priority in the same batch.
+        if (batch_aware_update && cluster.info()->gracefulHostRemoval() &&
+            !pending.per_priority_update_params_.empty() &&
+            (cluster.prioritySet().batchUpdateActive() ||
+             std::any_of(pending.per_priority_update_params_.begin(),
+                         pending.per_priority_update_params_.end(), [](const auto& per_priority) {
+                           return !per_priority.hosts_removed_.empty();
+                         }))) {
+          // With graceful host removal, hosts may be removed (or stop serving traffic, e.g. when
+          // an update marks them as draining) because a host in another priority became healthy,
+          // while that priority's update is still held in a merge window. Deliver such updates
+          // with the updates of a batch update or with removals, ahead of the other priorities, so
+          // that the worker threads never observe the removal without the healthy host.
+          std::vector<ThreadLocalClusterUpdateParams::PerPriority> reordered_params;
+          for (const uint32_t priority : cancelPendingMergedUpdates(cluster_data_ref)) {
+            if (std::none_of(pending.per_priority_update_params_.begin(),
+                             pending.per_priority_update_params_.end(),
+                             [priority](const auto& per_priority) {
+                               return per_priority.priority_ == priority;
+                             })) {
+              reordered_params.emplace_back(priority, HostVector{}, HostVector{});
+            }
+          }
+          if (!reordered_params.empty()) {
+            for (auto& per_priority : pending.per_priority_update_params_) {
+              reordered_params.push_back(std::move(per_priority));
+            }
+            pending.per_priority_update_params_ = std::move(reordered_params);
+          }
+        }
         if (!pending.per_priority_update_params_.empty()) {
           cm_stats_.cluster_updated_.inc();
           postThreadLocalClusterUpdate(cluster_data_ref, std::move(pending));
@@ -691,7 +725,12 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
         }
 
         // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
-        const bool is_mergeable = hosts_added.empty() && hosts_removed.empty();
+        // With graceful host removal, the updates of a batch update are not merged either, so that
+        // they are delivered in the order of the batch update, which updates the priorities with
+        // healthy hosts before removing hosts from the other priorities.
+        const bool is_mergeable =
+            hosts_added.empty() && hosts_removed.empty() &&
+            !(cluster.info()->gracefulHostRemoval() && cluster.prioritySet().batchUpdateActive());
 
         if (merge_timeout > 0) {
           // If this is not mergeable, we should cancel any scheduled updates since
@@ -701,6 +740,25 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
 
         // If an update was not scheduled for later, deliver it immediately.
         if (!scheduled) {
+          if (cluster.info()->gracefulHostRemoval() &&
+              (!hosts_removed.empty() || cluster.prioritySet().batchUpdateActive())) {
+            // With graceful host removal, hosts may be removed (or stop serving traffic, e.g. when
+            // a batch update marks them as draining) because a host in another priority became
+            // healthy, while that priority's update is still held in a merge window. Deliver such
+            // updates first so that the worker threads never observe the removal without the
+            // healthy host.
+            ThreadLocalClusterUpdateParams merged_params;
+            for (const uint32_t merged_priority : cancelPendingMergedUpdates(cm_cluster)) {
+              if (merged_priority != priority) {
+                merged_params.per_priority_update_params_.emplace_back(merged_priority,
+                                                                       HostVector{}, HostVector{});
+              }
+            }
+            if (!merged_params.per_priority_update_params_.empty()) {
+              cm_stats_.cluster_updated_.inc();
+              postThreadLocalClusterUpdate(cm_cluster, std::move(merged_params));
+            }
+          }
           cm_stats_.cluster_updated_.inc();
           postThreadLocalClusterUpdate(
               cm_cluster, ThreadLocalClusterUpdateParams(priority, hosts_added, hosts_removed));
@@ -781,6 +839,25 @@ bool ClusterManagerImpl::scheduleUpdate(ClusterManagerCluster& cluster, uint32_t
   }
 
   return true;
+}
+
+std::vector<uint32_t>
+ClusterManagerImpl::cancelPendingMergedUpdates(ClusterManagerCluster& cluster) {
+  std::vector<uint32_t> priorities;
+  const auto updates_by_prio = updates_map_.find(cluster.cluster().info()->name());
+  if (updates_by_prio == updates_map_.end() || updates_by_prio->second == nullptr) {
+    return priorities;
+  }
+  for (auto& [priority, updates] : *updates_by_prio->second) {
+    if (updates != nullptr && updates->disableTimer()) {
+      cm_stats_.update_merge_cancelled_.inc();
+      updates->last_updated_ = time_source_.monotonicTime();
+      priorities.push_back(priority);
+    }
+  }
+  // Deliver the updates in a deterministic order.
+  std::sort(priorities.begin(), priorities.end());
+  return priorities;
 }
 
 void ClusterManagerImpl::applyUpdates(ClusterManagerCluster& cluster, uint32_t priority,

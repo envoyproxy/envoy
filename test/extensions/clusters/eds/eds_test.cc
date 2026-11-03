@@ -1689,7 +1689,8 @@ TEST_F(EdsGracefulHostRemovalTest, RemovedHostsRetainedUntilHealthyPanicThreshol
 }
 
 // Validate that once a new host in another priority is healthy, the retained hosts are removed in a
-// single batch update.
+// single batch update that updates the priority with the healthy host first, so that the cluster
+// always has a healthy host.
 TEST_F(EdsGracefulHostRemovalTest, RetainedHostsRemovedAcrossPrioritiesInSingleBatchUpdate) {
   initializeCluster();
   addEndpoint(80, 0);
@@ -1710,9 +1711,12 @@ TEST_F(EdsGracefulHostRemovalTest, RetainedHostsRemovedAcrossPrioritiesInSingleB
   passActiveHealthCheck(findHost("1.2.3.4:81"));
   EXPECT_EQ(2UL, cluster_->info()->endpointStats().membership_healthy_.value());
 
+  std::vector<uint32_t> updated_priorities;
   auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) {
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
         EXPECT_TRUE(cluster_->prioritySet().batchUpdateActive());
+        EXPECT_GT(cluster_->info()->endpointStats().membership_healthy_.value(), 0UL);
         return absl::OkStatus();
       });
   uint32_t member_update_calls = 0;
@@ -1724,6 +1728,7 @@ TEST_F(EdsGracefulHostRemovalTest, RetainedHostsRemovedAcrossPrioritiesInSingleB
         return absl::OkStatus();
       });
   timer->invokeCallback();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
   EXPECT_EQ(1U, member_update_calls);
   EXPECT_TRUE(hostSet(0).hosts().empty());
   EXPECT_THAT(hostAddresses(1), testing::ElementsAre("1.2.3.4:81"));
@@ -2189,7 +2194,8 @@ TEST_F(EdsGracefulHostRemovalTest, RemovedHostsNotRetainedWhenNewHostHasActiveHe
 }
 
 // Validate that the retained hosts of a priority without warming hosts of its own are removed by an
-// update that makes a host in another priority healthy.
+// update that makes a host in another priority healthy, which updates that priority first so that
+// the cluster always has a healthy host.
 TEST_F(EdsGracefulHostRemovalTest, RetainedHostsRemovedWhenUpdateMarksHostHealthy) {
   initializeCluster();
   addEndpoint(80, 0);
@@ -2207,12 +2213,20 @@ TEST_F(EdsGracefulHostRemovalTest, RetainedHostsRemovedWhenUpdateMarksHostHealth
   EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
   EXPECT_TRUE(hostSet(1).healthyHosts().empty());
 
-  // Mark 81 HEALTHY in priority 1 while 82 is still warming up: priority 0 removes its retained
-  // host since the cluster now has a healthy advertised host.
+  // Mark 81 HEALTHY in priority 1 while 82 is still warming up: priority 1 updates first and
+  // priority 0 removes its retained host since the cluster now has a healthy advertised host.
+  std::vector<uint32_t> updated_priorities;
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
+        EXPECT_GT(cluster_->info()->endpointStats().membership_healthy_.value(), 0UL);
+        return absl::OkStatus();
+      });
   cluster_load_assignment_.clear_endpoints();
   addEndpoint(82, 1);
   addEndpoint(81, 1, 0, "", 0, "", envoy::config::core::v3::HEALTHY);
   updateEndpoints();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
   EXPECT_TRUE(hostSet(0).hosts().empty());
   EXPECT_EQ(1UL, hostSet(1).healthyHosts().size());
 }
@@ -2314,7 +2328,8 @@ TEST_F(EdsGracefulHostRemovalTest, PartialEndpointReplacementRetainsRemovedHosts
   EXPECT_EQ(3UL, hostSet(0).healthyHosts().size());
 }
 
-// Validate that a host moved to another priority is reused.
+// Validate that a host moved to another priority is reused, and that the priority it moves to is
+// updated first since it has a healthy host, so that the cluster always has a healthy host.
 TEST_F(EdsGracefulHostRemovalTest, HostMovedToAnotherPriorityReused) {
   initializeCluster();
   addEndpoint(80, 0);
@@ -2322,11 +2337,19 @@ TEST_F(EdsGracefulHostRemovalTest, HostMovedToAnotherPriorityReused) {
   passActiveHealthCheckForAllHosts();
   const HostSharedPtr host_80 = findHost("1.2.3.4:80");
 
+  std::vector<uint32_t> updated_priorities;
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
+        EXPECT_GT(cluster_->info()->endpointStats().membership_healthy_.value(), 0UL);
+        return absl::OkStatus();
+      });
   // Move 80 to priority 1, and add 81 to priority 0.
   cluster_load_assignment_.clear_endpoints();
   addEndpoint(81, 0);
   addEndpoint(80, 1);
   updateEndpoints();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
   EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:81"));
   ASSERT_EQ(1UL, hostSet(1).hosts().size());
   EXPECT_EQ(host_80, hostSet(1).hosts()[0]);
@@ -2489,6 +2512,38 @@ TEST_F(EdsGracefulHostRemovalTest, PriorityAndHealthCheckAddressChangeReplacesHo
   passActiveHealthCheck(new_host_80);
   timer->invokeCallback();
   EXPECT_TRUE(hostSet(0).hosts().empty());
+  EXPECT_EQ(new_host_80, findHost("1.2.3.4:80"));
+}
+
+// Validate that when a host is replaced by a new host in another priority while a priority has a
+// healthy host, the priority with the healthy host is updated first (so the cluster always has a
+// healthy host) and the new host still owns the address in the cross priority host map.
+TEST_F(EdsGracefulHostRemovalTest, HostReplacedInAnotherPriorityOwnsAddress) {
+  initializeCluster();
+  addEndpoint(80, 0, 8000);
+  addEndpoint(90, 1);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+
+  std::vector<uint32_t> updated_priorities;
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
+        EXPECT_GT(cluster_->info()->endpointStats().membership_healthy_.value(), 0UL);
+        return absl::OkStatus();
+      });
+  // Move 80 to priority 1 with a new health check port, and add 81 to priority 0. Priority 1 has a
+  // healthy host after the update, so priority 1 updates before priority 0.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0);
+  addEndpoint(80, 1, 9000);
+  addEndpoint(90, 1);
+  updateEndpoints();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
+  EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:81"));
+  EXPECT_THAT(hostAddresses(1), testing::ElementsAre("1.2.3.4:80", "1.2.3.4:90"));
+  const HostSharedPtr new_host_80 = hostSet(1).hosts()[0];
+  EXPECT_EQ(9000U, new_host_80->healthCheckAddress()->ip()->port());
   EXPECT_EQ(new_host_80, findHost("1.2.3.4:80"));
 }
 
@@ -3041,6 +3096,34 @@ TEST_F(EdsGracefulHostRemovalTest, ZeroWeightLocalityHostDoesNotPreventCrossPrio
   EXPECT_EQ(host_80, lb->chooseHost(nullptr).host);
 }
 
+// Validate that when no priority has healthy hosts, a priority with degraded hosts is updated
+// before a priority left without usable hosts, so that the cluster always has a usable host.
+TEST_F(EdsGracefulHostRemovalTest, DegradedPriorityUpdatedBeforePriorityWithoutUsableHosts) {
+  initializeCluster();
+  addEndpoint(80, 0);
+  addEndpoint(90, 1);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  findHost("1.2.3.4:90")->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+
+  std::vector<uint32_t> updated_priorities;
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
+        EXPECT_GT(cluster_->info()->endpointStats().membership_degraded_.value(), 0UL);
+        return absl::OkStatus();
+      });
+  // Remove 80 from priority 0 and add draining 91 to priority 1: no host is warming up, so 80 is
+  // not retained.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(90, 1);
+  addEndpoint(91, 1, 0, "", 0, "", envoy::config::core::v3::DRAINING);
+  updateEndpoints();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
+  EXPECT_TRUE(hostSet(0).hosts().empty());
+  EXPECT_EQ(1UL, hostSet(1).degradedHosts().size());
+}
+
 // Validate that an empty assignment (e.g. when the assignment times out) removes the retained hosts
 // right away, since no host is warming up anymore.
 TEST_F(EdsGracefulHostRemovalTest, EmptyAssignmentRemovesRetainedHosts) {
@@ -3329,11 +3412,18 @@ TEST_F(EdsGracefulHostRemovalTest, CrossPriorityRetentionUsesHealthyPanicThresho
   passActiveHealthCheck(findHost("1.2.3.4:91"));
   EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
 
-  // 92 passes HC in priority 1 (2/4 = 50% >= 50%): 80 is removed while 93 and 94 continue warming
-  // up.
+  // 92 passes HC in priority 1 (2/4 = 50% >= 50%): priority 1 updates before priority 0 and 80 is
+  // removed while 93 and 94 continue warming up.
   Event::MockTimer* timer = expectGracefulHostRemovalTimer();
   passActiveHealthCheck(findHost("1.2.3.4:92"));
+  std::vector<uint32_t> updated_priorities;
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
+        return absl::OkStatus();
+      });
   timer->invokeCallback();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
   EXPECT_TRUE(hostSet(0).hosts().empty());
   EXPECT_EQ(2UL, hostSet(1).healthyHosts().size());
 }
@@ -3382,6 +3472,47 @@ TEST_F(EdsGracefulHostRemovalTest, MaxHostWeightDefaultsToOneWhenAllHostsRemoved
   EXPECT_EQ(1UL, cluster_->info()->endpointStats().max_host_weight_.value());
 }
 
+// Validate that priority update ordering evaluates post-retention effective locality weights, so a
+// priority whose retained host keeps its previous positive locality weight (even though the
+// updated configuration sets that locality's weight to 0) updates ahead of a priority without
+// usable hosts.
+TEST_F(EdsGracefulHostRemovalTest, PriorityOrderingUsesEffectiveLocalityWeightsForRetainedHosts) {
+  resetRingHashClusterLocalityWeighted();
+  ThreadAwareLoadBalancerPtr thread_aware_lb = createThreadAwareLoadBalancer();
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  cluster_load_assignment_.mutable_endpoints(0)
+      ->mutable_lb_endpoints(0)
+      ->mutable_endpoint()
+      ->mutable_health_check_config()
+      ->set_disable_active_health_check(true);
+  addEndpoint(90, 1, 0, "a", 100);
+  updateEndpoints();
+  passActiveHealthCheck(findHost("1.2.3.4:90"));
+  const HostSharedPtr host_90 = findHost("1.2.3.4:90");
+
+  std::vector<uint32_t> updated_priorities;
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
+        EXPECT_GT(cluster_->info()->endpointStats().membership_healthy_.value(), 0UL);
+        return absl::OkStatus();
+      });
+
+  // Replace non-retained 80 in priority 0 with draining 81, and replace 90 in priority 1 with
+  // warming 91 in locality a (configured weight 0) and warming 92 in locality b (weight 100).
+  // Retained 90 has effective locality weight 100, so priority 1 updates ahead of priority 0.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0, 0, "a", 100, "", envoy::config::core::v3::DRAINING);
+  addEndpoint(91, 1, 0, "a", 0);
+  addEndpoint(92, 1, 0, "b", 100);
+  updateEndpoints();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
+  EXPECT_THAT(retainedHostAddresses(1), testing::ElementsAre("1.2.3.4:90"));
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_90, lb->chooseHost(nullptr).host);
+}
+
 // Validate that a removed host whose locality weight was 0 before the update and remains 0 in the
 // updated configuration is not retained, preventing an unroutable zero-weight priority from
 // claiming priority health and starving healthy lower priorities.
@@ -3395,6 +3526,14 @@ TEST_F(EdsGracefulHostRemovalTest, RemovedHostInAlwaysZeroWeightLocalityNotRetai
   passActiveHealthCheckForAllHosts();
   const HostSharedPtr host_90 = findHost("1.2.3.4:90");
 
+  std::vector<uint32_t> updated_priorities;
+  auto priority_update_cb = cluster_->prioritySet().addPriorityUpdateCb(
+      [&](uint32_t priority, const HostVector&, const HostVector&) {
+        updated_priorities.push_back(priority);
+        EXPECT_GT(cluster_->info()->endpointStats().membership_healthy_.value(), 0UL);
+        return absl::OkStatus();
+      });
+
   // Move healthy 90 to priority 1 alongside warming 91 and 92 (1/3 = 33% < 50%), and replace 80 in
   // priority 0 with warming 81 in locality a (weight 0). 80 was unroutable before the update and
   // would remain unroutable if retained, so it is removed immediately and traffic fails over to 90.
@@ -3404,6 +3543,7 @@ TEST_F(EdsGracefulHostRemovalTest, RemovedHostInAlwaysZeroWeightLocalityNotRetai
   addEndpoint(91, 1, 0, "b", 100);
   addEndpoint(92, 1, 0, "b", 100);
   updateEndpoints();
+  EXPECT_THAT(updated_priorities, testing::ElementsAre(1, 0));
   EXPECT_THAT(retainedHostAddresses(0), testing::IsEmpty());
   LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
   EXPECT_EQ(host_90, lb->chooseHost(nullptr).host);
