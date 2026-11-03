@@ -1680,6 +1680,7 @@ varchar
 variadic
 varint
 Vcluster
+vcluster
 vec
 vectorize
 VBC

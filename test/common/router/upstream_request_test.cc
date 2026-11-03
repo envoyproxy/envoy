@@ -87,8 +87,11 @@ TEST_F(UpstreamRequestTest, TestAccessors) {
 // UpstreamRequest is responsible for adding proper gRPC annotations to spans.
 TEST_F(UpstreamRequestTest, DecodeHeadersGrpcSpanAnnotations) {
   envoy::extensions::filters::http::router::v3::Router router_proto;
-  router_config_ = *Router::FilterConfig::create(
-      pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
+  const std::string stats_prefix = "prefix.";
+  auto extra_context = Server::Configuration::ExtraFactoryContext::create(context_, stats_prefix);
+  router_config_ =
+      *Router::FilterConfig::create(context_.server_factory_context_, extra_context,
+                                    ShadowWriterPtr(new MockShadowWriter()), router_proto);
   EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
 
   // Enable tracing in config.
@@ -117,8 +120,11 @@ TEST_F(UpstreamRequestTest,
   // Enable tracing in config.
   envoy::extensions::filters::http::router::v3::Router router_proto;
   router_proto.set_start_child_span(true);
-  router_config_ = *Router::FilterConfig::create(
-      pool_.add("prefix"), context_, ShadowWriterPtr(new MockShadowWriter()), router_proto);
+  const std::string stats_prefix = "prefix.";
+  auto extra_context = Server::Configuration::ExtraFactoryContext::create(context_, stats_prefix);
+  router_config_ =
+      *Router::FilterConfig::create(context_.server_factory_context_, extra_context,
+                                    ShadowWriterPtr(new MockShadowWriter()), router_proto);
   EXPECT_CALL(router_filter_interface_, config()).WillRepeatedly(ReturnRef(*router_config_));
 
   // Set expectations on span.

@@ -18,6 +18,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
@@ -182,18 +183,19 @@ public:
  */
 class FilterConfig : public Http::FilterChainFactory {
 public:
-  FilterConfig(Server::Configuration::CommonFactoryContext& factory_context,
-               Stats::StatName stat_prefix, Stats::Scope& scope, Upstream::ClusterManager& cm,
-               Runtime::Loader& runtime, Random::RandomGenerator& random,
-               ShadowWriterPtr&& shadow_writer, bool emit_dynamic_stats, bool start_child_span,
-               bool suppress_envoy_headers, bool respect_expected_rq_timeout,
-               bool suppress_grpc_request_failure_code_stats,
+  FilterConfig(Server::Configuration::CommonFactoryContext& factory_context, Stats::Scope& scope,
+               Stats::StatName stat_prefix, Stats::Scope& stats_prefix_scope,
+               Upstream::ClusterManager& cm, Runtime::Loader& runtime,
+               Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
+               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
+               bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
                bool flush_upstream_log_on_upstream_stream, bool reject_connect_request_early_data,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
       : factory_context_(factory_context), router_context_(router_context), scope_(scope), cm_(cm),
-        runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
+        runtime_(runtime),
+        default_stats_(router_context_.statNames(), stats_prefix_scope, stat_prefix),
         random_(random), emit_dynamic_stats_(emit_dynamic_stats),
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
@@ -220,12 +222,14 @@ public:
   }
 
   static absl::StatusOr<std::unique_ptr<FilterConfig>>
-  create(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
-         ShadowWriterPtr&& shadow_writer,
+  create(Server::Configuration::ServerFactoryContext& context,
+         Server::Configuration::ExtraFactoryContext& extra_context, ShadowWriterPtr&& shadow_writer,
          const envoy::extensions::filters::http::router::v3::Router& config);
 
 protected:
-  FilterConfig(Stats::StatName stat_prefix, Server::Configuration::GenericFactoryContext& context,
+  FilterConfig(Server::Configuration::ServerFactoryContext& context,
+               Server::Configuration::ExtraFactoryContext& extra_context,
+               Stats::StatName stat_prefix, Stats::Scope& stats_prefix_scope,
                ShadowWriterPtr&& shadow_writer,
                const envoy::extensions::filters::http::router::v3::Router& config,
                absl::Status& creation_status);
