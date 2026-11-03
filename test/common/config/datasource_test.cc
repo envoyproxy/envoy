@@ -53,14 +53,14 @@ protected:
 
   void initialize(AsyncClientSendFunc func, int num_retries = 1) {
     retry_timer_ = new Event::MockTimer();
-    EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    EXPECT_CALL(init_manager_, add(_)).WillOnce([this](const Init::Target& target) {
       init_target_handle_ = target.createHandle("test");
-    }));
+    });
 
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([this](Event::TimerCb timer_cb) {
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
-    }));
+    });
 
     EXPECT_CALL(*retry_timer_, disableTimer());
     if (!func) {
@@ -74,11 +74,11 @@ protected:
     if (num_retries == 1) {
       EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(AtLeast(1))
-          .WillRepeatedly(Invoke(func));
+          .WillRepeatedly(func);
     } else {
       EXPECT_CALL(cm_.thread_local_cluster_.async_client_, send_(_, _, _))
           .Times(num_retries)
-          .WillRepeatedly(Invoke(func));
+          .WillRepeatedly(func);
     }
   }
 };
@@ -547,7 +547,10 @@ TEST(DataSourceProviderTest, FileDataSourceWithWatchAndDataTransformCb) {
   Event::DispatcherPtr dispatcher = api->allocateDispatcher("test_thread");
   NiceMock<ThreadLocal::MockInstance> tls;
 
-  auto data_transform_cb = [](absl::string_view data) {
+  auto data_transform_cb = [&dispatcher](absl::string_view data) {
+    if (data == "Hello, world! Updated!") {
+      dispatcher->exit();
+    }
     absl::flat_hash_set<std::string> transformed_data;
     transformed_data.emplace(data);
     return std::make_shared<absl::flat_hash_set<std::string>>(transformed_data);
@@ -564,8 +567,8 @@ TEST(DataSourceProviderTest, FileDataSourceWithWatchAndDataTransformCb) {
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
                               TestEnvironment::temporaryPath("envoy_test/watcher_link"));
-  // Handle the events if any.
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  // Wait for the update. Watch events may be delivered asynchronously (e.g. on Windows).
+  dispatcher->run(Event::Dispatcher::RunType::Block);
 
   // The provider should return the updated content.
   EXPECT_NE(provider->data(), nullptr);
@@ -622,15 +625,21 @@ TEST(DataSourceProviderTest, FileDataSourceAndWithWatch) {
   // Create a provider with watch.
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api, false,
-      [](absl::string_view data) { return std::make_shared<std::string>(data); }, 0);
+      [&dispatcher](absl::string_view data) {
+        if (data == "Hello, world! Updated!") {
+          dispatcher->exit();
+        }
+        return std::make_shared<std::string>(data);
+      },
+      0);
   EXPECT_NE(provider_or_error.value()->data(), nullptr);
   EXPECT_EQ(*provider_or_error.value()->data(), "Hello, world!");
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(TestEnvironment::temporaryPath("envoy_test/watcher_new_link"),
                               TestEnvironment::temporaryPath("envoy_test/watcher_link"));
-  // Handle the events if any.
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  // Wait for the update. Watch events may be delivered asynchronously (e.g. on Windows).
+  dispatcher->run(Event::Dispatcher::RunType::Block);
 
   // The provider should return the updated content.
   EXPECT_NE(provider_or_error.value()->data(), nullptr);
@@ -777,7 +786,9 @@ TEST(DataSourceProviderTest, FileDataSourceModifyWatch) {
   auto provider_or_error = DataSource::DataSourceProvider<std::string>::create(
       config, *dispatcher, tls, *api,
       [&](absl::string_view data) {
-        callback_count++;
+        if (++callback_count > 1) {
+          dispatcher->exit();
+        }
         return std::make_shared<std::string>(data);
       },
       {.modify_watch = true});
@@ -792,8 +803,8 @@ TEST(DataSourceProviderTest, FileDataSourceModifyWatch) {
     file.close();
   }
 
-  // Handle the events if any.
-  dispatcher->run(Event::Dispatcher::RunType::NonBlock);
+  // Wait for the update. Watch events may be delivered asynchronously (e.g. on Windows).
+  dispatcher->run(Event::Dispatcher::RunType::Block);
   EXPECT_GT(callback_count, 1);
 
   // The provider should return the updated content.

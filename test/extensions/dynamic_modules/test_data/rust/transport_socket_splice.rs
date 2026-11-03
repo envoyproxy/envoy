@@ -96,8 +96,8 @@ struct Direction {
   mode: Mode,
   // Bytes in the pipe.
   pipe_bytes: usize,
-  // Bytes that have arrived in the writer's write buffer, published by the writer on each write and
-  // cleared once the reader passes more bytes through Envoy.
+  // Bytes that have arrived in the writer's write buffer, published by the writer on each write
+  // and cleared once the reader passes more bytes through Envoy.
   bytes_arrived_at_writer: Option<u64>,
   // The reader saw the end of its stream. It reports it to Envoy once the pipe is empty.
   reader_eof: bool,
@@ -192,7 +192,8 @@ fn wake_writer(socket: Option<SocketPtr>) {
 
 struct SpliceTransportSocket {
   role: Role,
-  // When set, the clean boundary hands both fds to the engine splice pump instead of relaying here.
+  // When set, the clean boundary hands both fds to the engine splice pump instead of relaying
+  // here.
   engine: bool,
   // The connection ID an upstream socket is registered under until it closes.
   registered_id: Option<u64>,
@@ -226,8 +227,8 @@ impl SpliceTransportSocket {
   }
 
   // Hands both fds to the engine splice pump once both directions have written out every byte they
-  // read, so no byte waits in an Envoy buffer. The new bytes that triggered this read stay on the fd
-  // for the pump. Returns true once the pump owns both fds.
+  // read, so no byte waits in an Envoy buffer. The new bytes that triggered this read stay on the
+  // fd for the pump. Returns true once the pump owns both fds.
   fn try_engage_engine(&self, envoy: &EnvoyTransportSocketImpl, relay: &mut Relay) -> bool {
     let Some(peer) = relay.peer(self.role) else {
       return false;

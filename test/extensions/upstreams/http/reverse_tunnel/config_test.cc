@@ -49,7 +49,6 @@ namespace {
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::_;
 using ::testing::Eq;
-using ::testing::Invoke;
 using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::ReturnRef;
@@ -115,9 +114,9 @@ protected:
 
   NiceMock<MockReverseTunnelReporter>* makeReporter() {
     auto* reporter = new NiceMock<MockReverseTunnelReporter>();
-    EXPECT_CALL(reporter_factory_, createReporter()).WillOnce(Invoke([reporter]() {
+    EXPECT_CALL(reporter_factory_, createReporter()).WillOnce([reporter]() {
       return std::unique_ptr<ReverseTunnelReporter>(reporter);
-    }));
+    });
     return reporter;
   }
 

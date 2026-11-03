@@ -62,6 +62,7 @@ envoy_cc_test(
     deps = [
         "//source/common/jwt:simple_lru_cache_lib",
         "//test/test_common:utility_lib",
+        "@abseil-cpp//absl/time",
     ],
 )
 
@@ -131,6 +132,7 @@ envoy_cc_test(
     deps = [
         ":test_common_lib",
         "//source/common/jwt:jwt_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )

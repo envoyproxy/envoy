@@ -2,6 +2,14 @@
 
 Instructions for AI coding agents (Claude Code, Copilot, Cursor, etc.) working in this repository.
 
+Some subdirectories have their own, more specific guides. Read them before working in (or
+debugging failures that involve) those areas:
+
+| Guide | Covers |
+|-------|--------|
+| `compat/openssl/AGENTS.md` | The OpenSSL compatibility layer (`bssl-compat`) and `--config=openssl` build failures |
+| `.github/copilot-instructions.md` | GitHub Copilot cloud agent environment setup |
+
 ## Critical rules
 
 1. **Always sign off commits.** The human user must sign off commits via `git commit -s` — never
@@ -11,15 +19,16 @@ Instructions for AI coding agents (Claude Code, Copilot, Cursor, etc.) working i
    a quick local check, or run `./ci/do_ci.sh format` inside Docker for the full CI check suite.
    Format failures are the most common CI rejection. If running checks is impractical, warn the
    user that formatting has not been verified.
-3. **Never amend commits or force-push after a PR has received human review.** Always create new
-   commits to preserve review history.
-4. **Never rebase a PR that is under review.** Use `git merge main` instead to pull in recent
-   changes. The project squash-merges, so commit count does not matter.
-5. **Disclose AI usage.** When submitting PRs, include a note about AI assistance in the PR
-   description. The submitter must fully understand all code being submitted.
-6. **Never commit to `main`.** Always create a new branch before committing. If switching
+3. **Never amend commits, force-push or rebase after a PR has received human review.** Always
+   create new commits to preserve review history, and use `git fetch origin main && git merge
+   origin/main` to pull in recent changes. The project squash-merges, so commit count does not
+   matter.
+4. **Follow the generative AI policy.** See the "Use of generative AI policy" section of
+   `CONTRIBUTING.md`. Disclose AI assistance in the PR description; the submitter must fully
+   understand all code being submitted.
+5. **Never commit to `main`.** Always create a new branch before committing. If switching
    contexts or unsure which branch to use, ask the user.
-7. **Always push to a personal fork.** Do not create branches in the main repo.
+6. **Always push to a personal fork.** Do not create branches in the main repo.
 
 ## Developer workflow
 
@@ -33,12 +42,10 @@ Read `CONTRIBUTING.md` for the full contribution process. Key points:
 
 ### 2. Writing code
 
-Read `STYLE.md` for the C++ coding style. After writing C++ code, run `clang-format` to fix
-formatting automatically rather than trying to hand-format:
-
-```bash
-clang-format -i <file>
-```
+Read `STYLE.md` for the C++ coding style. After writing code, use the format tooling (see
+[Format and lint checks](#4-format-and-lint-checks-required-before-every-commit)) rather than
+trying to hand-format. Prefer the Bazel targets: they use the pinned `//tools/clang-format`, and a
+locally installed `clang-format` may produce different output from CI.
 
 Tests must:
 - Live in `test/` mirroring the `source/` structure
@@ -78,45 +85,28 @@ tools/local_fix_format.sh -main    # changes since main
 tools/local_fix_format.sh -all     # entire repo
 ```
 
+The script runs the Bazel targets below. With `-skip-bazel` it instead requires `clang-format`,
+`buildifier` and `buildozer` on `PATH`, which may not match the CI versions.
+
 **Individual checks:**
 
 ```bash
 bazel run //tools/code_format:check_format -- fix      # C++, BUILD, .bzl, .proto
 bazel run //tools/spelling:check_spelling_pedantic -- fix   # spelling
+./tools/proto_format/proto_format.sh fix               # API protos under api/
 ./ci/do_ci.sh format                                   # full CI check (inside Docker)
 ```
 
-**Linter config files — read these to produce compliant output without running the tools:**
-
-| Config file | What it configures |
-|-------------|--------------------|
-| `.clang-format` | C++/Proto formatting (100-col, include order, pointer alignment) |
-| `.yamllint` | YAML rules (140-col max, consistent indentation) |
-| `.flake8` | Python lint rules |
-| `rustfmt.toml` | Rust formatting (100-col, 2-space indent) |
-| `tools/spelling/spelling_dictionary.txt` | Custom word list (1700+ project terms) |
+**Linter configs** (follow them to produce compliant output without running the tools):
+`.clang-format` (C++/proto, 100 cols), `.yamllint` (140 cols), `.flake8`, `rustfmt.toml`, and
+`tools/spelling/spelling_dictionary.txt` (project word list).
 
 ### 5. Creating the commit
 
-Before your first commit in a session:
-
-1. Check if the local `main` is up to date with `origin/main`:
-   ```bash
-   git fetch origin
-   git log main..origin/main --oneline
-   ```
-2. If `main` is behind, sync it:
-   ```bash
-   git checkout main && git pull && git checkout -
-   ```
-3. Create a new branch off the updated `main`:
-   ```bash
-   git checkout -b <descriptive-branch-name>
-   ```
-4. If you had uncommitted changes that conflict with the updated `main`, ask the user whether
-   to proceed on the outdated base or resolve conflicts against the new `main`.
-
-If you're switching contexts or unsure which branch to commit to, ask the user before committing.
+Before your first commit in a session, `git fetch origin` and make sure the new branch is based
+on an up-to-date `main` (`git checkout -b <descriptive-branch-name> origin/main`). If
+uncommitted changes conflict with the new `main`, or you are unsure which branch to use, ask the
+user.
 
 ```bash
 git add <files>
@@ -142,8 +132,12 @@ Release Notes: <description or N/A>
 See `PULL_REQUESTS.md` for full field descriptions and optional fields (runtime guard,
 deprecation, platform-specific features).
 
-**Release notes:** User-facing changes **must** add a release note fragment under
-`changelogs/current/`. Name the file `<area>__<short-description>.rst`.
+**Release notes:** User-facing changes **must** add a release note fragment at
+`changelogs/current/<section>/<area>__<short-description>.rst`, e.g.
+`changelogs/current/bug_fixes/http__fix-header-crash.rst`. Both `<section>` (e.g. `bug_fixes`,
+`new_features`, `behavior_changes`) and `<area>` must be listed in `changelogs/changelogs.yaml`;
+a `/` in an area name is written as `~` in the filename. If a change fits several sections, use
+only the most important one.
 
 ### 7. Waiting for CI and review
 
@@ -153,12 +147,8 @@ deprecation, platform-specific features).
 
 ### 8. Addressing review comments
 
-- **Never amend or force-push** after a reviewer has looked at the PR. Create new commits.
-- **Never rebase.** If you need to incorporate upstream changes:
-  ```bash
-  git fetch origin main && git merge origin/main
-  ```
-- If the reviewer asked for a runtime guard, add one (see `CONTRIBUTING.md`).
+- Push new commits; never amend, force-push or rebase (see critical rule 3).
+- If the reviewer asked for a runtime guard, add one (see [Runtime guards](#runtime-guards)).
 
 ### 9. After merge
 
@@ -167,32 +157,38 @@ final commit message. Make sure it's up to date before merge.
 
 ## Understanding CI
 
-Envoy uses a checks-based CI system. Results appear as **GitHub Check Runs** on PRs, not as
-simple workflow pass/fail statuses.
+CI results are **GitHub Check Runs**: `Envoy/Prechecks` (format, deps, docs, publish) and
+`Envoy/Checks` (builds, tests, coverage, sanitizers). Use `gh pr checks <PR>` and
+`gh run view <run-id> --log-failed`.
 
-**CI pipeline:**
+Each CI job runs `ci/do_ci.sh <target>` (see `ci/README.md`), usually adding a `.bazelrc`
+`--config`. Reproduce failures with the same target (ideally inside `./ci/run_envoy_docker.sh`),
+or with `bazel` and the same `--config` on the failing targets:
 
-1. **`Envoy/Prechecks`** — fast checks: format/lint/spelling, dependency validation, docs build
-2. **`Envoy/Checks`** — heavier checks: compilation, tests, coverage, sanitizers
+| CI job | `do_ci.sh` target | Bazel config / notes |
+|--------|-------------------|----------------------|
+| Prechecks: format | `format`, `format-api` | |
+| Prechecks: deps | `deps` | |
+| Prechecks: publish | `release.test_only`, `config` | |
+| Prechecks: external | `external` | downstream bzlmod build in `bazel/tests/external` |
+| Checks: build | `api`, `compile_time_options`, `execution_context`, `gcc` | `--config=gcc`, `--config=compile-time-options` |
+| Checks: openssl | `openssl.presubmit` (PRs), `openssl` (post-submit) | `--config=openssl`; allowed to fail |
+| Checks: coverage | `coverage`, `fuzz_coverage` | `--config=coverage`; limits in `test/coverage.yaml` |
+| Checks: runtime | `cpu-detection` | |
+| Checks: san | `asan`, `msan`, `tsan` | `--config=asan`/`msan`/`tsan`; only run when asked |
 
-**Checking CI status:**
+### SSL library variants (BoringSSL, BoringSSL-FIPS, OpenSSL)
 
-```bash
-gh pr checks <PR-number>
-gh run view <run-id> --log-failed
-```
-
-When CI fails, check the failed check run name to determine which `do_ci.sh` target to
-reproduce locally. Format failures come from `Envoy/Prechecks`; build/test failures come
-from `Envoy/Checks`.
+See `bazel/SSL.md`. Use the `--config` options; never set `//bazel:ssl`, `//bazel:crypto` or
+`//bazel:fips` directly. `--config=openssl` builds Envoy against BoringSSL headers backed by the
+`compat/openssl/` layer, defines `ENVOY_SSL_OPENSSL` (BUILD files: `//bazel:using_openssl`),
+disables HTTP/3 and skips tests tagged `nofips`/`quiche`. **For any OpenSSL build failure, read
+`compat/openssl/AGENTS.md` first.**
 
 ## Inclusive language
 
-The following terms are **not allowed**:
-- ~~whitelist~~ -> allowlist
-- ~~blacklist~~ -> denylist / blocklist
-- ~~master~~ -> primary / main
-- ~~slave~~ -> secondary / replica
+Not allowed: whitelist (use allowlist), blacklist (denylist/blocklist), master (primary/main),
+slave (secondary/replica).
 
 ## BUILD file conventions
 
@@ -201,12 +197,48 @@ See `bazel/DEVELOPER.md` for full BUILD file rules. Key points:
 - Target suffixes: `_lib`, `_test`, `_mocks`, `_interface`
 - Every `#include` must have a corresponding `deps` entry
 
+## Runtime guards
+
+High-risk changes and most user-visible protocol-processing changes should be runtime guarded.
+See the "Runtime guarding" section of `CONTRIBUTING.md`. In short:
+- Guard with `Runtime::runtimeFeatureEnabled("envoy.reloadable_features.<name>")`, keeping both
+  the old and new code paths; `reloadable_features` must be safe to flip on a running Envoy.
+- Features default to true by being listed in `source/common/runtime/runtime_features.cc`.
+- Test both code paths, and describe the flag (and how to revert) in the release note.
+- Removing a flag and its legacy code path needs a fragment in the
+  `removed_config_or_runtime` changelog section.
+
+## API changes and Mobile
+
+- Protos under `api/` follow `api/CONTRIBUTING.md`; format them with
+  `./tools/proto_format/proto_format.sh fix` (CI: `./ci/do_ci.sh format-api`).
+- `mobile/` is a separate Bazel module (own `MODULE.bazel`, `.bazelrc`, lockfile); run its Bazel
+  commands from inside `mobile/`.
+
+## New extensions
+
+Read `EXTENSION_POLICY.md` first; new extensions need a sponsoring maintainer. A new extension
+typically also needs:
+- An entry in `source/extensions/extensions_build_config.bzl` (or
+  `contrib/contrib_build_config.bzl` for contrib extensions)
+- An entry in `source/extensions/extensions_metadata.yaml` (status, security posture,
+  categories)
+- `CODEOWNERS` entries listing the two proposed extension reviewers
+- Docs and a `new_features` release note
+
 ## Updating dependencies
 
-See `bazel/EXTERNAL_DEPS.md` and `DEPENDENCY_POLICY.md`. When updating a version:
-1. Update the module version in `MODULE.bazel`, registry metadata, and the corresponding `deps.yaml` entry
-2. Update `release_date` in `bazel/deps.yaml` to the UTC date of the new release
-3. Prefer maintainer-provided tarballs over GitHub auto-generated ones
+See `bazel/EXTERNAL_DEPS.md` and `DEPENDENCY_POLICY.md`. Dependencies are managed with bzlmod and
+the [Envoy Bazel registry](https://github.com/envoyproxy/bazel-registry); patches live in the
+registry, not in this repo. When updating a version:
+1. Update the module in the Envoy Bazel registry, then the `bazel_dep` version in `MODULE.bazel`
+   and the corresponding `deps.yaml` entry (`bazel/deps.yaml` or `api/bazel/deps.yaml`)
+2. Update `release_date` in `deps.yaml` to the UTC date of the new release
+3. Re-pin the registry and regenerate lockfiles with `./ci/do_ci.sh registry` (see
+   `ci/README.md`)
+4. Some dependencies are also pinned in `mobile/MODULE.bazel` or `api/MODULE.bazel`; update all
+   of them together
+5. Prefer maintainer-provided tarballs over GitHub auto-generated ones
 
 ## CI and GitHub Actions (for workflow file authors)
 
@@ -217,19 +249,8 @@ See `bazel/EXTERNAL_DEPS.md` and `DEPENDENCY_POLICY.md`. When updating a version
 
 ## Key files
 
-| File | Purpose |
-|------|---------|
-| `STYLE.md` | C++ coding style and error handling |
-| `CONTRIBUTING.md` | Contribution guidelines, deprecation, breaking changes |
-| `PULL_REQUESTS.md` | PR field descriptions |
-| `EXTENSION_POLICY.md` | Extension lifecycle and requirements |
-| `DEPENDENCY_POLICY.md` | External dependency rules |
-| `RELEASES.md` | Release schedule and backport process |
-| `SECURITY.md` | Security reporting and disclosure |
-| `REPO_LAYOUT.md` | Repository structure |
-| `bazel/README.md` | Building, testing, sanitizers, coverage |
-| `bazel/DEVELOPER.md` | BUILD file conventions |
-| `bazel/EXTERNAL_DEPS.md` | Managing external dependencies |
-| `bazel/PPROF.md` | Performance profiling |
-| `source/extensions/extensions_metadata.yaml` | Extension status and security posture |
-| `source/common/runtime/runtime_features.cc` | Runtime feature flag defaults |
+`STYLE.md` (C++ style, error handling), `CONTRIBUTING.md` (process, AI policy, runtime guards,
+deprecation), `PULL_REQUESTS.md`, `EXTENSION_POLICY.md`, `DEPENDENCY_POLICY.md`, `RELEASES.md`
+(schedule, backports), `SECURITY.md`, `REPO_LAYOUT.md`, `bazel/README.md` (builds, sanitizers,
+coverage), `bazel/DEVELOPER.md` (BUILD rules), `bazel/EXTERNAL_DEPS.md`, `bazel/SSL.md`,
+`bazel/PPROF.md`, `ci/README.md` (`do_ci.sh` targets).

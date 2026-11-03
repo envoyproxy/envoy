@@ -106,6 +106,8 @@ TEST_F(HttpSubscriptionImplTest, OnDemandUpdateNotSupported) {
   // requestOnDemandUpdate() is not expected to be called for the REST subscription.
   EXPECT_ENVOY_BUG(subscription_->requestOnDemandUpdate({"cluster0"}),
                    "unexpected request for on demand update");
+  EXPECT_ENVOY_BUG(subscription_->update({"cluster0"}, {"cluster1"}),
+                   "unexpected request for on demand update");
 }
 
 } // namespace

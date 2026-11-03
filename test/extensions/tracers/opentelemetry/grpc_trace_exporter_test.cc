@@ -15,7 +15,6 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 using testing::_;
-using testing::Invoke;
 
 class OpenTelemetryGrpcTraceExporterTest : public testing::Test {
 public:
@@ -26,16 +25,16 @@ public:
     TestUtility::loadFromYaml(expected_message_yaml, expected_message);
 
     EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-        .WillOnce(Invoke([expected_message,
-                          this](absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
-                                Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                                const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
+        .WillOnce([expected_message,
+                   this](absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
+                         Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                         const Http::AsyncClient::RequestOptions&) -> Grpc::AsyncRequest* {
           opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_EQ(message.DebugString(), expected_message.DebugString());
           return &async_request_;
-        }));
+        });
   }
 
 protected:

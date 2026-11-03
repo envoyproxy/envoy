@@ -179,10 +179,6 @@ void ProxyFilter::onDestroy() {
 }
 
 bool ProxyFilter::isProxying() {
-  if (!(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests"))) {
-    return false;
-  }
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       decoder_callbacks_->streamInfo().filterState();
   return filter_state && filter_state->hasData<Network::Http11ProxyInfoFilterState>(

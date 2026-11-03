@@ -222,9 +222,9 @@ TEST_F(ThriftClientImplTest, SuccessWithFixedSeqId) {
 
   for (int i = 0; i < num_reqs; i++) {
     // Expect that the client writes the health check request.
-    EXPECT_CALL(*connection_, write(_, _))
-        .WillOnce(testing::Invoke(
-            [&](Buffer::Instance& data, bool) { request_strings[i] = data.toString(); }));
+    EXPECT_CALL(*connection_, write(_, _)).WillOnce([&](Buffer::Instance& data, bool) {
+      request_strings[i] = data.toString();
+    });
     bool success = client_->sendRequest();
     EXPECT_TRUE(success);
 
@@ -252,9 +252,9 @@ TEST_F(ThriftClientImplTest, SuccessWithIncreasingSeqId) {
 
   for (int i = 0; i < num_reqs; i++) {
     // Expect that the client writes the health check request.
-    EXPECT_CALL(*connection_, write(_, _))
-        .WillOnce(testing::Invoke(
-            [&](Buffer::Instance& data, bool) { request_strings[i] = data.toString(); }));
+    EXPECT_CALL(*connection_, write(_, _)).WillOnce([&](Buffer::Instance& data, bool) {
+      request_strings[i] = data.toString();
+    });
     bool success = client_->sendRequest();
     EXPECT_TRUE(success);
 

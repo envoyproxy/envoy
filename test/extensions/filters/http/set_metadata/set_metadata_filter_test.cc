@@ -250,6 +250,48 @@ TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
   checkKeyInt(tags_struct, "mytag1", 1);
 }
 
+TEST_F(SetMetadataFilterTest, UntypedCompleteOverwriteAtKey) {
+  envoy::config::core::v3::Metadata metadata;
+  TestUtility::loadFromYaml(R"EOF(
+    filter_metadata:
+      thenamespace:
+        tags:
+          mynumber: 10
+          mylist: ["a"]
+  )EOF",
+                            metadata);
+
+  // By default, `allow_overwrite: true` merges Struct and appends List values
+  // via `StructUtil::update`. To completely overwrite an untyped metadata
+  // Struct at a specified key to an empty Struct `{}`, first overwrite the key
+  // with a different value kind (such as `null`) and then set the empty Struct.
+  const std::string yaml_config = R"EOF(
+    metadata:
+    - metadata_namespace: thenamespace
+      value:
+        tags: null
+      allow_overwrite: true
+    - metadata_namespace: thenamespace
+      value:
+        tags: {}
+      allow_overwrite: true
+  )EOF";
+
+  runFilter(metadata, yaml_config);
+
+  // Verify that `metadata` contains `{"thenamespace": {"tags": {}}}`.
+  const auto& filter_metadata = metadata.filter_metadata();
+  const auto it_namespace = filter_metadata.find("thenamespace");
+  ASSERT_NE(it_namespace, filter_metadata.end());
+  const auto& fields = it_namespace->second.fields();
+
+  const auto it_tags = fields.find("tags");
+  ASSERT_NE(it_tags, fields.end());
+  const auto& tags = it_tags->second;
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
+  EXPECT_TRUE(tags.struct_value().fields().empty());
+}
+
 TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   envoy::config::core::v3::Metadata metadata;
 

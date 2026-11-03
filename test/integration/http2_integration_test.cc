@@ -1917,14 +1917,9 @@ TEST_P(Http2FrameIntegrationTest, UpstreamCompleteResponseFollowedByRstStreamNoE
   tcp_client_->close();
 }
 
-// Same scenario as above, but with allow_multiplexed_upstream_half_close enabled and using
-// gRPC-style trailers (HEADERS with END_STREAM) instead of DATA with END_STREAM.
-// This exercises the path where the upstream stream stays open after the response is complete
-// (onUpstreamComplete returns early), so the server's RST_STREAM(NO_ERROR) reaches the router
-// as a RemoteReset via onUpstreamReset. The downstream RST_STREAM must still be NO_ERROR.
-TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndRstStreamNoErrorWithHalfClose) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
+// Same scenario as above, but using gRPC-style trailers (HEADERS with END_STREAM) instead of DATA
+// with END_STREAM. The downstream RST_STREAM must still be NO_ERROR.
+TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndRstStreamNoError) {
   beginSession();
 
   const uint32_t stream_idx = 1;
@@ -2005,7 +2000,7 @@ TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndRstStreamNoErrorWithHalfClo
   tcp_client_->close();
 }
 
-// Same as UpstreamTrailersAndRstStreamNoErrorWithHalfClose, but the RST_STREAM is sent in a
+// Same as UpstreamTrailersAndRstStreamNoError, but the RST_STREAM is sent in a
 // separate write from the response, simulating separate TCP packets. This tests the case where
 // the RST_STREAM(NO_ERROR) arrives in a different event loop iteration from the response.
 TEST_P(Http2FrameIntegrationTest, UpstreamTrailersAndSeparateRstStreamNoError) {

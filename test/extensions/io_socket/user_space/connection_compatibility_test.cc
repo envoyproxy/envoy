@@ -16,7 +16,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -69,10 +68,10 @@ TEST_F(InternalClientConnectionImplTest, ConnectCallbacksAreInvoked) {
   client_->connect();
   client_->noDelay(true);
   EXPECT_CALL(connection_callbacks, onEvent(_))
-      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+      .WillOnce([&](Network::ConnectionEvent event) -> void {
         EXPECT_EQ(event, Network::ConnectionEvent::Connected);
         dispatcher_->exit();
-      }));
+      });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
 
@@ -221,12 +220,12 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullClosePropagates
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   io_handle_peer_->close();
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -250,7 +249,7 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullCloseLegacyBeha
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // With the feature off, the peer full close reads as a half-close: no RemoteClose.
@@ -282,7 +281,7 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerShutdownWritePreser
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Peer half-closes (shutdown(WR)) instead of fully closing. RemoteClose must not fire.
@@ -316,7 +315,7 @@ TEST_F(InternalClientConnectionImplTest,
   client_->noDelay(true);
 
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // Client half-closes its write side.
@@ -328,7 +327,7 @@ TEST_F(InternalClientConnectionImplTest,
   // Peer then fully closes. Because client already sent EOF, this completes the graceful
   // four-way shutdown. The connection must fire RemoteClose with DetectedCloseType::Normal.
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   io_handle_peer_->close();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 

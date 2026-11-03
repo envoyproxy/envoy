@@ -1,3 +1,4 @@
+//go:generate mockgen -source=udp_listener_api.go -destination=mocks/mock_udp_listener_api.go -package=mocks
 package shared
 
 // UdpListenerFilter is the interface to implement your own UDP listener filter logic.

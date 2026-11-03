@@ -34,8 +34,6 @@ using ::Envoy::StatusHelpers::HasStatusMessage;
 using testing::_;
 using testing::ContainerEq;
 using testing::DoAll;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Ref;
 using testing::Return;
@@ -209,12 +207,12 @@ protected:
                               Network::DnsResolver::ResolutionStatus status =
                                   Network::DnsResolver::ResolutionStatus::Completed) {
     EXPECT_CALL(*dns_resolver_, resolve(expected_address, dns_lookup_family, _))
-        .WillOnce(Invoke([status, resolved_addresses](
-                             const std::string&, Network::DnsLookupFamily,
-                             Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+        .WillOnce([status, resolved_addresses](
+                      const std::string&, Network::DnsLookupFamily,
+                      Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
           cb(status, "", TestUtility::makeDnsResponse(resolved_addresses));
           return nullptr;
-        }));
+        });
   }
 
   void expectRedisSessionCreated() {
@@ -740,10 +738,10 @@ protected:
   void testDnsResolve(const char* const address, const int port) {
     RedisCluster::DnsDiscoveryResolveTarget resolver_target(*cluster_, address, port);
     EXPECT_CALL(*dns_resolver_, resolve(address, Network::DnsLookupFamily::V4Only, _))
-        .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                             Network::DnsResolver::ResolveCb) -> Network::ActiveDnsQuery* {
+        .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                      Network::DnsResolver::ResolveCb) -> Network::ActiveDnsQuery* {
           return &active_dns_query_;
-        }));
+        });
     resolver_target.startResolveDns();
 
     EXPECT_CALL(active_dns_query_, cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
@@ -850,8 +848,8 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
 
   expectRedisResolve(true);
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", std::get<1>(GetParam()), _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+      .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         std::list<std::string> address_pair = std::get<2>(GetParam());
         cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(address_pair));
@@ -859,7 +857,7 @@ TEST_P(RedisDnsParamTest, ImmediateResolveDns) {
         expectClusterSlotResponse(
             singleSlotPrimaryReplica(address_pair.front(), address_pair.back(), 22120));
         return nullptr;
-      }));
+      });
 
   EXPECT_CALL(membership_updated_, ready());
   EXPECT_CALL(initialized_, ready());
@@ -1473,20 +1471,20 @@ TEST_F(RedisClusterTest, MultipleDnsDiscovery) {
   ReadyWatcher dns_resolve_2;
 
   EXPECT_CALL(*dns_resolver_, resolve("foo.bar.com", _, _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+      .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.1", "127.0.0.2"})));
         return nullptr;
-      }));
+      });
 
   EXPECT_CALL(*dns_resolver_, resolve("foo1.bar.com", _, _))
-      .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
-                           Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
+      .WillOnce([&](const std::string&, Network::DnsLookupFamily,
+                    Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
         cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::list<std::string>({"127.0.0.3", "127.0.0.4"})));
         return nullptr;
-      }));
+      });
 
   cluster_->initialize([&]() {
     initialized_.ready();

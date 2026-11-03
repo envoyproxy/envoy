@@ -8,6 +8,7 @@
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
 
@@ -233,12 +234,15 @@ public:
                    const std::vector<std::string>& removed, const std::string& version) {
     if (this->sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
         this->sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta) {
-      sendDeltaDiscoveryResponse(Config::TestTypeUrl::get().FilterChain, added_or_updated, removed,
-                                 version, fcds_stream_.get());
+      auto response = createDeltaDiscoveryResponse(Config::TestTypeUrl::get().FilterChain,
+                                                   added_or_updated, removed, version, {}, {});
+      response.set_nonce(version);
+      fcds_stream_->sendGrpcMessage(response);
     } else {
       envoy::service::discovery::v3::DiscoveryResponse response;
       response.set_version_info(version);
       response.set_type_url(Config::TestTypeUrl::get().FilterChain);
+      response.set_nonce(version);
       for (const auto& filter_chain : added_or_updated) {
         std::ignore = response.add_resources()->PackFrom(filter_chain);
       }
@@ -251,10 +255,132 @@ public:
     sendFcdsResponse(filter_chains, {}, version);
   }
 
+  // For chains that warm synchronously, the FCDS ACK is held until the coalesced TLS update
+  // has been posted. update_success only records acceptance and can precede that post.
+  AssertionResult waitForFcdsUpdate(const std::string& version) {
+    auto wait_for_ack = [this, &version](auto request) -> AssertionResult {
+      do {
+        const auto result = fcds_stream_->waitForGrpcMessage(*dispatcher_, request);
+        if (!result) {
+          return result;
+        }
+      } while (request.response_nonce() != version);
+      if (request.has_error_detail()) {
+        return AssertionFailure() << request.DebugString();
+      }
+      return AssertionSuccess();
+    };
+    const auto result = (sotwOrDelta() == Grpc::SotwOrDelta::Delta ||
+                         sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
+                            ? wait_for_ack(envoy::service::discovery::v3::DeltaDiscoveryRequest{})
+                            : wait_for_ack(envoy::service::discovery::v3::DiscoveryRequest{});
+    if (!result) {
+      return result;
+    }
+    // An ACK guarantees the TLS update was posted, but workers may not have processed it yet.
+    test_server_->waitForWorkerThreads();
+    return AssertionSuccess();
+  }
+
+  // A matcher that selects the first filter chain for the connections to port 1, and the second
+  // one for the other connections.
+  static std::string matcherYaml(absl::string_view port_1_filter_chain,
+                                 absl::string_view filter_chain) {
+    return fmt::format(R"EOF(
+        matcher_tree:
+          input:
+            name: port
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+          exact_match_map:
+            map:
+              "1":
+                action:
+                  name: filter-chain-name
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: {}
+        on_no_match:
+          action:
+            name: filter-chain-name
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: {}
+      )EOF",
+                       port_1_filter_chain, filter_chain);
+  }
+
+  // Sends a request on the connection and checks the status of the response.
+  void sendRequest(IntegrationCodecClient& codec_client, absl::string_view status = "200") {
+    IntegrationStreamDecoderPtr response =
+        codec_client.makeHeaderOnlyRequest(default_request_headers_);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ(status, response->headers().getStatusValue());
+  }
+
+  // In place address updates need fixed ports, so the tests cannot bind to port zero. On Linux, a
+  // socket with reuse port holds each port until the test ends, so that no other process takes it,
+  // and the listener shares the port, since it uses reuse port by default there.
+  uint32_t freePort() {
+#ifdef __linux__
+    auto [address, socket] =
+        Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+    port_sockets_.push_back(std::move(socket));
+    return address->ip()->port();
+#else
+    return Network::Test::findOrCheckFreePort(Network::Test::getCanonicalLoopbackAddress(version_),
+                                              Network::Socket::Type::Stream)
+        ->ip()
+        ->port();
+#endif
+  }
+
+  // Adds an address with the IP of the listener address and the port to the listener.
+  void addAddress(uint32_t port) {
+    auto* socket_address =
+        listener_config_.add_additional_addresses()->mutable_address()->mutable_socket_address();
+    socket_address->set_address(listener_config_.address().socket_address().address());
+    socket_address->set_port_value(port);
+  }
+
+  // Updates a listener with inline and FCDS filter chains in place to drop its FCDS filter chain,
+  // and checks that the connection on it gets a GOAWAY only with the drain notification and is
+  // then closed.
+  void testInPlaceUpdateOfListenerWithInlineAndFcdsFilterChains(bool connection_event_drain) {
+    downstream_protocol_ = Http::CodecType::HTTP2;
+    drain_strategy_ = Server::DrainStrategy::Immediate;
+    setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+    matcher_yaml_ = matcherYaml("inline_filter_chain", "dynamic_filter_chain_1");
+    on_server_init_function_ = [&]() {
+      *listener_config_.add_filter_chains() = buildFilterChain("inline_filter_chain", 200);
+      waitXdsStream();
+      sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+    };
+    initialize();
+    test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+    registerTestServerPorts({listener_name_});
+    IntegrationCodecClientPtr dropped_codec_client = makeHttpConnection(lookupPort(listener_name_));
+    sendRequest(*dropped_codec_client);
+
+    TestUtility::loadFromYaml(matcherYaml("inline_filter_chain", "inline_filter_chain"),
+                              *listener_config_.mutable_filter_chain_matcher());
+    sendLdsResponse("2");
+    test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+    EXPECT_EQ(1, test_server_->counter("listener_manager.listener_in_place_updated")->value());
+    sendRequest(*dropped_codec_client);
+    EXPECT_EQ(connection_event_drain, dropped_codec_client->sawGoAway());
+    ASSERT_TRUE(dropped_codec_client->waitForDisconnect());
+    IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+    sendRequest(*codec_client);
+    codec_client->close();
+  }
+
   envoy::config::listener::v3::Listener listener_config_;
   envoy::config::listener::v3::Listener listener_config2_;
   bool two_listeners_{false};
   std::string listener_name_{"testing-listener-0"};
+  // The sockets that hold the ports of freePort().
+  std::vector<Network::SocketPtr> port_sockets_;
   // The filter chain matcher applied to the listener. Defaults to a single dynamic filter chain and
   // can be overridden before initialize() to reference several chains.
   std::string matcher_yaml_{R"EOF(
@@ -314,10 +440,9 @@ TEST_P(ListenerFcdsIntegrationTest, BasicFcdsInPlaceUpdate) {
   // Perform in-place FCDS update modifying the direct response status code to 404!
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
-  // Wait for the new config to take effect. Since there's no listener reconstruction,
-  // we just make a new connection.
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
+  // A new connection uses the updated chain without reconstructing the listener.
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
   IntegrationStreamDecoderPtr response2 = codec_client2->makeHeaderOnlyRequest(request_headers);
   ASSERT_TRUE(response2->waitForEndStream());
@@ -382,10 +507,12 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsBatchWarmsMultipleFilterChains) {
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
   registerTestServerPorts({listener_name_});
 
-  // Every chain in the batch warms.
+  ASSERT_TRUE(waitForFcdsUpdate("1"));
+
+  // Verify that every chain in the batch was accepted.
   for (const std::string& name : chain_names) {
-    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
-                                 Eq(1));
+    EXPECT_EQ(1, test_server_->counter(fmt::format("filter_chain_manager.{}.update_success", name))
+                     ->value());
   }
 
   // The on_no_match chain serves live traffic.
@@ -403,9 +530,10 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsBatchWarmsMultipleFilterChains) {
                     buildFilterChain("dynamic_filter_chain_3", 212),
                     buildFilterChain("dynamic_filter_chain_4", 213)},
                    "2");
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
   for (const std::string& name : chain_names) {
-    test_server_->waitForCounter(fmt::format("filter_chain_manager.{}.update_success", name),
-                                 Eq(2));
+    EXPECT_EQ(2, test_server_->counter(fmt::format("filter_chain_manager.{}.update_success", name))
+                     ->value());
   }
 
   IntegrationCodecClientPtr codec_client2 = makeHttpConnection(lookupPort(listener_name_));
@@ -450,8 +578,8 @@ TEST_P(ListenerFcdsIntegrationTest, TwoListenersSharedFilterChain) {
   // Perform in-place FCDS update modifying the direct response status code to 404!
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Verify both listeners serve HTTP 404 correctly.
   IntegrationCodecClientPtr codec_client1_updated = makeHttpConnection(lookupPort(listener_name_));
@@ -517,8 +645,8 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsFilterChainRemovalAndDraining) {
   // We send an empty list of filter chains, which means dynamic_filter_chain_1 is removed.
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Check that the filter chain is now in draining state!
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
@@ -586,8 +714,8 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainRemovalAndDraining) {
   // Now perform in-place FCDS update removing the filter chain.
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
-  // Wait for Envoy's local stats to increment indicating FCDS update has completed.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  // Wait for FCDS acceptance and worker publication.
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Check that the filter chain is now draining.
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
@@ -650,7 +778,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsTcpFilterChainGracefulDrainClose) {
 
   // Now perform in-place FCDS update removing the filter chain.
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
   test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
 
   // Upstream data on the draining connection triggers the per-connection drain close.
@@ -730,7 +858,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsAddRemoveAdd) {
   sendFcdsResponse({}, {"dynamic_filter_chain_1"}, "2");
 
   // Wait for update.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(2));
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
 
   // Verify connection is rejected.
   {
@@ -744,7 +872,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsAddRemoveAdd) {
   sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "3");
 
   // Wait for update.
-  test_server_->waitForCounter("filter_chain_manager.dynamic_filter_chain_1.update_success", Eq(3));
+  ASSERT_TRUE(waitForFcdsUpdate("3"));
 
   // Verify connection works again.
   {
@@ -758,8 +886,7 @@ TEST_P(ListenerFcdsIntegrationTest, FcdsAddRemoveAdd) {
   }
 }
 
-// Tests that a listener update via LDS (which triggers a full listener update)
-// preserves existing warmed FCDS subscriptions.
+// Tests that a full listener update via LDS preserves existing warmed FCDS subscriptions.
 TEST_P(ListenerFcdsIntegrationTest, LdsUpdateWithFcds) {
   on_server_init_function_ = [&]() {
     waitXdsStream();
@@ -793,7 +920,7 @@ TEST_P(ListenerFcdsIntegrationTest, LdsUpdateWithFcds) {
   // Wait for LDS update success.
   test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
 
-  // The listener is updated. Since FCDS config is present, this causes full listener update.
+  // The listener is updated. Since the metadata changed, this causes a full listener update.
   // We expect a new listener created and old one destroyed.
   test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
   test_server_->waitForCounter("listener_manager.listener_modified", Eq(1));
@@ -887,6 +1014,272 @@ TEST_P(ListenerFcdsIntegrationTest, LdsRemovalWithSharedFcds) {
   if (codec_client_b->connected()) {
     codec_client_b->close();
   }
+}
+
+// An in place update that drops an FCDS filter chain drains the connections of the listener on it,
+// but not those of the other listeners that use it.
+TEST_P(ListenerFcdsIntegrationTest, InPlaceUpdateDrainsDroppedFcdsFilterChain) {
+  downstream_protocol_ = Http::CodecType::HTTP2;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+  two_listeners_ = true;
+  matcher_yaml_ = matcherYaml("dynamic_filter_chain_2", "dynamic_filter_chain_1");
+  on_server_init_function_ = [&]() {
+    waitXdsStream({listener_config_, listener_config2_});
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                      buildFilterChain("dynamic_filter_chain_2", 200)},
+                     "1");
+  };
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(2));
+  registerTestServerPorts({listener_name_, "testing-listener-1"});
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  sendRequest(*codec_client);
+  IntegrationCodecClientPtr other_codec_client =
+      makeHttpConnection(lookupPort("testing-listener-1"));
+  sendRequest(*other_codec_client);
+
+  TestUtility::loadFromYaml(matcherYaml("dynamic_filter_chain_2", "dynamic_filter_chain_2"),
+                            *listener_config_.mutable_filter_chain_matcher());
+  sendLdsResponse({listener_config_, listener_config2_}, "2");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_in_place_updated")->value());
+  sendRequest(*codec_client);
+  EXPECT_TRUE(codec_client->sawGoAway());
+  ASSERT_TRUE(codec_client->waitForDisconnect());
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  sendRequest(*other_codec_client);
+  EXPECT_FALSE(other_codec_client->sawGoAway());
+  other_codec_client->close();
+}
+
+// An in place update of a listener whose filter chains all come from FCDS keeps the connections on
+// the FCDS filter chains that it keeps.
+TEST_P(ListenerFcdsIntegrationTest, InPlaceUpdateKeepsFcdsFilterChainConnections) {
+  downstream_protocol_ = Http::CodecType::HTTP2;
+  setDrainTime(std::chrono::seconds(2 * TIMEOUT_FACTOR));
+  matcher_yaml_ = matcherYaml("dynamic_filter_chain_2", "dynamic_filter_chain_1");
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                      buildFilterChain("dynamic_filter_chain_2", 200)},
+                     "1");
+  };
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  sendRequest(*codec_client);
+
+  TestUtility::loadFromYaml(matcherYaml("dynamic_filter_chain_1", "dynamic_filter_chain_1"),
+                            *listener_config_.mutable_filter_chain_matcher());
+  sendLdsResponse("2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  // The update is applied, so the drain of the dropped filter chain has started.
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  sendRequest(*codec_client);
+  EXPECT_FALSE(codec_client->sawGoAway());
+  codec_client->close();
+}
+
+// Without the runtime guard of the in place address updates, an update of a listener whose filter
+// chains all come from FCDS drains the entire listener, also when it only changes the filter chain
+// matcher.
+TEST_P(ListenerFcdsIntegrationTest, MatcherUpdateWithInPlaceAddressUpdateDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.listener_in_place_address_update",
+                                    "false");
+  downstream_protocol_ = Http::CodecType::HTTP2;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  setDrainTime(std::chrono::seconds(2 * TIMEOUT_FACTOR));
+  matcher_yaml_ = matcherYaml("dynamic_filter_chain_2", "dynamic_filter_chain_1");
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                      buildFilterChain("dynamic_filter_chain_2", 200)},
+                     "1");
+  };
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  sendRequest(*codec_client);
+
+  TestUtility::loadFromYaml(matcherYaml("dynamic_filter_chain_1", "dynamic_filter_chain_1"),
+                            *listener_config_.mutable_filter_chain_matcher());
+  sendLdsResponse("2");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_in_place_updated")->value());
+  sendRequest(*codec_client);
+  EXPECT_TRUE(codec_client->sawGoAway());
+  ASSERT_TRUE(codec_client->waitForDisconnect());
+}
+
+// With the drain notification, an in place update of a listener with inline and FCDS filter chains
+// drains the connections on the FCDS filter chain that it drops.
+TEST_P(ListenerFcdsIntegrationTest,
+       InPlaceUpdateDrainsDroppedFcdsFilterChainWithInlineFilterChain) {
+  testInPlaceUpdateOfListenerWithInlineAndFcdsFilterChains(true);
+}
+
+// Without the drain notification, an in place update of a listener with inline and FCDS filter
+// chains closes the connections on the FCDS filter chain that it drops once the drain completes.
+TEST_P(ListenerFcdsIntegrationTest, InPlaceUpdateWithConnectionEventDrainDisabled) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_connection_event_drain",
+                                    "false");
+  testInPlaceUpdateOfListenerWithInlineAndFcdsFilterChains(false);
+}
+
+// The drain of an in place update that dropped two FCDS filter chains only closes the connections
+// of the one that a later update does not use again.
+TEST_P(ListenerFcdsIntegrationTest, InPlaceUpdateKeepsReaddedFcdsFilterChainConnections) {
+  downstream_protocol_ = Http::CodecType::HTTP2;
+  setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+  matcher_yaml_ = matcherYaml("dynamic_filter_chain_1", "dynamic_filter_chain_2");
+  on_server_init_function_ = [&]() {
+    waitXdsStream();
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                      buildFilterChain("dynamic_filter_chain_2", 200)},
+                     "1");
+  };
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+  IntegrationCodecClientPtr dropped_codec_client = makeHttpConnection(lookupPort(listener_name_));
+  sendRequest(*dropped_codec_client);
+
+  // The first update drops both filter chains, and the second one uses the first filter chain
+  // again.
+  TestUtility::loadFromYaml(matcherYaml("dynamic_filter_chain_3", "dynamic_filter_chain_3"),
+                            *listener_config_.mutable_filter_chain_matcher());
+  sendLdsResponse("2");
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(1));
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                    buildFilterChain("dynamic_filter_chain_2", 200),
+                    buildFilterChain("dynamic_filter_chain_3", 200)},
+                   "2");
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
+  EXPECT_EQ(2, test_server_->gauge("listener_manager.total_filter_chains_draining")->value());
+  TestUtility::loadFromYaml(matcherYaml("dynamic_filter_chain_3", "dynamic_filter_chain_1"),
+                            *listener_config_.mutable_filter_chain_matcher());
+  sendLdsResponse("3");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(3));
+  EXPECT_EQ(1, test_server_->gauge("listener_manager.total_filter_chains_draining")->value());
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  sendRequest(*codec_client);
+
+  ASSERT_TRUE(dropped_codec_client->waitForDisconnect());
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+  sendRequest(*codec_client);
+  EXPECT_FALSE(codec_client->sawGoAway());
+  codec_client->close();
+}
+
+// An update that replaces an address of a listener whose filter chains all come from FCDS keeps the
+// connections of the other address, and the FCDS filter chains stay attached and serve the added
+// address.
+TEST_P(ListenerFcdsIntegrationTest, InPlaceAddressUpdateKeepsFcdsFilterChainConnections) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  downstream_protocol_ = Http::CodecType::HTTP2;
+  setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+  on_server_init_function_ = [&]() {
+    const uint32_t port1 = freePort();
+    listener_config_.mutable_address()->mutable_socket_address()->set_port_value(port1);
+    uint32_t port2;
+    do {
+      port2 = freePort();
+    } while (port2 == port1);
+    addAddress(port2);
+    waitXdsStream();
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({"address1", "address2"});
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*codec_client);
+  IntegrationCodecClientPtr removed_codec_client = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*removed_codec_client);
+
+  const uint32_t port = freePort();
+  listener_config_.mutable_additional_addresses(0)
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_port_value(port);
+  sendLdsResponse("2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2));
+  IntegrationCodecClientPtr added_codec_client = makeHttpConnection(port);
+  sendRequest(*added_codec_client);
+  added_codec_client->close();
+  ASSERT_TRUE(removed_codec_client->waitForDisconnect());
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(0));
+  sendRequest(*codec_client);
+  EXPECT_FALSE(codec_client->sawGoAway());
+  codec_client->close();
+
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 404)}, "2");
+  ASSERT_TRUE(waitForFcdsUpdate("2"));
+  IntegrationCodecClientPtr updated_codec_client = makeHttpConnection(port);
+  sendRequest(*updated_codec_client, "404");
+  updated_codec_client->close();
+}
+
+// An address update that replaces a warming address update keeps the connections of the kept
+// address once it warms, and serves the addresses that both updates add.
+TEST_P(ListenerFcdsIntegrationTest, InPlaceAddressUpdateReplacesWarmingUpdate) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  downstream_protocol_ = Http::CodecType::HTTP2;
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  on_server_init_function_ = [&]() {
+    listener_config_.mutable_address()->mutable_socket_address()->set_port_value(freePort());
+    waitXdsStream();
+    sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200)}, "1");
+  };
+  initialize();
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+  IntegrationCodecClientPtr codec_client = makeHttpConnection(lookupPort(listener_name_));
+  sendRequest(*codec_client);
+
+  // The first update waits for a filter chain that FCDS has not sent yet.
+  std::vector<uint32_t> added_ports;
+  const auto add_address = [this, &added_ports]() {
+    uint32_t port;
+    do {
+      port = freePort();
+    } while (std::find(added_ports.begin(), added_ports.end(), port) != added_ports.end());
+    added_ports.push_back(port);
+    addAddress(port);
+  };
+  add_address();
+  TestUtility::loadFromYaml(matcherYaml("dynamic_filter_chain_2", "dynamic_filter_chain_1"),
+                            *listener_config_.mutable_filter_chain_matcher());
+  sendLdsResponse("2");
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(1));
+  add_address();
+  sendLdsResponse("3");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(3));
+  EXPECT_EQ(2, test_server_->counter("listener_manager.listener_in_place_updated")->value());
+  EXPECT_EQ(1, test_server_->gauge("listener_manager.total_listeners_warming")->value());
+
+  sendFcdsResponse({buildFilterChain("dynamic_filter_chain_1", 200),
+                    buildFilterChain("dynamic_filter_chain_2", 200)},
+                   "2");
+  test_server_->waitForGauge("listener_manager.total_listeners_warming", Eq(0));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2));
+  for (uint32_t port : added_ports) {
+    IntegrationCodecClientPtr added_codec_client = makeHttpConnection(port);
+    sendRequest(*added_codec_client);
+    added_codec_client->close();
+  }
+  sendRequest(*codec_client);
+  EXPECT_FALSE(codec_client->sawGoAway());
+  codec_client->close();
 }
 
 class ListenerFcdsRdsIntegrationTest : public ListenerFcdsIntegrationTest {

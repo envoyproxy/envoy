@@ -756,8 +756,6 @@ TEST_P(RBACIntegrationTest, DeniedWithDenyAction) {
 // Test that RBAC cannot be bypassed by sending duplicate headers.
 TEST_P(RBACIntegrationTest, MultiValueHeaderBypassPrevented) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.rbac_match_headers_individually",
-                                    "true");
   config_helper_.prependFilter(RBAC_CONFIG_WITH_CUSTOM_HEADER_DENY);
   initialize();
 
@@ -781,35 +779,6 @@ TEST_P(RBACIntegrationTest, MultiValueHeaderBypassPrevented) {
   EXPECT_EQ("403", response->headers().getStatusValue());
   EXPECT_THAT(waitForAccessLog(access_log_name_),
               testing::HasSubstr("rbac_access_denied_matched_policy[deny_policy]"));
-}
-
-// Test that duplicate headers bypass RBAC when individual matching is disabled (old behavior).
-TEST_P(RBACIntegrationTest, MultiValueHeaderConcatenatedMatchAllowsBypass) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.rbac_match_headers_individually",
-                                    "false");
-  config_helper_.prependFilter(RBAC_CONFIG_WITH_CUSTOM_HEADER_DENY);
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Create headers with duplicate x-internal values
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "GET"},
-      {":path", "/"},
-      {":scheme", "http"},
-      {":authority", "sni.lyft.com"},
-      {"x-forwarded-for", "10.0.0.1"},
-      {"x-internal", "true"},
-  };
-  headers.addCopy(Http::LowerCaseString("x-internal"), "other");
-
-  auto response = codec_client_->makeRequestWithBody(headers, 1024);
-  waitForNextUpstreamRequest();
-  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  ASSERT_TRUE(response->complete());
-  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 TEST_P(RBACIntegrationTest, RouteMetadataMatcherAllow) {

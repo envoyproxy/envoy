@@ -43,5 +43,19 @@ TaggedStatName mergeStatPrefix(SymbolTable& symbol_table, absl::string_view pref
                                absl::string_view base_name, TagStringViewSpan tags = {},
                                absl::string_view name = {}, bool sanitize = true);
 
+/**
+ * Creates the prefix of the stats of a thread. A worker thread contributes the envoy.worker_id
+ * tag and its tag-extracted prefix keeps a literal 'worker.' segment in place of the thread name
+ * ('<prefix>worker.<suffix>'); any other thread name stays a plain, untagged segment.
+ *
+ * @param symbol_table the symbol table used to pre-encode the names and tags.
+ * @param prefix empty or '.' suffixed parent prefix, e.g. "listener_manager.".
+ * @param name the name of the worker stats. It should be strictly set to "worker_<id>" if
+ *        worker_id is set.
+ * @param suffix empty or '.' suffixed suffix, e.g. "dispatcher.".
+ */
+TaggedStatName workerStatPrefix(SymbolTable& symbol_table, absl::string_view prefix,
+                                absl::string_view name, absl::string_view suffix = {});
+
 } // namespace Stats
 } // namespace Envoy

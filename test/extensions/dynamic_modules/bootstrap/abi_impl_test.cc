@@ -83,9 +83,9 @@ TEST_F(BootstrapAbiImplTest, SchedulerCommit) {
 
   // Expect the dispatcher to receive a post call when commit is called.
   Event::PostCb captured_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 42);
@@ -114,9 +114,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledCallback) {
 
   // Capture the posted callback.
   Event::PostCb captured_cb;
-  EXPECT_CALL(dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
     captured_cb = std::move(cb);
-  }));
+  });
 
   // Commit an event via the ABI callback.
   envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 123);
@@ -147,9 +147,9 @@ TEST_F(BootstrapAbiImplTest, OnScheduledAfterConfigDestroyed) {
     EXPECT_NE(scheduler_ptr, nullptr);
 
     // Capture the posted callback.
-    EXPECT_CALL(dispatcher_, post(_)).WillOnce(testing::Invoke([&](Event::PostCb cb) {
+    EXPECT_CALL(dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
       captured_cb = std::move(cb);
-    }));
+    });
 
     // Commit an event via the ABI callback.
     envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(scheduler_ptr, 456);
@@ -315,12 +315,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccess) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -376,12 +375,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureReset) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -427,12 +425,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureExceedBufferLimit) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -519,12 +516,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutSuccessAfterInModuleConfigCleared) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -578,12 +574,11 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutFailureAfterInModuleConfigCleared) {
   Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -633,13 +628,12 @@ TEST_F(BootstrapAbiImplTest, HttpCalloutWithBody) {
   std::string captured_body;
   Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
   EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
-      .WillOnce(testing::Invoke(
-          [&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured_body = message->body().toString();
-            callbacks_captured = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured_body = message->body().toString();
+        callbacks_captured = &callbacks;
+        return &request;
+      });
 
   // Build headers.
   std::vector<envoy_dynamic_module_type_module_http_header> headers = {
@@ -1503,10 +1497,10 @@ TEST_F(BootstrapAbiImplTest, TimerFiredAfterConfigDestroyed) {
     ASSERT_OK(dynamic_module);
 
     // Capture the timer callback from createTimer.
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(testing::Invoke([&](Event::TimerCb cb) {
+    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce([&](Event::TimerCb cb) {
       captured_timer_cb = std::move(cb);
       return new testing::NiceMock<Event::MockTimer>();
-    }));
+    });
 
     auto config = newDynamicModuleBootstrapExtensionConfig(
         "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
@@ -1566,11 +1560,11 @@ TEST_F(BootstrapAbiImplTest, FileWatcherFired) {
   auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(testing::Return(mock_watcher));
   EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
-      .WillOnce(testing::Invoke(
+      .WillOnce(
           [&](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
             captured_cb = std::move(cb);
             return absl::OkStatus();
-          }));
+          });
 
   auto config = newDynamicModuleBootstrapExtensionConfig("test", "config", DefaultMetricsNamespace,
                                                          std::move(dynamic_module.value()),
@@ -1597,17 +1591,16 @@ TEST_F(BootstrapAbiImplTest, FileWatcherFiredAfterConfigDestroyed) {
     ASSERT_OK(dynamic_module);
 
     // Capture the watcher callback from addWatch.
-    EXPECT_CALL(dispatcher_, createFilesystemWatcher_())
-        .WillOnce(testing::Invoke([&]() -> Filesystem::Watcher* {
-          auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
-          EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
-              .WillOnce(testing::Invoke([&](absl::string_view, uint32_t,
-                                            Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
-                captured_cb = std::move(cb);
-                return absl::OkStatus();
-              }));
-          return mock_watcher;
-        }));
+    EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce([&]() -> Filesystem::Watcher* {
+      auto* mock_watcher = new testing::NiceMock<Filesystem::MockWatcher>();
+      EXPECT_CALL(*mock_watcher, addWatch(_, _, _))
+          .WillOnce([&](absl::string_view, uint32_t,
+                        Filesystem::Watcher::OnChangedCb cb) -> absl::Status {
+            captured_cb = std::move(cb);
+            return absl::OkStatus();
+          });
+      return mock_watcher;
+    });
 
     auto config = newDynamicModuleBootstrapExtensionConfig(
         "test", "config", DefaultMetricsNamespace, std::move(dynamic_module.value()), dispatcher_,
@@ -1785,12 +1778,11 @@ TEST_F(BootstrapAbiImplTest, AdminHandlerCallbackInvokesEventHook) {
   // Capture the handler callback when addHandler is called.
   Server::Admin::HandlerCb captured_handler;
   EXPECT_CALL(context_.admin_, addHandler("/test_admin", "Test admin handler", _, true, false, _))
-      .WillOnce(
-          testing::Invoke([&](const std::string&, const std::string&, Server::Admin::HandlerCb cb,
-                              bool, bool, const Server::Admin::ParamDescriptorVec&) -> bool {
-            captured_handler = std::move(cb);
-            return true;
-          }));
+      .WillOnce([&](const std::string&, const std::string&, Server::Admin::HandlerCb cb, bool, bool,
+                    const Server::Admin::ParamDescriptorVec&) -> bool {
+        captured_handler = std::move(cb);
+        return true;
+      });
 
   envoy_dynamic_module_type_module_buffer path_prefix = {"/test_admin", 11};
   envoy_dynamic_module_type_module_buffer help_text = {"Test admin handler", 18};

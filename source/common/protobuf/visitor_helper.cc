@@ -7,8 +7,7 @@ namespace Helper {
 std::unique_ptr<Protobuf::Message> typeUrlToMessage(absl::string_view type_url) {
   const absl::string_view inner_type_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
   const Protobuf::Descriptor* inner_descriptor =
-      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
-          std::string(inner_type_name));
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(inner_type_name);
   if (inner_descriptor == nullptr) {
     return nullptr;
   }

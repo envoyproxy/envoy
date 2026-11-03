@@ -12,7 +12,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -43,9 +42,9 @@ public:
     if (cluster_name == good_cluster) {
       EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
                   factoryForGrpcService(_, _, _))
-          .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
             return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-          }));
+          });
       AccessLog::InstanceSharedPtr instance =
           factory_->createAccessLogInstance(*message_, std::move(filter_), context_);
       EXPECT_NE(nullptr, instance);
