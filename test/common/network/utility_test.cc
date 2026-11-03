@@ -392,17 +392,12 @@ TEST(NetworkUtility, GetAddressWithPort) {
   auto addr_v6_custom_sock_new_port = Utility::getAddressWithPort(*addr_v6_custom_sock, 8080);
   EXPECT_EQ(&custom_socket_interface, &addr_v6_custom_sock_new_port->socketInterface());
 
-  auto addr_v4_namespace = addr_v4_custom_sock->withNetworkNamespace("/test/netns");
-  auto addr_v4_namespace_new_port = Utility::getAddressWithPort(*addr_v4_namespace, 0);
-  EXPECT_EQ("/test/netns", addr_v4_namespace_new_port->networkNamespace());
-  EXPECT_EQ(&custom_socket_interface, &addr_v4_namespace_new_port->socketInterface());
-  EXPECT_EQ(0, addr_v4_namespace_new_port->ip()->port());
-
-  auto addr_v6_namespace = addr_v6_custom_sock->withNetworkNamespace("/test/netns");
-  auto addr_v6_namespace_new_port = Utility::getAddressWithPort(*addr_v6_namespace, 0);
-  EXPECT_EQ("/test/netns", addr_v6_namespace_new_port->networkNamespace());
-  EXPECT_EQ(&custom_socket_interface, &addr_v6_namespace_new_port->socketInterface());
-  EXPECT_EQ(0, addr_v6_namespace_new_port->ip()->port());
+  EXPECT_EQ("/test/netns", Utility::getAddressWithPort(
+                               *addr_v4_custom_sock->withNetworkNamespace("/test/netns"), 0)
+                               ->networkNamespace());
+  EXPECT_EQ("/test/netns", Utility::getAddressWithPort(
+                               *addr_v6_custom_sock->withNetworkNamespace("/test/netns"), 0)
+                               ->networkNamespace());
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};

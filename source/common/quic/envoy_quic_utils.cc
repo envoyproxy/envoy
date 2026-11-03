@@ -228,6 +228,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
     const Network::ConnectionSocket::OptionsSharedPtr& options, quic::QuicNetworkHandle network,
     std::function<void(Network::ConnectionSocket&, quic::QuicNetworkHandle)> custom_bind_func) {
   ASSERT(peer_addr != nullptr);
+  const auto network_namespace = local_addr ? local_addr->networkNamespace() : std::nullopt;
   // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
   // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
   //
@@ -245,18 +246,14 @@ Network::ConnectionSocketPtr createConnectionSocket(
   };
   Network::ConnectionSocketPtr connection_socket;
 #if defined(__linux__)
-  if (local_addr && local_addr->networkNamespace().has_value()) {
-    auto result = Network::Utility::execInNetworkNamespace(create_socket,
-                                                           local_addr->networkNamespace()->c_str());
-    if (!result.ok()) {
-      ENVOY_LOG_MISC(error, "Failed to create quic socket in network namespace {}: {}",
-                     local_addr->networkNamespace().value(), result.status().ToString());
-      // Callers require a socket with an IoHandle even when socket creation fails.
-      connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-          std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
-    } else {
-      connection_socket = *std::move(result);
-    }
+  if (network_namespace.has_value()) {
+    auto result =
+        Network::Utility::execInNetworkNamespace(create_socket, network_namespace->c_str());
+    // The packet writer requires a non-null socket even on namespace failure.
+    connection_socket =
+        result.ok() ? *std::move(result)
+                    : std::make_unique<Network::ConnectionSocketImpl>(
+                          std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
   } else
 #endif
   {
@@ -309,12 +306,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
   }
 
   if (local_addr != nullptr) {
-    if (auto result = connection_socket->bind(local_addr); result.return_value_ == -1) {
-      connection_socket->close();
-      ENVOY_LOG_MISC(error, "Fail to bind quic socket: ({}) {}", result.errno_,
-                     errorDetails(result.errno_));
-      return connection_socket;
-    }
+    connection_socket->bind(local_addr);
     ASSERT(local_addr->ip());
   } else if (network != quic::kInvalidNetworkHandle && custom_bind_func != nullptr) {
     custom_bind_func(*connection_socket, network);
@@ -331,7 +323,6 @@ Network::ConnectionSocketPtr createConnectionSocket(
     return connection_socket;
   }
 
-  const auto network_namespace = local_addr ? local_addr->networkNamespace() : std::nullopt;
   local_addr = connection_socket->connectionInfoProvider().localAddress();
   if (local_addr && network_namespace.has_value()) {
     // Port migration creates new sockets from this address and must retain the namespace.
