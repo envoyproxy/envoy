@@ -21,6 +21,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",

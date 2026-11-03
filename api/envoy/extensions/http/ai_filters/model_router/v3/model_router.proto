@@ -69,8 +69,8 @@ message Model {
 
   // The authorization credential or token used to authenticate requests for this model
   // (e.g., ``Bearer sk-...``). Leading and trailing ASCII whitespace (including newlines)
-  // is trimmed. When set, Envoy populates the authentication header when routing to this
-  // model.
+  // is trimmed. When set, Envoy populates the provider-specific authentication header
+  // (``Authorization`` or ``x-goog-api-key``) when routing to this model.
   config.core.v3.DataSource api_key = 4 [(udpa.annotations.sensitive) = true];
 }
 
@@ -97,13 +97,22 @@ message RoutingEntry {
 
 // Configuration for the Model Router AI filter.
 //
-// The Model Router AI filter maps the client's requested model (from ``envoy.ai.model.request``
-// filter state) to an ordered list of resolved upstream routes.
+// The Model Router AI filter maps the client's requested model (populated in the
+// ``envoy.ai.model.request`` filter state object by the :ref:`Request Info AI filter
+// <envoy_v3_api_msg_extensions.http.ai_filters.request_info.v3.RequestInfo>`) to an ordered list of
+// resolved upstream routes.
 //
 // The resolved routes combine provider endpoints, model parameters, bindings, and credentials,
 // and are published to the ``envoy.ai.routes`` filter state object for consumption by the
 // :ref:`Route Selector AI filter
 // <envoy_v3_api_msg_extensions.http.ai_filters.route_selector.v3.RouteSelector>`.
+//
+// .. note::
+//
+//   Multi-host fallbacks (targets across providers with different ``host_and_port`` values) only
+//   work when using a :ref:`composite cluster
+//   <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>` with ``STATIC`` or
+//   ``STRICT_DNS`` sub-clusters; they do not work with a Dynamic Forward Proxy cluster.
 message ModelRouter {
   // Configured LLM backend providers.
   repeated Provider providers = 1;

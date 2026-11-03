@@ -218,7 +218,6 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   const std::vector<std::pair<std::string, std::string>> stale_headers = {
       {"authorization", "Bearer stale-client-token"},
       {"x-goog-api-key", "stale-google-key"},
-      {"anthropic-version", "2023-01-01"},
   };
 
   // Attempt 1: OpenAI Chat Completions with binding and api_key.
@@ -235,10 +234,9 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
       request_headers_.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       "Bearer sk-openai-1");
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
 
-  // Attempt 2: OpenAI Responses without binding or api_key clears BindingResponse and sets empty
-  // Authorization so client credentials are not leaked.
+  // Attempt 2: OpenAI Responses without binding or api_key clears BindingResponse and removes
+  // authentication headers so client credentials are not leaked.
   run(2, stale_headers);
   EXPECT_FALSE(reply_code_.has_value());
   EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::OpenAiResponses);
@@ -249,14 +247,10 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   ASSERT_TRUE(cleared_binding.ok());
   EXPECT_EQ(*cleared_binding, nullptr);
   EXPECT_EQ(request_headers_.getHostValue(), "api.openai.com");
-  ASSERT_EQ(request_headers_.get(Http::CustomHeaders::get().Authorization).size(), 1);
-  EXPECT_EQ(
-      request_headers_.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
-      "");
+  EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
 
-  // Attempt 3: Anthropic Messages sets anthropic-version, Authorization, and binding.
+  // Attempt 3: Anthropic Messages sets Authorization and binding, and strips x-goog-api-key.
   run(3, stale_headers);
   EXPECT_FALSE(reply_code_.has_value());
   EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::AnthropicMessages);
@@ -264,18 +258,13 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   ASSERT_NE(responseBindingObject(), nullptr);
   EXPECT_EQ((*responseBindingObject()->binding())->pattern()->source(), "/v1/messages");
   EXPECT_EQ(request_headers_.getHostValue(), "api.anthropic.com");
-  ASSERT_EQ(request_headers_.get(Http::LowerCaseString("anthropic-version")).size(), 1);
-  EXPECT_EQ(
-      request_headers_.get(Http::LowerCaseString("anthropic-version"))[0]->value().getStringView(),
-      "2023-06-01");
   ASSERT_EQ(request_headers_.get(Http::CustomHeaders::get().Authorization).size(), 1);
   EXPECT_EQ(
       request_headers_.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       "Bearer sk-anthropic");
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
 
-  // Attempt 4: Gemini Generate Content sets x-goog-api-key and strips Authorization and
-  // anthropic-version.
+  // Attempt 4: Gemini Generate Content sets x-goog-api-key and strips Authorization.
   run(4, stale_headers);
   EXPECT_FALSE(reply_code_.has_value());
   EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::GeminiGenerateContent);
@@ -289,7 +278,6 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
       request_headers_.get(Http::LowerCaseString("x-goog-api-key"))[0]->value().getStringView(),
       "gemini-key-123");
   EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
-  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("anthropic-version")).empty());
 
   EXPECT_EQ(counterValue("success"), 4);
   EXPECT_EQ(counterValue("invalid_route_data"), 0);

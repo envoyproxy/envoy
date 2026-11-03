@@ -4,8 +4,6 @@
 #include <utility>
 
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
-#include "envoy/type/ai/v3/llm_binding.pb.h"
-#include "envoy/type/ai/v3/llm_protocol.pb.h"
 
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"

@@ -1,6 +1,7 @@
 #include "source/extensions/http/ai_filters/model_router/filter.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
@@ -89,12 +90,20 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
       route.llm_protocol = protocolFromProto(provider_it->second.proto.llm_protocol());
       route.model = model_it->second.model();
       route.host_and_port = provider_it->second.proto.host_and_port();
+      if (!Http::HeaderUtility::authorityIsValid(route.host_and_port)) {
+        return absl::InvalidArgumentError(
+            "host_and_port value isn't valid Authority for provider " + provider_it->first);
+      }
       route.binding = provider_it->second.binding;
       if (model_it->second.has_api_key()) {
         ABSL_ASSIGN_OR_RETURN(
             std::string api_key,
             Envoy::Config::DataSource::read(model_it->second.api_key(), /*allow_empty=*/true, api));
         route.api_key = std::string(absl::StripAsciiWhitespace(api_key));
+        if (!Http::HeaderUtility::headerValueIsValid(route.api_key)) {
+          return absl::InvalidArgumentError("API key value isn't valid HTTP header for model " +
+                                            route.model);
+        }
       }
       resolved.push_back(std::move(route));
     }
@@ -118,6 +127,7 @@ absl::Status
 ModelRouterFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
                               HttpFilters::AiProtocolManager::LocalReplier reply_locally) {
   const StreamInfo::FilterStateSharedPtr& filter_state = context_.stream_info.filterState();
+  // ModelRequest is set by RequestInfo filter.
   auto model_name = stringFromFilterState(*filter_state, FilterStateKeys::ModelRequest);
 
   if (!model_name) {

@@ -12,10 +12,6 @@ namespace RouteSelector {
 
 namespace {
 
-const Http::LowerCaseString& anthropicVersionHeader() {
-  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "anthropic-version");
-}
-
 const Http::LowerCaseString& googleApiKeyHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-goog-api-key");
 }
@@ -72,21 +68,17 @@ RouteSelectorFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
   // Cleanup headers we manage in this filter.
   context_.request_headers.remove(Http::CustomHeaders::get().Authorization);
   context_.request_headers.remove(googleApiKeyHeader());
-  context_.request_headers.remove(anthropicVersionHeader());
 
-  switch (route.llm_protocol) {
-  case LLMProtocol::AnthropicMessages:
-    context_.request_headers.setReference(anthropicVersionHeader(), "2023-06-01");
-    context_.request_headers.setReferenceKey(Http::CustomHeaders::get().Authorization,
-                                             route.api_key);
-    break;
-  case LLMProtocol::GeminiGenerateContent:
-    context_.request_headers.setReferenceKey(googleApiKeyHeader(), route.api_key);
-    break;
-  default:
-    context_.request_headers.setReferenceKey(Http::CustomHeaders::get().Authorization,
-                                             route.api_key);
-    break;
+  if (!route.api_key.empty()) {
+    switch (route.llm_protocol) {
+    case LLMProtocol::GeminiGenerateContent:
+      context_.request_headers.setReferenceKey(googleApiKeyHeader(), route.api_key);
+      break;
+    default:
+      context_.request_headers.setReferenceKey(Http::CustomHeaders::get().Authorization,
+                                               route.api_key);
+      break;
+    }
   }
 
   Envoy::Http::Utility::updateAuthority(context_.request_headers, route.host_and_port, false,

@@ -302,6 +302,40 @@ routes:
       - model: haiku
 )EOF",
        "Unknown provider nonexistent-provider"},
+      // Invalid host_and_port authority.
+      {R"EOF(
+providers:
+  - name: bad-authority-provider
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: "api.openai.com/invalid/path"
+models:
+  - name: gpt4o
+    provider: bad-authority-provider
+    model: gpt-4o
+routes:
+  - requested_model: fast-model
+    targets:
+      - model: gpt4o
+)EOF",
+       "host_and_port value isn't valid Authority for provider bad-authority-provider"},
+      // Invalid API key HTTP header value (contains newline inside the value).
+      {R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com
+models:
+  - name: bad-key-model
+    provider: openai
+    model: gpt-4o
+    api_key:
+      inline_string: "Bearer sk-123\ninjected: header"
+routes:
+  - requested_model: fast-model
+    targets:
+      - model: bad-key-model
+)EOF",
+       "API key value isn't valid HTTP header for model gpt-4o"},
   };
 
   for (const auto& c : cases) {
