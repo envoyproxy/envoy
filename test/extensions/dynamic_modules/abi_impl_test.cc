@@ -722,6 +722,9 @@ WEAK_STUB(TlsCertificateSelectorConfigRemoveCertificate,
           envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(nullptr,
                                                                                            {nullptr,
                                                                                             0}))
+WEAK_STUB(
+    TlsCertificateSelectorConfigSignalInitComplete,
+    envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(nullptr))
 WEAK_STUB(TlsCertificateSelectorConfigDefineCounter,
           envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter(
               nullptr, {nullptr, 0}, nullptr, 0, nullptr))

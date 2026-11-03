@@ -385,6 +385,9 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_tls_certificate_selector_config_rem
                envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
                envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB_VOID(envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete,
+               envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr)
+
 WEAK_STUB(envoy_dynamic_module_type_metrics_result,
           envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter,
           envoy_dynamic_module_type_metrics_result_MetricNotFound,

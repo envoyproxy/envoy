@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -8,6 +9,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
@@ -20,6 +22,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/statusor.h"
+#include "source/common/init/target_impl.h"
 #include "source/common/ssl/tls_certificate_config_impl.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
@@ -61,6 +64,7 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(provided)                                                                                \
   COUNTER(rejected)                                                                                \
   COUNTER(removed)                                                                                 \
+  COUNTER(request_timeout)                                                                         \
   COUNTER(requested)                                                                               \
   GAUGE(active, Accumulate)                                                                        \
   GAUGE(pending, Accumulate)
@@ -109,6 +113,8 @@ public:
    * @param tls_config the TLS context configuration, which the selector factory detaches when it is
    * destroyed.
    * @param metrics_namespace the namespace of the module metrics.
+   * @param certificate_request_timeout how long a request for a dynamic certificate waits for the
+   * module, or zero to wait until the module answers.
    * @param dynamic_context_factory builds the TLS context of a dynamic certificate, or is empty
    * when dynamic certificates are not allowed.
    */
@@ -116,6 +122,7 @@ public:
       Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module,
       Server::Configuration::GenericFactoryContext& factory_context,
       const Ssl::ContextConfig& tls_config, absl::string_view metrics_namespace,
+      std::chrono::milliseconds certificate_request_timeout,
       AsyncContextFactory dynamic_context_factory);
   ~DynamicModuleTlsCertificateSelectorConfig();
 
@@ -139,15 +146,20 @@ public:
   void onConfigUpdate();
 
   /**
-   * Stops using the TLS context configuration, which is destroyed with the selector factory, and
-   * stops reporting the dynamic certificates in the context manager. Must be called on the main
-   * thread.
+   * Stops using the TLS context configuration, which is destroyed with the selector factory, stops
+   * reporting the dynamic certificates in the context manager, and stops the request timers and
+   * the wait for the module. Must be called on the main thread.
    */
   void detachTlsConfig();
 
   /**
+   * Marks the init target ready in a later main thread event. Must be called on the main thread.
+   */
+  void signalInitComplete();
+
+  /**
    * Serves a dynamic certificate on the thread running the handshake, or holds the handshake until
-   * the module provides or removes it.
+   * the module provides or removes it, or until its request times out.
    */
   Ssl::SelectionResult selectDynamicCertificate(absl::string_view name, bool client_ocsp_capable,
                                                 Ssl::CertificateSelectionCallbackPtr&& cb);
@@ -194,6 +206,8 @@ private:
     // until the certificate changes or the TLS context is removed.
     Ssl::ContextSharedPtr managed_context;
     std::vector<std::weak_ptr<DynamicCertificateHandle>> waiting_handles;
+    // Fails the request of the certificate when the module does not answer it in time.
+    Event::TimerPtr request_timer;
   };
 
   struct ThreadLocalCertificates : public ThreadLocal::ThreadLocalObject {
@@ -209,6 +223,8 @@ private:
   void failRequestedCertificate(absl::string_view name);
   void requestCertificate(const std::string& name,
                           const std::weak_ptr<DynamicCertificateHandle>& weak_handle);
+  // Takes the name by value, since failing the request destroys the timer that holds it.
+  void onRequestTimeout(std::string name);
   absl::StatusOr<AsyncContextSharedPtr>
   buildContext(const Ssl::TlsCertificateConfig& certificate_config);
   void activateCertificate(const std::string& name, DynamicCertificate& certificate,
@@ -224,6 +240,11 @@ private:
   Ssl::ContextManager& context_manager_;
   // Null once the selector factory is destroyed.
   const Ssl::ContextConfig* tls_config_;
+  // Zero disables the timeout.
+  const std::chrono::milliseconds certificate_request_timeout_;
+  // Set until the target is marked ready after the module signals that its initialization is
+  // complete.
+  std::unique_ptr<Init::TargetImpl> init_target_;
   AsyncContextFactory dynamic_context_factory_;
   // Whether the socket factory installed a TLS context built from the configuration, which it does
   // when the configuration is ready at creation and on each accepted update. A rejected update can
@@ -254,7 +275,7 @@ using DynamicModuleTlsCertificateSelectorConfigSharedPtr =
 absl::StatusOr<DynamicModuleTlsCertificateSelectorConfigSharedPtr>
 newDynamicModuleTlsCertificateSelectorConfig(
     absl::string_view selector_name, absl::string_view selector_config, bool is_upstream,
-    absl::string_view metrics_namespace,
+    absl::string_view metrics_namespace, std::chrono::milliseconds certificate_request_timeout,
     Envoy::Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Server::Configuration::GenericFactoryContext& factory_context,
     const Ssl::ContextConfig& tls_config, AsyncContextFactory dynamic_context_factory);
