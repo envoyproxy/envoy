@@ -8,8 +8,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 
-#include "fmt/format.h"
 #include "absl/strings/str_cat.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
