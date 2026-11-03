@@ -2954,7 +2954,6 @@ envoy_cc_test(
 # selects.
 envoy_cc_test(
     name = "quic_protocol_integration_test",
-    size = "enormous",
     srcs = select({
         "//bazel:disable_http3": [],
         "//bazel:disable_admin_functionality": [],
@@ -2962,7 +2961,7 @@ envoy_cc_test(
     }),
     data = ["//test/config/integration/certs"],
     rbe_pool = "linux_x64_large",
-    shard_count = 16,
+    shard_count = 24,
     tags = [
         "cpu:4",
     ],
