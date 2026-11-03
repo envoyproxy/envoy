@@ -173,9 +173,7 @@ bool FaultFilter::maybeSetupDelay(const Http::RequestHeaderMap& request_headers)
     delay_timer_->enableTimer(duration.value(), &decoder_callbacks_->scope());
     recordDelaysInjectedStats();
     decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DelayInjected);
-    auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-    (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
-        fault_settings_->filterMetadata();
+    setFilterMetadata();
     return true;
   }
   return false;
@@ -188,7 +186,7 @@ bool FaultFilter::maybeDoAbort(const Http::RequestHeaderMap& request_headers) {
 
   if (http_status.has_value()) {
     if (isAbortDryRun()) {
-      recordAbortDryRun();
+      onAbortDryRun();
       return false;
     }
     if (tryIncActiveFaults()) {
@@ -472,34 +470,33 @@ void FaultFilter::postDelayInjection(const Http::RequestHeaderMap& request_heade
   std::optional<Grpc::Status::GrpcStatus> grpc_status;
   std::tie(http_status, grpc_status) = abortStatus(request_headers);
 
-  if (http_status.has_value() && !isAbortDryRun()) {
-    abortWithStatus(http_status.value(), grpc_status);
-  } else {
-    if (http_status.has_value()) {
-      recordAbortDryRun();
+  if (http_status.has_value()) {
+    if (!isAbortDryRun()) {
+      abortWithStatus(http_status.value(), grpc_status);
+      return;
     }
-    // Should not continue to count as an active fault after the delay has elapsed if no other type
-    // of fault is active. As the delay timer is always done at this point and followed abort faults
-    // have been checked earlier, here we just check if there's a response rate limit configured.
-    ASSERT(fault_active_);
-    ASSERT(delay_timer_ == nullptr);
-    if (!isResponseRateLimitConfigured()) {
-      config_->stats().active_faults_.dec();
-      fault_active_ = false;
-    }
-
-    // Continue request processing.
-    decoder_callbacks_->continueDecoding();
+    onAbortDryRun();
   }
+
+  // Should not continue to count as an active fault after the delay has elapsed if no other type
+  // of fault is active. As the delay timer is always done at this point and followed abort faults
+  // have been checked earlier, here we just check if there's a response rate limit configured.
+  ASSERT(fault_active_);
+  ASSERT(delay_timer_ == nullptr);
+  if (!isResponseRateLimitConfigured()) {
+    config_->stats().active_faults_.dec();
+    fault_active_ = false;
+  }
+
+  // Continue request processing.
+  decoder_callbacks_->continueDecoding();
 }
 
 void FaultFilter::abortWithStatus(Http::Code http_status_code,
                                   std::optional<Grpc::Status::GrpcStatus> grpc_status) {
   recordAbortsInjectedStats();
   decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::FaultInjected);
-  auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
-  (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
-      fault_settings_->filterMetadata();
+  setFilterMetadata();
   absl::string_view body = "fault filter abort";
   if (fault_settings_->requestAbort() != nullptr &&
       !fault_settings_->requestAbort()->responseBody().empty()) {
@@ -509,8 +506,12 @@ void FaultFilter::abortWithStatus(Http::Code http_status_code,
                                      RcDetails::get().FaultAbort);
 }
 
-void FaultFilter::recordAbortDryRun() {
+void FaultFilter::onAbortDryRun() {
   recordAbortsDryRunStats();
+  setFilterMetadata();
+}
+
+void FaultFilter::setFilterMetadata() {
   auto& dynamic_metadata = decoder_callbacks_->streamInfo().dynamicMetadata();
   (*dynamic_metadata.mutable_filter_metadata())[decoder_callbacks_->filterConfigName()] =
       fault_settings_->filterMetadata();

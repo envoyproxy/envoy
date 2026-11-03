@@ -109,6 +109,8 @@ areas:
   ext_proc:
     title: ext_proc
 
+  fault:
+    title: fault
   filter_chain:
     title: filter_chain
   formatter:

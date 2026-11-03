@@ -60,8 +60,16 @@ message FaultAbort {
   string response_body = 6;
 
   // If true, requests matching the abort fault will be recorded in dry-run
-  // stats and dynamic metadata without actually aborting the request.
-  // Defaults to false.
+  // stats (``aborts_dry_run``) and :ref:`filter_metadata
+  // <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.filter_metadata>`
+  // dynamic metadata without actually aborting the request. Defaults to ``false``.
+  //
+  // .. note::
+  //   This setting intentionally applies only to abort fault injection. Any
+  //   :ref:`delay <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.delay>` or
+  //   :ref:`response_rate_limit
+  //   <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.response_rate_limit>`
+  //   configured on the same filter is still injected normally.
   bool dry_run = 7;
 }
 
