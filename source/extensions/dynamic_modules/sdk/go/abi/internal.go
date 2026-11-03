@@ -9,12 +9,21 @@ package abi
 #include "../../../abi/abi.h"
 
 typedef const envoy_dynamic_module_type_envoy_buffer* ConstEnvoyBufferPtr;
+
+extern void envoy_dynamic_module_go_sdk_filter_state_object_destroy(
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object);
+
+static inline envoy_dynamic_module_type_filter_state_object_module_ptr
+handleToFilterStateObject(uintptr_t handle) {
+  return (envoy_dynamic_module_type_filter_state_object_module_ptr)handle;
+}
 */
 import "C"
 import (
 	_ "embed"
 	"fmt"
 	"runtime"
+	"runtime/cgo"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -1099,6 +1108,38 @@ func (h *dymHttpFilterHandle) HasFilterState(key string) bool {
 	)
 	runtime.KeepAlive(key)
 	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) SetFilterStateObject(key string, value any, lifeSpan shared.FilterStateLifeSpan) bool {
+	handle := cgo.NewHandle(value)
+	ret := C.envoy_dynamic_module_callback_http_set_filter_state_object(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		C.handleToFilterStateObject(C.uintptr_t(handle)),
+		C.envoy_dynamic_module_type_filter_state_object_destructor(
+			C.envoy_dynamic_module_go_sdk_filter_state_object_destroy),
+		C.envoy_dynamic_module_type_filter_state_life_span(lifeSpan),
+	)
+	runtime.KeepAlive(key)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) GetFilterStateObject(key string) (value any, found bool) {
+	object := C.envoy_dynamic_module_callback_http_get_filter_state_object(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+	)
+	runtime.KeepAlive(key)
+	if object == nil {
+		return nil, false
+	}
+	// Value panics if another module stored the object.
+	defer func() {
+		if recover() != nil {
+			value, found = nil, false
+		}
+	}()
+	return cgo.Handle(uintptr(unsafe.Pointer(object))).Value(), true
 }
 
 func (h *dymHttpFilterHandle) GetData(key string) any {
@@ -2188,6 +2229,19 @@ func (h *dymRouteConfigHandle) DefineCounter(name string,
 func envoy_dynamic_module_on_program_init() (version C.envoy_dynamic_module_type_abi_version_module_ptr) {
 	defer recovery.Export("envoy_dynamic_module_on_program_init", nil, &version)
 	return C.envoy_dynamic_module_type_abi_version_module_ptr(C.envoy_dynamic_modules_abi_version)
+}
+
+//export envoy_dynamic_module_go_sdk_filter_state_object_destroy
+func envoy_dynamic_module_go_sdk_filter_state_object_destroy(
+	object C.envoy_dynamic_module_type_filter_state_object_module_ptr,
+) {
+	defer recovery.ExportVoid("envoy_dynamic_module_go_sdk_filter_state_object_destroy")
+	handle := cgo.Handle(uintptr(unsafe.Pointer(object)))
+	value := handle.Value()
+	handle.Delete()
+	if destroyer, ok := value.(shared.FilterStateObjectDestroyer); ok {
+		destroyer.OnFilterStateObjectDestroy()
+	}
 }
 
 //export envoy_dynamic_module_on_http_filter_config_new

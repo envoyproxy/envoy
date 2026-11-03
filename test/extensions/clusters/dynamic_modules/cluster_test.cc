@@ -5542,6 +5542,60 @@ TEST_F(DynamicModuleClusterPersistentPartitionsTest, HealthUpdateForForeignHost)
   EXPECT_EQ(1, cluster->prioritySet().hostSetsPerPriority()[0]->hostCounts().healthy);
 }
 
+// The module opts the cluster in from on_cluster_config_new, without the config field.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, ModuleOptInDuringConfigNew) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op", "use_persistent_host_partitions"));
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  clusters_.push_back(std::move(*result));
+
+  EXPECT_EQ(reinterpret_cast<envoy_dynamic_module_type_cluster_config_module_ptr>(0x5),
+            cluster->config()->in_module_config_);
+  EXPECT_TRUE(cluster->config()->use_persistent_host_partitions_);
+  EXPECT_TRUE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[0]));
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts, 1));
+  EXPECT_TRUE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[1]));
+  EXPECT_NE(nullptr, cluster->prioritySet().hostSetsPerPriority()[1]->snapshot());
+}
+
+// The host sets exist once on_cluster_config_new returns, so a later request is refused.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, ModuleOptInAfterConfigNewIsRefused) {
+  auto cluster = createDecCluster();
+  EXPECT_FALSE(envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+      cluster->config().get()));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(nullptr));
+  EXPECT_FALSE(cluster->config()->use_persistent_host_partitions_);
+  EXPECT_FALSE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[0]));
+}
+
+// Native load balancing policies read the flat host vectors on every update, so the module's
+// request is refused and the cluster keeps flat host sets.
+TEST_F(DynamicModuleClusterPersistentPartitionsTest, ModuleOptInRefusedForNativeLbPolicy) {
+  const std::string yaml = R"EOF(
+name: test_cluster
+connect_timeout: 0.25s
+lb_policy: ROUND_ROBIN
+cluster_type:
+  name: envoy.clusters.dynamic_modules
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_modules.v3.ClusterConfig
+    dynamic_module_config:
+      name: cluster_no_op
+    cluster_name: use_persistent_host_partitions
+)EOF";
+  auto result = createCluster(yaml);
+  ASSERT_TRUE(result.ok()) << result.status().message();
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  clusters_.push_back(std::move(*result));
+
+  EXPECT_EQ(reinterpret_cast<envoy_dynamic_module_type_cluster_config_module_ptr>(0x6),
+            cluster->config()->in_module_config_);
+  EXPECT_FALSE(cluster->config()->use_persistent_host_partitions_);
+  EXPECT_FALSE(isPersistent(*cluster->prioritySet().hostSetsPerPriority()[0]));
+}
+
 // Native load balancing policies read the flat host vectors on every update, so the option is
 // rejected for them.
 TEST_F(DynamicModuleClusterPersistentPartitionsTest, RequiresClusterProvidedLbPolicy) {

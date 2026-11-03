@@ -31,8 +31,13 @@ public:
 
     auto header_string = HeaderUtility::getAllOfHeaderAsString(*maybe_headers, name_, ",");
 
+    if (!header_string.backingString().empty()) {
+      return Matcher::DataInputGetResult::CreateString(
+          std::move(header_string).releaseBackingString());
+    }
     if (header_string.result()) {
-      return Matcher::DataInputGetResult::CreateString(std::string(header_string.result().value()));
+      // A single value is a view into the header map, which outlives the match.
+      return Matcher::DataInputGetResult::CreateStringView(*header_string.result());
     }
 
     return Matcher::DataInputGetResult::NoData();

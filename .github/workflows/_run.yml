@@ -73,6 +73,11 @@ on:
       docker-ci:
         type: boolean
         default: true
+      # Use the devtools image. Only respected by branches whose `ci/run_envoy_docker.sh` defaults
+      # CI to the minimal `ci` image; older branches select the image with `docker-ci`.
+      devtools:
+        type: boolean
+        default: false
       docker-ipv6:
         default: true
         type: boolean
@@ -417,6 +422,7 @@ jobs:
         ENVOY_SIGNING_PASSPHRASE_PATH: ${{ inputs.signing && '/build/signing/passphrase' || '' }}
         ENVOY_DOCKER_CPUS: ${{ inputs.docker-cpus }}
         ENVOY_DOCKER_CI: ${{ inputs.docker-ci && 'true' || '' }}
+        ENVOY_DOCKER_DEVTOOLS: ${{ inputs.devtools && 'true' || '' }}
         ENVOY_COMMIT: ${{ fromJSON(inputs.request).request.sha }}
         ENVOY_REPO: ${{ github.repository }}
         ENVOY_PUBLISH_DRY_RUN: ${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}

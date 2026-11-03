@@ -11,6 +11,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -81,9 +82,34 @@ public:
   int decode_trailers_{0};
 };
 
+// Records what the router hands to the factory of an upstream HTTP filter.
+class StatsRecordingFilterFactory : public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message&, Server::Configuration::ServerFactoryContext& context,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    stats_prefix_ = extra_context.stats_prefix;
+    scope_ = &extra_context.scopeOr(context);
+    stats_prefix_scope_ = &extra_context.statsPrefixScopeOr(context);
+    stats_prefix_or_ = extra_context.statsPrefixOr();
+    return [](Http::FilterChainFactoryCallbacks&) {};
+  }
+  bool isUnifiedFilter() override { return true; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::PassthroughFilterConfig>();
+  }
+  std::string name() const override { return "stats-recording-filter"; }
+
+  std::string stats_prefix_;
+  Stats::Scope* scope_{};
+  Stats::Scope* stats_prefix_scope_{};
+  std::string stats_prefix_or_;
+};
+
 class RouterUpstreamFilterTest : public testing::Test {
 public:
-  void init(std::vector<HttpFilter> upstream_filters) {
+  void init(std::vector<HttpFilter> upstream_filters, const std::string& stats_prefix = "prefix.",
+            OptRef<Stats::Scope> stats_prefix_scope = {}) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
     static const std::string cluster_name = "cluster_0";
 
@@ -96,8 +122,9 @@ public:
       *router_proto.add_upstream_http_filters() = filter;
     }
 
-    Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
-    config_ = *FilterConfig::create(prefix.statName(), context_,
+    auto extra_context = Server::Configuration::ExtraFactoryContext::create(context_, stats_prefix);
+    extra_context.stats_prefix_scope = stats_prefix_scope;
+    config_ = *FilterConfig::create(context_.server_factory_context_, extra_context,
                                     ShadowWriterPtr(new MockShadowWriter()), router_proto);
     router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
@@ -303,6 +330,82 @@ TEST_F(RouterUpstreamFilterTest, DynamicFilterKeepsConfigProviderManagerAlive) {
   config_.reset();
   EXPECT_TRUE(manager.expired());
 }
+
+class RouterUpstreamFilterStatsTest : public RouterUpstreamFilterTest {
+public:
+  void initWithRecordingFilter(const std::string& stats_prefix,
+                               OptRef<Stats::Scope> stats_prefix_scope = {}) {
+    HttpFilter recording_filter;
+    recording_filter.set_name("stats-recording-filter");
+    std::ignore = recording_filter.mutable_typed_config()->PackFrom(
+        test::integration::filters::PassthroughFilterConfig());
+
+    HttpFilter codec_filter;
+    codec_filter.set_name("envoy.filters.http.upstream_codec");
+    envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec upstream_codec_config;
+    std::ignore = codec_filter.mutable_typed_config()->PackFrom(upstream_codec_config);
+
+    init({recording_filter, codec_filter}, stats_prefix, stats_prefix_scope);
+  }
+
+  StatsRecordingFilterFactory factory_;
+  Registry::InjectFactory<Server::Configuration::UpstreamHttpFilterConfigFactory> registration_{
+      factory_};
+};
+
+TEST_F(RouterUpstreamFilterStatsTest, NoStatsPrefixScope) {
+  initWithRecordingFilter("http.ingress.");
+
+  EXPECT_EQ("http.ingress.rq_total", config_->default_stats_.rq_total_.name());
+  // The prefix is passed as is rather than re-decoded from a stat name, which drops the trailing
+  // dot.
+  EXPECT_EQ("http.ingress.", factory_.stats_prefix_);
+  EXPECT_EQ(&context_.scope(), factory_.scope_);
+  EXPECT_EQ(&context_.scope(), factory_.stats_prefix_scope_);
+  EXPECT_EQ("http.ingress.", factory_.stats_prefix_or_);
+}
+
+TEST_F(RouterUpstreamFilterStatsTest, StatsPrefixScope) {
+  // Named differently from the prefix to tell which one the stats got their name from.
+  Stats::ScopeSharedPtr prefixed_scope = context_.scope().createScope("prefixed.");
+  initWithRecordingFilter("http.ingress.", *prefixed_scope);
+
+  EXPECT_EQ("prefixed.rq_total", config_->default_stats_.rq_total_.name());
+  // The vhost, vcluster and route level stats stay in the root scope.
+  EXPECT_EQ(&context_.scope(), &config_->scope_);
+
+  EXPECT_EQ("http.ingress.", factory_.stats_prefix_);
+  EXPECT_EQ(&context_.scope(), factory_.scope_);
+  EXPECT_EQ(prefixed_scope.get(), factory_.stats_prefix_scope_);
+  EXPECT_EQ("", factory_.stats_prefix_or_);
+}
+
+// TODO(wbpcode): remove this test once the
+// envoy.reloadable_features.ecds_filter_use_parent_stats_prefix runtime flag is removed.
+TEST_F(RouterUpstreamFilterStatsTest, StatsPrefixScopeNotGivenToOtherPrefix) {
+  Stats::ScopeSharedPtr prefixed_scope = context_.scope().createScope("prefixed.");
+  initWithRecordingFilter("http.ingress.", *prefixed_scope);
+
+  // E.g. an ECDS filter that is created with the prefix of its subscription.
+  const std::string other_prefix = "extension_config_discovery.upstream_http_filter.foo.";
+  auto extra_context =
+      Server::Configuration::ExtraFactoryContext::create(*config_->upstream_ctx_, other_prefix);
+  EXPECT_FALSE(extra_context.stats_prefix_scope.has_value());
+  EXPECT_EQ(other_prefix, extra_context.statsPrefixOr());
+}
+
+TEST_F(RouterUpstreamFilterStatsTest, StatsPrefixScopeWithLegacyEmptyPrefix) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.upstream_http_filters_correct_stats_prefix", "false"}});
+  Stats::ScopeSharedPtr prefixed_scope = context_.scope().createScope("prefixed.");
+  initWithRecordingFilter("http.ingress.", *prefixed_scope);
+
+  EXPECT_EQ("", factory_.stats_prefix_);
+  EXPECT_EQ(&context_.scope(), factory_.stats_prefix_scope_);
+  EXPECT_EQ("", factory_.stats_prefix_or_);
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

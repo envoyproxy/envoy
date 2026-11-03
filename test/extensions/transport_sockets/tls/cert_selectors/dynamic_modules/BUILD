@@ -46,6 +46,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/common/tls:ssl_test_utils",
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "test/common/tls/integration/ssl_integration_test_base.h"
 #include "test/config/integration/certs/client_ecdsacert_hash.h"
 #include "test/config/integration/certs/clientcert_hash.h"
+#include "test/config/integration/certs/concatenated_dns_servercert_hash.h"
 #include "test/config/integration/certs/server2cert_hash.h"
 #include "test/config/integration/certs/server_ecdsacert_hash.h"
 #include "test/config/integration/certs/servercert_hash.h"
@@ -35,10 +37,12 @@ namespace {
 // selection. The "dynamic" selector uses the dynamic certificate named by the server name and lets
 // Envoy select the certificate for a server name with the "www." prefix. Its config lines provide
 // the "prefetch" certificates when the config is created, the "sync" certificates when they are
-// requested, the "fetch" certificates from another thread when they are requested, and the "hold"
-// certificates only when a name with the "release." prefix is requested, and it declines other
-// names.
-std::string selectorConfig(absl::string_view selector_name, absl::string_view config) {
+// requested, the "fetch" certificates from another thread when they are requested, the "hold"
+// certificates only when a name with the "release." prefix is requested, and the "init"
+// certificates from another thread before it signals that its initialization is complete. It
+// declines other names. The extra fields are added to the DynamicModuleTlsCertificateSelector.
+std::string selectorConfig(absl::string_view selector_name, absl::string_view config,
+                           absl::string_view extra_fields = "") {
   // The module runs its own threads, so it stays loaded.
   return fmt::format(R"EOF(
 name: envoy.tls.certificate_selectors.dynamic_modules
@@ -52,12 +56,14 @@ typed_config:
     "@type": type.googleapis.com/google.protobuf.StringValue
     value: "{}"
   allow_dynamic_certificates: {}
+  {}
 )EOF",
-                     selector_name, config, selector_name == "dynamic");
+                     selector_name, config, selector_name == "dynamic", extra_fields);
 }
 
-std::string dynamicSelectorConfig(const std::vector<std::string>& certificates) {
-  return selectorConfig("dynamic", absl::StrJoin(certificates, "\\n"));
+std::string dynamicSelectorConfig(const std::vector<std::string>& certificates,
+                                  absl::string_view extra_fields = "") {
+  return selectorConfig("dynamic", absl::StrJoin(certificates, "\\n"), extra_fields);
 }
 
 // Returns a config line of the "dynamic" selector for a certificate of the test certificates, with
@@ -87,6 +93,21 @@ void setModulesSearchPath() {
       1);
 }
 
+// Returns the BoringSSL connection of a TLS client connection.
+SSL* clientSsl(const Network::ClientConnection& connection) {
+  const auto* handshaker =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
+          connection.ssl().get());
+  RELEASE_ASSERT(handshaker != nullptr, "the client connection must use TLS");
+  return handshaker->ssl();
+}
+
+// Expects the client to offer a session that the server could resume.
+void expectResumableSession(const SSL_SESSION* session) {
+  ASSERT_NE(nullptr, session);
+  EXPECT_TRUE(SSL_SESSION_is_resumable(session));
+}
+
 class DynamicModuleTlsCertificateSelectorIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public SslIntegrationTestBase {
@@ -101,28 +122,24 @@ public:
     SslIntegrationTestBase::initialize();
   }
 
-  // Initializes the listener with the "dynamic" selector, which requires session resumption to be
-  // disabled.
-  void initializeWithDynamicCertificates(const std::vector<std::string>& certificates) {
-    tls_cert_selector_yaml_ = dynamicSelectorConfig(certificates);
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* transport_socket = bootstrap.mutable_static_resources()
-                                   ->mutable_listeners(0)
-                                   ->mutable_filter_chains(0)
-                                   ->mutable_transport_socket();
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      ASSERT_TRUE(transport_socket->typed_config().UnpackTo(&tls_context));
-      tls_context.set_disable_stateless_session_resumption(true);
-      tls_context.set_disable_stateful_session_resumption(true);
-      ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(tls_context));
-    });
+  // Initializes the listener with the "dynamic" selector and the extra fields.
+  void initializeWithDynamicCertificates(const std::vector<std::string>& certificates,
+                                         absl::string_view extra_fields = "") {
+    tls_cert_selector_yaml_ = dynamicSelectorConfig(certificates, extra_fields);
     initialize();
   }
 
   // Sends a request with the given server name and expects the certificate with the given hash.
   void expectServedCertificate(absl::string_view server_name, absl::string_view certificate_hash,
                                ClientSslTransportOptions options = ClientSslTransportOptions()) {
-    codec_client_ = makeHttpConnection(makeSslClientConnection(options.setSni(server_name)));
+    expectServedCertificate(makeSslClientConnection(options.setSni(server_name)), certificate_hash);
+  }
+
+  // Sends a request over the connection and expects the certificate with the given hash. The
+  // response arrives after the TLS 1.3 session tickets, so the client has cached them.
+  void expectServedCertificate(Network::ClientConnectionPtr&& connection,
+                               absl::string_view certificate_hash) {
+    codec_client_ = makeHttpConnection(std::move(connection));
     auto response =
         sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
     ASSERT_TRUE(response->complete());
@@ -134,8 +151,63 @@ public:
 
   // Expects the handshake of a client with the given options to fail.
   void expectFailedHandshake(const ClientSslTransportOptions& options) {
-    auto codec_client = makeRawHttpConnection(makeSslClientConnection(options), std::nullopt);
+    expectFailedHandshake(makeSslClientConnection(options));
+  }
+
+  // Expects the handshake of the connection to fail.
+  void expectFailedHandshake(Network::ClientConnectionPtr&& connection) {
+    auto codec_client = makeRawHttpConnection(std::move(connection), std::nullopt);
     EXPECT_FALSE(codec_client->connected());
+  }
+
+  // Creates a client transport socket factory, whose connections share its session cache.
+  Network::UpstreamTransportSocketFactoryPtr
+  createClientFactory(const ClientSslTransportOptions& options) {
+    return createClientSslTransportSocketFactory(options, *context_manager_, *api_,
+                                                 &server_factory_context_.serverScope());
+  }
+
+  // Creates a client connection with a transport socket of the factory.
+  Network::ClientConnectionPtr makeSslClientConnectionFromFactory(
+      const Network::UpstreamTransportSocketFactory& client_factory) {
+    return dispatcher_->createClientConnection(
+        getSslAddress(version_, lookupPort("http")), Network::Address::InstanceConstSharedPtr(),
+        client_factory.createTransportSocket({}, nullptr), nullptr, nullptr);
+  }
+
+  // Expects the second of two connections of the client factory to resume the session of the first.
+  void expectResumedSession(const Network::UpstreamTransportSocketFactory& client_factory,
+                            absl::string_view certificate_hash) {
+    expectServedCertificate(makeSslClientConnectionFromFactory(client_factory), certificate_hash);
+    expectServedCertificate(makeSslClientConnectionFromFactory(client_factory), certificate_hash);
+    test_server_->waitForCounter(listenerStatPrefix("ssl.session_reused"), testing::Eq(1));
+  }
+
+  // Offers the session of the dynamic certificate for "first.lyft.com" in a handshake for
+  // "second.lyft.com", whose certificate has names that concatenate to the same bytes, and expects
+  // the handshake to resume the session only when expect_resumption is set.
+  void offerSessionForConcatenatedNames(bool expect_resumption) {
+    initializeWithDynamicCertificates(
+        {dynamicCertificate("prefetch", "first.lyft.com", "server"),
+         dynamicCertificate("prefetch", "second.lyft.com", "concatenated_dns_server")});
+    ClientSslTransportOptions options;
+    options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+    expectServedCertificate(
+        makeSslClientConnection(ClientSslTransportOptions(options).setSni("first.lyft.com")),
+        TEST_SERVER_CERT_HASH);
+    bssl::UniquePtr<SSL_SESSION> session(SSL_get1_session(clientSsl(*codec_client_->connection())));
+    ASSERT_NO_FATAL_FAILURE(expectResumableSession(session.get()));
+
+    Network::ClientConnectionPtr connection =
+        makeSslClientConnection(ClientSslTransportOptions(options).setSni("second.lyft.com"));
+    ASSERT_EQ(1, SSL_set_session(clientSsl(*connection), session.get()));
+    // A resumed session keeps the certificate of the handshake that established it.
+    expectServedCertificate(std::move(connection), expect_resumption
+                                                       ? TEST_SERVER_CERT_HASH
+                                                       : TEST_CONCATENATED_DNS_SERVER_CERT_HASH);
+    test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), testing::Eq(2));
+    EXPECT_EQ(expect_resumption ? 1U : 0U,
+              test_server_->counter(listenerStatPrefix("ssl.session_reused"))->value());
   }
 
   void waitForModuleCounter(absl::string_view name, uint64_t value,
@@ -166,24 +238,41 @@ public:
     test_server_->waitForGauge("server.seconds_until_first_ocsp_response_expiring", matcher);
   }
 
+  // Waits for a stats flush that sets the days until the first certificate expires to a matching
+  // value.
+  void waitForCertificateExpiration(testing::Matcher<uint64_t> matcher) {
+    test_server_->waitForGauge("server.days_until_first_cert_expiring", matcher);
+  }
+
+  // Applies the modifier to the TLS context of the listener.
+  void modifyListenerTlsContext(
+      std::function<void(envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext&)>&&
+          modifier) {
+    config_helper_.addConfigModifier(
+        [modifier = std::move(modifier)](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+          auto* transport_socket = bootstrap.mutable_static_resources()
+                                       ->mutable_listeners(0)
+                                       ->mutable_filter_chains(0)
+                                       ->mutable_transport_socket();
+          envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+          ASSERT_TRUE(transport_socket->typed_config().UnpackTo(&tls_context));
+          modifier(tls_context);
+          ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(tls_context));
+        });
+  }
+
   // Serves the validation context of the listener from a file over SDS.
   void useValidationContextFromSds() {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto* transport_socket = bootstrap.mutable_static_resources()
-                                   ->mutable_listeners(0)
-                                   ->mutable_filter_chains(0)
-                                   ->mutable_transport_socket();
-      envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
-      ASSERT_TRUE(transport_socket->typed_config().UnpackTo(&tls_context));
-      auto* common_tls_context = tls_context.mutable_common_tls_context();
-      common_tls_context->clear_validation_context();
-      auto* secret_config = common_tls_context->mutable_validation_context_sds_secret_config();
-      secret_config->set_name("validation");
-      auto* config_source = secret_config->mutable_sds_config();
-      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
-      config_source->mutable_path_config_source()->set_path(validationContextPath());
-      ASSERT_TRUE(transport_socket->mutable_typed_config()->PackFrom(tls_context));
-    });
+    modifyListenerTlsContext(
+        [this](envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& tls_context) {
+          auto* common_tls_context = tls_context.mutable_common_tls_context();
+          common_tls_context->clear_validation_context();
+          auto* secret_config = common_tls_context->mutable_validation_context_sds_secret_config();
+          secret_config->set_name("validation");
+          auto* config_source = secret_config->mutable_sds_config();
+          config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+          config_source->mutable_path_config_source()->set_path(validationContextPath());
+        });
   }
 
   // Writes the SDS validation context, which accepts only the client certificate with the given
@@ -268,6 +357,98 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ServesFetchedDynamicC
   waitForModuleCounter("selected.outcome.dynamic", 2);
 }
 
+// A TLS 1.3 session resumes from its ticket when the module selects the certificate that
+// established it.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ResumesTicketOfDynamicCertificate) {
+  server_tlsv1_3_ = true;
+  initializeWithDynamicCertificates(
+      {dynamicCertificate("prefetch", "prefetch.lyft.com", "server2")});
+  Network::UpstreamTransportSocketFactoryPtr client_factory = createClientFactory(
+      ClientSslTransportOptions()
+          .setSni("prefetch.lyft.com")
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3));
+  expectResumedSession(*client_factory, TEST_SERVER2_CERT_HASH);
+  waitForModuleCounter("selected.outcome.dynamic", 2);
+}
+
+// With stateless resumption disabled, a TLS 1.2 session resumes from the session cache.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       ResumesCachedSessionOfDynamicCertificate) {
+  modifyListenerTlsContext(
+      [](envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& tls_context) {
+        tls_context.set_disable_stateless_session_resumption(true);
+      });
+  initializeWithDynamicCertificates(
+      {dynamicCertificate("prefetch", "prefetch.lyft.com", "server2")});
+  Network::UpstreamTransportSocketFactoryPtr client_factory = createClientFactory(
+      ClientSslTransportOptions()
+          .setSni("prefetch.lyft.com")
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2));
+  expectResumedSession(*client_factory, TEST_SERVER2_CERT_HASH);
+  waitForModuleCounter("selected.outcome.dynamic", 2);
+}
+
+// A session does not resume once the module replaces its certificate with one for other names.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       DoesNotResumeSessionOfReplacedCertificate) {
+  server_tlsv1_3_ = true;
+  initializeWithDynamicCertificates({dynamicCertificate("prefetch", "replaced.lyft.com", "server2"),
+                                     dynamicCertificate("hold", "replaced.lyft.com", "server")});
+  Network::UpstreamTransportSocketFactoryPtr client_factory = createClientFactory(
+      ClientSslTransportOptions()
+          .setSni("replaced.lyft.com")
+          .setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3));
+  expectServedCertificate(makeSslClientConnectionFromFactory(*client_factory),
+                          TEST_SERVER2_CERT_HASH);
+
+  // The module provides the held certificate when the release name is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("release.lyft.com"));
+  Network::ClientConnectionPtr connection = makeSslClientConnectionFromFactory(*client_factory);
+  // The client offers the ticket of the first session.
+  ASSERT_NO_FATAL_FAILURE(expectResumableSession(SSL_get_session(clientSsl(*connection))));
+  expectServedCertificate(std::move(connection), TEST_SERVER_CERT_HASH);
+  test_server_->waitForCounter(listenerStatPrefix("ssl.handshake"), testing::Eq(2));
+  EXPECT_EQ(0U, test_server_->counter(listenerStatPrefix("ssl.session_reused"))->value());
+}
+
+// A session does not resume on a dynamic certificate for other names, even when the names of the
+// two certificates concatenate to the same bytes.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       DoesNotResumeSessionOnCertificateWithConcatenatedNames) {
+  offerSessionForConcatenatedNames(/*expect_resumption=*/false);
+}
+
+// Without the runtime guard, the session context IDs of the two certificates hash the same bytes,
+// so the session resumes.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       ResumesSessionOnCertificateWithConcatenatedNamesWithoutRuntimeGuard) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.unambiguous_tls_session_context_id",
+                                    "false");
+  offerSessionForConcatenatedNames(/*expect_resumption=*/true);
+}
+
+// A failed selection fails the handshake even when the client offers a session that the
+// certificates of the listener would resume.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, FailedSelectionDoesNotResumeSession) {
+  initializeWithDynamicCertificates({});
+  ClientSslTransportOptions options;
+  options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  // The module lets Envoy select a certificate of the listener for the "www." prefix.
+  expectServedCertificate(
+      makeSslClientConnection(ClientSslTransportOptions(options).setSni("www.lyft.com")),
+      TEST_SERVER_ECDSA_CERT_HASH);
+  bssl::UniquePtr<SSL_SESSION> session(SSL_get1_session(clientSsl(*codec_client_->connection())));
+  ASSERT_NO_FATAL_FAILURE(expectResumableSession(session.get()));
+
+  // The selector fails a handshake without a server name.
+  Network::ClientConnectionPtr connection = makeSslClientConnection(options);
+  ASSERT_EQ(1, SSL_set_session(clientSsl(*connection), session.get()));
+  expectFailedHandshake(std::move(connection));
+  test_server_->waitForCounter(listenerStatPrefix("ssl.connection_error"), testing::Ge(1));
+  waitForModuleCounter("selected.outcome.failed", 1);
+  EXPECT_EQ(0U, test_server_->counter(listenerStatPrefix("ssl.session_reused"))->value());
+}
+
 TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, DeclinedDynamicCertificateFails) {
   initializeWithDynamicCertificates({});
   expectFailedHandshake(ClientSslTransportOptions().setSni("unknown.lyft.com"));
@@ -308,6 +489,35 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, PendingHandshakeTimes
   connection->close(Network::ConnectionCloseType::NoFlush);
 }
 
+// A request that the module does not answer in time fails its handshake, and the next handshake
+// requests the certificate again.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, CertificateRequestTimesOut) {
+  initializeWithDynamicCertificates({dynamicCertificate("hold", "hold.lyft.com", "server2")},
+                                    "dynamic_certificate_request_timeout: 0.2s");
+  expectFailedHandshake(ClientSslTransportOptions().setSni("hold.lyft.com"));
+  test_server_->waitForCounter(listenerStatPrefix("dynamic_certificates.request_timeout"),
+                               testing::Eq(1));
+  expectFailedHandshake(ClientSslTransportOptions().setSni("hold.lyft.com"));
+  test_server_->waitForCounter(listenerStatPrefix("dynamic_certificates.request_timeout"),
+                               testing::Eq(2));
+  waitForModuleCounter("requested", 2);
+}
+
+// The listener warms until the module provides its certificates and signals that its
+// initialization is complete, so the first handshake does not wait for the module.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ListenerWaitsForModuleInitialization) {
+  initializeWithDynamicCertificates({dynamicCertificate("init", "init.lyft.com", "server2")});
+  expectServedCertificate("init.lyft.com", TEST_SERVER2_CERT_HASH);
+  EXPECT_EQ(0U, test_server_->counter("dynamicmodulescustom.requested")->value());
+}
+
+// A module that signals while its configuration is created does not keep the listener warming.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, ModuleSignalsDuringConfigCreation) {
+  initializeWithDynamicCertificates(
+      {dynamicCertificate("prefetch", "prefetch.lyft.com", "server2")});
+  expectServedCertificate("prefetch.lyft.com", TEST_SERVER2_CERT_HASH);
+}
+
 // The listener only accepts the RSA client certificate, and so does its dynamic certificate.
 TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
        DynamicCertificateValidatesClientCertificate) {
@@ -336,6 +546,34 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, DynamicCertificateFol
                           ClientSslTransportOptions().setClientEcdsaCert(true));
 }
 
+// With session ticket keys, the session of a dynamic certificate resumes until SDS updates the
+// validation context, and then the client certificate is verified again. The configured keys
+// survive the rebuild of the TLS context, so only the session ID context can stop the resumption.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       ValidationUpdateEndsSessionsOfDynamicCertificate) {
+  writeValidationContext("1", TEST_CLIENT_CERT_HASH);
+  useValidationContextFromSds();
+  modifyListenerTlsContext(
+      [](envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext& tls_context) {
+        tls_context.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(
+            std::string(80, 'k'));
+      });
+  initializeWithDynamicCertificates(
+      {dynamicCertificate("prefetch", "prefetch.lyft.com", "server2")});
+  Network::UpstreamTransportSocketFactoryPtr client_factory =
+      createClientFactory(ClientSslTransportOptions().setSni("prefetch.lyft.com"));
+  expectResumedSession(*client_factory, TEST_SERVER2_CERT_HASH);
+
+  writeValidationContext("2", TEST_CLIENT_ECDSA_CERT_HASH);
+  test_server_->waitForCounter("sds.validation.update_success", testing::Eq(2));
+  Network::ClientConnectionPtr connection = makeSslClientConnectionFromFactory(*client_factory);
+  // The client offers the ticket of the resumed session.
+  ASSERT_NO_FATAL_FAILURE(expectResumableSession(SSL_get_session(clientSsl(*connection))));
+  expectFailedHandshake(std::move(connection));
+  test_server_->waitForCounter(listenerStatPrefix("ssl.fail_verify_cert_hash"), testing::Ge(1));
+  EXPECT_EQ(1U, test_server_->counter(listenerStatPrefix("ssl.session_reused"))->value());
+}
+
 // The configured certificates have no OCSP response, so the stapled one comes from the dynamic
 // certificate. It is prefetched, since OpenSSL builds do not staple the response of a selection
 // that completes asynchronously.
@@ -344,11 +582,8 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, StaplesDynamicCertifi
       {dynamicCertificate("prefetch", "ocsp.lyft.com", "server", true)});
   Network::ClientConnectionPtr connection =
       makeSslClientConnection(ClientSslTransportOptions().setSni("ocsp.lyft.com"));
-  const auto* handshaker =
-      dynamic_cast<const Extensions::TransportSockets::Tls::SslHandshakerImpl*>(
-          connection->ssl().get());
-  ASSERT_NE(nullptr, handshaker);
-  SSL_enable_ocsp_stapling(handshaker->ssl());
+  SSL* ssl = clientSsl(*connection);
+  SSL_enable_ocsp_stapling(ssl);
   codec_client_ = makeHttpConnection(std::move(connection));
   auto response =
       sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
@@ -357,7 +592,7 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest, StaplesDynamicCertifi
             codec_client_->connection()->ssl()->sha256PeerCertificateDigest());
   const uint8_t* ocsp_response = nullptr;
   size_t ocsp_response_length = 0;
-  SSL_get0_ocsp_response(handshaker->ssl(), &ocsp_response, &ocsp_response_length);
+  SSL_get0_ocsp_response(ssl, &ocsp_response, &ocsp_response_length);
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
                 "test/config/integration/certs/server_ocsp_resp.der")),
             std::string(reinterpret_cast<const char*>(ocsp_response), ocsp_response_length));
@@ -389,6 +624,43 @@ TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
   // The module removes the certificate whose name follows the "remove." prefix.
   expectFailedHandshake(ClientSslTransportOptions().setSni("remove.ocsp.lyft.com"));
   waitForOcspResponseExpiration(testing::Eq(0));
+}
+
+// An expired dynamic certificate sets the days until the first certificate expires to 0, and
+// replacing it restores the days of the other certificates. They can be one less if a day passes
+// while the test runs.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       ReplacingExpiredCertificateRestoresCertificateExpiration) {
+  flushStatsOften();
+  initializeWithDynamicCertificates({dynamicCertificate("sync", "expired.lyft.com", "expired_"),
+                                     dynamicCertificate("hold", "expired.lyft.com", "server2")});
+  waitForCertificateExpiration(testing::Gt(0));
+  const uint64_t initial_days =
+      test_server_->gauge("server.days_until_first_cert_expiring")->value();
+  // The client rejects the expired certificate, which the module provides when it is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("expired.lyft.com"));
+  waitForCertificateExpiration(testing::Eq(0));
+  // The module provides the held certificate when the release name is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("release.lyft.com"));
+  waitForCertificateExpiration(testing::AllOf(testing::Gt(0), testing::Le(initial_days)));
+}
+
+// An expired dynamic certificate sets the days until the first certificate expires to 0, and
+// removing it restores the days of the other certificates. They can be one less if a day passes
+// while the test runs.
+TEST_P(DynamicModuleTlsCertificateSelectorIntegrationTest,
+       RemovingExpiredCertificateRestoresCertificateExpiration) {
+  flushStatsOften();
+  initializeWithDynamicCertificates({dynamicCertificate("hold", "expired.lyft.com", "expired_")});
+  waitForCertificateExpiration(testing::Gt(0));
+  const uint64_t initial_days =
+      test_server_->gauge("server.days_until_first_cert_expiring")->value();
+  // The module provides the held certificate when the release name is requested.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("release.lyft.com"));
+  waitForCertificateExpiration(testing::Eq(0));
+  // The module removes the certificate whose name follows the "remove." prefix.
+  expectFailedHandshake(ClientSslTransportOptions().setSni("remove.expired.lyft.com"));
+  waitForCertificateExpiration(testing::AllOf(testing::Gt(0), testing::Le(initial_days)));
 }
 
 // The dynamic certificates are listed by /certs without the trusted certificate, which only the TLS
@@ -538,6 +810,17 @@ TEST_P(DynamicModuleUpstreamTlsCertificateSelectorIntegrationTest, ServesDynamic
   test_server_->waitForCounter("dynamicmodulescustom.requested", testing::Eq(1));
   test_server_->waitForCounter("cluster.cluster_0.dynamic_certificates.provided", testing::Eq(1));
   test_server_->waitForGauge("cluster.cluster_0.dynamic_certificates.active", testing::Eq(1));
+}
+
+// The cluster warms until the module provides its client certificate and signals that its
+// initialization is complete, so the first upstream handshake does not wait for the module.
+TEST_P(DynamicModuleUpstreamTlsCertificateSelectorIntegrationTest,
+       ClusterWaitsForModuleInitialization) {
+  initializeWithSelector(dynamicSelectorConfig({dynamicCertificate(
+                             "init", default_request_headers_.getHostValue(), "client_ecdsa")}),
+                         {});
+  expectClientCertificate(TEST_CLIENT_ECDSA_CERT_HASH, default_request_headers_);
+  EXPECT_EQ(0U, test_server_->counter("dynamicmodulescustom.requested")->value());
 }
 
 } // namespace

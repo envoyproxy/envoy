@@ -79,11 +79,14 @@ public:
    * @param cluster_config the configuration bytes to pass to the module.
    * @param module the loaded dynamic module.
    * @param stats_scope the stats scope for creating custom metrics.
+   * @param persistent_host_partitions_allowed whether the module may opt the cluster into
+   * persistent host partitions, which requires lb_policy CLUSTER_PROVIDED.
    * @return a shared pointer to the config, or an error status.
    */
   static absl::StatusOr<std::shared_ptr<DynamicModuleClusterConfig>>
   create(const std::string& cluster_name, const std::string& cluster_config,
-         Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope);
+         Envoy::Extensions::DynamicModules::DynamicModulePtr module, Stats::Scope& stats_scope,
+         bool persistent_host_partitions_allowed);
 
   ~DynamicModuleClusterConfig();
 
@@ -110,8 +113,13 @@ public:
   // The in-module configuration pointer.
   envoy_dynamic_module_type_cluster_config_module_ptr in_module_config_ = nullptr;
 
-  // Whether the cluster's host sets are PersistentHostSet. From ClusterConfig.
+  // Whether the cluster's host sets are PersistentHostSet. Set by the module during
+  // on_cluster_config_new or from ClusterConfig.
   bool use_persistent_host_partitions_ = false;
+  // Whether the module may set use_persistent_host_partitions_, which requires CLUSTER_PROVIDED.
+  const bool persistent_host_partitions_allowed_;
+  // Set when the module asked for persistent host partitions and was refused.
+  bool persistent_host_partitions_refused_ = false;
 
   // ----------------------------- Metrics Support -----------------------------
   // The shared registry holding all module-defined metrics.
@@ -130,7 +138,7 @@ public:
 private:
   DynamicModuleClusterConfig(const std::string& cluster_name, const std::string& cluster_config,
                              Envoy::Extensions::DynamicModules::DynamicModulePtr module,
-                             Stats::Scope& stats_scope);
+                             Stats::Scope& stats_scope, bool persistent_host_partitions_allowed);
 
   const std::string cluster_name_;
   const std::string cluster_config_;
@@ -258,6 +266,8 @@ private:
 
   // The PersistentHostSet at `priority`, created if missing. Only valid with persistent partitions.
   PersistentHostSet& persistentHostSet(uint32_t priority);
+  // Whether the host sets are PersistentHostSet. The factory is fixed once a host set exists.
+  bool usesPersistentHostSets() const;
   // Hands `snapshot`, returned by a PersistentHostSet change, to the priority set with its delta.
   void updateHostsFromSnapshot(uint32_t priority, Upstream::HostSetSnapshotConstSharedPtr snapshot,
                                const Upstream::HostVector& hosts_added,

@@ -1287,6 +1287,28 @@ TEST_F(SslServerContextImplTicketTest, TicketKeyNone) {
   EXPECT_NO_THROW(loadConfigV2(cfg));
 }
 
+// A certificate selector can switch the handshake to a context without keys, which sends no
+// ticket.
+TEST_F(SslServerContextImplTicketTest, TicketKeyNoneSendsNoTicket) {
+  const std::string yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+)EOF";
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, {}, false);
+  Envoy::Ssl::ServerContextSharedPtr server_context =
+      *manager_.createSslServerContext(*store_.rootScope(), *server_context_config, nullptr);
+  auto cleanup = cleanUpHelper(server_context);
+  EXPECT_EQ(0, dynamic_cast<ServerContextImpl&>(*server_context)
+                   .sessionTicketProcess(nullptr, nullptr, nullptr, nullptr, nullptr, 1));
+}
+
 TEST_F(SslServerContextImplTicketTest, TicketKeyInlineBytesSuccess) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext cfg;
   cfg.mutable_session_ticket_keys()->add_keys()->set_inline_bytes(std::string(80, '\0'));

@@ -104,6 +104,14 @@ void ExtProcIntegrationTest::initializeConfig(
       }
     }
 
+    // The filter's default message timeout (200ms) is shorter than a round trip through the
+    // fake ext_proc server can take under the sanitizers. A timeout fails the request with a 504
+    // (or passes it through unprocessed with failure_mode_allow), and the test then fails on
+    // whatever it expected next. Tests of the timeout itself set their own.
+    if (!proto_config_.has_message_timeout()) {
+      proto_config_.mutable_message_timeout()->set_seconds(5);
+    }
+
     const std::string valid_grpc_cluster_name = "ext_proc_server_0";
     std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
     if (!two_ext_proc_filters_) {
