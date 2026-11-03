@@ -204,6 +204,22 @@ public:
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
   }
+
+  // Routes every request to cluster_0, without a timeout, so that a request can stay in flight
+  // across the drains of the tests.
+  std::string routeConfig() {
+    return fmt::format(R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: integration
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: cluster_0, timeout: 0s }}
+)EOF",
+                       route_table_name_);
+  }
+
   envoy::config::listener::v3::Listener listener_config_;
   std::string listener_name_{"testing-listener-0"};
   std::string route_table_name_{"testing-route-table-0"};
@@ -239,6 +255,120 @@ public:
                             Network::Address::InstanceConstSharedPtr address) override {
     setGrpcService(grpc_service, cluster_name, address);
   }
+
+  // Initializes the listener with two addresses on free fixed ports, so that its addresses can be
+  // updated in place, with two workers and an immediate drain.
+  void initializeWithFixedPorts() {
+    concurrency_ = 2;
+    drain_strategy_ = Server::DrainStrategy::Immediate;
+    on_server_init_function_ = [&]() {
+      createLdsStream();
+      auto* address1 = listener_config_.mutable_address()->mutable_socket_address();
+      auto* address2 = listener_config_.mutable_additional_addresses(0)
+                           ->mutable_address()
+                           ->mutable_socket_address();
+      address1->set_port_value(freePort());
+      do {
+        address2->set_port_value(freePort());
+      } while (address2->port_value() == address1->port_value());
+      sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+      createRdsStream(route_table_name_);
+    };
+    initialize();
+    test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
+    registerTestServerPorts({"address1", "address2"});
+    sendRdsResponse(routeConfig(), "1");
+    test_server_->waitForCounter(
+        fmt::format("http.config_test.rds.{}.update_success", route_table_name_), Ge(1));
+    test_server_->waitUntilListenersReady();
+    test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+  }
+
+  // In place address updates need fixed ports, so the tests cannot bind to port zero. On Linux, a
+  // socket with reuse port holds each port until the test ends, so that no other process takes it,
+  // and the listener shares the port, since it uses reuse port by default there.
+  uint32_t freePort() {
+#ifdef __linux__
+    auto [address, socket] =
+        Network::Test::bindFreeLoopbackPort(version_, Network::Socket::Type::Stream, true);
+    port_sockets_.push_back(std::move(socket));
+    return address->ip()->port();
+#else
+    return Network::Test::findOrCheckFreePort(Network::Test::getCanonicalLoopbackAddress(version_),
+                                              Network::Socket::Type::Stream)
+        ->ip()
+        ->port();
+#endif
+  }
+
+  // Initializes the listener with initializeWithFixedPorts(), connects codec_client_ to the first
+  // address and another client to the second address, removes the second address in place and
+  // returns the other client.
+  IntegrationCodecClientPtr startAddressDrain() {
+    initializeWithFixedPorts();
+    codec_client_ = makeHttpConnection(lookupPort("address1"));
+    sendRequest(*codec_client_);
+    IntegrationCodecClientPtr removed_codec_client = makeHttpConnection(lookupPort("address2"));
+    sendRequest(*removed_codec_client);
+    listener_config_.mutable_additional_addresses()->RemoveLast();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+    test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+    test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2 * concurrency_));
+    return removed_codec_client;
+  }
+
+  // Waits until the drains of the removed address and of the listener close the connections of
+  // both addresses.
+  void waitForAddressAndListenerDrains(IntegrationCodecClient& removed_codec_client) {
+    // The workers close the connections of the removed address before the gauge drops.
+    test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(0));
+    ASSERT_TRUE(removed_codec_client.waitForDisconnect());
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+    test_server_->waitForGauge("listener_manager.total_listeners_draining", Eq(0));
+  }
+
+  // Adds a loopback address with the port to the listener.
+  envoy::config::listener::v3::AdditionalAddress& addAddress(uint32_t port) {
+    envoy::config::listener::v3::AdditionalAddress& address =
+        *listener_config_.add_additional_addresses();
+    auto* socket_address = address.mutable_address()->mutable_socket_address();
+    socket_address->set_address(Network::Test::getLoopbackAddressString(version_));
+    socket_address->set_port_value(port);
+    return address;
+  }
+
+  // Waits until the socket of the address is closed, which happens once all workers have stopped
+  // listening on it.
+  void waitForClosedPort(const std::string& port_name) {
+    const MonotonicTime deadline = timeSystem().monotonicTime() + TestUtility::DefaultTimeout;
+    while (true) {
+      auto codec = makeRawHttpConnection(makeClientConnection(lookupPort(port_name)), std::nullopt);
+      if (!codec->connected()) {
+        EXPECT_THAT(codec->connection()->transportFailureReason(),
+                    StartsWith("delayed connect error"));
+        return;
+      }
+      codec->close();
+      ASSERT_LT(timeSystem().monotonicTime(), deadline);
+    }
+  }
+
+  // Sends a request on the connection and checks the `connection` header of the response.
+  void sendRequest(IntegrationCodecClient& codec_client, absl::string_view connection = "") {
+    auto response = codec_client.makeHeaderOnlyRequest(default_request_headers_);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    EXPECT_EQ(connection, response->headers().getConnectionValue());
+    // The next request may be served by another worker, which has its own upstream connections.
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    fake_upstream_connection_.reset();
+  }
+
+  // The sockets that hold the ports of freePort().
+  std::vector<Network::SocketPtr> port_sockets_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, ListenerIntegrationTest,
@@ -944,6 +1074,284 @@ TEST_P(ListenerMultiAddressesIntegrationTest, MultipleAddressesListenerInPlaceUp
   verifyResponse(std::move(response2), "200", response_headers, std::string(response_size, 'a'));
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
+}
+
+// Adding an address in place does not drain the connections of the other addresses.
+TEST_P(ListenerMultiAddressesIntegrationTest, AddAddressInPlace) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  initializeWithFixedPorts();
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*codec_client_);
+
+  addAddress(freePort());
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2 * concurrency_));
+  EXPECT_EQ(0, test_server_->gauge("listener_manager.total_listeners_draining")->value());
+  registerTestServerPorts({"address1", "address2", "address3"});
+
+  IntegrationCodecClientPtr added_codec_client = makeHttpConnection(lookupPort("address3"));
+  sendRequest(*added_codec_client);
+  added_codec_client->close();
+
+  sendRequest(*codec_client_);
+}
+
+// Removing an address in place only drains the connections of the removed address.
+TEST_P(ListenerMultiAddressesIntegrationTest, RemoveAddressInPlace) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  // Leave time for the requests below before the drain of the removed address completes.
+  setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+  initializeWithFixedPorts();
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*codec_client_);
+  IntegrationCodecClientPtr active_codec_client = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*active_codec_client);
+  IntegrationCodecClientPtr idle_codec_client = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*idle_codec_client);
+
+  listener_config_.mutable_additional_addresses()->RemoveLast();
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(1));
+  EXPECT_EQ(0, test_server_->gauge("listener_manager.total_listeners_draining")->value());
+  waitForClosedPort("address2");
+
+  // The connections of the removed address are drained, and closed when the drain completes.
+  sendRequest(*active_codec_client, "close");
+  active_codec_client->close();
+  ASSERT_TRUE(idle_codec_client->waitForDisconnect());
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(0));
+
+  sendRequest(*codec_client_);
+  IntegrationCodecClientPtr new_codec_client = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*new_codec_client);
+  new_codec_client->close();
+}
+
+// Removing an address in place also closes its socket that an earlier version of the listener holds
+// while it drains.
+TEST_P(ListenerMultiAddressesIntegrationTest, RemoveAddressAfterFilterChainUpdateInPlace) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  setDrainTime(std::chrono::seconds(30));
+  initializeWithFixedPorts();
+  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(routeConfig(), "2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(1));
+
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*codec_client_);
+  IntegrationCodecClientPtr removed_codec_client = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*removed_codec_client);
+
+  listener_config_.mutable_additional_addresses()->RemoveLast();
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "3");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(2));
+  waitForClosedPort("address2");
+
+  sendRequest(*removed_codec_client, "close");
+  removed_codec_client->close();
+  sendRequest(*codec_client_);
+}
+
+// Replacing an address in place only drains the connections of the replaced address.
+TEST_P(ListenerMultiAddressesIntegrationTest, ReplaceAddressInPlace) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  setDrainTime(std::chrono::seconds(30));
+  initializeWithFixedPorts();
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*codec_client_);
+  IntegrationCodecClientPtr replaced_codec_client = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*replaced_codec_client);
+
+  const uint32_t port = freePort();
+  listener_config_.mutable_additional_addresses(0)
+      ->mutable_address()
+      ->mutable_socket_address()
+      ->set_port_value(port);
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2 * concurrency_));
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(1));
+  EXPECT_EQ(0, test_server_->gauge("listener_manager.total_listeners_draining")->value());
+  waitForClosedPort("address2");
+
+  IntegrationCodecClientPtr added_codec_client = makeHttpConnection(port);
+  sendRequest(*added_codec_client);
+  added_codec_client->close();
+  sendRequest(*replaced_codec_client, "close");
+  replaced_codec_client->close();
+  sendRequest(*codec_client_);
+}
+
+// An address that an update adds back while its removal drains listens again, and the end of that
+// drain only closes the connections accepted before the removal.
+TEST_P(ListenerMultiAddressesIntegrationTest, AddBackAddressDuringAddressDrain) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+  initializeWithFixedPorts();
+  IntegrationCodecClientPtr removed_codec_client = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*removed_codec_client);
+
+  const envoy::config::listener::v3::AdditionalAddress removed_address =
+      listener_config_.additional_addresses(0);
+  listener_config_.mutable_additional_addresses()->RemoveLast();
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  waitForClosedPort("address2");
+
+  *listener_config_.add_additional_addresses() = removed_address;
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "3");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(2));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(3 * concurrency_));
+  EXPECT_EQ(0, test_server_->counter("listener_manager.listener_create_failure")->value());
+  codec_client_ = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*codec_client_);
+
+  ASSERT_TRUE(removed_codec_client->waitForDisconnect());
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(0));
+  sendRequest(*codec_client_);
+}
+
+// The drains of the addresses that consecutive updates remove overlap, and each one only closes the
+// connections of its own address.
+TEST_P(ListenerMultiAddressesIntegrationTest, RemoveAddressDuringAddressDrain) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  setDrainTime(std::chrono::seconds(6 * TIMEOUT_FACTOR));
+  initializeWithFixedPorts();
+  const uint32_t port = freePort();
+  addAddress(port);
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2 * concurrency_));
+  IntegrationCodecClientPtr removed_codec_client = makeHttpConnection(lookupPort("address2"));
+  sendRequest(*removed_codec_client);
+  // The request in flight shows whether the end of the first drain closes this connection.
+  IntegrationCodecClientPtr later_removed_codec_client = makeHttpConnection(port);
+  auto response = later_removed_codec_client->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+
+  listener_config_.mutable_additional_addresses()->DeleteSubrange(0, 1);
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "3");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(2));
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(1));
+  // The second drain ends later than the first one.
+  timeSystem().advanceTimeWait(std::chrono::seconds(3 * TIMEOUT_FACTOR));
+  listener_config_.mutable_additional_addresses()->Clear();
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "4");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(3));
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(2));
+
+  ASSERT_TRUE(removed_codec_client->waitForDisconnect());
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(1));
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("close", response->headers().getConnectionValue());
+  ASSERT_TRUE(later_removed_codec_client->waitForDisconnect());
+  test_server_->waitForGauge("listener_manager.total_listener_addresses_draining", Eq(0));
+}
+
+// Removing a listener while the drain of its removed address continues closes the connections of
+// all its addresses.
+TEST_P(ListenerMultiAddressesIntegrationTest, RemoveListenerDuringAddressDrain) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+  IntegrationCodecClientPtr removed_codec_client = startAddressDrain();
+
+  sendLdsResponse(std::vector<std::string>{}, "3");
+  test_server_->waitForGauge("listener_manager.total_listeners_active", Eq(0));
+  EXPECT_EQ(1, test_server_->gauge("listener_manager.total_listener_addresses_draining")->value());
+  waitForAddressAndListenerDrains(*removed_codec_client);
+}
+
+// A full update while the drain of a removed address continues closes the connections of the
+// replaced listener, and the new listener serves the remaining address.
+TEST_P(ListenerMultiAddressesIntegrationTest, FullUpdateDuringAddressDrain) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  setDrainTime(std::chrono::seconds(5 * TIMEOUT_FACTOR));
+  IntegrationCodecClientPtr removed_codec_client = startAddressDrain();
+
+  listener_config_.mutable_per_connection_buffer_limit_bytes()->set_value(1024);
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "3");
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(3 * concurrency_));
+  EXPECT_EQ(1, test_server_->gauge("listener_manager.total_listeners_draining")->value());
+  EXPECT_EQ(1, test_server_->gauge("listener_manager.total_listener_addresses_draining")->value());
+  waitForAddressAndListenerDrains(*removed_codec_client);
+  EXPECT_EQ(1, test_server_->counter("listener_manager.listener_in_place_updated")->value());
+
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*codec_client_);
+}
+
+// An update that warms while it initializes, since its route configuration is loaded already, and
+// that then fails to set a socket option of an added address after listening, is dropped. ASAN
+// reports a use-after-free here if the update is deleted inside its own init manager.
+TEST_P(ListenerMultiAddressesIntegrationTest, AddAddressWithBadPostListenSocketOption) {
+#ifdef WIN32
+  GTEST_SKIP() << "Envoy always uses ExactBalance at WIN32.";
+#endif
+  initializeWithFixedPorts();
+  codec_client_ = makeHttpConnection(lookupPort("address1"));
+  sendRequest(*codec_client_);
+
+  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
+  auto* socket_option = addAddress(freePort()).mutable_socket_options()->add_socket_options();
+  socket_option->set_state(envoy::config::core::v3::SocketOption::STATE_LISTENING);
+  socket_option->set_level(10000);     // Invalid level.
+  socket_option->set_int_value(10000); // Invalid value.
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  test_server_->waitForCounter("listener_manager.listener_create_failure", Eq(1));
+  test_server_->waitForCounter("listener_manager.lds.update_success", Eq(2));
+  EXPECT_EQ(0, test_server_->gauge("listener_manager.total_listeners_warming")->value());
+  sendRequest(*codec_client_);
+}
+
+// An in place filter chain update that gets new sockets for its port 0 address, since it adds an
+// empty TCP keepalive, keeps serving the address that the workers listen on.
+TEST_P(ListenerIntegrationTest, InPlaceUpdateWithNewSocketsOfPortZeroAddress) {
+  on_server_init_function_ = [&]() {
+    createLdsStream();
+    sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "1");
+    createRdsStream(route_table_name_);
+  };
+  setDrainTime(std::chrono::seconds(2 * TIMEOUT_FACTOR));
+  initialize();
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
+  registerTestServerPorts({listener_name_});
+  sendRdsResponse(routeConfig(), "1");
+  test_server_->waitForCounter("listener_manager.listener_create_success", Ge(1));
+
+  listener_config_.mutable_filter_chains(0)->mutable_filters(0)->set_name("http_filter");
+  listener_config_.mutable_tcp_keepalive();
+  sendLdsResponse({MessageUtil::getYamlStringFromMessage(listener_config_)}, "2");
+  sendRdsResponse(routeConfig(), "2");
+  test_server_->waitForCounter("listener_manager.listener_in_place_updated", Eq(1));
+  test_server_->waitForCounter("listener_manager.listener_create_success", Eq(2));
+  test_server_->waitForGauge("listener_manager.total_filter_chains_draining", Eq(0));
+
+  codec_client_ = makeHttpConnection(lookupPort(listener_name_));
+  auto response =
+      sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Create a listener, then do an in-place update for the listener.

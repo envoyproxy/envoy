@@ -58,6 +58,7 @@ ECN
 ECS
 EdDSA
 EKS
+LEB
 Millicores
 NID
 NIST
@@ -331,6 +332,7 @@ JWT
 JWTs
 alg
 aud
+audiobook
 crv
 iat
 iss
@@ -1333,6 +1335,7 @@ quantiles
 querydetails
 quiesce
 quitquitquit
+quota
 qvalue
 radix
 radixtree
@@ -1388,6 +1391,7 @@ rele
 releasor
 reloadable
 remoting
+renormalize
 renderers
 reparse
 repeatability
@@ -1670,12 +1674,16 @@ util
 utils
 va
 valgrind
+valkey
 validator
 validators
+valkey
 vanishingly
 varchar
 variadic
 varint
+Vcluster
+vcluster
 vec
 vectorize
 VBC
@@ -1843,3 +1851,7 @@ X25519MLKEM768
 cpaths
 SynchronousFeedbackResourceMonitor
 bernoulli
+vendored
+reparent
+reparents
+reparenting

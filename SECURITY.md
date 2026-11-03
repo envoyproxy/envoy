@@ -369,7 +369,7 @@ use of Envoy should:
     an individual user address, but instead a list that can be maintained by your organization as
     individuals come and go. A good example is envoy-security@seven.com, a bad example is
     acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
-    e-mail updates. This e-mail address will be [shared with the Envoy community](#Members).
+    e-mail updates. This e-mail address will be [shared with the Envoy community](#members).
 
 Note that Envoy maintainers are members of the Envoy security team. [Members of the Envoy security
 team](OWNERS.md#envoy-security-team) and the organizations that they represent are implicitly

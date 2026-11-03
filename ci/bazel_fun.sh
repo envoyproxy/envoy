@@ -34,6 +34,7 @@ run_in_mods() {
     }
     for module_dir in "${_mod_dirs[@]}"; do
         status=0
+        echo "Updating .. $module_dir" >&2
         pushd "$module_dir" > /dev/null || return 1
         "$fn" "$module_dir" "$@" || status=$?
         bazel "${BAZEL_STARTUP_OPTIONS[@]}" shutdown
@@ -93,13 +94,13 @@ workspace_bazel_run() {
 
 lockfiles_check() {
     lockfiles_generate
-    if [[ -z "$(git status --porcelain -- "${LOCKFILE_PATHSPECS[@]}")" ]]; then
+    if [[ -z "$("${GIT_BIN}" status --porcelain -- "${LOCKFILE_PATHSPECS[@]}")" ]]; then
         return 0
     fi
-    git --no-pager diff --stat -- "${LOCKFILE_PATHSPECS[@]}"
+    "${GIT_BIN}" --no-pager diff --stat -- "${LOCKFILE_PATHSPECS[@]}"
     echo >&2
     echo "FAIL: Lockfiles are not in sync, please run: ci/do_ci.sh lockfiles" >&2
-    if { git --no-pager diff -- "${LOCKFILE_PATHSPECS[@]}" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
+    if { "${GIT_BIN}" --no-pager diff -- "${LOCKFILE_PATHSPECS[@]}" > "$LOCKFILES_DIFF_OUTPUT"; } 2>/dev/null; then
         echo "  Full diff written to ${LOCKFILES_DIFF_OUTPUT}" >&2
     fi
     echo >&2
@@ -138,10 +139,10 @@ module_versions_update() {
             -e "/^module\($/,/^\)$/ s/^(    version = )\"[^\"]*\"/\1\"${version}\"/" \
             -e "s/^(bazel_dep\(name = \"(${modules})\", version = )\"[^\"]*\"/\1\"${version}\"/" \
             "$module_file"
-        if ! git diff --quiet -- "$module_file"; then
+        if ! "${GIT_BIN}" diff --quiet -- "$module_file"; then
             echo "${module_file}: ${version}"
         fi
-    done < <(git ls-files ':(glob)**/MODULE.bazel')
+    done < <("${GIT_BIN}" ls-files ':(glob)**/MODULE.bazel')
 }
 
 registry_current_hash() {
@@ -167,10 +168,75 @@ registry_current_hash() {
     echo "${current_hash}"
 }
 
+# Print the absolute path of a hermetic, Bazel-provided executable (eg `@jq//:jq`), so CI
+# scripts outside Bazel do not depend on tools installed in the build image.
+bazel_tool_path() {
+    local target="$1"
+    local path
+    local root
+    # Leave the `bazel-bin` etc convenience symlinks pointing at the caller's build, which may
+    # use different options (eg `-c opt`), and skip workspace status: it needs git, which may be
+    # the tool being resolved.
+    bazel "${BAZEL_STARTUP_OPTIONS[@]}" build "${BAZEL_BUILD_OPTIONS[@]}" \
+        --remote_download_toplevel --experimental_convenience_symlinks=ignore \
+        --workspace_status_command=/bin/true "$target" >&2
+    path="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" cquery "${BAZEL_BUILD_OPTIONS[@]}" \
+        --output=files "$target" 2>/dev/null)"
+    if [[ -z "$path" || "$path" == *$'\n'* ]]; then
+        echo "FAIL: Unable to resolve a single executable for ${target}" >&2
+        return 1
+    fi
+    # Source files of external repos live under the output base. The execroot only gets
+    # `external/<repo>` symlinks planted when a local action consumes them, which never
+    # happens with remote execution. Generated files are under the execution root.
+    if [[ "$path" == external/* ]]; then
+        root="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" output_base)"
+    else
+        root="$(bazel "${BAZEL_STARTUP_OPTIONS[@]}" info "${BAZEL_BUILD_OPTIONS[@]}" execution_root)"
+    fi
+    echo "${root}/${path}"
+}
+
+# Resolve the LLVM toolchain's `llvm-strip` as `STRIP_BIN` (it strips GCC-built binaries too),
+# rather than relying on binutils in the build image.
+hermetic_strip() {
+    if [[ -z "${STRIP_BIN:-}" ]]; then
+        STRIP_BIN="$(bazel_tool_path @llvm_toolchain_llvm//:strip)"
+        export STRIP_BIN
+    fi
+}
+
+# Resolve the hermetic git toolchain as `GIT_BIN`, for CI scripts and Bazel's workspace status.
+# CI must not depend on a `git` installed in the build image. There is no prebuilt git for macOS,
+# where `do_ci.sh` only runs locally (CI uses `ci/mac_ci_steps.sh`), so use the host's git there
+# rather than resolving through Bazel.
+hermetic_git() {
+    if [[ -n "${GIT_BIN:-}" ]]; then
+        return
+    fi
+    if [[ "${OSTYPE}" == darwin* ]]; then
+        GIT_BIN="$(command -v git)" || {
+            echo "FAIL: git not found on PATH" >&2
+            return 1
+        }
+    else
+        GIT_BIN="$(bazel_tool_path //tools/git:bin)"
+    fi
+    export GIT_BIN
+}
+
+hermetic_jq() {
+    if [[ -z "${JQ_BIN:-}" ]]; then
+        JQ_BIN="$(bazel_tool_path @jq//:jq)"
+        export JQ_BIN
+    fi
+}
+
 registry_check() {
     local version
     local registry_hash=""
 
+    hermetic_jq
     version="$(cat VERSION.txt)"
     if [[ -n "${ENVOY_REGISTRY_ALLOW_UNSAFE:-}" ]]; then
         run_in_registry_mods _registry_check_mod \
@@ -206,7 +272,7 @@ _registry_check_mod() {
     }
 
     sha="$(cat "${sha_path}")"
-    tags="$(jq -r '.tags | join(" ")' "${status_path}")"
+    tags="$("${JQ_BIN}" -r '.tags | join(" ")' "${status_path}")"
     if [[ -z "${sha}" || "${sha}" == "null" ]]; then
         echo "FAIL: Failed to determine registry hash for ${workspace}" >&2
         return 1

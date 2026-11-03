@@ -8,6 +8,8 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace GeoipProviders {
@@ -306,7 +308,7 @@ void GeoipProvider::lookupInCityDb(
     int mmdb_error = MMDB_SUCCESS;
     auto city_db_ptr = getCityDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(CITY_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(CITY_DB_TYPE, "_lookup_pre_complete"));
     if (!city_db_ptr) {
       IS_ENVOY_BUG("Maxmind city database must be initialised for performing lookups");
       return;
@@ -345,7 +347,7 @@ void GeoipProvider::lookupInAsnDb(
     int mmdb_error = MMDB_SUCCESS;
     auto asn_db_ptr = getAsnDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(ASN_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(ASN_DB_TYPE, "_lookup_pre_complete"));
     if (!asn_db_ptr) {
       if (isIspDbSet()) {
         // ASN information can be looked up from ISP database as well, so we don't need to
@@ -383,7 +385,7 @@ void GeoipProvider::lookupInAnonDb(
     int mmdb_error = MMDB_SUCCESS;
     auto anon_db_ptr = getAnonDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(ANON_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(ANON_DB_TYPE, "_lookup_pre_complete"));
     if (!anon_db_ptr) {
       IS_ENVOY_BUG("Maxmind anon database must be initialised for performing lookups");
       return;
@@ -418,7 +420,7 @@ void GeoipProvider::lookupInIspDb(
     int mmdb_error = MMDB_SUCCESS;
     auto isp_db_ptr = getIspDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(ISP_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(ISP_DB_TYPE, "_lookup_pre_complete"));
     if (!isp_db_ptr) {
       IS_ENVOY_BUG("Maxmind isp database must be initialised for performing lookups");
       return;
@@ -460,7 +462,7 @@ void GeoipProvider::lookupInCountryDb(
     int mmdb_error = MMDB_SUCCESS;
     auto country_db_ptr = getCountryDb();
     // Used for testing.
-    synchronizer_.syncPoint(std::string(COUNTRY_DB_TYPE).append("_lookup_pre_complete"));
+    synchronizer_.syncPoint(absl::StrCat(COUNTRY_DB_TYPE, "_lookup_pre_complete"));
     if (!country_db_ptr) {
       if (isCityDbSet()) {
         // Country information can be looked up from City database as well, so we don't need to

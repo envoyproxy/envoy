@@ -168,6 +168,9 @@ std::string getStatusString(Status status) {
 
   case Status::JwksBioAllocError:
     return "Failed to create BIO due to memory allocation failure";
+
+  case Status::JwtAlgorithmNotAllowed:
+    return "Jwt algorithm is not allowed";
   };
   // Return empty string though switch-case is exhaustive. See issues/91.
   return "";

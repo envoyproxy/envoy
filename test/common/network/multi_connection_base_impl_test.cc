@@ -13,7 +13,6 @@
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/stream_info/mocks.h"
 
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
@@ -42,8 +41,7 @@ public:
     next_connections_.pop_front();
     created_connections_.push_back(conn.get());
     EXPECT_CALL(*created_connections_.back(), addConnectionCallbacks(_))
-        .WillOnce(
-            Invoke([&](ConnectionCallbacks& cb) -> void { connection_callbacks_.push_back(&cb); }));
+        .WillOnce([&](ConnectionCallbacks& cb) -> void { connection_callbacks_.push_back(&cb); });
     return conn;
   }
 
@@ -79,10 +77,10 @@ public:
 
   void expectConnectionCreation(size_t id) {
     EXPECT_CALL(*connection_provider_, createNextConnection(_))
-        .WillOnce(testing::Invoke([this, id](uint64_t conn_id) -> auto {
+        .WillOnce([this, id](uint64_t conn_id) -> auto {
           EXPECT_EQ(connection_provider_->nextConnection(), id);
           return connection_provider_->getNextConnection(conn_id);
-        }));
+        });
   }
 
   void setupMultiConnectionImpl(size_t connections) {
@@ -240,7 +238,7 @@ TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectIsForwardedToFinalConnecti
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*createdConnections()[0], addConnectionCallbacks(_));
   EXPECT_CALL(*createdConnections()[0], onDrain(_))
-      .WillOnce(Invoke([&forwarded](Network::ConnectionDrainEvent event) { forwarded = event; }));
+      .WillOnce([&forwarded](Network::ConnectionDrainEvent event) { forwarded = event; });
   connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
 
   EXPECT_EQ(start_time, forwarded.start_time);
@@ -262,7 +260,7 @@ TEST_F(MultiConnectionBaseImplTest, DrainBeforeConnectFinishedKeepsFirstEvent) {
   EXPECT_CALL(*failover_timer_, disableTimer());
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   EXPECT_CALL(*createdConnections()[0], onDrain(_))
-      .WillOnce(Invoke([&forwarded](Network::ConnectionDrainEvent event) { forwarded = event; }));
+      .WillOnce([&forwarded](Network::ConnectionDrainEvent event) { forwarded = event; });
   connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
 
   EXPECT_EQ(start_time, forwarded.start_time);
@@ -523,7 +521,7 @@ TEST_F(MultiConnectionBaseImplTest, CloseDuringAttemptWithCallbacks) {
   EXPECT_CALL(*createdConnections()[1], close(ConnectionCloseType::NoFlush, _));
   // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*createdConnections()[0], addConnectionCallbacks(_))
-      .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); }));
+      .WillOnce([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); });
   EXPECT_CALL(*createdConnections()[0], close(ConnectionCloseType::FlushWrite, _));
   impl_->close(ConnectionCloseType::FlushWrite);
 }
@@ -656,13 +654,13 @@ TEST_F(MultiConnectionBaseImplTest, AddConnectionCallbacks) {
 
   // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*createdConnections()[1], addConnectionCallbacks(_))
-      .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); }));
+      .WillOnce([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks); });
   connectSecondAttempt();
 
   MockConnectionCallbacks callbacks2;
   // Verify that addConnectionCallbacks() calls are delegated to the remaining connection.
   EXPECT_CALL(*createdConnections()[1], addConnectionCallbacks(_))
-      .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks2); }));
+      .WillOnce([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks2); });
   impl_->addConnectionCallbacks(callbacks2);
 }
 
@@ -681,12 +679,12 @@ TEST_F(MultiConnectionBaseImplTest, RemoveConnectionCallbacks) {
 
   // addConnectionCallbacks() should be applied to the now final connection.
   EXPECT_CALL(*createdConnections()[0], addConnectionCallbacks(_))
-      .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks2); }));
+      .WillOnce([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks2); });
   connectFirstAttempt();
 
   // Verify that removeConnectionCallbacks calls are delegated to the remaining connection.
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_))
-      .WillOnce(Invoke([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks2); }));
+      .WillOnce([&](ConnectionCallbacks& c) -> void { EXPECT_EQ(&c, &callbacks2); });
   impl_->removeConnectionCallbacks(callbacks2);
 }
 
@@ -704,11 +702,11 @@ TEST_F(MultiConnectionBaseImplTest, WriteBeforeConnect) {
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   // The call to write() will be replayed on the underlying connection.
   EXPECT_CALL(*createdConnections()[0], write(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
+      .WillOnce([](Buffer::Instance& data, bool end_stream) -> void {
         EXPECT_EQ("hello world", data.toString());
         EXPECT_FALSE(end_stream);
         ;
-      }));
+      });
   connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
 }
 
@@ -727,11 +725,11 @@ TEST_F(MultiConnectionBaseImplTest, WriteTwiceBeforeConnect) {
   EXPECT_CALL(*createdConnections()[0], removeConnectionCallbacks(_));
   // The call to write() will be replayed on the underlying connection.
   EXPECT_CALL(*createdConnections()[0], write(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
+      .WillOnce([](Buffer::Instance& data, bool end_stream) -> void {
         EXPECT_EQ("hello worldgoodbye", data.toString());
         EXPECT_TRUE(end_stream);
         ;
-      }));
+      });
   connectionCallbacks()[0]->onEvent(ConnectionEvent::Connected);
 }
 
@@ -745,11 +743,11 @@ TEST_F(MultiConnectionBaseImplTest, Write) {
   Buffer::OwnedImpl data("hello world");
   // The call to write() will be replayed on the underlying connection.
   EXPECT_CALL(*createdConnections()[0], write(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
+      .WillOnce([](Buffer::Instance& data, bool end_stream) -> void {
         EXPECT_EQ("hello world", data.toString());
         EXPECT_TRUE(end_stream);
         ;
-      }));
+      });
   impl_->write(data, true);
 }
 
@@ -790,10 +788,10 @@ TEST_F(MultiConnectionBaseImplTest, WriteBeforeLimit) {
 
   // The call to write() will be replayed on the underlying connection.
   EXPECT_CALL(*createdConnections()[0], write(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
+      .WillOnce([](Buffer::Instance& data, bool end_stream) -> void {
         EXPECT_EQ("hello world", data.toString());
         EXPECT_FALSE(end_stream);
-      }));
+      });
   EXPECT_CALL(*createdConnections()[0], bufferLimit()).WillRepeatedly(Return(length - 1));
   connectFirstAttempt();
 }
@@ -815,10 +813,10 @@ TEST_F(MultiConnectionBaseImplTest, WriteBeforeConnectOverLimit) {
   EXPECT_CALL(*createdConnections()[0], bufferLimit()).WillRepeatedly(Return(length - 1));
   // The call to write() will be replayed on the underlying connection.
   EXPECT_CALL(*createdConnections()[0], write(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& data, bool end_stream) -> void {
+      .WillOnce([](Buffer::Instance& data, bool end_stream) -> void {
         EXPECT_EQ("hello world", data.toString());
         EXPECT_FALSE(end_stream);
-      }));
+      });
   connectFirstAttempt();
 }
 
@@ -882,7 +880,7 @@ TEST_F(MultiConnectionBaseImplTest, SetConnectionStats) {
   Connection::ConnectionStats cs = {rx_total,   rx_current,   tx_total,
                                     tx_current, &bind_errors, &delayed_close_timeouts};
   EXPECT_CALL(*createdConnections()[0], setConnectionStats(_))
-      .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs); }));
+      .WillOnce([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs); });
   impl_->setConnectionStats(cs);
 
   startConnect();
@@ -891,7 +889,7 @@ TEST_F(MultiConnectionBaseImplTest, SetConnectionStats) {
   // Here, it is using stats latched by the multi connection base connection and so
   // will be its own unique data structure.
   EXPECT_CALL(*nextConnection(), setConnectionStats(_))
-      .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_NE(&s, &cs); }));
+      .WillOnce([&](const Connection::ConnectionStats& s) -> void { EXPECT_NE(&s, &cs); });
   timeOutAndStartNextAttempt();
 
   connectSecondAttempt();
@@ -900,7 +898,7 @@ TEST_F(MultiConnectionBaseImplTest, SetConnectionStats) {
   Connection::ConnectionStats cs2 = {rx_total,   rx_current,   tx_total,
                                      tx_current, &bind_errors, &delayed_close_timeouts};
   EXPECT_CALL(*createdConnections()[1], setConnectionStats(_))
-      .WillOnce(Invoke([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs2); }));
+      .WillOnce([&](const Connection::ConnectionStats& s) -> void { EXPECT_EQ(&s, &cs2); });
   impl_->setConnectionStats(cs2);
 }
 

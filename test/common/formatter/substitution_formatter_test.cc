@@ -56,7 +56,6 @@ using testing::AnyOf;
 using testing::Const;
 using testing::ContainsRegex;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Not;
 using testing::Return;
@@ -1274,8 +1273,7 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
-        .WillOnce(
-            Invoke([](char*, size_t) -> Api::SysCallIntResult { return {-1, ENAMETOOLONG}; }));
+        .WillOnce([](char*, size_t) -> Api::SysCallIntResult { return {-1, ENAMETOOLONG}; });
 
     StreamInfoFormatter upstream_format("HOSTNAME");
     EXPECT_EQ(std::nullopt, formatForTest(upstream_format, {}, stream_info));
@@ -1287,10 +1285,10 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
     EXPECT_CALL(os_sys_calls, gethostname(_, _))
-        .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+        .WillOnce([](char* name, size_t) -> Api::SysCallIntResult {
           StringUtil::strlcpy(name, "myhostname", 11);
           return {0, 0};
-        }));
+        });
 
     StreamInfoFormatter upstream_format("HOSTNAME");
     EXPECT_EQ("myhostname", formatForTest(upstream_format, {}, stream_info));
@@ -3005,6 +3003,9 @@ TEST(SubstitutionFormatterTest, streamInfoFormatterWithSsl) {
     EXPECT_THAT(formatValueForTest(upstream_format, {}, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
   }
+}
+
+TEST(SubstitutionFormatterTest, streamInfoFormatterWithUpstreamSsl) {
   {
     NiceMock<StreamInfo::MockStreamInfo> stream_info;
     StreamInfoFormatter upstream_format("UPSTREAM_TLS_SESSION_ID");
@@ -4393,7 +4394,7 @@ TEST(SubstitutionFormatterTest, SpanIDFormatter) {
   }
 
   {
-    // Span present but getSpanId() returns empty (e.g., Zipkin, Datadog, SkyWalking).
+    // Span present but getSpanId() returns empty (e.g., Zipkin, SkyWalking).
     Tracing::MockSpan active_span;
     EXPECT_CALL(active_span, getSpanId()).WillRepeatedly(Return(""));
 
@@ -6382,10 +6383,10 @@ TEST(SubstitutionFormatterTest, PercentEscapingEdgeCase) {
   NiceMock<Api::MockOsSysCalls> os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
   EXPECT_CALL(os_sys_calls, gethostname(_, _))
-      .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+      .WillOnce([](char* name, size_t) -> Api::SysCallIntResult {
         StringUtil::strlcpy(name, "myhostname", 11);
         return {0, 0};
-      }));
+      });
   std::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 

@@ -32,6 +32,7 @@ namespace RateLimitFilter {
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(ok)                                                                                      \
   COUNTER(over_limit)                                                                              \
+  COUNTER(shadow_over_limit)                                                                       \
   COUNTER(total)                                                                                   \
   GAUGE(active, Accumulate)
 

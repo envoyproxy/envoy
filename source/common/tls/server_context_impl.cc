@@ -19,6 +19,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/base64.h"
+#include "source/common/common/byte_order.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/utility.h"
@@ -257,8 +258,44 @@ ServerContextImpl::ServerContextImpl(
   }
 }
 
+namespace {
+
+// The type of a session context ID field. The values are part of every session context ID, so
+// changing one stops the resumption of the sessions that were established before.
+enum class SessionContextIdField : uint8_t {
+  CommonName = 1,
+  DnsSubjectAltName = 2,
+  UriSubjectAltName = 3,
+  IpSubjectAltName = 4,
+  IssuerDigest = 5,
+  CertificateValidationDigest = 6,
+  ServerName = 7,
+};
+
+// Hashes a field of the session context ID. With prefix_type_and_length, the type and the length
+// of the field precede its bytes, so that no two different sequences of fields hash the same bytes.
+void updateDigestForSessionContextIdField(bssl::ScopedEVP_MD_CTX& md, bool prefix_type_and_length,
+                                          SessionContextIdField field, const void* data,
+                                          size_t length) {
+  int rc;
+  if (prefix_type_and_length) {
+    const uint8_t field_type = static_cast<uint8_t>(field);
+    rc = EVP_DigestUpdate(md.get(), &field_type, sizeof(field_type));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    const uint64_t field_length = toEndianness<ByteOrder::BigEndian>(static_cast<uint64_t>(length));
+    rc = EVP_DigestUpdate(md.get(), &field_length, sizeof(field_length));
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+  }
+  rc = EVP_DigestUpdate(md.get(), data, length);
+  RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+}
+
+} // namespace
+
 absl::StatusOr<ServerContextImpl::SessionContextID>
 ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string>& server_names) {
+  const bool prefix_type_and_length = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.unambiguous_tls_session_context_id");
   uint8_t hash_buffer[EVP_MAX_MD_SIZE];
   unsigned hash_length = 0;
 
@@ -289,9 +326,9 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
           return absl::InvalidArgumentError("Invalid TLS context has an empty subject CN");
         }
 
-        rc =
-            EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(cn_asn1), ASN1_STRING_length(cn_asn1));
-        RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+        updateDigestForSessionContextIdField(
+            md, prefix_type_and_length, SessionContextIdField::CommonName,
+            ASN1_STRING_get0_data(cn_asn1), ASN1_STRING_length(cn_asn1));
       }
 
       unsigned san_count = 0;
@@ -302,21 +339,22 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
         for (const GENERAL_NAME* san : san_names.get()) {
           switch (san->type) {
           case GEN_IPADD:
-            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.iPAddress),
-                                  ASN1_STRING_length(san->d.iPAddress));
-            RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+            updateDigestForSessionContextIdField(
+                md, prefix_type_and_length, SessionContextIdField::IpSubjectAltName,
+                ASN1_STRING_get0_data(san->d.iPAddress), ASN1_STRING_length(san->d.iPAddress));
             ++san_count;
             break;
           case GEN_DNS:
-            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.dNSName),
-                                  ASN1_STRING_length(san->d.dNSName));
-            RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+            updateDigestForSessionContextIdField(
+                md, prefix_type_and_length, SessionContextIdField::DnsSubjectAltName,
+                ASN1_STRING_get0_data(san->d.dNSName), ASN1_STRING_length(san->d.dNSName));
             ++san_count;
             break;
           case GEN_URI:
-            rc = EVP_DigestUpdate(md.get(), ASN1_STRING_get0_data(san->d.uniformResourceIdentifier),
-                                  ASN1_STRING_length(san->d.uniformResourceIdentifier));
-            RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+            updateDigestForSessionContextIdField(
+                md, prefix_type_and_length, SessionContextIdField::UriSubjectAltName,
+                ASN1_STRING_get0_data(san->d.uniformResourceIdentifier),
+                ASN1_STRING_length(san->d.uniformResourceIdentifier));
             ++san_count;
             break;
           }
@@ -335,18 +373,32 @@ ServerContextImpl::generateHashForSessionContextId(const std::vector<std::string
       RELEASE_ASSERT(hash_length == SHA256_DIGEST_LENGTH,
                      fmt::format("invalid SHA256 hash length {}", hash_length));
 
-      rc = EVP_DigestUpdate(md.get(), hash_buffer, hash_length);
-      RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+      updateDigestForSessionContextIdField(md, prefix_type_and_length,
+                                           SessionContextIdField::IssuerDigest, hash_buffer,
+                                           hash_length);
     }
   }
 
-  cert_validator_->updateDigestForSessionId(md, hash_buffer, hash_length);
+  if (prefix_type_and_length) {
+    // The certificate validator hashes settings of varying length, so its digest is one field.
+    bssl::ScopedEVP_MD_CTX validation_md;
+    rc = EVP_DigestInit(validation_md.get(), EVP_sha256());
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    cert_validator_->updateDigestForSessionId(validation_md, hash_buffer, hash_length);
+    rc = EVP_DigestFinal(validation_md.get(), hash_buffer, &hash_length);
+    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    updateDigestForSessionContextIdField(md, prefix_type_and_length,
+                                         SessionContextIdField::CertificateValidationDigest,
+                                         hash_buffer, hash_length);
+  } else {
+    cert_validator_->updateDigestForSessionId(md, hash_buffer, hash_length);
+  }
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different
   // filter chains, even when using the same server certificate.
   for (const auto& name : server_names) {
-    rc = EVP_DigestUpdate(md.get(), name.data(), name.size());
-    RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
+    updateDigestForSessionContextIdField(
+        md, prefix_type_and_length, SessionContextIdField::ServerName, name.data(), name.size());
   }
 
   SessionContextID session_id;
@@ -371,10 +423,11 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
   if (encrypt == 1) {
     // Encrypt
-    RELEASE_ASSERT(!session_ticket_keys_.empty(), "");
-    // TODO(ggreenway): validate in SDS that session_ticket_keys_ cannot be empty,
-    // or if we allow it to be emptied, reconfigure the context so this callback
-    // isn't set.
+    // A certificate selector can switch the handshake to a context without keys, which sends no
+    // ticket.
+    if (session_ticket_keys_.empty()) {
+      return 0;
+    }
 
     const Envoy::Ssl::ServerContextConfig::SessionTicketKey& key = session_ticket_keys_.front();
 
