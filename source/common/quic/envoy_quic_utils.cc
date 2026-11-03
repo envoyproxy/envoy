@@ -236,6 +236,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
   // `recent_received_addresses_` cache in
   // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   constexpr size_t max_addresses_cache_size = 4u;
+  Network::ConnectionSocketPtr connection_socket;
   auto create_socket = [&]() {
     return std::make_unique<Network::ConnectionSocketImpl>(
         Network::Socket::Type::Datagram,
@@ -244,7 +245,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
         local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
         Network::SocketCreationOptions{false, max_addresses_cache_size});
   };
-  auto connection_socket =
+  connection_socket =
 #if defined(__linux__)
       netns ? Network::Utility::execInNetworkNamespace(create_socket, netns->c_str())
                   .value_or(nullptr)
