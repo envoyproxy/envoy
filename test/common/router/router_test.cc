@@ -738,6 +738,60 @@ TEST_F(RouterTest, AddMultipleCookies) {
   router_->onDestroy();
 }
 
+// Regression test for the crash in addDownstreamSetCookie() on the
+// Http::AsyncClient-driven router path (ext_authz / ratelimit side calls,
+// mirror/shadow), where there is no downstream connection. Previously the cookie
+// seed unconditionally dereferenced the null downstream connection and crashed
+// the worker whenever a cookie hash policy was configured. The call must now
+// degrade to a stable empty seed and not crash.
+TEST_F(RouterTest, AddCookieNullDownstreamConnection) {
+  router_->downstream_connection_is_null_ = true;
+
+  ON_CALL(callbacks_.route_->route_entry_, hashPolicy())
+      .WillByDefault(Return(&callbacks_.route_->route_entry_.hash_policy_));
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           std::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+        EXPECT_EQ(10UL, context->computeHashKey().value());
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
+
+  std::string cookie_value = "not-empty";
+  EXPECT_CALL(callbacks_.route_->route_entry_.hash_policy_, generateHash(_, _, _))
+      .WillOnce(
+          Invoke([&](OptRef<const Http::RequestHeaderMap>, OptRef<const StreamInfo::StreamInfo>,
+                     Http::HashPolicy::AddCookieCallback add_cookie) {
+            // Pre-fix this dereferenced the null downstream connection and crashed
+            // the worker; it must now return a stable empty seed.
+            cookie_value = add_cookie("foo", "", std::chrono::seconds(1337), {});
+            return std::optional<uint64_t>(10);
+          }));
+
+  // With no downstream connection the cookie is not generated, so no Set-Cookie
+  // header is emitted downstream.
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::HeaderMap& headers, const bool) -> void {
+        EXPECT_TRUE(headers.get(Http::Headers::get().SetCookie).empty());
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+
+  // The worker did not crash and the async path produced a stable empty cookie.
+  EXPECT_EQ(cookie_value, "");
+  router_->onDestroy();
+}
+
 TEST_F(RouterTest, MetadataNoOp) { EXPECT_EQ(nullptr, router_->metadataMatchCriteria()); }
 
 TEST_F(RouterTest, MetadataMatchCriteria) {

@@ -5,14 +5,9 @@ CONTAINERS = """
 REPO = "{repo}"
 REPO_GCR = "{repo_gcr}"
 SHA = "{sha}"
-SHA_GCC = "{sha_gcc}"
 SHA_MOBILE = "{sha_mobile}"
 SHA_WORKER = "{sha_worker}"
 TAG = "{tag}"
-
-def image_gcc():
-    return "%s@sha256:%s" % (
-        REPO_GCR, SHA_GCC)
 
 def image_mobile():
     return "%s@sha256:%s" % (
@@ -85,7 +80,6 @@ def _envoy_repo_impl(repository_ctx):
         repo = build_image["repo"],
         repo_gcr = build_image["repo-gcr"],
         sha = build_image["sha"],
-        sha_gcc = build_image["sha-gcc"],
         sha_mobile = build_image["sha-mobile"],
         sha_worker = build_image["sha-worker"],
         tag = build_image["tag"],
@@ -108,16 +102,9 @@ def _envoy_repo_impl(repository_ctx):
     # Starlark file - we should only accept a proper boolean value and nothing else.
     local_sysroot = {"True": True, "False": False}.get(local_sysroot, False)
 
-    # When set to True, the toolchain uses libstdc++ instead of the default
-    # builtin libc++. This is useful on systems where libc++ is not available
-    # (e.g. RHEL/UBI).
-    use_libstdcpp = repository_ctx.os.environ.get("BAZEL_USE_LIBSTDCPP", "False")
-    use_libstdcpp = {"True": True, "False": False}.get(use_libstdcpp, False)
-
     repository_ctx.file("compiler.bzl", """
 USE_LOCAL_SYSROOT = %s
-USE_LIBSTDCPP = %s
-""" % (local_sysroot, use_libstdcpp))
+""" % local_sysroot)
     repository_ctx.file("version.bzl", "VERSION = '%s'\nAPI_VERSION = '%s'" % (version, api_version))
     repository_ctx.file("path.bzl", "PATH = '%s'" % repo_version_path.dirname)
     repository_ctx.file("envoy_repo.py", "PATH = '%s'\nVERSION = '%s'\nAPI_VERSION = '%s'" % (repo_version_path.dirname, version, api_version))
@@ -298,7 +285,7 @@ _envoy_repo = repository_rule(
         "envoy_api_version": attr.label(default = "@envoy//:API_VERSION.txt"),
         "envoy_ci_config": attr.label(default = "@envoy//:.github/config.yml"),
     },
-    environ = ["BAZEL_USE_HOST_SYSROOT", "BAZEL_USE_LIBSTDCPP"],
+    environ = ["BAZEL_USE_HOST_SYSROOT"],
 )
 
 def envoy_repo():

@@ -60,6 +60,7 @@ envoy_cc_extension(
         ":filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/network/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

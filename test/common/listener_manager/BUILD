@@ -72,11 +72,56 @@ envoy_cc_test_library(
     ],
 )
 
+# The listener manager tests are compiled once and run as separate targets by suite, so the slow
+# in-place update tests and the large real filter suite each get their own shards and time budget.
+# Keep these lists in step with the suite names: a filter matching no tests runs nothing and passes.
+# Suites not listed run in `listener_manager_impl_test`.
+_REAL_FILTERS_SUITES = [
+    "ListenerManagerImplWithRealFiltersTest",
+    "ListenerManagerImplWithRealFiltersWorkerRoutingTest",
+]
+
+_IN_PLACE_SUITES = [
+    "ListenerManagerImplFcdsInPlaceUpdateTest",
+    "ListenerManagerImplForInPlaceFilterChainUpdateTest",
+    "ListenerManagerImplInPlaceAddressUpdateTest",
+    "ListenerManagerImplInPlaceAddressUpdateWithTwoWorkersTest",
+]
+
+_REAL_FILTERS_TESTS = ":".join(["*/%s.*" % suite for suite in _REAL_FILTERS_SUITES])
+
+_IN_PLACE_TESTS = ":".join(["*/%s.*" % suite for suite in _IN_PLACE_SUITES])
+
 envoy_cc_test(
     name = "listener_manager_impl_test",
+    args = ["--gtest_filter=-%s:%s" % (_REAL_FILTERS_TESTS, _IN_PLACE_TESTS)],
+    rbe_pool = "linux_x64_small",
+    shard_count = 6,
+    deps = [":listener_manager_impl_test_suites"],
+)
+
+envoy_cc_test(
+    name = "listener_manager_impl_real_filters_test",
+    args = ["--gtest_filter=" + _REAL_FILTERS_TESTS],
+    rbe_pool = "linux_x64_small",
+    shard_count = 7,
+    deps = [":listener_manager_impl_test_suites"],
+)
+
+envoy_cc_test(
+    name = "listener_manager_impl_in_place_test",
+    args = ["--gtest_filter=" + _IN_PLACE_TESTS],
+    rbe_pool = "linux_x64_small",
+    shard_count = 4,
+    deps = [":listener_manager_impl_test_suites"],
+)
+
+# The suites' compile needs about 8GB with GCC, so it keeps the pool the single test target
+# had (an envoy_cc_test's pool also applies to its compiles).
+envoy_cc_test_library(
+    name = "listener_manager_impl_test_suites",
     srcs = ["listener_manager_impl_test.cc"],
     rbe_pool = "linux_x64_small",
-    shard_count = 16,
     deps = [
         ":listener_manager_impl_test_lib",
         "//envoy/network:socket_interface",

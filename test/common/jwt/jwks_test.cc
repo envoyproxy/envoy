@@ -27,6 +27,8 @@ TEST(JwksParseTest, GoodJwks) {
             "alg": "RS256",
             "use": "sig",
             "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",
+            "x5t#S256": "s256",
+            "x5t": "sha1",
             "n": "0YWnm_eplO9BFtXszMRQNL5UtZ8HJdTH2jK7vjs4XdLkPW7YBkkm_2xNgcaVpkW0VT2l4mU3KftR-6s3Oa5Rnz5BrWEUkCTVVolR7VYksfqIB2I_x5yZHdOiomMTcm3DheUUCgbJRv5OKRnNqszA4xHn3tA3Ry8VO3X7BgKZYAUh9fyZTFLlkeAh0-bLK5zvqCmKW5QgDIXSxUTJxPjZCgfx1vmAfGqaJb-nvmrORXQ6L284c73DUL7mnt6wj3H6tVqPKA27j56N0TB1Hfx4ja6Slr8S4EB3F1luYhATa1PKUSH8mYDW11HolzZmTQpRoLV8ZoHbHEaTfqX_aYahIw",
             "e": "AQAB"
           },
@@ -48,9 +50,13 @@ TEST(JwksParseTest, GoodJwks) {
 
   EXPECT_EQ(jwks->keys()[0]->alg_, "RS256");
   EXPECT_EQ(jwks->keys()[0]->kid_, "62a93512c9ee4c7f8067b5a216dade2763d32a47");
+  EXPECT_EQ(jwks->keys()[0]->x5t_s256_, "s256");
+  EXPECT_EQ(jwks->keys()[0]->x5t_, "sha1");
 
   EXPECT_EQ(jwks->keys()[1]->alg_, "RS256");
   EXPECT_EQ(jwks->keys()[1]->kid_, "b3319a147514df7ee5e4bcdee51350cc890cc89e");
+  EXPECT_EQ(jwks->keys()[1]->x5t_s256_, "");
+  EXPECT_EQ(jwks->keys()[1]->x5t_, "");
 }
 
 TEST(JwksParseTest, GoodEC) {

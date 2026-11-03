@@ -1,5 +1,7 @@
 #include <fcntl.h>
 
+#include "envoy/common/platform.h"
+
 #ifndef WIN32
 #include <net/if.h>
 

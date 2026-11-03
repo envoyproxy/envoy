@@ -615,7 +615,7 @@ envoy.filters.http.grpc_json_transcoder:
 envoy.filters.http.grpc_stats:
   categories:
   - envoy.filters.http
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream
   status: stable
   type_urls:
   - envoy.extensions.filters.http.grpc_stats.v3.FilterConfig
@@ -1032,7 +1032,7 @@ envoy.filters.network.redis_proxy:
 envoy.filters.network.sni_cluster:
   categories:
   - envoy.filters.network
-  security_posture: unknown
+  security_posture: robust_to_untrusted_downstream_and_upstream
   status: stable
   type_urls:
   - envoy.extensions.filters.network.sni_cluster.v3.SniCluster
