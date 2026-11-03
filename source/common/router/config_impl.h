@@ -1385,6 +1385,11 @@ private:
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
+  bool hasOnlyDefaultVirtualHost() const {
+    return virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
+           wildcard_virtual_host_prefixes_.empty();
+  }
+  const VirtualHostImpl* findVirtualHostInternal(absl::string_view host) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   // Keeps the shared part of the route config alive and gives access to the route configuration

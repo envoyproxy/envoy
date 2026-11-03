@@ -2855,6 +2855,26 @@ virtual_hosts:
     EXPECT_TRUE(config.virtualHostExists("any.random.domain.org"));
     EXPECT_TRUE(config.virtualHostExists(""));
   }
+
+  // Empty virtual_hosts returns false for all domains
+  {
+    envoy::config::route::v3::RouteConfiguration empty_route_configuration;
+    TestConfigImpl config(empty_route_configuration, factory_context_, true, creation_status_);
+
+    EXPECT_FALSE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists(""));
+  }
+
+  // Alternate vhost_header does not affect direct domain matching in virtualHostExists
+  {
+    auto vhost_header_route_configuration = route_configuration;
+    vhost_header_route_configuration.set_vhost_header("alternate");
+    TestConfigImpl config(vhost_header_route_configuration, factory_context_, true,
+                          creation_status_);
+
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com"));
+  }
 }
 
 TEST_F(RouteMatcherTest, Priority) {

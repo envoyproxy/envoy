@@ -155,8 +155,7 @@ void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
           // reflects that answer, so the request can be answered locally. The delta subscription
           // to the alias is persistent: if the virtual host appears or changes later, the server
           // pushes an update on its own.
-          const bool host_exists =
-              config->virtualHostExists(VhdsSubscription::aliasToDomainName(alias));
+          const bool host_exists = config->virtualHostExists(for_domain);
           thread_local_dispatcher.post([route_config_updated_cb, host_exists] {
             if (auto cb = route_config_updated_cb.lock()) {
               (*cb)(host_exists);
