@@ -71,8 +71,9 @@ Tracer::ThreadLocalTracer::~ThreadLocalTracer() {
 Tracer::Tracer(const std::string& collector_cluster, const std::string& collector_reference_host,
                const datadog::tracing::TracerConfig& config,
                Upstream::ClusterManager& cluster_manager, Stats::Scope& scope,
-               ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source)
-    : tracer_stats_(makeTracerStats(scope)),
+               ThreadLocal::SlotAllocator& thread_local_slot_allocator, TimeSource& time_source,
+               bool delegate_sampling)
+    : delegate_sampling_(delegate_sampling), tracer_stats_(makeTracerStats(scope)),
       thread_local_slot_(
           ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
   const bool allow_added_via_api = true;
@@ -115,20 +116,12 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   datadog::tracing::Span span =
       extractOrCreateSpan(*thread_local_tracer.tracer, span_config, reader);
 
-  // If we did not extract a sampling decision, and if Envoy is telling us to
-  // drop the trace, then we treat that as a "user drop" (manual override).
-  //
-  // If Envoy is telling us to keep the trace, then we leave it up to the
-  // tracer's internal sampler (which might decide to drop the trace anyway).
   const bool use_local_decision = !span.trace_segment().sampling_decision().has_value();
-  if (use_local_decision && !tracing_decision.traced) {
-    // TODO(wbpcode): use USER_KEEP to indicate that the trace should be kept if the
-    // Envoy is telling us to keep the trace.
-    span.trace_segment().override_sampling_priority(
-        int(datadog::tracing::SamplingPriority::USER_DROP));
+  auto result = std::make_unique<Span>(std::move(span), use_local_decision, delegate_sampling_);
+  if (use_local_decision) {
+    result->setSampled(tracing_decision.traced);
   }
-
-  return std::make_unique<Span>(std::move(span), use_local_decision);
+  return result;
 }
 
 datadog::tracing::Span Tracer::extractOrCreateSpan(datadog::tracing::Tracer& tracer,

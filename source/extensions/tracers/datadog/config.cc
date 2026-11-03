@@ -61,10 +61,11 @@ Tracing::DriverSharedPtr DatadogTracerFactory::createTracerDriverTyped(
     const envoy::config::trace::v3::DatadogConfig& proto_config,
     Server::Configuration::TracerFactoryContext& context) {
   auto& factory_context = context.serverFactoryContext();
-  return std::make_shared<Tracer>(
-      proto_config.collector_cluster(), makeCollectorReferenceHost(proto_config),
-      makeConfig(proto_config), factory_context.clusterManager(), factory_context.scope(),
-      factory_context.threadLocal(), factory_context.timeSource());
+  return std::make_shared<Tracer>(proto_config.collector_cluster(),
+                                  makeCollectorReferenceHost(proto_config),
+                                  makeConfig(proto_config), factory_context.clusterManager(),
+                                  factory_context.scope(), factory_context.threadLocal(),
+                                  factory_context.timeSource(), proto_config.delegate_sampling());
 }
 
 /**

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <optional>
+#include <memory>
 
 #include "envoy/common/time.h"
 #include "envoy/tracing/trace_driver.h"
@@ -31,7 +31,9 @@ namespace Datadog {
  */
 class Span : public Tracing::Span {
 public:
-  explicit Span(datadog::tracing::Span&& span, bool use_local_decision = false);
+  explicit Span(datadog::tracing::Span&& span, bool use_local_decision = false,
+                bool delegate_sampling = false);
+  ~Span() override { finishSpan(); }
 
   const datadog::tracing::Optional<datadog::tracing::Span>& impl() const;
 
@@ -53,8 +55,21 @@ public:
   std::string getSpanId() const override;
 
 private:
+  struct SamplingState {
+    // dd-trace-cpp cannot clear an override. Defer the drop so a route refresh
+    // can undo it, and share the state because children use the same segment.
+    bool drop{false};
+    bool finalized{false};
+  };
+  using SamplingStateSharedPtr = std::shared_ptr<SamplingState>;
+
+  Span(datadog::tracing::Span&& span, bool use_local_decision,
+       SamplingStateSharedPtr&& sampling_state);
+  void finalizeSampling();
+
   datadog::tracing::Optional<datadog::tracing::Span> span_;
   const bool use_local_decision_{false};
+  const SamplingStateSharedPtr sampling_state_;
 };
 
 } // namespace Datadog

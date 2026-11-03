@@ -47,4 +47,14 @@ message DatadogConfig {
   // Each tracer regularly polls for configuration updates, and the number of tracers is the product
   // of the number of listeners and worker threads.
   DatadogRemoteConfig remote_config = 4;
+
+  // When true, Envoy's decision to sample a trace allows the Datadog tracer to apply its own
+  // sampling rules and rates provided by the Datadog agent. Envoy's decision not to sample
+  // still drops the trace. The decision is finalized when trace context is first injected
+  // upstream, or when the span finishes if no context is injected.
+  //
+  // When false (the default), Envoy's sampling decision is applied as a manual keep or drop,
+  // bypassing the Datadog sampler. Sampling decisions extracted from incoming trace context
+  // are preserved in either mode.
+  bool delegate_sampling = 5;
 }
