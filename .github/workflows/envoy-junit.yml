@@ -1,0 +1,55 @@
+name: Envoy/JUnit
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+  - cron: '23 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      since-hours:
+        description: Collect runs completed in the last N hours.
+        type: number
+        default: 2
+      workflows:
+        description: Comma-separated workflow names to collect from.
+        type: string
+        default: Envoy/Checks,Envoy/Prechecks
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+
+jobs:
+  collect:
+    # Runs on a schedule, not on each CI run, so collecting never slows CI down. Each run looks
+    # back over the scheduling interval and pulls the test.xml of every test the runs' Bazel
+    # invocations actually executed, from EngFlow.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.repository == 'envoyproxy/envoy-ci-staging'
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      with:
+        sparse-checkout: ci/junit
+    - name: Collect JUnit XML from EngFlow
+      run: >-
+        python3 ci/junit/collect.py
+        --repo "${{ github.repository }}"
+        --since-hours "${{ inputs.since-hours || 2 }}"
+        --workflows "${{ inputs.workflows || 'Envoy/Checks,Envoy/Prechecks' }}"
+        --out junit
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+      with:
+        name: junit
+        path: junit
+        if-no-files-found: warn
