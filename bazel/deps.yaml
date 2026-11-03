@@ -515,6 +515,18 @@ highway:
   extensions:
   - envoy.wasm.runtime.v8
 
+hiredis:
+  project_name: "HiRedis"
+  project_desc: "Minimalistic C client library for the Redis database"
+  project_url: "https://github.com/redis/hiredis"
+  release_date: "2025-09-15"
+  use_category:
+  - dataplane_ext
+  extensions:
+  - envoy.http.ai_filters.model_router
+  license: "BSD-3-Clause"
+  license_url: "https://github.com/redis/hiredis/blob/v{version}/LICENSE"
+
 hyperscan:
   project_name: "Hyperscan"
   project_desc: "High-performance regular expression matching library"
