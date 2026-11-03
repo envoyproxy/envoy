@@ -228,7 +228,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
     const Network::ConnectionSocket::OptionsSharedPtr& options, quic::QuicNetworkHandle network,
     std::function<void(Network::ConnectionSocket&, quic::QuicNetworkHandle)> custom_bind_func) {
   ASSERT(peer_addr != nullptr);
-  const auto network_namespace = local_addr ? local_addr->networkNamespace() : std::nullopt;
+  const auto netns = local_addr ? local_addr->networkNamespace() : std::nullopt;
   // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
   // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
   //
@@ -236,7 +236,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
   // `recent_received_addresses_` cache in
   // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   constexpr size_t max_addresses_cache_size = 4u;
-  auto create_socket = [&]() -> Network::ConnectionSocketPtr {
+  auto create_socket = [&]() {
     return std::make_unique<Network::ConnectionSocketImpl>(
         Network::Socket::Type::Datagram,
         // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
@@ -246,9 +246,8 @@ Network::ConnectionSocketPtr createConnectionSocket(
   };
   Network::ConnectionSocketPtr connection_socket;
 #if defined(__linux__)
-  if (network_namespace.has_value()) {
-    auto result =
-        Network::Utility::execInNetworkNamespace(create_socket, network_namespace->c_str());
+  if (netns.has_value()) {
+    auto result = Network::Utility::execInNetworkNamespace(create_socket, netns->c_str());
     // The packet writer requires a non-null socket even on namespace failure.
     connection_socket =
         result.ok() ? *std::move(result)
@@ -324,9 +323,9 @@ Network::ConnectionSocketPtr createConnectionSocket(
   }
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
-  if (local_addr && network_namespace.has_value()) {
+  if (local_addr && netns.has_value()) {
     // Port migration creates new sockets from this address and must retain the namespace.
-    local_addr = local_addr->withNetworkNamespace(network_namespace.value());
+    local_addr = local_addr->withNetworkNamespace(netns.value());
     connection_socket->connectionInfoProvider().setLocalAddress(local_addr);
   }
   ENVOY_LOG_MISC(trace, "connected to local address: {}",
