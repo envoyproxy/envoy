@@ -2685,11 +2685,12 @@ TEST_P(TcpTunnelingIntegrationTest, DrainCloseOnUpstreamTrailers) {
     }
   });
   initialize();
-  startServerDrain();
 
   setUpConnection(fake_upstream_connection_);
   ASSERT_TRUE(tcp_client_->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  startServerDrain();
 
   Http::TestResponseTrailerMapImpl response_trailers{{"test-trailer-name", "trailer-value"}};
   upstream_request_->encodeTrailers(response_trailers);
@@ -2726,11 +2727,12 @@ TEST_P(TcpTunnelingIntegrationTest, DrainCloseOnUpstreamEndStreamData) {
     }
   });
   initialize();
-  startServerDrain();
 
   setUpConnection(fake_upstream_connection_);
   ASSERT_TRUE(tcp_client_->write("hello", false));
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 5));
+
+  startServerDrain();
 
   upstream_request_->encodeData(0, true);
 
