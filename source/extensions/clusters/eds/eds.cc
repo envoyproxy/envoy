@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -65,6 +66,25 @@ bool isHostWarmingUp(const Host& host) {
          !host.healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING);
 }
 
+// Returns whether the configured locality weights of a priority assign a non-zero weight to at
+// least one locality.
+bool hasPositiveLocalityWeight(const LocalityWeightsMap& configured_locality_weights) {
+  return std::any_of(configured_locality_weights.begin(), configured_locality_weights.end(),
+                     [](const auto& locality_weight) { return locality_weight.second != 0; });
+}
+
+// Returns whether locality-weighted load balancing may route traffic to a host of a priority, i.e.
+// whether locality weighting is not active for the priority or the locality weights assign a
+// non-zero weight to the host's locality.
+bool isHostInRoutableLocality(const Host& host, const LocalityWeightsMap& locality_weights,
+                              bool locality_weighted) {
+  if (!locality_weighted) {
+    return true;
+  }
+  const auto weight = locality_weights.find(host.locality());
+  return weight != locality_weights.end() && weight->second != 0;
+}
+
 struct PriorityWarmupState {
   bool has_warming_host{};
   bool meets_panic_threshold{};
@@ -75,18 +95,23 @@ bool isHostExcludedFromPanicThreshold(const Host& host) {
          host.healthFlagGet(Host::HealthFlag::EDS_STATUS_DRAINING);
 }
 
-// Evaluates whether a priority has warming hosts and whether its healthy non-retained hosts meet
-// the cluster's healthy panic threshold. Including warming (PENDING_ACTIVE_HC) hosts in
+// Evaluates whether a priority has warming hosts and whether its healthy non-retained routable
+// hosts meet the cluster's healthy panic threshold. Including warming (PENDING_ACTIVE_HC) hosts in
 // eligible_hosts ensures that dropping retained hosts never leaves the priority below the load
 // balancer's healthy panic threshold even if all remaining warming hosts fail their initial active
 // health check.
-PriorityWarmupState evaluatePriorityWarmupState(const HostVector& hosts,
-                                                uint64_t panic_threshold_percent) {
+PriorityWarmupState
+evaluatePriorityWarmupState(const HostVector& hosts,
+                            const LocalityWeightsMap& configured_locality_weights,
+                            bool locality_weighted, uint64_t panic_threshold_percent) {
   PriorityWarmupState state;
   size_t eligible_hosts = 0;
   size_t healthy_hosts = 0;
   for (const HostSharedPtr& host : hosts) {
-    if (host->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL) ||
+    if (host->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
+      continue;
+    }
+    if (!isHostInRoutableLocality(*host, configured_locality_weights, locality_weighted) ||
         isHostExcludedFromPanicThreshold(*host)) {
       continue;
     }
@@ -101,6 +126,100 @@ PriorityWarmupState evaluatePriorityWarmupState(const HostVector& hosts,
   state.meets_panic_threshold = healthy_hosts > 0 && uint64_t{100} * healthy_hosts >=
                                                          panic_threshold_percent * eligible_hosts;
   return state;
+}
+
+// With graceful host removal, returns the unscaled locality weights to retain for a priority so
+// that hosts retained with PENDING_DYNAMIC_REMOVAL remain reachable by locality-weighted load
+// balancing. A locality with retained hosts keeps its previous non-zero weight unless the updated
+// configuration assigns it a non-zero weight.
+LocalityWeightsMap retainedLocalityWeights(const HostVector& hosts,
+                                           const LocalityWeightsMap& configured_locality_weights,
+                                           const LocalityWeightsMap& previous_configured_weights,
+                                           const LocalityWeightsMap& previous_retained_weights) {
+  LocalityWeightsMap retained_locality_weights;
+  absl::flat_hash_set<envoy::config::core::v3::Locality, LocalityHash, LocalityEqualTo>
+      retained_localities;
+  for (const HostSharedPtr& host : hosts) {
+    if (host->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
+      retained_localities.insert(host->locality());
+    }
+  }
+
+  for (const auto& locality : retained_localities) {
+    const auto configured_weight = configured_locality_weights.find(locality);
+    if (configured_weight != configured_locality_weights.end() && configured_weight->second != 0) {
+      continue;
+    }
+    uint32_t previous_weight = 0;
+    if (const auto prev = previous_configured_weights.find(locality);
+        prev != previous_configured_weights.end() && prev->second != 0) {
+      previous_weight = prev->second;
+    } else if (const auto prev_retained = previous_retained_weights.find(locality);
+               prev_retained != previous_retained_weights.end() && prev_retained->second != 0) {
+      previous_weight = prev_retained->second;
+    }
+    if (previous_weight != 0) {
+      retained_locality_weights[locality] = previous_weight;
+    }
+  }
+  return retained_locality_weights;
+}
+
+// Scales locality weights proportionally into <= UINT32_MAX when combining retained and configured
+// locality weights pushes their sum above the per-priority UINT32_MAX bound enforced by
+// validateEndpoints() for hash-based load balancers.
+void scaleLocalityWeightsIfNeeded(LocalityWeightsMap& locality_weights_map) {
+  constexpr uint64_t max_weight = std::numeric_limits<uint32_t>::max();
+  uint64_t total_weight = 0;
+  uint64_t positive_count = 0;
+  for (const auto& [_, weight] : locality_weights_map) {
+    if (weight != 0) {
+      total_weight += weight;
+      ++positive_count;
+    }
+  }
+  if (total_weight <= max_weight) {
+    return;
+  }
+  if (positive_count >= max_weight) {
+    for (auto& [_, weight] : locality_weights_map) {
+      if (weight != 0) {
+        weight = 1;
+      }
+    }
+    return;
+  }
+  for (auto& [_, weight] : locality_weights_map) {
+    if (weight != 0) {
+      weight = 1 + static_cast<uint32_t>(
+                       (static_cast<uint64_t>(weight - 1) * (max_weight - positive_count)) /
+                       (total_weight - positive_count));
+    }
+  }
+}
+
+LocalityWeightsSharedPtr
+buildLocalityWeightsForBuckets(const std::vector<HostVector>& buckets,
+                               const LocalityWeightsMap& configured_locality_weights,
+                               const LocalityWeightsMap& retained_locality_weights) {
+  LocalityWeightsMap combined = configured_locality_weights;
+  for (const auto& [locality, weight] : retained_locality_weights) {
+    combined[locality] = weight;
+  }
+  if (!retained_locality_weights.empty()) {
+    scaleLocalityWeightsIfNeeded(combined);
+  }
+  auto weights = std::make_shared<LocalityWeights>();
+  weights->reserve(buckets.size());
+  for (const HostVector& bucket : buckets) {
+    if (bucket.empty()) {
+      weights->push_back(0);
+      continue;
+    }
+    const auto it = combined.find(bucket[0]->locality());
+    weights->push_back(it != combined.end() ? it->second : 0);
+  }
+  return weights;
 }
 
 } // namespace
@@ -537,20 +656,32 @@ void EdsClusterImpl::reloadHealthyHostsWithGracefulHostRemoval(const bool remove
   // threshold (or, for priorities without warming hosts of their own, while another priority in
   // the cluster is warming up and no priority in the cluster has reached the healthy panic
   // threshold), and are removed once the threshold is met, warmup ends, or they are no longer
-  // healthy.
+  // healthy. When locality-weighted load balancing is active for a priority, hosts in
+  // localities with a zero weight are excluded from the threshold evaluation, since
+  // locality-weighted load balancing does not route traffic to them.
   const auto& host_sets = prioritySet().hostSetsPerPriority();
+  const LocalityWeightsMap no_locality_weights;
+  const auto configured_locality_weights = [&](size_t priority) -> const LocalityWeightsMap& {
+    return priority < locality_weights_map_.size() ? locality_weights_map_[priority]
+                                                   : no_locality_weights;
+  };
+  const bool cluster_locality_weighted = info_->lbConfig().has_locality_weighted_lb_config();
   const uint64_t panic_threshold_percent = healthyPanicThresholdPercent();
   std::vector<PriorityWarmupState> warmup_state(host_sets.size());
   bool cluster_has_warming_host = false;
   bool cluster_meets_panic_threshold = false;
   bool has_retained_host = false;
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
+    const LocalityWeightsMap& locality_weights = configured_locality_weights(priority);
+    const bool locality_weighted =
+        cluster_locality_weighted || hasPositiveLocalityWeight(locality_weights);
     const auto& hosts = host_sets[priority]->hosts();
     has_retained_host =
         has_retained_host || std::any_of(hosts.begin(), hosts.end(), [](const HostSharedPtr& host) {
           return host->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
         });
-    warmup_state[priority] = evaluatePriorityWarmupState(hosts, panic_threshold_percent);
+    warmup_state[priority] = evaluatePriorityWarmupState(hosts, locality_weights, locality_weighted,
+                                                         panic_threshold_percent);
     cluster_has_warming_host = cluster_has_warming_host || warmup_state[priority].has_warming_host;
     cluster_meets_panic_threshold =
         cluster_meets_panic_threshold || warmup_state[priority].meets_panic_threshold;
@@ -648,11 +779,6 @@ void EdsClusterImpl::reloadHealthyHostsWithGracefulHostRemoval(const bool remove
           (locality_weights == nullptr || locality_weights->size() == buckets.size())) {
         std::vector<HostVector> non_empty_buckets;
         non_empty_buckets.reserve(buckets.size());
-        LocalityWeightsSharedPtr non_empty_locality_weights;
-        if (locality_weights != nullptr) {
-          non_empty_locality_weights = std::make_shared<LocalityWeights>();
-          non_empty_locality_weights->reserve(buckets.size());
-        }
         bool has_local_locality = false;
         for (size_t i = 0; i < buckets.size(); ++i) {
           if (buckets[i].empty()) {
@@ -662,14 +788,19 @@ void EdsClusterImpl::reloadHealthyHostsWithGracefulHostRemoval(const bool remove
             has_local_locality = true;
           }
           non_empty_buckets.push_back(buckets[i]);
-          if (non_empty_locality_weights != nullptr) {
-            non_empty_locality_weights->push_back((*locality_weights)[i]);
-          }
         }
         hosts_per_locality = std::make_shared<HostsPerLocalityImpl>(std::move(non_empty_buckets),
                                                                     has_local_locality);
-        locality_weights = std::move(non_empty_locality_weights);
       }
+    }
+    if (locality_weights != nullptr && priority < locality_weights_map_.size() &&
+        priority < retained_locality_weights_map_.size() &&
+        (!hosts_removed.empty() || !retained_locality_weights_map_[priority].empty())) {
+      retained_locality_weights_map_[priority] = retainedLocalityWeights(
+          *hosts, locality_weights_map_[priority], {}, retained_locality_weights_map_[priority]);
+      locality_weights =
+          buildLocalityWeightsForBuckets(hosts_per_locality->get(), locality_weights_map_[priority],
+                                         retained_locality_weights_map_[priority]);
     }
     updates.push_back({priority, HostSetImpl::partitionHosts(std::move(hosts), hosts_per_locality),
                        std::move(locality_weights), std::move(hosts_removed)});
@@ -771,6 +902,9 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
   if (locality_weights_map_.size() < priority_state.size()) {
     locality_weights_map_.resize(priority_state.size());
   }
+  if (retained_locality_weights_map_.size() < priority_state.size()) {
+    retained_locality_weights_map_.resize(priority_state.size());
+  }
 
   struct PriorityUpdate {
     const HostSet* host_set{};
@@ -781,9 +915,12 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
     // Whether the priority had hosts retained with PENDING_DYNAMIC_REMOVAL before the update.
     bool had_retained_hosts{};
     PriorityWarmupState warmup_state;
+    LocalityWeightsMap new_retained_weights;
+    LocalityWeightsMap effective_locality_weights;
   };
   std::vector<PriorityUpdate> updates(priority_state.size());
   const HostVector no_hosts;
+  const bool cluster_locality_weighted = info_->lbConfig().has_locality_weighted_lb_config();
   const uint64_t panic_threshold_percent = healthyPanicThresholdPercent();
   bool cluster_has_warming_host = false;
   bool cluster_meets_panic_threshold = false;
@@ -809,7 +946,14 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
         new_hosts, *update.hosts, update.hosts_added, update.hosts_removed,
         [&all_hosts](const std::string& address) { return all_hosts.findHost(address); },
         all_new_hosts);
-    update.warmup_state = evaluatePriorityWarmupState(*update.hosts, panic_threshold_percent);
+    // When locality-weighted load balancing is active for the priority, hosts in localities with a
+    // zero weight are excluded from the threshold evaluation, since locality-weighted load
+    // balancing does not route traffic to them.
+    const LocalityWeightsMap& configured_locality_weights = priority_state[priority].second;
+    const bool locality_weighted =
+        cluster_locality_weighted || hasPositiveLocalityWeight(configured_locality_weights);
+    update.warmup_state = evaluatePriorityWarmupState(*update.hosts, configured_locality_weights,
+                                                      locality_weighted, panic_threshold_percent);
     cluster_has_warming_host = cluster_has_warming_host || update.warmup_state.has_warming_host;
     cluster_meets_panic_threshold =
         cluster_meets_panic_threshold || update.warmup_state.meets_panic_threshold;
@@ -831,9 +975,22 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
       if (!retain_in_priority) {
         continue;
       }
+      const LocalityWeightsMap& configured_locality_weights = priority_state[priority].second;
+      const LocalityWeightsMap& previous_configured_weights = locality_weights_map_[priority];
+      const LocalityWeightsMap& previous_retained_weights =
+          retained_locality_weights_map_[priority];
+      const bool was_locality_weighted = cluster_locality_weighted ||
+                                         hasPositiveLocalityWeight(previous_configured_weights) ||
+                                         hasPositiveLocalityWeight(previous_retained_weights);
       HostVector hosts_removed;
       for (const HostSharedPtr& host : update.hosts_removed) {
-        if (!all_new_hosts.contains(host->address()->asString()) && canRetainHost(*host)) {
+        const bool routable_if_retained =
+            !was_locality_weighted ||
+            isHostInRoutableLocality(*host, configured_locality_weights, true) ||
+            isHostInRoutableLocality(*host, previous_configured_weights, true) ||
+            isHostInRoutableLocality(*host, previous_retained_weights, true);
+        if (!all_new_hosts.contains(host->address()->asString()) && canRetainHost(*host) &&
+            routable_if_retained) {
           host->healthFlagSet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
           update.hosts->push_back(host);
         } else {
@@ -851,7 +1008,19 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
 
   uint64_t max_host_weight = 1;
   for (uint32_t priority = 0; priority < updates.size(); ++priority) {
-    for (const HostSharedPtr& host : *updates[priority].hosts) {
+    PriorityUpdate& update = updates[priority];
+    const LocalityWeightsMap& configured_locality_weights = priority_state[priority].second;
+    update.new_retained_weights = retainedLocalityWeights(
+        *update.hosts, configured_locality_weights, locality_weights_map_[priority],
+        retained_locality_weights_map_[priority]);
+    update.effective_locality_weights = configured_locality_weights;
+    for (const auto& [locality, weight] : update.new_retained_weights) {
+      update.effective_locality_weights[locality] = weight;
+    }
+    if (!update.new_retained_weights.empty()) {
+      scaleLocalityWeightsIfNeeded(update.effective_locality_weights);
+    }
+    for (const HostSharedPtr& host : *update.hosts) {
       max_host_weight = std::max<uint64_t>(max_host_weight, host->weight());
     }
   }
@@ -863,9 +1032,11 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
   const auto update_priority = [&](const uint32_t priority) {
     PriorityUpdate& update = updates[priority];
     LocalityWeightsMap& locality_weights_map = locality_weights_map_[priority];
+    LocalityWeightsMap& retained_locality_weights_map = retained_locality_weights_map_[priority];
     LocalityWeightsMap& new_locality_weights_map = priority_state[priority].second;
     // A priority that had retained hosts is always rebuilt, since its retained hosts may have been
-    // removed, retained again or added back. A new priority is always created, even without hosts.
+    // removed, retained again or added back, which may change the weights of their localities. A
+    // new priority is always created, even without hosts.
     if (update.host_set != nullptr && !update.hosts_updated && !update.had_retained_hosts &&
         update.host_set->weightedPriorityHealth() == weighted_priority_health &&
         update.host_set->overprovisioningFactor() == overprovisioning_factor &&
@@ -875,6 +1046,9 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
     ASSERT(std::all_of(update.hosts->begin(), update.hosts->end(),
                        [&](const auto& host) { return host->priority() == priority; }));
     locality_weights_map = new_locality_weights_map;
+    retained_locality_weights_map = std::move(update.new_retained_weights);
+    // The locality weights of the priority state are used by updateClusterPrioritySet().
+    new_locality_weights_map = std::move(update.effective_locality_weights);
     ENVOY_LOG(
         debug, "EDS hosts or locality weights changed for cluster: {} current hosts {} priority {}",
         info_->name(), update.host_set != nullptr ? update.host_set->hosts().size() : 0, priority);

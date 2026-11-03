@@ -273,6 +273,16 @@ message Cluster {
     //     retained hosts are removed even if healthy capacity remains below
     //     ``healthy_panic_threshold``, so unreachable or degraded replacement endpoints do not keep
     //     removed hosts retained indefinitely.
+    //   * When :ref:`locality weighted load balancing
+    //     <arch_overview_load_balancing_locality_weighted_lb>` is active for a priority, advertised
+    //     endpoints in localities with missing or zero weight are ignored when evaluating warming
+    //     state and ``healthy_panic_threshold`` (since locality-weighted load balancing does not
+    //     route traffic to them), and removed hosts whose locality has missing or zero weight both
+    //     before and after the update are not retained. Localities with retained
+    //     ``PENDING_DYNAMIC_REMOVAL`` hosts whose updated weight is missing or zero preserve their
+    //     previous non-zero locality weight for the entire duration that those hosts remain
+    //     retained, so traffic continues to be served from the retained locality until warmup
+    //     reaches ``healthy_panic_threshold`` or completes.
     //   * This option should not be combined with :ref:`close_connections_on_host_set_change
     //     <envoy_v3_api_field_config.cluster.v3.Cluster.CommonLbConfig.close_connections_on_host_set_change>`.
     bool graceful_host_removal = 3;

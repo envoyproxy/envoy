@@ -128,6 +128,8 @@ private:
   Config::SubscriptionPtr subscription_;
   const LocalInfo::LocalInfo& local_info_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
+  // Unscaled locality weights currently retained for PENDING_DYNAMIC_REMOVAL hosts per priority.
+  std::vector<LocalityWeightsMap> retained_locality_weights_map_;
   Event::TimerPtr assignment_timeout_;
   Event::Dispatcher& main_thread_dispatcher_;
   // Created on first use by scheduleGracefulHostRemoval().

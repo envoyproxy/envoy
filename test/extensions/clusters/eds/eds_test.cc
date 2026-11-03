@@ -1395,6 +1395,13 @@ public:
     }
   }
 
+  // Adds a locality without any endpoint.
+  void addLocalityWithoutEndpoints(const std::string& region, uint32_t locality_weight) {
+    auto* endpoints = cluster_load_assignment_.add_endpoints();
+    endpoints->mutable_locality()->set_region(region);
+    endpoints->mutable_load_balancing_weight()->set_value(locality_weight);
+  }
+
   // Adds an endpoint in a specific zone (with empty region) for testing local-locality handling.
   void addEndpointInZone(uint32_t port, const std::string& zone, uint32_t locality_weight = 0) {
     auto* endpoints = cluster_load_assignment_.add_endpoints();
@@ -1409,6 +1416,8 @@ public:
     socket_address->set_address("1.2.3.4");
     socket_address->set_port_value(port);
   }
+
+  void resetRingHashClusterLocalityWeighted() { resetRingHashCluster(/*locality_weighted=*/true); }
 
   void resetClusterWithHealthyPanicThreshold(double panic_threshold_percent) {
     resetCluster(fmt::format(R"EOF(
@@ -2387,18 +2396,19 @@ TEST_F(EdsGracefulHostRemovalTest, LocalityChangeReplacesHostImmediately) {
 }
 
 // Validate that when the locality and the health check address of an endpoint change, its host is
-// replaced right away, while the other removed hosts are retained until the new host is healthy.
+// replaced right away, while the other removed hosts are retained until the new host is healthy,
+// and keep the weight of their locality while it has no host in the configuration.
 TEST_F(EdsGracefulHostRemovalTest, LocalityAndHealthCheckAddressChangeReplacesHostImmediately) {
   initializeCluster();
-  addEndpoint(80, 0, 8000, "a");
-  addEndpoint(81, 0, 8001, "a");
+  addEndpoint(80, 0, 8000, "a", 100);
+  addEndpoint(81, 0, 8001, "a", 100);
   updateEndpoints();
   passActiveHealthCheckForAllHosts();
   const HostSharedPtr old_host_80 = findHost("1.2.3.4:80");
 
   // Move 80 to locality b with a new health check port, and remove 81.
   cluster_load_assignment_.clear_endpoints();
-  addEndpoint(80, 0, 9000, "b");
+  addEndpoint(80, 0, 9000, "b", 50);
   updateEndpoints();
   EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:80", "1.2.3.4:81"));
   EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:81"));
@@ -2409,12 +2419,19 @@ TEST_F(EdsGracefulHostRemovalTest, LocalityAndHealthCheckAddressChangeReplacesHo
   ASSERT_EQ(2UL, hosts_per_locality.size());
   EXPECT_EQ("a", hosts_per_locality[0][0]->locality().region());
   EXPECT_EQ("b", hosts_per_locality[1][0]->locality().region());
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+
+  // The weight of locality a is kept across updates while the new host is warming up.
+  updateEndpoints();
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
 
   Event::MockTimer* timer = expectGracefulHostRemovalTimer();
   passActiveHealthCheck(new_host_80);
   timer->invokeCallback();
   EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
   ASSERT_EQ(1UL, hostSet(0).hostsPerLocality().get().size());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(50));
 
   // A subsequent identical update does not rebuild the cluster.
   const uint64_t update_no_rebuild = updateNoRebuildCount();
@@ -2556,29 +2573,134 @@ TEST_F(EdsGracefulHostRemovalTest, RetainedHostAddedBackWithNewHealthCheckAddres
   EXPECT_TRUE(hostSet(0).healthyHosts().empty());
 }
 
+// Validate that when a retained host is added back without any other change to its priority, the
+// priority is still rebuilt, so that its locality weights reflect the configuration again.
+TEST_F(EdsGracefulHostRemovalTest, RetainedHostAddedBackUpdatesLocalityWeights) {
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  const HostSharedPtr host_80 = findHost("1.2.3.4:80");
+
+  // Replace 80 with 81 in priority 1: 80 is retained in priority 0 with the weight of its locality.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 1, 0, "a", 100);
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100));
+
+  // Add 80 back without a locality weight.
+  addEndpoint(80, 0, 0, "a");
+  const uint64_t update_no_rebuild = updateNoRebuildCount();
+  updateEndpoints();
+  EXPECT_EQ(update_no_rebuild, updateNoRebuildCount());
+  ASSERT_EQ(1UL, hostSet(0).hosts().size());
+  EXPECT_EQ(host_80, hostSet(0).hosts()[0]);
+  EXPECT_FALSE(host_80->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(0));
+}
+
+// Validate that a locality with retained hosts whose updated configuration assigns a non-zero
+// weight uses that updated configured weight, whereas a locality with retained hosts whose updated
+// weight is missing or zero preserves its previous non-zero weight until retention ends.
+TEST_F(EdsGracefulHostRemovalTest, LocalityWeightFromConfigurationForLocalitiesWithHosts) {
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  addEndpoint(90, 0, 0, "b", 100);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+
+  // Replace 80 with 81 in locality a, which loses its weight, and replace 90 with 91 in locality b
+  // with a new weight of 50. While 80 and 90 are retained, locality a preserves its previous
+  // non-zero weight 100 and locality b uses its updated non-zero weight 50.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0, 0, "a");
+  addEndpoint(91, 0, 0, "b", 50);
+  updateEndpoints();
+  EXPECT_EQ(4UL, hostSet(0).hosts().size());
+  ASSERT_EQ(2UL, hostSet(0).hostsPerLocality().get().size());
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+
+  // Once 91 in routable locality b passes active health checking, retained hosts 80 and 90 are
+  // removed and locality a's configured weight of 0 takes effect.
+  Event::MockTimer* timer = expectGracefulHostRemovalTimer();
+  passActiveHealthCheck(findHost("1.2.3.4:91"));
+  timer->invokeCallback();
+  EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:81", "1.2.3.4:91"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(0, 50));
+}
+
+// Validate that when all the hosts of a priority are replaced by hosts warming up in another
+// priority, the retained hosts keep the weights of their localities, even though the updated
+// configuration has no locality weights for their priority.
+TEST_F(EdsGracefulHostRemovalTest, LocalityWeightsKeptWhenAllHostsOfPriorityRetained) {
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 80);
+  addEndpoint(90, 0, 0, "b", 20);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 1, 0, "a", 80);
+  addEndpoint(91, 1, 0, "b", 20);
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80", "1.2.3.4:90"));
+  EXPECT_EQ(2UL, hostSet(0).healthyHosts().size());
+  ASSERT_EQ(2UL, hostSet(0).hostsPerLocality().get().size());
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(80, 20));
+}
+
 // Validate that the hosts of a priority that is not present in the updated configuration anymore
-// are retained while another priority warms up.
+// are retained along with the weights of their localities.
 TEST_F(EdsGracefulHostRemovalTest, HostsOfPriorityRemovedFromConfigurationRetained) {
   initializeCluster();
-  addEndpoint(80, 0);
-  addEndpoint(90, 1);
+  addEndpoint(80, 0, 0, "a", 80);
+  addEndpoint(90, 1, 0, "b", 20);
   updateEndpoints();
   passActiveHealthCheckForAllHosts();
 
   // Replace 80 with 81 in priority 0, and remove priority 1 from the configuration.
   cluster_load_assignment_.clear_endpoints();
-  addEndpoint(81, 0);
+  addEndpoint(81, 0, 0, "a", 80);
   updateEndpoints();
   ASSERT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority().size());
   EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
   EXPECT_THAT(hostAddresses(1), testing::ElementsAre("1.2.3.4:90"));
   EXPECT_THAT(retainedHostAddresses(1), testing::ElementsAre("1.2.3.4:90"));
+  ASSERT_NE(nullptr, hostSet(1).localityWeights());
+  EXPECT_THAT(*hostSet(1).localityWeights(), testing::ElementsAre(20));
 
   Event::MockTimer* timer = expectGracefulHostRemovalTimer();
   passActiveHealthCheck(findHost("1.2.3.4:81"));
   timer->invokeCallback();
   EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:81"));
   EXPECT_TRUE(hostSet(1).hosts().empty());
+}
+
+// Validate that the localities of retained hosts that the updated configuration lists without any
+// host and with a weight of 0 keep their current weights, independently of each other.
+TEST_F(EdsGracefulHostRemovalTest, ZeroWeightEmptyLocalitiesKeepTheirWeights) {
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  addEndpoint(81, 0, 0, "b", 50);
+  addEndpoint(90, 0, 0, "c", 10);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+
+  // List localities a and b without any host and with a weight of 0, and replace 90 with 91 in
+  // locality c.
+  cluster_load_assignment_.clear_endpoints();
+  addLocalityWithoutEndpoints("a", 0);
+  addLocalityWithoutEndpoints("b", 0);
+  addEndpoint(91, 0, 0, "c", 10);
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0),
+              testing::ElementsAre("1.2.3.4:80", "1.2.3.4:81", "1.2.3.4:90"));
+  ASSERT_EQ(3UL, hostSet(0).hostsPerLocality().get().size());
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50, 10));
 }
 
 // Validate that with active health checking configured, graceful host removal excludes newly added
@@ -2625,6 +2747,99 @@ TEST_F(EdsGracefulHostRemovalTest, NewHostsExcludedUntilFirstHealthCheck) {
               testing::ElementsAre("1.2.3.4:81", "1.2.3.4:82", "1.2.3.4:83", "1.2.3.4:84"));
   EXPECT_TRUE(hostSet(0).excludedHosts().empty());
   EXPECT_EQ(4UL, hostSet(0).healthyHosts().size());
+}
+
+// Validate that when a locality's configured weight drops to 0 while its previous healthy host is
+// retained, its previous non-zero weight is preserved continuously while the priority warms up
+// toward healthy_panic_threshold (even after some hosts in a positive-weight locality become
+// healthy below the threshold), and reverts to 0 once the threshold is reached.
+TEST_F(EdsGracefulHostRemovalTest,
+       ZeroWeightLocalityWithWarmingHostRetainsWeightUntilThresholdReached) {
+  resetRingHashClusterLocalityWeighted();
+  ThreadAwareLoadBalancerPtr thread_aware_lb = createThreadAwareLoadBalancer();
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  const HostSharedPtr host_80 = findHost("1.2.3.4:80");
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_80, lb->chooseHost(nullptr).host);
+
+  // Drain locality a (weight omitted / 0) while rolling 80 -> warming 81 in locality a and adding
+  // warming 91..93 in locality b (weight 50). Locality a retains weight 100 so RingHash keeps
+  // routing to retained host 80 while locality b warms up.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0, 0, "a");
+  addEndpoint(91, 0, 0, "b", 50);
+  addEndpoint(92, 0, 0, "b", 50);
+  addEndpoint(93, 0, 0, "b", 50);
+  updateEndpoints();
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+  lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_80, lb->chooseHost(nullptr).host);
+
+  // When 91 in positive-weight locality b passes active health checking (1/3 = 33% < 50% in
+  // locality b), 80 remains retained and locality a preserves its previous weight of 100 so traffic
+  // continues to be served from locality a alongside 91 until locality b reaches the threshold.
+  const HostSharedPtr host_91 = findHost("1.2.3.4:91");
+  passActiveHealthCheck(host_91);
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+
+  // Once 92 also passes active health checking (2/3 = 66% >= 50%), retained host 80 is removed
+  // while 81 and 93 continue warming up, configured locality weights {0, 50} take effect, and
+  // RingHash routes exclusively to locality b.
+  Event::MockTimer* timer = expectGracefulHostRemovalTimer();
+  const HostSharedPtr host_92 = findHost("1.2.3.4:92");
+  passActiveHealthCheck(host_92);
+  timer->invokeCallback();
+  EXPECT_THAT(hostAddresses(0),
+              testing::ElementsAre("1.2.3.4:81", "1.2.3.4:91", "1.2.3.4:92", "1.2.3.4:93"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(0, 50));
+  lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  const HostConstSharedPtr chosen = lb->chooseHost(nullptr).host;
+  EXPECT_TRUE(chosen == host_91 || chosen == host_92);
+}
+
+// Validate that when merging a retained locality's weight with a newly configured locality's weight
+// would exceed UINT32_MAX, the effective weights are scaled within UINT32_MAX (avoiding
+// IS_ENVOY_BUG in ThreadAwareLoadBalancerBase::normalizeLocalityWeights), repeated updates do not
+// decay weights, and the exact configured weight is restored once warmup completes.
+TEST_F(EdsGracefulHostRemovalTest, CombinedLocalityWeightsExceedingUint32MaxScaledDuringWarmup) {
+  resetRingHashClusterLocalityWeighted();
+  ThreadAwareLoadBalancerPtr thread_aware_lb = createThreadAwareLoadBalancer();
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 3000000000U);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  const HostSharedPtr host_80 = findHost("1.2.3.4:80");
+
+  // Replace locality a (weight 3,000,000,000) with warming locality b (weight 3,000,000,000): each
+  // update is individually <= UINT32_MAX, and the combined weights are scaled proportionally into
+  // <= UINT32_MAX without firing an ENVOY_BUG.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0, 0, "b", 3000000000U);
+  updateEndpoints();
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(2147483647U, 2147483647U));
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_80, lb->chooseHost(nullptr).host);
+
+  // A repeated update during warmup preserves the same scaled weights without cumulative decay.
+  updateEndpoints();
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(2147483647U, 2147483647U));
+
+  // Once 81 finishes warming up and 80 is removed, locality b's exact unscaled configured weight is
+  // restored.
+  Event::MockTimer* timer = expectGracefulHostRemovalTimer();
+  const HostSharedPtr host_81 = findHost("1.2.3.4:81");
+  passActiveHealthCheck(host_81);
+  timer->invokeCallback();
+  EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:81"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(3000000000U));
+  lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_81, lb->chooseHost(nullptr).host);
 }
 
 // Validate that pruning an empty non-local locality bucket when removing retained hosts preserves
@@ -2678,6 +2893,152 @@ TEST_F(EdsGracefulHostRemovalTest, LocalLocalityClearedWhenPruningEmptyLocalLoca
   ASSERT_EQ(1UL, hostSet(0).hostsPerLocality().get().size());
   EXPECT_EQ("us-east-1b", hostSet(0).hostsPerLocality().get()[0][0]->locality().zone());
   EXPECT_FALSE(hostSet(0).hostsPerLocality().hasLocalLocality());
+}
+
+// Validate that the weight of a zero-weight locality with a retained healthy host and a warming
+// replacement host is applied while the only positive-weight locality of the priority is below the
+// healthy panic threshold and only has degraded hosts, since load balancing prefers the healthy
+// retained host.
+TEST_F(EdsGracefulHostRemovalTest, ZeroWeightLocalityKeepsWeightWhilePositiveLocalityOnlyDegraded) {
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  addEndpoint(90, 0, 0, "b", 50);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  findHost("1.2.3.4:90")->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
+
+  // Replace 80 with warming 81 in locality a (weight 0), while locality b (weight 50) has degraded
+  // 90 and warming 91 and 92 (1/3 = 33% < 50% panic threshold).
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0, 0, "a");
+  addEndpoint(90, 0, 0, "b", 50);
+  addEndpoint(91, 0, 0, "b", 50);
+  addEndpoint(92, 0, 0, "b", 50);
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  EXPECT_EQ(1UL, hostSet(0).healthyHosts().size());
+  EXPECT_EQ(1UL, hostSet(0).degradedHosts().size());
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+}
+
+// Validate that the weight of a zero-weight locality with a retained healthy host and a warming
+// replacement host is preserved across EDS updates and health changes throughout the entire
+// retention period while positive-weight localities are warming up below the healthy panic
+// threshold, and reverts to 0 once the threshold is reached.
+TEST_F(EdsGracefulHostRemovalTest, RetainedLocalityWeightKeptContinuouslyUntilThresholdReached) {
+  resetRingHashClusterLocalityWeighted();
+  ThreadAwareLoadBalancerPtr thread_aware_lb = createThreadAwareLoadBalancer();
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  addEndpoint(90, 0, 0, "b", 50);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  const HostSharedPtr host_80 = findHost("1.2.3.4:80");
+  const HostSharedPtr host_90 = findHost("1.2.3.4:90");
+
+  // Replace 80 with warming 81 in locality a, which loses its weight, while 90 keeps serving in
+  // locality b alongside warming 91 and 92 (1/3 = 33% < 50%): 80 is retained, and locality a
+  // preserves its previous weight of 100 continuously while locality b is below the threshold.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0, 0, "a");
+  addEndpoint(90, 0, 0, "b", 50);
+  addEndpoint(91, 0, 0, "b", 50);
+  addEndpoint(92, 0, 0, "b", 50);
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  ASSERT_NE(nullptr, hostSet(0).localityWeights());
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+
+  // A subsequent update continues to preserve the weight of locality a.
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+
+  // 90 fails active health checking while 81, 91, and 92 are still warming up: retained 80 keeps
+  // serving traffic with locality weight 100.
+  host_90->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+  health_checker_->runCallbacks(host_90, HealthTransition::Changed, HealthState::Unhealthy);
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_80, lb->chooseHost(nullptr).host);
+
+  // When 91 passes active health checking (1/3 = 33% < 50%), 80 and locality a's weight of 100
+  // remain retained.
+  passActiveHealthCheck(findHost("1.2.3.4:91"));
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(100, 50));
+
+  // Once 92 also passes active health checking (2/3 = 66% >= 50%), 80 is removed along with the
+  // retained weight of locality a even while 81 is still warming up.
+  Event::MockTimer* timer = expectGracefulHostRemovalTimer();
+  passActiveHealthCheck(findHost("1.2.3.4:92"));
+  timer->invokeCallback();
+  EXPECT_THAT(hostAddresses(0),
+              testing::ElementsAre("1.2.3.4:81", "1.2.3.4:90", "1.2.3.4:91", "1.2.3.4:92"));
+  EXPECT_THAT(*hostSet(0).localityWeights(), testing::ElementsAre(0, 50));
+}
+
+// Validate that with locality weights, a host of another priority in a locality without weight that
+// passes active health checking does not remove the retained hosts of a priority without warming
+// hosts, since locality weighted load balancing does not route traffic to it.
+TEST_F(EdsGracefulHostRemovalTest, ZeroWeightLocalityHostDoesNotRemoveCrossPriorityRetainedHosts) {
+  resetRingHashClusterLocalityWeighted();
+  ThreadAwareLoadBalancerPtr thread_aware_lb = createThreadAwareLoadBalancer();
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  const HostSharedPtr host_80 = findHost("1.2.3.4:80");
+
+  // Replace 80 with warming 81 in locality a without weight and warming 91 in locality b in
+  // priority 1.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 1, 0, "a");
+  addEndpoint(91, 1, 0, "b", 100);
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+
+  // 81 passes active health checking before 91: 80 stays retained, and keeps receiving traffic.
+  passActiveHealthCheck(findHost("1.2.3.4:81"));
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_80, lb->chooseHost(nullptr).host);
+
+  // Once 91 passes active health checking, 80 is removed.
+  Event::MockTimer* timer = expectGracefulHostRemovalTimer();
+  const HostSharedPtr host_91 = findHost("1.2.3.4:91");
+  passActiveHealthCheck(host_91);
+  timer->invokeCallback();
+  EXPECT_TRUE(hostSet(0).hosts().empty());
+  lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_91, lb->chooseHost(nullptr).host);
+}
+
+// Validate that with locality weights, a healthy host of another priority in a locality without
+// weight does not prevent the hosts removed from a priority without warming hosts from being
+// retained, since locality weighted load balancing does not route traffic to it.
+TEST_F(EdsGracefulHostRemovalTest, ZeroWeightLocalityHostDoesNotPreventCrossPriorityRetention) {
+  resetRingHashClusterLocalityWeighted();
+  ThreadAwareLoadBalancerPtr thread_aware_lb = createThreadAwareLoadBalancer();
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 100);
+  addEndpoint(81, 1, 0, "a", 100);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  const HostSharedPtr host_80 = findHost("1.2.3.4:80");
+
+  // Remove 80 from priority 0, remove the weight of locality a in priority 1 where 81 stays
+  // healthy, and add warming 91 in locality b in priority 1.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 1, 0, "a");
+  addEndpoint(91, 1, 0, "b", 100);
+  updateEndpoints();
+  EXPECT_THAT(hostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  EXPECT_THAT(retainedHostAddresses(0), testing::ElementsAre("1.2.3.4:80"));
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_80, lb->chooseHost(nullptr).host);
 }
 
 // Validate that an empty assignment (e.g. when the assignment times out) removes the retained hosts
@@ -3019,6 +3380,33 @@ TEST_F(EdsGracefulHostRemovalTest, MaxHostWeightDefaultsToOneWhenAllHostsRemoved
   cluster_load_assignment_.clear_endpoints();
   updateEndpoints();
   EXPECT_EQ(1UL, cluster_->info()->endpointStats().max_host_weight_.value());
+}
+
+// Validate that a removed host whose locality weight was 0 before the update and remains 0 in the
+// updated configuration is not retained, preventing an unroutable zero-weight priority from
+// claiming priority health and starving healthy lower priorities.
+TEST_F(EdsGracefulHostRemovalTest, RemovedHostInAlwaysZeroWeightLocalityNotRetained) {
+  resetRingHashClusterLocalityWeighted();
+  ThreadAwareLoadBalancerPtr thread_aware_lb = createThreadAwareLoadBalancer();
+  initializeCluster();
+  addEndpoint(80, 0, 0, "a", 0);
+  addEndpoint(90, 0, 0, "b", 100);
+  updateEndpoints();
+  passActiveHealthCheckForAllHosts();
+  const HostSharedPtr host_90 = findHost("1.2.3.4:90");
+
+  // Move healthy 90 to priority 1 alongside warming 91 and 92 (1/3 = 33% < 50%), and replace 80 in
+  // priority 0 with warming 81 in locality a (weight 0). 80 was unroutable before the update and
+  // would remain unroutable if retained, so it is removed immediately and traffic fails over to 90.
+  cluster_load_assignment_.clear_endpoints();
+  addEndpoint(81, 0, 0, "a", 0);
+  addEndpoint(90, 1, 0, "b", 100);
+  addEndpoint(91, 1, 0, "b", 100);
+  addEndpoint(92, 1, 0, "b", 100);
+  updateEndpoints();
+  EXPECT_THAT(retainedHostAddresses(0), testing::IsEmpty());
+  LoadBalancerPtr lb = thread_aware_lb->factory()->create({cluster_->prioritySet(), nullptr});
+  EXPECT_EQ(host_90, lb->chooseHost(nullptr).host);
 }
 
 // Verifies that if an endpoint is moved to a new priority, the active hc status is preserved.
