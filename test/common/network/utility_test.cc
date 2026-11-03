@@ -392,12 +392,10 @@ TEST(NetworkUtility, GetAddressWithPort) {
   auto addr_v6_custom_sock_new_port = Utility::getAddressWithPort(*addr_v6_custom_sock, 8080);
   EXPECT_EQ(&custom_socket_interface, &addr_v6_custom_sock_new_port->socketInterface());
 
-  EXPECT_EQ("/test/netns", Utility::getAddressWithPort(
-                               *addr_v4_custom_sock->withNetworkNamespace("/test/netns"), 0)
-                               ->networkNamespace());
-  EXPECT_EQ("/test/netns", Utility::getAddressWithPort(
-                               *addr_v6_custom_sock->withNetworkNamespace("/test/netns"), 0)
-                               ->networkNamespace());
+  for (const auto& address : {addr_v4_custom_sock->withNetworkNamespace("/test/netns"),
+                              addr_v6_custom_sock->withNetworkNamespace("/test/netns")}) {
+    EXPECT_EQ("/test/netns", Utility::getAddressWithPort(*address, 0)->networkNamespace());
+  }
 }
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
