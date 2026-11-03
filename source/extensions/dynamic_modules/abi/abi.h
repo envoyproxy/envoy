@@ -16030,7 +16030,9 @@ typedef const void* envoy_dynamic_module_type_stat_sink_config_module_ptr;
  * envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr is an opaque handle to the metric
  * snapshot for a single flush. It is passed to the snapshot read-back callbacks.
  *
- * OWNERSHIP: Envoy owns the pointer. Valid only during the flush event hook.
+ * OWNERSHIP: Envoy owns the pointer. The handle passed to the flush event hook is valid only during
+ * that hook. A handle returned by envoy_dynamic_module_callback_stat_sink_snapshot_retain is valid
+ * until the module passes it to envoy_dynamic_module_callback_stat_sink_snapshot_release.
  */
 typedef void* envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr;
 
@@ -16085,7 +16087,8 @@ void envoy_dynamic_module_on_stat_sink_config_destroy(
  * The module can iterate over counters, gauges, and text readouts via the snapshot callbacks.
  *
  * This is called on the main thread during the periodic stats flush. Implementations must not
- * block.
+ * block. A module that needs the snapshot after this call returns, for example to format it off
+ * the main thread, keeps it with envoy_dynamic_module_callback_stat_sink_snapshot_retain.
  *
  * @param config_module_ptr is the pointer to the in-module configuration object.
  * @param snapshot_envoy_ptr is the opaque snapshot handle. Valid only during this call.
@@ -16128,6 +16131,45 @@ void envoy_dynamic_module_on_stat_sink_config_scheduled(
 // =============================================================================
 // Stats Sink Callbacks
 // =============================================================================
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_retain keeps the snapshot readable after the
+ * flush event hook returns, so a module can read and format it off the main thread.
+ *
+ * Envoy takes a reference on every stat in the snapshot and copies their values: counter values and
+ * deltas, gauge values, text readout values, and histogram sample counts, sums, and buckets. The
+ * snapshot callbacks on the returned handle report those copied values, so every read reflects the
+ * time of this call. Stat names and tags are read on demand from the referenced stats.
+ *
+ * The returned handle may be read and released on any thread, but by one thread at a time. The
+ * module must release it with envoy_dynamic_module_callback_stat_sink_snapshot_release, and must
+ * do so before envoy_dynamic_module_on_stat_sink_config_destroy returns. Removed stats stay alive
+ * until the handles that reference them are released.
+ *
+ * This must be called on the main thread, during envoy_dynamic_module_on_stat_sink_flush, with the
+ * handle passed to that hook or with another retained handle. Its cost is linear in the number of
+ * stats but does no name decoding.
+ *
+ * @param snapshot_envoy_ptr is the handle passed to envoy_dynamic_module_on_stat_sink_flush, or a
+ *        handle previously returned by this callback and not yet released.
+ * @return a new snapshot handle that every snapshot callback accepts. The module owns its lifetime
+ *         and must release it as described above.
+ */
+envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr
+envoy_dynamic_module_callback_stat_sink_snapshot_retain(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_stat_sink_snapshot_release drops a snapshot handle returned by
+ * envoy_dynamic_module_callback_stat_sink_snapshot_retain, along with its stat references. It may
+ * be called on any thread. The handle must not be used afterwards.
+ *
+ * @param retained_snapshot_envoy_ptr is a handle returned by
+ *        envoy_dynamic_module_callback_stat_sink_snapshot_retain. It must not be the handle passed
+ *        to envoy_dynamic_module_on_stat_sink_flush.
+ */
+void envoy_dynamic_module_callback_stat_sink_snapshot_release(
+    envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr retained_snapshot_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count returns the number of
@@ -16294,11 +16336,13 @@ bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
  * histogram counterpart of the counter tag-extracted-name callback below, with the same buffer
  * and truncation contract. The index is into the snapshot's histogram collection.
  *
- * These histogram tag callbacks are only valid during envoy_dynamic_module_on_stat_sink_flush.
- * A module aggregating observations from envoy_dynamic_module_on_stat_sink_on_histogram_complete
- * can use the raw name returned by envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram
- * to associate those observations with an owned copy of this name and its tags. No tag extraction
- * or histogram statistics computation is performed by these callbacks.
+ * Like every snapshot callback, these histogram tag callbacks are valid on the handle passed to
+ * envoy_dynamic_module_on_stat_sink_flush during that hook, or on a retained handle until it is
+ * released. A module aggregating observations from
+ * envoy_dynamic_module_on_stat_sink_on_histogram_complete can use the raw name returned by
+ * envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram to associate those observations
+ * with an owned copy of this name and its tags. No tag extraction or histogram statistics
+ * computation is performed by these callbacks.
  */
 bool envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_tag_extracted_name(
     envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr snapshot_envoy_ptr, size_t index,

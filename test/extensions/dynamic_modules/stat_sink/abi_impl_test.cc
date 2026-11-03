@@ -8,6 +8,7 @@
 #include "test/extensions/dynamic_modules/stat_sink/test_util.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/thread_factory_for_test.h"
 #include "test/test_common/utility.h"
 
 #include "circllhist.h"
@@ -817,6 +818,248 @@ TEST_F(DynamicModuleStatsSinkHistogramAbiTest, GetHistogramOutOfRange) {
       snapshotHandle(), 0, 99999, &upper_bound, &cumulative_count));
   EXPECT_EQ(-1, upper_bound);
   EXPECT_EQ(42u, cumulative_count);
+}
+
+// =============================================================================
+// Retained snapshot callbacks
+// =============================================================================
+
+// A counter that records its own deletion, so a test can observe when its last reference drops.
+class DeletionTrackingCounter : public Stats::MockCounter {
+public:
+  explicit DeletionTrackingCounter(bool& deleted) : deleted_(deleted) {}
+  ~DeletionTrackingCounter() override { deleted_ = true; }
+
+private:
+  bool& deleted_;
+};
+
+// Exercises retain and release. A retained handle stays readable after the flush snapshot is gone,
+// reports the values copied at retain time, and holds a reference on every stat it covers.
+class DynamicModuleStatsSinkRetainAbiTest : public DynamicModuleStatsSinkHistogramAbiTest {
+public:
+  DynamicModuleStatsSinkRetainAbiTest() {
+    // The fixture stats live on the stack and start with no references. Hold one for the whole test
+    // so dropping the references a retained handle took never frees them.
+    c0_.incRefCount();
+    g0_.incRefCount();
+    h0_.incRefCount();
+  }
+
+  // Fills the flush snapshot with one stat of each kind.
+  void populateSnapshot() {
+    c0_.name_ = "cluster.foo.rq_total";
+    c0_.value_ = 100;
+    c0_.setTagExtractedName("cluster.rq_total");
+    c0_.setTags({{"envoy.cluster_name", "foo"}});
+    snapshot_.counters_.push_back({/*delta=*/7, c0_});
+    g0_.name_ = "server.uptime";
+    g0_.value_ = 42;
+    snapshot_.gauges_.push_back(g0_);
+    t0_.name_ = "server.version";
+    t0_.value_ = "1.38.0";
+    snapshot_.text_readouts_.push_back(t0_);
+    addHistogram(h0_, "latency", {1, 1, 3, 8});
+  }
+
+  // Models the next flush: the live values move on and the previous flush snapshot is gone.
+  void advanceLiveStats() {
+    c0_.value_ = 1;
+    g0_.value_ = 2;
+    t0_.value_ = "changed";
+    snapshot_.counters_.clear();
+    snapshot_.gauges_.clear();
+    snapshot_.text_readouts_.clear();
+    snapshot_.histograms_.clear();
+  }
+
+  // Reads the counter at index 0 of the handle and returns its name.
+  static std::string counterName(envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr handle,
+                                 uint64_t* value_out, uint64_t* delta_out) {
+    char name_buffer[256];
+    size_t name_size = 0;
+    if (!envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+            handle, 0, name_buffer, sizeof(name_buffer), &name_size, value_out, delta_out)) {
+      return "";
+    }
+    return written(name_buffer, name_size, sizeof(name_buffer));
+  }
+};
+
+TEST_F(DynamicModuleStatsSinkRetainAbiTest, RetainedHandleReportsValuesAtRetainTime) {
+  populateSnapshot();
+  const uint64_t sample_count = stats_->sampleCount();
+  const double sample_sum = stats_->sampleSum();
+  const std::vector<double> upper_bounds = stats_->supportedBuckets();
+  const std::vector<uint64_t> cumulative_counts = stats_->computedBuckets();
+
+  auto* retained = envoy_dynamic_module_callback_stat_sink_snapshot_retain(snapshotHandle());
+  ASSERT_NE(nullptr, retained);
+  EXPECT_NE(snapshotHandle(), retained);
+  // Reads through the retained handle never touch the live histogram statistics, which only the
+  // main thread may read.
+  EXPECT_CALL(h0_, cumulativeStatistics()).Times(0);
+  advanceLiveStats();
+  EXPECT_EQ(0u,
+            envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(snapshotHandle()));
+
+  ASSERT_EQ(1u, envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(retained));
+  uint64_t value = 0;
+  uint64_t delta = 0;
+  EXPECT_EQ("cluster.foo.rq_total", counterName(retained, &value, &delta));
+  EXPECT_EQ(100u, value);
+  EXPECT_EQ(7u, delta);
+
+  // Names and tags are still read on demand from the referenced stat.
+  char name_buffer[256];
+  size_t name_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag_extracted_name(
+      retained, 0, name_buffer, sizeof(name_buffer), &name_size));
+  EXPECT_EQ("cluster.rq_total", written(name_buffer, name_size, sizeof(name_buffer)));
+  char tag_value[256];
+  size_t tag_value_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_tag(
+      retained, 0, 0, name_buffer, sizeof(name_buffer), &name_size, tag_value, sizeof(tag_value),
+      &tag_value_size));
+  EXPECT_EQ("envoy.cluster_name", written(name_buffer, name_size, sizeof(name_buffer)));
+  EXPECT_EQ("foo", written(tag_value, tag_value_size, sizeof(tag_value)));
+
+  ASSERT_EQ(1u, envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge_count(retained));
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_gauge(
+      retained, 0, name_buffer, sizeof(name_buffer), &name_size, &value));
+  EXPECT_EQ("server.uptime", written(name_buffer, name_size, sizeof(name_buffer)));
+  EXPECT_EQ(42u, value);
+
+  ASSERT_EQ(1u, envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout_count(retained));
+  char text_value[256];
+  size_t text_value_size = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+      retained, 0, name_buffer, sizeof(name_buffer), &name_size, text_value, sizeof(text_value),
+      &text_value_size));
+  EXPECT_EQ("server.version", written(name_buffer, name_size, sizeof(name_buffer)));
+  EXPECT_EQ("1.38.0", written(text_value, text_value_size, sizeof(text_value)));
+
+  ASSERT_EQ(1u, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_count(retained));
+  uint64_t retained_sample_count = 0;
+  double retained_sample_sum = 0;
+  EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+      retained, 0, name_buffer, sizeof(name_buffer), &name_size, &retained_sample_count,
+      &retained_sample_sum));
+  EXPECT_EQ("latency", written(name_buffer, name_size, sizeof(name_buffer)));
+  EXPECT_EQ(sample_count, retained_sample_count);
+  EXPECT_EQ(sample_sum, retained_sample_sum);
+  ASSERT_EQ(
+      upper_bounds.size(),
+      envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(retained, 0));
+  for (size_t i = 0; i < upper_bounds.size(); i++) {
+    double upper_bound = -1;
+    uint64_t cumulative_count = 0;
+    ASSERT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+        retained, 0, i, &upper_bound, &cumulative_count));
+    EXPECT_EQ(upper_bounds[i], upper_bound);
+    EXPECT_EQ(cumulative_counts[i], cumulative_count);
+  }
+
+  // Out-of-range reads fail the same way they do on the flush handle.
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_counter(
+      retained, 1, name_buffer, sizeof(name_buffer), &name_size, &value, &delta));
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_text_readout(
+      retained, 1, name_buffer, sizeof(name_buffer), &name_size, text_value, sizeof(text_value),
+      &text_value_size));
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+      retained, 1, name_buffer, sizeof(name_buffer), &name_size, &retained_sample_count,
+      &retained_sample_sum));
+  EXPECT_EQ(
+      0u, envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket_count(retained, 1));
+  double upper_bound = -1;
+  uint64_t cumulative_count = 42;
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+      retained, 0, upper_bounds.size(), &upper_bound, &cumulative_count));
+  EXPECT_FALSE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram_bucket(
+      retained, 1, 0, &upper_bound, &cumulative_count));
+  EXPECT_EQ(-1, upper_bound);
+  EXPECT_EQ(42u, cumulative_count);
+
+  envoy_dynamic_module_callback_stat_sink_snapshot_release(retained);
+}
+
+// Each retained handle holds its own reference on every stat, so a handle retained from another
+// retained handle outlives it, and releasing a handle drops exactly its references.
+TEST_F(DynamicModuleStatsSinkRetainAbiTest, RetainAndReleaseManageStatReferences) {
+  populateSnapshot();
+  const auto expect_use_count = [this](uint32_t expected) {
+    EXPECT_EQ(expected, c0_.use_count());
+    EXPECT_EQ(expected, g0_.use_count());
+    EXPECT_EQ(expected, t0_.use_count());
+    EXPECT_EQ(expected, h0_.use_count());
+  };
+  expect_use_count(1);
+
+  auto* first = envoy_dynamic_module_callback_stat_sink_snapshot_retain(snapshotHandle());
+  expect_use_count(2);
+  auto* second = envoy_dynamic_module_callback_stat_sink_snapshot_retain(first);
+  EXPECT_NE(first, second);
+  expect_use_count(3);
+
+  envoy_dynamic_module_callback_stat_sink_snapshot_release(first);
+  expect_use_count(2);
+  advanceLiveStats();
+  uint64_t value = 0;
+  uint64_t delta = 0;
+  EXPECT_EQ("cluster.foo.rq_total", counterName(second, &value, &delta));
+  EXPECT_EQ(100u, value);
+  EXPECT_EQ(7u, delta);
+
+  envoy_dynamic_module_callback_stat_sink_snapshot_release(second);
+  expect_use_count(1);
+}
+
+// A stat whose other references go away while a handle is retained, as when its scope is removed,
+// stays readable until the handle is released, and is freed by that release.
+TEST_F(DynamicModuleStatsSinkRetainAbiTest, RetainedHandleKeepsRemovedStatAlive) {
+  bool deleted = false;
+  auto* counter = new NiceMock<DeletionTrackingCounter>(deleted);
+  counter->name_ = "cluster.removed.rq_total";
+  counter->value_ = 3;
+  Stats::CounterSharedPtr owner(counter);
+  snapshot_.counters_.push_back({/*delta=*/1, *counter});
+
+  auto* retained = envoy_dynamic_module_callback_stat_sink_snapshot_retain(snapshotHandle());
+  snapshot_.counters_.clear();
+  owner.reset();
+  EXPECT_FALSE(deleted);
+
+  uint64_t value = 0;
+  uint64_t delta = 0;
+  EXPECT_EQ("cluster.removed.rq_total", counterName(retained, &value, &delta));
+  EXPECT_EQ(3u, value);
+  EXPECT_EQ(1u, delta);
+
+  envoy_dynamic_module_callback_stat_sink_snapshot_release(retained);
+  EXPECT_TRUE(deleted);
+}
+
+// A retained handle is read and released on a thread other than the one that retained it, which is
+// how a module hands a flush to a background runtime.
+TEST_F(DynamicModuleStatsSinkRetainAbiTest, RetainedHandleReadAndReleasedOnAnotherThread) {
+  populateSnapshot();
+  auto* retained = envoy_dynamic_module_callback_stat_sink_snapshot_retain(snapshotHandle());
+  advanceLiveStats();
+
+  std::string name;
+  uint64_t value = 0;
+  uint64_t delta = 0;
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
+    name = counterName(retained, &value, &delta);
+    envoy_dynamic_module_callback_stat_sink_snapshot_release(retained);
+  });
+  thread->join();
+
+  EXPECT_EQ("cluster.foo.rq_total", name);
+  EXPECT_EQ(100u, value);
+  EXPECT_EQ(7u, delta);
+  EXPECT_EQ(1u, c0_.use_count());
+  EXPECT_EQ(1u, h0_.use_count());
 }
 
 // =============================================================================

@@ -10413,6 +10413,10 @@ static SS_DEFINE_GAUGE_FROZEN: AtomicBool = AtomicBool::new(false);
 static SS_SCHEDULER_COMMITS: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
 static SS_SCHEDULER_NEW_COUNT: AtomicUsize = AtomicUsize::new(0);
 static SS_SCHEDULER_DELETE_COUNT: AtomicUsize = AtomicUsize::new(0);
+// (source handle, retained handle) for every retain call, and every handle passed to release.
+static SS_SNAPSHOT_RETAINS: std::sync::Mutex<Vec<(usize, usize)>> =
+  std::sync::Mutex::new(Vec::new());
+static SS_SNAPSHOT_RELEASES: std::sync::Mutex<Vec<usize>> = std::sync::Mutex::new(Vec::new());
 
 fn reset_stat_sink_stubs() {
   SS_DEFINE_GAUGE_NAMES.lock().unwrap().clear();
@@ -10421,6 +10425,30 @@ fn reset_stat_sink_stubs() {
   SS_SCHEDULER_COMMITS.lock().unwrap().clear();
   SS_SCHEDULER_NEW_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
   SS_SCHEDULER_DELETE_COUNT.store(0, std::sync::atomic::Ordering::SeqCst);
+  SS_SNAPSHOT_RETAINS.lock().unwrap().clear();
+  SS_SNAPSHOT_RELEASES.lock().unwrap().clear();
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_retain(
+  snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr {
+  // Allocate a token so the retained handle is distinct from its source and release receives a
+  // real, non-null pointer, just like the host. The snapshot read stubs ignore the handle.
+  let retained = Box::into_raw(Box::new(0u8)) as *mut std::ffi::c_void;
+  SS_SNAPSHOT_RETAINS
+    .lock()
+    .unwrap()
+    .push((snapshot as usize, retained as usize));
+  retained
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_stat_sink_snapshot_release(
+  snapshot: abi::envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+) {
+  SS_SNAPSHOT_RELEASES.lock().unwrap().push(snapshot as usize);
+  unsafe { drop(Box::from_raw(snapshot as *mut u8)) };
 }
 
 #[no_mangle]
@@ -10588,6 +10616,40 @@ fn test_envoy_stat_sink_config_scheduler_mock() {
     .times(1)
     .return_const(());
   mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_metric_snapshot_retain_reads_on_another_thread_and_releases_on_drop() {
+  let _guard = STAT_SINK_TEST_LOCK.lock().unwrap();
+  reset_stat_sink_stubs();
+
+  let mut dummy = 0u8;
+  let flush_ptr = &mut dummy as *mut _ as *mut std::ffi::c_void;
+  let snapshot = stats_sink::MetricSnapshot::new(flush_ptr);
+  let retained = snapshot.retain();
+  let retains = SS_SNAPSHOT_RETAINS.lock().unwrap().clone();
+  assert_eq!(retains.len(), 1);
+  let (source, retained_ptr) = retains[0];
+  assert_eq!(source, flush_ptr as usize);
+  assert_ne!(retained_ptr, flush_ptr as usize);
+  assert!(SS_SNAPSHOT_RELEASES.lock().unwrap().is_empty());
+
+  // The retained snapshot is Send, so it moves to a worker, which reads it through the same
+  // MetricSnapshot methods and drops it there.
+  let worker = std::thread::spawn(move || {
+    let mut name = Vec::new();
+    let counter = retained.counter(0, &mut name).unwrap();
+    (name, counter, retained.to_owned())
+  });
+  let (name, counter, owned) = worker.join().unwrap();
+  assert_eq!(name.as_slice(), b"counter_0");
+  assert_eq!(counter.value, 10);
+  assert_eq!(counter.delta, 5);
+  assert_eq!(owned.counters.len(), 2);
+  assert_eq!(owned.histograms.len(), 1);
+
+  // Dropping it on the worker released exactly the handle retain returned, and only once.
+  assert_eq!(*SS_SNAPSHOT_RELEASES.lock().unwrap(), vec![retained_ptr]);
 }
 
 #[test]
