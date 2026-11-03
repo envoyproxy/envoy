@@ -131,11 +131,9 @@ put: "/v1/{parent=projects/*}/shelves/{shelf.name}"
   ASSERT_OK(http_request);
   EXPECT_EQ(status, BridgeStatus::Ok);
 
-  EXPECT_THAT(
-      http_request->url,
-      StrEq(
-          "/v1/projects/123456789/shelves/"
-          "science-fiction?shelf.editions=kindle&shelf.editions=hardback&shelf.editions=audiobook"));
+  EXPECT_THAT(http_request->url, StrEq("/v1/projects/123456789/shelves/"
+                                       "science-fiction?shelf.editions=kindle&shelf.editions="
+                                       "hardback&shelf.editions=audiobook"));
   EXPECT_THAT(http_request->method, StrEq("PUT"));
   EXPECT_TRUE(http_request->body.is_null());
 }
