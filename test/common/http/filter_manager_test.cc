@@ -283,10 +283,14 @@ TEST_F(FilterManagerTest, SidestreamWatermarkReplayOnRegistration) {
   EXPECT_CALL(late_sidestream_callbacks, onAboveWriteBufferHighWatermark());
   decoder_filter->callbacks_->addSidestreamWatermarkCallbacks(late_sidestream_callbacks);
 
+  // Removing a sidestream callback while downstream high watermark is active should unwind it.
+  EXPECT_CALL(late_sidestream_callbacks, onBelowWriteBufferLowWatermark());
+  decoder_filter->callbacks_->removeSidestreamWatermarkCallbacks(late_sidestream_callbacks);
+
   // Clear downstream watermark.
   EXPECT_CALL(downstream_callbacks, onBelowWriteBufferLowWatermark());
   EXPECT_CALL(sidestream_callbacks, onBelowWriteBufferLowWatermark());
-  EXPECT_CALL(late_sidestream_callbacks, onBelowWriteBufferLowWatermark());
+  EXPECT_CALL(late_sidestream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
   filter_manager_->callLowWatermarkCallbacks();
   EXPECT_TRUE(filter_manager_->aboveHighWatermark());
 

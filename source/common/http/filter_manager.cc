@@ -1956,12 +1956,13 @@ void ActiveStreamDecoderFilter::addSidestreamWatermarkCallbacks(
 
 void ActiveStreamDecoderFilter::removeSidestreamWatermarkCallbacks(
     DownstreamWatermarkCallbacks& watermark_callbacks) {
-  if (std::find(parent_.sidestream_watermark_callbacks_.begin(),
-                parent_.sidestream_watermark_callbacks_.end(),
-                &watermark_callbacks) != parent_.sidestream_watermark_callbacks_.end()) {
-    parent_.sidestream_watermark_callbacks_.remove(&watermark_callbacks);
-  } else {
-    ASSERT(parent_.sidestream_watermark_callbacks_.empty());
+  auto it = std::find(parent_.sidestream_watermark_callbacks_.begin(),
+                      parent_.sidestream_watermark_callbacks_.end(), &watermark_callbacks);
+  if (it != parent_.sidestream_watermark_callbacks_.end()) {
+    parent_.sidestream_watermark_callbacks_.erase(it);
+    for (uint32_t i = 0; i < parent_.downstream_high_watermark_count_; ++i) {
+      watermark_callbacks.onBelowWriteBufferLowWatermark();
+    }
   }
 }
 

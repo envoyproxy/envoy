@@ -45,11 +45,8 @@ public:
   }
 
   void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) final {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_side_stream_flow_control_3")) {
-      if (decode_callback_ != nullptr) {
-        decode_callback_->removeSidestreamWatermarkCallbacks(callbacks);
-      }
+    if (decode_callback_ != nullptr) {
+      decode_callback_->removeSidestreamWatermarkCallbacks(callbacks);
     }
   }
 
