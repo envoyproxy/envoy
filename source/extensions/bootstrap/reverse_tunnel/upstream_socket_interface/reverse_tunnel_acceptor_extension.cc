@@ -64,33 +64,31 @@ absl::string_view socketStateForEvent(absl::string_view event,
 
 // UpstreamSocketThreadLocal implementation
 UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher,
-                                                     ReverseTunnelAcceptorExtension* extension)
+                                                     ReverseTunnelAcceptorExtension& extension)
     : dispatcher_(dispatcher),
-      socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, extension)) {
+      socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, &extension)) {
   // Initialize per-worker aggregate metrics.
-  if (extension != nullptr) {
-    auto& stats_store = extension->getStatsScope();
-    std::string dispatcher_name = dispatcher.name();
-    std::string stat_prefix = extension->statPrefix();
+  auto& stats_store = extension.getStatsScope();
+  std::string dispatcher_name = dispatcher.name();
+  std::string stat_prefix = extension.statPrefix();
 
-    std::string total_clusters_stat_name =
-        fmt::format("{}.{}.total_clusters", stat_prefix, dispatcher_name);
-    Stats::StatNameManagedStorage total_clusters_stat_name_storage(total_clusters_stat_name,
-                                                                   stats_store.symbolTable());
-    total_clusters_gauge_ = &stats_store.gaugeFromStatName(
-        total_clusters_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
+  std::string total_clusters_stat_name =
+      fmt::format("{}.{}.total_clusters", stat_prefix, dispatcher_name);
+  Stats::StatNameManagedStorage total_clusters_stat_name_storage(total_clusters_stat_name,
+                                                                 stats_store.symbolTable());
+  total_clusters_gauge_ = &stats_store.gaugeFromStatName(
+      total_clusters_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
 
-    std::string total_nodes_stat_name =
-        fmt::format("{}.{}.total_nodes", stat_prefix, dispatcher_name);
-    Stats::StatNameManagedStorage total_nodes_stat_name_storage(total_nodes_stat_name,
-                                                                stats_store.symbolTable());
-    total_nodes_gauge_ = &stats_store.gaugeFromStatName(total_nodes_stat_name_storage.statName(),
-                                                        Stats::Gauge::ImportMode::NeverImport);
+  std::string total_nodes_stat_name =
+      fmt::format("{}.{}.total_nodes", stat_prefix, dispatcher_name);
+  Stats::StatNameManagedStorage total_nodes_stat_name_storage(total_nodes_stat_name,
+                                                              stats_store.symbolTable());
+  total_nodes_gauge_ = &stats_store.gaugeFromStatName(total_nodes_stat_name_storage.statName(),
+                                                      Stats::Gauge::ImportMode::NeverImport);
 
-    cx_idle_expire_time_ = getHistogram("cx_idle_expire_time", stats_store, stat_prefix);
-    cx_upgrade_time_ = getHistogram("cx_upgrade_time", stats_store, stat_prefix);
-    cx_post_upgrade_lifetime_ = getHistogram("cx_post_upgrade_lifetime", stats_store, stat_prefix);
-  }
+  cx_idle_expire_time_ = getHistogram("cx_idle_expire_time", stats_store, stat_prefix);
+  cx_upgrade_time_ = getHistogram("cx_upgrade_time", stats_store, stat_prefix);
+  cx_post_upgrade_lifetime_ = getHistogram("cx_post_upgrade_lifetime", stats_store, stat_prefix);
 }
 
 Stats::Histogram* UpstreamSocketThreadLocal::getHistogram(absl::string_view name,
@@ -109,6 +107,10 @@ ReverseTunnelAcceptorExtension::~ReverseTunnelAcceptorExtension() {
   // emitSyntheticLifecycleLog() which accesses the already-destroyed access_logs_, causing a
   // segfault under GCC.
   tls_slot_.reset();
+
+  if (socket_interface_ != nullptr && socket_interface_->extension_ == this) {
+    socket_interface_->extension_ = nullptr;
+  }
 }
 
 ReverseTunnelAcceptorExtension::ReverseTunnelAcceptorExtension(
@@ -156,7 +158,7 @@ void ReverseTunnelAcceptorExtension::emitSyntheticLifecycleLog(
     absl::string_view event, const ReverseTunnelLifecycleInfo& lifecycle, TimeSource& time_source,
     AccessLog::AccessLogType access_log_type, absl::string_view handoff_kind,
     absl::string_view close_reason, const LifecycleLogMetadata& extra_metadata) const {
-  if (access_logs_.empty()) {
+  if (access_logs_.empty() || context_.threadLocal().isShutdown()) {
     return;
   }
 
@@ -176,7 +178,7 @@ void ReverseTunnelAcceptorExtension::emitConnectionLifecycleLog(
     const ReverseTunnelLifecycleInfo& lifecycle, AccessLog::AccessLogType access_log_type,
     absl::string_view handoff_kind, absl::string_view close_reason,
     const LifecycleLogMetadata& extra_metadata) const {
-  if (access_logs_.empty()) {
+  if (access_logs_.empty() || context_.threadLocal().isShutdown()) {
     return;
   }
 
@@ -239,19 +241,10 @@ void ReverseTunnelAcceptorExtension::populateLifecycleStreamInfo(
 }
 
 // ReverseTunnelAcceptorExtension implementation
-void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
-  // Initialize the reporter.
-  if (reporter_) {
-    reporter_->onServerInitialized();
-  }
-
-  ENVOY_LOG(debug,
-            "ReverseTunnelAcceptorExtension::onServerInitialized: creating thread-local slot.");
-
-  // Set the extension reference in the socket interface.
-  if (socket_interface_) {
-    socket_interface_->extension_ = this;
-  }
+void ReverseTunnelAcceptorExtension::onWorkerThreadInitialized() {
+  ENVOY_LOG(
+      debug,
+      "ReverseTunnelAcceptorExtension::onWorkerThreadInitialized: creating thread-local slot.");
 
   // Create thread-local slot for the dispatcher and socket manager.
   tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(context_.threadLocal());
@@ -261,7 +254,7 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
   // Set up the thread-local dispatcher and socket manager.
   tls_slot_->set(
       [this, ping_failure_threshold, enable_tenant_isolation](Event::Dispatcher& dispatcher) {
-        auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
+        auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, *this);
         // Propagate configured miss threshold and tenant isolation into the socket manager.
         if (auto* socket_manager = tls->socketManager(); socket_manager != nullptr) {
           socket_manager->setMissThreshold(ping_failure_threshold);
@@ -270,6 +263,13 @@ void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
         }
         return tls;
       });
+}
+
+void ReverseTunnelAcceptorExtension::onServerInitialized(Server::Instance&) {
+  // Initialize the reporter.
+  if (reporter_) {
+    reporter_->onServerInitialized();
+  }
 }
 
 // Get thread-local registry for the current thread.
