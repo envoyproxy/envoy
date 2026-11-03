@@ -268,12 +268,19 @@ public:
     // cleanupUpstreamAndDownstream() does not close them. Destroying one while its fake upstream
     // is still flushing a response frees the HTTP/1 codec under the write: the codec's
     // flood-tracking sentinel fragment then calls back into freed memory when the write buffer
-    // drains. Close them and wait for the upstream side to finish before they are destroyed.
+    // drains. Close them, wait for the upstream side to finish and for anything the test posted
+    // to its thread to run, then release them, as cleanupUpstreamAndDownstream() does for
+    // fake_upstream_connection_.
     for (FakeHttpConnectionPtr* connection :
          {&time_backend_connection_, &tools_backend_connection_}) {
       if (*connection != nullptr) {
-        ASSERT_TRUE((*connection)->close());
-        ASSERT_TRUE((*connection)->waitForDisconnect());
+        auto result = (*connection)->close();
+        RELEASE_ASSERT(result, result.message());
+        result = (*connection)->waitForDisconnect();
+        RELEASE_ASSERT(result, result.message());
+        result = (*connection)->waitForNoPost();
+        RELEASE_ASSERT(result, result.message());
+        connection->reset();
       }
     }
     cleanupUpstreamAndDownstream();
