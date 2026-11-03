@@ -64,8 +64,8 @@ private:
                               PriorityStateManager& priority_state_manager,
                               const HostLookupMap& all_hosts,
                               const absl::flat_hash_set<std::string>& all_new_hosts);
-  // Updates the priorities when graceful_host_removal is enabled. Returns whether any priority was
-  // rebuilt.
+  // Updates all the priorities, including the existing priorities that are not present in the
+  // configuration, when graceful_host_removal is enabled. Returns whether any priority was rebuilt.
   bool updatePrioritiesWithGracefulHostRemoval(
       bool weighted_priority_health, uint32_t overprovisioning_factor,
       PriorityStateManager& priority_state_manager, const HostLookupMap& all_hosts,

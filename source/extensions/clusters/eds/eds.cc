@@ -534,11 +534,15 @@ void EdsClusterImpl::reloadHealthyHostsWithGracefulHostRemoval(const bool remove
 
   // Hosts retained with PENDING_DYNAMIC_REMOVAL in a priority are kept while at least one host in
   // that priority is still warming up and the priority has not yet reached the healthy panic
-  // threshold, and are removed once the threshold is met, warmup ends, or they are no longer
+  // threshold (or, for priorities without warming hosts of their own, while another priority in
+  // the cluster is warming up and no priority in the cluster has reached the healthy panic
+  // threshold), and are removed once the threshold is met, warmup ends, or they are no longer
   // healthy.
   const auto& host_sets = prioritySet().hostSetsPerPriority();
   const uint64_t panic_threshold_percent = healthyPanicThresholdPercent();
   std::vector<PriorityWarmupState> warmup_state(host_sets.size());
+  bool cluster_has_warming_host = false;
+  bool cluster_meets_panic_threshold = false;
   bool has_retained_host = false;
   for (size_t priority = 0; priority < host_sets.size(); ++priority) {
     const auto& hosts = host_sets[priority]->hosts();
@@ -547,14 +551,18 @@ void EdsClusterImpl::reloadHealthyHostsWithGracefulHostRemoval(const bool remove
           return host->healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL);
         });
     warmup_state[priority] = evaluatePriorityWarmupState(hosts, panic_threshold_percent);
+    cluster_has_warming_host = cluster_has_warming_host || warmup_state[priority].has_warming_host;
+    cluster_meets_panic_threshold =
+        cluster_meets_panic_threshold || warmup_state[priority].meets_panic_threshold;
   }
   const auto should_remove_host_in_priority = [&](size_t priority, const Host& host) {
     if (!host.healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
       return false;
     }
     const bool retain_in_priority = health_checker_ != nullptr &&
-                                    warmup_state[priority].has_warming_host &&
-                                    !warmup_state[priority].meets_panic_threshold;
+                                    ((warmup_state[priority].has_warming_host &&
+                                      !warmup_state[priority].meets_panic_threshold) ||
+                                     (cluster_has_warming_host && !cluster_meets_panic_threshold));
     return !retain_in_priority || !canRetainHost(host);
   };
   bool has_hosts_to_remove = false;
@@ -777,7 +785,8 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
   std::vector<PriorityUpdate> updates(priority_state.size());
   const HostVector no_hosts;
   const uint64_t panic_threshold_percent = healthyPanicThresholdPercent();
-  bool any_warming_host = false;
+  bool cluster_has_warming_host = false;
+  bool cluster_meets_panic_threshold = false;
   for (uint32_t priority = 0; priority < updates.size(); ++priority) {
     PriorityUpdate& update = updates[priority];
     // The host sets of new priorities are not created here, but by updateClusterPrioritySet() below
@@ -801,19 +810,24 @@ bool EdsClusterImpl::updatePrioritiesWithGracefulHostRemoval(
         [&all_hosts](const std::string& address) { return all_hosts.findHost(address); },
         all_new_hosts);
     update.warmup_state = evaluatePriorityWarmupState(*update.hosts, panic_threshold_percent);
-    any_warming_host = any_warming_host || update.warmup_state.has_warming_host;
+    cluster_has_warming_host = cluster_has_warming_host || update.warmup_state.has_warming_host;
+    cluster_meets_panic_threshold =
+        cluster_meets_panic_threshold || update.warmup_state.meets_panic_threshold;
   }
 
   // Retain healthy removed hosts with PENDING_DYNAMIC_REMOVAL in any priority that has warming
-  // hosts in the updated configuration and has not yet reached the healthy panic threshold.
-  // Removed hosts whose address is still in the configuration are replaced by a new host (e.g.
-  // because their health check configuration, hostname or locality changed) and are removed as with
-  // ignore_health_on_host_removal.
-  if (health_checker_ != nullptr && any_warming_host) {
+  // hosts in the updated configuration and has not yet reached the healthy panic threshold (or, for
+  // priorities without warming hosts of their own, while another priority is warming up and no
+  // priority in the cluster has reached the healthy panic threshold). Removed hosts whose address
+  // is still in the configuration either moved to another priority or are replaced by a new host
+  // (e.g. because their health check configuration, hostname or locality changed): they are removed
+  // as with ignore_health_on_host_removal.
+  if (health_checker_ != nullptr && cluster_has_warming_host) {
     for (uint32_t priority = 0; priority < updates.size(); ++priority) {
       PriorityUpdate& update = updates[priority];
       const bool retain_in_priority =
-          update.warmup_state.has_warming_host && !update.warmup_state.meets_panic_threshold;
+          (update.warmup_state.has_warming_host && !update.warmup_state.meets_panic_threshold) ||
+          (cluster_has_warming_host && !cluster_meets_panic_threshold);
       if (!retain_in_priority) {
         continue;
       }

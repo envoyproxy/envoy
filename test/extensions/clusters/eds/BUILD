@@ -21,6 +21,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/eds:eds_lib",
+        "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",

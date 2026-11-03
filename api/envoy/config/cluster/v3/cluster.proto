@@ -241,7 +241,7 @@ message Cluster {
     //   <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.locality>`, :ref:`hostname
     //   <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>` or :ref:`health check
     //   configuration <envoy_v3_api_field_config.endpoint.v3.Endpoint.health_check_config>`
-    //   changes, since Envoy replaces the host of such an
+    //   changes (possibly along with their priority), since Envoy replaces the host of such an
     //   endpoint with a new host at the same address. As with
     //   :ref:`ignore_health_on_host_removal
     //   <envoy_v3_api_field_config.cluster.v3.Cluster.ignore_health_on_host_removal>`, the previous
@@ -256,7 +256,8 @@ message Cluster {
     //   * Retention and removal are evaluated per priority (rather than per locality or
     //     :ref:`lb_subset_config <envoy_v3_api_field_config.cluster.v3.Cluster.lb_subset_config>`
     //     subset): a priority retains removed hosts while it has warming endpoints and has not yet
-    //     reached ``healthy_panic_threshold``.
+    //     reached ``healthy_panic_threshold``, or while any priority in the cluster has warming
+    //     endpoints and no priority in the cluster has reached ``healthy_panic_threshold``.
     //   * Removed hosts are only retained if they are actively health checked and healthy (neither
     //     unhealthy nor degraded—i.e., not failing or degraded by active health checking or
     //     outlier detection, not marked unhealthy, degraded, or draining by EDS, and not excluded
