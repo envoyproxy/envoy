@@ -4394,7 +4394,7 @@ TEST(SubstitutionFormatterTest, SpanIDFormatter) {
   }
 
   {
-    // Span present but getSpanId() returns empty (e.g., Zipkin, Datadog, SkyWalking).
+    // Span present but getSpanId() returns empty (e.g., Zipkin, SkyWalking).
     Tracing::MockSpan active_span;
     EXPECT_CALL(active_span, getSpanId()).WillRepeatedly(Return(""));
 
