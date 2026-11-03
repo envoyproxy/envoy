@@ -433,6 +433,10 @@ type HttpFilterHandle interface {
 	// graceful is true, a graceful drain is initiated before closing.
 	SendGoAwayAndClose(graceful bool)
 
+	// DrainConnectionUponCompletion marks the downstream connection to be drained once the
+	// current HTTP stream completes.
+	DrainConnectionUponCompletion()
+
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a
 	// successful call, the current filter chain is destroyed and the filter SHOULD return Stop

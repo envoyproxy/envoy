@@ -72,10 +72,10 @@ class GroupVerifierTest : public testing::Test {
 public:
   void createVerifier() {
     ON_CALL(mock_factory_, create(_, _, _, _))
-        .WillByDefault(Invoke([&](const JwtVerify::CheckAudience*,
-                                  const std::optional<std::string>& provider, bool, bool) {
+        .WillByDefault([&](const JwtVerify::CheckAudience*,
+                           const std::optional<std::string>& provider, bool, bool) {
           return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
-        }));
+        });
     auto verifier_or = Verifier::create(proto_config_.rules(0).requires_(),
                                         proto_config_.providers(), mock_factory_);
     ASSERT_TRUE(verifier_or.ok());
@@ -85,17 +85,16 @@ public:
     for (const auto& it : statuses) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
-          .WillOnce(
-              Invoke([issuer = it.first, status = it.second](
-                         Http::RequestHeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
-                         SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
-                         AuthenticatorCallback callback) {
-                if (status == Status::Ok) {
-                  Protobuf::Struct empty_struct;
-                  set_extracted_jwt_data_cb(issuer, empty_struct);
-                }
-                callback(status);
-              }));
+          .WillOnce([issuer = it.first, status = it.second](
+                        Http::RequestHeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
+                        SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
+                        AuthenticatorCallback callback) {
+            if (status == Status::Ok) {
+              Protobuf::Struct empty_struct;
+              set_extracted_jwt_data_cb(issuer, empty_struct);
+            }
+            callback(status);
+          });
       EXPECT_CALL(*mock_auth, onDestroy());
       mock_auths_[it.first] = std::move(mock_auth);
     }
@@ -118,12 +117,10 @@ public:
     for (const auto& provider : providers) {
       auto mock_auth = std::make_unique<MockAuthenticator>();
       EXPECT_CALL(*mock_auth, doVerify(_, _, _, _, _))
-          .WillOnce(Invoke([&, iss = provider](Http::RequestHeaderMap&, Tracing::Span&,
-                                               std::vector<JwtLocationConstPtr>*,
-                                               SetExtractedJwtDataCallback,
-                                               AuthenticatorCallback callback) {
-            callbacks_[iss] = std::move(callback);
-          }));
+          .WillOnce([&, iss = provider](
+                        Http::RequestHeaderMap&, Tracing::Span&, std::vector<JwtLocationConstPtr>*,
+                        SetExtractedJwtDataCallback,
+                        AuthenticatorCallback callback) { callbacks_[iss] = std::move(callback); });
       EXPECT_CALL(*mock_auth, onDestroy());
       mock_auths_[provider] = std::move(mock_auth);
     }
@@ -176,11 +173,10 @@ rules:
   TestUtility::loadFromYaml(config, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
-        EXPECT_TRUE(TestUtility::protoEqual(extracted_data,
-                                            getExpectedExtractedData({"example_provider"})));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& extracted_data) {
+    EXPECT_TRUE(
+        TestUtility::protoEqual(extracted_data, getExpectedExtractedData({"example_provider"})));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{
@@ -233,11 +229,10 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
   createSyncMockAuthsAndVerifier(
       StatusMap{{"example_provider", Status::Ok}, {"other_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
-        EXPECT_TRUE(TestUtility::protoEqual(
-            extracted_data, getExpectedExtractedData({"example_provider", "other_provider"})));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& extracted_data) {
+    EXPECT_TRUE(TestUtility::protoEqual(
+        extracted_data, getExpectedExtractedData({"example_provider", "other_provider"})));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{
@@ -321,11 +316,10 @@ TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
   TestUtility::loadFromYaml(RequiresAnyConfig, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
-        EXPECT_TRUE(TestUtility::protoEqual(extracted_data,
-                                            getExpectedExtractedData({"example_provider"})));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& extracted_data) {
+    EXPECT_TRUE(
+        TestUtility::protoEqual(extracted_data, getExpectedExtractedData({"example_provider"})));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{
@@ -344,11 +338,10 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
   createSyncMockAuthsAndVerifier(
       StatusMap{{"example_provider", Status::JwtUnknownIssuer}, {"other_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
-        EXPECT_TRUE(
-            TestUtility::protoEqual(extracted_data, getExpectedExtractedData({"other_provider"})));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& extracted_data) {
+    EXPECT_TRUE(
+        TestUtility::protoEqual(extracted_data, getExpectedExtractedData({"other_provider"})));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{
@@ -433,11 +426,10 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
   TestUtility::loadFromYaml(AllWithAny, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::Ok}, {"provider_3", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
-        EXPECT_TRUE(TestUtility::protoEqual(
-            extracted_data, getExpectedExtractedData({"provider_1", "provider_3"})));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& extracted_data) {
+    EXPECT_TRUE(TestUtility::protoEqual(extracted_data,
+                                        getExpectedExtractedData({"provider_1", "provider_3"})));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};
@@ -453,11 +445,10 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
                                            {"provider_2", Status::Ok},
                                            {"provider_3", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
-        EXPECT_TRUE(TestUtility::protoEqual(
-            extracted_data, getExpectedExtractedData({"provider_2", "provider_3"})));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce([](const Protobuf::Struct& extracted_data) {
+    EXPECT_TRUE(TestUtility::protoEqual(extracted_data,
+                                        getExpectedExtractedData({"provider_2", "provider_3"})));
+  });
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
   auto headers = Http::TestRequestHeaderMapImpl{};

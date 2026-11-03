@@ -24,11 +24,11 @@ namespace {
 
 void setStringMetadataField(Protobuf::Struct& metadata, absl::string_view key,
                             absl::string_view value) {
-  (*metadata.mutable_fields())[std::string(key)].set_string_value(std::string(value));
+  (*metadata.mutable_fields())[key].set_string_value(value);
 }
 
 void setNumberMetadataField(Protobuf::Struct& metadata, absl::string_view key, double value) {
-  (*metadata.mutable_fields())[std::string(key)].set_number_value(value);
+  (*metadata.mutable_fields())[key].set_number_value(value);
 }
 
 void maybeSetStringFilterState(StreamInfo::FilterState& filter_state, absl::string_view key,

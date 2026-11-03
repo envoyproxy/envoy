@@ -20,7 +20,6 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -88,32 +87,31 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, CreateExporterAndExportSpan) {
                     Http::AsyncClient::RequestOptions()
                         .setTimeout(std::chrono::milliseconds(250))
                         .setDiscardResponseBody(true)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
-            EXPECT_EQ(message->headers().getUserAgentValue(),
-                      "OTel-OTLP-Exporter-Envoy/" + Envoy::VersionInfo::version());
-            EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
-                      message->headers().getContentTypeValue());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Post, message->headers().getMethodValue());
+        EXPECT_EQ(message->headers().getUserAgentValue(),
+                  "OTel-OTLP-Exporter-Envoy/" + Envoy::VersionInfo::version());
+        EXPECT_EQ(Http::Headers::get().ContentTypeValues.Protobuf,
+                  message->headers().getContentTypeValue());
 
-            EXPECT_EQ("/otlp/v1/traces", message->headers().getPathValue());
-            EXPECT_EQ("some-o11y.com", message->headers().getHostValue());
+        EXPECT_EQ("/otlp/v1/traces", message->headers().getPathValue());
+        EXPECT_EQ("some-o11y.com", message->headers().getHostValue());
 
-            // Custom headers provided in the configuration
-            EXPECT_EQ("auth-token", message->headers()
-                                        .get(Http::LowerCaseString("authorization"))[0]
-                                        ->value()
-                                        .getStringView());
-            EXPECT_EQ("custom-value", message->headers()
-                                          .get(Http::LowerCaseString("x-custom-header"))[0]
-                                          ->value()
-                                          .getStringView());
+        // Custom headers provided in the configuration
+        EXPECT_EQ("auth-token", message->headers()
+                                    .get(Http::LowerCaseString("authorization"))[0]
+                                    ->value()
+                                    .getStringView());
+        EXPECT_EQ("custom-value", message->headers()
+                                      .get(Http::LowerCaseString("x-custom-header"))[0]
+                                      ->value()
+                                      .getStringView());
 
-            return &request;
-          }));
+        return &request;
+      });
 
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest
       export_trace_service_request;
@@ -163,25 +161,24 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, FormattedHeaders) {
   Http::AsyncClient::Callbacks* callback;
 
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            // Formatted header should be evaluated.
-            EXPECT_EQ("Bearer my-secret-token", message->headers()
-                                                    .get(Http::LowerCaseString("authorization"))[0]
-                                                    ->value()
-                                                    .getStringView());
+        // Formatted header should be evaluated.
+        EXPECT_EQ("Bearer my-secret-token", message->headers()
+                                                .get(Http::LowerCaseString("authorization"))[0]
+                                                ->value()
+                                                .getStringView());
 
-            // Static header should also be present.
-            EXPECT_EQ("static-value", message->headers()
-                                          .get(Http::LowerCaseString("x-static-header"))[0]
-                                          ->value()
-                                          .getStringView());
+        // Static header should also be present.
+        EXPECT_EQ("static-value", message->headers()
+                                      .get(Http::LowerCaseString("x-static-header"))[0]
+                                      ->value()
+                                      .getStringView());
 
-            return &request;
-          }));
+        return &request;
+      });
 
   opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest
       export_trace_service_request;

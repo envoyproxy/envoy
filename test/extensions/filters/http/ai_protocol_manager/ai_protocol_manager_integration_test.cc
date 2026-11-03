@@ -383,6 +383,33 @@ typed_config:
     initialize();
   }
 
+  // Declares route 0 an OpenAI chat-completions AI endpoint, which is what
+  // builds both filter chain bridges, and installs the filter downstream.
+  void initializeDeclaredAiRoute() {
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          envoy::config::route::v3::Route ai_route;
+          TestUtility::loadFromYaml(R"EOF(
+typed_per_filter_config:
+  envoy.filters.http.ai_protocol_manager:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
+    request:
+      llm_protocol: OPENAI_CHAT_COMPLETIONS
+)EOF",
+                                    ai_route);
+          hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->MergeFrom(
+              ai_route);
+        });
+    config_helper_.prependFilter(R"EOF(
+name: envoy.filters.http.ai_protocol_manager
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
+  request_handling: {}
+)EOF");
+    initialize();
+  }
+
   Http::TestRequestHeaderMapImpl requestHeaders() {
     return Http::TestRequestHeaderMapImpl{{":method", "POST"},
                                           {":path", "/v1/chat/completions"},
@@ -473,28 +500,7 @@ TEST_P(AiProtocolManagerResponseIntegrationTest, UpstreamFilterJsonTokenUsage) {
 TEST_P(AiProtocolManagerResponseIntegrationTest, ResponseOverBufferLimitCompletes) {
   // A large upstream limit lets one read exceed the ingest watermark.
   config_helper_.setBufferLimits(1024 * 1024, 1024);
-  config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) {
-        envoy::config::route::v3::Route ai_route;
-        TestUtility::loadFromYaml(R"EOF(
-typed_per_filter_config:
-  envoy.filters.http.ai_protocol_manager:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManagerPerRoute
-    request:
-      llm_protocol: OPENAI_CHAT_COMPLETIONS
-)EOF",
-                                  ai_route);
-        hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->MergeFrom(
-            ai_route);
-      });
-  config_helper_.prependFilter(R"EOF(
-name: envoy.filters.http.ai_protocol_manager
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.ai_protocol_manager.v3.AiProtocolManager
-  request_handling: {}
-)EOF");
-  initialize();
+  initializeDeclaredAiRoute();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeRequestWithBody(
@@ -508,6 +514,57 @@ typed_config:
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(body, response->body());
+}
+
+// A request over the downstream buffer limit on an AI route pauses the client
+// while it is ingested, and replay still delivers it whole.
+TEST_P(AiProtocolManagerResponseIntegrationTest, RequestOverBufferLimitCompletes) {
+  config_helper_.setBufferLimits(1024 * 1024, 1024);
+  initializeDeclaredAiRoute();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const std::string request = R"({"model":"gpt-4o","messages":[{"role":"user","content":")" +
+                              std::string(64 * 1024, 'x') + R"("}]})";
+  auto response = codec_client_->makeRequestWithBody(requestHeaders(), request);
+  waitForNextUpstreamRequest();
+  // Compared as JSON: re-serializing the request does not keep key order.
+  EXPECT_THAT(upstream_request_->body().toString(), JsonStringEq(request));
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // The ingest pause actually engaged, so the test is not passing vacuously.
+  test_server_->waitForCounter("http.config_test.downstream_flow_control_paused_reading_total",
+                               testing::Ge(1));
+}
+
+// A client that stops reading mid-response holds the response back through the
+// encode bridge, and the response completes once the client reads again.
+TEST_P(AiProtocolManagerResponseIntegrationTest, ResponseResumesAfterClientBackPressure) {
+  config_helper_.setBufferLimits(1024, 1024);
+  initializeDeclaredAiRoute();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder = codec_client_->startRequest(requestHeaders());
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  codec_client_->sendData(
+      *request_encoder_, R"({"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]})", true);
+  waitForNextUpstreamRequest();
+
+  request_encoder_->getStream().readDisable(true);
+  const std::string body =
+      R"({"id":"chatcmpl-1","pad":")" + std::string(1024 * 1024, 'x') + R"("})";
+  upstream_request_->encodeHeaders(responseHeaders("application/json"), false);
+  upstream_request_->encodeData(body, true);
+  test_server_->waitForCounter("cluster.cluster_0.upstream_flow_control_paused_reading_total",
+                               testing::Ge(1));
+  EXPECT_FALSE(response->complete());
+
+  request_encoder_->getStream().readDisable(false);
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
   EXPECT_EQ(body, response->body());
 }
 

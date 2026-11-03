@@ -178,9 +178,9 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestTranslation) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
   response_trailers_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
   response_trailers_.addCopy("custom-metadata", "test");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke((
-          [&](Buffer::Instance& d, bool) { EXPECT_EQ(R"EOF({"response":1})EOF", d.toString()); })));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ(R"EOF({"response":1})EOF", d.toString());
+  });
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
   EXPECT_EQ("test", response_headers_.get_("trailer-custom-metadata"));
 }
@@ -250,12 +250,11 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestWithTrailers) {
   Buffer::OwnedImpl data{R"EOF({"request":1})EOF"};
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.decodeData(data, false));
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\0', d.drainInt<uint8_t>());
-        EXPECT_EQ(13U, d.drainBEInt<uint32_t>());
-        EXPECT_EQ(R"EOF({"request":1})EOF", d.toString());
-      })));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\0', d.drainInt<uint8_t>());
+    EXPECT_EQ(13U, d.drainBEInt<uint32_t>());
+    EXPECT_EQ(R"EOF({"request":1})EOF", d.toString());
+  });
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_trailers_));
 }
 
@@ -291,9 +290,9 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryDisjointFrameHandling) {
   part.move(data);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(part, false));
 
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke((
-          [&](Buffer::Instance& d, bool) { EXPECT_EQ(R"EOF({"response":1})EOF", d.toString()); })));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ(R"EOF({"response":1})EOF", d.toString());
+  });
 
   response_trailers_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
   response_trailers_.addCopy("custom-metadata", "test");
@@ -320,17 +319,16 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryTrailerErrorTranslation) {
   setStatusDetails(response_trailers_, status);
   response_trailers_.setGrpcStatus(status.code());
   response_trailers_.addCopy("custom-metadata", "test");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_TRUE(jsonEqual(R"EOF({
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_TRUE(jsonEqual(R"EOF({
           "code": "internal",
           "details": [{
             "type": "type.googleapis.com/google.protobuf.Value",
             "value": "GgtUZXN0IFN0YXR1cw=="
           }]
         })EOF",
-                              d.toString()));
-      })));
+                          d.toString()));
+  });
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
@@ -342,10 +340,9 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryHeaderOnlyErrorTranslation) {
   Buffer::OwnedImpl data{};
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
 
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ(R"EOF({"code":"internal"})EOF", d.toString());
-      })));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ(R"EOF({"code":"internal"})EOF", d.toString());
+  });
 
   response_headers_.setStatus(200);
   response_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);
@@ -373,12 +370,11 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryIgnoreBrokenGrpcResponse) {
 TEST_F(ConnectGrpcBridgeFilterTest, UnaryGetRequest) {
   request_headers_.setPath(
       "/Service/Method?connect=v1&encoding=json&message=%7B%22request%22%3A1%7D");
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\0', d.drainInt<uint8_t>());
-        EXPECT_EQ(13U, d.drainBEInt<uint32_t>());
-        EXPECT_EQ(R"EOF({"request":1})EOF", d.toString());
-      })));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\0', d.drainInt<uint8_t>());
+    EXPECT_EQ(13U, d.drainBEInt<uint32_t>());
+    EXPECT_EQ(R"EOF({"request":1})EOF", d.toString());
+  });
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, true));
   EXPECT_EQ("/Service/Method", request_headers_.getPathValue());
   EXPECT_EQ(Http::Headers::get().TEValues.Trailers, request_headers_.get_(Http::Headers::get().TE));
@@ -393,9 +389,9 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryGetRequest) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(data, false));
   response_trailers_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
   response_trailers_.addCopy("custom-metadata", "test");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke((
-          [&](Buffer::Instance& d, bool) { EXPECT_EQ(R"EOF({"response":1})EOF", d.toString()); })));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ(R"EOF({"response":1})EOF", d.toString());
+  });
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
   EXPECT_EQ("test", response_headers_.get_("trailer-custom-metadata"));
 }
@@ -403,12 +399,11 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryGetRequest) {
 TEST_F(ConnectGrpcBridgeFilterTest, UnaryGetRequestBase64) {
   request_headers_.setPath(
       "/Service/Method?connect=v1&encoding=json&message=eyJyZXF1ZXN0IjoxfQ&base64=1");
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\0', d.drainInt<uint8_t>());
-        EXPECT_EQ(13U, d.drainBEInt<uint32_t>());
-        EXPECT_EQ(R"EOF({"request":1})EOF", d.toString());
-      })));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\0', d.drainInt<uint8_t>());
+    EXPECT_EQ(13U, d.drainBEInt<uint32_t>());
+    EXPECT_EQ(R"EOF({"request":1})EOF", d.toString());
+  });
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, true));
   EXPECT_EQ("application/grpc+json", request_headers_.getContentTypeValue());
 }
@@ -417,12 +412,11 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryGetRequestCompression) {
   request_headers_.setPath(
       "/Service/Method?connect=v1&encoding=proto&message=fake&compression=gzip");
   request_headers_.setCopy(Http::CustomHeaders::get().AcceptEncoding, "brotli");
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\1', d.drainInt<uint8_t>());
-        EXPECT_EQ(4U, d.drainBEInt<uint32_t>());
-        EXPECT_EQ("fake", d.toString());
-      })));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\1', d.drainInt<uint8_t>());
+    EXPECT_EQ(4U, d.drainBEInt<uint32_t>());
+    EXPECT_EQ("fake", d.toString());
+  });
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, true));
   EXPECT_FALSE(request_headers_.has(Http::CustomHeaders::get().AcceptEncoding));
   EXPECT_EQ("gzip", request_headers_.get_(Http::CustomHeaders::get().GrpcEncoding));
@@ -443,9 +437,9 @@ TEST_F(ConnectGrpcBridgeFilterTest, UnaryRequestWithNoBodyNorTrailers) {
 
   Buffer::OwnedImpl data{};
 
-  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true))
-      .WillOnce(
-          Invoke(([&](Buffer::Instance& d, bool) { EXPECT_EQ('\0', d.drainInt<uint8_t>()); })));
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\0', d.drainInt<uint8_t>());
+  });
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers_, true));
 }
@@ -500,17 +494,16 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingRequestTranslation) {
 
   response_trailers_.setGrpcStatus(Grpc::Status::WellKnownGrpcStatus::Ok);
   response_trailers_.addCopy("custom-metadata", "test");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\2', d.drainInt<uint8_t>());
-        EXPECT_EQ(41U, d.drainBEInt<uint32_t>());
-        EXPECT_TRUE(jsonEqual(R"EOF({
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\2', d.drainInt<uint8_t>());
+    EXPECT_EQ(41U, d.drainBEInt<uint32_t>());
+    EXPECT_TRUE(jsonEqual(R"EOF({
           "metadata": {
             "custom-metadata": ["test"]
           }
         })EOF",
-                              d.toString()));
-      })));
+                          d.toString()));
+  });
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
@@ -536,11 +529,10 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingErrorTranslation) {
   setStatusDetails(response_trailers_, status);
   response_trailers_.setGrpcStatus(status.code());
   response_trailers_.addCopy("custom-metadata", "test");
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\2', d.drainInt<uint8_t>());
-        d.drainBEInt<uint32_t>();
-        EXPECT_TRUE(jsonEqual(R"EOF({
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\2', d.drainInt<uint8_t>());
+    d.drainBEInt<uint32_t>();
+    EXPECT_TRUE(jsonEqual(R"EOF({
           "metadata": {
             "custom-metadata": ["test"]
           },
@@ -552,8 +544,8 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingErrorTranslation) {
             }]
           }
         })EOF",
-                              d.toString()));
-      })));
+                          d.toString()));
+  });
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(response_trailers_));
 }
 
@@ -565,12 +557,11 @@ TEST_F(ConnectGrpcBridgeFilterTest, StreamingHeaderOnlyErrorTranslation) {
   Grpc::Common::prependGrpcFrameHeader(data);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data, true));
 
-  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true))
-      .WillOnce(Invoke(([&](Buffer::Instance& d, bool) {
-        EXPECT_EQ('\2', d.drainInt<uint8_t>());
-        EXPECT_EQ(29U, d.drainBEInt<uint32_t>());
-        EXPECT_EQ(R"EOF({"error":{"code":"internal"}})EOF", d.toString());
-      })));
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, true)).WillOnce([&](Buffer::Instance& d, bool) {
+    EXPECT_EQ('\2', d.drainInt<uint8_t>());
+    EXPECT_EQ(29U, d.drainBEInt<uint32_t>());
+    EXPECT_EQ(R"EOF({"error":{"code":"internal"}})EOF", d.toString());
+  });
 
   response_headers_.setStatus(200);
   response_headers_.setContentType(Http::Headers::get().ContentTypeValues.Grpc);

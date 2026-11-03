@@ -1,10 +1,13 @@
 #include "source/extensions/transport_sockets/tls/cert_selectors/dynamic_modules/tls_certificate_selector.h"
 
+#include <algorithm>
+
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "source/common/common/thread.h"
 #include "source/common/tls/default_tls_certificate_selector.h"
 #include "source/common/tls/server_context_impl.h"
+#include "source/common/tls/utility.h"
 #include "source/server/generic_factory_context.h"
 
 #include "absl/strings/str_cat.h"
@@ -43,6 +46,34 @@ bool validationContextReady(const Ssl::ContextConfig& tls_config) {
          tls_config.certificateValidationContext() != nullptr;
 }
 
+// Reports a dynamic certificate to the context manager without the trusted certificates, which the
+// TLS context of the selector reports once for all of its dynamic certificates.
+class DynamicCertificateView : public Ssl::Context {
+public:
+  DynamicCertificateView(AsyncContextConstSharedPtr context, TimeSource& time_source)
+      : context_(std::move(context)),
+        ssl_context_(dynamic_cast<const Ssl::Context*>(context_.get())), time_source_(time_source) {
+    ASSERT(ssl_context_ != nullptr);
+  }
+
+  // Ssl::Context
+  std::optional<uint32_t> daysUntilFirstCertExpires() const override {
+    return Utility::getDaysUntilExpiration(context_->tlsContext().cert_chain_.get(), time_source_);
+  }
+  std::vector<Ssl::CertificateDetailsPtr> getCaCertInformation() const override { return {}; }
+  std::vector<Ssl::CertificateDetailsPtr> getCertChainInformation() const override {
+    return ssl_context_->getCertChainInformation();
+  }
+  std::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override {
+    return ssl_context_->secondsUntilFirstOcspResponseExpires();
+  }
+
+private:
+  const AsyncContextConstSharedPtr context_;
+  const Ssl::Context* const ssl_context_;
+  TimeSource& time_source_;
+};
+
 } // namespace
 
 void DynamicCertificateHandle::notify(AsyncContextConstSharedPtr context) {
@@ -67,12 +98,19 @@ DynamicModuleTlsCertificateSelectorConfig::DynamicModuleTlsCertificateSelectorCo
     AsyncContextFactory dynamic_context_factory)
     : main_thread_dispatcher_(factory_context.serverFactoryContext().mainThreadDispatcher()),
       dynamic_module_(std::move(dynamic_module)),
-      server_context_(factory_context.serverFactoryContext()), tls_config_(&tls_config),
+      server_context_(factory_context.serverFactoryContext()),
+      context_manager_(server_context_.sslContextManager()), tls_config_(&tls_config),
       dynamic_context_factory_(std::move(dynamic_context_factory)),
       context_scope_(factory_context.scope().createScope("")),
       stats_scope_(server_context_.scope().createScope(absl::StrCat(metrics_namespace, "."))),
       metrics_(*stats_scope_) {
   if (dynamic_context_factory_ != nullptr) {
+    // The socket factory is created right after the configuration, and installs a TLS context built
+    // from it if it is ready.
+    tls_context_installed_ = tls_config.isReady();
+    stats_ = std::make_unique<DynamicCertificateStats>(DynamicCertificateStats{
+        ALL_DYNAMIC_CERTIFICATE_STATS(POOL_COUNTER_PREFIX(*context_scope_, "dynamic_certificates"),
+                                      POOL_GAUGE_PREFIX(*context_scope_, "dynamic_certificates"))});
     thread_local_certificates_ =
         ThreadLocal::TypedSlot<ThreadLocalCertificates>::makeUnique(server_context_.threadLocal());
     thread_local_certificates_->set(
@@ -83,6 +121,12 @@ DynamicModuleTlsCertificateSelectorConfig::DynamicModuleTlsCertificateSelectorCo
 DynamicModuleTlsCertificateSelectorConfig::~DynamicModuleTlsCertificateSelectorConfig() {
   if (in_module_config_ != nullptr) {
     on_config_destroy_(in_module_config_);
+  }
+  // Requests still waiting for the module end with the configuration.
+  if (stats_ != nullptr) {
+    stats_->pending_.sub(std::count_if(
+        dynamic_certificates_.begin(), dynamic_certificates_.end(),
+        [](const auto& entry) { return !entry.second.certificate_config.has_value(); }));
   }
 }
 
@@ -105,6 +149,7 @@ bool DynamicModuleTlsCertificateSelectorConfig::setCertificate(absl::string_view
   if (tls_config_ == nullptr) {
     ENVOY_LOG(debug, "dynamic module set TLS certificate '{}', but its TLS context is removed",
               name);
+    stats_->rejected_.inc();
     failRequestedCertificate(name);
     return false;
   }
@@ -113,9 +158,11 @@ bool DynamicModuleTlsCertificateSelectorConfig::setCertificate(absl::string_view
   if (!status.ok()) {
     ENVOY_LOG(warn, "dynamic module set an invalid TLS certificate '{}': {}", name,
               status.message());
+    stats_->rejected_.inc();
     failRequestedCertificate(name);
     return false;
   }
+  stats_->provided_.inc();
   return true;
 }
 
@@ -144,15 +191,26 @@ absl::Status DynamicModuleTlsCertificateSelectorConfig::addCertificate(
   RETURN_IF_NOT_OK_REF(certificate_config.status());
   // onConfigUpdate() builds the certificate once the validation context arrives.
   if (!validationContextReady(*tls_config_)) {
-    dynamic_certificates_[name].certificate_config.emplace(*std::move(certificate_config));
+    storeProvidedCertificate(name, *std::move(certificate_config));
     return absl::OkStatus();
   }
   auto context = buildContext(*certificate_config);
   RETURN_IF_NOT_OK_REF(context.status());
-  DynamicCertificate& certificate = dynamic_certificates_[name];
-  certificate.certificate_config.emplace(*std::move(certificate_config));
+  DynamicCertificate& certificate = storeProvidedCertificate(name, *std::move(certificate_config));
   activateCertificate(name, certificate, *std::move(context));
   return absl::OkStatus();
+}
+
+DynamicModuleTlsCertificateSelectorConfig::DynamicCertificate&
+DynamicModuleTlsCertificateSelectorConfig::storeProvidedCertificate(
+    const std::string& name, Ssl::TlsCertificateConfigImpl&& certificate_config) {
+  const auto [it, inserted] = dynamic_certificates_.try_emplace(name);
+  DynamicCertificate& certificate = it->second;
+  if (!inserted && !certificate.certificate_config.has_value()) {
+    stats_->pending_.dec();
+  }
+  certificate.certificate_config.emplace(std::move(certificate_config));
+  return certificate;
 }
 
 void DynamicModuleTlsCertificateSelectorConfig::removeCertificate(absl::string_view name) {
@@ -170,6 +228,12 @@ void DynamicModuleTlsCertificateSelectorConfig::removeCertificate(absl::string_v
   if (it->second.context != nullptr) {
     updateWorkers(it->first, nullptr);
   }
+  if (it->second.certificate_config.has_value()) {
+    stats_->removed_.inc();
+  } else {
+    stats_->pending_.dec();
+  }
+  replaceManagedContext(it->second, nullptr);
   dynamic_certificates_.erase(it);
   for (const auto& weak_handle : waiting_handles) {
     if (const auto handle = weak_handle.lock(); handle != nullptr) {
@@ -180,6 +244,14 @@ void DynamicModuleTlsCertificateSelectorConfig::removeCertificate(absl::string_v
 
 void DynamicModuleTlsCertificateSelectorConfig::onConfigUpdate() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // The socket factory installed a TLS context built from the updated configuration before this
+  // call, or none if the configuration is not ready.
+  tls_context_installed_ = tls_config_->isReady();
+  if (!tls_context_installed_) {
+    for (auto& [_, certificate] : dynamic_certificates_) {
+      replaceManagedContext(certificate, nullptr);
+    }
+  }
   if (!validationContextReady(*tls_config_)) {
     return;
   }
@@ -206,6 +278,10 @@ void DynamicModuleTlsCertificateSelectorConfig::onConfigUpdate() {
 
 void DynamicModuleTlsCertificateSelectorConfig::detachTlsConfig() {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // The context manager is main thread state, and the configuration may be destroyed on a worker.
+  for (auto& [_, certificate] : dynamic_certificates_) {
+    replaceManagedContext(certificate, nullptr);
+  }
   tls_config_ = nullptr;
   dynamic_context_factory_ = nullptr;
 }
@@ -273,28 +349,53 @@ void DynamicModuleTlsCertificateSelectorConfig::requestCertificate(
   certificate.waiting_handles.push_back(handle);
   if (inserted) {
     ENVOY_LOG(debug, "requesting TLS certificate '{}' from the dynamic module", name);
+    stats_->requested_.inc();
+    stats_->pending_.inc();
     // The hook can provide or remove the certificate, so the entry is not used after it returns.
     on_certificate_requested_(this, in_module_config_, {name.data(), name.size()});
   }
 }
 
-absl::StatusOr<AsyncContextConstSharedPtr> DynamicModuleTlsCertificateSelectorConfig::buildContext(
+absl::StatusOr<AsyncContextSharedPtr> DynamicModuleTlsCertificateSelectorConfig::buildContext(
     const Ssl::TlsCertificateConfig& certificate_config) {
   absl::Status creation_status = absl::OkStatus();
-  AsyncContextConstSharedPtr context = dynamic_context_factory_(
-      *context_scope_, server_context_, certificate_config, creation_status);
+  AsyncContextSharedPtr context = dynamic_context_factory_(*context_scope_, server_context_,
+                                                           certificate_config, creation_status);
   RETURN_IF_NOT_OK(creation_status);
   return context;
 }
 
-void DynamicModuleTlsCertificateSelectorConfig::activateCertificate(
-    const std::string& name, DynamicCertificate& certificate, AsyncContextConstSharedPtr context) {
+void DynamicModuleTlsCertificateSelectorConfig::activateCertificate(const std::string& name,
+                                                                    DynamicCertificate& certificate,
+                                                                    AsyncContextSharedPtr context) {
+  // Only a certificate that an installed TLS context can serve is reported. onConfigUpdate()
+  // activates the certificate again once a TLS context is installed, and a handshaker that
+  // provides the certificates builds the context without one.
+  Ssl::ContextSharedPtr managed_context;
+  if (tls_context_installed_ && context->tlsContext().cert_chain_ != nullptr) {
+    managed_context =
+        std::make_shared<DynamicCertificateView>(context, server_context_.timeSource());
+  }
+  replaceManagedContext(certificate, std::move(managed_context));
   certificate.context = context;
   updateWorkers(name, context);
   for (const auto& weak_handle : std::exchange(certificate.waiting_handles, {})) {
     if (const auto handle = weak_handle.lock(); handle != nullptr) {
       handle->notify(context);
     }
+  }
+}
+
+void DynamicModuleTlsCertificateSelectorConfig::replaceManagedContext(
+    DynamicCertificate& certificate, Ssl::ContextSharedPtr&& context) {
+  if (certificate.managed_context != nullptr) {
+    context_manager_.removeContext(certificate.managed_context);
+    stats_->active_.dec();
+  }
+  certificate.managed_context = std::move(context);
+  if (certificate.managed_context != nullptr) {
+    context_manager_.addContext(certificate.managed_context);
+    stats_->active_.inc();
   }
 }
 
@@ -371,6 +472,8 @@ newDynamicModuleTlsCertificateSelectorConfig(
   config->in_module_config_ = on_config_new.value()(static_cast<void*>(config.get()), name_buffer,
                                                     config_buffer, is_upstream);
   if (config->in_module_config_ == nullptr) {
+    // The module may have provided dynamic certificates before it failed.
+    config->detachTlsConfig();
     return absl::InvalidArgumentError(
         "Failed to initialize dynamic module TLS certificate selector config");
   }

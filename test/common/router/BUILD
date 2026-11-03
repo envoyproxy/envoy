@@ -81,6 +81,7 @@ envoy_cc_test_library(
 envoy_cc_test_binary(
     name = "config_impl_test_static",
     rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
     deps = [
         ":config_impl_test_lib",
         "//test:main",
@@ -90,6 +91,7 @@ envoy_cc_test_binary(
 sh_binary(
     name = "corpus_from_config_impl_sh",
     srcs = ["corpus_from_config_impl.sh"],
+    tags = ["skip_on_windows"],
 )
 
 corpus_from_test_binary(
@@ -100,6 +102,7 @@ corpus_from_test_binary(
         "//conditions:default": {},
     }),
     script = ":corpus_from_config_impl_sh",
+    tags = ["skip_on_windows"],
     # test_binary uses cfg = "target" (not "exec") to preserve host/target
     # distinction needed for oss-fuzz builds.
     test_binary = ":config_impl_test_static",
@@ -110,6 +113,7 @@ pkg_files(
     testonly = 1,
     srcs = [":corpus_from_config_impl_dir"],
     strip_prefix = "corpus_from_config_impl_dir",
+    tags = ["skip_on_windows"],
 )
 
 pkg_tar(
@@ -117,6 +121,7 @@ pkg_tar(
     testonly = 1,
     srcs = [":corpus_from_config_impl_files"],
     extension = "tar.gz",
+    tags = ["skip_on_windows"],
 )
 
 envoy_cc_test(
@@ -314,6 +319,7 @@ envoy_cc_test(
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
@@ -556,6 +562,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "router_outlier_detection_test",
     srcs = ["router_outlier_detection_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":router_test_base_lib",
         "//source/common/router:router_lib",

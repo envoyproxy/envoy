@@ -26,7 +26,6 @@
 using testing::_;
 using testing::Contains;
 using testing::Eq;
-using testing::Invoke;
 using testing::IsSupersetOf;
 using testing::NiceMock;
 using testing::Return;
@@ -319,23 +318,22 @@ TEST_F(TestUpstreamSocketManager, SetupLogPreservesOriginalIdentifiersWithTenant
   auto socket = createMockSocket(fd, "10.0.0.1:8080", "10.0.0.2:9090");
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_THAT(
-                metadata.fields(),
-                IsSupersetOf(StructMatchers(
-                    IsStructString("event", std::string(kLifecycleEventTunnelSetup)),
-                    IsStructString("node_id", "node-a"), IsStructString("cluster_id", "cluster-a"),
-                    IsStructString("tenant_id", "tenant-a"),
-                    IsStructString("socket_state", std::string(kLifecycleSocketStateIdle)),
-                    IsStructNumber("fd", fd))));
-            EXPECT_EQ(filterStateString(stream_info, kFilterStateNodeId), "node-a");
-            EXPECT_EQ(filterStateString(stream_info, kFilterStateClusterId), "cluster-a");
-            EXPECT_EQ(filterStateString(stream_info, kFilterStateTenantId), "tenant-a");
-            EXPECT_EQ(filterStateUint64(stream_info, kFilterStateFd), fd);
-          }))
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+        EXPECT_THAT(
+            metadata.fields(),
+            IsSupersetOf(StructMatchers(
+                IsStructString("event", std::string(kLifecycleEventTunnelSetup)),
+                IsStructString("node_id", "node-a"), IsStructString("cluster_id", "cluster-a"),
+                IsStructString("tenant_id", "tenant-a"),
+                IsStructString("socket_state", std::string(kLifecycleSocketStateIdle)),
+                IsStructNumber("fd", fd))));
+        EXPECT_EQ(filterStateString(stream_info, kFilterStateNodeId), "node-a");
+        EXPECT_EQ(filterStateString(stream_info, kFilterStateClusterId), "cluster-a");
+        EXPECT_EQ(filterStateString(stream_info, kFilterStateTenantId), "tenant-a");
+        EXPECT_EQ(filterStateUint64(stream_info, kFilterStateFd), fd);
+      })
       .RetiresOnSaturation();
 
   socket_manager_->addConnectionSocket("node-a", "cluster-a", std::move(socket),
@@ -354,14 +352,14 @@ TEST_F(TestUpstreamSocketManager, SetupLogSurfacesInitiatorWorkerAndConnectionId
   auto socket = createMockSocket(fd, "10.0.0.1:8080", "10.0.0.2:9090");
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_THAT(metadata.fields(), IsSupersetOf(StructMatchers(
                                            IsStructString("initiator_worker_id", "worker_7"),
                                            IsStructString("initiator_connection_id", "9001"))));
         EXPECT_EQ(filterStateString(stream_info, kFilterStateInitiatorWorkerId), "worker_7");
         EXPECT_EQ(filterStateString(stream_info, kFilterStateInitiatorConnectionId), "9001");
-      }))
+      })
       .RetiresOnSaturation();
 
   socket_manager_->addConnectionSocket("node-a", "cluster-a", std::move(socket),
@@ -378,13 +376,13 @@ TEST_F(TestUpstreamSocketManager, SyntheticLifecycleLogDoesNotSetConnectionId) {
   extension_->setTestOnlyAccessLogs({access_log});
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         // Connection ID should not be set on synthetic lifecycle logs — the FD is
         // available in dynamic metadata instead, and FDs are not valid connection IDs
         // because they can be recycled by the OS.
         auto id = stream_info.downstreamAddressProvider().connectionID();
         EXPECT_FALSE(id.has_value());
-      }));
+      });
 
   auto socket = createMockSocket(42);
   socket_manager_->addConnectionSocket("node-1", "cluster-1", std::move(socket),
@@ -403,16 +401,14 @@ TEST_F(TestUpstreamSocketManager, HandoffAndCloseLogsUseLifecycleMetadata) {
 
   testing::InSequence sequence;
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_THAT(metadata.fields(),
-                        Contains(IsStructString("event", std::string(kLifecycleEventTunnelSetup))));
-          }));
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+        EXPECT_THAT(metadata.fields(),
+                    Contains(IsStructString("event", std::string(kLifecycleEventTunnelSetup))));
+      });
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context& context,
-                           const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamPoolReady);
         EXPECT_THAT(
@@ -421,10 +417,9 @@ TEST_F(TestUpstreamSocketManager, HandoffAndCloseLogsUseLifecycleMetadata) {
                 IsStructString("event", std::string(kLifecycleEventSocketHandoff)),
                 IsStructString("handoff_kind", std::string(kLifecycleHandoffKindPoolToUpstream)),
                 IsStructString("socket_state", std::string(kLifecycleSocketStateHandedOff)))));
-      }));
+      });
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context& context,
-                           const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::UpstreamEnd);
         EXPECT_THAT(metadata.fields(),
@@ -433,7 +428,7 @@ TEST_F(TestUpstreamSocketManager, HandoffAndCloseLogsUseLifecycleMetadata) {
                         IsStructString("close_reason",
                                        StreamInfo::LocalCloseReasons::get().Http2PingTimeout),
                         IsStructString("socket_state", std::string(kLifecycleSocketStateInUse)))));
-      }));
+      });
 
   socket_manager_->addConnectionSocket("node-b", "cluster-b", std::move(socket),
                                        std::chrono::seconds(30), false, "tenant-b");
@@ -742,10 +737,10 @@ TEST_F(TestUpstreamSocketManager, SendPingForConnectionWriteSuccess) {
       dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.front()->ioHandle());
 
   EXPECT_CALL(*mock_io_handle1, write(_))
-      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillRepeatedly([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
-      }));
+      });
 
   // Ping only one connection -- the other remains untouched.
   socket_manager_->sendPingForConnection(123);
@@ -773,10 +768,10 @@ TEST_F(TestUpstreamSocketManager, SendPingForConnectionWriteFailure) {
 
   EXPECT_CALL(*mock_io_handle1, write(_))
       .Times(1)
-      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillRepeatedly([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
-      }));
+      });
 
   socket_manager_->sendPingForConnection(123);
 
@@ -792,10 +787,10 @@ TEST_F(TestUpstreamSocketManager, SendPingForConnectionWriteFailure) {
 
   EXPECT_CALL(*mock_io_handle2, write(_))
       .Times(1)
-      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillRepeatedly([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(EPIPE)};
-      }));
+      });
 
   socket_manager_->sendPingForConnection(456);
 
@@ -832,17 +827,17 @@ TEST_F(TestUpstreamSocketManager, SendPingForConnectionStaleNodeCleanup) {
 
   EXPECT_CALL(*mock_io_handle1, write(_))
       .Times(1)
-      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
-      }));
+      });
 
   EXPECT_CALL(*mock_io_handle2, write(_))
       .Times(1)
-      .WillOnce(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillOnce([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
-      }));
+      });
 
   // Ping each connection individually.
   socket_manager_->sendPingForConnection(123);
@@ -1430,11 +1425,11 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadCallsReportDisconnection) {
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
   NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&]() {
     auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
     reporter_ptr = reporter.get();
     return reporter;
-  }));
+  });
 
   extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
                                                                 config_with_reporter);
@@ -1471,11 +1466,11 @@ TEST_F(TestUpstreamSocketManager, OnGoAwayCallsReportGoAway) {
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
   NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&]() {
     auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
     reporter_ptr = reporter.get();
     return reporter;
-  }));
+  });
 
   extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
                                                                 config_with_reporter);
@@ -1523,11 +1518,11 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadAndOnGoAwayAreDistinct) {
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
   NiceMock<MockReverseTunnelReporter>* reporter_ptr = nullptr;
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&]() {
     auto reporter = std::make_unique<NiceMock<MockReverseTunnelReporter>>();
     reporter_ptr = reporter.get();
     return reporter;
-  }));
+  });
 
   extension_ = std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_,
                                                                 config_with_reporter);
@@ -1694,21 +1689,21 @@ TEST_F(TestUpstreamSocketManagerRebalancing, RebalanceToLeastLoadedWorker) {
   bool dispatcher3_post_called = false;
 
   // Mock post() on dispatcher2 (the least loaded) to execute the lambda.
-  EXPECT_CALL(dispatcher2_, post(_)).WillOnce(Invoke([&](Event::PostCb callback) {
+  EXPECT_CALL(dispatcher2_, post(_)).WillOnce([&](Event::PostCb callback) {
     dispatcher2_post_called = true;
     callback(); // Execute the lambda immediately.
-  }));
+  });
 
   // Mock post() on other dispatchers (should not be called).
-  EXPECT_CALL(dispatcher1_, post(_)).WillRepeatedly(Invoke([&](Event::PostCb callback) {
+  EXPECT_CALL(dispatcher1_, post(_)).WillRepeatedly([&](Event::PostCb callback) {
     dispatcher1_post_called = true;
     callback();
-  }));
+  });
 
-  EXPECT_CALL(dispatcher3_, post(_)).WillRepeatedly(Invoke([&](Event::PostCb callback) {
+  EXPECT_CALL(dispatcher3_, post(_)).WillRepeatedly([&](Event::PostCb callback) {
     dispatcher3_post_called = true;
     callback();
-  }));
+  });
 
   // Create socket and add it to worker1 (with rebalanced = false to trigger rebalancing).
   auto socket = createMockSocket(123);
@@ -1971,22 +1966,21 @@ TEST_F(TestUpstreamSocketManager, SendPingEmitsIdlePingSentEvent) {
       dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.front()->ioHandle());
 
   EXPECT_CALL(*mock_io_handle, write(_))
-      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+      .WillRepeatedly([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         uint64_t len = buffer.length();
         buffer.drain(len);
         return Api::IoCallUint64Result{len, Api::IoError::none()};
-      }));
+      });
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context& context,
-                           const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
         EXPECT_THAT(metadata.fields(),
                     IsSupersetOf(StructMatchers(
                         IsStructString("event", std::string(kLifecycleEventIdlePingSent)),
                         IsStructString("socket_state", std::string(kLifecycleSocketStateIdle)))));
-      }));
+      });
 
   socket_manager_->sendPingForConnection(123);
   extension_->setTestOnlyAccessLogs({});
@@ -2017,13 +2011,12 @@ TEST_F(TestUpstreamSocketManager, PingAckEmitsIdlePingAckEvent) {
       });
 
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_THAT(metadata.fields(),
-                        Contains(IsStructString("event", std::string(kLifecycleEventIdlePingAck))));
-          }));
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+        EXPECT_THAT(metadata.fields(),
+                    Contains(IsStructString("event", std::string(kLifecycleEventIdlePingAck))));
+      });
 
   socket_manager_->onPingResponse(*mock_io_handle);
   extension_->setTestOnlyAccessLogs({});
@@ -2045,15 +2038,14 @@ TEST_F(TestUpstreamSocketManager, PingMissEmitsIdlePingMissEvent) {
 
   // Default miss threshold is 3. First timeout should emit idle_ping_miss.
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(
-          Invoke([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
-            const auto& metadata = lifecycleMetadata(stream_info);
-            EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
-            EXPECT_THAT(metadata.fields(),
-                        IsSupersetOf(StructMatchers(
-                            IsStructString("event", std::string(kLifecycleEventIdlePingMiss)),
-                            IsStructString("miss_count", "1"))));
-          }));
+      .WillOnce([&](const Formatter::Context& context, const StreamInfo::StreamInfo& stream_info) {
+        const auto& metadata = lifecycleMetadata(stream_info);
+        EXPECT_EQ(context.accessLogType(), AccessLog::AccessLogType::TcpUpstreamConnected);
+        EXPECT_THAT(metadata.fields(),
+                    IsSupersetOf(StructMatchers(
+                        IsStructString("event", std::string(kLifecycleEventIdlePingMiss)),
+                        IsStructString("miss_count", "1"))));
+      });
 
   socket_manager_->onPingTimeout(123);
   EXPECT_TRUE(verifyFDToNodeMap(123)); // Should still be alive.
@@ -2077,12 +2069,11 @@ TEST_F(TestUpstreamSocketManager, PingTimeoutEmitsIdlePingTimeoutEvent) {
   // Miss twice (below threshold=3) -- expect idle_ping_miss events.
   EXPECT_CALL(*access_log, log(_, _))
       .Times(2)
-      .WillRepeatedly(Invoke([&](const Formatter::Context&,
-                                 const StreamInfo::StreamInfo& stream_info) {
+      .WillRepeatedly([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_THAT(metadata.fields(),
                     Contains(IsStructString("event", std::string(kLifecycleEventIdlePingMiss))));
-      }))
+      })
       .RetiresOnSaturation();
   socket_manager_->onPingTimeout(123);
   socket_manager_->onPingTimeout(123);
@@ -2091,22 +2082,22 @@ TEST_F(TestUpstreamSocketManager, PingTimeoutEmitsIdlePingTimeoutEvent) {
   // Third miss exceeds threshold -- expect idle_ping_timeout then tunnel_closed.
   testing::InSequence seq;
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_THAT(metadata.fields(),
                     IsSupersetOf(StructMatchers(
                         IsStructString("event", std::string(kLifecycleEventIdlePingTimeout)),
                         IsStructString("miss_count", "3"))));
-      }));
+      });
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_THAT(metadata.fields(),
                     IsSupersetOf(StructMatchers(
                         IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
                         IsStructString("close_reason",
                                        std::string(kLifecycleCloseReasonIdlePingTimeout)))));
-      }));
+      });
 
   socket_manager_->onPingTimeout(123);
   EXPECT_FALSE(verifyFDToNodeMap(123)); // Should be dead.
@@ -2139,14 +2130,14 @@ TEST_F(TestUpstreamSocketManager, DestructorEmitsDeferredCloseLogs) {
 
   // Destructor should emit the deferred tunnel_closed log.
   EXPECT_CALL(*access_log, log(_, _))
-      .WillOnce(Invoke([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
+      .WillOnce([&](const Formatter::Context&, const StreamInfo::StreamInfo& stream_info) {
         const auto& metadata = lifecycleMetadata(stream_info);
         EXPECT_THAT(
             metadata.fields(),
             IsSupersetOf(StructMatchers(
                 IsStructString("event", std::string(kLifecycleEventTunnelClosed)),
                 IsStructString("close_reason", std::string(kLifecycleCloseReasonExplicitClose)))));
-      }));
+      });
 
   socket_manager_.reset(); // Triggers destructor.
   extension_->setTestOnlyAccessLogs({});

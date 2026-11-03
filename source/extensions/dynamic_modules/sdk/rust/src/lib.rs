@@ -42,6 +42,8 @@ pub mod transport_socket;
 pub mod udp_listener;
 pub mod upstream_http_tcp_bridge;
 pub mod utility;
+#[cfg(envoy_dynamic_module_dll)]
+mod windows_delay_load;
 pub use bootstrap::*;
 pub use buffer::*;
 pub use catch_unwind::*;

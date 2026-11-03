@@ -15,7 +15,6 @@
 
 using testing::_;
 using testing::AnyNumber;
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -29,35 +28,34 @@ public:
 
     EXPECT_CALL(os_sys_calls_, socket(_, _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(
-            Invoke([this](int domain, int type, int protocol) -> Api::SysCallSocketResult {
-              return os_sys_calls_actual_.socket(domain, type, protocol);
-            }));
+        .WillRepeatedly([this](int domain, int type, int protocol) -> Api::SysCallSocketResult {
+          return os_sys_calls_actual_.socket(domain, type, protocol);
+        });
     EXPECT_CALL(os_sys_calls_, setsocketblocking(_, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke([this](os_fd_t sockfd, bool block) -> Api::SysCallIntResult {
+        .WillRepeatedly([this](os_fd_t sockfd, bool block) -> Api::SysCallIntResult {
           return os_sys_calls_actual_.setsocketblocking(sockfd, block);
-        }));
+        });
     EXPECT_CALL(os_sys_calls_, setsockopt_(_, IPPROTO_IPV6, IPV6_V6ONLY, _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke([this](os_fd_t sockfd, int level, int optname, const void* optval,
-                                      socklen_t optlen) -> int {
+        .WillRepeatedly([this](os_fd_t sockfd, int level, int optname, const void* optval,
+                               socklen_t optlen) -> int {
           return os_sys_calls_actual_.setsockopt(sockfd, level, optname, optval, optlen)
               .return_value_;
-        }));
+        });
     EXPECT_CALL(os_sys_calls_, getsockopt_(_, _, _, _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [this](os_fd_t sockfd, int level, int optname, void* optval, socklen_t* optlen) -> int {
               return os_sys_calls_actual_.getsockopt(sockfd, level, optname, optval, optlen)
                   .return_value_;
-            }));
+            });
     EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke(
+        .WillRepeatedly(
             [this](os_fd_t sockfd, sockaddr* name, socklen_t* namelen) -> Api::SysCallIntResult {
               return os_sys_calls_actual_.getsockname(sockfd, name, namelen);
-            }));
+            });
   }
 
   NiceMock<MockListenSocket> socket_;
@@ -79,11 +77,11 @@ public:
       if (option_name.hasValue()) {
         EXPECT_CALL(socket_,
                     setSocketOption(option_name.level(), option_name.option(), _, sizeof(int)))
-            .WillOnce(Invoke(
+            .WillOnce(
                 [option_val](int, int, const void* optval, socklen_t) -> Api::SysCallIntResult {
                   EXPECT_EQ(option_val, *static_cast<const int*>(optval));
                   return {0, 0};
-                }));
+                });
         EXPECT_TRUE(socket_option.setOption(socket_, state));
       } else {
         EXPECT_FALSE(socket_option.setOption(socket_, state));

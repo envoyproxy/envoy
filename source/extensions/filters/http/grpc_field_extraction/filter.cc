@@ -195,6 +195,10 @@ Filter::HandleDecodeDataStatus Filter::handleDecodeData(Envoy::Buffer::Instance&
                      data.length());
   }
 
+  // Forward any bytes the MessageConverter buffered past the last complete
+  // message (the head of a pipelined message that shared the final chunk).
+  request_msg_converter_->drainLeftoverData(data);
+
   // Reject the request if  extraction is required but could not
   // buffer up any messages.
   if (!extraction_done_) {

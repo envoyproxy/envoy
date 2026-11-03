@@ -1454,9 +1454,9 @@ sphinxcontrib-devhelp==2.0.0 \
     #   -r requirements.in
     #   envoy-docs-sphinx-runner
     #   sphinx
-sphinxcontrib-googleanalytics==0.5 \
-    --hash=sha256:437e529c33c441bcccceabe3ead1585115e6ba83fe90e23bd42e42521333cc0a \
-    --hash=sha256:a2ac6df9d16b9c124febf6b44e714c1fd9725e692b73ee84ec6b52b377ff5561
+sphinxcontrib-googleanalytics==0.6 \
+    --hash=sha256:9264640a9a0449a088cadaca6794946e60059345752221dae2c6ad986723d3d4 \
+    --hash=sha256:dc8740342331ff523b5eda8f5d1ea6176acfa86bbd195e8d67f642db8f2b22c7
     # via -r requirements.in
 sphinxcontrib-htmlhelp==2.1.0 \
     --hash=sha256:166759820b47002d22914d64a075ce08f4c46818e17cfc9470a9786b759b19f8 \

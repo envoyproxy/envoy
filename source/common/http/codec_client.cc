@@ -13,7 +13,6 @@
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/status.h"
 #include "source/common/http/utility.h"
-#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/client_codec_impl.h"
@@ -26,9 +25,7 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
                          Upstream::HostDescriptionConstSharedPtr host,
                          Event::Dispatcher& dispatcher)
     : type_(type), host_(host), connection_(std::move(connection)),
-      idle_timeout_(host_->cluster().idleTimeout()),
-      enable_idle_timer_only_when_connected_(Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.codec_client_enable_idle_timer_only_when_connected")) {
+      idle_timeout_(host_->cluster().idleTimeout()) {
   if (type_ != CodecType::HTTP3) {
     // Make sure upstream connections process data and then the FIN, rather than processing
     // TCP disconnects immediately. (see https://github.com/envoyproxy/envoy/issues/1679 for
@@ -40,11 +37,6 @@ CodecClient::CodecClient(CodecType type, Network::ClientConnectionPtr&& connecti
 
   if (idle_timeout_) {
     idle_timer_ = dispatcher.createTimer([this]() -> void { onIdleTimeout(); });
-    // If the runtime flag is disabled, start the idle timer immediately even when connection
-    // is not yet established, restoring the old behavior.
-    if (!enable_idle_timer_only_when_connected_) {
-      enableIdleTimer();
-    }
   }
 
   // We just universally set no delay on connections. Theoretically we might at some point want

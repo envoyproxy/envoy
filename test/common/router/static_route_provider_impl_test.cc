@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -91,7 +90,7 @@ virtual_hosts:
     EXPECT_FALSE(exists);
   });
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillOnce(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
+      .WillOnce([](absl::AnyInvocable<void()> callback) { callback(); });
   provider.requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_, cb);
   EXPECT_TRUE(called);
 }
@@ -121,14 +120,14 @@ vhds:
   auto subscription = std::make_unique<Envoy::Config::MockSubscription>();
   Envoy::Config::MockSubscription* subscription_ptr = subscription.get();
   EXPECT_CALL(subscription_factory, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([&vhds_callbacks, &subscription](
-                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                           Envoy::Config::OpaqueResourceDecoderSharedPtr,
-                           const Envoy::Config::SubscriptionOptions&) {
+      .WillOnce([&vhds_callbacks, &subscription](const envoy::config::core::v3::ConfigSource&,
+                                                 absl::string_view, Stats::Scope&,
+                                                 Envoy::Config::SubscriptionCallbacks& callbacks,
+                                                 Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                                 const Envoy::Config::SubscriptionOptions&) {
         vhds_callbacks = &callbacks;
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
-      }));
+      });
   // The initial VHDS fetch is started as part of applying the inline route configuration, so that
   // it warms up with it. On-demand virtual hosts under the route configuration are accepted first.
   EXPECT_CALL(*subscription_ptr, accept(absl::flat_hash_set<std::string>{"foo/*"}));
@@ -155,7 +154,7 @@ vhds:
   // First post to main thread.
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
       .Times(2)
-      .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
+      .WillRepeatedly([](absl::AnyInvocable<void()> callback) { callback(); });
   provider.requestVirtualHostsUpdate("example.com", server_factory_context_.dispatcher_, cb);
 
   // Simulate a VHDS response.
@@ -222,14 +221,14 @@ vhds:
   Envoy::Config::SubscriptionCallbacks* vhds_callbacks = nullptr;
   auto subscription = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
   EXPECT_CALL(subscription_factory, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([&vhds_callbacks, &subscription](
-                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                           Envoy::Config::OpaqueResourceDecoderSharedPtr,
-                           const Envoy::Config::SubscriptionOptions&) {
+      .WillOnce([&vhds_callbacks, &subscription](const envoy::config::core::v3::ConfigSource&,
+                                                 absl::string_view, Stats::Scope&,
+                                                 Envoy::Config::SubscriptionCallbacks& callbacks,
+                                                 Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                                 const Envoy::Config::SubscriptionOptions&) {
         vhds_callbacks = &callbacks;
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
-      }));
+      });
 
   StaticRouteConfigProviderImpl provider(route_config, config_traits_, server_factory_context_,
                                          init_manager_, rds_manager_);
@@ -289,14 +288,14 @@ vhds:
   auto subscription = std::make_unique<Envoy::Config::MockSubscription>();
   Envoy::Config::MockSubscription* subscription_ptr = subscription.get();
   EXPECT_CALL(subscription_factory, subscriptionFromConfigSource(_, _, _, _, _, _))
-      .WillOnce(Invoke([&vhds_callbacks, &subscription](
-                           const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                           Envoy::Config::OpaqueResourceDecoderSharedPtr,
-                           const Envoy::Config::SubscriptionOptions&) {
+      .WillOnce([&vhds_callbacks, &subscription](const envoy::config::core::v3::ConfigSource&,
+                                                 absl::string_view, Stats::Scope&,
+                                                 Envoy::Config::SubscriptionCallbacks& callbacks,
+                                                 Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                                 const Envoy::Config::SubscriptionOptions&) {
         vhds_callbacks = &callbacks;
         return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
-      }));
+      });
   // The initial VHDS fetch is started as part of applying the inline route configuration, so that
   // it warms up with it. On-demand virtual hosts under the route configuration are accepted first.
   EXPECT_CALL(*subscription_ptr, accept(absl::flat_hash_set<std::string>{"foo/*"}));
@@ -315,7 +314,7 @@ vhds:
   EXPECT_CALL(*subscription_ptr,
               requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo/example1.com"}));
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillOnce(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
+      .WillOnce([](absl::AnyInvocable<void()> callback) { callback(); });
   provider.requestVirtualHostsUpdate("example1.com", server_factory_context_.dispatcher_, cb1);
 
   // Request for example2.com.
@@ -328,7 +327,7 @@ vhds:
   EXPECT_CALL(*subscription_ptr,
               requestOnDemandUpdate(absl::flat_hash_set<std::string>{"foo/example2.com"}));
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillOnce(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
+      .WillOnce([](absl::AnyInvocable<void()> callback) { callback(); });
   provider.requestVirtualHostsUpdate("example2.com", server_factory_context_.dispatcher_, cb2);
 
   // Simulate VHDS response for both example1.com and example2.com.
@@ -361,7 +360,7 @@ vhds:
   // onConfigUpdate will post to worker thread for both callbacks.
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
       .Times(2)
-      .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
+      .WillRepeatedly([](absl::AnyInvocable<void()> callback) { callback(); });
   EXPECT_OK(vhds_callbacks->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
 
   EXPECT_TRUE(cb1_called);
@@ -398,14 +397,14 @@ vhds:
     auto subscription = std::make_unique<Envoy::Config::MockSubscription>();
     subscription_ = subscription.get();
     EXPECT_CALL(subscription_factory_, subscriptionFromConfigSource(_, _, _, _, _, _))
-        .WillOnce(Invoke([this, &subscription](const envoy::config::core::v3::ConfigSource&,
-                                               absl::string_view, Stats::Scope&,
-                                               Envoy::Config::SubscriptionCallbacks& callbacks,
-                                               Envoy::Config::OpaqueResourceDecoderSharedPtr,
-                                               const Envoy::Config::SubscriptionOptions&) {
+        .WillOnce([this, &subscription](const envoy::config::core::v3::ConfigSource&,
+                                        absl::string_view, Stats::Scope&,
+                                        Envoy::Config::SubscriptionCallbacks& callbacks,
+                                        Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                        const Envoy::Config::SubscriptionOptions&) {
           vhds_callbacks_ = &callbacks;
           return absl::StatusOr<Envoy::Config::SubscriptionPtr>(std::move(subscription));
-        }));
+        });
     // On-demand virtual hosts under the route configuration are accepted first.
     EXPECT_CALL(*subscription_, accept(absl::flat_hash_set<std::string>{"foo/*"}));
     EXPECT_CALL(*subscription_, start(_));
@@ -417,7 +416,7 @@ vhds:
 
     // All posts, to the main thread and back to the worker, run inline.
     EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-        .WillRepeatedly(Invoke([](absl::AnyInvocable<void()> callback) { callback(); }));
+        .WillRepeatedly([](absl::AnyInvocable<void()> callback) { callback(); });
   }
 
   // A VHDS delta response whose resource is named after the alias of `domain` and carries the

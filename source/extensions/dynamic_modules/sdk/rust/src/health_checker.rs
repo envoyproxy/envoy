@@ -202,6 +202,24 @@ impl HealthCheckHost {
     }
   }
 
+  /// Attach a string key/value pair to the in-flight health check result. Envoy forwards the pairs
+  /// to the management server in the HDS `EndpointHealth.health_metadata` field. The pairs
+  /// accumulated during a check replace the host's health check metadata when the check resolves,
+  /// and each check starts empty.
+  ///
+  /// Call this from `on_interval`; the pairs apply to the check it starts, even if that check times
+  /// out. Returns `false` if the key is empty or is the reserved key `http_status_code`, in which
+  /// case nothing is stored.
+  pub fn set_health_metadata(&self, key: &str, value: &str) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_health_checker_set_health_metadata(
+        self.session_envoy_ptr,
+        module_buffer(key),
+        module_buffer(value),
+      )
+    }
+  }
+
   /// The host's current health status as known to Envoy.
   pub fn health(&self) -> HostHealth {
     HostHealth::from_abi(unsafe {

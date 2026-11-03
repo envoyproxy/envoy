@@ -233,20 +233,20 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().Rbac, _))
-        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
+        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, Protobuf::Struct>(NetworkFilterNames::get().Rbac,
                                                                obj));
-        }));
+        });
 
     ON_CALL(stream_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
+        .WillByDefault([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
               Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
-        }));
+        });
   }
 
   NiceMock<Network::MockReadFilterCallbacks> callbacks_;

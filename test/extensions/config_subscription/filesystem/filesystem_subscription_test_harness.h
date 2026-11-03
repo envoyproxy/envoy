@@ -23,7 +23,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -43,16 +42,15 @@ public:
 
   Event::DispatcherPtr setupDispatcher() {
     auto dispatcher = std::make_unique<Event::MockDispatcher>();
-    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillOnce(InvokeWithoutArgs([this] {
+    EXPECT_CALL(*dispatcher, createFilesystemWatcher_()).WillOnce([this] {
       Filesystem::MockWatcher* mock_watcher = new Filesystem::MockWatcher();
       EXPECT_CALL(*mock_watcher, addWatch(path_.path(), Filesystem::Watcher::Events::MovedTo, _))
-          .WillOnce(
-              Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
-                on_changed_cb_ = cb;
-                return absl::OkStatus();
-              }));
+          .WillOnce([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
+            on_changed_cb_ = cb;
+            return absl::OkStatus();
+          });
       return mock_watcher;
-    }));
+    });
     return dispatcher;
   }
 

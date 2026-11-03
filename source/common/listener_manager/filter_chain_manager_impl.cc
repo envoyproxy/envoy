@@ -1096,6 +1096,10 @@ public:
     return shared_manager_->isFilterChainActive(filter_chain_name_);
   }
 
+  Network::DrainableFilterChainSharedPtr activeFilterChain() const override {
+    return shared_manager_->activeFilterChain(filter_chain_name_);
+  }
+
   ~FcdsSubscriptionHandleImpl() override {
     shared_manager_->unsubscribe(filter_chain_name_, *this);
   }
@@ -1242,8 +1246,13 @@ void FcdsSharedFilterChainManager::updateTlsState() {
 bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {
   // A subscription's committed chain is non-null exactly when it is active (same test
   // updateTlsState() uses to publish the active set to workers).
+  return activeFilterChain(filter_chain_name) != nullptr;
+}
+
+Network::DrainableFilterChainSharedPtr
+FcdsSharedFilterChainManager::activeFilterChain(const std::string& filter_chain_name) const {
   auto it = subscriptions_.find(filter_chain_name);
-  return it != subscriptions_.end() && it->second->api_->filterChain() != nullptr;
+  return it != subscriptions_.end() ? it->second->api_->filterChain() : nullptr;
 }
 
 } // namespace Server

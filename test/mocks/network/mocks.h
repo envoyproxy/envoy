@@ -589,6 +589,12 @@ public:
                Network::ConnectionDrainEvent drain_event));
   MOCK_METHOD(void, onListenerDrain,
               (uint64_t listener_tag, Network::ConnectionDrainEvent drain_event));
+  MOCK_METHOD(void, stopListenerAddresses,
+              (const ListenerConfig& listener,
+               const std::vector<Address::InstanceConstSharedPtr>& addresses));
+  MOCK_METHOD(void, onListenerAddressesDrain,
+              (const ListenerConfig& listener, ConnectionDrainEvent drain_event));
+  MOCK_METHOD(void, removeListenerAddresses, (const ListenerConfig& listener));
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
   MOCK_METHOD(void, setListenerRejectFraction, (UnitFloat), (override));

@@ -162,10 +162,10 @@ TEST_F(PeakEwmaRttFilterTest, EncodeHeadersWithPeakEwmaStats) {
   MockTimeSystem time_system;
   // Set up time source mock to return consistent time values
   std::chrono::nanoseconds current_time = std::chrono::nanoseconds(1000000000);
-  EXPECT_CALL(time_system, monotonicTime()).WillRepeatedly(testing::Invoke([&current_time]() {
+  EXPECT_CALL(time_system, monotonicTime()).WillRepeatedly([&current_time]() {
     current_time += std::chrono::microseconds(100);
     return MonotonicTime(current_time);
-  }));
+  });
 
   // Create Peak EWMA host data for the mock host
   auto peak_data = std::make_unique<LoadBalancingPolicies::PeakEwma::PeakEwmaHostLbPolicyData>(100);

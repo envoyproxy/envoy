@@ -62,13 +62,12 @@ public:
     EXPECT_CALL(cluster_manager_, getThreadLocalCluster(absl::string_view{"callout_cluster"}))
         .WillOnce(testing::Return(cluster.get()));
     EXPECT_CALL(cluster->async_client_, send_(testing::_, testing::_, testing::_))
-        .WillOnce(testing::Invoke(
-            [&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
-              complete(callbacks, req);
-              return nullptr;
-            }));
+        .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          testing::NiceMock<Http::MockAsyncClientRequest> req{&cluster->async_client_};
+          complete(callbacks, req);
+          return nullptr;
+        });
 
     auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_or_status.value());
     filter->initializeReadFilterCallbacks(read_callbacks_);
@@ -513,6 +512,44 @@ TEST_F(DynamicModuleNetworkFilterTest, HttpCalloutInlineSuccessDoesNotReenterMod
             Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
         callbacks.onSuccess(req, std::move(response));
       }));
+}
+
+class DynamicModuleNetworkFilterLanguageTest : public DynamicModuleNetworkFilterTest,
+                                               public testing::WithParamInterface<std::string> {};
+
+#ifndef __SANITIZE_ADDRESS__
+auto DynamicModuleNetworkFilterLanguageTestValues = testing::Values("rust", "go", "cpp");
+#else
+auto DynamicModuleNetworkFilterLanguageTestValues = testing::Values("rust", "go");
+#endif
+
+INSTANTIATE_TEST_SUITE_P(Languages, DynamicModuleNetworkFilterLanguageTest,
+                         DynamicModuleNetworkFilterLanguageTestValues,
+                         DynamicModuleTestLanguages::languageParamToTestName);
+
+// Each SDK sets a namespace from a serialized google.protobuf.Struct and a typed namespace from a
+// serialized google.protobuf.Any on new connection.
+TEST_P(DynamicModuleNetworkFilterLanguageTest, DynamicMetadata) {
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("network_integration_test", GetParam()), false);
+  EXPECT_OK(dynamic_module);
+  auto filter_config_or_status = newDynamicModuleNetworkFilterConfig(
+      "dynamic_metadata", "", DefaultMetricsNamespace, std::move(dynamic_module.value()),
+      cluster_manager_, *stats_.rootScope(), main_thread_dispatcher_);
+  EXPECT_OK(filter_config_or_status);
+
+  auto filter = std::make_shared<DynamicModuleNetworkFilter>(filter_config_or_status.value());
+  filter->initializeReadFilterCallbacks(read_callbacks_);
+  EXPECT_EQ(Network::FilterStatus::Continue, filter->onNewConnection());
+
+  const auto& metadata = connection_.stream_info_.metadata_;
+  ASSERT_TRUE(metadata.filter_metadata().contains("dynamic_modules.struct"));
+  EXPECT_EQ(
+      "v", metadata.filter_metadata().at("dynamic_modules.struct").fields().at("k").string_value());
+  ASSERT_TRUE(metadata.typed_filter_metadata().contains("dynamic_modules.typed"));
+  const auto& typed_metadata = metadata.typed_filter_metadata().at("dynamic_modules.typed");
+  EXPECT_EQ("t/x", typed_metadata.type_url());
+  EXPECT_EQ(std::string("\x01\x02", 2), typed_metadata.value());
 }
 
 } // namespace NetworkFilters
