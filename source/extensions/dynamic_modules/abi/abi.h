@@ -4898,6 +4898,40 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
     envoy_dynamic_module_type_module_buffer filter_namespace,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_metadata_struct is called by the module to
+ * merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing entries
+ * with the same key are overwritten. An empty struct is a no-op and does not create the namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_struct is the serialized google.protobuf.Struct owned by the module. Its
+ * pointer may be null only when its length is zero.
+ * @return true if the struct was merged, false if the buffer does not parse as a
+ * google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_network_set_dynamic_typed_metadata is called by the module to set
+ * the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any, replacing
+ * an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object.
+ * @param filter_namespace is the namespace owned by the module.
+ * @param serialized_any is the serialized google.protobuf.Any owned by the module. Its pointer
+ * may be null only when its length is zero.
+ * @return true if the entry was set, false if the buffer does not parse as a google.protobuf.Any
+ * with a type URL.
+ */
+bool envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
 // ------------------------------ HTTP Callouts -------------------------------
 
 /**
@@ -6431,6 +6465,41 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_b
     envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer filter_namespace,
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct is called by the
+ * module to merge a serialized google.protobuf.Struct into a dynamic metadata namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the dynamic metadata is not accessible or the
+ * buffer does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata is called by the module
+ * to set the typed_filter_metadata entry of a namespace from a serialized google.protobuf.Any,
+ * replacing an existing entry.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object.
+ * @param filter_namespace is the namespace of the metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the dynamic metadata is not accessible or the buffer
+ * does not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any);
 
 /**
  * envoy_dynamic_module_callback_listener_filter_max_read_bytes is called by the
@@ -10575,6 +10644,25 @@ void envoy_dynamic_module_callback_cluster_use_persistent_host_map(
     envoy_dynamic_module_type_cluster_envoy_ptr cluster_envoy_ptr);
 
 /**
+ * envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions makes the cluster
+ * keep persistent host partitions, as if its ClusterConfig set use_persistent_host_partitions. This
+ * lets the module choose the host set storage without the cluster's configuration carrying the
+ * field. The same costs apply, so pair it with
+ * envoy_dynamic_module_callback_cluster_use_persistent_host_map.
+ *
+ * This is optional and must be called on the main thread during
+ * envoy_dynamic_module_on_cluster_config_new, before the cluster and its host sets exist. A call
+ * made then off the main thread is reported as a bug. A refusal for the lb_policy is logged.
+ *
+ * @param cluster_config_envoy_ptr is the pointer to the DynamicModuleClusterConfig.
+ * @return true if the cluster will keep persistent host partitions. It returns false on a null
+ * pointer, after envoy_dynamic_module_on_cluster_config_new returned, off the main thread, and
+ * when the cluster's lb_policy is not CLUSTER_PROVIDED.
+ */
+bool envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+    envoy_dynamic_module_type_cluster_config_envoy_ptr cluster_config_envoy_ptr);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_get_healthy_host_count returns the number of healthy
  * hosts at the given priority level in the cluster's host set.
  *
@@ -11698,6 +11786,41 @@ bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_strin
     const envoy_dynamic_module_type_module_key_value_pair* entries, size_t entries_size);
 
 /**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct merges a serialized
+ * google.protobuf.Struct into the request's dynamic metadata under the given namespace. Existing
+ * entries with the same key are overwritten. An empty struct is a no-op and does not create the
+ * namespace.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_struct is the serialized google.protobuf.Struct to set. Its pointer may be
+ * null only when its length is zero.
+ * @return true if the struct was merged, false if the request has no stream info or the buffer
+ * does not parse as a google.protobuf.Struct.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_struct);
+
+/**
+ * envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata sets the
+ * typed_filter_metadata entry of the request's dynamic metadata under the given namespace from a
+ * serialized google.protobuf.Any, replacing an existing entry.
+ *
+ * @param context_envoy_ptr is the per-request load balancer context.
+ * @param ns is the namespace of the dynamic metadata.
+ * @param serialized_any is the serialized google.protobuf.Any to set. Its pointer may be null
+ * only when its length is zero.
+ * @return true if the entry was set, false if the request has no stream info or the buffer does
+ * not parse as a google.protobuf.Any with a type URL.
+ */
+bool envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_cluster_lb_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer ns,
+    envoy_dynamic_module_type_module_buffer serialized_any);
+
+/**
  * envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete is called by the module
  * to deliver the result of an asynchronous host selection. This must be called exactly once for
  * each async handle returned from envoy_dynamic_module_on_cluster_lb_choose_host, unless
@@ -11856,10 +11979,11 @@ bool envoy_dynamic_module_callback_cluster_lb_get_member_update_host_packed_addr
  * envoy_dynamic_module_on_cluster_lb_on_host_membership_update, on the worker thread that runs it.
  *
  * Envoy only knows this when the cluster keeps persistent host partitions, which requires
- * use_persistent_host_partitions in the cluster's ClusterConfig, and no health refresh happened
- * since the previous update. A refresh covers every host, and with an active health checker it
- * precedes a worker's first update. Otherwise it returns false and the module must reread the hosts
- * it tracks.
+ * use_persistent_host_partitions in the cluster's ClusterConfig or a call to
+ * envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions, and no health
+ * refresh happened since the previous update. A refresh covers every host, and with an active
+ * health checker it precedes a worker's first update. Otherwise it returns false and the module
+ * must reread the hosts it tracks.
  *
  * @param lb_envoy_ptr is the pointer to the Envoy cluster load balancer.
  * @param result receives the count. Its contents are unspecified when the callback returns false.
@@ -13333,8 +13457,8 @@ envoy_dynamic_module_type_tls_handshaker_result envoy_dynamic_module_on_tls_hand
 // context. When a handshake needs a certificate the selector picks one of them, lets Envoy select
 // one, or picks a dynamic certificate by name. The module provides dynamic certificates at
 // runtime, and a handshake that picks a dynamic certificate that is not provided yet can wait
-// until the module provides or removes it. Envoy applies the configured OCSP stapling policy to
-// the certificate it uses.
+// until the module provides or removes it, or until its request times out. Envoy applies the
+// configured OCSP stapling policy to the certificate it uses.
 
 // =============================================================================
 // TLS Certificate Selector Types
@@ -13416,7 +13540,8 @@ typedef enum envoy_dynamic_module_type_tls_certificate_selector_status {
   // Envoy uses the dynamic certificate named by certificate_name. When the module has not provided
   // it yet, the handshake waits for it if the module implements
   // envoy_dynamic_module_on_tls_certificate_selector_config_certificate_requested, and fails
-  // otherwise. When allow_dynamic_certificates is not set, the handshake fails.
+  // otherwise or when its request times out. When allow_dynamic_certificates is not set, the
+  // handshake fails.
   envoy_dynamic_module_type_tls_certificate_selector_status_Dynamic = 2,
   // Envoy fails the handshake.
   envoy_dynamic_module_type_tls_certificate_selector_status_Failed = 3,
@@ -13429,8 +13554,9 @@ typedef enum envoy_dynamic_module_type_tls_certificate_selector_status {
 /**
  * envoy_dynamic_module_on_tls_certificate_selector_config_new is called on the main thread when the
  * certificate selector config is loaded. Metrics can only be defined during this call. Dynamic
- * certificates provided during this call are available to the first handshake, unless the TLS
- * context waits for its SDS validation context.
+ * certificates provided during this call, or before
+ * envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete, are
+ * available to the first handshake, unless the TLS context waits for its SDS validation context.
  *
  * @param config_envoy_ptr is the pointer to the DynamicModuleTlsCertificateSelectorConfig object
  * for the corresponding config.
@@ -13523,11 +13649,14 @@ envoy_dynamic_module_on_tls_certificate_selector_select(
 /**
  * envoy_dynamic_module_on_tls_certificate_selector_config_certificate_requested is called on the
  * main thread when a handshake waits for a dynamic certificate that the module has not provided. It
- * is called once for each name until the certificate is provided or removed. The module
- * must answer with envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate or
+ * is called once for each name until the certificate is provided or removed, or its request times
+ * out. The module must answer with
+ * envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate or
  * envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate, either during
  * this call or later. Until then Envoy keeps the name, and the handshakes that wait for the
- * certificate stay paused until their connections close.
+ * certificate stay paused until their connections close. When dynamic_certificate_request_timeout
+ * expires first, Envoy fails them and forgets the name, so a later handshake requests the
+ * certificate again. An answer after the timeout still applies to the name.
  *
  * This hook is optional. Without it, a handshake that selects a dynamic certificate that the module
  * has not provided fails.
@@ -13652,6 +13781,23 @@ bool envoy_dynamic_module_callback_tls_certificate_selector_config_set_certifica
 void envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(
     envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_module_buffer name);
+
+/**
+ * envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete is called by
+ * the module to signal that the certificate selector configuration has completed its
+ * initialization. Envoy registers an init target for every certificate selector configuration, so
+ * the listeners and clusters that use the TLS context warm until the first call, and Envoy does not
+ * time out the wait. Later calls do nothing.
+ *
+ * The module must call this during or after
+ * envoy_dynamic_module_on_tls_certificate_selector_config_new. If the module does not require
+ * asynchronous initialization, it should call this during that call. This must be called on the
+ * main thread.
+ *
+ * @param config_envoy_ptr is the pointer to the DynamicModuleTlsCertificateSelectorConfig object.
+ */
+void envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+    envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter is called by the
@@ -16639,6 +16785,29 @@ bool envoy_dynamic_module_callback_health_checker_get_host_metadata_bool(
  */
 envoy_dynamic_module_type_host_health envoy_dynamic_module_callback_health_checker_get_host_health(
     envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_health_checker_set_health_metadata attaches a string key/value pair
+ * to the result of the health check currently in flight for the session. The accumulated pairs
+ * replace the host's health check metadata when the check resolves (a reported result or a
+ * timeout), so each check starts with an empty set. Envoy forwards the metadata to the management
+ * server in the HDS EndpointHealth.health_metadata field. Setting an existing key overwrites it.
+ *
+ * The key ``http_status_code`` is reserved for the HTTP health checker and is rejected.
+ *
+ * This must be called on the main thread during
+ * envoy_dynamic_module_on_health_checker_session_on_interval. The metadata applies to the check
+ * started by that interval, including when the check later times out.
+ *
+ * @param session_envoy_ptr is the pointer to the DynamicModuleActiveHealthCheckSession object.
+ * @param key is the metadata key. Envoy copies it.
+ * @param value is the metadata value. Envoy copies it.
+ * @return true if the pair was stored, false if the session pointer is null, the key is empty or
+ * reserved, or a buffer is invalid.
+ */
+bool envoy_dynamic_module_callback_health_checker_set_health_metadata(
+    envoy_dynamic_module_type_health_checker_session_envoy_ptr session_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer key, envoy_dynamic_module_type_module_buffer value);
 
 // =============================================================================
 // ============================ Cluster Specifier ==============================

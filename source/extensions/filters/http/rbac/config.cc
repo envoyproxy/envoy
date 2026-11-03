@@ -18,8 +18,8 @@ RoleBasedAccessControlFilterConfigFactory::createHttpFilterFactoryFromProtoTyped
     Server::Configuration::ExtraFactoryContext& extra_context) {
 
   auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
-      proto_config, extra_context.stats_prefix, extra_context.scopeOr(context), context,
-      extra_context.visitor);
+      proto_config, extra_context.statsPrefixOr(), extra_context.statsPrefixScopeOr(context),
+      context, extra_context.visitor);
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));

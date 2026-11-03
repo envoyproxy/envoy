@@ -2,9 +2,10 @@
 //!
 //! Exposes a cluster whose load balancer, during ``choose_host``, annotates the current request
 //! under the ``dynamic_modules.test`` namespace with a number and a string through the single-key
-//! setters and two more strings through the batch setter, then returns its pre-registered upstream.
-//! The C++ harness reads the values back from the access log via
-//! ``%DYNAMIC_METADATA(dynamic_modules.test:...)%``.
+//! setters, two more strings through the batch setter, one more through the struct setter and typed
+//! metadata through the typed setter, then returns its pre-registered upstream. It selects no host
+//! if Envoy rejects a valid buffer or accepts a malformed one. The C++ harness reads the untyped
+//! values back from the access log via ``%DYNAMIC_METADATA(dynamic_modules.test:...)%``.
 
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::{Arc, Mutex};
@@ -15,6 +16,10 @@ const STRING_KEY: &str = "string_key";
 const NUMBER_VALUE: f64 = 1234.0;
 const STRING_VALUE: &str = "test_value";
 const BATCH_ENTRIES: [(&str, &str); 2] = [("l1_decision", "resolved"), ("l2_selector", "dicer")];
+// A serialized google.protobuf.Struct with "k" set to "v".
+const SERIALIZED_STRUCT: &[u8] = &[0x0a, 0x08, 0x0a, 0x01, 0x6b, 0x12, 0x03, 0x1a, 0x01, 0x76];
+// A serialized google.protobuf.Any with type URL "t/x" and value 0x01 0x02.
+const SERIALIZED_ANY: &[u8] = &[0x0a, 0x03, 0x74, 0x2f, 0x78, 0x12, 0x02, 0x01, 0x02];
 
 declare_cluster_init_functions!(my_program_init, new_cluster_config_fn);
 
@@ -97,6 +102,17 @@ impl ClusterLb for DynamicMetadataWriterLb {
     ctx.set_dynamic_metadata_number(METADATA_NAMESPACE, NUMBER_KEY, NUMBER_VALUE);
     ctx.set_dynamic_metadata_string(METADATA_NAMESPACE, STRING_KEY, STRING_VALUE);
     ctx.set_dynamic_metadata_string_batch(METADATA_NAMESPACE, &BATCH_ENTRIES);
+    if !ctx.set_dynamic_metadata_struct(METADATA_NAMESPACE, SERIALIZED_STRUCT)
+      || !ctx.set_dynamic_typed_metadata(METADATA_NAMESPACE, SERIALIZED_ANY)
+    {
+      return HostSelectionResult::NoHost;
+    }
+    // A struct that does not parse and an Any without a type URL are rejected.
+    if ctx.set_dynamic_metadata_struct(METADATA_NAMESPACE, &[0x0f])
+      || ctx.set_dynamic_typed_metadata(METADATA_NAMESPACE, &[])
+    {
+      return HostSelectionResult::NoHost;
+    }
     let hosts = self.hosts.lock().unwrap();
     if hosts.0.is_empty() {
       return HostSelectionResult::NoHost;

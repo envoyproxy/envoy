@@ -4696,6 +4696,14 @@ pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+) {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_config_call("signal_init_complete".to_string());
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(
   config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr {
@@ -5249,6 +5257,7 @@ fn test_tls_certificate_selector_envoy_config_calls_envoy() {
   assert!(envoy_config.set_certificate("dynamic.lyft.com", b"chain", b"key", b""));
   assert!(!envoy_config.set_certificate("invalid", b"chain", b"key", b"ocsp"));
   envoy_config.remove_certificate("dynamic.lyft.com");
+  envoy_config.signal_init_complete();
   // A boxed scheduler is itself a scheduler, so generic module code can take it.
   fn commit_event(scheduler: &impl EnvoyTlsCertificateSelectorConfigScheduler, event_id: u64) {
     scheduler.commit(event_id);
@@ -5281,6 +5290,7 @@ fn test_tls_certificate_selector_envoy_config_calls_envoy() {
       "set_certificate dynamic.lyft.com chain key ",
       "set_certificate invalid chain key ocsp",
       "remove_certificate dynamic.lyft.com",
+      "signal_init_complete",
       "scheduler_new",
       "scheduler_commit 42",
       "scheduler_delete",
@@ -6432,6 +6442,13 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_use_persistent_host_map(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+  cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+) -> bool {
+  !cluster_config_envoy_ptr.is_null()
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_update_host_health(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
@@ -6666,6 +6683,48 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_m
       String::from_utf8_lossy(value).into_owned(),
     ));
   }
+  true
+}
+
+// Records the setter, context, namespace and buffer of each serialized metadata call so a test can
+// assert the wrappers forward them unchanged.
+pub(crate) static MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA: std::sync::Mutex<
+  Vec<(&'static str, usize, String, Vec<u8>)>,
+> = std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_struct: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+    .lock()
+    .unwrap()
+    .push((
+      "struct",
+      context_envoy_ptr as usize,
+      unsafe { stub_specifier_string(ns) },
+      unsafe { stub_specifier_bytes(serialized_struct) },
+    ));
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_any: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+    .lock()
+    .unwrap()
+    .push((
+      "typed",
+      context_envoy_ptr as usize,
+      unsafe { stub_specifier_string(ns) },
+      unsafe { stub_specifier_bytes(serialized_any) },
+    ));
   true
 }
 

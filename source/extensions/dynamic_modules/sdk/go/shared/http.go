@@ -110,6 +110,12 @@ const (
 	FilterStateStreamSharingSharedWithUpstreamConnectionOnce
 )
 
+// FilterStateObjectDestroyer is optionally implemented by values passed to SetFilterStateObject.
+// OnFilterStateObjectDestroy is called once when Envoy destroys the filter state entry.
+type FilterStateObjectDestroyer interface {
+	OnFilterStateObjectDestroy()
+}
+
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
 // valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
 // because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
@@ -306,6 +312,14 @@ type HttpFilterHandle interface {
 	// HasFilterState checks whether a filter state entry with the given key exists, regardless of
 	// its type. Unlike the getter methods, this does not read or serialize the stored object.
 	HasFilterState(key string) bool
+
+	// SetFilterStateObject stores a Go value in the filter state without serializing it.
+	// Returns false if the filter state is not accessible or the key exists with a different
+	// lifespan; the value is destroyed in that case.
+	SetFilterStateObject(key string, value any, lifeSpan FilterStateLifeSpan) bool
+
+	// GetFilterStateObject returns the value stored with SetFilterStateObject under the given key.
+	GetFilterStateObject(key string) (any, bool)
 
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.

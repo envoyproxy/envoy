@@ -148,7 +148,7 @@ def envoy_cc_fuzz_test(
             Label("//test/fuzz:fuzz_runner_lib"),
             _TEST_VERSION_LINKSTAMP,
         ],
-        tags = tags,
+        tags = tags + ["skip_on_windows"],
         **kwargs
     )
 
@@ -179,7 +179,7 @@ def envoy_cc_fuzz_test(
             ],
         }) + deprecate_repository("envoy_cc_fuzz_test", repository),
         size = size,
-        tags = ["fuzz_target"] + tags,
+        tags = ["fuzz_target"] + tags + ["skip_on_windows"],
     )
 
     fuzzing_decoration(

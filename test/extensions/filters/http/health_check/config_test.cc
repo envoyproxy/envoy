@@ -75,7 +75,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
 
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
               HasStatus(absl::StatusCode::kInvalidArgument,
-                        "cache_time_ms must not be set when path_through_mode is disabled"));
+                        "cache_time_ms must not be set when pass_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
@@ -112,7 +112,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   EXPECT_THAT(
       healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
       HasStatus(absl::StatusCode::kInvalidArgument,
-                "cache_time_ms must not be set when path_through_mode is disabled"));
+                "cache_time_ms must not be set when pass_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {

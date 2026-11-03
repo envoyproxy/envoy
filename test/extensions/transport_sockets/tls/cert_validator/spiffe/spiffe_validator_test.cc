@@ -13,6 +13,7 @@
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/filter_state_impl.h"
+#include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/tls/stats.h"
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
 
@@ -136,6 +137,20 @@ public:
     return creation_status;
   }
 
+  // Creates an additional validator that shares this fixture's factory context -
+  // and therefore its singleton manager and its trusted CA cache - with
+  // `validator()`.
+  SPIFFEValidatorPtr createAdditionalValidator(const std::string& yaml,
+                                               absl::Status& creation_status) {
+    envoy::config::core::v3::TypedExtensionConfig typed_conf;
+    TestUtility::loadFromYaml(yaml, typed_conf);
+    auto config = std::make_unique<TestCertificateValidationContextConfig>(typed_conf);
+    auto validator = std::make_unique<SPIFFEValidator>(config.get(), stats_, factory_context_,
+                                                       *store_.rootScope(), creation_status);
+    additional_configs_.push_back(std::move(config));
+    return validator;
+  }
+
   // Getter.
   SPIFFEValidator& validator() { return *validator_; }
   SslStats& stats() { return stats_; }
@@ -181,6 +196,7 @@ private:
   bool allow_expired_certificate_{false};
   bool suppress_client_ca_list_{false};
   TestCertificateValidationContextConfigPtr config_;
+  std::vector<TestCertificateValidationContextConfigPtr> additional_configs_;
   std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
   Stats::TestUtil::TestStore store_;
   SslStats stats_;
@@ -1558,6 +1574,238 @@ typed_config:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF")),
                           EnvoyException, "Didn't find a registered implementation");
+}
+
+// Two trust domains configured with identical trust bundle content share a
+// single parsed copy of the certificates instead of parsing the PEM twice.
+TEST_F(TestSPIFFEValidator, SharesParsedTrustBundleAcrossTrustDomains) {
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF")));
+
+  // ca_cert.pem holds a single certificate, so each trust domain contributed one
+  // entry - and both entries are the very same parsed X509.
+  OptRef<SpiffeData> spiffe_data = validator().getSpiffeData();
+  ASSERT_EQ(2, spiffe_data->ca_certs_.size());
+  EXPECT_EQ(spiffe_data->ca_certs_[0].get(), spiffe_data->ca_certs_[1].get());
+  EXPECT_EQ(1, getCaCertCache(factory_context_.singletonManager())->size());
+
+  // Only the parsed certificates are shared: each trust domain still has its own
+  // store, which is what keeps the trust domains isolated from each other.
+  ASSERT_EQ(2, spiffe_data->trust_bundle_stores_.size());
+  EXPECT_NE(spiffe_data->trust_bundle_stores_.at("lyft.com").at("").get(),
+            spiffe_data->trust_bundle_stores_.at("example.com").at("").get());
+}
+
+// Validators created from the same server factory context - the shape of many
+// clusters referencing one trust bundle - also share the parsed certificates.
+TEST_F(TestSPIFFEValidator, SharesParsedTrustBundleAcrossValidators) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF");
+  ASSERT_OK(initialize(yaml));
+
+  absl::Status creation_status = absl::OkStatus();
+  SPIFFEValidatorPtr second = createAdditionalValidator(yaml, creation_status);
+  ASSERT_OK(creation_status);
+
+  EXPECT_EQ(1, getCaCertCache(factory_context_.singletonManager())->size());
+  ASSERT_EQ(1, validator().getSpiffeData()->ca_certs_.size());
+  ASSERT_EQ(1, second->getSpiffeData()->ca_certs_.size());
+  EXPECT_EQ(validator().getSpiffeData()->ca_certs_[0].get(),
+            second->getSpiffeData()->ca_certs_[0].get());
+
+  // Both validators still verify against their own store.
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  TestSslExtendedSocketInfo info;
+  for (SPIFFEValidator* validator_to_check : {&validator(), second.get()}) {
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
+              validator_to_check
+                  ->doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                      /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
+                  .status);
+  }
+}
+
+// Trust domains configured with different bundles get separate cache entries and
+// remain isolated: a certificate chaining to one trust domain's CA is not
+// accepted for the other.
+TEST_F(TestSPIFFEValidator, DoesNotShareDistinctTrustBundles) {
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"
+  )EOF")));
+
+  EXPECT_EQ(2, getCaCertCache(factory_context_.singletonManager())->size());
+  OptRef<SpiffeData> spiffe_data = validator().getSpiffeData();
+  ASSERT_EQ(2, spiffe_data->ca_certs_.size());
+  EXPECT_NE(spiffe_data->ca_certs_[0].get(), spiffe_data->ca_certs_[1].get());
+
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  TestSslExtendedSocketInfo info;
+  {
+    // Issued by ca_cert.pem with a spiffe://lyft.com SAN, so it matches the trust
+    // domain it was configured for.
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Successful,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
+                  .status);
+  }
+  {
+    // Issued by ca_cert.pem but with a spiffe://example.com SAN, so it is checked
+    // against the example.com store, which only trusts fake_ca_cert.pem. Sharing
+    // the parsed certificates must not let it be validated by the lyft.com CA.
+    auto cert = readCertFromFile(TestEnvironment::substitute(
+        "{{ test_rundir }}/test/common/tls/test_data/spiffe_san_cert.pem"));
+    bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+    sk_X509_push(cert_chain.get(), cert.release());
+    EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+              validator()
+                  .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                     /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
+                  .status);
+  }
+}
+
+// A cache entry is released once the last validator referencing it is destroyed,
+// so the cache does not grow without bound as trust bundles are reconfigured.
+TEST_F(TestSPIFFEValidator, ReleasesCachedTrustBundleWhenValidatorsAreDestroyed) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF");
+  ASSERT_OK(initialize(yaml));
+
+  absl::Status creation_status = absl::OkStatus();
+  SPIFFEValidatorPtr second = createAdditionalValidator(yaml, creation_status);
+  ASSERT_OK(creation_status);
+  EXPECT_EQ(1, getCaCertCache(factory_context_.singletonManager())->size());
+
+  // The entry survives while the other validator still references it.
+  second.reset();
+  EXPECT_EQ(1, getCaCertCache(factory_context_.singletonManager())->size());
+
+  // Replacing the remaining validator with one using different content releases
+  // the old entry.
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/fake_ca_cert.pem"
+  )EOF")));
+  EXPECT_EQ(1, getCaCertCache(factory_context_.singletonManager())->size());
+}
+
+// A trust bundle that parses but carries no certificate cannot verify anything,
+// so it is rejected at configuration time rather than failing every handshake.
+TEST_F(TestSPIFFEValidator, TrustBundleWithoutCertificatesIsRejected) {
+  EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
+  )EOF")),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Failed to load trusted CA certificate for hello.com")));
+}
+
+// Legacy behavior, retained behind a runtime guard: such a trust bundle used to
+// be accepted, producing a store with no trust anchors.
+TEST_F(TestSPIFFEValidator, TrustBundleWithoutCertificatesAcceptedWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.spiffe_validator_reject_empty_trust_bundle", "false"}});
+
+  ASSERT_OK(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.crl"
+  )EOF")));
+
+  // The store exists but holds no trust anchor, and nothing was cached.
+  OptRef<SpiffeData> spiffe_data = validator().getSpiffeData();
+  EXPECT_EQ(1, spiffe_data->trust_bundle_stores_.size());
+  EXPECT_TRUE(spiffe_data->ca_certs_.empty());
+  EXPECT_EQ(0, getCaCertCache(factory_context_.singletonManager())->size());
+
+  // A certificate for that trust domain cannot be validated against it.
+  SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
+  TestSslExtendedSocketInfo info;
+  auto cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"));
+  bssl::UniquePtr<STACK_OF(X509)> cert_chain(sk_X509_new_null());
+  sk_X509_push(cert_chain.get(), cert.release());
+  EXPECT_EQ(ValidationResults::ValidationStatus::Failed,
+            validator()
+                .doVerifyCertChain(*cert_chain, info.createValidateResultCallback(),
+                                   /*transport_socket_options=*/nullptr, *ssl_ctx, {}, false, "")
+                .status);
+}
+
+// A bundle with no PEM object at all is rejected with or without the guard.
+TEST_F(TestSPIFFEValidator, InvalidCAWithGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.spiffe_validator_reject_empty_trust_bundle", "false"}});
+
+  EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: hello.com
+      trust_bundle:
+        inline_string: "invalid"
+  )EOF")),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("Failed to load trusted CA certificate for hello.com")));
 }
 
 } // namespace Tls

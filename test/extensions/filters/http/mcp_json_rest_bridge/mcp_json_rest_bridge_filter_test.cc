@@ -6087,6 +6087,61 @@ TEST_F(McpJsonRestBridgeFilterTest,
             Http::FilterDataStatus::StopIterationNoBuffer);
 }
 
+TEST_F(McpJsonRestBridgeFilterTest, StatelessToolsCallWithoutProtocolVersionMetaReturnsError) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"mcp-method", "tools/call"},
+                      {"mcp-name", "create_api_key"},
+                      {"mcp-protocol-version", "2026-07-28"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::BadRequest),
+          StrEq(
+              R"json({"code":-32602,"message":"Missing or invalid params._meta field: io.modelcontextprotocol/protocolVersion"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key"}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
+TEST_F(McpJsonRestBridgeFilterTest,
+       StatelessToolsCallWithNonStringProtocolVersionMetaReturnsError) {
+  proto_config_.mutable_server_info()->mutable_max_supported_protocol_version()->set_value(
+      "2026-07-28");
+  ASSERT_OK(makeFilter());
+
+  request_headers_ = {{":method", "POST"},
+                      {":path", "/mcp"},
+                      {"mcp-method", "tools/call"},
+                      {"mcp-name", "create_api_key"},
+                      {"mcp-protocol-version", "2026-07-28"}};
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, /*end_stream=*/false),
+            Http::FilterHeadersStatus::StopIteration);
+
+  EXPECT_CALL(
+      decoder_callbacks_,
+      sendLocalReply(
+          Eq(Http::Code::BadRequest),
+          StrEq(
+              R"json({"code":-32602,"message":"Missing or invalid params._meta field: io.modelcontextprotocol/protocolVersion"})json"),
+          _, _, StrEq("mcp_json_rest_bridge_request_mcp_protocol_version_meta_invalid")));
+
+  Buffer::OwnedImpl body(
+      R"json({"jsonrpc":"2.0","id":123,"method":"tools/call","params":{"name":"create_api_key","_meta":{"io.modelcontextprotocol/protocolVersion":123}}})json");
+  EXPECT_EQ(filter_->decodeData(body, /*end_stream=*/true),
+            Http::FilterDataStatus::StopIterationNoBuffer);
+}
+
 constexpr absl::string_view kMissingClientCapabilitiesError =
     R"json({"code":-32602,"message":"Missing required params._meta field: io.modelcontextprotocol/clientCapabilities"})json";
 constexpr absl::string_view kInvalidClientCapabilitiesError =
