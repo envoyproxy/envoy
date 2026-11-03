@@ -12,9 +12,9 @@ hunspell_dic(name = "hunspell_dic")
 
 hunspell_aff(name = "hunspell_aff")
 
-# WIP: SCOWL's affix file does not list the apostrophe in WORDCHARS, so hunspell checks
-# "doesn't" as "doesn" and "t". Fixed in envoy_toolshed (hunspell-wordchars); drop this once a
-# bins release carries it.
+# SCOWL's affix file does not list the apostrophe in WORDCHARS, so hunspell would check "doesn't"
+# as "doesn" and "t". Patch the resolved toolchain's dictionary (prebuilt or source-built) until
+# envoy_toolshed ships one with it, then use `:hunspell_aff`/`:hunspell_dic` directly.
 genrule(
     name = "en_US_dict",
     srcs = [

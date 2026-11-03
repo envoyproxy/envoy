@@ -138,11 +138,18 @@ NON_ASCII_WORD = re.compile(r'\w*[^\x00-\x7f]\w*')
 # (head_'s) would otherwise be checked as words, as aspell never did.
 STRAY_APOSTROPHE = re.compile(r"(?<![A-Za-z])'|'(?![A-Za-z])")
 
-# Anything that looks like a URL, host name, path, email address or string literal with escape
-# sequences: aspell's URL filter skipped these, hunspell has no equivalent. A dot only counts
-# between name parts (example.com, stat name templates like vhost.<name>.vcluster.[<cluster>.]),
-# so sentence punctuation (`woork.)`, `woork...`) does not hide a word from the check.
-URL_LIKE = re.compile(r'\S*(?:://|@|/|\\|[A-Za-z0-9_\-\]>)*]\.[A-Za-z0-9_\[<(*])\S*')
+# aspell's URL filter skipped URLs, paths, email addresses and host names; hunspell has no
+# equivalent. A whitespace-delimited token containing a URL, path, email or escape-sequence marker
+# is skipped whole. A dotted name (example.com, foo.cc, obj.method, e.g., stat name templates like
+# vhost.<name>.vcluster.[<cluster>.]) is skipped where the part after a dot starts in lower case
+# (or a bracket), or there are at least two dots: a dot before a capital (sentense.Next) or at the
+# end of a sentence (woork.) is punctuation, so the words around it are still checked, and the
+# name is bounded by non-name characters so `speling,e.g.` only skips the `e.g.`.
+URL_LIKE = re.compile(r'(?<!\S)\S*(?:://|@|/|\\)\S*')
+NAME_CHAR = r'[A-Za-z0-9_\-\[\]<>()*]'
+DOTTED_NAME = re.compile(
+    r'(?<![A-Za-z0-9_])%s+(?:\.%s+){2,}'
+    r'|(?<![A-Za-z0-9_])%s+\.(?=[a-z0-9_\[<(*])%s+' % ((NAME_CHAR,) * 4))
 
 # Valid dictionary words. Anything else is not a word to the spell checker.
 DICTIONARY_WORD = re.compile(r"^[A-Za-z']+$")
@@ -507,6 +514,7 @@ def check_comment(checker, offset, comment):
     # URLs, host names, paths, email addresses and escaped string literals are skipped, as aspell
     # did for us.
     comment, _ = mask_with_regex(comment, URL_LIKE, 0)
+    comment, _ = mask_with_regex(comment, DOTTED_NAME, 0)
 
     # Digits separate words (eg SHA256 checks "SHA"), as they did for aspell; hunspell's en_US
     # dictionary declares them word characters.
