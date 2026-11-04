@@ -92,20 +92,6 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
   // Captured here because the proto is moved into the state below, before it is used to decide
   // what happens to the VHDS subscription.
   const bool has_vhds = new_route_config->has_vhds();
-  if (has_vhds) {
-    if (!base_.initialized_ || vhds_configuration_changed || vhds_subscription_ == nullptr) {
-      warming_blocks_unmatched_requests_ =
-          new_route_config->vhds().has_warming_blocks_unmatched_requests();
-      awaiting_initial_vhds_update_ = warming_blocks_unmatched_requests_;
-    }
-  } else {
-    warming_blocks_unmatched_requests_ = false;
-    awaiting_initial_vhds_update_ = false;
-  }
-  if (awaiting_initial_vhds_update_) {
-    const_cast<ConfigImpl*>(static_cast<const ConfigImpl*>(config.get()))
-        ->setAwaitingInitialVhdsUpdate(true);
-  }
 
   std::unique_ptr<Init::Manager> vhds_noop_init_manager;
   std::unique_ptr<Init::Watcher> vhds_noop_init_watcher;
@@ -140,6 +126,20 @@ absl::Status RouteConfigUpdateReceiverImpl::onRdsUpdate(const Protobuf::Message&
 
   // The new route configuration and VHDS subscription have been built without error, now we can
   // update the state and start warming up.
+  if (has_vhds) {
+    if (!base_.initialized_ || vhds_configuration_changed || vhds_subscription_ == nullptr) {
+      warming_blocks_unmatched_requests_ =
+          new_route_config->vhds().has_warming_blocks_unmatched_requests();
+      awaiting_initial_vhds_update_ = warming_blocks_unmatched_requests_;
+    }
+  } else {
+    warming_blocks_unmatched_requests_ = false;
+    awaiting_initial_vhds_update_ = false;
+  }
+  if (awaiting_initial_vhds_update_) {
+    const_cast<ConfigImpl*>(static_cast<const ConfigImpl*>(config.get()))
+        ->setAwaitingInitialVhdsUpdate(true);
+  }
   Protobuf::Any route_config_any;
   MessageUtil::packFrom(route_config_any, *new_route_config);
   base_.updateState(std::move(route_config_any), new_route_config->name(), new_hash, version_info,
