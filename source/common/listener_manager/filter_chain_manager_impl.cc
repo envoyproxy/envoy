@@ -1067,10 +1067,6 @@ FcdsSharedFilterChainManager::FcdsSharedFilterChainManager(
     ListenerComponentFactory& listener_component_factory)
     : server_context_(server_context), listener_component_factory_(listener_component_factory),
       tls_slot_(ThreadLocal::TypedSlot<ThreadLocalState>::makeUnique(server_context.threadLocal())),
-      transport_factory_context_(
-          std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-              server_context,
-              server_context.messageValidationContext().dynamicValidationVisitor())),
       scope_(server_context_.scope().createScope("filter_chain_manager.")),
       resource_type_helper_(server_context.messageValidationContext().dynamicValidationVisitor(),
                             "name"),
@@ -1094,6 +1090,10 @@ public:
 
   bool isActive() const override {
     return shared_manager_->isFilterChainActive(filter_chain_name_);
+  }
+
+  Network::DrainableFilterChainSharedPtr activeFilterChain() const override {
+    return shared_manager_->activeFilterChain(filter_chain_name_);
   }
 
   ~FcdsSubscriptionHandleImpl() override {
@@ -1153,10 +1153,10 @@ absl::Status FcdsSharedFilterChainManager::onFilterChainUpdated(const FilterChai
         fmt::format("no subscription found for filter chain {}", proto.name()));
   }
   SubscriptionState& state = *state_iter->second;
+  FcdsContextCreator context(server_context_, &proto);
   ListenerFilterChainFactoryBuilder builder(false, server_context_.messageValidationVisitor(),
                                             listener_component_factory_,
-                                            *transport_factory_context_);
-  FcdsContextCreator context(server_context_, &proto);
+                                            context.transportSocketFactoryContext());
   auto filter_chain_or_error = builder.buildFilterChain(proto, context, true);
   RETURN_IF_NOT_OK(filter_chain_or_error.status());
   Network::DrainableFilterChainSharedPtr filter_chain = std::move(filter_chain_or_error).value();
@@ -1242,8 +1242,13 @@ void FcdsSharedFilterChainManager::updateTlsState() {
 bool FcdsSharedFilterChainManager::isFilterChainActive(const std::string& filter_chain_name) const {
   // A subscription's committed chain is non-null exactly when it is active (same test
   // updateTlsState() uses to publish the active set to workers).
+  return activeFilterChain(filter_chain_name) != nullptr;
+}
+
+Network::DrainableFilterChainSharedPtr
+FcdsSharedFilterChainManager::activeFilterChain(const std::string& filter_chain_name) const {
   auto it = subscriptions_.find(filter_chain_name);
-  return it != subscriptions_.end() && it->second->api_->filterChain() != nullptr;
+  return it != subscriptions_.end() ? it->second->api_->filterChain() : nullptr;
 }
 
 } // namespace Server

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.ai_protocol_manager;
+
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+message EncodeSseFuzzInput {
+  string body = 1;
+  uint64 fragmentation_seed = 2;
+  envoy.type.ai.v3.LLMProtocol request_protocol = 3;
+  envoy.type.ai.v3.LLMProtocol response_protocol = 4;
+  uint32 max_sse_event_size = 5;
+  uint32 max_parsed_sse_events = 6;
+}

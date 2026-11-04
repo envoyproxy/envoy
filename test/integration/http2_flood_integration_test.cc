@@ -650,12 +650,13 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
 
 // Verify detection of flood by the RST_STREAM frame sent on pending flush timeout
 TEST_P(Http2FloodMitigationTest, RstStreamOverflowOnPendingFlushTimeout) {
+  // Shorten only the pending flush timer. A short stream_idle_timeout would also apply to the
+  // pre-fill stream and fire if its upstream response is slow to start.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
-        hcm.mutable_stream_idle_timeout()->set_seconds(0);
-        constexpr uint64_t IdleTimeoutMs = 400;
-        hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
+        constexpr uint64_t FlushTimeoutMs = 400;
+        hcm.mutable_stream_flush_timeout()->set_nanos(FlushTimeoutMs * 1000 * 1000);
       });
 
   // Pending flush timer is started when upstream response has completed but there is no window to
@@ -1226,9 +1227,10 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) 
   EXPECT_EQ(Http2Frame::ResponseStatus::Ok, headers.responseStatus());
   EXPECT_FALSE(headers.endStream());
 
-  // Wait until the whole response has arrived from upstream, i.e. the full 1 MiB body is sitting
-  // in the downstream codec's send buffer waiting for the client's window to open.
-  test_server_->waitForCounter("cluster.cluster_0.upstream_rq_completed", Ge(1));
+  // Wait until the full 1 MiB body is sitting in the downstream codec's send buffer waiting for the
+  // client's window to open. upstream_rq_completed is charged when the response headers arrive, so
+  // it says nothing about how much of the body has been proxied.
+  test_server_->waitForGauge("http2.pending_send_bytes", Eq(kResponseSize));
 
   // The client is ready to read: grow the connection window (65,535 bytes initially per RFC 9113)
   // and open the stream window to 1 MiB.
@@ -1255,7 +1257,9 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) 
   EXPECT_EQ(kResponseSize, body_bytes);
 
   const bool is_oghttp2 = std::get<1>(GetParam()) == Http2Impl::Oghttp2;
-  if (is_oghttp2) {
+  const bool cap_data_frames = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.http2_oghttp2_cap_data_frame_payload");
+  if (is_oghttp2 && !cap_data_frames) {
     // Frame size = min(connection window, stream window, peer SETTINGS_MAX_FRAME_SIZE) = 1 MiB.
     EXPECT_EQ(1, data_frames);
   } else {
@@ -1281,7 +1285,7 @@ TEST_P(Http2FloodMitigationTest, WindowUpdateAfterLargeResponseRealisticClient) 
     }
   }
 
-  if (is_oghttp2) {
+  if (is_oghttp2 && !cap_data_frames) {
     // Legitimate flow-control replenishment is misclassified as a WINDOW_UPDATE flood and Envoy
     // terminates the connection.
     tcp_client_->waitForDisconnect();

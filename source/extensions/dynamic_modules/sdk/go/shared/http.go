@@ -110,6 +110,12 @@ const (
 	FilterStateStreamSharingSharedWithUpstreamConnectionOnce
 )
 
+// FilterStateObjectDestroyer is optionally implemented by values passed to SetFilterStateObject.
+// OnFilterStateObjectDestroy is called once when Envoy destroys the filter state entry.
+type FilterStateObjectDestroyer interface {
+	OnFilterStateObjectDestroy()
+}
+
 // Span is a tracing span associated with the current HTTP stream. It is owned by Envoy and is
 // valid for the lifetime of the HTTP stream. Modules MUST NOT call Finish on the active span
 // because it is managed by Envoy. Use SpawnChild to create child spans whose lifetime the module
@@ -307,6 +313,14 @@ type HttpFilterHandle interface {
 	// its type. Unlike the getter methods, this does not read or serialize the stored object.
 	HasFilterState(key string) bool
 
+	// SetFilterStateObject stores a Go value in the filter state without serializing it.
+	// Returns false if the filter state is not accessible or the key exists with a different
+	// lifespan; the value is destroyed in that case.
+	SetFilterStateObject(key string, value any, lifeSpan FilterStateLifeSpan) bool
+
+	// GetFilterStateObject returns the value stored with SetFilterStateObject under the given key.
+	GetFilterStateObject(key string) (any, bool)
+
 	// GetData retrieves internal data stored for cross-phase communication.
 	// This data is not included in DynamicMetadata responses.
 	// Returns data value if found, otherwise nil.
@@ -432,6 +446,10 @@ type HttpFilterHandle interface {
 	// SendGoAwayAndClose sends a GOAWAY frame to the downstream and closes the connection. If
 	// graceful is true, a graceful drain is initiated before closing.
 	SendGoAwayAndClose(graceful bool)
+
+	// DrainConnectionUponCompletion marks the downstream connection to be drained once the
+	// current HTTP stream completes.
+	DrainConnectionUponCompletion()
 
 	// RecreateStream recreates the HTTP stream, optionally with new headers (or with the original
 	// headers if headers is nil). Useful for internal redirects or request retries. After a

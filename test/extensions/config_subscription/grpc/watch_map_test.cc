@@ -18,8 +18,6 @@
 
 using ::testing::_;
 using ::testing::AtMost;
-using ::testing::Invoke;
-using ::testing::InvokeWithoutArgs;
 using ::testing::NiceMock;
 
 namespace Envoy {
@@ -31,10 +29,10 @@ void expectDeltaUpdate(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& expected_resources,
     const std::vector<std::string>& expected_removals, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
-      .WillOnce(Invoke([expected_resources, expected_removals,
-                        version](const std::vector<DecodedResourceRef>& gotten_resources,
-                                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                 const std::string&) {
+      .WillOnce([expected_resources, expected_removals,
+                 version](const std::vector<DecodedResourceRef>& gotten_resources,
+                          const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                          const std::string&) {
         EXPECT_EQ(expected_resources.size(), gotten_resources.size());
         for (size_t i = 0; i < expected_resources.size(); i++) {
           EXPECT_EQ(gotten_resources[i].get().version(), version);
@@ -51,7 +49,7 @@ void expectDeltaUpdate(
           EXPECT_EQ(expected_removals[i], removed_resources[i]);
         }
         return absl::OkStatus();
-      }));
+      });
 }
 
 // expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
@@ -64,8 +62,8 @@ void expectDeltaAndSotwUpdate(
     const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& expected_resources,
     const std::vector<std::string>& expected_removals, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(Invoke([expected_resources](const std::vector<DecodedResourceRef>& gotten_resources,
-                                            const std::string&) {
+      .WillOnce([expected_resources](const std::vector<DecodedResourceRef>& gotten_resources,
+                                     const std::string&) {
         EXPECT_EQ(expected_resources.size(), gotten_resources.size());
         for (size_t i = 0; i < expected_resources.size(); i++) {
           EXPECT_TRUE(
@@ -77,7 +75,7 @@ void expectDeltaAndSotwUpdate(
           }
         }
         return absl::OkStatus();
-      }));
+      });
   expectDeltaUpdate(callbacks, expected_resources, expected_removals, version);
 }
 
@@ -89,11 +87,10 @@ void expectNoUpdate(MockSubscriptionCallbacks& callbacks, const std::string& ver
 void expectEmptySotwNoDeltaUpdate(MockSubscriptionCallbacks& callbacks,
                                   const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(
-          Invoke([](const std::vector<DecodedResourceRef>& gotten_resources, const std::string&) {
-            EXPECT_EQ(gotten_resources.size(), 0);
-            return absl::OkStatus();
-          }));
+      .WillOnce([](const std::vector<DecodedResourceRef>& gotten_resources, const std::string&) {
+        EXPECT_EQ(gotten_resources.size(), 0);
+        return absl::OkStatus();
+      });
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
 
@@ -450,12 +447,12 @@ public:
 };
 
 TEST_F(SameWatchRemoval, SameWatchRemovalSotw) {
-  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
   watch_map_.onConfigUpdate(updated_resources_, "version1");
 }
 
@@ -464,24 +461,24 @@ TEST_F(SameWatchRemoval, SameWatchRemovalDeltaAdd) {
       wrapInResource(updated_resources_, "version1");
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
 
-  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
   watch_map_.onConfigUpdate(delta_resources, removed_names_proto, "version1");
 }
 
 TEST_F(SameWatchRemoval, SameWatchRemovalDeltaRemove) {
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
   *removed_names_proto.Add() = "alice";
-  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
-  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _))
-      .Times(AtMost(1))
-      .WillRepeatedly(InvokeWithoutArgs([this] { return removeAllInterest(); }));
+  EXPECT_CALL(callbacks1_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
+  EXPECT_CALL(callbacks2_, onConfigUpdate(_, _, _)).Times(AtMost(1)).WillRepeatedly([this] {
+    return removeAllInterest();
+  });
   watch_map_.onConfigUpdate({}, removed_names_proto, "version1");
 }
 
@@ -816,16 +813,16 @@ TEST(WatchMapTest, OnConfigUpdateUsingSuffixGlobs) {
     cur_resource->add_aliases(not_resolved);
 
     EXPECT_CALL(callbacks3, onConfigUpdate(_, _, _))
-        .WillOnce(Invoke([not_resolved, version](
-                             const std::vector<DecodedResourceRef>& gotten_resources,
-                             const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        .WillOnce([not_resolved, version](const std::vector<DecodedResourceRef>& gotten_resources,
+                                          const Protobuf::RepeatedPtrField<std::string>&,
+                                          const std::string&) {
           EXPECT_EQ(1, gotten_resources.size());
           EXPECT_EQ(gotten_resources[0].get().version(), version);
           EXPECT_FALSE(gotten_resources[0].get().hasResource());
           EXPECT_EQ(gotten_resources[0].get().name(), not_resolved);
           EXPECT_EQ(gotten_resources[0].get().aliases(), std::vector<std::string>{not_resolved});
           return absl::OkStatus();
-        }));
+        });
 
     Protobuf::RepeatedPtrField<std::string> removed_names_proto;
 

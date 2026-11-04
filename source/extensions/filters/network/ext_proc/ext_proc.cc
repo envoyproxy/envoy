@@ -106,6 +106,7 @@ Config::Config(
       untyped_receiving_namespaces_(
           config.metadata_options().receiving_namespaces().untyped().begin(),
           config.metadata_options().receiving_namespaces().untyped().end()),
+      send_once_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.metadata_options(), send_once, false)),
       stats_(generateStats(config.stat_prefix(), scope)),
       message_timeout_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))),
@@ -584,8 +585,9 @@ void NetworkExtProcFilter::handleConnectionStatus(const ProcessingResponse& resp
 }
 
 void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {
-  if (config_->untypedForwardingMetadataNamespaces().empty() &&
-      config_->typedForwardingMetadataNamespaces().empty()) {
+  if ((metadata_sent_ && config_->sendOnce()) ||
+      (config_->untypedForwardingMetadataNamespaces().empty() &&
+       config_->typedForwardingMetadataNamespaces().empty())) {
     return;
   }
 
@@ -614,6 +616,7 @@ void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {
       !forwarding_metadata.typed_filter_metadata().empty()) {
     *req.mutable_metadata() = std::move(forwarding_metadata);
   }
+  metadata_sent_ = true;
 }
 
 void NetworkExtProcFilter::addAttributes(ProcessingRequest& req) {

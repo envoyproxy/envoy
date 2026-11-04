@@ -402,7 +402,7 @@ VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
     // be used as an inspiration for some bucketing configuration. The config
     // should enable and control the bucketing wanted.
     const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-        request_headers, Http::LowerCaseString(std::string(value)), inValueSeparator);
+        request_headers, Http::LowerCaseString(value), inValueSeparator);
     absl::StrAppend(&vary_identifier, value, inValueSeparator,
                     all_values.result().has_value() ? all_values.result().value() : "",
                     headerSeparator);

@@ -20,7 +20,6 @@ using namespace std::chrono_literals;
 using testing::_;
 using testing::An;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -130,11 +129,10 @@ public:
     HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
     EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
-        .WillOnce(
-            Invoke([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
-              entry.mutable_common_properties()->clear_duration();
-              EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
-            }));
+        .WillOnce([expected_log_entry](envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
+          entry.mutable_common_properties()->clear_duration();
+          EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
+        });
   }
 
   void expectLogRequestMethod(const std::string& request_method) {

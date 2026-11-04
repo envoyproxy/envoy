@@ -1,4 +1,4 @@
-#include <arpa/inet.h>
+#include "envoy/common/platform.h"
 
 #include "source/common/network/ip_address_parsing.h"
 

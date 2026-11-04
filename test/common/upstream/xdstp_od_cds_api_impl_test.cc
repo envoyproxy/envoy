@@ -46,7 +46,7 @@ public:
     EXPECT_CALL(xds_manager_,
                 subscribeToSingletonResource(resource_name, _, _, _,
                                              testing::An<Config::SubscriptionCallbacks&>(), _, _))
-        .WillOnce(Invoke(
+        .WillOnce(
             [this](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
                    absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
                    Config::OpaqueResourceDecoderSharedPtr,
@@ -55,7 +55,7 @@ public:
               subscription_ = ret.get();
               odcds_callbacks_ = &callbacks;
               return ret;
-            }));
+            });
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -270,14 +270,14 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
   EXPECT_CALL(xds_manager_,
               subscribeToSingletonResource(cluster_name1, _, _, _,
                                            testing::An<Config::SubscriptionCallbacks&>(), _, _))
-      .WillOnce(Invoke(
-          [&callbacks1](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
-                        absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                        Config::OpaqueResourceDecoderSharedPtr, const Config::SubscriptionOptions&)
-              -> absl::StatusOr<Config::SubscriptionPtr> {
-            callbacks1 = &callbacks;
-            return std::make_unique<NiceMock<Config::MockSubscription>>();
-          }));
+      .WillOnce([&callbacks1](
+                    absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+                    absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                    Config::OpaqueResourceDecoderSharedPtr,
+                    const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+        callbacks1 = &callbacks;
+        return std::make_unique<NiceMock<Config::MockSubscription>>();
+      });
   odcds_->updateOnDemand(cluster_name1);
   ASSERT_NE(callbacks1, nullptr);
 
@@ -287,14 +287,14 @@ TEST_F(XdstpOdCdsApiImplTest, MultipleSubscriptions) {
   EXPECT_CALL(xds_manager_,
               subscribeToSingletonResource(cluster_name2, _, _, _,
                                            testing::An<Config::SubscriptionCallbacks&>(), _, _))
-      .WillOnce(Invoke(
-          [&callbacks2](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
-                        absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
-                        Config::OpaqueResourceDecoderSharedPtr, const Config::SubscriptionOptions&)
-              -> absl::StatusOr<Config::SubscriptionPtr> {
-            callbacks2 = &callbacks;
-            return std::make_unique<NiceMock<Config::MockSubscription>>();
-          }));
+      .WillOnce([&callbacks2](
+                    absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+                    absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                    Config::OpaqueResourceDecoderSharedPtr,
+                    const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+        callbacks2 = &callbacks;
+        return std::make_unique<NiceMock<Config::MockSubscription>>();
+      });
   odcds_->updateOnDemand(cluster_name2);
   ASSERT_NE(callbacks2, nullptr);
 

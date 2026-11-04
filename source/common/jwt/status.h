@@ -211,6 +211,9 @@ enum class Status {
 
   // Failed to create BIO
   JwksBioAllocError,
+
+  // Jwt algorithm is not allowed.
+  JwtAlgorithmNotAllowed,
 };
 
 /**

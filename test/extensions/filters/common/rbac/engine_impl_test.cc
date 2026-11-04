@@ -93,9 +93,9 @@ void checkMatcherEngine(
 
 void onMetadata(NiceMock<StreamInfo::MockStreamInfo>& info) {
   ON_CALL(info, setDynamicMetadata("envoy.common", _))
-      .WillByDefault(Invoke([&info](const std::string&, const Protobuf::Struct& obj) {
+      .WillByDefault([&info](const std::string&, const Protobuf::Struct& obj) {
         (*info.metadata_.mutable_filter_metadata())["envoy.common"] = obj;
-      }));
+      });
 }
 
 TEST(RoleBasedAccessControlEngineImpl, Disabled) {

@@ -66,6 +66,13 @@ impl EnvoyBuffer<'_> {
   }
 }
 
+impl std::ops::Deref for EnvoyBuffer<'_> {
+  type Target = [u8];
+  fn deref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
 /// This is exactly the same as [`EnvoyBuffer`] except that it is mutable and data can be written
 /// in-place. See [`EnvoyBuffer`] for more details.
 #[repr(C)]
@@ -143,6 +150,19 @@ impl Default for EnvoyMutBuffer<'_> {
       length: 0,
       _marker: std::marker::PhantomData,
     }
+  }
+}
+
+impl std::ops::Deref for EnvoyMutBuffer<'_> {
+  type Target = [u8];
+  fn deref(&self) -> &[u8] {
+    self.as_slice()
+  }
+}
+
+impl std::ops::DerefMut for EnvoyMutBuffer<'_> {
+  fn deref_mut(&mut self) -> &mut [u8] {
+    self.as_mut_slice()
   }
 }
 
@@ -250,6 +270,37 @@ mod tests {
     // getters can return Envoy-filled entries directly without normalizing empty ones.
     assert_eq!(EnvoyBuffer::default().as_slice(), b"");
     assert_eq!(EnvoyBuffer::new(b"").as_slice(), b"");
+  }
+
+  #[test]
+  fn test_envoy_buffer_deref_returns_underlying_bytes() {
+    let buf = EnvoyBuffer::new(b"hello");
+    assert_eq!(&*buf, b"hello");
+    assert_eq!(buf.len(), 5);
+  }
+
+  #[test]
+  fn test_envoy_buffer_deref_treats_null_as_empty() {
+    let buf = EnvoyBuffer::default();
+    assert_eq!(&*buf, b"");
+    assert!(buf.is_empty());
+  }
+
+  #[test]
+  fn test_option_envoy_buffer_as_deref() {
+    let some: Option<EnvoyBuffer> = Some(EnvoyBuffer::new(b"val"));
+    let none: Option<EnvoyBuffer> = None;
+    assert_eq!(some.as_deref(), Some(b"val".as_slice()));
+    assert_eq!(none.as_deref(), None);
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_deref_and_deref_mut() {
+    let mut data = *b"hello";
+    let mut buffer = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
+    assert_eq!(&*buffer, b"hello");
+    buffer[0] = b'j';
+    assert_eq!(&*buffer, b"jello");
   }
 
   #[test]

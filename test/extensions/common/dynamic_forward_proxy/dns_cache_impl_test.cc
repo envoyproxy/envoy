@@ -670,12 +670,12 @@ TEST_F(DnsCacheImplTest, InlineResolve) {
   Event::MockTimer* timeout_timer = new Event::MockTimer(&context_.server_context_.dispatcher_);
   EXPECT_CALL(*timeout_timer, enableTimer(std::chrono::milliseconds(5000), nullptr));
   EXPECT_CALL(*resolver_, resolve("localhost", _, _))
-      .WillOnce(Invoke([](const std::string&, Network::DnsLookupFamily,
-                          Network::DnsResolver::ResolveCb callback) {
+      .WillOnce([](const std::string&, Network::DnsLookupFamily,
+                   Network::DnsResolver::ResolveCb callback) {
         callback(Network::DnsResolver::ResolutionStatus::Completed, "",
                  TestUtility::makeDnsResponse({"127.0.0.1"}));
         return nullptr;
-      }));
+      });
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(
       update_callbacks_,
@@ -2163,12 +2163,12 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
 
   // Configure the cache.
   MockKeyValueStoreFactory factory;
-  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<
         envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
-  }));
+  });
   MockKeyValueStore* store{};
-  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([this, &store]() {
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce([this, &store]() {
     auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
     store = ret.get();
     // Make sure there's an attempt to load from the key value store.
@@ -2176,7 +2176,7 @@ TEST_F(DnsCacheImplTest, ResolveSuccessWithCaching) {
     // Make sure the result is sent to the worker threads.
     EXPECT_CALL(context_.server_context_.thread_local_, runOnAllThreads(_)).Times(2);
     return ret;
-  }));
+  });
 
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
@@ -2297,16 +2297,16 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
 
   // Configure the cache.
   MockKeyValueStoreFactory factory;
-  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<
         envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
-  }));
+  });
   MockKeyValueStore* store{};
-  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce([&store]() {
     auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
     store = ret.get();
     // Make sure there's an attempt to load from the key value store.
-    EXPECT_CALL(*store, iterate).WillOnce(Invoke([&](KeyValueStore::ConstIterateCb fn) {
+    EXPECT_CALL(*store, iterate).WillOnce([&](KeyValueStore::ConstIterateCb fn) {
       fn("foo.com:80", "10.0.0.2:80|40|0");
       fn("bar.com:80", "1.1.1.1:1|20|1\n2.2.2.2:2|30|2");
       // No port.
@@ -2314,10 +2314,10 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
                           fn("eep.com:80", "1.1.1.1|20|1"));
       // Won't be loaded because of prior error.
       fn("eep.com:80", "1.1.1.1|20|1:1");
-    }));
+    });
 
     return ret;
-  }));
+  });
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
   key_value_config->set_name("mock_key_value_store_factory");
@@ -2366,23 +2366,23 @@ TEST_F(DnsCacheImplTest, SingleAddressCache) {
   context_.server_context_.dispatcher_.time_system_.reset(time_source);
 
   MockKeyValueStoreFactory factory;
-  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<
         envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
-  }));
+  });
 
   MockKeyValueStore* store{};
-  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce([&store]() {
     auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
     store = ret.get();
 
     // Set up store with single address entry
-    EXPECT_CALL(*store, iterate(_)).WillOnce(Invoke([](KeyValueStore::ConstIterateCb fn) -> void {
+    EXPECT_CALL(*store, iterate(_)).WillOnce([](KeyValueStore::ConstIterateCb fn) -> void {
       fn("foo.com:80", "10.0.0.1:80|60|0");
-    }));
+    });
 
     return ret;
-  }));
+  });
 
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
@@ -2407,18 +2407,18 @@ TEST_F(DnsCacheImplTest, CacheLoadParsingErrors) {
 
   // Configure the cache
   MockKeyValueStoreFactory factory;
-  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
+  EXPECT_CALL(factory, createEmptyConfigProto()).WillRepeatedly([]() {
     return std::make_unique<
         envoy::extensions::key_value::file_based::v3::FileBasedKeyValueStoreConfig>();
-  }));
+  });
 
   MockKeyValueStore* store{};
-  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce(Invoke([&store]() {
+  EXPECT_CALL(factory, createStore(_, _, _, _)).WillOnce([&store]() {
     auto ret = std::make_unique<NiceMock<MockKeyValueStore>>();
     store = ret.get();
 
     // Test different malformed cache entries
-    EXPECT_CALL(*store, iterate(_)).WillOnce(Invoke([](KeyValueStore::ConstIterateCb fn) -> void {
+    EXPECT_CALL(*store, iterate(_)).WillOnce([](KeyValueStore::ConstIterateCb fn) -> void {
       // Test wrong number of tokens (only 2 instead of 3)
       EXPECT_LOG_CONTAINS("warning", "Incorrect number of tokens in the cache line",
                           fn("foo.com:80", "10.0.0.1:80|6"));
@@ -2428,10 +2428,10 @@ TEST_F(DnsCacheImplTest, CacheLoadParsingErrors) {
 
       // Test empty response list
       fn("foobar.com:80", "");
-    }));
+    });
 
     return ret;
-  }));
+  });
 
   Registry::InjectFactory<KeyValueStoreFactory> injector(factory);
   auto* key_value_config = config_.mutable_key_value_config()->mutable_config();
@@ -2763,13 +2763,13 @@ TEST_F(DnsCacheImplTest, LoadDnsCacheEntryRaceWithInlineResolve) {
   // simulating the case where DNS resolution completes inline within resolver_->resolve()
   // and returns nullptr instead of an active query handle.
   EXPECT_CALL(*resolver_, resolve("foo.com", _, _))
-      .WillOnce(Invoke([](const std::string&, Network::DnsLookupFamily,
-                          Network::DnsResolver::ResolveCb callback) {
+      .WillOnce([](const std::string&, Network::DnsLookupFamily,
+                   Network::DnsResolver::ResolveCb callback) {
         callback(Network::DnsResolver::ResolutionStatus::Completed, "",
                  TestUtility::makeDnsResponse({"10.0.0.1"}));
         // returns nullptr instead of an active query.
         return nullptr;
-      }));
+      });
 
   EXPECT_CALL(*timeout_timer, disableTimer());
   EXPECT_CALL(

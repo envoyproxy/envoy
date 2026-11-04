@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.composite"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/common:cleanup_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
@@ -56,7 +57,9 @@ envoy_extension_cc_test(
         "//test/integration/filters:server_factory_context_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",
         "//test/integration/filters:set_response_code_filter_lib",
+        "//test/integration/filters:stop_in_headers_continue_in_data_filter_lib",
         "//test/proto:helloworld_proto_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/composite/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
