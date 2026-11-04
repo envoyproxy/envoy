@@ -47,8 +47,8 @@ absl::StatusOr<Http::FilterFactoryCb> FilterFactory::createHttpFilterFactoryFrom
   RETURN_IF_NOT_OK(validateJwtConfig(proto_config, context.api()));
   absl::Status creation_status = absl::OkStatus();
   auto filter_config = std::make_shared<FilterConfigImpl>(
-      proto_config, extra_context.stats_prefix, context, extra_context.scopeOr(context),
-      extra_context.init_manager, creation_status);
+      proto_config, extra_context.statsPrefixOr(), context,
+      extra_context.statsPrefixScopeOr(context), extra_context.init_manager, creation_status);
   RETURN_IF_NOT_OK_REF(creation_status);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));

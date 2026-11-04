@@ -11,7 +11,6 @@
 #include "test/integration/fake_upstream.h"
 #include "test/integration/integration.h"
 #include "test/test_common/resources.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -342,8 +341,6 @@ TEST_P(TcpProxyOdcdsIntegrationTest, ShutdownTcpClientBeforeOdcdsResponse) {
 class TcpProxyOdcdsAdsIntegrationTest : public TcpProxyOdcdsIntegrationTest {
 public:
   void initialize() override {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.tcp_proxy_odcds_over_ads_fix", "true"}});
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Set xds_cluster.
       auto* static_resources = bootstrap.mutable_static_resources();
@@ -435,9 +432,6 @@ public:
 
 protected:
   bool use_multiple_listeners_{false};
-
-private:
-  TestScopedRuntime scoped_runtime_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, TcpProxyOdcdsAdsIntegrationTest,

@@ -108,8 +108,11 @@ sources_javadocs = rule(
         ),
         # Java Runtime
         "_javabase": attr.label(
-            default = Label("@rules_java//toolchains:current_java_runtime"),
+            # Dokka 1.5.31 bundles an IntelliJ version that fails JavaVersion.parse on
+            # JDK 25, so pin Dokka itself to JDK 17 until Dokka can be upgraded.
+            default = Label("//bazel:dokka_java_runtime"),
             allow_files = True,
+            cfg = "exec",
             providers = [java_common.JavaRuntimeInfo],
         ),
     },

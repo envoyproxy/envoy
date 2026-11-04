@@ -19,7 +19,6 @@
 using testing::_;
 using testing::Contains;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -159,24 +158,24 @@ public:
 
   void expectStreamStart(MockAccessLogStream& stream, AccessLogCallbacks** callbacks_to_set) {
     EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-        .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
-                                                     Grpc::RawAsyncStreamCallbacks& callbacks,
-                                                     const Http::AsyncClient::StreamOptions&) {
+        .WillOnce([&stream, callbacks_to_set](absl::string_view, absl::string_view,
+                                              Grpc::RawAsyncStreamCallbacks& callbacks,
+                                              const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<AccessLogCallbacks*>(&callbacks);
           return &stream;
-        }));
+        });
   }
 
   void expectFlushedLogEntriesCount(MockAccessLogStream& stream, const std::string& key,
                                     int count) {
     EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
     EXPECT_CALL(stream, sendMessageRaw_(_, false))
-        .WillOnce(Invoke([key, count](Buffer::InstancePtr& request, bool) {
+        .WillOnce([key, count](Buffer::InstancePtr& request, bool) {
           Protobuf::Struct message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
-        }));
+        });
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -295,13 +294,12 @@ TEST_F(StreamingGrpcAccessLogTest, StreamFailure) {
   initLogger(FlushInterval, 0);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions& options) {
-            EXPECT_FALSE(options.retry_policy.has_value());
-            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
-            return nullptr;
-          }));
+      .WillOnce([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                   const Http::AsyncClient::StreamOptions& options) {
+        EXPECT_FALSE(options.retry_policy.has_value());
+        callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+        return nullptr;
+      });
   logger_->log(mockHttpEntry());
   EXPECT_EQ(1, logger_->numInits());
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
@@ -320,14 +318,13 @@ TEST_F(StreamingGrpcAccessLogTest, StreamFailureAndRetry) {
   initLogger(FlushInterval, 1);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks&,
-                    const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
-            EXPECT_TRUE(options.retry_policy.has_value());
-            EXPECT_TRUE(options.retry_policy.value().has_num_retries());
-            EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 2);
-            return nullptr;
-          }));
+      .WillOnce([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks&,
+                   const Http::AsyncClient::StreamOptions& options) -> Grpc::RawAsyncStream* {
+        EXPECT_TRUE(options.retry_policy.has_value());
+        EXPECT_TRUE(options.retry_policy.value().has_num_retries());
+        EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 2);
+        return nullptr;
+      });
   logger_->log(mockHttpEntry());
 }
 
@@ -418,12 +415,11 @@ TEST_F(StreamingGrpcAccessLogTest, GrpcEntriesFlushFailedOnStreamCreationFailure
   initLogger(FlushInterval, 0);
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions&) {
-            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
-            return nullptr;
-          }));
+      .WillOnce([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                   const Http::AsyncClient::StreamOptions&) {
+        callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+        return nullptr;
+      });
   logger_->log(mockHttpEntry());
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_, "mock_access_log_prefix.grpc_entries_flushed")
                    ->value());
@@ -446,12 +442,11 @@ public:
 
 TEST_F(StreamingGrpcAccessLogClientTest, ReturnsFalseOnStreamCreationFailure) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
-                    const Http::AsyncClient::StreamOptions&) {
-            callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
-            return nullptr;
-          }));
+      .WillOnce([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                   const Http::AsyncClient::StreamOptions&) {
+        callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
+        return nullptr;
+      });
   EXPECT_FALSE(client_->log(Protobuf::Struct{}));
 }
 
@@ -482,16 +477,15 @@ public:
 
   void expectFlushedLogEntriesCount(const std::string& key, int count) {
     EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-        .WillOnce(
-            Invoke([key, count](absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
-                                Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                                const Http::AsyncClient::RequestOptions&) {
-              Protobuf::Struct message;
-              Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
-              EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
-              EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
-              return nullptr; // We don't care about the returned request.
-            }));
+        .WillOnce([key, count](absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
+                               Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                               const Http::AsyncClient::RequestOptions&) {
+          Protobuf::Struct message;
+          Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
+          EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
+          EXPECT_THAT(message.fields(), Contains(IsStructNumber(key, count)));
+          return nullptr; // We don't care about the returned request.
+        });
   }
 
   Stats::IsolatedStoreImpl stats_store_;
@@ -536,14 +530,14 @@ TEST_F(UnaryGrpcAccessLogTest, FailureAndRetry) {
       ->set_seconds(1);
   initLogger(FlushInterval, 1);
   EXPECT_CALL(*async_client_, sendRaw(_, _, _, _, _, _))
-      .WillOnce(Invoke([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-                          Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
-                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+      .WillOnce([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                   Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
+                   const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
         EXPECT_TRUE(options.retry_policy.has_value());
         EXPECT_TRUE(options.retry_policy.value().has_num_retries());
         EXPECT_EQ(PROTOBUF_GET_WRAPPED_REQUIRED(options.retry_policy.value(), num_retries), 2);
         return nullptr;
-      }));
+      });
   logger_->log(mockHttpEntry());
 }
 
@@ -624,12 +618,12 @@ public:
     factory_ = new Grpc::MockAsyncClientFactory;
     async_client_ = new Grpc::MockAsyncClient;
     EXPECT_CALL(async_client_manager_, factoryForGrpcService(_, _, true))
-        .WillOnce(Invoke([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
-          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce(Invoke([this] {
+        .WillOnce([this](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+          EXPECT_CALL(*factory_, createUncachedRawAsyncClient()).WillOnce([this] {
             return Grpc::RawAsyncClientPtr{async_client_};
-          }));
+          });
           return Grpc::AsyncClientFactoryPtr{factory_};
-        }));
+        });
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;

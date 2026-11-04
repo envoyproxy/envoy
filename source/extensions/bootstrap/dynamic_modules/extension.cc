@@ -11,9 +11,10 @@ DynamicModuleBootstrapExtension::DynamicModuleBootstrapExtension(
 
 DynamicModuleBootstrapExtension::~DynamicModuleBootstrapExtension() { destroy(); }
 
-void DynamicModuleBootstrapExtension::initializeInModuleExtension() {
+bool DynamicModuleBootstrapExtension::initializeInModuleExtension() {
   in_module_extension_ =
       config_->on_bootstrap_extension_new_(config_->in_module_config_, thisAsVoidPtr());
+  return in_module_extension_ != nullptr;
 }
 
 void DynamicModuleBootstrapExtension::destroy() {

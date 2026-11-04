@@ -133,9 +133,9 @@ public:
                                            {":method", "GET"},
                                            {"authorization", "auth_token"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code, document = std::move(document)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             receiver.onMetadataSuccess(std::move(document));
           } else {
@@ -144,7 +144,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -408,9 +408,9 @@ public:
                                            {":method", "GET"},
                                            {"authorization", auth_token}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code, document = std::move(document)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code, document = std::move(document)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!document.empty()) {
               receiver.onMetadataSuccess(std::move(document));
@@ -427,7 +427,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   TestScopedRuntime scoped_runtime_;

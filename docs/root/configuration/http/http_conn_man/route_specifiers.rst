@@ -23,12 +23,12 @@ Specifiers are configured with
 :ref:`TypedExtensionConfig <envoy_v3_api_msg_config.core.v3.TypedExtensionConfig>` at three levels
 of the route configuration, and the levels run in this order:
 
-#. :ref:`RouteConfiguration.route_specifiers
-   <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
-#. :ref:`VirtualHost.route_specifiers
-   <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>` of the resolved virtual host
 #. :ref:`Route.route_specifiers <envoy_v3_api_field_config.route.v3.Route.route_specifiers>` of the
    resolved route
+#. :ref:`VirtualHost.route_specifiers
+   <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>` of the resolved virtual host
+#. :ref:`RouteConfiguration.route_specifiers
+   <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
 
 Within a level the specifiers run in the order they are configured. The route that route matching
 resolved is the input of the first specifier, the output of each specifier is the input of the
@@ -36,11 +36,14 @@ next, and the output of the last one is the final route:
 
 .. code-block:: text
 
-  route matching  ->  route config level  ->  virtual host level  ->  route level  ->  final route
+  route matching  ->  route level  ->  virtual host level  ->  route config level  ->  final route
 
-In the following configuration, a request that reaches ``/api`` runs three specifiers - ``audit``,
-then ``canary``, then ``slow_timeout`` - while a request that reaches ``/`` runs only ``audit`` and
-``canary``:
+The most specific level runs first, which leaves the last word to the specifiers that are shared
+by the whole route configuration.
+
+In the following configuration, a request that reaches ``/api`` runs three specifiers -
+``slow_timeout``, then ``canary``, then ``audit`` - while a request that reaches ``/`` runs only
+``canary`` and ``audit``:
 
 .. code-block:: yaml
 
@@ -70,14 +73,16 @@ then ``canary``, then ``slow_timeout`` - while a request that reaches ``/`` runs
       route:
         cluster: web_service
 
-A level is only reached once it has been resolved. A request that matches no virtual host runs the
-route configuration level alone, and a request that matches a virtual host but none of its routes
-runs the route configuration and virtual host levels.
+A level only runs once it has been resolved. A request that matches a virtual host but none of its
+routes runs the virtual host and route configuration levels, and a request that matches no virtual
+host runs the route configuration level alone.
+
+.. _config_http_conn_man_route_specifiers_no_route:
 
 Requests with no resolved route
 -------------------------------
 
-The route configuration and virtual host levels run whether or not route matching resolved a route.
+The virtual host and route configuration levels run whether or not route matching resolved a route.
 When it did not, the first specifier is simply given no route, which has two consequences:
 
 * A specifier may **generate** a route for a request that matching resolved nothing for, rather
@@ -96,6 +101,26 @@ A specifier may declare its result final. No further specifier runs, neither the
 level nor any of the levels after it, and its result becomes the final route. This is how an
 specifier that has fully decided the route - a fallback route for an unresolved request, for
 instance - keeps later specifiers from overriding it.
+
+Continuing route matching
+-------------------------
+
+The specifiers run while the routes of the virtual host are being evaluated, each time one of them
+matches the request. Besides the route, a specifier may return a match status that tells whether
+the matched route is accepted, or whether route matching continues with the next route of the
+virtual host. The last specifier that returns a match status decides it, and a specifier that
+returns none leaves the decision to the others.
+
+When the specifiers ask to continue, the matched route is skipped and the next route that matches
+the request runs the specifiers again, with the route level taken from that route. If none of the
+routes is accepted, the request has no resolved route, and the virtual host and route configuration
+levels run once more as described in
+:ref:`Requests with no resolved route <config_http_conn_man_route_specifiers_no_route>`. A specifier
+may therefore run more than once for a single request.
+
+Dropping the route is not the same as asking to continue. Unless the specifiers ask to continue,
+what they produced is accepted, so a route that they dropped leaves the request with no route and
+the remaining routes of the virtual host are not evaluated.
 
 Writing a route specifier
 -------------------------

@@ -58,6 +58,20 @@ TEST_F(TracerConfigTest, CreateSuccess) {
                                              std::move(module.value()), *store.rootScope());
   ASSERT_OK(config);
   EXPECT_NE(config.value()->in_module_config_, nullptr);
+  EXPECT_NE(config.value()->on_span_reserve_tags_, nullptr);
+}
+
+// A module built before reserve_tags was added still loads because the hook is now optional.
+TEST_F(TracerConfigTest, CreateSuccessWithoutReserveTags) {
+  auto module = Envoy::Extensions::DynamicModules::newDynamicModuleByName(
+      "tracer_no_op_no_reserve_tags", false, false);
+  ASSERT_OK(module);
+
+  Stats::IsolatedStoreImpl store;
+  auto config = newDynamicModuleTracerConfig("test_tracer", "", "test_ns",
+                                             std::move(module.value()), *store.rootScope());
+  ASSERT_OK(config);
+  EXPECT_EQ(config.value()->on_span_reserve_tags_, nullptr);
 }
 
 TEST_F(TracerConfigTest, CreateFailMissingSymbol) {
@@ -136,6 +150,19 @@ TEST_F(DriverTest, SpanSetTagBatch) {
   span->reserveTags(2);
   span->setTag("batch.key1", "batch.value1");
   span->setTag("batch.key2", "batch.value2");
+}
+
+// A span from a module without reserve_tags treats reserveTags as a no-op instead of crashing.
+TEST_F(DriverTest, SpanReserveTagsNoOpWhenHookAbsent) {
+  auto config = createTracerConfig("tracer_no_op_no_reserve_tags", *store_.rootScope());
+  ASSERT_EQ(config->on_span_reserve_tags_, nullptr);
+  auto driver = std::make_shared<DynamicModuleDriver>(config);
+  Tracing::TestTraceContextImpl trace_context{};
+  Tracing::Decision decision{Tracing::Reason::Sampling, true};
+  auto span =
+      driver->startSpan(tracing_config_, trace_context, stream_info_, "test_operation", decision);
+  ASSERT_NE(span, nullptr);
+  span->reserveTags(2);
 }
 
 TEST_F(DriverTest, SpanLog) {

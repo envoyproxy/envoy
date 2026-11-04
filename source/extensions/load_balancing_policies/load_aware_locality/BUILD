@@ -38,6 +38,7 @@ envoy_cc_library(
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_includes",
         "//source/extensions/load_balancing_policies/common:load_balancer_lib",
+        "//source/extensions/load_balancing_policies/common:orca_oob_manager_lib",
         "//source/extensions/load_balancing_policies/common:orca_weight_manager_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",

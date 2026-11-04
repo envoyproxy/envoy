@@ -132,5 +132,22 @@ TEST(RouterCheckTest, DynamicMetadataTest) {
   }
 }
 
+TEST(RouterCheckTest, RouteMetadataTest) {
+  const std::string config_filename_ =
+      TestEnvironment::runfilesPath(absl::StrCat(kDir, "RouteMetadata.yaml"));
+  const std::string tests_filename_ =
+      TestEnvironment::runfilesPath(absl::StrCat(kDir, "RouteMetadata.golden.proto.json"));
+  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+  const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
+      checktool.compareEntries(tests_filename_);
+  ASSERT_EQ(test_results.size(), 3);
+  // The route metadata matches the expected namespaced value.
+  EXPECT_TRUE(test_results[0].test_passed());
+  // The route metadata value differs from the expected value.
+  EXPECT_FALSE(test_results[1].test_passed());
+  // The default route has no metadata for the namespace.
+  EXPECT_FALSE(test_results[2].test_passed());
+}
+
 } // namespace
 } // namespace Envoy

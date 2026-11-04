@@ -183,18 +183,20 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_counters(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
-  thread_local std::vector<char> name_buffer;
-  stats_store.forEachCounter([](size_t) {},
-                             [iterator_fn, user_data](Envoy::Stats::Counter& counter) {
-                               absl::string_view name = serializeMetricName(counter, name_buffer);
-                               envoy_dynamic_module_type_envoy_buffer name_buf{name.data(),
-                                                                               name.size()};
-                               auto action = iterator_fn(name_buf, counter.value(), user_data);
-                               // Note: forEachCounter doesn't support early exit, so we ignore Stop
-                               // action. The module should handle this by setting a flag in
-                               // user_data.
-                               (void)action;
-                             });
+  // Snapshot the counters so the module callback runs without the allocator lock held. A stats call
+  // from the callback would otherwise re-enter the non-recursive allocator lock and deadlock. The
+  // snapshot holds a reference to each counter so it stays alive during iteration, and a local name
+  // buffer keeps a nested iteration from clobbering it.
+  const std::vector<Envoy::Stats::CounterSharedPtr> counters = stats_store.counters();
+  std::vector<char> name_buffer;
+  for (const auto& counter : counters) {
+    absl::string_view name = serializeMetricName(*counter, name_buffer);
+    envoy_dynamic_module_type_envoy_buffer name_buf{name.data(), name.size()};
+    if (iterator_fn(name_buf, counter->value(), user_data) ==
+        envoy_dynamic_module_type_stats_iteration_action_Stop) {
+      break;
+    }
+  }
 }
 
 void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
@@ -203,18 +205,36 @@ void envoy_dynamic_module_callback_bootstrap_extension_iterate_gauges(
   auto* extension = static_cast<DynamicModuleBootstrapExtension*>(extension_envoy_ptr);
   Envoy::Stats::Store& stats_store = extension->statsStore();
 
-  thread_local std::vector<char> name_buffer;
-  stats_store.forEachGauge([](size_t) {},
-                           [iterator_fn, user_data](Envoy::Stats::Gauge& gauge) {
-                             absl::string_view name = serializeMetricName(gauge, name_buffer);
-                             envoy_dynamic_module_type_envoy_buffer name_buf{name.data(),
-                                                                             name.size()};
-                             auto action = iterator_fn(name_buf, gauge.value(), user_data);
-                             // Note: forEachGauge doesn't support early exit, so we ignore Stop
-                             // action. The module should handle this by setting a flag in
-                             // user_data.
-                             (void)action;
-                           });
+  // Snapshot the gauges so the module callback runs without the allocator lock held. A stats call
+  // from the callback would otherwise re-enter the non-recursive allocator lock and deadlock. The
+  // snapshot holds a reference to each gauge so it stays alive during iteration, and a local name
+  // buffer keeps a nested iteration from clobbering it.
+  const std::vector<Envoy::Stats::GaugeSharedPtr> gauges = stats_store.gauges();
+  std::vector<char> name_buffer;
+  for (const auto& gauge : gauges) {
+    absl::string_view name = serializeMetricName(*gauge, name_buffer);
+    envoy_dynamic_module_type_envoy_buffer name_buf{name.data(), name.size()};
+    if (iterator_fn(name_buf, gauge->value(), user_data) ==
+        envoy_dynamic_module_type_stats_iteration_action_Stop) {
+      break;
+    }
+  }
+}
+
+void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+    envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names must "
+                 "be called on the main thread");
+    return;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  config->getActiveResourceNames(kind, [name_fn, user_data](absl::string_view name) {
+    envoy_dynamic_module_type_envoy_buffer name_buffer{const_cast<char*>(name.data()), name.size()};
+    name_fn(name_buffer, user_data);
+  });
 }
 
 // -------------------- Stats Definition and Update Callbacks --------------------

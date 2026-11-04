@@ -191,6 +191,7 @@ envoy_cc_test(
     deps = [
         ":stat_test_utility_lib",
         "//source/common/common:mutex_tracer_lib",
+        "//source/common/config:well_known_names",
         "//source/common/memory:stats_lib",
         "//source/common/stats:symbol_table_lib",
         "//test/common/memory:memory_test_utility_lib",
@@ -434,6 +435,21 @@ envoy_cc_benchmark_binary(
 envoy_benchmark_test(
     name = "thread_local_store_speed_test_benchmark_test",
     benchmark_binary = "thread_local_store_speed_test",
+)
+
+envoy_cc_benchmark_binary(
+    name = "thread_local_store_merge_speed_test",
+    srcs = ["thread_local_store_merge_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/stats:thread_local_store_lib",
+        "@benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "thread_local_store_merge_speed_test_benchmark_test",
+    benchmark_binary = "thread_local_store_merge_speed_test",
 )
 
 envoy_cc_benchmark_binary(

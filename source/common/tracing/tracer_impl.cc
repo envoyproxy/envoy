@@ -136,7 +136,7 @@ SpanPtr TracerImpl::startSpan(const Config& config, TraceContext& trace_context,
 
   if (config.operationName() == OperationName::Egress) {
     span_name.append(" ");
-    span_name.append(std::string(trace_context.host()));
+    span_name.append(trace_context.host());
   }
 
   SpanPtr active_span =

@@ -39,7 +39,7 @@ public:
                                          "Couldn't find stat", nullptr, std::nullopt, "");
       return Http::FilterHeadersStatus::StopIteration;
     }
-    if (gauge->get().value() == 0) {
+    if (gauge->value() == 0) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::InternalServerError, "EDS not ready",
                                          nullptr, std::nullopt, "");
       return Http::FilterHeadersStatus::StopIteration;

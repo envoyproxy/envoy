@@ -23,7 +23,7 @@ GrpcJsonTranscoderFilterConfig::createHttpFilterFactoryFromProtoTyped(
   RETURN_IF_NOT_OK_REF(creation_status);
   auto stats =
       std::make_shared<GrpcJsonTranscoderFilterStats>(GrpcJsonTranscoderFilterStats::generateStats(
-          extra_context.stats_prefix, extra_context.scopeOr(context)));
+          extra_context.statsPrefixOr(), extra_context.statsPrefixScopeOr(context)));
   return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<JsonTranscoderFilter>(filter_config, stats));
   };

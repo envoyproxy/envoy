@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package envoy.extensions.http.ai_filters.schema_validation.v3;
+
+import "envoy/type/ai/v3/llm_protocol.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.ai_filters.schema_validation.v3";
+option java_outer_classname = "SchemaValidationProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ai_filters/schema_validation/v3;schema_validationv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Schema validation AI filter]
+// Schema validation AI filter :ref:`configuration overview
+// <config_http_filters_ai_protocol_manager_schema_validation>`.
+// [#extension: envoy.http.ai_filters.schema_validation]
+
+// Validates the request payload against the payload schema of its wire API, and rejects a payload
+// that violates it with a 400. Configure it first, so the AI filters after it see the API it
+// resolved and only a payload that passed.
+message SchemaValidation {
+  // The wire API for a request that declares none, through either the
+  // ``envoy.ai.llm_protocol.request`` filter state object or the route's :ref:`llm_protocol
+  // <envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestPerRoute.llm_protocol>`.
+  // ``LLM_PROTOCOL_UNSPECIFIED``, the default, detects it from the request path, then the
+  // ``anthropic-version`` header, then the payload's shape. A request none of them identifies is
+  // forwarded unvalidated.
+  type.ai.v3.LLMProtocol default_llm_protocol = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // Forward a payload that violates its schema instead of rejecting it. It is still counted.
+  bool fail_open = 2;
+}

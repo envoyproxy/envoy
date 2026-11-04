@@ -45,11 +45,6 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
     "span_across_callbacks" => Some(Box::new(SpanAcrossCallbacksConfig {})),
-    "early_response_during_upload" => Some(Box::new(EarlyResponseDuringUploadConfig {
-      response_pause_total: envoy_filter_config
-        .define_counter("response_pause_total")
-        .unwrap(),
-    })),
     "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
     "stats_callbacks" => {
       let config = String::from_utf8(config.to_owned()).unwrap();
@@ -89,6 +84,11 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
+    "upstream_connection_attempts" => Some(Box::new(UpstreamConnectionAttemptsFilterConfig {
+      observed_total: envoy_filter_config
+        .define_counter("upstream_connection_attempts_observed_total")
+        .unwrap(),
+    })),
     "generic_secret_callbacks" => {
       let secret_name = String::from_utf8(config.to_owned()).unwrap();
       // A secret that is not configured anywhere cannot be subscribed to.
@@ -134,6 +134,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     })),
     "http_config_scheduler" => {
       let shared_status = Arc::new(AtomicBool::new(false));
+      let scheduled_events = envoy_filter_config
+        .define_gauge("config_scheduled_events")
+        .unwrap();
       let scheduler = envoy_filter_config.new_scheduler();
 
       // Spawn a thread to simulate async work.
@@ -145,6 +148,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 
       Some(Box::new(ConfigSchedulerConfig {
         shared_status,
+        scheduled_events,
         thread_handle: Some(thread_handle),
       }))
     },
@@ -234,9 +238,9 @@ extern "C" fn drop_live_exchange(object: *mut std::ffi::c_void) {
   drop(unsafe { Box::from_raw(object as *mut LiveExchange) });
 }
 
-/// A HTTP filter that keeps a live object alive across recreate_stream, the way a filter holding the
-/// endpoints of an async exchange would. The first instance queues a token on the live channel and
-/// parks it in filter state at Request lifespan, then recreates the stream, which destroys the
+/// A HTTP filter that keeps a live object alive across recreate_stream, the way a filter holding
+/// the endpoints of an async exchange would. The first instance queues a token on the live channel
+/// and parks it in filter state at Request lifespan, then recreates the stream, which destroys the
 /// instance. The rebuilt instance re-attaches to the same live object and drains the queued token,
 /// proving the live handles survived the recreate (a serialized copy would not carry the message).
 struct FilterStateObjectRecreateFilterConfig {}
@@ -365,6 +369,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UseSelfAfterTeardownFilter {
 
 struct ConfigSchedulerConfig {
   shared_status: Arc<AtomicBool>,
+  scheduled_events: EnvoyGaugeId,
   thread_handle: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -383,9 +388,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for ConfigSchedulerConfig {
     })
   }
 
-  fn on_scheduled(&self, event_id: u64) {
+  fn on_scheduled(&self, envoy_config: &mut EnvoyHttpFilterConfigImpl, event_id: u64) {
     if event_id == 1 {
       self.shared_status.store(true, Ordering::SeqCst);
+      // Emitted from the scheduled event itself, with no stream involved.
+      envoy_config
+        .increase_gauge(self.scheduled_events, 1)
+        .unwrap();
     }
   }
 }
@@ -595,7 +604,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionIdFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    assert!(envoy_filter.get_upstream_connection_id() > 0);
+    assert_ne!(envoy_filter.get_upstream_connection_id(), None);
     envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
@@ -1001,8 +1010,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     let mut body_content = String::new();
 
     let buffered_body = envoy_filter.get_buffered_request_body();
-    if buffered_body.is_some() {
-      for chunk in buffered_body.unwrap() {
+    if let Some(buffered_body) = buffered_body {
+      for chunk in buffered_body {
         buffered_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
@@ -1011,8 +1020,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
 
     let received_body = envoy_filter.get_received_request_body();
-    if received_body.is_some() {
-      for chunk in received_body.unwrap() {
+    if let Some(received_body) = received_body {
+      for chunk in received_body {
         received_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
@@ -1061,8 +1070,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     let mut body_content = String::new();
 
     let buffered_body = envoy_filter.get_buffered_response_body();
-    if buffered_body.is_some() {
-      for chunk in buffered_body.unwrap() {
+    if let Some(buffered_body) = buffered_body {
+      for chunk in buffered_body {
         buffered_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
@@ -1071,8 +1080,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     }
 
     let received_body = envoy_filter.get_received_response_body();
-    if received_body.is_some() {
-      for chunk in received_body.unwrap() {
+    if let Some(received_body) = received_body {
+      for chunk in received_body {
         received_body_len += chunk.as_slice().len();
         body_content.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
       }
@@ -1393,65 +1402,6 @@ impl Drop for SpanAcrossCallbacksFilter {
   }
 }
 
-const EVENT_RESUME_ENCODING: u64 = 1;
-
-struct EarlyResponseDuringUploadConfig {
-  response_pause_total: EnvoyCounterId,
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for EarlyResponseDuringUploadConfig {
-  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(EarlyResponseDuringUploadFilter {
-      response_pause_total: self.response_pause_total,
-      resume_scheduled: Cell::new(false),
-    })
-  }
-}
-
-/// Reproduces the early-response-during-upload wedge. The upstream response is held at
-/// on_response_headers while the client keeps uploading. A request body chunk then continues the
-/// decode direction, after which the held response is resumed from on_scheduled via
-/// continue_encoding. A single shared continue flag let the decode-side continue suppress that
-/// resume and wedge the held response.
-struct EarlyResponseDuringUploadFilter {
-  response_pause_total: EnvoyCounterId,
-  resume_scheduled: Cell<bool>,
-}
-
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for EarlyResponseDuringUploadFilter {
-  fn on_request_body(
-    &self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
-    // Post the resume instead of calling it inline so it runs after this body returns Continue and
-    // the decode direction is marked continued. An inline resume would not reproduce the wedge.
-    if !self.resume_scheduled.get() {
-      self.resume_scheduled.set(true);
-      envoy_filter.new_scheduler().commit(EVENT_RESUME_ENCODING);
-    }
-    envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
-  }
-
-  fn on_response_headers(
-    &self,
-    envoy_filter: &mut EHF,
-    _end_of_stream: bool,
-  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
-    // Hold the response so the test can interleave a request body continue before it is resumed.
-    envoy_filter
-      .increment_counter(self.response_pause_total, 1)
-      .unwrap();
-    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
-  }
-
-  fn on_scheduled(&self, envoy_filter: &mut EHF, event_id: u64) {
-    if event_id == EVENT_RESUME_ENCODING {
-      envoy_filter.continue_encoding();
-    }
-  }
-}
-
 /// This implements a fake external caching filter that simulates an asynchronous cache lookup.
 struct FakeExternalCachingFilterConfig {}
 
@@ -1729,6 +1679,40 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
   }
 }
 
+struct UpstreamConnectionAttemptsFilterConfig {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for UpstreamConnectionAttemptsFilterConfig {
+  fn new_http_filter(&self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(UpstreamConnectionAttemptsFilter {
+      observed_total: self.observed_total,
+    })
+  }
+}
+
+struct UpstreamConnectionAttemptsFilter {
+  observed_total: EnvoyCounterId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for UpstreamConnectionAttemptsFilter {
+  fn on_stream_complete(&self, envoy_filter: &mut EHF) {
+    assert!(!envoy_filter
+      .get_upstream_remote_address()
+      .unwrap()
+      .as_slice()
+      .is_empty());
+    assert_eq!(envoy_filter.get_upstream_hosts_attempted().len(), 1);
+    assert_eq!(
+      envoy_filter.get_upstream_connection_ids_attempted().len(),
+      1
+    );
+    envoy_filter
+      .increment_counter(self.observed_total, 1)
+      .unwrap();
+  }
+}
+
 // Terminal filter that creates a response without an upstream.
 // This filter demonstrates a bidirectional stream with trailers - response processing
 // can happen in filter callbacks or scheduled events. We test scheduled events here
@@ -1908,9 +1892,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingResponseReentryHttpFilte
 // =============================================================================
 
 // Completes its response with end-of-stream from on_scheduled. Completing with eos drives
-// FilterManager::onStreamComplete inline (before the scheduled callback returns), which synchronously
-// re-enters the same CatchUnwind-wrapped filter's on_stream_complete. If the filter isn't kept
-// alive across the re-entry, on_stream_complete is skipped and the counter isn't incremented.
+// FilterManager::onStreamComplete inline (before the scheduled callback returns), which
+// synchronously re-enters the same CatchUnwind-wrapped filter's on_stream_complete. If the filter
+// isn't kept alive across the re-entry, on_stream_complete is skipped and the counter isn't
+// incremented.
 struct ReentrantStreamCompleteFilterConfig {
   stream_complete_total: EnvoyCounterId,
 }
@@ -1976,8 +1961,42 @@ struct StreamTimingFilter {
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamTimingFilter {
   fn on_stream_complete(&self, envoy_filter: &mut EHF) {
     let timing = envoy_filter.get_timing_info();
-    assert!(timing.start_time_unix_ns > 0);
-    assert!(timing.request_complete_duration_ns >= 0);
+    assert!(timing.start_time_unix_ns.unwrap() > 0);
+    assert!(timing.downstream_connection_begin_ns.is_some());
+    assert_eq!(timing.downstream_handshake_start_ns, None);
+    assert_eq!(timing.downstream_handshake_complete_ns, None);
+    assert!(timing.last_downstream_header_rx_byte_received_ns.unwrap() >= 0);
+    assert!(
+      timing.last_downstream_rx_byte_received_ns.unwrap()
+        >= timing.last_downstream_header_rx_byte_received_ns.unwrap()
+    );
+    assert!(timing.upstream_connect_start_ns.unwrap() >= 0);
+    assert!(
+      timing.upstream_connect_complete_ns.unwrap() >= timing.upstream_connect_start_ns.unwrap()
+    );
+    assert_eq!(timing.upstream_handshake_complete_ns, None);
+    assert!(timing.first_upstream_tx_byte_sent_ns.unwrap() >= 0);
+    assert!(
+      timing.last_upstream_tx_byte_sent_ns.unwrap()
+        >= timing.first_upstream_tx_byte_sent_ns.unwrap()
+    );
+    assert!(timing.first_upstream_rx_byte_received_ns.unwrap() >= 0);
+    assert!(
+      timing.first_upstream_rx_body_byte_received_ns.unwrap()
+        >= timing.first_upstream_rx_byte_received_ns.unwrap()
+    );
+    assert!(
+      timing.last_upstream_rx_byte_received_ns.unwrap()
+        >= timing.first_upstream_rx_body_byte_received_ns.unwrap()
+    );
+    assert!(timing.first_downstream_tx_byte_sent_ns.unwrap() >= 0);
+    assert!(
+      timing.last_downstream_tx_byte_sent_ns.unwrap()
+        >= timing.first_downstream_tx_byte_sent_ns.unwrap()
+    );
+    assert_eq!(timing.last_downstream_ack_received_ns, None);
+    assert!(timing.request_complete_duration_ns.unwrap() >= 0);
+    assert_eq!(timing.downstream_connection_end_ns, None);
     envoy_filter
       .increment_counter(self.timing_observed_total, 1)
       .unwrap();
@@ -2464,7 +2483,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
       .get_metadata_list_size(source, "ns", "numbers")
       .unwrap();
     envoy_filter.set_response_header("x-list-num-size", num_size.to_string().as_bytes());
-    for i in 0..num_size {
+    for i in 0 .. num_size {
       let val = envoy_filter
         .get_metadata_list_number(source, "ns", "numbers", i)
         .unwrap();
@@ -2477,7 +2496,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
       .get_metadata_list_size(source, "ns", "strings")
       .unwrap();
     envoy_filter.set_response_header("x-list-str-size", str_size.to_string().as_bytes());
-    for i in 0..str_size {
+    for i in 0 .. str_size {
       let val = envoy_filter
         .get_metadata_list_string(source, "ns", "strings", i)
         .unwrap();
@@ -2491,7 +2510,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for ListMetadataCallbacksFilter {
       .get_metadata_list_size(source, "ns", "bools")
       .unwrap();
     envoy_filter.set_response_header("x-list-bool-size", bool_size.to_string().as_bytes());
-    for i in 0..bool_size {
+    for i in 0 .. bool_size {
       let val = envoy_filter
         .get_metadata_list_bool(source, "ns", "bools", i)
         .unwrap();

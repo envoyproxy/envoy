@@ -1,10 +1,12 @@
 #include "envoy/registry/registry.h"
 
-#include "source/common/config/utility.h"
 #include "source/extensions/filters/http/header_mutation/config.h"
 
+#include "test/common/formatter/command_extension.h"
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/init/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -76,10 +78,13 @@ TEST(FactoryTest, FactoryTest) {
     EXPECT_CALL(filter_callbacks, addStreamFilter(_));
     cb(filter_callbacks);
 
+    Server::Configuration::ExtraFactoryContext extra_context{
+        mock_factory_context.messageValidationVisitor(), "",
+        makeOptRef<Init::Manager>(mock_factory_context.init_manager_)};
     EXPECT_NE(nullptr, factory
-                           ->createRouteSpecificFilterConfig(
+                           ->createHttpFilterRouteConfig(
                                per_route_proto_config, mock_factory_context.server_factory_context_,
-                               mock_factory_context.messageValidationVisitor())
+                               extra_context)
                            .value());
   }
 
@@ -216,6 +221,129 @@ TEST(FactoryTest, FactoryTestWithServerContext) {
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_));
   cb(filter_callbacks);
+}
+
+class ContextRecordingCommandFactory : public Formatter::TestCommandFactory {
+public:
+  Formatter::CommandParserPtr
+  createCommandParserFromProto(const Protobuf::Message& message,
+                               Server::Configuration::GenericFactoryContext& context) override {
+    init_manager_ = &context.initManager();
+    scope_ = &context.scope();
+    return Formatter::TestCommandFactory::createCommandParserFromProto(message, context);
+  }
+
+  Init::Manager* init_manager_{};
+  Stats::Scope* scope_{};
+};
+
+TEST(FactoryTest, CustomFormatterUsesFactoryContextTest) {
+  ContextRecordingCommandFactory formatter_factory;
+  Registry::InjectFactory<Formatter::CommandParserFactory> register_factory(formatter_factory);
+  testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
+  HeaderMutationFactoryConfig factory;
+
+  const std::string config = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+  EXPECT_OK(factory.createFilterFactoryFromProto(proto_config, "test", mock_factory_context));
+  EXPECT_EQ(&mock_factory_context.init_manager_, formatter_factory.init_manager_);
+  EXPECT_EQ(&mock_factory_context.scope_, formatter_factory.scope_);
+
+  PerRouteProtoConfig per_route_proto_config;
+  TestUtility::loadFromYaml(config, per_route_proto_config);
+  testing::StrictMock<Init::MockManager> route_init_manager;
+  Server::Configuration::ExtraFactoryContext extra_context{
+      mock_factory_context.messageValidationVisitor(), "",
+      makeOptRef<Init::Manager>(route_init_manager)};
+  EXPECT_OK(factory.createHttpFilterRouteConfig(
+      per_route_proto_config, mock_factory_context.server_factory_context_, extra_context));
+  EXPECT_EQ(&route_init_manager, formatter_factory.init_manager_);
+}
+
+TEST(FactoryTest, UnknownFormatterTest) {
+  const std::string config = R"EOF(
+  mutations:
+    formatters:
+    - name: envoy.formatter.TestFormatterUnknown
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.Any
+  )EOF";
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
+  HeaderMutationFactoryConfig factory;
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(config, proto_config);
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "test", mock_factory_context),
+              HasStatusMessage("Formatter not found: envoy.formatter.TestFormatterUnknown"));
+
+  PerRouteProtoConfig per_route_proto_config;
+  TestUtility::loadFromYaml(config, per_route_proto_config);
+  Server::Configuration::ExtraFactoryContext extra_context{
+      mock_factory_context.messageValidationVisitor(), "",
+      makeOptRef<Init::Manager>(mock_factory_context.init_manager_)};
+  EXPECT_THAT(factory.createHttpFilterRouteConfig(per_route_proto_config,
+                                                  mock_factory_context.server_factory_context_,
+                                                  extra_context),
+              HasStatusMessage("Formatter not found: envoy.formatter.TestFormatterUnknown"));
+}
+
+TEST(FactoryTest, FormattersNotInheritedByRouteTest) {
+  Formatter::TestCommandFactory formatter_factory;
+  Registry::InjectFactory<Formatter::CommandParserFactory> register_factory(formatter_factory);
+  testing::NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context;
+  HeaderMutationFactoryConfig factory;
+
+  const std::string filter_config = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+    formatters:
+    - name: envoy.formatter.TestFormatter
+      typed_config:
+        "@type": type.googleapis.com/google.protobuf.StringValue
+  )EOF";
+  const std::string route_config = R"EOF(
+  mutations:
+    request_mutations:
+    - append:
+        header:
+          key: "flag-header"
+          value: "%COMMAND_EXTENSION()%"
+        append_action: APPEND_IF_EXISTS_OR_ADD
+  )EOF";
+
+  ProtoConfig proto_config;
+  TestUtility::loadFromYaml(filter_config, proto_config);
+  EXPECT_OK(factory.createFilterFactoryFromProto(proto_config, "test", mock_factory_context));
+
+  PerRouteProtoConfig per_route_proto_config;
+  TestUtility::loadFromYaml(route_config, per_route_proto_config);
+  Server::Configuration::ExtraFactoryContext extra_context{
+      mock_factory_context.messageValidationVisitor(), "",
+      makeOptRef<Init::Manager>(mock_factory_context.init_manager_)};
+  EXPECT_THAT(factory.createHttpFilterRouteConfig(per_route_proto_config,
+                                                  mock_factory_context.server_factory_context_,
+                                                  extra_context),
+              HasStatusMessage("Not supported field in StreamInfo: COMMAND_EXTENSION"));
 }
 
 } // namespace

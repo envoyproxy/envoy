@@ -44,7 +44,6 @@ public:
 
   void expectBasicHttp() {
     EXPECT_CALL(callbacks_, connection())
-        .Times(2)
         .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -645,7 +644,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeer) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                  {":path", "/bar"}};
   EXPECT_CALL(callbacks_, connection())
-      .Times(2)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -724,7 +722,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerCertificate) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
@@ -748,7 +745,6 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSession) {
 // Verify that the SNI is populated correctly.
 TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   EXPECT_CALL(callbacks_, connection())
-      .Times(3)
       .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
   connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);

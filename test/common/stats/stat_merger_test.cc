@@ -328,7 +328,7 @@ TEST_F(StatMergerThreadLocalTest, DontFilterOutUninitializedGauges) {
   // We get "newgauge1" in the aggregated list and if we try to find it by name.
   GaugeOptConstRef find = store_.rootScope()->findGauge(g1.statName());
   ASSERT_TRUE(find);
-  EXPECT_EQ(&g1, &(find->get()));
+  EXPECT_EQ(&g1, &find.ref());
 }
 
 // When the parent sends us counters we haven't ourselves instantiated, they should be stored

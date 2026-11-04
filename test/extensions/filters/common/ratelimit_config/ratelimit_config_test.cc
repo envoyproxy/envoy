@@ -94,6 +94,7 @@ public:
   absl::Status creation_status_;
   std::unique_ptr<Envoy::Extensions::Filters::Common::RateLimit::RateLimitConfig> config_;
   Http::TestRequestHeaderMapImpl headers_;
+  Http::TestResponseHeaderMapImpl response_headers_;
   std::shared_ptr<Router::MockRoute> route_{new NiceMock<Router::MockRoute>()};
   Network::Address::InstanceConstSharedPtr default_remote_address_{
       new Network::Address::Ipv4Instance("10.0.0.1")};
@@ -198,7 +199,7 @@ TEST_F(RateLimitConfigTest, SinglePolicy) {
   EXPECT_EQ(1U, config_->size());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors));
 }
@@ -219,7 +220,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActions) {
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {Envoy::RateLimit::Descriptor{
@@ -248,7 +249,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndOneForStreamDon
   {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-    config_->populateDescriptors(headers_, stream_info_, "", descriptors, false);
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors, false);
 
     EXPECT_EQ(1, descriptors.size());
 
@@ -260,7 +261,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndOneForStreamDon
   {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-    config_->populateDescriptors(headers_, stream_info_, "", descriptors, true);
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors, true);
 
     EXPECT_EQ(1, descriptors.size());
 
@@ -287,7 +288,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndBothForStreamDo
   {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-    config_->populateDescriptors(headers_, stream_info_, "", descriptors, false);
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors, false);
 
     EXPECT_EQ(0, descriptors.size());
   }
@@ -295,7 +296,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndBothForStreamDo
   {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
-    config_->populateDescriptors(headers_, stream_info_, "", descriptors, true);
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors, true);
 
     EXPECT_EQ(2, descriptors.size());
 
@@ -383,7 +384,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndHitsAddend) {
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
   stream_info_.bytes_received_ = 321;
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
       {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
@@ -410,7 +411,7 @@ TEST_F(RateLimitConfigTest, MultipleActionsAndStringHitsAddend) {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
     headers_.setCopy(Http::LowerCaseString("x-test-hits-addend"), "321");
-    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
     std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
         {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}}};
 
@@ -422,7 +423,7 @@ TEST_F(RateLimitConfigTest, MultipleActionsAndStringHitsAddend) {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
     headers_.setCopy(Http::LowerCaseString("x-test-hits-addend"), "-1");
-    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
     EXPECT_TRUE(descriptors.empty());
   }
@@ -431,7 +432,7 @@ TEST_F(RateLimitConfigTest, MultipleActionsAndStringHitsAddend) {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
     headers_.setCopy(Http::LowerCaseString("x-test-hits-addend"), "11000000000");
-    config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+    config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
     EXPECT_TRUE(descriptors.empty());
   }
@@ -458,7 +459,7 @@ TEST_F(RateLimitConfigTest, MultiplePoliciesAndMultipleActionsAndIsNegative) {
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
 
   stream_info_.bytes_received_ = 321;
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
       {{{"remote_address", "10.0.0.1"}, {"destination_cluster", "fake_cluster"}}},
@@ -500,7 +501,7 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
       {{{"generic_key", "limited_fake_key"}}}};
@@ -524,7 +525,7 @@ TEST_F(RateLimitConfigTest, StaticLimitOverrideApplied) {
   ASSERT_OK(creation_status_);
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   std::vector<Envoy::RateLimit::Descriptor> expected_descriptors = {
       {{{"generic_key", "limited_fake_key"}}}};
@@ -564,7 +565,7 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   ASSERT_EQ(1, descriptors.size());
   // Both the cost (hits_addend) and the per-descriptor limit override are present.
@@ -572,6 +573,58 @@ filter_metadata:
   ASSERT_TRUE(descriptors[0].limit_.has_value());
   EXPECT_EQ(42, descriptors[0].limit_->requests_per_unit_);
   EXPECT_EQ(envoy::type::v3::RateLimitUnit::HOUR, descriptors[0].limit_->unit_);
+}
+
+// When response headers are wired into the formatter context (as they are on the
+// apply_on_stream_done path), %RESP(<header>)% in hits_addend.format resolves to the
+// response header value on the per-descriptor field.
+TEST_F(RateLimitConfigTest, HitsAddendFromResponseHeader) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: fake_key
+    hits_addend:
+      format: "%RESP(x-actual-cost)%"
+    apply_on_stream_done: true
+  )EOF";
+
+  setupTest(yaml);
+  ASSERT_OK(creation_status_);
+
+  response_headers_.addCopy("x-actual-cost", "7");
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, &response_headers_, stream_info_, "", descriptors,
+                               /*on_stream_done=*/true);
+
+  ASSERT_EQ(1, descriptors.size());
+  ASSERT_TRUE(descriptors[0].hits_addend_.has_value());
+  EXPECT_EQ(7, descriptors[0].hits_addend_.value());
+}
+
+// Backward compatibility: with no response headers in the context (e.g. the request-time
+// path, where response_headers is nullptr), %RESP(<header>)% resolves to a non-numeric value
+// and the whole descriptor is dropped -- exactly the pre-change behavior.
+TEST_F(RateLimitConfigTest, HitsAddendResponseHeaderMissingDropsDescriptor) {
+  const std::string yaml = R"EOF(
+  rate_limits:
+  - actions:
+    - generic_key:
+        descriptor_value: fake_key
+    hits_addend:
+      format: "%RESP(x-actual-cost)%"
+    apply_on_stream_done: true
+  )EOF";
+
+  setupTest(yaml);
+  ASSERT_OK(creation_status_);
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  config_->populateDescriptors(headers_, /*response_headers=*/nullptr, stream_info_, "",
+                               descriptors, /*on_stream_done=*/true);
+
+  EXPECT_EQ(0, descriptors.size());
 }
 
 // When the override metadata is missing, the descriptor is still produced without a limit.
@@ -602,7 +655,7 @@ filter_metadata:
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  config_->populateDescriptors(headers_, stream_info_, "", descriptors);
+  config_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   ASSERT_EQ(1, descriptors.size());
   EXPECT_FALSE(descriptors[0].limit_.has_value());
@@ -662,7 +715,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors_));
@@ -676,7 +729,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>({{{{"masked_remote_address", "10.0.0.1/32"}}}}),
@@ -692,7 +745,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>({{{{"masked_remote_address", "10.0.0.0/16"}}}}),
@@ -707,7 +760,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"masked_remote_address", "2001:abcd:ef01:2345:6789:abcd:ef01:234/128"}}}}),
@@ -723,7 +776,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
                   {{{{"masked_remote_address", "2001:abcd:ef01:2345::/64"}}}}),
@@ -741,7 +794,7 @@ actions:
 
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       *Network::Address::PipeInstance::create("/hello"));
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -754,7 +807,8 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
@@ -769,7 +823,8 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>({{{{"destination_cluster", "fake_cluster"}}}}),
@@ -787,7 +842,8 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -811,7 +867,8 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -835,7 +892,8 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{"x-header-test", "test_value"}};
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -851,7 +909,8 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -865,7 +924,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_key"}}}}),
               testing::ContainerEq(descriptors_));
@@ -881,7 +940,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -897,7 +956,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -926,7 +985,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
@@ -956,7 +1015,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
@@ -987,7 +1046,7 @@ filter_metadata:
 
   TestUtility::loadFromYaml(metadata_yaml, route_->metadata_);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "foo"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1017,7 +1076,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1045,7 +1104,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1072,7 +1131,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1104,7 +1163,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1138,7 +1197,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1167,7 +1226,7 @@ filter_metadata:
   )EOF";
 
   TestUtility::loadFromYaml(metadata_yaml, stream_info_.dynamicMetadata());
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1186,7 +1245,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1207,7 +1266,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1227,7 +1286,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "not_same_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1247,7 +1306,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "not_same_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1268,7 +1327,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1287,7 +1346,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1308,7 +1367,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"fake_key", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1328,7 +1387,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=not_same_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1348,7 +1407,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=not_same_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "fake_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1369,7 +1428,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1383,7 +1442,8 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_THAT(
       std::vector<Envoy::RateLimit::Descriptor>(
@@ -1405,7 +1465,8 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1423,7 +1484,8 @@ TEST_F(RateLimitPolicyTest, RequestMatchInput) {
   setupTest(RequestHeaderMatchInputDescriptor);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_header_name", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1433,7 +1495,8 @@ TEST_F(RateLimitPolicyTest, RequestMatchInputEmpty) {
   setupTest(RequestHeaderMatchInputDescriptor);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_FALSE(descriptors_.empty());
 }
@@ -1441,7 +1504,8 @@ TEST_F(RateLimitPolicyTest, RequestMatchInputEmpty) {
 TEST_F(RateLimitPolicyTest, RequestMatchInputSkip) {
   setupTest(RequestHeaderMatchInputDescriptor);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                         descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1481,7 +1545,8 @@ actions:
 
     setupTest(ExtensionDescriptor);
 
-    rate_limit_entry_->populateDescriptors(headers_, stream_info_, "service_cluster", descriptors_);
+    rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "service_cluster",
+                                           descriptors_);
     EXPECT_THAT(
         std::vector<Envoy::RateLimit::Descriptor>({{{{"source_cluster", "service_cluster"}}}}),
         testing::ContainerEq(descriptors_));
@@ -1510,7 +1575,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "test_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1528,7 +1593,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/no-match"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_TRUE(descriptors_.empty());
 }
@@ -1545,7 +1610,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/no-match"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_FALSE(descriptors_.empty());
 }
@@ -1562,7 +1627,7 @@ actions:
   Http::TestRequestHeaderMapImpl header{
       {":path", "/?x-parameter-name=value1&x-parameter-name=value2"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "value1"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1579,7 +1644,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?test-parameter=hello%20world"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_param", "hello world"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1655,7 +1720,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "value1");
   headers_.setCopy(Http::LowerCaseString("header2"), "value2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Multiple formatters should concatenate their results
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "value1value2"}}}}),
@@ -1681,7 +1746,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "value1");
   headers_.setCopy(Http::LowerCaseString("header2"), "value2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Multiple formatters should concatenate their results
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "value1value2"}}}}),
@@ -1707,7 +1772,7 @@ actions:
   header.setCopy(Http::LowerCaseString("header1"), "value1");
   header.setCopy(Http::LowerCaseString("header2"), "value2");
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   // Multiple formatters should concatenate their results
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "value1value2"}}}}),
@@ -1728,7 +1793,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // When descriptor_value is a plain string, it should always be used
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_key", "static_value"}}}}),
@@ -1755,7 +1820,7 @@ hits_addend:
 
   // Test with invalid string value (non-numeric)
   headers_.setCopy(Http::LowerCaseString("x-invalid-hits"), "not_a_number");
-  policy.populateDescriptors(headers_, stream_info_, "", descriptors);
+  policy.populateDescriptors(headers_, nullptr, stream_info_, "", descriptors);
 
   // Should not add descriptor when hits_addend is invalid
   EXPECT_TRUE(descriptors.empty());
@@ -1775,7 +1840,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-custom-header"), "my_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"user_key", "my_value"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1799,7 +1864,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
   headers_.setCopy(Http::LowerCaseString("x-user-id"), "user123");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "user123"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1823,7 +1888,7 @@ actions:
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
   header.setCopy(Http::LowerCaseString("x-session-id"), "session456");
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "session456"}}}}),
               testing::ContainerEq(descriptors_));
@@ -1842,7 +1907,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Plain string value should work without substitution
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"my_key", "plain_static_value"}}}}),
@@ -1866,7 +1931,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Plain string value should work without substitution
   EXPECT_THAT(
@@ -1891,7 +1956,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   // Plain string value should work without substitution
   EXPECT_THAT(
@@ -1914,7 +1979,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "value1");
   headers_.setCopy(Http::LowerCaseString("header2"), "value2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Even though one formatter returns empty, the final concatenated result is not empty
   // so the actual concatenated value should be used instead of default
@@ -1935,7 +2000,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // All formatters return empty, so default_value should be used
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"generic_key", "default_val"}}}}),
@@ -1954,7 +2019,7 @@ actions:
 
   setupTest(yaml);
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // All formatters return empty and no default_value, so descriptor should be skipped
   EXPECT_TRUE(descriptors_.empty());
@@ -1974,7 +2039,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
   headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Multiple formatters with static text should concatenate properly
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
@@ -1993,7 +2058,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
   headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // With formatter disabled (default), descriptor_value should be used as literal string
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
@@ -2021,7 +2086,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "value1");
   headers_.setCopy(Http::LowerCaseString("header2"), "value2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Even though one formatter returns empty, the final concatenated result is not empty
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "value1value2"}}}}),
@@ -2046,7 +2111,7 @@ actions:
   setupTest(yaml);
   headers_.setCopy(Http::LowerCaseString("x-header-name"), "test_value");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // All formatters return empty, so default_value should be used
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"header_match", "default_val"}}}}),
@@ -2072,7 +2137,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
   headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // Multiple formatters with static text should concatenate properly
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
@@ -2096,7 +2161,7 @@ actions:
   headers_.setCopy(Http::LowerCaseString("header1"), "dynamic1");
   headers_.setCopy(Http::LowerCaseString("header2"), "dynamic2");
 
-  rate_limit_entry_->populateDescriptors(headers_, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(headers_, nullptr, stream_info_, "", descriptors_);
 
   // With formatter disabled (default), descriptor_value should be used as literal string
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
@@ -2124,7 +2189,7 @@ actions:
   header.setCopy(Http::LowerCaseString("header1"), "value1");
   header.setCopy(Http::LowerCaseString("header2"), "value2");
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   // Even though one formatter returns empty, the final concatenated result is not empty
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "value1value2"}}}}),
@@ -2149,7 +2214,7 @@ actions:
   setupTest(yaml);
   Http::TestRequestHeaderMapImpl header{{":path", "/?x-parameter-name=test_value"}};
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   // All formatters return empty, so default_value should be used
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"query_match", "default_val"}}}}),
@@ -2175,7 +2240,7 @@ actions:
   header.setCopy(Http::LowerCaseString("header1"), "dynamic1");
   header.setCopy(Http::LowerCaseString("header2"), "dynamic2");
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   // Multiple formatters with static text should concatenate properly
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
@@ -2199,7 +2264,7 @@ actions:
   header.setCopy(Http::LowerCaseString("header1"), "dynamic1");
   header.setCopy(Http::LowerCaseString("header2"), "dynamic2");
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
 
   // With formatter disabled (default), descriptor_value should be used as literal string
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>(
@@ -2223,7 +2288,7 @@ actions:
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
   EXPECT_THAT(std::vector<Envoy::RateLimit::Descriptor>({{{{"remote_address_match", "10.0.0.1"}}}}),
               testing::ContainerEq(descriptors_));
 }
@@ -2244,7 +2309,7 @@ actions:
   stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
 
-  rate_limit_entry_->populateDescriptors(header, stream_info_, "", descriptors_);
+  rate_limit_entry_->populateDescriptors(header, nullptr, stream_info_, "", descriptors_);
   EXPECT_TRUE(descriptors_.empty());
 }
 

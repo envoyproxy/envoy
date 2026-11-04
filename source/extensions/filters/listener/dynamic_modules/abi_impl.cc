@@ -863,10 +863,12 @@ bool envoy_dynamic_module_callback_listener_filter_get_filter_state_typed(
     return false;
   }
 
-  // Store the serialized string on the filter so it outlives the current event hook.
-  filter->last_serialized_filter_state_ = std::move(serialized.value());
-  value_out->ptr = const_cast<char*>(filter->last_serialized_filter_state_->data());
-  value_out->length = filter->last_serialized_filter_state_->size();
+  // Append to the scratch so consecutive getter calls in the same hook stay valid until the hook
+  // returns.
+  filter->filter_state_scratch_.push_back(std::move(serialized.value()));
+  const std::string& stored = filter->filter_state_scratch_.back();
+  value_out->ptr = const_cast<char*>(stored.data());
+  value_out->length = stored.size();
   return true;
 }
 
@@ -1031,6 +1033,40 @@ void envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_string_b
   }
 
   callbacks->setDynamicMetadata(ns, metadata);
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || !isValidModuleBuffer(filter_namespace) ||
+      !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
+
+  return ContextAccessor::setDynamicMetadataStruct(
+      callbacks->streamInfo(), absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_struct.ptr, serialized_struct.length));
+}
+
+bool envoy_dynamic_module_callback_listener_filter_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_listener_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  auto* filter = static_cast<DynamicModuleListenerFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+
+  if (callbacks == nullptr || !isValidModuleBuffer(filter_namespace) ||
+      !isValidModuleBuffer(serialized_any)) {
+    return false;
+  }
+
+  return ContextAccessor::setDynamicTypedMetadata(
+      callbacks->streamInfo(), absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_any.ptr, serialized_any.length));
 }
 
 size_t envoy_dynamic_module_callback_listener_filter_max_read_bytes(

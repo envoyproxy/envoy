@@ -39,6 +39,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/buffer:buffer_lib",
         "//source/common/config:utility_lib",
         "//source/common/http:async_client_utility_lib",
         "//source/common/http:message_lib",
@@ -46,7 +47,6 @@ envoy_cc_library(
         "//source/common/tracing:common_values_lib",
         "//source/common/tracing:null_span_lib",
         "//source/common/tracing:trace_context_lib",
-        "//source/common/upstream:cluster_update_tracker_lib",
         "//source/common/version:version_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "@dd-trace-cpp//:dd_trace_cpp",

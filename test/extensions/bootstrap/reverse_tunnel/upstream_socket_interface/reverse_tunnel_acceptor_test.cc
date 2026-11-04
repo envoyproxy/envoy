@@ -51,8 +51,7 @@ protected:
 
   void setupThreadLocalSlot() {
     extension_->onServerInitialized(server_);
-    thread_local_registry_ =
-        std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
+    thread_local_registry_ = std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, *extension_);
     tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(thread_local_);
     thread_local_.setDispatcher(&dispatcher_);
     tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });

@@ -3,6 +3,8 @@
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
@@ -26,8 +28,8 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
   auto config_new_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_config_new_)>(
       "envoy_dynamic_module_on_udp_listener_filter_config_new");
   if (!config_new_or_error.ok()) {
-    throw EnvoyException("Dynamic module does not support UDP listener filters: " +
-                         std::string(config_new_or_error.status().message()));
+    throw EnvoyException(absl::StrCat("Dynamic module does not support UDP listener filters: ",
+                                      config_new_or_error.status().message()));
   }
   on_filter_config_new_ = config_new_or_error.value();
 
@@ -35,38 +37,43 @@ DynamicModuleUdpListenerFilterConfig::DynamicModuleUdpListenerFilterConfig(
       dynamic_module_->getFunctionPointer<decltype(on_filter_config_destroy_)>(
           "envoy_dynamic_module_on_udp_listener_filter_config_destroy");
   if (!config_destroy_or_error.ok()) {
-    throw EnvoyException("Dynamic module does not support UDP listener filters: " +
-                         std::string(config_destroy_or_error.status().message()));
+    throw EnvoyException(absl::StrCat("Dynamic module does not support UDP listener filters: ",
+                                      config_destroy_or_error.status().message()));
   }
   on_filter_config_destroy_ = config_destroy_or_error.value();
 
   auto filter_new_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_new_)>(
       "envoy_dynamic_module_on_udp_listener_filter_new");
   if (!filter_new_or_error.ok()) {
-    throw EnvoyException("Dynamic module does not support UDP listener filters: " +
-                         std::string(filter_new_or_error.status().message()));
+    throw EnvoyException(absl::StrCat("Dynamic module does not support UDP listener filters: ",
+                                      filter_new_or_error.status().message()));
   }
   on_filter_new_ = filter_new_or_error.value();
 
   auto filter_on_data_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_on_data_)>(
       "envoy_dynamic_module_on_udp_listener_filter_on_data");
   if (!filter_on_data_or_error.ok()) {
-    throw EnvoyException("Dynamic module does not support UDP listener filters: " +
-                         std::string(filter_on_data_or_error.status().message()));
+    throw EnvoyException(absl::StrCat("Dynamic module does not support UDP listener filters: ",
+                                      filter_on_data_or_error.status().message()));
   }
   on_filter_on_data_ = filter_on_data_or_error.value();
 
   auto filter_destroy_or_error = dynamic_module_->getFunctionPointer<decltype(on_filter_destroy_)>(
       "envoy_dynamic_module_on_udp_listener_filter_destroy");
   if (!filter_destroy_or_error.ok()) {
-    throw EnvoyException("Dynamic module does not support UDP listener filters: " +
-                         std::string(filter_destroy_or_error.status().message()));
+    throw EnvoyException(absl::StrCat("Dynamic module does not support UDP listener filters: ",
+                                      filter_destroy_or_error.status().message()));
   }
   on_filter_destroy_ = filter_destroy_or_error.value();
 
   in_module_config_ =
       on_filter_config_new_(static_cast<void*>(this), {filter_name_.c_str(), filter_name_.size()},
                             {filter_config_.data(), filter_config_.size()});
+  // A null config means the module reported a configuration error. Reject at load so no later hook
+  // runs against a null config and dereferences it.
+  if (in_module_config_ == nullptr) {
+    throw EnvoyException("Failed to initialize dynamic module UDP listener filter");
+  }
   stat_creation_frozen_ = true;
 }
 

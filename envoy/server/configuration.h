@@ -93,6 +93,12 @@ public:
    * @return uint32_t a multiple of the flush interval to perform stats eviction, or 0 if disabled.
    */
   virtual uint32_t evictOnFlush() const PURE;
+
+  /**
+   * @return const std::string& the runtime key to read the stats eviction interval (in
+   * milliseconds) from, or empty if the interval is not runtime configurable.
+   */
+  virtual const std::string& evictionIntervalRuntimeKey() const PURE;
 };
 
 /**

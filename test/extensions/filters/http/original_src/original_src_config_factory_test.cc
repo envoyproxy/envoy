@@ -10,7 +10,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -36,9 +35,9 @@ TEST(OriginalSrcHttpConfigFactoryTest, TestCreateFactory) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   Http::StreamDecoderFilterSharedPtr added_filter;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_))
-      .WillOnce(Invoke([&added_filter](Http::StreamDecoderFilterSharedPtr filter) {
+      .WillOnce([&added_filter](Http::StreamDecoderFilterSharedPtr filter) {
         added_filter = std::move(filter);
-      }));
+      });
 
   cb(filter_callback);
 
@@ -66,9 +65,9 @@ TEST(OriginalSrcHttpConfigFactoryTest, CreateFilterWithServerContext) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   Http::StreamDecoderFilterSharedPtr added_filter;
   EXPECT_CALL(filter_callback, addStreamDecoderFilter(_))
-      .WillOnce(Invoke([&added_filter](Http::StreamDecoderFilterSharedPtr filter) {
+      .WillOnce([&added_filter](Http::StreamDecoderFilterSharedPtr filter) {
         added_filter = std::move(filter);
-      }));
+      });
 
   cb(filter_callback);
 

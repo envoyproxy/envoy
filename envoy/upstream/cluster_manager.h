@@ -217,6 +217,14 @@ public:
   // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
   // with the cluster name to the management server.
   virtual void updateOnDemand(std::string cluster_name) PURE;
+
+  // Whether the config source behind this instance has answered an earlier on-demand request for
+  // the cluster with "doesn't exist", and no later update has delivered the cluster.
+  virtual bool isKnownMissing(absl::string_view cluster_name) const PURE;
+
+  // Called when the cluster manager answers an on-demand request from this instance's remembered
+  // "doesn't exist" answer, so the implementation can record the event in its stats.
+  virtual void recordKnownMissingAnswer() PURE;
 };
 
 using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
@@ -315,11 +323,11 @@ public:
     ClusterConstOptRef getCluster(absl::string_view cluster) const {
       auto active_cluster = active_clusters_.find(cluster);
       if (active_cluster != active_clusters_.cend()) {
-        return active_cluster->second;
+        return active_cluster->second.get();
       }
       auto warming_cluster = warming_clusters_.find(cluster);
       if (warming_cluster != warming_clusters_.cend()) {
-        return warming_cluster->second;
+        return warming_cluster->second.get();
       }
       return std::nullopt;
     }

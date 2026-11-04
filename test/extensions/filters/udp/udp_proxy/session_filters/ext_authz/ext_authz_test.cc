@@ -15,7 +15,6 @@
 
 using testing::_;
 using testing::Contains;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -64,12 +63,12 @@ public:
 
     // Capture the callbacks (to drive onComplete() asynchronously) and the emitted CheckRequest.
     ON_CALL(*client_, check(_, _, _, _))
-        .WillByDefault(Invoke([this](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                                     const envoy::service::auth::v3::CheckRequest& check_request,
-                                     Tracing::Span&, const StreamInfo::StreamInfo&) {
+        .WillByDefault([this](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                              const envoy::service::auth::v3::CheckRequest& check_request,
+                              Tracing::Span&, const StreamInfo::StreamInfo&) {
           request_callbacks_ = &callbacks;
           check_request_ = check_request;
-        }));
+        });
   }
 
   Network::UdpRecvData makeDatagram(const std::string& payload) {
@@ -157,10 +156,10 @@ TEST_F(ExtAuthzFilterTest, AllowedPublishesDynamicMetadata) {
   (*metadata.mutable_fields())["foo"].set_string_value("bar");
 
   EXPECT_CALL(stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& value) {
+      .WillOnce([](const std::string& ns, const Protobuf::Struct& value) {
         EXPECT_EQ("envoy.filters.udp.session.ext_authz", ns);
         EXPECT_THAT(value.fields(), Contains(IsStructString("foo", "bar")));
-      }));
+      });
   EXPECT_CALL(callbacks_, continueFilterChain()).WillOnce(Return(true));
   request_callbacks_->onComplete(makeResponse(CheckStatus::OK, metadata));
 }
@@ -213,13 +212,13 @@ TEST_F(ExtAuthzFilterTest, SynchronousAllowedContinuesInline) {
   setup();
 
   ON_CALL(*client_, check(_, _, _, _))
-      .WillByDefault(Invoke([](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                               const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                               const StreamInfo::StreamInfo&) {
+      .WillByDefault([](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                        const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                        const StreamInfo::StreamInfo&) {
         auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
         response->status = CheckStatus::OK;
         callbacks.onComplete(std::move(response));
-      }));
+      });
 
   EXPECT_CALL(callbacks_, continueFilterChain()).Times(0);
   EXPECT_EQ(ReadFilterStatus::Continue, filter_->onNewSession());
