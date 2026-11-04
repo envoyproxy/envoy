@@ -1,7 +1,9 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -75,5 +77,31 @@ envoy_extension_cc_test(
         "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "spiffe_validator_fuzz_proto",
+    srcs = ["spiffe_validator_fuzz.proto"],
+    deps = ["@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg"],
+)
+
+envoy_cc_fuzz_test(
+    name = "spiffe_validator_fuzz_test",
+    srcs = ["spiffe_validator_fuzz_test.cc"],
+    corpus = "spiffe_validator_corpus",
+    rbe_pool = "linux_x64_small",
+    deps = [
+        ":spiffe_validator_fuzz_proto_cc_proto",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/common/tls:stats_lib",
+        "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+        "//test/common/tls/cert_validator:test_common",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
