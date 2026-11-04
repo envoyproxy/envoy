@@ -1042,19 +1042,19 @@ key:
 // Tests a partially failed push where the valid scopes use dynamic RDS (`route_configuration_name`)
 // and `bad_scope` is missing `route_configuration_name`:
 //
-// - When `envoy.reloadable_features.srds_partial_acceptance` is false, `addOrUpdateScopes()`
-//   creates the RDS subscription for `valid_scope` (processed before `bad_scope`) and inserts it
-//   into `scoped_route_map_`, then aborts on `bad_scope` before reaching `other_scope`. Because
-//   the `srds_initialization_continuation` cleanup still starts `valid_scope`'s RDS subscription
-//   on unwind, an RDS push for `valid_scope_routes` triggers `onRdsConfigUpdate()` and propagates
-//   `valid_scope` to worker threads, while `other_scope` (after `bad_scope`) is completely skipped.
+// - When `envoy.reloadable_features.srds_partial_acceptance` is false (and
+//   `envoy.reloadable_features.srds_fast_config_update` is true), `onConfigUpdate()` rejects the
+//   entire push up front before mutating `scoped_route_map_` or starting any RDS subscriptions.
 // - When `envoy.reloadable_features.srds_partial_acceptance` is true, both `valid_scope` and
 //   `other_scope` have their RDS subscriptions started and both propagate to worker threads once
 //   their RDS configs arrive.
 TEST_P(ScopedRdsPartialAcceptanceTest, PartiallyFailedDynamicRdsPush) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_partial_acceptance",
-                               partialAcceptanceEnabled() ? "true" : "false"}});
+  scoped_runtime.mergeValues({
+      {"envoy.reloadable_features.srds_fast_config_update", "true"},
+      {"envoy.reloadable_features.srds_partial_acceptance",
+       partialAcceptanceEnabled() ? "true" : "false"},
+  });
 
   server_factory_context_.cluster_manager_.initializeClusters({"bluh"}, {});
   setup();
@@ -1134,16 +1134,13 @@ key:
     ASSERT_THAT(worker_route_config("other-key"), Not(IsNull()));
     EXPECT_EQ(worker_route_config("other-key")->name(), "other_scope_routes");
   } else {
-    // When flag is false: valid_scope (processed before bad_scope) had its RDS subscription
-    // created and started on unwind, so onRdsConfigUpdate() propagated it to worker threads even
-    // though the SRDS push was rejected and config_dump is still empty. other_scope (after
-    // bad_scope) was skipped and never received an RDS subscription.
+    // When partial acceptance is false, the up-front validation rejects the entire push before
+    // mutating scoped_route_map_ or creating any RDS subscriptions.
     EXPECT_EQ(0UL, all_scopes_.value());
-    EXPECT_EQ(1UL, active_scopes_.value());
-    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope")));
+    EXPECT_EQ(0UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), testing::IsEmpty());
     EXPECT_THAT(dumped_scope_names(), testing::IsEmpty());
-    ASSERT_THAT(worker_route_config("valid-key"), Not(IsNull()));
-    EXPECT_EQ(worker_route_config("valid-key")->name(), "valid_scope_routes");
+    EXPECT_THAT(worker_route_config("valid-key"), IsNull());
     EXPECT_THAT(worker_route_config("other-key"), IsNull());
   }
 
@@ -1154,7 +1151,7 @@ key:
     const auto decoded_resources = TestUtility::decodeResources({valid_resource, other_resource});
     EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, removed, "2"));
   }
-  pushRdsConfig({"other_scope_routes"}, "222");
+  pushRdsConfig({"valid_scope_routes", "other_scope_routes"}, "222");
 
   EXPECT_EQ(1UL,
             server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
