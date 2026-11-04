@@ -45,6 +45,7 @@ void SotwSubscriptionState::markStreamFresh(bool) {
 
 void SotwSubscriptionState::handleGoodResponse(
     envoy::service::discovery::v3::DiscoveryResponse& message) {
+  Protobuf::Arena batch_arena(resource_decoder_->arenaOptions());
   std::vector<DecodedResourcePtr> non_heartbeat_resources;
 
   {
@@ -58,9 +59,10 @@ void SotwSubscriptionState::handleGoodResponse(
                         any.type_url(), message.type_url(), message.DebugString()));
       }
 
-      auto decoded_resource = THROW_OR_RETURN_VALUE(
-          DecodedResourceImpl::fromResource(*resource_decoder_, any, message.version_info()),
-          DecodedResourceImplPtr);
+      auto decoded_resource =
+          THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(
+                                    *resource_decoder_, any, message.version_info(), batch_arena),
+                                DecodedResourceImplPtr);
       setResourceTtl(*decoded_resource);
       if (isHeartbeatResource(*decoded_resource, message.version_info())) {
         continue;
@@ -108,6 +110,7 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
     std::vector<envoy::service::discovery::v3::Resource> resources =
         xds_resources_delegate_->getResources(source_id, names_tracked_);
 
+    Protobuf::Arena batch_arena(resource_decoder_->arenaOptions());
     std::vector<DecodedResourcePtr> decoded_resources;
     const auto scoped_update = ttl_.scopedTtlUpdate();
     std::string version_info;
@@ -125,9 +128,9 @@ void SotwSubscriptionState::handleEstablishmentFailure() {
       }
 
       TRY_ASSERT_MAIN_THREAD {
-        auto decoded_resource =
-            THROW_OR_RETURN_VALUE(DecodedResourceImpl::fromResource(*resource_decoder_, resource),
-                                  DecodedResourceImplPtr);
+        auto decoded_resource = THROW_OR_RETURN_VALUE(
+            DecodedResourceImpl::fromResource(*resource_decoder_, resource, batch_arena),
+            DecodedResourceImplPtr);
         setResourceTtl(*decoded_resource);
         if (unaccounted > 0) {
           --unaccounted;

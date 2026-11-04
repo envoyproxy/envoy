@@ -1,11 +1,13 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/factory_context.h"
 
 #include "absl/container/flat_hash_set.h"
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Geolocation {
@@ -40,6 +42,17 @@ public:
    *  @param cb supplies the filter callbacks to notify when lookup is complete.
    */
   virtual void lookup(LookupRequest&& request, LookupGeoHeadersCallback&& cb) const PURE;
+
+  /**
+   * @return every key this driver is configured to populate in a ``LookupResult``, that is, every
+   * request header the HTTP geoip filter may write, lower-cased once at configuration time so the
+   * filter can remove them from each request without further conversions. The filter removes
+   * these headers from the request before the lookup, so a value a client sent cannot stand in
+   * for one the lookup did not produce. The default is empty, which keeps a provider that does
+   * not override this method on the previous behavior of only writing the headers a lookup
+   * returns.
+   */
+  virtual absl::Span<const Http::LowerCaseString> geoHeaderNames() const { return {}; }
 };
 
 using DriverSharedPtr = std::shared_ptr<Driver>;

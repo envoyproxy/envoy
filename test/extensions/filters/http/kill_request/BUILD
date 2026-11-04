@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -55,11 +54,12 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "crash_integration_test",
     size = "large",
     srcs = ["crash_integration_test.cc"],
     coverage = False,
+    extension_names = ["envoy.filters.http.kill_request"],
     rbe_pool = "linux_x64_small",
     shard_count = 8,
     deps = [

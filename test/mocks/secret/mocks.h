@@ -58,6 +58,7 @@ public:
               (const envoy::config::core::v3::ConfigSource&, const std::string&,
                Server::Configuration::ServerFactoryContext&, OptRef<Init::Manager> init_manager,
                bool warm));
+  MOCK_METHOD(std::vector<absl::string_view>, dynamicActiveSecretNames, (), (const));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {

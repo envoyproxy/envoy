@@ -265,6 +265,10 @@ protected:
       uint8_t flags;
     };
     FrameHeaderInfo current_frame_ = {};
+    // Latched to avoid runtime lookup on the per-frame hot path.
+    // TODO: remove when removing
+    // `envoy.reloadable_features.http2_mask_continuation_flags`.
+    const bool mask_continuation_flags_;
     size_t padding_length_ = 0;
     size_t remaining_data_payload_ = 0;
     // TODO: remove when removing `envoy.reloadable_features.http2_use_oghttp2`.
@@ -460,6 +464,9 @@ protected:
     bool remote_end_stream_ : 1 = false;
     bool remote_rst_ : 1 = false;
     bool data_deferred_ : 1 = false;
+    // Set once non-empty trailers have been handed to the adapter. They carry END_STREAM, so
+    // the body must not end the stream itself.
+    bool trailers_submitted_ : 1 = false;
     bool received_noninformational_headers_ : 1 = false;
     bool pending_receive_buffer_high_watermark_called_ : 1 = false;
     bool pending_send_buffer_high_watermark_called_ : 1 = false;
@@ -761,6 +768,8 @@ protected:
   // Latched value of the `http2_reject_frames_after_end_stream` runtime feature, consulted for
   // every received HEADERS and DATA frame instead of performing a runtime lookup on the data path.
   const bool reject_frames_after_end_stream_ = false;
+  // Latched value of the `http2_trailers_after_exhausted_window` runtime feature.
+  const bool trailers_after_exhausted_window_ = false;
 
   // Status for any errors encountered by the nghttp2 callbacks.
   // nghttp2 library uses single return code to indicate callback failure and
@@ -930,6 +939,7 @@ private:
   // Remove when removing runtime feature `http2_fix_goaway_loadshed_point`.
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
   Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_reset_stream_on_begin_headers_{nullptr};
   bool sent_go_away_on_dispatch_{false};
 };
 

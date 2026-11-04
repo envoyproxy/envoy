@@ -250,6 +250,11 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
+  // VHDS only reports that the virtual host exists. If none of its routes match the request,
+  // requesting the same virtual host again cannot resolve one, so let the router reply instead.
+  const bool require_route_match = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.on_demand_vhds_require_route_match");
+
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.on_demand_vhds_no_recreate_stream")) {
     // Continue the existing stream so the decoder filters before on_demand do not run again.
@@ -259,13 +264,21 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     if (route_exists) {
       callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
       callbacks_->downstreamCallbacks()->clearRouteCache();
-      getConfig()->decodeHeadersBehavior().decodeHeaders(*this);
-      if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
-        return;
+      if (!require_route_match || callbacks_->route().has_value()) {
+        getConfig()->decodeHeadersBehavior().decodeHeaders(*this);
+        if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
+          return;
+        }
       }
     }
     callbacks_->continueDecoding();
     return;
+  }
+
+  if (route_exists && require_route_match) {
+    callbacks_->downstreamCallbacks()->refreshRouteConfigSnapshot();
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+    route_exists = callbacks_->route().has_value();
   }
 
   // Legacy behavior (guard disabled): recreate the stream so processing restarts from the
@@ -289,31 +302,9 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
 
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.on_demand_cluster_no_recreate_stream")) {
-    // Whether or not the cluster exists, we continue decoding. Filters further down the
-    // chain may want to weigh in on cluster selection, so we don't send a local reply
-    // here.
-    if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
-      callbacks_->downstreamCallbacks()->recreateClusterInfo();
-    }
-    callbacks_->continueDecoding();
-    return;
-  }
-
-  // Track end_stream state to support stream recreation with fully read bodies.
-  const bool can_recreate_stream = downstream_end_stream_;
-  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available && can_recreate_stream) {
-    // Redirects require fully read body.
-    const Http::ResponseHeaderMap* headers = nullptr;
-    if (callbacks_->recreateStream(headers)) {
-      callbacks_->downstreamCallbacks()->clearRouteCache();
-      return;
-    }
-  }
-
-  // Cluster still does not exist or we did not recreate the stream. Either way,
-  // continue with the filter chain.
+  // Whether or not the cluster exists, we continue decoding. Filters further down the
+  // chain may want to weigh in on cluster selection, so we don't send a local reply
+  // here.
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
     callbacks_->downstreamCallbacks()->recreateClusterInfo();
   }

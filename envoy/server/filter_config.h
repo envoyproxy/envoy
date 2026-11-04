@@ -369,6 +369,11 @@ struct ExtraFactoryContext {
     extra_context.init_manager = context.initManager();
     extra_context.scope = context.scope();
     extra_context.is_upstream = true;
+    // Same as the downstream one above: the scope stands in for one prefix only.
+    if (auto stats_prefix_scope = context.statsPrefixScope();
+        stats_prefix_scope.has_value() && stats_prefix == context.statsPrefix()) {
+      extra_context.stats_prefix_scope = stats_prefix_scope;
+    }
     return extra_context;
   }
 };

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -111,7 +112,7 @@ absl::Status decodePath(absl::string_view path, std::string* resource_type, std:
   const std::vector<absl::string_view> path_components = absl::StrSplit(path.substr(1), '/');
   auto id_it = path_components.cbegin();
   if (resource_type != nullptr) {
-    *resource_type = std::string(path_components[0]);
+    resource_type->assign(path_components[0]);
     if (resource_type->empty()) {
       return absl::InvalidArgumentError(fmt::format("Resource type missing from {}", path));
     }
@@ -213,6 +214,18 @@ XdsResourceIdentifier::decodeUrl(absl::string_view resource_url) {
 
 bool XdsResourceIdentifier::hasXdsTpScheme(absl::string_view resource_name) {
   return absl::StartsWith(resource_name, "xdstp:");
+}
+
+absl::StatusOr<std::string>
+XdsResourceIdentifier::normalizeResourceName(absl::string_view resource_name) {
+  if (hasXdsTpScheme(resource_name)) {
+    auto xdstp_resource_or_error = decodeUrn(resource_name);
+    RETURN_IF_NOT_OK_REF(xdstp_resource_or_error.status());
+    EncodeOptions options;
+    options.sort_context_params_ = true;
+    return encodeUrn(xdstp_resource_or_error.value(), options);
+  }
+  return std::string(resource_name);
 }
 
 } // namespace Config

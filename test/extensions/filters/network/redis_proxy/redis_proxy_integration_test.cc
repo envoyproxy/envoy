@@ -5,12 +5,15 @@
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/random_generator.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/thread_local_store.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
 
 #include "gtest/gtest.h"
@@ -1996,6 +1999,54 @@ TEST_P(RedisProxyIntegrationTest, RedirectWhenNotEnabled) {
   }
 }
 
+// The upstream answers one command with two replies in the same write. The first reply is
+// forwarded downstream and the surplus reply is dropped. The upstream connection stays open and
+// the next command on it gets its own reply.
+
+TEST_P(RedisProxyIntegrationTest, SurplusUpstreamReplyIsDropped) {
+  const std::string request = makeBulkStringArray({"lpush", "foo", "bar"});
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  ASSERT_TRUE(redis_client->write(request));
+  WAIT_FOR_LOG_CONTAINS("debug", "redis: dropping upstream frame with no outstanding request",
+                        expectUpstreamRequestResponse(fake_upstreams_[0], request, ":1\r\n:1\r\n",
+                                                      fake_upstream_connection, "", ""));
+  redis_client->waitForData(":1\r\n");
+  EXPECT_EQ(":1\r\n", redis_client->data());
+
+  roundtripToUpstreamStep(fake_upstreams_[0], request, ":2\r\n", redis_client,
+                          fake_upstream_connection, "", "");
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// The upstream sends a reply after the reply to the only pending command. The unsolicited reply
+// is dropped. The upstream connection stays open and the next command on it gets its own reply.
+
+TEST_P(RedisProxyIntegrationTest, UnsolicitedUpstreamReplyIsDropped) {
+  const std::string request = makeBulkStringArray({"lpush", "foo", "bar"});
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  roundtripToUpstreamStep(fake_upstreams_[0], request, ":1\r\n", redis_client,
+                          fake_upstream_connection, "", "");
+  WAIT_FOR_LOG_CONTAINS("debug", "redis: dropping upstream frame with no outstanding request",
+                        ASSERT_TRUE(fake_upstream_connection->write(":1\r\n")));
+  EXPECT_EQ(":1\r\n", redis_client->data());
+
+  roundtripToUpstreamStep(fake_upstreams_[0], request, ":2\r\n", redis_client,
+                          fake_upstream_connection, "", "");
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_protocol_error")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_cx_total")->value());
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
 // This test sends an AUTH command from the fake downstream client to
 // the Envoy proxy. Envoy will respond with a no-password-set error since
 // no downstream_auth_password has been set for the filter.
@@ -2961,6 +3012,62 @@ TEST_P(RedisProxyWithExternalAuthIntegrationTest, ExternalAuthRespectsPipelining
 
   EXPECT_TRUE(fake_upstream_external_auth->close());
   redis_client->close();
+}
+
+// Shared by the two tags-mode tests below. The proxy, splitter and per-command stats must carry
+// the stat prefix as the envoy.redis_prefix tag with identical flat and tag-extracted names in
+// both the legacy (regex extraction) and explicit tags modes.
+void expectRedisStatsTagsAndNames(IntegrationTestServer& server) {
+  auto expect_tags = [](const Stats::Metric& metric, const std::string& tag_extracted_name) {
+    EXPECT_EQ(tag_extracted_name, metric.tagExtractedName())
+        << " for stat '" << metric.name() << "'";
+    ASSERT_EQ(1U, metric.tags().size()) << " for stat '" << metric.name() << "'";
+    EXPECT_EQ("envoy.redis_prefix", metric.tags()[0].name_)
+        << " for stat '" << metric.name() << "'";
+    EXPECT_EQ("redis_stats", metric.tags()[0].value_) << " for stat '" << metric.name() << "'";
+  };
+
+  const std::vector<std::pair<std::string, std::string>> counter_expectations = {
+      {"redis.redis_stats.downstream_cx_total", "redis.downstream_cx_total"},
+      {"redis.redis_stats.splitter.invalid_request", "redis.splitter.invalid_request"},
+      {"redis.redis_stats.command.get.total", "redis.command.get.total"},
+  };
+  for (const auto& [name, tag_extracted_name] : counter_expectations) {
+    const Stats::CounterSharedPtr counter = server.counter(name);
+    ASSERT_NE(counter, nullptr) << "no counter named '" << name << "'";
+    expect_tags(*counter, tag_extracted_name);
+  }
+
+  const Stats::ParentHistogramSharedPtr latency =
+      server.histogram("redis.redis_stats.command.get.latency");
+  ASSERT_NE(latency, nullptr);
+  expect_tags(*latency, "redis.command.get.latency");
+}
+
+// The tags mode is latched from the process-global runtime flag during server initialization, so
+// it must be set before initialize(); the global TestListener restores the flag after each test.
+TEST_P(RedisProxyIntegrationTest, StatsTagsAndNamesLegacyTagsMode) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", false);
+  initialize();
+
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_FALSE(store->useExplicitTags());
+
+  simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+  expectRedisStatsTagsAndNames(*test_server_);
+}
+
+TEST_P(RedisProxyIntegrationTest, StatsTagsAndNamesExplicitTagsMode) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.enable_stats_explicit_tags", true);
+  initialize();
+
+  auto* store = dynamic_cast<Stats::ThreadLocalStoreImpl*>(&test_server_->statStore());
+  ASSERT_NE(store, nullptr);
+  EXPECT_TRUE(store->useExplicitTags());
+
+  simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+  expectRedisStatsTagsAndNames(*test_server_);
 }
 
 } // namespace

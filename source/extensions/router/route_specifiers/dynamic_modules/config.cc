@@ -42,7 +42,10 @@ DynamicModuleRouteSpecifierFactory::createRouteSpecifier(
                                                    specifier_config.status().message()));
   }
 
-  return std::make_shared<DynamicModuleRouteSpecifier>(std::move(specifier_config.value()));
+  return std::make_shared<DynamicModuleRouteSpecifier>(
+      std::move(specifier_config.value()), proto_config,
+      context.serverFactoryContext().threadLocal(),
+      context.serverFactoryContext().api().randomGenerator());
 }
 
 REGISTER_FACTORY(DynamicModuleRouteSpecifierFactory, Envoy::Router::RouteSpecifierFactory);

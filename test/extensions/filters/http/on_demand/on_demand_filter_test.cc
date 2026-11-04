@@ -13,7 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -120,8 +119,8 @@ TEST_F(OnDemandFilterTest, TestDecodeHeadersRouteConfigUpdateCompletesSynchronou
   // Invoke the route config update callback synchronously, before requestRouteConfigUpdate()
   // returns, i.e. while decode_headers_active_ is still true.
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_))
-      .WillOnce(Invoke(
-          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); }));
+      .WillOnce(
+          [](Http::RouteConfigUpdatedCallbackSharedPtr callback) -> void { (*callback)(true); });
   // continueDecoding() must not be called from within decodeHeaders().
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
   filter_->decodeHeaders(headers, true);
@@ -149,28 +148,7 @@ TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionRestartsActiveStreamWith
 }
 
 // tests onClusterDiscoveryCompletion() when redirect contains a body with trailers (fully read)
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundWithTrailers) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  Http::TestRequestTrailerMapImpl trailers;
-  Buffer::OwnedImpl buffer;
-  // Simulate request with body and trailers (end_stream = true)
-  filter_->decodeHeaders(headers, false);
-  filter_->decodeData(buffer, false);
-  filter_->decodeTrailers(trailers);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion() when redirect contains a body with trailers (fully read)
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundWithTrailersNoRecreateStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "true"}});
   Http::TestRequestHeaderMapImpl headers;
   Http::TestRequestTrailerMapImpl trailers;
   Buffer::OwnedImpl buffer;
@@ -318,10 +296,10 @@ TEST_F(OnDemandFilterTest, NoRecreateStreamVhdsResolutionTriggersOnDemandCds) {
   // The route is unknown until VHDS resolves the virtual host, and resolved
   // thereafter.
   bool vhds_resolved = false;
-  ON_CALL(decoder_callbacks_, route()).WillByDefault(Invoke([&]() -> OptRef<const Router::Route> {
+  ON_CALL(decoder_callbacks_, route()).WillByDefault([&]() -> OptRef<const Router::Route> {
     return makeOptRefFromPtr<const Router::Route>(vhds_resolved ? decoder_callbacks_.route_.get()
                                                                 : nullptr);
-  }));
+  });
 
   // Initial decodeHeaders: route missing -> VHDS requested, StopIteration. CDS is
   // not reached yet because the route is still unknown.
@@ -342,6 +320,78 @@ TEST_F(OnDemandFilterTest, NoRecreateStreamVhdsResolutionTriggersOnDemandCds) {
   filter_->onRouteConfigUpdateCompletion(true);
 }
 
+// VHDS resolves the virtual host, but none of its routes match the request. With the
+// no-recreate VHDS guard on (default), the filter must let the router reply instead of
+// requesting the same virtual host again.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoMatchingRouteContinuesDecoding) {
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Same as above with the legacy recreateStream() path: the recreated stream would request the
+// same virtual host again, so the stream must be continued instead of recreated.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoMatchingRouteDoesNotRecreateStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// With envoy.reloadable_features.on_demand_vhds_require_route_match disabled, a resolved virtual
+// host without a matching route re-runs decodeHeaders(), which requests the same virtual host
+// again.
+TEST_F(OnDemandFilterTest, OnRouteConfigUpdateCompletionNoMatchingRouteRouteMatchNotRequired) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_require_route_match", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_)).Times(2);
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot());
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
+// Same as above with the legacy recreateStream() path: the stream is recreated.
+TEST_F(OnDemandFilterTest,
+       OnRouteConfigUpdateCompletionNoMatchingRouteRouteMatchNotRequiredRecreatesStream) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.on_demand_vhds_no_recreate_stream", "false"},
+       {"envoy.reloadable_features.on_demand_vhds_require_route_match", "false"}});
+  Http::TestRequestHeaderMapImpl headers;
+  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(OptRef<const Router::Route>{}));
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, true));
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, refreshRouteConfigSnapshot()).Times(0);
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
+  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
+  filter_->onRouteConfigUpdateCompletion(true);
+}
+
 // tests onClusterDiscoveryCompletion when a cluster is missing
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterNotFound) {
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
@@ -357,53 +407,18 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterTimedOut) {
 }
 
 // tests onClusterDiscoveryCompletion when a cluster is available
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFound) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  filter_->decodeHeaders(headers, true);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion when a cluster is available
 TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundNoRecreateStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "true"}});
   Http::TestRequestHeaderMapImpl headers;
   filter_->decodeHeaders(headers, true);
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion when a cluster is available with a fully read body
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundWithFullyReadBody) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  Buffer::OwnedImpl buffer;
-  // Simulate request with body that has been fully read (end_stream = true)
-  filter_->decodeHeaders(headers, false);
-  filter_->decodeData(buffer, true);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
 // tests onClusterDiscoveryCompletion when a cluster is available with a fully read body
 TEST_F(OnDemandFilterTest,
        OnClusterDiscoveryCompletionClusterFoundWithFullyReadBodyNoRecreateStream) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "true"}});
   Http::TestRequestHeaderMapImpl headers;
   Buffer::OwnedImpl buffer;
   // Simulate request with body that has been fully read (end_stream = true)
@@ -412,20 +427,6 @@ TEST_F(OnDemandFilterTest,
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
-  filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
-}
-
-// tests onClusterDiscoveryCompletion when a cluster is available, but recreating a stream failed
-TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRecreateStreamFailed) {
-  TestScopedRuntime scoped_runtime;
-  // This test is irrelevant for the case when there is no recreateStream call.
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.on_demand_cluster_no_recreate_stream", "false"}});
-  Http::TestRequestHeaderMapImpl headers;
-  filter_->decodeHeaders(headers, true);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(false));
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 

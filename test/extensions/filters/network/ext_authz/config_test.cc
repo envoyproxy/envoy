@@ -14,7 +14,6 @@
 
 using testing::_;
 using testing::HasSubstr;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -41,9 +40,9 @@ void expectCorrectProto() {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
+      });
   Network::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, context).value();
   Network::MockConnection connection;
@@ -109,9 +108,9 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzWithMetadataContextNamespaces) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_CALL(context.server_factory_context_.cluster_manager_.async_client_manager_,
               factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce([](const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
-      }));
+      });
   Network::FilterFactoryCb cb =
       factory.createFilterFactoryFromProto(*proto_config, context).value();
   Network::MockConnection connection;

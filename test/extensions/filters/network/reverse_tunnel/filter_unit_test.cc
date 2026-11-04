@@ -80,10 +80,10 @@ std::string driveFilterHandshake(ReverseTunnelFilter& filter,
                                  const std::string& request_str) {
   std::string written;
   EXPECT_CALL(callbacks.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&written](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&written](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
   Buffer::OwnedImpl request(request_str);
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
   return written;
@@ -119,12 +119,12 @@ public:
     // acceptance path can register a tunnel.
     default_io_handle_ = std::make_unique<NiceMock<Network::MockIoHandle>>();
     EXPECT_CALL(*default_io_handle_, isOpen()).WillRepeatedly(testing::Return(true));
-    EXPECT_CALL(*default_io_handle_, duplicate()).WillRepeatedly(testing::Invoke([]() {
+    EXPECT_CALL(*default_io_handle_, duplicate()).WillRepeatedly([]() {
       auto dup = std::make_unique<NiceMock<Network::MockIoHandle>>();
       EXPECT_CALL(*dup, isOpen()).WillRepeatedly(testing::Return(true));
       EXPECT_CALL(*dup, fdDoNotUse()).WillRepeatedly(testing::Return(1234));
       return dup;
-    }));
+    });
     auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     auto* socket_raw = socket.get();
     socket_raw->connection_info_provider_->setLocalAddress(
@@ -143,8 +143,8 @@ public:
     // the wire. A mock connection has no real transport, so fire the bytes-sent callback
     // immediately to simulate the flush.
     EXPECT_CALL(callbacks_.connection_, addBytesSentCallback(testing::_))
-        .WillRepeatedly(testing::Invoke(
-            [](Network::Connection::BytesSentCb cb) { cb(std::numeric_limits<uint64_t>::max()); }));
+        .WillRepeatedly(
+            [](Network::Connection::BytesSentCb cb) { cb(std::numeric_limits<uint64_t>::max()); });
 
     filter_->initializeReadFilterCallbacks(callbacks_);
   }
@@ -153,6 +153,12 @@ public:
   void setupUpstreamExtension() {
     upstream_config_.set_stat_prefix("reverse_connections");
     // Create the upstream socket interface and extension.
+    if (upstream_extension_) {
+      upstream_extension_->setTestOnlyTLSRegistry(nullptr);
+    }
+    upstream_tls_slot_.reset();
+    upstream_thread_local_registry_.reset();
+    upstream_extension_.reset();
     upstream_socket_interface_ =
         std::make_unique<ReverseConnection::ReverseTunnelAcceptor>(context_);
     upstream_extension_ = std::make_unique<ReverseConnection::ReverseTunnelAcceptorExtension>(
@@ -193,7 +199,7 @@ public:
     // Create a thread local registry for upstream with the dispatcher.
     upstream_thread_local_registry_ =
         std::make_shared<ReverseConnection::UpstreamSocketThreadLocal>(dispatcher_,
-                                                                       upstream_extension_.get());
+                                                                       *upstream_extension_);
 
     upstream_tls_slot_ =
         ThreadLocal::TypedSlot<ReverseConnection::UpstreamSocketThreadLocal>::makeUnique(
@@ -367,6 +373,9 @@ public:
   void TearDown() override {
     clearRegisteredUpstreamExtension();
     // Clean up thread local components to avoid issues during destruction.
+    if (upstream_extension_) {
+      upstream_extension_->setTestOnlyTLSRegistry(nullptr);
+    }
     upstream_tls_slot_.reset();
     upstream_thread_local_registry_.reset();
     upstream_extension_.reset();
@@ -382,14 +391,6 @@ public:
     ReverseTunnelFilterUnitTest::SetUp();
     setupUpstreamExtension();
     setupUpstreamThreadLocalSlot();
-  }
-
-  void TearDown() override {
-    upstream_tls_slot_.reset();
-    upstream_thread_local_registry_.reset();
-    upstream_extension_.reset();
-    upstream_socket_interface_.reset();
-    ReverseTunnelFilterUnitTest::TearDown();
   }
 };
 
@@ -419,10 +420,10 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowAccepts) {
   // Capture writes to connection.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -430,6 +431,35 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowAccepts) {
 
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
   // Stats: accepted should increment.
+  auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
+  ASSERT_NE(nullptr, accepted);
+  EXPECT_EQ(1, accepted->value());
+}
+
+// Identifiers at the 255-byte limit enforced by the initiator resolver are accepted here, so that
+// bound never produces a handshake header the acceptor would reject.
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowAcceptsMaxLengthIdentifiers) {
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
+  auto config_or_error = ReverseTunnelFilterConfig::create(cfg, factory_context_);
+  ASSERT_OK(config_or_error);
+  auto local_config = config_or_error.value();
+  ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
+  EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
+  filter.initializeReadFilterCallbacks(callbacks_);
+
+  std::string written;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
+        written.append(data.toString());
+        data.drain(data.length());
+      });
+
+  const std::string max_id(255, 'a');
+  Buffer::OwnedImpl request(
+      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", max_id, max_id, max_id));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
+
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
   auto accepted = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.accepted");
   ASSERT_NE(nullptr, accepted);
   EXPECT_EQ(1, accepted->value());
@@ -448,10 +478,10 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowMissingHeadersIsBadRequest) {
   // Missing required headers should cause 400.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/reverse_connections/request", ""));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
   EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
@@ -461,10 +491,10 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowParseError) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Missing required headers should cause 400.
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/reverse_connections/request", ""));
@@ -479,10 +509,10 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowParseError) {
 TEST_F(ReverseTunnelFilterUnitTest, NotFoundForNonReverseTunnelPath) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/health"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
   EXPECT_THAT(written, testing::HasSubstr("404 Not Found"));
@@ -499,10 +529,10 @@ TEST_F(ReverseTunnelFilterUnitTest, DetachesConnectionAfterAccept) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
   // The handshake runs SSL quiet close on the connection before detaching it.
   EXPECT_CALL(callbacks_.connection_, ssl()).WillOnce(Return(nullptr));
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -531,10 +561,10 @@ TEST_F(ReverseTunnelFilterUnitTest, DetachAppliesQuietShutdownOnTls) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   EXPECT_CALL(callbacks_.connection_, ssl()).WillOnce(Return(handshaker));
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -564,16 +594,15 @@ TEST_F(ReverseTunnelFilterUnitTest, AcceptanceCompletesAcrossSplitWrites) {
   // Capture the flush callback instead of firing it immediately.
   Network::Connection::BytesSentCb bytes_sent_cb;
   EXPECT_CALL(callbacks_.connection_, addBytesSentCallback(testing::_))
-      .WillRepeatedly(testing::Invoke([&bytes_sent_cb](Network::Connection::BytesSentCb cb) {
-        bytes_sent_cb = std::move(cb);
-      }));
+      .WillRepeatedly(
+          [&bytes_sent_cb](Network::Connection::BytesSentCb cb) { bytes_sent_cb = std::move(cb); });
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&written](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&written](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -597,6 +626,24 @@ TEST_F(ReverseTunnelFilterUnitTest, AcceptanceCompletesAcrossSplitWrites) {
   // One more sub-response chunk carries the cumulative count past the full response, completing it.
   EXPECT_FALSE(bytes_sent_cb(chunk));
   EXPECT_EQ(1, handshakeCounter(stats_store_, "reverse_tunnel.handshake.accepted"));
+}
+
+// Codec stats must outlive the onData() call that created the codec. Pipelined requests with
+// unread responses trip the codec's flood check, and so increment a codec stat, on a later
+// dispatch.
+TEST_F(ReverseTunnelFilterUnitTest, PipelinedRequestsUseCodecStatsAfterFirstDispatch) {
+  // Keep the responses queued, as a peer that never reads would.
+  Buffer::OwnedImpl unread;
+  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
+      .WillRepeatedly([&unread](Buffer::Instance& data, bool) { unread.move(data); });
+
+  Buffer::OwnedImpl requests(makeHttpRequest("GET", "/health") + makeHttpRequest("GET", "/health") +
+                             makeHttpRequest("GET", "/health"));
+  // The codec parses one request per dispatch, so redeliver the remaining bytes.
+  for (int i = 0; i < 3 && requests.length() > 0; ++i) {
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(requests, false));
+  }
+  EXPECT_EQ(1, handshakeCounter(stats_store_, "http1.response_flood"));
 }
 
 // Exercise RequestDecoder interface methods by obtaining the decoder via
@@ -670,10 +717,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
 TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplMethods) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Create a request that will trigger decoder creation.
   const std::string req =
@@ -699,10 +746,10 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplMethods) {
 TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplDecodeTrailers) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Create a chunked request with trailers to trigger decodeTrailers.
   const std::string headers_part = "GET /reverse_connections/request HTTP/1.1\r\n"
@@ -730,10 +777,10 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplDecodeTrailers) {
 TEST_F(ReverseTunnelFilterUnitTest, DecodeTrailersTriggersCompletion) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Build a proper chunked request to ensure decodeTrailers is called.
   std::string req = "GET /reverse_connections/request HTTP/1.1\r\n"
@@ -754,10 +801,10 @@ TEST_F(ReverseTunnelFilterUnitTest, DecodeTrailersTriggersCompletion) {
 TEST_F(ReverseTunnelFilterUnitTest, ParseEmptyPayload) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/reverse_connections/request", ""));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
@@ -779,10 +826,10 @@ TEST_F(ReverseTunnelFilterUnitTest, NonStringFilterStateIgnored) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -801,10 +848,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterIdMismatchIgnored) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -823,10 +870,10 @@ TEST_F(ReverseTunnelFilterUnitTest, TenantIdMissingIgnored) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -847,10 +894,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionClosedSocket) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -863,10 +910,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionClosedSocket) {
 TEST_F(ReverseTunnelFilterUnitTest, WrongHttpMethod) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("PUT", "/reverse_connections/request", "n", "c", "t"));
@@ -885,10 +932,10 @@ TEST_F(ReverseTunnelFilterUnitTest, OnGoAway) {
 TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyVariants) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Test sendLocalReply with empty body.
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/wrong/path", ""));
@@ -901,10 +948,10 @@ TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyVariants) {
 TEST_F(ReverseTunnelFilterUnitTest, InvalidProtobufData) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // A body is rejected with 400 regardless of its contents.
   std::string junk_body(100, '\xFF');
@@ -918,10 +965,10 @@ TEST_F(ReverseTunnelFilterUnitTest, InvalidProtobufData) {
 TEST_F(ReverseTunnelFilterUnitTest, HeadersOnlyRequest) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   std::string headers_only = "GET /reverse_connections/request HTTP/1.1\r\n"
                              "Host: localhost\r\n"
@@ -936,10 +983,10 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplInterfaceMethods) {
   // Create a decoder to test interface methods.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Start a request to create the decoder.
   // Use a non-empty body so the headers phase does not signal end_stream.
@@ -963,10 +1010,10 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplInterfaceMethods) {
 TEST_F(ReverseTunnelFilterUnitTest, WrongHttpMethodTest) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Test with wrong method (PUT instead of GET).
   Buffer::OwnedImpl request(
@@ -979,10 +1026,10 @@ TEST_F(ReverseTunnelFilterUnitTest, WrongHttpMethodTest) {
 TEST_F(ReverseTunnelFilterUnitTest, SuccessfulRequestWithResponseBody) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
       "GET", "/reverse_connections/request", "test-node", "test-cluster", "test-tenant"));
@@ -999,10 +1046,10 @@ TEST_F(ReverseTunnelFilterUnitTest, SuccessfulRequestWithResponseBody) {
 TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyWithHeaderModifier) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Send a request with wrong path to trigger sendLocalReply.
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/wrong/path"));
@@ -1020,10 +1067,10 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
   Http::MockResponseEncoder encoder;
   bool saw_custom_header = false;
   EXPECT_CALL(encoder, encodeHeaders(testing::_, testing::_))
-      .WillOnce(testing::Invoke([&](const Http::ResponseHeaderMap& headers, bool) {
+      .WillOnce([&](const Http::ResponseHeaderMap& headers, bool) {
         auto values = headers.get(Http::LowerCaseString("x-custom-mod"));
         saw_custom_header = !values.empty() && values[0]->value().getStringView() == "v";
-      }));
+      });
 
   // Obtain a decoder and call sendLocalReply with a modifier.
   Http::RequestDecoder& decoder = filter_->newStream(encoder, false);
@@ -1039,10 +1086,10 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
 TEST_F(ReverseTunnelFilterUnitTest, MissingReverseTunnelHeadersReturns400) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Missing required header should fail.
   std::string req = "GET /reverse_connections/request HTTP/1.1\r\n"
@@ -1059,10 +1106,10 @@ TEST_F(ReverseTunnelFilterUnitTest, MissingReverseTunnelHeadersReturns400) {
 TEST_F(ReverseTunnelFilterUnitTest, PartialHttpData) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   const std::string full_request =
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t");
@@ -1083,10 +1130,10 @@ TEST_F(ReverseTunnelFilterUnitTest, PartialHttpData) {
 TEST_F(ReverseTunnelFilterUnitTest, CompleteRequestSingleCall) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                          "single", "call", "test"));
@@ -1107,10 +1154,10 @@ TEST_F(ReverseTunnelFilterUnitTest, PartialStateIgnored) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -1122,10 +1169,10 @@ TEST_F(ReverseTunnelFilterUnitTest, PartialStateIgnored) {
 TEST_F(ReverseTunnelFilterUnitTest, ParseHandshakeStringViaHttp) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Test with a valid protobuf serialized as string.
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
@@ -1138,10 +1185,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ParseHandshakeStringViaHttp) {
 TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyWithHeadersCallback) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Create a request with wrong path to trigger sendLocalReply.
   Buffer::OwnedImpl request("GET / HTTP/1.1\r\nHost: test\r\n\r\n");
@@ -1156,10 +1203,10 @@ TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyWithHeadersCallback) {
 TEST_F(ReverseTunnelFilterUnitTest, ProcessIfCompleteEarlyReturns) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   const std::string req =
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t");
@@ -1220,10 +1267,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
 TEST_F(ReverseTunnelFilterUnitTest, ParseHandshakeArrayEdgeCases) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Test with empty body to trigger array parsing with null data.
   Buffer::OwnedImpl empty_request(makeHttpRequest("GET", "/reverse_connections/request", ""));
@@ -1248,10 +1295,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionNullSocket) {
 
   std::string written;
   EXPECT_CALL(null_socket_callbacks.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -1264,10 +1311,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionNullSocket) {
 TEST_F(ReverseTunnelFilterUnitTest, EmptyResponseBody) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -1282,10 +1329,10 @@ TEST_F(ReverseTunnelFilterUnitTest, EmptyResponseBody) {
 TEST_F(ReverseTunnelFilterUnitTest, CodecDispatchError) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Send completely invalid HTTP data that will cause dispatch error.
   Buffer::OwnedImpl invalid_data("\x00\x01\x02\x03INVALID HTTP");
@@ -1305,10 +1352,10 @@ TEST_F(ReverseTunnelFilterUnitTest, TenantIdMismatchIgnored2) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
@@ -1320,10 +1367,10 @@ TEST_F(ReverseTunnelFilterUnitTest, TenantIdMismatchIgnored2) {
 TEST_F(ReverseTunnelFilterUnitTest, NewStreamWithInternallyCreatedFlag) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // newStream is called internally when processing HTTP requests.
   Buffer::OwnedImpl request(
@@ -1336,10 +1383,10 @@ TEST_F(ReverseTunnelFilterUnitTest, NewStreamWithInternallyCreatedFlag) {
 TEST_F(ReverseTunnelFilterUnitTest, StatsGeneration) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Trigger parse error to verify stats are generated (missing headers).
   Buffer::OwnedImpl invalid_request(makeHttpRequest("GET", "/reverse_connections/request", ""));
@@ -1370,10 +1417,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationHandshakeTimeoutDefault) {
 TEST_F(ReverseTunnelFilterUnitTest, DecodeDataMultipleChunks) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   const std::string req =
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t");
@@ -1405,10 +1452,10 @@ TEST_F(ReverseTunnelFilterUnitTest, DecodeDataMultipleChunks) {
 TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplInterfaceMethodsCoverage) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Create a proper HTTP request with chunked encoding and trailers and headers-only body
   std::string chunked_request = "GET /reverse_connections/request HTTP/1.1\r\n"
@@ -1471,10 +1518,10 @@ TEST_F(ReverseTunnelFilterUnitTest, CodecDispatchMultipleErrorTypes) {
 TEST_F(ReverseTunnelFilterUnitTest, SuccessPathCoverage) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Create a valid request; response verification occurs normally.
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
@@ -1489,10 +1536,10 @@ TEST_F(ReverseTunnelFilterUnitTest, SuccessPathCoverage) {
 TEST_F(ReverseTunnelFilterUnitTest, DecodeMetadataMethodCoverage) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // The decodeMetadata method is called internally when processing certain HTTP requests
   Buffer::OwnedImpl request(
@@ -1505,10 +1552,10 @@ TEST_F(ReverseTunnelFilterUnitTest, DecodeMetadataMethodCoverage) {
 TEST_F(ReverseTunnelFilterUnitTest, StreamInfoMethodCoverage) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                          "stream", "info", "test"));
@@ -1520,10 +1567,10 @@ TEST_F(ReverseTunnelFilterUnitTest, StreamInfoMethodCoverage) {
 TEST_F(ReverseTunnelFilterUnitTest, AccessLogHandlersMethodCoverage) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "access", "log", "test"));
@@ -1535,10 +1582,10 @@ TEST_F(ReverseTunnelFilterUnitTest, AccessLogHandlersMethodCoverage) {
 TEST_F(ReverseTunnelFilterUnitTest, GetRequestDecoderHandleMethodCoverage) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                          "decoder", "handle", "test"));
@@ -1588,10 +1635,10 @@ TEST_F(ReverseTunnelFilterUnitTest, VariousHttpMalformations) {
 TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionNullTlsRegistry) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Socket lifecycle is now managed by UpstreamReverseConnectionIOHandle wrapper.
 
@@ -1623,10 +1670,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionDuplicateFa
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "dup-fail", "c", "t"));
@@ -1660,10 +1707,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionDuplicatedH
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "dup-closed", "c", "t"));
@@ -1690,14 +1737,14 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ProcessAcceptedConnectionReportsConn
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&]() {
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter,
                 reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
                                       testing::Eq(tenant_id), testing::_, testing::Eq(100)));
     return reporter;
-  }));
+  });
 
   setupUpstreamExtension();
   setupUpstreamThreadLocalSlot();
@@ -1746,7 +1793,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&]() {
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter,
@@ -1754,7 +1801,7 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
                                       testing::Eq(tenant_id), testing::Eq(initiation_time_ms),
                                       testing::Eq(100)));
     return reporter;
-  }));
+  });
 
   setupUpstreamExtension();
   setupUpstreamThreadLocalSlot();
@@ -1844,14 +1891,14 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
   EXPECT_CALL(context_, messageValidationVisitor())
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&]() {
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
                                                  testing::Eq(tenant_id), testing::Eq(int64_t(0)),
                                                  testing::Eq(100)));
     return reporter;
-  }));
+  });
 
   setupUpstreamExtension();
   setupUpstreamThreadLocalSlot();
@@ -1901,14 +1948,14 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest,
       .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
   // A non-numeric header value must fail to parse and fall back to 0.
-  EXPECT_CALL(reporter_factory, createReporter()).WillOnce(Invoke([&]() {
+  EXPECT_CALL(reporter_factory, createReporter()).WillOnce([&]() {
     auto reporter =
         std::make_unique<NiceMock<Bootstrap::ReverseConnection::MockReverseTunnelReporter>>();
     EXPECT_CALL(*reporter, reportConnectionEvent(testing::Eq(node_id), testing::Eq(cluster_id),
                                                  testing::Eq(tenant_id), testing::Eq(int64_t(0)),
                                                  testing::Eq(100)));
     return reporter;
-  }));
+  });
 
   setupUpstreamExtension();
   setupUpstreamThreadLocalSlot();
@@ -1974,10 +2021,10 @@ TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
 TEST_F(ReverseTunnelFilterUnitTest, EdgeCaseHttpProtobufProcessing) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Test 1: Binary data that looks like protobuf but isn't
   std::string fake_protobuf;
@@ -2021,10 +2068,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, InterfaceMethodsCompleteCoverage) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Create request with HTTP/1.1 Transfer-Encoding chunked to trigger trailers
   std::string chunked_request = "GET /reverse_connections/request HTTP/1.1\r\n"
@@ -2046,10 +2093,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, InterfaceMethodsCompleteCoverage) {
 TEST_F(ReverseTunnelFilterUnitTest, ProcessIfCompleteAlreadyComplete) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Send a complete request.
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
@@ -2098,10 +2145,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, SuccessfulSocketDuplication) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                          "dup", "success", "test"));
@@ -2113,10 +2160,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, SuccessfulSocketDuplication) {
 TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyWithModifyHeaders) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Send a request that will trigger a 404 response with modify_headers callback.
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/wrong/path"));
@@ -2130,10 +2177,10 @@ TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyWithModifyHeaders) {
 TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyAllBranches) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Test with wrong method to trigger 404.
   Buffer::OwnedImpl request(makeHttpRequest("POST", "/reverse_connections/request"));
@@ -2183,10 +2230,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationAcceptsMatchingName) {
   // Capture writes to connection.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Send request with matching cluster name.
   Buffer::OwnedImpl request(makeHttpRequestWithAllHeaders("GET", "/reverse_connections/request",
@@ -2218,10 +2265,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMismatchedName) 
   // Capture writes to connection.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Expect connection to be closed.
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
@@ -2257,10 +2304,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationRejectsMissingHeader) {
   // Capture writes to connection.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Expect connection to be closed.
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
@@ -2293,10 +2340,10 @@ TEST_F(ReverseTunnelFilterUnitTest, ClusterNameValidationDisabledWhenNotSet) {
   // Capture writes to connection.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
 
   // Send request without upstream cluster name header.
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
@@ -2321,14 +2368,6 @@ public:
     if (upstream_thread_local_registry_ && upstream_thread_local_registry_->socketManager()) {
       upstream_thread_local_registry_->socketManager()->setTenantIsolationEnabled(true);
     }
-  }
-
-  void TearDown() override {
-    upstream_tls_slot_.reset();
-    upstream_thread_local_registry_.reset();
-    upstream_extension_.reset();
-    upstream_socket_interface_.reset();
-    ReverseTunnelFilterUnitTest::TearDown();
   }
 };
 
@@ -2505,10 +2544,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_RespondsWith101) {
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
   // The handshake detaches the original connection after the response is flushed.
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
 
@@ -2543,10 +2582,10 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, UpgradeMode_MissingUpgradeRejected) 
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
+      .WillRepeatedly([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
-      }));
+      });
   EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 
   Buffer::OwnedImpl request(
@@ -2781,10 +2820,9 @@ TEST_F(ReverseTunnelFilterWithUpstreamTest, ValidateIdentifiersDistinguishesLimi
 TEST_F(ReverseTunnelFilterWithUpstreamTest, ValidationMetadataEmitsTriStateResult) {
   auto& stream_info = callbacks_.connection_.stream_info_;
   ON_CALL(stream_info, setDynamicMetadata(testing::_, testing::_))
-      .WillByDefault(
-          testing::Invoke([&stream_info](const std::string& ns, const Protobuf::Struct& value) {
-            (*stream_info.metadata_.mutable_filter_metadata())[ns].MergeFrom(value);
-          }));
+      .WillByDefault([&stream_info](const std::string& ns, const Protobuf::Struct& value) {
+        (*stream_info.metadata_.mutable_filter_metadata())[ns].MergeFrom(value);
+      });
 
   auto* socket_manager = upstream_thread_local_registry_->socketManager();
   ASSERT_NE(socket_manager, nullptr);
@@ -2904,10 +2942,9 @@ protected:
     // claims published during the handshake.
     auto& stream_info = callbacks_.connection_.stream_info_;
     ON_CALL(stream_info, setDynamicMetadata(testing::_, testing::_))
-        .WillByDefault(
-            testing::Invoke([&stream_info](const std::string& ns, const Protobuf::Struct& value) {
-              (*stream_info.metadata_.mutable_filter_metadata())[ns].MergeFrom(value);
-            }));
+        .WillByDefault([&stream_info](const std::string& ns, const Protobuf::Struct& value) {
+          (*stream_info.metadata_.mutable_filter_metadata())[ns].MergeFrom(value);
+        });
   }
 
   // Configures inline JWT auth on `cfg` with the shared test JWKS.
@@ -2956,10 +2993,10 @@ protected:
 
     std::string written;
     EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-        .WillRepeatedly(testing::Invoke([&written](Buffer::Instance& data, bool) {
+        .WillRepeatedly([&written](Buffer::Instance& data, bool) {
           written.append(data.toString());
           data.drain(data.length());
-        }));
+        });
     Buffer::OwnedImpl request(request_str);
     EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
     return written;
@@ -3265,15 +3302,14 @@ Extensions::HttpFilters::Common::JwksFetcherPtr makeMockFetcher(FetchOutcome out
   auto fetcher = std::make_unique<NiceMock<Extensions::HttpFilters::Common::MockJwksFetcher>>();
   if (outcome == FetchOutcome::Success) {
     ON_CALL(*fetcher, fetch(testing::_, testing::_))
-        .WillByDefault(
-            testing::Invoke([jwks = std::string(jwks)](Tracing::Span&, Receiver& receiver) {
-              receiver.onJwksSuccess(JwtVerify::Jwks::createFrom(jwks, JwtVerify::Jwks::JWKS));
-            }));
+        .WillByDefault([jwks = std::string(jwks)](Tracing::Span&, Receiver& receiver) {
+          receiver.onJwksSuccess(JwtVerify::Jwks::createFrom(jwks, JwtVerify::Jwks::JWKS));
+        });
   } else if (outcome == FetchOutcome::Error) {
     ON_CALL(*fetcher, fetch(testing::_, testing::_))
-        .WillByDefault(testing::Invoke([](Tracing::Span&, Receiver& receiver) {
+        .WillByDefault([](Tracing::Span&, Receiver& receiver) {
           receiver.onJwksError(Receiver::Failure::Network);
-        }));
+        });
   }
   // NeverCompletes leaves fetch() a no-op, so the handshake sees no cached keys.
   return fetcher;
@@ -3473,9 +3509,9 @@ TEST_F(ReverseTunnelJwtTest, RemoteJwksRefreshReplacesKeys) {
 TEST_F(ReverseTunnelJwtTest, RemoteJwksInitTargetFetchesOnInit) {
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(factory_context_.init_manager_, add(testing::_))
-      .WillOnce(testing::Invoke([&init_target_handle](const Init::Target& target) {
+      .WillOnce([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   setRemoteJwt(cfg, kIssuer, /*allow_missing_or_failed=*/false, /*fast_listener=*/false);
@@ -3502,9 +3538,9 @@ TEST_F(ReverseTunnelJwtTest, RemoteJwksInitTargetFetchesOnInit) {
 TEST_F(ReverseTunnelJwtTest, RemoteJwksInitTargetReadyOnFetchFailure) {
   Init::TargetHandlePtr init_target_handle;
   EXPECT_CALL(factory_context_.init_manager_, add(testing::_))
-      .WillOnce(testing::Invoke([&init_target_handle](const Init::Target& target) {
+      .WillOnce([&init_target_handle](const Init::Target& target) {
         init_target_handle = target.createHandle("test");
-      }));
+      });
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   setRemoteJwt(cfg, kIssuer, /*allow_missing_or_failed=*/false, /*fast_listener=*/false);

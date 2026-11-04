@@ -37,7 +37,7 @@ std::optional<std::string> LocalReplyBodyFormatter::format(const Context& contex
 
 Protobuf::Value LocalReplyBodyFormatter::formatValue(const Context& context,
                                                      const StreamInfo::StreamInfo&) const {
-  return ValueUtil::stringValue(std::string(context.localReplyBody()));
+  return ValueUtil::stringValue(context.localReplyBody());
 }
 
 bool LocalReplyBodyFormatter::formatTo(std::string& sink, const Context& context,

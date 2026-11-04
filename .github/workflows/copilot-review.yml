@@ -1,0 +1,42 @@
+name: Copilot review request
+
+on:
+  pull_request_target:
+    types:
+    - opened
+    - ready_for_review
+    - synchronize
+    paths:
+    - 'api/**'
+
+permissions: {}
+
+
+jobs:
+  request:
+    permissions:
+      contents: read
+      pull-requests: write
+    if: >-
+      github.event.pull_request.draft == false &&
+      !contains(fromJSON('["dependabot[bot]","renovate[bot]","github-actions[bot]"]'), github.actor)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Request Copilot review (once)
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        # already requested?
+        if gh api "repos/${REPO}/pulls/${PR}/requested_reviewers" \
+             --jq '.users[].login' | grep -qx 'copilot-pull-request-reviewer\[bot\]'; then
+          echo "already requested"; exit 0
+        fi
+        # already reviewed?
+        if gh api "repos/${REPO}/pulls/${PR}/reviews" --paginate \
+             --jq '.[].user.login' | grep -qx 'copilot-pull-request-reviewer\[bot\]'; then
+          echo "already reviewed"; exit 0
+        fi
+        gh api -X POST "repos/${REPO}/pulls/${PR}/requested_reviewers" \
+          -f 'reviewers[]=copilot-pull-request-reviewer[bot]'

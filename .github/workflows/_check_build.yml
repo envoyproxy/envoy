@@ -57,5 +57,8 @@ jobs:
         - target: compile_time_options
           name: Compile time options
           docker-ci: true
+        - target: execution_context
+          name: Execution context
+          skip: ${{ fromJSON(inputs.request).run.check-build-execution-context != true }}
         - target: gcc
           name: GCC

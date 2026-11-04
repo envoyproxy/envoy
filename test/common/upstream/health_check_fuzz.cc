@@ -142,8 +142,8 @@ void HttpHealthCheckFuzz::respond(test::common::upstream::Respond respond, bool 
   response_headers->setStatus(status);
 
   // Responding with http can cause client to close, if so create a new one.
-  const bool client_will_close =
-      Http::HeaderUtility::shouldCloseConnection(health_checker_->protocol(), *response_headers);
+  const bool client_will_close = Http::HeaderUtility::shouldCloseConnection(
+      health_checker_->configuredProtocol(), *response_headers);
 
   // Check if there is a response body.
   bool has_response_body = !respond.http_respond().body().empty();
@@ -341,21 +341,20 @@ void GrpcHealthCheckFuzz::initialize(test::common::upstream::HealthCheckTestCase
   }
   expectSessionCreate();
   ON_CALL(context_.dispatcher_, createClientConnection_(_, _, _, _))
-      .WillByDefault(testing::InvokeWithoutArgs(
-          [&]() -> Network::ClientConnection* { return test_session_->client_connection_; }));
+      .WillByDefault(
+          [&]() -> Network::ClientConnection* { return test_session_->client_connection_; });
 
   ON_CALL(*health_checker_, createCodecClient_(_))
-      .WillByDefault(
-          Invoke([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
-            TestSession& test_session = *test_session_;
-            std::shared_ptr<Upstream::MockClusterInfo> cluster{
-                new NiceMock<Upstream::MockClusterInfo>()};
-            Event::MockDispatcher dispatcher_;
-            test_session.codec_client_ = new CodecClientForTest(
-                Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_,
-                nullptr, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
-            return test_session.codec_client_;
-          }));
+      .WillByDefault([&](Upstream::Host::CreateConnectionData& conn_data) -> Http::CodecClient* {
+        TestSession& test_session = *test_session_;
+        std::shared_ptr<Upstream::MockClusterInfo> cluster{
+            new NiceMock<Upstream::MockClusterInfo>()};
+        Event::MockDispatcher dispatcher_;
+        test_session.codec_client_ = new CodecClientForTest(
+            Http::CodecType::HTTP1, std::move(conn_data.connection_), test_session.codec_, nullptr,
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), dispatcher_);
+        return test_session.codec_client_;
+      });
   expectStreamCreate();
   health_checker_->start();
   ON_CALL(context_.runtime_.snapshot_, getInteger("health_check.min_interval", _))

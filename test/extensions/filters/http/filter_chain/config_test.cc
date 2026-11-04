@@ -4,8 +4,10 @@
 #include "source/extensions/filters/http/filter_chain/config.h"
 #include "source/extensions/filters/http/filter_chain/filter.h"
 
+#include "test/integration/filters/test_filters.pb.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
@@ -144,6 +146,55 @@ TEST(FilterChainFilterFactoryTest,
       factory.createHttpFilterRouteConfig(*proto_config, factory_context, extra_context);
   EXPECT_THAT(route_config, HasStatus(absl::StatusCode::kInvalidArgument,
                                       "FilterChain filter cannot be configured recursively."));
+}
+
+// Records the stats prefix that the filter chain hands to its filters.
+class StatsPrefixRecordingFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  absl::StatusOr<Http::FilterFactoryCb> createHttpFilterFactoryFromProto(
+      const Protobuf::Message&, Server::Configuration::ServerFactoryContext&,
+      Server::Configuration::ExtraFactoryContext& extra_context) override {
+    stats_prefix_ = extra_context.stats_prefix;
+    return [](Http::FilterChainFactoryCallbacks&) {};
+  }
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    return absl::UnimplementedError("unexpected");
+  }
+  bool isUnifiedFilter() override { return true; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<test::integration::filters::PassthroughFilterConfig>();
+  }
+  std::string name() const override { return "stats-prefix-recording-filter"; }
+
+  std::string stats_prefix_;
+};
+
+TEST(FilterChainFilterFactoryTest, RouteSpecificConfigUsesStatsPrefixOfExtraContext) {
+  StatsPrefixRecordingFactory recording_factory;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registration(
+      recording_factory);
+  FilterChainFilterFactory factory;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  const std::string yaml_string = R"EOF(
+  filter_chain:
+    filters:
+    - name: stats-prefix-recording-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.PassthroughFilterConfig
+  )EOF";
+
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(yaml_string, *proto_config);
+
+  const std::string stats_prefix = "http.ingress.";
+  Server::Configuration::ExtraFactoryContext extra_context{
+      ProtobufMessage::getNullValidationVisitor(), stats_prefix};
+  EXPECT_TRUE(
+      factory.createHttpFilterRouteConfig(*proto_config, factory_context, extra_context).ok());
+  EXPECT_EQ("http.ingress.", recording_factory.stats_prefix_);
 }
 
 } // namespace

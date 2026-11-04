@@ -1,17 +1,21 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "http_subscription_impl_test",
     srcs = ["http_subscription_impl_test.cc"],
+    extension_names = ["envoy.config_subscription.rest"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":http_subscription_test_harness",

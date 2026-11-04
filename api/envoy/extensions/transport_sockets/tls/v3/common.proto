@@ -107,8 +107,7 @@ message TlsParameters {
   //   Using TLS protocol versions below TLSv1_2 has serious security considerations and risks.
   TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
 
-  // Maximum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_3`` for
-  // servers.
+  // Maximum TLS protocol version. By default, it's ``TLSv1_3`` for both clients and servers.
   TlsProtocol tls_maximum_protocol_version = 2 [(validate.rules).enum = {defined_only: true}];
 
   // If specified, the TLS listener will only support the specified `cipher list

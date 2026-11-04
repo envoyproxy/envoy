@@ -836,6 +836,22 @@ TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedInvalidEscapes) {
   EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
 }
 
+// A double-quoted token that begins directly with a hex escape (``"\xAB"``) must
+// decode without reading before the start of the accumulated string.
+TEST_F(RedisEncoderDecoderImplTest, InlineCommandQuotedLeadingHexEscape) {
+  RespValue unescaped;
+  unescaped.type(RespType::BulkString);
+  unescaped.asString() = std::string("\xAB", 1);
+
+  // Bytes on the wire: quote, backslash, 'x', 'A', 'B', quote, CRLF.
+  buffer_.add("\"\\xAB\"\r\n");
+  decoder_.decode(buffer_);
+  EXPECT_EQ(1UL, decoded_values_.size());
+  EXPECT_EQ(RespType::Array, decoded_values_[0]->type());
+  EXPECT_EQ(1UL, decoded_values_[0]->asArray().size());
+  EXPECT_EQ(unescaped, decoded_values_[0]->asArray()[0]);
+}
+
 TEST_F(RedisEncoderDecoderImplTest, InlineCommandSingleQuotedCommand) {
   RespValue echo;
   echo.type(RespType::BulkString);
