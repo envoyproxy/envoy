@@ -2,6 +2,7 @@
 #include "envoy/stream_info/bool_accessor.h"
 
 #include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uuid_object_impl.h"
 #include "source/extensions/filters/common/set_filter_state/filter_config.h"
 #include "source/server/generic_factory_context.h"
 
@@ -106,6 +107,43 @@ TEST_F(ConfigTest, SetHashableValueWithFactory) {
   )YAML"});
   update();
   const auto* foo = info_.filterState()->getDataReadOnly<Hashable>("my_key");
+  ASSERT_NE(nullptr, foo);
+}
+
+TEST_F(ConfigTest, SetUuidValueWithFactory) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.uuid
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(x-tunnel-id)%"
+    shared_with_upstream: ONCE
+  )YAML"});
+  header_map_.addCopy("x-tunnel-id", "a121e9e1-feae-4136-9e0e-6fac343d56c9");
+  update();
+  const auto* foo = info_.filterState()->getDataReadOnly<StreamInfo::UuidObject>("my_key");
+  ASSERT_NE(nullptr, foo);
+  // The input is ignored and a random UUID is generated instead.
+  const std::string uuid = foo->serializeAsString().value();
+  EXPECT_EQ(36, uuid.size());
+  EXPECT_NE("a121e9e1-feae-4136-9e0e-6fac343d56c9", uuid);
+  EXPECT_EQ(1, info_.filterState()->objectsSharedWithUpstreamConnection()->size());
+
+  std::vector<uint8_t> key;
+  foo->hashKey(key);
+  EXPECT_EQ(16, key.size());
+}
+
+TEST_F(ConfigTest, SetUuidValueWithFactoryEmptyInput) {
+  initialize({R"YAML(
+    object_key: my_key
+    factory_key: envoy.uuid
+    format_string:
+      text_format_source:
+        inline_string: ""
+  )YAML"});
+  update();
+  const auto* foo = info_.filterState()->getDataReadOnly<StreamInfo::UuidObject>("my_key");
   ASSERT_NE(nullptr, foo);
 }
 
