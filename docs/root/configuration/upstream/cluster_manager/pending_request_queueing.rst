@@ -133,6 +133,23 @@ manager filter chain:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
+Impact on tenant isolation
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In an unconfigured connection pool (default FIFO ordering), an aggressive or bursty tenant can
+fill the pending request queue when upstream connection capacity is constrained. Requests from
+well-behaved tenants wait behind the backlog, suffering head-of-line blocking and inflated tail
+latency:
+
+.. image:: images/queue_and_latency_timeseries_no_queue.png
+
+With the fair queue policy enabled, Envoy partitions pending requests into per-class buckets
+and services active buckets in round-robin order. A bursty tenant fills only its own bucket.
+Envoy continues to dequeue requests from other tenants promptly, preserving low tail latency
+without shedding traffic:
+
+.. image:: images/queue_and_latency_timeseries_fair_queue.png
+
 Observability
 -------------
 
