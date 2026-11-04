@@ -221,7 +221,7 @@ public:
           tls_context, factory_context_, {}, false);
       addFakeUpstream(
           *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
-              std::move(config), context_manager_, server_factory_context_.serverScope()),
+              std::move(config), context_manager_, upstreamStatsScope()),
           Http::CodecType::HTTP1, false);
     }
   }
