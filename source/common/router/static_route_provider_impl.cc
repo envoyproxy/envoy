@@ -3,7 +3,6 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/router/route_config_update_receiver_impl.h"
-#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {

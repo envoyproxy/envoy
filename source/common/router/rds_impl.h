@@ -63,7 +63,6 @@ public:
   ~RdsRouteConfigSubscription() override;
 
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
-  void updateOnDemand(const std::string& alias) { config_update_info_->updateOnDemand(alias); }
 
 protected:
   RdsRouteConfigSubscription(

@@ -17,7 +17,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/route_config_update_receiver_impl.h"
-#include "source/common/router/vhds.h"
 
 namespace Envoy {
 namespace Router {
