@@ -4,6 +4,3 @@ in both the filter-level and per-route configuration. These actions update match
 token buckets when the stream completes and remain skipped on the request path. The default local
 token bucket continues to apply only on the request path. Route and virtual-host rate limit entries
 are unchanged and continue to apply on the request path.
-
-Missing or empty formatted completion usage now skips the descriptor without warning in both
-global and local rate limiting. Invalid nonempty usage still logs a warning.

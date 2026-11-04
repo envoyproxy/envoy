@@ -23,7 +23,6 @@ envoy_extension_cc_test(
         "//test/common/stream_info:test_util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_factory_context_mocks",
-        "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",

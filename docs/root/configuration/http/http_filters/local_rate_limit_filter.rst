@@ -189,9 +189,8 @@ descriptor bucket without blocking the completed request. Usage exceeding the re
 overdraws the bucket: it borrows future tokens, and later requests are rejected until the refill
 repays the debt. The debt is capped at the bucket's ``max_tokens``, and usage beyond the cap is
 dropped. The default token bucket is consumed only on the request path.
-Missing or empty formatted usage is skipped quietly. Invalid nonempty usage does not generate a
-descriptor and logs a warning. Negative hits addends refund tokens using the existing local
-descriptor behavior.
+Missing, empty or invalid formatted usage does not generate a descriptor and logs a warning.
+Negative hits addends refund tokens using the existing local descriptor behavior.
 
 With ``local_cluster_rate_limit``, positive charges are divided by the local cluster's token share
 factor, while refunds add the specified token count without scaling. This matches request-path
@@ -210,8 +209,8 @@ change the response or increment request counters again.
 As with the global rate limit filter, completion actions also run when the request was rejected
 by the rate limit filter. Stream information such as ``%BYTES_SENT%`` includes usage from a local
 rate limit response. To account for upstream-reported usage, use a response header such as
-``%RESP(x-usage)%`` that is present only when the upstream reports a cost. A missing header is
-skipped without logging a warning.
+``%RESP(x-usage)%`` that is present only when the upstream reports a cost. A missing header
+drops the descriptor and logs a warning.
 
 Statistics
 ----------
