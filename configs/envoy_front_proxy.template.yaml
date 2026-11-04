@@ -65,6 +65,9 @@
             "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit
             domain: envoy_front
             request_type: external
+            rate_limits:
+            - actions:
+              - remote_address: {}
             rate_limit_service:
               grpc_service:
                 envoy_grpc:
