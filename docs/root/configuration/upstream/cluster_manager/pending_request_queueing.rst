@@ -71,7 +71,7 @@ How it works
 1. **Classification**: Envoy extracts the class identifier from dynamic metadata using
    :ref:`class_metadata_key
    <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.class_metadata_key>`.
-   The value may be a string, number, or boolean.
+   The value may be a string, number, boolean, struct, or list.
 2. **Default class**: Envoy assigns requests that lack the specified metadata key to a dedicated
    default class. Unclassified traffic shares a single bucket. This ensures unclassified bursts
    cannot pollute buckets assigned to classified tenants.
