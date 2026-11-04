@@ -166,7 +166,7 @@ static void BM_StdListMoveToFrontReinsert(benchmark::State& state) {
 BENCHMARK(BM_StdListMoveToFrontReinsert)->Arg(1)->Arg(8)->Arg(64)->Arg(512);
 
 // Benchmark moving an item to the front of a std::list<unique_ptr<T>> with splice,
-// which relinks the existing node.
+// which reuses the existing node.
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_StdListMoveToFrontSplice(benchmark::State& state) {
   const int n = state.range(0);
