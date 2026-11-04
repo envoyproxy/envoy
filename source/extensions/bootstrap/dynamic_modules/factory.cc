@@ -7,6 +7,7 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
@@ -32,6 +33,12 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
     Extensions::DynamicModules::incrementLoadFailure(
         context, proto_config.extension_name(), Extensions::DynamicModules::RemoteFetchErrorStat);
     throwEnvoyExceptionOrPanic("Bootstrap dynamic module does not support remote module sources");
+  }
+  OptRef<const envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter> cluster_writer;
+  if (proto_config.has_cluster_writer()) {
+    THROW_IF_NOT_OK(registerClusterWriter(context, proto_config.extension_name(),
+                                          proto_config.cluster_writer().name_prefix()));
+    cluster_writer = makeOptRef(proto_config.cluster_writer());
   }
   auto load_result = Extensions::DynamicModules::newDynamicModuleByConfig(
       module_config, proto_config.extension_name(), context);
@@ -60,7 +67,7 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
   auto extension_config = newDynamicModuleBootstrapExtensionConfig(
       proto_config.extension_name(), extension_config_str, metrics_namespace,
       std::move(dynamic_module), context.mainThreadDispatcher(), context,
-      context.serverScope().store());
+      context.serverScope().store(), cluster_writer);
 
   if (!extension_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(

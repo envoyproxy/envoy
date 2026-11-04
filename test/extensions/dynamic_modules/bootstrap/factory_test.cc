@@ -4,6 +4,7 @@
 #include "source/extensions/bootstrap/dynamic_modules/factory.h"
 
 #include "test/extensions/dynamic_modules/util.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
@@ -170,6 +171,30 @@ TEST_F(FactoryTestBase, RemoteSourceWithNackRejected) {
 
   EXPECT_EQ(1U, failureCounter(context_.serverScope(), "remote_fetch_error", "test"));
   EXPECT_EQ(0U, failureCounter(context_.serverScope(), "module_load_error", "test"));
+}
+
+TEST_F(FactoryTestBase, CreatesClusterWriterAndRejectsOverlappingPrefixes) {
+  DynamicModuleBootstrapExtensionFactory factory;
+  envoy::extensions::bootstrap::dynamic_modules::v3::DynamicModuleBootstrapExtension proto_config;
+  proto_config.mutable_dynamic_module_config()->mutable_module()->mutable_local()->set_filename(
+      testDataDir() + "/libbootstrap_no_op.so");
+  proto_config.set_extension_name("first");
+  proto_config.mutable_cluster_writer()->set_name_prefix("first.");
+
+  // The writer creates its schedulable callbacks with the extension.
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  auto extension = factory.createBootstrapExtension(proto_config, context_);
+  ASSERT_NE(extension, nullptr);
+  EXPECT_NE(nullptr, dynamic_cast<DynamicModuleBootstrapExtension&>(*extension)
+                         .getExtensionConfig()
+                         .cluster_writer_);
+
+  // A second writer may not use an overlapping prefix.
+  proto_config.set_extension_name("second");
+  proto_config.mutable_cluster_writer()->set_name_prefix("first.second.");
+  EXPECT_THROW_WITH_REGEX(factory.createBootstrapExtension(proto_config, context_), EnvoyException,
+                          "overlaps name_prefix first. of first");
 }
 
 } // namespace DynamicModules

@@ -3460,6 +3460,38 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_liste
   false
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  event_id: u64,
+) -> bool {
+  event_id == 7
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  cluster: abi::envoy_dynamic_module_type_module_buffer,
+  version_info: abi::envoy_dynamic_module_type_module_buffer,
+  update_id_out: *mut u64,
+) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result {
+  // Reports the argument lengths through the update ID so that the test can check them.
+  unsafe {
+    *update_id_out =
+      (cluster_name.length * 10000 + cluster.length * 100 + version_info.length) as u64;
+  }
+  abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
+  abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -8428,6 +8460,205 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
+}
+
+#[test]
+fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  // Calling the worker and cluster writer hooks with default implementations should not panic.
+  envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 1);
+  envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+  );
+  envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+    cluster_name_buf,
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  );
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
+  use std::sync::atomic::{AtomicU64, Ordering};
+  static WORKER_EVENT_ID: AtomicU64 = AtomicU64::new(0);
+  static DONE_EVENT_ID: AtomicU64 = AtomicU64::new(0);
+  type UpdateDone = (
+    u64,
+    String,
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    String,
+  );
+  static UPDATE_DONE: std::sync::Mutex<Option<UpdateDone>> = std::sync::Mutex::new(None);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_worker_event(
+      &self,
+      _envoy_extension_config: &dyn EnvoyBootstrapExtensionConfig,
+      event_id: u64,
+    ) {
+      WORKER_EVENT_ID.store(event_id, Ordering::SeqCst);
+    }
+
+    fn on_run_on_all_workers_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      event_id: u64,
+    ) {
+      DONE_EVENT_ID.store(event_id, Ordering::SeqCst);
+    }
+
+    fn on_cluster_writer_update_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      update_id: u64,
+      cluster_name: &str,
+      status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+      error_details: &str,
+    ) {
+      *UPDATE_DONE.lock().unwrap() = Some((
+        update_id,
+        cluster_name.to_string(),
+        status,
+        error_details.to_string(),
+      ));
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 3);
+  assert_eq!(WORKER_EVENT_ID.load(Ordering::SeqCst), 3);
+
+  envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    4,
+  );
+  assert_eq!(DONE_EVENT_ID.load(Ordering::SeqCst), 4);
+
+  let cluster_name = "writer.a";
+  let error_details = "invalid cluster";
+  envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    5,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: cluster_name.as_ptr() as *const _,
+      length: cluster_name.len(),
+    },
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: error_details.as_ptr() as *const _,
+      length: error_details.len(),
+    },
+  );
+  assert_eq!(
+    *UPDATE_DONE.lock().unwrap(),
+    Some((
+      5,
+      "writer.a".to_string(),
+      abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Failed,
+      "invalid cluster".to_string(),
+    ))
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
+  let envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  assert!(envoy_config.run_on_all_workers(7));
+  assert!(!envoy_config.run_on_all_workers(8));
+
+  // The stub encodes the lengths of the name, the cluster and the version in the update ID.
+  assert_eq!(
+    envoy_config.cluster_writer_add_or_update("writer.a", b"xyz", "v1"),
+    (
+      abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result::Success,
+      80302
+    )
+  );
+  assert_eq!(
+    envoy_config.cluster_writer_remove("writer.a"),
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+  );
 }
 
 #[test]

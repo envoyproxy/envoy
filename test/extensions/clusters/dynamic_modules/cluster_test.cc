@@ -36,6 +36,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -76,8 +77,8 @@ public:
   // given id, so the destructor's cancellation loop sees a pending entry.
   static void injectPendingHttpCallout(DynamicModuleCluster& cluster, uint64_t callout_id,
                                        Http::AsyncClient::Request* request) {
-    auto callback = std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(
-        /*cluster=*/nullptr, callout_id);
+    auto callback =
+        std::make_unique<DynamicModuleCluster::HttpCalloutCallback>(cluster, callout_id);
     callback->request_ = request;
     cluster.http_callouts_.emplace(callout_id, std::move(callback));
   }
@@ -1705,6 +1706,378 @@ TEST_F(DynamicModuleClusterTest, OnScheduledDirect) {
   cluster->onScheduled(789);
 }
 
+// Loads the cluster_init_in_hooks module. The handle keeps the module loaded, so its accessors stay
+// valid after the clusters that use it are destroyed.
+Envoy::Extensions::DynamicModules::DynamicModulePtr initInHooksModule() {
+  auto module = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_init_in_hooks", "c"),
+      /*do_not_close=*/false);
+  EXPECT_OK(module);
+  return std::move(module.value());
+}
+
+// Returns a test accessor exported by the cluster_init_in_hooks module.
+template <class FunctionType>
+FunctionType initInHooksFunction(Envoy::Extensions::DynamicModules::DynamicModule& module,
+                                 const std::string& function_name) {
+  auto function = module.getFunctionPointer<FunctionType>(function_name);
+  EXPECT_OK(function);
+  return function.value();
+}
+
+// A lifecycle registration handle that counts its releases and checks that they run on the main
+// thread.
+class MainThreadReleasedHandle : public Server::ServerLifecycleNotifier::Handle,
+                                 public Envoy::Common::CallbackHandle {
+public:
+  explicit MainThreadReleasedHandle(std::atomic<int>& releases) : releases_(releases) {}
+  ~MainThreadReleasedHandle() override {
+    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+    ++releases_;
+  }
+
+private:
+  std::atomic<int>& releases_;
+};
+
+// Test that a scheduler created in on_cluster_new delivers its events, since a shared_ptr already
+// owns the cluster when the hook runs.
+TEST_F(DynamicModuleClusterTest, SchedulerCreatedInOnClusterNewDeliversEvents) {
+  auto module = initInHooksModule();
+  Event::PostCb captured_cb;
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+    captured_cb = std::move(cb);
+  });
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "scheduler_in_new"));
+  ASSERT_OK(result);
+  ASSERT_NE(nullptr, captured_cb);
+
+  captured_cb();
+  EXPECT_EQ(42, initInHooksFunction<uint64_t (*)()>(
+                    *module, "cluster_init_in_hooks_test_last_scheduled_event_id")());
+  result = absl::InternalError("cleanup");
+}
+
+// Test that an HTTP callout started in on_cluster_new is sent.
+TEST_F(DynamicModuleClusterTest, HttpCalloutStartedInOnClusterNewIsSent) {
+  auto module = initInHooksModule();
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("callout_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Return(&request));
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "callout_in_new"));
+  ASSERT_OK(result);
+  EXPECT_EQ(
+      envoy_dynamic_module_type_http_callout_init_result_Success,
+      initInHooksFunction<int (*)()>(*module, "cluster_init_in_hooks_test_callout_init_result")());
+  EXPECT_CALL(request, cancel());
+  result = absl::InternalError("cleanup");
+}
+
+// Test that an HTTP callout started in on_cluster_destroy is cancelled with the cluster.
+TEST_F(DynamicModuleClusterTest, HttpCalloutStartedInOnClusterDestroyIsCancelled) {
+  auto module = initInHooksModule();
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("callout_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Return(&request));
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "callout_in_destroy"));
+  ASSERT_OK(result);
+
+  EXPECT_CALL(request, cancel());
+  result = absl::InternalError("destroyed");
+  EXPECT_EQ(
+      envoy_dynamic_module_type_http_callout_init_result_Success,
+      initInHooksFunction<int (*)()>(*module, "cluster_init_in_hooks_test_callout_init_result")());
+}
+
+// Test that pre_init_complete called inside on_cluster_init takes effect once the hook returns.
+TEST_F(DynamicModuleClusterTest, PreInitCompleteInsideOnClusterInitTakesEffectAfterTheHook) {
+  auto module = initInHooksModule();
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "pre_init_in_init"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  const auto returned_from_pre_init_complete = initInHooksFunction<int (*)()>(
+      *module, "cluster_init_in_hooks_test_returned_from_pre_init_complete");
+
+  bool initialized = false;
+  cluster->initialize([&]() {
+    initialized = true;
+    EXPECT_EQ(1, returned_from_pre_init_complete());
+    return absl::OkStatus();
+  });
+  EXPECT_TRUE(initialized);
+}
+
+// Test that pre_init_complete called inside on_cluster_http_callout_done takes effect from a posted
+// callback, for a callout that succeeds and for one whose failure is reported from a posted
+// callback.
+TEST_F(DynamicModuleClusterTest, PreInitCompleteInsideOnClusterHttpCalloutDoneIsPosted) {
+  auto module = initInHooksModule();
+  const auto returned_from_pre_init_complete = initInHooksFunction<int (*)()>(
+      *module, "cluster_init_in_hooks_test_returned_from_pre_init_complete");
+  for (const bool succeed : {true, false}) {
+    NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+    EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("callout_cluster"))
+        .WillOnce(testing::Return(&thread_local_cluster));
+    Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+    Http::AsyncClient::Callbacks* callbacks = nullptr;
+    EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+        .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callbacks = &cb;
+          return &request;
+        });
+    auto result = createCluster(makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test",
+                                                                "pre_init_in_callout_done"));
+    ASSERT_OK(result);
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+    bool initialized = false;
+    cluster->initialize([&]() {
+      initialized = true;
+      EXPECT_EQ(1, returned_from_pre_init_complete());
+      return absl::OkStatus();
+    });
+    ASSERT_NE(nullptr, callbacks);
+    EXPECT_FALSE(initialized);
+    Event::PostCb posted_cb;
+    EXPECT_CALL(server_context_.dispatcher_, post(_))
+        .Times(succeed ? 1 : 2)
+        .WillRepeatedly([&](Event::PostCb cb) { posted_cb = std::move(cb); });
+    if (succeed) {
+      Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+          Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+      callbacks->onSuccess(request, std::move(response));
+    } else {
+      callbacks->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+      Event::PostCb report_failure_cb = std::move(posted_cb);
+      report_failure_cb();
+    }
+    EXPECT_FALSE(initialized) << succeed;
+    ASSERT_NE(nullptr, posted_cb);
+    posted_cb();
+    EXPECT_TRUE(initialized) << succeed;
+  }
+}
+
+// Test that pre_init_complete called inside the scheduled and lifecycle hooks takes effect from a
+// posted callback, since the cluster that it replaces could otherwise be freed while Envoy runs a
+// callback list.
+TEST_F(DynamicModuleClusterTest, PreInitCompleteInsideHooksIsPosted) {
+  auto module = initInHooksModule();
+  const auto returned_from_pre_init_complete = initInHooksFunction<int (*)()>(
+      *module, "cluster_init_in_hooks_test_returned_from_pre_init_complete");
+  for (const absl::string_view hook :
+       {"scheduled", "server_initialized", "drain_started", "shutdown"}) {
+    Server::ServerLifecycleNotifier::StageCallback server_initialized_cb;
+    Server::DrainManager::DrainCloseCb drain_cb;
+    Server::ServerLifecycleNotifier::StageCallbackWithCompletion shutdown_cb;
+    EXPECT_CALL(server_context_.lifecycle_notifier_,
+                registerCallback(Server::ServerLifecycleNotifier::Stage::PostInit,
+                                 An<Server::ServerLifecycleNotifier::StageCallback>()))
+        .WillOnce(
+            testing::DoAll(testing::SaveArg<1>(&server_initialized_cb), testing::Return(nullptr)));
+    EXPECT_CALL(server_context_.drain_manager_, addOnDrainCloseCb(Network::DrainDirection::All, _))
+        .WillOnce(testing::DoAll(testing::SaveArg<1>(&drain_cb), testing::Return(nullptr)));
+    EXPECT_CALL(
+        server_context_.lifecycle_notifier_,
+        registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                         An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+        .WillOnce(testing::DoAll(testing::SaveArg<1>(&shutdown_cb), testing::Return(nullptr)));
+    auto result = createCluster(makeYamlConfigWithClusterConfig(
+        "cluster_init_in_hooks", "test", absl::StrCat("pre_init_in_", hook)));
+    ASSERT_OK(result);
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+    bool initialized = false;
+    cluster->initialize([&]() {
+      initialized = true;
+      EXPECT_EQ(1, returned_from_pre_init_complete());
+      return absl::OkStatus();
+    });
+    EXPECT_FALSE(initialized) << hook;
+    Event::PostCb posted_cb;
+    EXPECT_CALL(server_context_.dispatcher_, post(_)).WillOnce([&](Event::PostCb cb) {
+      posted_cb = std::move(cb);
+    });
+    if (hook == "scheduled") {
+      cluster->onScheduled(1);
+    } else if (hook == "server_initialized") {
+      server_initialized_cb();
+    } else if (hook == "drain_started") {
+      EXPECT_OK(drain_cb(std::chrono::milliseconds(0)));
+    } else {
+      bool completed = false;
+      shutdown_cb([&completed]() { completed = true; });
+      EXPECT_TRUE(completed);
+    }
+    EXPECT_FALSE(initialized) << hook;
+    ASSERT_NE(nullptr, posted_cb) << hook;
+    posted_cb();
+    EXPECT_TRUE(initialized) << hook;
+  }
+}
+
+// Test that pre_init_complete called before on_cluster_init takes effect once on_cluster_init
+// returns.
+TEST_F(DynamicModuleClusterTest, PreInitCompleteBeforeOnClusterInitIsHeld) {
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "pre_init_in_new"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+  bool initialized = false;
+  cluster->initialize([&]() {
+    initialized = true;
+    return absl::OkStatus();
+  });
+  EXPECT_TRUE(initialized);
+}
+
+// Test that run_on_all_workers called inside on_cluster_new starts once the hook returns, since the
+// workers read the in-module cluster that the hook returns.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersInsideOnClusterNewStartsOnceTheHookReturns) {
+  auto module = initInHooksModule();
+  // The thread local mock runs callbacks on the test thread. Run them on a worker first.
+  EXPECT_CALL(server_context_.thread_local_, runOnAllThreads(_))
+      .WillOnce([](std::function<void()> cb) {
+        std::thread worker(cb);
+        worker.join();
+        cb();
+      });
+  auto result = createCluster(makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test",
+                                                              "run_on_all_workers_in_new"));
+  ASSERT_OK(result);
+  EXPECT_EQ(7, initInHooksFunction<uint64_t (*)()>(
+                   *module, "cluster_init_in_hooks_test_last_worker_event_id")());
+}
+
+// Test that a cluster neither finishes initializing nor starts its health checks once the cluster
+// manager released it.
+TEST_F(DynamicModuleClusterTest, ReleasedClusterDoesNotFinishInitializing) {
+  for (const absl::string_view lb_policy : {"CLUSTER_PROVIDED", "ROUND_ROBIN"}) {
+    auto result = createCluster(absl::StrReplaceAll(
+        makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "pre_init_in_scheduled"),
+        {{"CLUSTER_PROVIDED", lb_policy}}));
+    ASSERT_OK(result);
+    auto* cluster = dynamic_cast<DynamicModuleCluster*>(result->first.get());
+    ASSERT_NE(nullptr, cluster);
+    auto health_checker = std::make_shared<NiceMock<Upstream::MockHealthChecker>>();
+    EXPECT_CALL(*health_checker, start()).Times(0);
+    cluster->setHealthChecker(health_checker);
+
+    bool initialized = false;
+    cluster->initialize([&]() {
+      initialized = true;
+      return absl::OkStatus();
+    });
+    // Keep the released cluster alive, as a hook that runs on it would.
+    std::shared_ptr<DynamicModuleCluster> alive = cluster->shared_from_this();
+    result = absl::InternalError("released");
+    cluster->onScheduled(1);
+    envoy_dynamic_module_callback_cluster_pre_init_complete(cluster);
+    EXPECT_FALSE(initialized) << lb_policy;
+  }
+}
+
+// Test that health checks do not finish the initialization of a cluster that the cluster manager
+// released.
+TEST_F(DynamicModuleClusterTest, HealthChecksDoNotFinishTheInitializationOfAReleasedCluster) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto* cluster = dynamic_cast<DynamicModuleCluster*>(result->first.get());
+  ASSERT_NE(nullptr, cluster);
+  auto health_checker = std::make_shared<NiceMock<Upstream::MockHealthChecker>>();
+  cluster->setHealthChecker(health_checker);
+  std::vector<Upstream::HostSharedPtr> hosts;
+  ASSERT_TRUE(addSimpleHosts(*cluster, {"127.0.0.1:10001"}, {1}, hosts));
+
+  // The initialization waits for the first health check of the host.
+  bool initialized = false;
+  cluster->initialize([&initialized] {
+    initialized = true;
+    return absl::OkStatus();
+  });
+  envoy_dynamic_module_callback_cluster_pre_init_complete(cluster);
+  ASSERT_FALSE(initialized);
+
+  // Keep the released cluster alive, as its load balancer would.
+  std::shared_ptr<DynamicModuleCluster> alive = cluster->shared_from_this();
+  result = absl::InternalError("released");
+  health_checker->runCallbacks(hosts[0], Upstream::HealthTransition::Changed,
+                               Upstream::HealthState::Healthy);
+  EXPECT_FALSE(initialized);
+}
+
+// Test that a cluster with a native load balancer is destroyed as soon as the cluster manager
+// releases it.
+TEST_F(DynamicModuleClusterTest, NativeLbClusterIsDestroyedWhenReleased) {
+  auto result = createCluster(
+      absl::StrReplaceAll(makeYamlConfig("cluster_no_op"), {{"CLUSTER_PROVIDED", "ROUND_ROBIN"}}));
+  ASSERT_OK(result);
+  ASSERT_EQ(nullptr, result->second);
+  // The cluster destructor cancels this callout, which shows when the cluster is destroyed.
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  DynamicModuleClusterTestPeer::injectPendingHttpCallout(
+      dynamic_cast<DynamicModuleCluster&>(*result->first), /*callout_id=*/1, &request);
+  bool cancelled = false;
+  EXPECT_CALL(request, cancel()).WillOnce([&cancelled]() { cancelled = true; });
+  // Hold what is handed to the main thread, so that a deferred destruction would not run yet.
+  std::vector<Event::DispatcherThreadDeletableConstPtr> deletables;
+  EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_))
+      .WillRepeatedly([&deletables](Event::DispatcherThreadDeletableConstPtr deletable) {
+        deletables.push_back(std::move(deletable));
+      });
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  result = absl::InternalError("released");
+  EXPECT_TRUE(cancelled);
+  // Destroying a deletable can hand over another one.
+  while (!deletables.empty()) {
+    Event::DispatcherThreadDeletableConstPtr deletable = std::move(deletables.back());
+    deletables.pop_back();
+  }
+}
+
+// Test that an HTTP callout in flight does not keep a released cluster alive.
+TEST_F(DynamicModuleClusterTest, HttpCalloutInFlightDoesNotKeepTheClusterAlive) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce(testing::Return(&request));
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3},
+      {":path", 5, "/test", 5},
+      {"host", 4, "example.com", 11},
+  };
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success,
+            envoy_dynamic_module_callback_cluster_http_callout(cluster.get(), &callout_id,
+                                                               {"test_cluster", 12}, headers.data(),
+                                                               headers.size(), {nullptr, 0}, 5000));
+
+  std::weak_ptr<DynamicModuleCluster> weak_cluster = cluster->weak_from_this();
+  EXPECT_CALL(request, cancel());
+  cluster.reset();
+  result = absl::InternalError("cleanup");
+  EXPECT_TRUE(weak_cluster.expired());
+}
+
 // Test run_on_all_workers is safe to call with no payload published and allocates the slot
 // lazily.
 TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsSafeOnUnpopulatedSlot) {
@@ -1778,6 +2151,62 @@ TEST_F(DynamicModuleClusterTest, RunOnAllWorkersIsNoOpWithoutWorkerEventHook) {
   EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
 }
 
+// Test that the worker event runs on worker threads and not on the main thread, whether or not the
+// main dispatcher runs yet.
+TEST_F(DynamicModuleClusterTest, RunOnAllWorkersRunsOnWorkerThreads) {
+  auto module_handle = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_run_on_all_workers", "c"),
+      /*do_not_close=*/true);
+  ASSERT_OK(module_handle);
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+
+  // Before the main loop runs, the main dispatcher reports every thread as thread safe.
+  ON_CALL(server_context_.dispatcher_, isThreadSafe()).WillByDefault(testing::Return(true));
+  // The thread local mock runs callbacks on the test thread. Run them on a worker first.
+  EXPECT_CALL(server_context_.thread_local_, runOnAllThreads(_))
+      .WillOnce([](std::function<void()> cb) {
+        std::thread worker(cb);
+        worker.join();
+        cb();
+      });
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/42);
+
+  using GetCountFn = size_t (*)();
+  using GetEventIdFn = uint64_t (*)();
+  EXPECT_EQ(1, (*module_handle.value()->getFunctionPointer<GetCountFn>(
+                   "cluster_run_on_all_workers_test_get_count"))());
+  EXPECT_EQ(42, (*module_handle.value()->getFunctionPointer<GetEventIdFn>(
+                    "cluster_run_on_all_workers_test_get_last_event_id"))());
+}
+
+// Test that run_on_all_workers and worker_slot_set do not reach the workers once thread local
+// storage shut down, and that worker_slot_set then releases the data right away.
+TEST_F(DynamicModuleClusterTest, WorkerCallbacksDoNotReachTheWorkersAfterThreadLocalShutdown) {
+  auto module_handle = Envoy::Extensions::DynamicModules::newDynamicModule(
+      Envoy::Extensions::DynamicModules::testSharedObjectPath("cluster_run_on_all_workers", "c"),
+      /*do_not_close=*/true);
+  ASSERT_OK(module_handle);
+  auto get_destroy_count = module_handle.value()->getFunctionPointer<size_t (*)()>(
+      "cluster_run_on_all_workers_test_get_destroy_count");
+  ASSERT_OK(get_destroy_count);
+  auto result = createCluster(makeYamlConfig("cluster_run_on_all_workers"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+  const size_t destroy_count = (*get_destroy_count.value())();
+
+  server_context_.thread_local_.shutdownGlobalThreading();
+  EXPECT_CALL(server_context_.thread_local_, runOnAllThreads(_)).Times(0);
+  envoy_dynamic_module_callback_cluster_run_on_all_workers(cluster.get(), /*event_id=*/1);
+  uint64_t* payload = static_cast<uint64_t*>(std::malloc(sizeof(uint64_t)));
+  envoy_dynamic_module_callback_cluster_worker_slot_set(cluster.get(), payload);
+  EXPECT_EQ(destroy_count + 1, (*get_destroy_count.value())());
+  EXPECT_EQ(nullptr, envoy_dynamic_module_callback_cluster_worker_slot_get(cluster.get()));
+}
+
 // Test worker_slot_get returns nullptr when the slot has never been allocated (no prior
 // worker_slot_set or run_on_all_workers call).
 TEST_F(DynamicModuleClusterTest, WorkerSlotGetReturnsNullptrBeforeAllocation) {
@@ -1815,48 +2244,168 @@ TEST_F(DynamicModuleClusterTest, ClusterGetNameReturnsCdsName) {
   EXPECT_EQ("test_cluster", absl::string_view(buffer.ptr, buffer.length));
 }
 
-// Test the DynamicModuleClusterHandle destructor dispatches to main thread.
+// Test that the DynamicModuleClusterHandle destructor releases the cluster through
+// deleteInDispatcherThread instead of a posted callback.
 TEST_F(DynamicModuleClusterTest, HandleDestructorDispatchesToMainThread) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_OK(result);
 
-  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
-  ASSERT_NE(nullptr, cluster);
+  std::shared_ptr<DynamicModuleCluster> cluster =
+      dynamic_cast<DynamicModuleCluster&>(*result->first).shared_from_this();
 
-  // Create a handle and let it go out of scope.
+  // The internal handle held by the thread-aware load balancer also hands the cluster over when
+  // `result` is torn down, so capture only the first handover.
+  Event::DispatcherThreadDeletableConstPtr release;
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_))
+      .WillOnce([&](Event::DispatcherThreadDeletableConstPtr deletable) {
+        release = std::move(deletable);
+      })
+      .WillRepeatedly([](Event::DispatcherThreadDeletableConstPtr) {});
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
-  // The handle destructor should post to the dispatcher. The mock dispatcher will execute
-  // the posted callback inline.
+  const long use_count = cluster.use_count();
   handle.reset();
+  ASSERT_NE(nullptr, release);
+  EXPECT_EQ(use_count, cluster.use_count());
+  release.reset();
+  EXPECT_EQ(use_count - 1, cluster.use_count());
 }
 
-// Covers that a worker-thread handle destruction posts the full teardown to the main dispatcher.
+// Covers that a worker-thread handle destruction defers the full teardown to the main dispatcher.
 TEST_F(DynamicModuleClusterTest, HandleDestructorFromWorkerThreadDefersAllTeardownToMainThread) {
+  std::atomic<int> lifecycle_releases = 0;
+  auto lifecycle_handle = [&lifecycle_releases](auto, auto) {
+    return std::make_unique<MainThreadReleasedHandle>(lifecycle_releases);
+  };
+  ON_CALL(server_context_.lifecycle_notifier_,
+          registerCallback(_, An<Server::ServerLifecycleNotifier::StageCallback>()))
+      .WillByDefault(lifecycle_handle);
+  ON_CALL(server_context_.lifecycle_notifier_,
+          registerCallback(_, An<Server::ServerLifecycleNotifier::StageCallbackWithCompletion>()))
+      .WillByDefault(lifecycle_handle);
+  ON_CALL(server_context_.drain_manager_, addOnDrainCloseCb(_, _)).WillByDefault(lifecycle_handle);
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_OK(result);
-  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
-  ASSERT_NE(nullptr, cluster);
+  std::shared_ptr<DynamicModuleCluster> cluster =
+      dynamic_cast<DynamicModuleCluster&>(*result->first).shared_from_this();
 
-  // The internal handle held by the thread-aware load balancer also posts on its main-thread
-  // destruction when `result` is torn down, so allow repeated posts and capture the first one
-  // from the worker-thread handle destruction.
-  Event::PostCb captured_cb;
-  EXPECT_CALL(server_context_.dispatcher_, post(_)).WillRepeatedly([&](Event::PostCb cb) {
-    if (!captured_cb) {
-      captured_cb = std::move(cb);
-    }
-  });
+  // The internal handle held by the thread-aware load balancer also hands the cluster over when
+  // `result` is torn down, so capture only the first handover, from the worker-thread handle
+  // destruction.
+  Event::DispatcherThreadDeletableConstPtr release;
+  EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_))
+      .WillOnce([&](Event::DispatcherThreadDeletableConstPtr deletable) {
+        release = std::move(deletable);
+      })
+      .WillRepeatedly([](Event::DispatcherThreadDeletableConstPtr) {});
 
   auto handle = std::make_shared<DynamicModuleClusterHandle>(cluster);
   auto& thread_factory = Thread::threadFactoryForTest();
   auto thread = thread_factory.createThread([&]() { handle.reset(); });
   thread->join();
 
-  ASSERT_TRUE(captured_cb);
+  ASSERT_NE(nullptr, release);
   EXPECT_NE(cluster.use_count(), 1);
-  captured_cb();
+  // The server initialized, shutdown and drain registrations are released on the main thread.
+  EXPECT_EQ(0, lifecycle_releases.load());
+  release.reset();
+  EXPECT_EQ(3, lifecycle_releases.load());
   cluster.reset();
   result = absl::InternalError("cleanup");
+}
+
+// Test that a worker that drops the last reference to a cluster hands the cluster to the main
+// thread, which destroys it.
+TEST_F(DynamicModuleClusterTest, LastReferenceDroppedOnAWorkerDestroysTheClusterOnTheMainThread) {
+  auto result = createCluster(
+      absl::StrReplaceAll(makeYamlConfig("cluster_no_op"), {{"CLUSTER_PROVIDED", "ROUND_ROBIN"}}));
+  ASSERT_OK(result);
+  std::shared_ptr<DynamicModuleCluster> worker_reference =
+      dynamic_cast<DynamicModuleCluster&>(*result->first).shared_from_this();
+  result = absl::InternalError("released");
+
+  // The cluster destructor cancels this callout, which shows the thread that destroys the cluster.
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  DynamicModuleClusterTestPeer::injectPendingHttpCallout(*worker_reference, /*callout_id=*/1,
+                                                         &request);
+  EXPECT_CALL(request, cancel()).WillOnce([]() {
+    EXPECT_TRUE(Thread::MainThread::isMainOrTestThread());
+  });
+
+  // The cluster info that the cluster destroys is handed to the main thread too.
+  Event::DispatcherThreadDeletableConstPtr release;
+  EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_))
+      .WillOnce([&](Event::DispatcherThreadDeletableConstPtr deletable) {
+        release = std::move(deletable);
+      })
+      .WillRepeatedly([](Event::DispatcherThreadDeletableConstPtr) {});
+  auto thread = Thread::threadFactoryForTest().createThread([&]() { worker_reference.reset(); });
+  thread->join();
+  ASSERT_NE(nullptr, release);
+  release.reset();
+}
+
+// Test that a callout that completes while the cluster waits for the main thread to destroy it is
+// dropped, since nothing owns the cluster anymore.
+TEST_F(DynamicModuleClusterTest, CalloutCompletingWhileTheClusterAwaitsDestructionIsDropped) {
+  auto module = initInHooksModule();
+  const auto callout_done_count = initInHooksFunction<size_t (*)()>(
+      *module, "cluster_init_in_hooks_test_http_callout_done_count");
+  for (const bool succeed : {true, false}) {
+    auto result = createCluster(absl::StrReplaceAll(
+        makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "pre_init_in_new"),
+        {{"CLUSTER_PROVIDED", "ROUND_ROBIN"}}));
+    ASSERT_OK(result);
+    std::shared_ptr<DynamicModuleCluster> worker_reference =
+        dynamic_cast<DynamicModuleCluster&>(*result->first).shared_from_this();
+
+    NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+    EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+        .WillOnce(testing::Return(&thread_local_cluster));
+    Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+    Http::AsyncClient::Callbacks* callbacks = nullptr;
+    EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+        .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callbacks = &cb;
+          return &request;
+        });
+    uint64_t callout_id = 0;
+    std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+        {":method", 7, "GET", 3}, {":path", 5, "/test", 5}, {"host", 4, "example.com", 11}};
+    EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success,
+              envoy_dynamic_module_callback_cluster_http_callout(
+                  worker_reference.get(), &callout_id, {"test_cluster", 12}, headers.data(),
+                  headers.size(), {nullptr, 0}, 5000));
+    ASSERT_NE(nullptr, callbacks);
+
+    // The cluster manager releases the cluster, and then a worker drops the last reference.
+    result = absl::InternalError("released");
+    Event::DispatcherThreadDeletableConstPtr release;
+    EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_))
+        .WillOnce([&](Event::DispatcherThreadDeletableConstPtr deletable) {
+          release = std::move(deletable);
+        })
+        .WillRepeatedly([](Event::DispatcherThreadDeletableConstPtr) {});
+    auto thread = Thread::threadFactoryForTest().createThread([&]() { worker_reference.reset(); });
+    thread->join();
+    ASSERT_NE(nullptr, release);
+
+    EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+    EXPECT_CALL(request, cancel()).Times(0);
+    if (succeed) {
+      callbacks->onSuccess(request,
+                           std::make_unique<Http::ResponseMessageImpl>(Http::ResponseHeaderMapPtr{
+                               new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+    } else {
+      callbacks->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    }
+    EXPECT_EQ(0, callout_done_count()) << succeed;
+    release.reset();
+    testing::Mock::VerifyAndClearExpectations(&server_context_.dispatcher_);
+  }
 }
 
 // Test that the server_initialized lifecycle callback is invoked.
@@ -4035,6 +4584,38 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureExceedBufferLimit) {
 }
 
 // Test HTTP callout when async client cannot create request.
+// Test that a callout that the async client completes inside send does not call back into the
+// module, which learns about it from the return value.
+TEST_F(DynamicModuleClusterTest, HttpCalloutCompletedInsideSendDoesNotReachTheModule) {
+  auto module = initInHooksModule();
+  auto result = createCluster(
+      makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "pre_init_in_shutdown"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+      .WillOnce(testing::Return(&thread_local_cluster));
+  Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+  EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callbacks.onSuccess(request,
+                            std::make_unique<Http::ResponseMessageImpl>(Http::ResponseHeaderMapPtr{
+                                new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
+        return nullptr;
+      });
+  uint64_t callout_id = 0;
+  std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+      {":method", 7, "GET", 3}, {":path", 5, "/test", 5}, {"host", 4, "example.com", 11}};
+  EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+            envoy_dynamic_module_callback_cluster_http_callout(cluster.get(), &callout_id,
+                                                               {"test_cluster", 12}, headers.data(),
+                                                               headers.size(), {nullptr, 0}, 5000));
+  EXPECT_EQ(0, initInHooksFunction<size_t (*)()>(
+                   *module, "cluster_init_in_hooks_test_http_callout_done_count")());
+}
+
 TEST_F(DynamicModuleClusterTest, HttpCalloutCannotCreateRequest) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
   ASSERT_OK(result);
@@ -4194,6 +4775,62 @@ TEST_F(DynamicModuleClusterTest, HttpCalloutFailureAfterInModuleClusterCleared) 
 
   // The callback should not invoke on_cluster_http_callout_done and should just clean up.
   callbacks_captured->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test that an HTTP callout failure reaches the module from a posted callback, and only while the
+// cluster is alive.
+TEST_F(DynamicModuleClusterTest, HttpCalloutFailureIsReportedFromAPostedCallback) {
+  auto module = initInHooksModule();
+  const auto callout_done_count = initInHooksFunction<size_t (*)()>(
+      *module, "cluster_init_in_hooks_test_http_callout_done_count");
+  for (const bool destroy_cluster : {false, true}) {
+    auto result = createCluster(
+        makeYamlConfigWithClusterConfig("cluster_init_in_hooks", "test", "pre_init_in_new"));
+    ASSERT_OK(result);
+    auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+
+    NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+    EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("test_cluster"))
+        .WillOnce(testing::Return(&thread_local_cluster));
+    Http::MockAsyncClientRequest request(&thread_local_cluster.async_client_);
+    Http::AsyncClient::Callbacks* callbacks_captured = nullptr;
+    EXPECT_CALL(thread_local_cluster.async_client_, send_(_, _, _))
+        .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callbacks_captured = &callbacks;
+          return &request;
+        });
+    uint64_t callout_id = 0;
+    std::vector<envoy_dynamic_module_type_module_http_header> headers = {
+        {":method", 7, "GET", 3},
+        {":path", 5, "/test", 5},
+        {"host", 4, "example.com", 11},
+    };
+    EXPECT_EQ(envoy_dynamic_module_type_http_callout_init_result_Success,
+              envoy_dynamic_module_callback_cluster_http_callout(
+                  cluster.get(), &callout_id, {"test_cluster", 12}, headers.data(), headers.size(),
+                  {nullptr, 0}, 5000));
+    ASSERT_NE(callbacks_captured, nullptr);
+
+    Event::PostCb posted_cb;
+    EXPECT_CALL(server_context_.dispatcher_, post(_))
+        .WillOnce([&](Event::PostCb cb) { posted_cb = std::move(cb); })
+        .WillRepeatedly([](Event::PostCb cb) { cb(); });
+    callbacks_captured->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+    EXPECT_EQ(0, callout_done_count());
+
+    if (destroy_cluster) {
+      cluster.reset();
+      result = absl::InternalError("cleanup");
+    }
+    posted_cb();
+    EXPECT_EQ(destroy_cluster ? 0 : 1, callout_done_count());
+    if (!destroy_cluster) {
+      EXPECT_EQ(envoy_dynamic_module_type_http_callout_result_Reset,
+                initInHooksFunction<int (*)()>(
+                    *module, "cluster_init_in_hooks_test_last_http_callout_result")());
+    }
+  }
 }
 
 // Test adding hosts with locality information.
@@ -5094,6 +5731,29 @@ TEST_F(DynamicModuleClusterTest, PreInitCompleteOffMainThreadFailsClosed) {
       "envoy_dynamic_module_callback_cluster_pre_init_complete must be called on the main thread");
 }
 
+// Verifies that `cluster_http_callout` fails closed off the main thread.
+TEST_F(DynamicModuleClusterTest, HttpCalloutOffMainThreadFailsClosed) {
+  auto result = createCluster(makeYamlConfig("cluster_no_op"));
+  ASSERT_OK(result);
+  auto cluster = std::dynamic_pointer_cast<DynamicModuleCluster>(result->first);
+  ASSERT_NE(nullptr, cluster);
+  void* cluster_ptr = cluster.get();
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster(_)).Times(0);
+
+  EXPECT_ENVOY_BUG(
+      {
+        std::thread t([&] {
+          uint64_t callout_id = 0;
+          EXPECT_EQ(
+              envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
+              envoy_dynamic_module_callback_cluster_http_callout(
+                  cluster_ptr, &callout_id, {"test_cluster", 12}, nullptr, 0, {nullptr, 0}, 1000));
+        });
+        t.join();
+      },
+      "envoy_dynamic_module_callback_cluster_http_callout must be called on the main thread");
+}
+
 // Verifies that `cluster_use_persistent_host_map` is a safe no-op when called off the main thread.
 TEST_F(DynamicModuleClusterTest, UsePersistentHostMapOffMainThreadFailsClosed) {
   auto result = createCluster(makeYamlConfig("cluster_no_op"));
@@ -5337,8 +5997,9 @@ TEST_F(DynamicModuleClusterTest, ChooseHostShortCircuitsWhenInModuleLbIsNull) {
 // DynamicModuleClusterHandle destruction is a no-op when the wrapped cluster pointer is already
 // null (e.g. the handle was constructed from an empty shared_ptr).
 TEST_F(DynamicModuleClusterTest, HandleDestructorIsNoOpWhenClusterIsNull) {
-  // No dispatcher.post call should occur because the destructor returns early.
+  // Nothing reaches the dispatcher because the destructor returns early.
   EXPECT_CALL(server_context_.dispatcher_, post(_)).Times(0);
+  EXPECT_CALL(server_context_.dispatcher_, deleteInDispatcherThread(_)).Times(0);
   {
     DynamicModuleClusterHandle handle(nullptr);
   }

@@ -1251,7 +1251,8 @@ void envoy_dynamic_module_on_http_filter_destroy(
 
 /**
  * envoy_dynamic_module_on_http_filter_http_callout_done is called when the HTTP callout
- * response is received initiated by a HTTP filter.
+ * response is received initiated by a HTTP filter. Envoy reports a failure of a callout in flight
+ * from a later callback on the same thread.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -1356,7 +1357,9 @@ void envoy_dynamic_module_on_http_filter_http_stream_complete(
 /**
  * envoy_dynamic_module_on_http_filter_http_stream_reset is called when a streamable HTTP callout
  * stream is reset or fails. This may be called instead of the complete callback if the stream
- * encounters an error.
+ * encounters an error. Envoy reports a reset that the module did not request from a later callback
+ * on the same thread. A reset requested with
+ * envoy_dynamic_module_callback_http_filter_reset_http_stream is reported before that call returns.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -1405,7 +1408,8 @@ void envoy_dynamic_module_on_http_filter_config_scheduled(
 
 /**
  * envoy_dynamic_module_on_http_filter_config_http_callout_done is called when the HTTP callout
- * response is received for a callout initiated by an HTTP filter configuration.
+ * response is received for a callout initiated by an HTTP filter configuration. Envoy reports a
+ * failure of a callout in flight from a later callback on the same thread.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
@@ -1504,7 +1508,10 @@ void envoy_dynamic_module_on_http_filter_config_http_stream_complete(
 
 /**
  * envoy_dynamic_module_on_http_filter_config_http_stream_reset is called when a streamable HTTP
- * callout stream started from an HTTP filter configuration is reset or fails.
+ * callout stream started from an HTTP filter configuration is reset or fails. Envoy reports a reset
+ * that the module did not request from a later callback on the same thread. A reset requested with
+ * envoy_dynamic_module_callback_http_filter_config_reset_http_stream is reported before that call
+ * returns.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param filter_config_ptr is the pointer to the in-module HTTP filter configuration created by
@@ -3203,14 +3210,17 @@ void envoy_dynamic_module_callback_http_filter_reset_http_stream(
  * the request body in chunks.
  *
  * This must be called after the stream is started and headers have been sent. It can be called
- * multiple times until end_stream is set to true.
+ * multiple times until end_stream is set to true. When Envoy reset the stream and did not call the
+ * reset event hook yet, this drops the data and returns true, and the reset event hook follows
+ * unless the filter is destroyed first.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param stream_id is the handle to the HTTP stream.
  * @param data is the body data to send.
  * @param end_stream is true if this is the last data (no trailers will follow).
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the data is
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_stream_send_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
@@ -3221,14 +3231,17 @@ bool envoy_dynamic_module_callback_http_stream_send_data(
  * request trailers on an active streamable HTTP callout. This implicitly ends the stream.
  *
  * This must be called after the stream is started and all request data has been sent.
- * After calling this, no more data can be sent on the stream.
+ * After calling this, no more data can be sent on the stream. When Envoy reset the stream and did
+ * not call the reset event hook yet, this drops the trailers and returns true, and the reset event
+ * hook follows unless the filter is destroyed first.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
  * @param stream_id is the handle to the HTTP stream.
  * @param trailers is the trailers to send.
  * @param trailers_size is the size of the trailers.
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the trailers are
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_stream_send_trailers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint64_t stream_id,
@@ -3320,13 +3333,16 @@ void envoy_dynamic_module_callback_http_filter_config_reset_http_stream(
  * configuration context. This can be called multiple times to stream the request body in chunks.
  *
  * This must be called after the stream is started and headers have been sent. It can be called
- * multiple times until end_stream is set to true.
+ * multiple times until end_stream is set to true. When Envoy reset the stream and did not call the
+ * reset event hook yet, this drops the data and returns true, and the reset event hook follows
+ * unless the configuration is destroyed first.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param stream_id is the handle to the HTTP stream.
  * @param data is the body data to send.
  * @param end_stream is true if this is the last data (no trailers will follow).
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the data is
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_filter_config_stream_send_data(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
@@ -3338,13 +3354,16 @@ bool envoy_dynamic_module_callback_http_filter_config_stream_send_data(
  * configuration context. This implicitly ends the stream.
  *
  * This must be called after the stream is started and all request data has been sent.
- * After calling this, no more data can be sent on the stream.
+ * After calling this, no more data can be sent on the stream. When Envoy reset the stream and did
+ * not call the reset event hook yet, this drops the trailers and returns true, and the reset event
+ * hook follows unless the configuration is destroyed first.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object.
  * @param stream_id is the handle to the HTTP stream.
  * @param trailers is the trailers to send.
  * @param trailers_size is the size of the trailers.
- * @return true if the operation is successful, false otherwise.
+ * @return false if the stream does not exist, and true otherwise, including when the trailers are
+ * dropped.
  */
 bool envoy_dynamic_module_callback_http_filter_config_stream_send_trailers(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
@@ -4174,7 +4193,8 @@ void envoy_dynamic_module_on_network_filter_destroy(
 
 /**
  * envoy_dynamic_module_on_network_filter_http_callout_done is called when the HTTP callout
- * response is received initiated by a network filter.
+ * response is received initiated by a network filter. Envoy reports a failure of a callout in
+ * flight from a later callback on the same thread.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleNetworkFilter object of the
  * corresponding network filter.
@@ -5789,7 +5809,8 @@ void envoy_dynamic_module_on_listener_filter_config_scheduled(
 
 /**
  * envoy_dynamic_module_on_listener_filter_http_callout_done is called when the HTTP callout
- * response is received initiated by a listener filter.
+ * response is received initiated by a listener filter. Envoy reports a failure of a callout in
+ * flight from a later callback on the same thread.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleListenerFilter object of the
  * corresponding listener filter.
@@ -9074,6 +9095,61 @@ typedef enum {
 typedef void (*envoy_dynamic_module_type_bootstrap_active_resource_name_fn)(
     envoy_dynamic_module_type_envoy_buffer name, void* user_data);
 
+/**
+ * envoy_dynamic_module_type_bootstrap_cluster_writer_update_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_update_result {
+  // The write is queued. The done hook reports its outcome with the returned update ID.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_Success = 0,
+  // The extension has no cluster_writer configuration, or the call was made off the main thread,
+  // before envoy_dynamic_module_on_bootstrap_extension_server_initialized or after shutdown began.
+  // A call off the main thread also reports an Envoy bug.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed = 1,
+  // The cluster name does not start with cluster_writer.name_prefix.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_OutsideNamePrefix = 2,
+  // Adding the cluster would exceed cluster_writer.max_clusters.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_LimitReached = 3,
+  // The name or the serialized cluster is larger than 4 MiB, or the version is larger than 1 KiB.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_TooLarge = 4,
+} envoy_dynamic_module_type_bootstrap_cluster_writer_update_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result is the result of
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
+  // The removal is queued. A queued write of the cluster completes as Removed, and the removal of a
+  // cluster that is only queued cancels its write.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_Success = 0,
+  // The call is not allowed for the same reasons as a write.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed = 1,
+  // The extension neither owns nor has queued a cluster with this name.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotFound = 2,
+} envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result;
+
+/**
+ * envoy_dynamic_module_type_bootstrap_cluster_writer_update_status is the outcome of a write that
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done reports.
+ */
+typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_update_status {
+  // The cluster finished warming with this configuration or an identical one, and Envoy serves it.
+  // Every worker applies the cluster before it runs any event that the module posts afterwards.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Active = 0,
+  // A later write of the cluster replaced this one before it became active.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Superseded = 1,
+  // A removal of the cluster ended this write before it became active. A warming write that
+  // finishes warming before Envoy applies the removal completes as Active instead.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Removed = 2,
+  // Envoy rejected the write. The cluster failed to parse or validate, its name differs from the
+  // name passed in, a cluster with this name exists that the extension does not own, or Envoy
+  // failed to create the cluster. The workers keep serving the previous configuration, if any.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Failed = 3,
+  // Another component removed the cluster before this write became active, so the extension no
+  // longer owns it.
+  envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_OwnershipLost = 4,
+} envoy_dynamic_module_type_bootstrap_cluster_writer_update_status;
+
 // =============================================================================
 // Bootstrap Extension Event Hooks
 // =============================================================================
@@ -9136,8 +9212,10 @@ void envoy_dynamic_module_on_bootstrap_extension_server_initialized(
     envoy_dynamic_module_type_bootstrap_extension_module_ptr extension_module_ptr);
 
 /**
- * envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized is called when a worker
- * thread is initialized. This is called once per worker thread.
+ * envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized is called once on the main
+ * thread after Envoy creates its workers and before it starts their threads. To run code on every
+ * worker thread, call envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers during
+ * or after envoy_dynamic_module_on_bootstrap_extension_server_initialized.
  *
  * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
  * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
@@ -9179,6 +9257,12 @@ typedef void (*envoy_dynamic_module_type_event_cb)(void* context);
  * cleanup. Envoy will wait for the callback before terminating. This is the appropriate place to
  * flush batched data, close connections, or signal external systems that this Envoy instance is
  * going away.
+ *
+ * Shutdown has begun when Envoy calls this, so
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers returns false, the cluster
+ * writer callbacks return NotAllowed, and Envoy drops the done hooks of pending worker events and
+ * the pending cluster writer outcomes. A worker can still run the worker event hook of an event
+ * posted before shutdown began, until the workers stop.
  *
  * @param extension_envoy_ptr is the pointer to the DynamicModuleBootstrapExtension object.
  * @param extension_module_ptr is the pointer to the in-module bootstrap extension.
@@ -9330,6 +9414,9 @@ void envoy_dynamic_module_on_bootstrap_extension_listener_removal(
 // =============================================================================
 // Bootstrap Extension Callbacks
 // =============================================================================
+//
+// A callback that must be called on the main thread reports an Envoy bug and fails when a module
+// calls it from another thread, unless its documentation says otherwise.
 
 /**
  * envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_new is called by the module
@@ -9386,7 +9473,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_config_scheduler_commit(
 
 /**
  * envoy_dynamic_module_on_bootstrap_extension_http_callout_done is called when the HTTP callout
- * response is received initiated by a bootstrap extension.
+ * response is received initiated by a bootstrap extension. Envoy reports a failure of a callout in
+ * flight from a later callback on the main thread.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9416,7 +9504,10 @@ void envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
  * is received in envoy_dynamic_module_on_bootstrap_extension_http_callout_done.
  *
  * This must be called on the main thread. To call from other threads, use the scheduler mechanism
- * to post an event to the main thread first.
+ * to post an event to the main thread first. Off the main thread this reports an Envoy bug and
+ * returns CannotCreateRequest. Before the server is initialized and once the extension is
+ * destroyed, it returns ClusterNotFound. A callout that completes before this returns is reported
+ * only by the return value.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9450,8 +9541,13 @@ envoy_dynamic_module_callback_bootstrap_extension_http_callout(
  * envoy_dynamic_module_on_bootstrap_extension_config_new to unblock Envoy. If the module does not
  * require asynchronous initialization, it should call this immediately during config creation.
  *
+ * When this completes the initialization of Envoy, it can run other hooks and start the workers
+ * before it returns, and it waits until every worker ran the worker events posted before it. The
+ * module must not hold a lock across this call that those hooks take.
+ *
  * This must be called on the main thread. To call from other threads, use the scheduler mechanism
- * to post an event to the main thread first.
+ * to post an event to the main thread first. Off the main thread this reports an Envoy bug and
+ * signals from a later callback on the main thread.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9744,7 +9840,8 @@ envoy_dynamic_module_callback_bootstrap_extension_config_record_histogram_value(
  * When the timer fires, envoy_dynamic_module_on_bootstrap_extension_timer_fired is called on the
  * main thread.
  *
- * This must be called on the main thread.
+ * This must be called on the main thread. Off the main thread this reports an Envoy bug and
+ * returns a timer whose operations do nothing, which the module must still delete.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9899,7 +9996,8 @@ void envoy_dynamic_module_callback_bootstrap_extension_admin_set_response(
  * @param mutates_server_state if true, indicates the handler mutates server state (e.g. POST
  * endpoints).
  * @return true if the handler was successfully registered, false otherwise (e.g. if admin is
- * not available or the prefix is already taken).
+ * not available or the prefix is already taken). Admin is not available once the extension is
+ * destroyed.
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
@@ -9916,7 +10014,7 @@ bool envoy_dynamic_module_callback_bootstrap_extension_register_admin_handler(
  * object.
  * @param path_prefix is the URL prefix of the handler to remove.
  * @return true if the handler was successfully removed, false otherwise (e.g. if the handler
- * was not found or is not removable).
+ * was not found or is not removable, or once the extension is destroyed).
  */
 bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
@@ -9934,7 +10032,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_remove_admin_handler(
  * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the ClusterManager is
  * not available until that point.
  *
- * This should be called at most once. Subsequent calls are no-ops and return false.
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once the server began to shut down and when Envoy runs with --mode init_only.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9955,7 +10054,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_lifecycle(
  * envoy_dynamic_module_on_bootstrap_extension_server_initialized, since the ListenerManager is
  * not available until that point.
  *
- * This should be called at most once. Subsequent calls are no-ops and return false.
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once the server began to shut down and when Envoy runs with --mode init_only.
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
@@ -9970,7 +10070,8 @@ bool envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle
  * envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names is called by the
  * module to enumerate the names of the currently active resources of a single kind, invoking
  * name_fn once per name. Each name is reported at most once. To read several kinds, call once per
- * kind. A no-op before the server is initialized. Must be called on the main thread.
+ * kind. A no-op before the server is initialized and once the extension is destroyed. Must be
+ * called on the main thread.
  *
  * The kinds report:
  * - FilterChain: the named filter chains of the active listeners: inline chains, the default
@@ -9993,6 +10094,191 @@ void envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
     envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
     envoy_dynamic_module_type_bootstrap_active_resource_name_fn name_fn, void* user_data);
+
+// -------------------- Bootstrap Extension - Run On All Workers --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_worker_event is called on every worker thread for an
+ * event posted by envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers. The worker
+ * threads call it concurrently.
+ *
+ * This hook is optional. It may only update metrics and commit events to a scheduler, and it should
+ * return quickly since it runs on the event loop of the worker.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param event_id is the ID passed to
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_worker_event(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done is called on the main thread
+ * once every worker thread ran the event posted by
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers. Events complete in the
+ * order they were posted, and none completes after shutdown began.
+ *
+ * This hook is optional.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param event_id is the ID passed to
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers is called by the module to
+ * run envoy_dynamic_module_on_bootstrap_extension_worker_event on every worker thread, followed by
+ * envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done on the main thread. The main
+ * thread does not run the worker event. The done hook follows even when the module does not
+ * implement the worker event hook.
+ *
+ * A worker runs the event after it applied every cluster addition, update and removal, and every
+ * host addition and removal, that Envoy posted to it before this call. Host health, weight and
+ * metadata changes merged by the update_merge_window of a cluster may reach the workers later.
+ *
+ * An event posted before the module calls
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete runs on each worker
+ * before that worker serves its first connection. The workers start only after initialization
+ * completes, so the module must not wait for the done hook before it signals that its
+ * initialization is complete. That signal can wait for the workers to run these events, so the
+ * module must not hold a lock across it that the worker event hook takes.
+ *
+ * This must be called on the main thread.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param event_id is the ID of the event. It can be any module-defined value.
+ * @return true if the event was posted. Returns false when called off the main thread, before
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, or after shutdown began. A call
+ * off the main thread also reports an Envoy bug.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    uint64_t event_id);
+
+// -------------------- Bootstrap Extension - Cluster Writer --------------------
+
+/**
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done is called on the main
+ * thread with the outcome of a write accepted by
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update.
+ *
+ * This hook is optional. Without it, Envoy still applies the writes.
+ *
+ * Envoy calls this at most once per update ID, and never from inside a callback that the module
+ * called. It is called exactly once unless shutdown began first, the cluster never finishes
+ * warming, or Envoy never finishes initializing its clusters. To end a write that stays warming,
+ * write the cluster again or remove it, which completes the write as Superseded or Removed.
+ * Outcomes can arrive out of update ID order. When Envoy fails to create the cluster of a
+ * write, the status is Failed, Envoy logs the error at most once every 10 seconds, and the
+ * extension keeps owning the cluster if it exists.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param extension_config_module_ptr is the pointer to the in-module bootstrap extension
+ * configuration created by envoy_dynamic_module_on_bootstrap_extension_config_new.
+ * @param update_id is the ID returned by
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update.
+ * @param cluster_name is the name of the cluster. It is owned by Envoy and valid only during this
+ * call.
+ * @param status is the outcome of the write.
+ * @param error_details describes the problem when the status is Failed or OwnershipLost, and is
+ * empty otherwise. It is owned by Envoy and valid only during this call.
+ */
+void envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_bootstrap_extension_config_module_ptr extension_config_module_ptr,
+    uint64_t update_id, envoy_dynamic_module_type_envoy_buffer cluster_name,
+    envoy_dynamic_module_type_bootstrap_cluster_writer_update_status status,
+    envoy_dynamic_module_type_envoy_buffer error_details);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update is called by the
+ * module to add or update a cluster in the cluster manager. Envoy queues the write, applies it
+ * asynchronously on the main thread, and reports the outcome through
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done.
+ *
+ * The extension owns the clusters it writes, and CDS does not remove them. When another component,
+ * for example CDS, replaces an active cluster that the extension owns, the extension no longer owns
+ * it and later writes of the cluster complete as Failed. Envoy does not notice a replacement of a
+ * cluster that is still warming, so no other component should write clusters with the name prefix.
+ * Writes submitted before Envoy finishes initializing its static and CDS clusters are applied once
+ * it has. Envoy does not wait for written clusters before it finishes initializing, so to serve
+ * them from the first request, call
+ * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete only after their
+ * writes completed as Active. When the module writes a cluster again before its
+ * previous write is applied, Envoy applies only the latest write and the previous one completes as
+ * Superseded.
+ *
+ * A written cluster has the same authority as a cluster delivered by CDS, so build clusters from a
+ * schema that the module owns. On the ADS stream and the xDS-TP authority streams, a written
+ * cluster holds back the CDS requests while it warms, as a cluster delivered by CDS does, unless
+ * its wait_for_warm_on_init is false. While Envoy applies a burst of writes, it holds back the EDS,
+ * LEDS and SDS requests on those streams, including their ACKs, for about one second, as it does
+ * while it applies a CDS update.
+ *
+ * A write that changes a cluster rebuilds it and drains its connection pools on every worker, so
+ * endpoint changes should not go through the writer. Use a dynamic module cluster and its host
+ * callbacks instead.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized. The buffers are owned by the
+ * module and only need to be valid during this call. A buffer pointer may be null only when its
+ * length is zero.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param cluster_name is the name of the cluster. It must start with cluster_writer.name_prefix.
+ * @param cluster is the serialized envoy.config.cluster.v3.Cluster. Its name must equal
+ * cluster_name.
+ * @param version_info is the version that Envoy stores with the cluster when the write changes it,
+ * and shows in the config dump.
+ * @param update_id_out receives a nonzero ID that increases with every accepted write, or 0 when
+ * the write is rejected. It must not be null.
+ * @return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result is Success when the
+ * write is queued.
+ */
+envoy_dynamic_module_type_bootstrap_cluster_writer_update_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name,
+    envoy_dynamic_module_type_module_buffer cluster,
+    envoy_dynamic_module_type_module_buffer version_info, uint64_t* update_id_out);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove is called by the module
+ * to remove a cluster that it owns. Envoy queues the removal and applies it asynchronously on the
+ * main thread. A removal has no outcome of its own, and the workers can use the cluster until Envoy
+ * applies it and each worker processes the removal. With cluster lifecycle enabled,
+ * envoy_dynamic_module_on_bootstrap_extension_cluster_removal reports the removal of an active
+ * cluster.
+ *
+ * This must be called on the main thread, during or after
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @param cluster_name is the name of the cluster. The buffer is owned by the module and only needs
+ * to be valid during this call.
+ * @return envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result is Success when the
+ * removal is queued.
+ */
+envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result
+envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer cluster_name);
 
 // =============================================================================
 // Common Host Types (shared by cluster and standalone load balancer extensions)
@@ -10274,8 +10560,14 @@ void envoy_dynamic_module_on_cluster_init(
     envoy_dynamic_module_type_cluster_module_ptr cluster_module_ptr);
 
 /**
- * envoy_dynamic_module_on_cluster_destroy is called when the cluster is destroyed. The module
- * should release any resources associated with the cluster.
+ * envoy_dynamic_module_on_cluster_destroy is called on the main thread when the cluster is
+ * destroyed. The module should release any resources associated with the cluster, for example by
+ * deleting its schedulers. Envoy can call this hook while it removes the cluster from the cluster
+ * manager and at exit after it stopped its workers, so callbacks that read or update clusters, such
+ * as host updates or envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names,
+ * are not safe from this hook. Scheduler commits and deletes stay safe. After this hook, Envoy
+ * cancels the HTTP callouts of the cluster that are still in flight, including any that the hook
+ * started, without calling envoy_dynamic_module_on_cluster_http_callout_done.
  *
  * @param cluster_module_ptr is the pointer to the in-module cluster.
  */
@@ -10378,8 +10670,9 @@ void envoy_dynamic_module_on_cluster_worker_event(
 /**
  * envoy_dynamic_module_on_cluster_worker_slot_data_destroy is invoked when a previously published
  * worker-slot pointer is no longer referenced — that is, when the slot has been overwritten or
- * the cluster has been torn down. The module is expected to release any allocation backing the
- * pointer.
+ * the cluster has been torn down. Once Envoy stopped its workers at exit, it is invoked for the
+ * new pointer before envoy_dynamic_module_callback_cluster_worker_slot_set returns. The module is
+ * expected to release any allocation backing the pointer.
  *
  * This is optional but required for modules that publish payloads, otherwise the prior payload
  * leaks. The hook fires on whichever thread drops the last reference, so the module must make
@@ -10441,7 +10734,8 @@ void envoy_dynamic_module_on_cluster_shutdown(
 /**
  * envoy_dynamic_module_on_cluster_http_callout_done is called on the main thread when an HTTP
  * callout initiated by envoy_dynamic_module_callback_cluster_http_callout receives a response or
- * fails.
+ * fails. Envoy reports a failure from a later callback, and does not call this for the callouts in
+ * flight when the cluster is destroyed.
  *
  * This is optional. Only modules that use HTTP callouts need to implement this. If not
  * implemented, envoy_dynamic_module_callback_cluster_http_callout will return
@@ -10619,8 +10913,12 @@ envoy_dynamic_module_callback_cluster_find_host_by_address(
 
 /**
  * envoy_dynamic_module_callback_cluster_pre_init_complete signals that the cluster's initial host
- * discovery is complete. The module must call this during or after
- * envoy_dynamic_module_on_cluster_init to allow Envoy to start routing traffic to this cluster.
+ * discovery is complete. The module must call this from envoy_dynamic_module_on_cluster_new onward
+ * to allow Envoy to start routing traffic to this cluster.
+ *
+ * When called before envoy_dynamic_module_on_cluster_init returns, for example inside
+ * envoy_dynamic_module_on_cluster_new, this takes effect once envoy_dynamic_module_on_cluster_init
+ * returns. Otherwise it takes effect from a later callback on the main thread.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster.
  */
@@ -11108,7 +11406,9 @@ void envoy_dynamic_module_callback_cluster_scheduler_commit(
 /**
  * envoy_dynamic_module_callback_cluster_run_on_all_workers posts the module's worker-event hook
  * to every worker thread registered with the server's thread-local engine. The main thread is
- * excluded. Must be called from the main thread.
+ * excluded. Must be called from the main thread. When called inside
+ * envoy_dynamic_module_on_cluster_new, the events are posted once that hook returns. Once Envoy
+ * stopped its workers at exit, this does nothing.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
  * @param event_id is a module-defined identifier delivered to each worker invocation.
@@ -11120,7 +11420,8 @@ void envoy_dynamic_module_callback_cluster_run_on_all_workers(
  * envoy_dynamic_module_callback_cluster_worker_slot_set publishes an opaque module pointer to
  * the cluster's worker thread-local slot. All registered threads observe the same pointer
  * (single-pointer semantics — not a per-worker factory). Any previously published pointer is
- * released through the module's destroy hook. Must be called from the main thread.
+ * released through the module's destroy hook. Must be called from the main thread. Once Envoy
+ * stopped its workers at exit, the pointer is released through the destroy hook right away.
  *
  * Threads that are not yet registered with the TLS engine at the time of the call will not
  * observe this update.
@@ -11846,7 +12147,9 @@ void envoy_dynamic_module_callback_cluster_lb_async_host_selection_complete(
  * and asynchronously delivers the response via envoy_dynamic_module_on_cluster_http_callout_done.
  *
  * This must be called on the main thread. The request requires ``:method``, ``:path``, and
- * ``host`` headers to be present.
+ * ``host`` headers to be present. Off the main thread this reports an Envoy bug and returns
+ * envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest. A callout that completes
+ * before this returns is reported only by the return value.
  *
  * @param cluster_envoy_ptr is the pointer to the Envoy cluster object.
  * @param callout_id_out is a pointer to a variable where the callout ID will be stored on success.

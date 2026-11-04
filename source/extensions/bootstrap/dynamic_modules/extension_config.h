@@ -3,18 +3,22 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/extensions/bootstrap/dynamic_modules/cluster_writer.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
@@ -62,6 +66,12 @@ using OnBootstrapExtensionListenerAddOrUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
 using OnBootstrapExtensionListenerRemovalType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
+using OnBootstrapExtensionWorkerEventType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_worker_event);
+using OnBootstrapExtensionRunOnAllWorkersDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done);
+using OnBootstrapExtensionClusterWriterUpdateDoneType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done);
 
 class DynamicModuleBootstrapExtension;
 
@@ -128,6 +138,11 @@ public:
   void signalInitComplete();
 
   /**
+   * Runs signalInitComplete() on the main thread. This can be called from any thread.
+   */
+  void postSignalInitComplete();
+
+  /**
    * Enables cluster lifecycle event notifications. When enabled, the module will receive
    * on_bootstrap_extension_cluster_add_or_update and on_bootstrap_extension_cluster_removal
    * callbacks when clusters are added, updated, or removed.
@@ -147,11 +162,14 @@ public:
   /**
    * Sets the listener manager reference. Must be called during onServerInitialized before
    * the module can enable listener lifecycle events. Marks the server as initialized so the
-   * cluster manager can be accessed safely.
+   * cluster manager can be accessed safely and the cluster writer accepts writes.
    */
   void setListenerManager(Server::ListenerManager& listener_manager) {
     listener_manager_ = &listener_manager;
     server_initialized_ = true;
+    if (cluster_writer_ != nullptr) {
+      cluster_writer_->onServerInitialized();
+    }
   }
 
   /**
@@ -175,7 +193,8 @@ public:
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
    * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
    * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
-   * is invoked at most once per name. A no-op before the server is initialized. Main thread only.
+   * is invoked at most once per name. A no-op before the server is initialized and once the
+   * extension is destroyed. Main thread only.
    *
    * @param kind selects which kind of active resource to enumerate.
    * @param emit is invoked for each name; the string_view is valid only during that invocation.
@@ -190,6 +209,30 @@ public:
    */
   static std::vector<absl::string_view> transportSocketMatchIntersection(
       const std::vector<std::vector<absl::string_view>>& per_cluster_matches);
+
+  /**
+   * Runs the module's worker event hook on every worker thread, followed by its done hook on the
+   * main thread. Must be called on the main thread.
+   * @return false before the server is initialized or after shutdown began.
+   */
+  bool runOnAllWorkers(uint64_t event_id);
+
+  /**
+   * Called on the main thread when the server begins to shut down and when the extension is
+   * destroyed.
+   */
+  void onShutdown();
+
+  /**
+   * Called on the main thread when the extension is destroyed. The server destroys its context
+   * before its bootstrap extensions, so the callbacks that use the context stop working.
+   */
+  void onExtensionDestroyed();
+
+  /**
+   * Returns the admin server, or nothing once the extension is destroyed.
+   */
+  OptRef<Server::Admin> admin();
 
   // The corresponding in-module configuration.
   envoy_dynamic_module_type_bootstrap_extension_config_module_ptr in_module_config_ = nullptr;
@@ -216,6 +259,13 @@ public:
   OnBootstrapExtensionListenerAddOrUpdateType on_bootstrap_extension_listener_add_or_update_ =
       nullptr;
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
+
+  // The following hooks are optional and stay nullptr when the module does not implement them.
+  OnBootstrapExtensionWorkerEventType on_bootstrap_extension_worker_event_ = nullptr;
+  OnBootstrapExtensionRunOnAllWorkersDoneType on_bootstrap_extension_run_on_all_workers_done_ =
+      nullptr;
+  OnBootstrapExtensionClusterWriterUpdateDoneType
+      on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -259,6 +309,9 @@ public:
   // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
   std::string admin_response_body_;
 
+  // The cluster writer, or nullptr when the extension has no cluster_writer configuration.
+  DynamicModuleClusterWriterPtr cluster_writer_;
+
 private:
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
@@ -287,6 +340,12 @@ private:
   };
 
   uint64_t getNextCalloutId() { return next_callout_id_++; }
+
+  /**
+   * Whether the server still notifies the shutdown that releases the lifecycle registrations. A
+   * server in init only mode exits without it.
+   */
+  bool shutdownNotificationExpected() const;
 
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
 
@@ -317,6 +376,14 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  // Thread-local slot that carries the worker events. Allocated on the first runOnAllWorkers().
+  ThreadLocal::TypedSlotPtr<> worker_slot_;
+
+  // Set once the server begins to shut down or the extension is destroyed.
+  bool shutdown_started_ = false;
+  // Set when the extension is destroyed, after which context_ can be gone.
+  bool extension_destroyed_ = false;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
@@ -373,7 +440,8 @@ public:
    */
   void setTimer(Event::TimerPtr timer) { timer_ = std::move(timer); }
 
-  Event::Timer& timer() { return *timer_; }
+  // The underlying Envoy timer. Empty when the timer was requested off the main thread.
+  OptRef<Event::Timer> timer() { return makeOptRefFromPtr(timer_.get()); }
 
 private:
   // The config that this timer is associated with. Using a weak pointer to avoid unnecessarily
@@ -392,6 +460,7 @@ private:
  * @param main_thread_dispatcher the main thread dispatcher.
  * @param context the server factory context for accessing cluster manager lazily.
  * @param stats_store the stats store for accessing metrics.
+ * @param cluster_writer the cluster writer configuration, if the extension has one.
  * @return an error status if the module could not be loaded or the configuration could not be
  * created, or a shared pointer to the config.
  */
@@ -401,7 +470,9 @@ newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
-    Stats::Store& stats_store);
+    Stats::Store& stats_store,
+    OptRef<const envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter> cluster_writer =
+        {});
 
 } // namespace DynamicModules
 } // namespace Bootstrap
