@@ -2855,6 +2855,26 @@ virtual_hosts:
     EXPECT_TRUE(config.virtualHostExists("any.random.domain.org"));
     EXPECT_TRUE(config.virtualHostExists(""));
   }
+
+  // Empty virtual_hosts returns false for all domains
+  {
+    envoy::config::route::v3::RouteConfiguration empty_route_configuration;
+    TestConfigImpl config(empty_route_configuration, factory_context_, true, creation_status_);
+
+    EXPECT_FALSE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists(""));
+  }
+
+  // Alternate vhost_header does not affect direct domain matching in virtualHostExists
+  {
+    auto vhost_header_route_configuration = route_configuration;
+    vhost_header_route_configuration.set_vhost_header("alternate");
+    TestConfigImpl config(vhost_header_route_configuration, factory_context_, true,
+                          creation_status_);
+
+    EXPECT_TRUE(config.virtualHostExists("example.com"));
+    EXPECT_FALSE(config.virtualHostExists("nonexistent.com"));
+  }
 }
 
 TEST_F(RouteMatcherTest, Priority) {
@@ -4260,7 +4280,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4277,7 +4297,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
@@ -4339,7 +4359,7 @@ virtual_hosts:
   auto mock_cluster_specifier_plugin_3 = std::make_shared<NiceMock<MockClusterSpecifierPlugin>>();
 
   EXPECT_CALL(factory, createClusterSpecifierPlugin(_, _))
-      .WillRepeatedly(Invoke(
+      .WillRepeatedly(
           [mock_cluster_specifier_plugin_1, mock_cluster_specifier_plugin_2,
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
@@ -4356,7 +4376,7 @@ virtual_hosts:
               return mock_cluster_specifier_plugin_3;
             }
             return nullptr;
-          }));
+          });
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,

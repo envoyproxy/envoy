@@ -776,8 +776,9 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnRequestHeaders) {
 // A live, non-serializable object stored in filter state at Request lifespan is carried across
 // recreate_stream: the rebuilt filter recovers the same object and echoes its value.
 TEST_P(DynamicModulesIntegrationTest, FilterStateObjectSurvivesRecreateStream) {
-  if (GetParam() != "rust" && GetParam() != "rust_static") {
-    GTEST_SKIP() << "the filter_state_object_recreate filter is only in the rust test module";
+  if (GetParam() != "rust" && GetParam() != "rust_static" && GetParam() != "go") {
+    GTEST_SKIP()
+        << "the filter_state_object_recreate filter is only in the rust and go test modules";
   }
   initializeFilter("filter_state_object_recreate");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
@@ -1004,48 +1005,6 @@ TEST_P(DynamicModulesIntegrationTest, SpanAcrossCallbacks) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_GE(offThreadWorkSpansFinished().load(), before + 1);
-}
-
-// Regression test for the shared continue-flag wedge. The upstream replies complete at headers
-// while the client is still uploading. The module holds the response at on_response_headers, a
-// request body chunk continues the decode direction, and the held response is then resumed via
-// continue_encoding. With a single shared continue flag the decode-side continue suppressed the
-// resume and the response never reached the client.
-TEST_P(DynamicModulesIntegrationTest, EarlyResponseDuringUpload) {
-  if (GetParam() != "rust") {
-    GTEST_SKIP() << "Early response during upload test only runs for Rust";
-  }
-  // The upstream half-closes its response while the request keeps uploading, so the router must
-  // keep decoding request data instead of resetting the stream.
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
-  initializeFilter("early_response_during_upload");
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"}, {":path", "/test"}, {":scheme", "http"}, {":authority", "host"}};
-  auto encoder_decoder = codec_client_->startRequest(request_headers);
-  auto& request_encoder = encoder_decoder.first;
-  auto response = std::move(encoder_decoder.second);
-
-  // The request is still open, so wait for the upstream stream without requiring its end of stream.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-
-  // Reply complete at headers, for example an early 403, while the client is still uploading.
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "403"}};
-  upstream_request_->encodeHeaders(response_headers, true);
-
-  // Wait until the module has held the response at on_response_headers before uploading more, so
-  // the request body continue is interleaved after the encode direction is paused.
-  test_server_->waitForCounter("dynamicmodulescustom.response_pause_total", testing::Ge(1));
-
-  // The request body continues the decode direction, then on_scheduled resumes the held response.
-  codec_client_->sendData(request_encoder, "upload", true);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(response->complete());
-  EXPECT_EQ("403", response->headers().Status()->value().getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {

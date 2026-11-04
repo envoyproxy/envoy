@@ -44,7 +44,6 @@
 
 #include "gmock/gmock.h"
 
-using testing::InvokeWithoutArgs;
 using testing::Return;
 
 namespace Envoy {
@@ -78,23 +77,23 @@ public:
     encoder_filter_ = new NiceMock<MockStreamEncoderFilter>();
 
     EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([this](FilterChainFactoryCallbacks& callbacks) -> bool {
+        .WillOnce([this](FilterChainFactoryCallbacks& callbacks) -> bool {
           callbacks.setFilterConfigName("");
           callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filter_});
           callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filter_});
           return true;
-        }));
+        });
     EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
-        .WillOnce(Invoke([this](StreamDecoderFilterCallbacks& callbacks) -> void {
+        .WillOnce([this](StreamDecoderFilterCallbacks& callbacks) -> void {
           decoder_filter_->callbacks_ = &callbacks;
           callbacks.streamInfo().setResponseCodeDetails("");
-        }));
+        });
     EXPECT_CALL(*encoder_filter_, setEncoderFilterCallbacks(_));
     EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _, _))
-        .WillRepeatedly(Invoke([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
-                                   FilterChainFactoryCallbacks& callbacks) -> bool {
+        .WillRepeatedly([&](absl::string_view, const Http::FilterChainFactory::UpgradeMap*,
+                            FilterChainFactoryCallbacks& callbacks) -> bool {
           return filter_factory_.createFilterChain(callbacks);
-        }));
+        });
   }
 
   Http::ForwardClientCertType
@@ -343,39 +342,34 @@ public:
     response_state_ = StreamState::PendingHeaders;
     decoder_filter_ = config.decoder_filter_;
     encoder_filter_ = config.encoder_filter_;
-    EXPECT_CALL(*config_.codec_, dispatch(_))
-        .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
-          decoder_ = &conn_manager_.newStream(encoder_);
-          auto headers = std::make_unique<TestRequestHeaderMapImpl>(request_headers);
-          if (headers->Method() == nullptr) {
-            headers->setReferenceKey(Headers::get().Method, "GET");
-          }
-          if (headers->Host() != nullptr &&
-              !HeaderUtility::authorityIsValid(headers->getHostValue())) {
-            // Sanitize host header so we don't fail at ASSERTs that verify header sanity checks
-            // which should have been performed by the codec.
-            headers->setHost(Fuzz::replaceInvalidHostCharacters(headers->getHostValue()));
-          }
-          // If sendLocalReply is called:
-          ON_CALL(encoder_, encodeHeaders(_, true))
-              .WillByDefault(Invoke([this](const ResponseHeaderMap&, bool end_stream) -> void {
-                response_state_ =
-                    end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
-              }));
-          ON_CALL(encoder_, encodeData(_, true))
-              .WillByDefault(Invoke([this](const Buffer::Instance&, bool end_stream) -> void {
-                response_state_ =
-                    end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
-              }));
-          decoder_->decodeHeaders(std::move(headers), end_stream);
-          return Http::okStatus();
-        }));
+    EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce([this, &request_headers, end_stream] {
+      decoder_ = &conn_manager_.newStream(encoder_);
+      auto headers = std::make_unique<TestRequestHeaderMapImpl>(request_headers);
+      if (headers->Method() == nullptr) {
+        headers->setReferenceKey(Headers::get().Method, "GET");
+      }
+      if (headers->Host() != nullptr && !HeaderUtility::authorityIsValid(headers->getHostValue())) {
+        // Sanitize host header so we don't fail at ASSERTs that verify header sanity checks
+        // which should have been performed by the codec.
+        headers->setHost(Fuzz::replaceInvalidHostCharacters(headers->getHostValue()));
+      }
+      // If sendLocalReply is called:
+      ON_CALL(encoder_, encodeHeaders(_, true))
+          .WillByDefault([this](const ResponseHeaderMap&, bool end_stream) -> void {
+            response_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+          });
+      ON_CALL(encoder_, encodeData(_, true))
+          .WillByDefault([this](const Buffer::Instance&, bool end_stream) -> void {
+            response_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+          });
+      decoder_->decodeHeaders(std::move(headers), end_stream);
+      return Http::okStatus();
+    });
     ON_CALL(*decoder_filter_, decodeHeaders(_, _))
-        .WillByDefault(
-            InvokeWithoutArgs([this, decode_header_status]() -> Http::FilterHeadersStatus {
-              header_status_ = fromHeaderStatus(decode_header_status);
-              return *header_status_;
-            }));
+        .WillByDefault([this, decode_header_status]() -> Http::FilterHeadersStatus {
+          header_status_ = fromHeaderStatus(decode_header_status);
+          return *header_status_;
+        });
     fakeOnData();
     FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
   }
@@ -450,18 +444,18 @@ public:
       if (state == StreamState::PendingDataOrTrailers) {
         const auto& data_action = request_action.data();
         ON_CALL(*decoder_filter_, decodeData(_, _))
-            .WillByDefault(InvokeWithoutArgs([this, &data_action]() -> Http::FilterDataStatus {
+            .WillByDefault([this, &data_action]() -> Http::FilterDataStatus {
               if (data_action.has_decoder_filter_callback_action()) {
                 decoderFilterCallbackAction(data_action.decoder_filter_callback_action());
               }
               data_status_ = fromDataStatus(data_action.status());
               return *data_status_;
-            }));
-        EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce(InvokeWithoutArgs([this, &data_action] {
+            });
+        EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce([this, &data_action] {
           Buffer::OwnedImpl buf(std::string(data_action.size() % (1024 * 1024), 'a'));
           decoder_->decodeData(buf, data_action.end_stream());
           return Http::okStatus();
-        }));
+        });
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = data_action.end_stream() ? StreamState::Closed : StreamState::PendingDataOrTrailers;
@@ -473,20 +467,18 @@ public:
       if (state == StreamState::PendingDataOrTrailers) {
         const auto& trailers_action = request_action.trailers();
         ON_CALL(*decoder_filter_, decodeTrailers(_))
-            .WillByDefault(
-                InvokeWithoutArgs([this, &trailers_action]() -> Http::FilterTrailersStatus {
-                  if (trailers_action.has_decoder_filter_callback_action()) {
-                    decoderFilterCallbackAction(trailers_action.decoder_filter_callback_action());
-                  }
-                  trailers_status_ = fromTrailerStatus(trailers_action.status());
-                  return *trailers_status_;
-                }));
-        EXPECT_CALL(*config_.codec_, dispatch(_))
-            .WillOnce(InvokeWithoutArgs([this, &trailers_action] {
-              decoder_->decodeTrailers(std::make_unique<TestRequestTrailerMapImpl>(
-                  Fuzz::fromHeaders<TestRequestTrailerMapImpl>(trailers_action.headers())));
-              return Http::okStatus();
-            }));
+            .WillByDefault([this, &trailers_action]() -> Http::FilterTrailersStatus {
+              if (trailers_action.has_decoder_filter_callback_action()) {
+                decoderFilterCallbackAction(trailers_action.decoder_filter_callback_action());
+              }
+              trailers_status_ = fromTrailerStatus(trailers_action.status());
+              return *trailers_status_;
+            });
+        EXPECT_CALL(*config_.codec_, dispatch(_)).WillOnce([this, &trailers_action] {
+          decoder_->decodeTrailers(std::make_unique<TestRequestTrailerMapImpl>(
+              Fuzz::fromHeaders<TestRequestTrailerMapImpl>(trailers_action.headers())));
+          return Http::okStatus();
+        });
         fakeOnData();
         FUZZ_ASSERT(testing::Mock::VerifyAndClearExpectations(config_.codec_));
         state = StreamState::Closed;
@@ -641,10 +633,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection));
   ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection));
-  ON_CALL(filter_callbacks.connection_, close(_))
-      .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
-  ON_CALL(filter_callbacks.connection_, close(_, _))
-      .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
+  ON_CALL(filter_callbacks.connection_, close(_)).WillByDefault([&connection_alive] {
+    connection_alive = false;
+  });
+  ON_CALL(filter_callbacks.connection_, close(_, _)).WillByDefault([&connection_alive] {
+    connection_alive = false;
+  });
   filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   filter_callbacks.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(

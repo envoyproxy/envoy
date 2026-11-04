@@ -22,7 +22,9 @@
 #include "source/common/init/target_impl.h"
 #include "source/common/protobuf/utility.h"
 
+#include "absl/base/attributes.h"
 #include "absl/container/node_hash_set.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -48,11 +50,12 @@ public:
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void updateOnDemand(const std::string& with_route_config_name_prefix);
-  static std::string domainNameToAlias(const std::string& route_config_name,
-                                       const std::string& domain) {
-    return route_config_name + "/" + domain;
+  static std::string domainNameToAlias(absl::string_view route_config_name,
+                                       absl::string_view domain) {
+    return absl::StrCat(route_config_name, "/", domain);
   }
-  static absl::string_view aliasToDomainName(absl::string_view alias) {
+  static absl::string_view
+  aliasToDomainName(absl::string_view alias ABSL_ATTRIBUTE_LIFETIME_BOUND) {
     const auto pos = alias.find_last_of('/');
     return pos == absl::string_view::npos ? alias : alias.substr(pos + 1);
   }

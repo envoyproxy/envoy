@@ -341,12 +341,12 @@ struct FcdsTlsUpdateBenchmarkState {
     ON_CALL(server_context_.cluster_manager_.subscription_factory_,
             subscriptionFromConfigSource(testing::_, testing::_, testing::_, testing::_, testing::_,
                                          testing::_))
-        .WillByDefault(testing::Invoke(
+        .WillByDefault(
             [](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
                Config::SubscriptionCallbacks&, Config::OpaqueResourceDecoderSharedPtr,
                const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
               return std::make_unique<NiceMock<Config::MockSubscription>>();
-            }));
+            });
 
     // The manager owns the returned callback. The raw pointer drives the coalesced publish.
     tls_update_cb_ = new NiceMock<Event::MockSchedulableCallback>(&server_context_.dispatcher_);

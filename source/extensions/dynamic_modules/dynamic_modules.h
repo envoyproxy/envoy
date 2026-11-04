@@ -14,6 +14,7 @@
 #include "source/extensions/common/wasm/remote_async_datasource.h"
 
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -53,7 +54,7 @@ public:
                   "T must be a function pointer type");
     auto symbol = getSymbol(symbol_ref);
     if (symbol == nullptr) {
-      return absl::InvalidArgumentError("Failed to resolve symbol " + std::string(symbol_ref));
+      return absl::InvalidArgumentError(absl::StrCat("Failed to resolve symbol ", symbol_ref));
     }
     return reinterpret_cast<T>(symbol);
   }
