@@ -283,6 +283,26 @@ TEST_F(ExtractorTest, TestCommaJoinedCustomHeaderToken) {
   EXPECT_EQ(tokens[1]->token(), "foo");
 }
 
+// With the runtime guard disabled, comma-joined header values are not split.
+TEST_F(ExtractorTest, TestCommaJoinedHeadersNotSplitWhenGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.jwt_authn_split_comma_joined_headers", "false"}});
+  setUp(ExampleConfig);
+
+  auto headers = TestRequestHeaderMapImpl{
+      {"Authorization", absl::StrCat("Bearer ", GoodToken, ", Bearer ", GoodToken)},
+      {"token-header", "jwt_token, foo"}};
+  auto tokens = extractor_->extract(headers);
+  ASSERT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0]->token(), absl::StrCat(GoodToken, ", Bearer ", GoodToken));
+  EXPECT_EQ(tokens[1]->token(), "jwt_token, foo");
+
+  // A value that doesn't contain the prefix is still skipped.
+  auto no_prefix = TestRequestHeaderMapImpl{{"prefix-header", "nope"}};
+  EXPECT_TRUE(extractor_->extract(no_prefix).empty());
+}
+
 // Test extracting token from the custom header: "prefix-header"
 // value prefix doesn't match. It has to be either "AAA" or "AAABBB".
 TEST_F(ExtractorTest, TestPrefixHeaderNotMatch) {

@@ -176,8 +176,8 @@ private:
   };
 
   // @return the first token in value_str, or nullopt if the required_prefix was not found in it.
-  static std::optional<HeaderToken> extractHeaderToken(absl::string_view required_prefix,
-                                                        absl::string_view value_str);
+  std::optional<HeaderToken> extractHeaderToken(absl::string_view required_prefix,
+                                                absl::string_view value_str) const;
 
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
@@ -212,6 +212,11 @@ private:
   absl::btree_map<std::string, CookieLocationSpec> cookie_locations_;
 
   std::vector<LowerCaseString> headers_to_sanitize_;
+
+  // If set, enables the legacy behavior of not splitting header values on comma,
+  // which contravenes RFC 9110 Section 5.3.
+  const bool disable_comma_splitting_{!Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.jwt_authn_split_comma_joined_headers")};
 };
 
 ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
@@ -279,7 +284,19 @@ void ExtractorImpl::addCookieConfig(const std::string& issuer, const std::string
 // was not found in value_str.
 std::optional<ExtractorImpl::HeaderToken>
 ExtractorImpl::extractHeaderToken(const absl::string_view required_prefix,
-                                  const absl::string_view value_str) {
+                                  const absl::string_view value_str) const {
+  if (disable_comma_splitting_) {
+    // Legacy behavior: treat the whole header value as a single token.
+    if (required_prefix.empty()) {
+      return HeaderToken{.token = value_str, .rest = {}};
+    }
+    const auto pos = value_str.find(required_prefix);
+    if (pos == absl::string_view::npos) {
+      return std::nullopt;
+    }
+    return HeaderToken{.token = extractJWT(value_str, pos + required_prefix.length()), .rest = {}};
+  }
+
   if (required_prefix.empty()) {
     // Split on commas so that headers collapsed as allowed by RFC 9110 Section
     // 5.3 are honored.
