@@ -1,7 +1,5 @@
 #include "source/common/network/filter_manager_impl.h"
 
-#include <list>
-
 #include "envoy/network/connection.h"
 
 #include "source/common/common/assert.h"
@@ -12,9 +10,10 @@ namespace Network {
 
 void FilterManagerImpl::addWriteFilter(WriteFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
-  ActiveWriteFilterPtr new_filter = std::make_unique<ActiveWriteFilter>(*this, filter);
+  ActiveWriteFilterPtr new_filter =
+      std::make_unique<ActiveWriteFilter>(*this, filter, downstream_filters_.size());
   filter->initializeWriteFilterCallbacks(*new_filter);
-  LinkedList::moveIntoList(std::move(new_filter), downstream_filters_);
+  downstream_filters_.push_back(std::move(new_filter));
 }
 
 void FilterManagerImpl::addFilter(FilterSharedPtr filter) {
@@ -24,9 +23,10 @@ void FilterManagerImpl::addFilter(FilterSharedPtr filter) {
 
 void FilterManagerImpl::addReadFilter(ReadFilterSharedPtr filter) {
   ASSERT(connection_.state() == Connection::State::Open);
-  ActiveReadFilterPtr new_filter = std::make_unique<ActiveReadFilter>(*this, filter);
+  ActiveReadFilterPtr new_filter =
+      std::make_unique<ActiveReadFilter>(*this, filter, upstream_filters_.size());
   filter->initializeReadFilterCallbacks(*new_filter);
-  LinkedList::moveIntoListBack(std::move(new_filter), upstream_filters_);
+  upstream_filters_.push_back(std::move(new_filter));
 }
 
 void FilterManagerImpl::removeReadFilter(ReadFilterSharedPtr filter_to_remove) {
@@ -46,7 +46,8 @@ bool FilterManagerImpl::initializeReadFilters() {
   // Initialize read filters without calling onData() afterwards.
   // This is called just after an connection has been established and nothing may have been read
   // yet. onData() will be called separately as data is read from the connection.
-  for (auto& entry : upstream_filters_) {
+  for (size_t i = 0; i < upstream_filters_.size(); ++i) {
+    ActiveReadFilter* entry = upstream_filters_[i].get();
     if (entry->filter_ && !entry->initialized_) {
       entry->initialized_ = true;
       FilterStatus status = entry->filter_->onNewConnection();
@@ -67,21 +68,21 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
     return;
   }
 
-  std::list<ActiveReadFilterPtr>::iterator entry;
+  size_t i = 0;
   if (!filter) {
     connection_.streamInfo().addBytesReceived(buffer_source.getReadBuffer().buffer.length());
-    entry = upstream_filters_.begin();
   } else {
-    entry = std::next(filter->entry());
+    i = filter->index_ + 1;
   }
 
-  for (; entry != upstream_filters_.end(); entry++) {
-    if (!(*entry)->filter_) {
+  for (; i < upstream_filters_.size(); ++i) {
+    ActiveReadFilter* entry = upstream_filters_[i].get();
+    if (!entry->filter_) {
       continue;
     }
-    if (!(*entry)->initialized_) {
-      (*entry)->initialized_ = true;
-      FilterStatus status = (*entry)->filter_->onNewConnection();
+    if (!entry->initialized_) {
+      entry->initialized_ = true;
+      FilterStatus status = entry->filter_->onNewConnection();
       if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
       }
@@ -89,7 +90,7 @@ void FilterManagerImpl::onContinueReading(ActiveReadFilter* filter,
 
     StreamBuffer read_buffer = buffer_source.getReadBuffer();
     if (read_buffer.buffer.length() > 0 || read_buffer.end_stream) {
-      FilterStatus status = (*entry)->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
+      FilterStatus status = entry->filter_->onData(read_buffer.buffer, read_buffer.end_stream);
       if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
         return;
       }
@@ -103,7 +104,8 @@ void FilterManagerImpl::onRead() {
 }
 
 bool FilterManagerImpl::startUpstreamSecureTransport() {
-  for (auto& filter : upstream_filters_) {
+  for (size_t i = 0; i < upstream_filters_.size(); ++i) {
+    ActiveReadFilter* filter = upstream_filters_[i].get();
     if (filter->filter_ != nullptr && filter->filter_->startUpstreamSecureTransport()) {
       // Success. The filter converted upstream's transport socket to secure mode.
       return true;
@@ -194,16 +196,13 @@ FilterStatus FilterManagerImpl::onWrite(ActiveWriteFilter* filter,
     return FilterStatus::StopIteration;
   }
 
-  std::list<ActiveWriteFilterPtr>::iterator entry;
-  if (!filter) {
-    entry = downstream_filters_.begin();
-  } else {
-    entry = std::next(filter->entry());
-  }
-
-  for (; entry != downstream_filters_.end(); entry++) {
+  // Write filters iterate from the most recently added to the first added. Filters added during
+  // the iteration are appended, so they never shift the index of a filter not yet visited.
+  size_t remaining = filter == nullptr ? downstream_filters_.size() : filter->index_;
+  for (; remaining > 0; --remaining) {
+    ActiveWriteFilter* entry = downstream_filters_[remaining - 1].get();
     StreamBuffer write_buffer = buffer_source.getWriteBuffer();
-    FilterStatus status = (*entry)->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
+    FilterStatus status = entry->filter_->onWrite(write_buffer.buffer, write_buffer.end_stream);
     if (status == FilterStatus::StopIteration || connection_.state() != Connection::State::Open) {
       return FilterStatus::StopIteration;
     }

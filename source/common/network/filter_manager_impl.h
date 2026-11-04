@@ -1,6 +1,5 @@
 #pragma once
 
-#include <list>
 #include <memory>
 
 #include "envoy/access_log/access_log.h"
@@ -8,7 +7,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 
-#include "source/common/common/linked_object.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Network {
@@ -151,9 +150,9 @@ protected:
   };
 
 private:
-  struct ActiveReadFilter : public ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
-    ActiveReadFilter(FilterManagerImpl& parent, ReadFilterSharedPtr filter)
-        : parent_(parent), filter_(filter) {}
+  struct ActiveReadFilter : public ReadFilterCallbacks {
+    ActiveReadFilter(FilterManagerImpl& parent, ReadFilterSharedPtr filter, size_t index)
+        : parent_(parent), filter_(filter), index_(index) {}
 
     Connection& connection() override { return parent_.connection_; }
     const ConnectionSocket& socket() override { return parent_.socket_; }
@@ -178,15 +177,17 @@ private:
 
     FilterManagerImpl& parent_;
     ReadFilterSharedPtr filter_;
+    // Position of this filter in upstream_filters_.
+    const size_t index_;
     bool initialized_{};
     bool pending_close_{false};
   };
 
   using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
 
-  struct ActiveWriteFilter : public WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
-    ActiveWriteFilter(FilterManagerImpl& parent, WriteFilterSharedPtr filter)
-        : parent_(parent), filter_(std::move(filter)) {}
+  struct ActiveWriteFilter : public WriteFilterCallbacks {
+    ActiveWriteFilter(FilterManagerImpl& parent, WriteFilterSharedPtr filter, size_t index)
+        : parent_(parent), filter_(std::move(filter)), index_(index) {}
 
     Connection& connection() override { return parent_.connection_; }
     const ConnectionSocket& socket() override { return parent_.socket_; }
@@ -206,6 +207,8 @@ private:
 
     FilterManagerImpl& parent_;
     WriteFilterSharedPtr filter_;
+    // Position of this filter in downstream_filters_.
+    const size_t index_;
     bool pending_close_{false};
   };
 
@@ -219,8 +222,12 @@ private:
   FilterManagerConnection& connection_;
   const ConnectionSocket& socket_;
   Upstream::HostDescriptionConstSharedPtr host_description_;
-  std::list<ActiveReadFilterPtr> upstream_filters_;
-  std::list<ActiveWriteFilterPtr> downstream_filters_;
+  // Filters can be added while the chain is being iterated, so iterate these by index and
+  // re-check the size on every step rather than holding iterators or references.
+  // Read filters are stored and iterated in the order they were added.
+  absl::InlinedVector<ActiveReadFilterPtr, 4> upstream_filters_;
+  // Write filters are stored in the order they were added and iterated in reverse.
+  absl::InlinedVector<ActiveWriteFilterPtr, 4> downstream_filters_;
   State state_;
   std::optional<ConnectionCloseAction> latched_close_action_;
   AccessLog::InstanceSharedPtrVector access_logs_;

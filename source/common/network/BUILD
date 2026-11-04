@@ -185,8 +185,8 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:assert_lib",
-        "//source/common/common:linked_object",
         "//source/common/runtime:runtime_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
     ],
 )
 

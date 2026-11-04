@@ -18,7 +18,6 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/empty_string.h"
-#include "source/common/common/linked_object.h"
 #include "source/common/common/random_generator.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
@@ -38,6 +37,7 @@
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -536,9 +536,9 @@ protected:
                                bool defer_socket_creation);
   void removeSession(ActiveSession* session);
 
-  struct ActiveReadFilter : public virtual ReadFilterCallbacks, LinkedObject<ActiveReadFilter> {
-    ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter)
-        : parent_(parent), read_filter_(std::move(filter)) {}
+  struct ActiveReadFilter : public virtual ReadFilterCallbacks {
+    ActiveReadFilter(ActiveSession& parent, ReadFilterSharedPtr filter, size_t index)
+        : parent_(parent), read_filter_(std::move(filter)), index_(index) {}
 
     // SessionFilters::ReadFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -550,14 +550,16 @@ protected:
 
     ActiveSession& parent_;
     ReadFilterSharedPtr read_filter_;
+    // Position of this filter in read_filters_.
+    const size_t index_;
     bool initialized_{false};
   };
 
   using ActiveReadFilterPtr = std::unique_ptr<ActiveReadFilter>;
 
-  struct ActiveWriteFilter : public virtual WriteFilterCallbacks, LinkedObject<ActiveWriteFilter> {
-    ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter)
-        : parent_(parent), write_filter_(std::move(filter)) {}
+  struct ActiveWriteFilter : public virtual WriteFilterCallbacks {
+    ActiveWriteFilter(ActiveSession& parent, WriteFilterSharedPtr filter, size_t index)
+        : parent_(parent), write_filter_(std::move(filter)), index_(index) {}
 
     // SessionFilters::WriteFilterCallbacks
     uint64_t sessionId() const override { return parent_.sessionId(); };
@@ -568,6 +570,8 @@ protected:
 
     ActiveSession& parent_;
     WriteFilterSharedPtr write_filter_;
+    // Position of this filter in write_filters_.
+    const size_t index_;
   };
 
   using ActiveWriteFilterPtr = std::unique_ptr<ActiveWriteFilter>;
@@ -618,25 +622,29 @@ protected:
 
     // SessionFilters::FilterChainFactoryCallbacks
     void addReadFilter(ReadFilterSharedPtr filter) override {
-      ActiveReadFilterPtr wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
+      ActiveReadFilterPtr wrapper =
+          std::make_unique<ActiveReadFilter>(*this, filter, read_filters_.size());
       filter->initializeReadFilterCallbacks(*wrapper);
-      LinkedList::moveIntoListBack(std::move(wrapper), read_filters_);
+      read_filters_.push_back(std::move(wrapper));
     };
 
     void addWriteFilter(WriteFilterSharedPtr filter) override {
-      ActiveWriteFilterPtr wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
+      ActiveWriteFilterPtr wrapper =
+          std::make_unique<ActiveWriteFilter>(*this, filter, write_filters_.size());
       filter->initializeWriteFilterCallbacks(*wrapper);
-      LinkedList::moveIntoList(std::move(wrapper), write_filters_);
+      write_filters_.push_back(std::move(wrapper));
     };
 
     void addFilter(FilterSharedPtr filter) override {
-      ActiveReadFilterPtr read_wrapper = std::make_unique<ActiveReadFilter>(*this, filter);
+      ActiveReadFilterPtr read_wrapper =
+          std::make_unique<ActiveReadFilter>(*this, filter, read_filters_.size());
       filter->initializeReadFilterCallbacks(*read_wrapper);
-      LinkedList::moveIntoListBack(std::move(read_wrapper), read_filters_);
+      read_filters_.push_back(std::move(read_wrapper));
 
-      ActiveWriteFilterPtr write_wrapper = std::make_unique<ActiveWriteFilter>(*this, filter);
+      ActiveWriteFilterPtr write_wrapper =
+          std::make_unique<ActiveWriteFilter>(*this, filter, write_filters_.size());
       filter->initializeWriteFilterCallbacks(*write_wrapper);
-      LinkedList::moveIntoList(std::move(write_wrapper), write_filters_);
+      write_filters_.push_back(std::move(write_wrapper));
     };
 
   protected:
@@ -673,8 +681,10 @@ protected:
 
     UdpProxySessionStats session_stats_{};
     StreamInfo::StreamInfoImpl udp_session_info_;
-    std::list<ActiveReadFilterPtr> read_filters_;
-    std::list<ActiveWriteFilterPtr> write_filters_;
+    // Read filters are stored and iterated in configuration order.
+    absl::InlinedVector<ActiveReadFilterPtr, 4> read_filters_;
+    // Write filters are stored in configuration order and iterated in reverse.
+    absl::InlinedVector<ActiveWriteFilterPtr, 4> write_filters_;
 
   private:
     std::shared_ptr<Network::ConnectionInfoSetterImpl> createDownstreamConnectionInfoProvider();

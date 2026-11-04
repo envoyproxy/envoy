@@ -919,6 +919,66 @@ TEST_F(NetworkFilterManagerTest, MultipleInjectDataCallsFromDifferentFilters) {
   read_filter_2->callbacks_->disableClose(false);
 }
 
+TEST_F(NetworkFilterManagerTest, AddFiltersDuringIteration) {
+  FilterManagerImpl manager(connection_, socket_);
+
+  std::vector<MockReadFilter*> read_filters;
+  std::vector<MockWriteFilter*> write_filters;
+  for (int i = 0; i < 4; ++i) {
+    read_filters.push_back(new MockReadFilter());
+    manager.addReadFilter(ReadFilterSharedPtr{read_filters.back()});
+    write_filters.push_back(new MockWriteFilter());
+    manager.addWriteFilter(WriteFilterSharedPtr{write_filters.back()});
+  }
+  // Fifth filters overflow the inline storage when added mid-iteration.
+  MockReadFilter* added_read_filter = new MockReadFilter();
+  MockWriteFilter* added_write_filter = new MockWriteFilter();
+
+  InSequence s;
+
+  for (MockReadFilter* filter : read_filters) {
+    EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  }
+  EXPECT_TRUE(manager.initializeReadFilters());
+
+  // A read filter added mid-iteration is appended and runs in the same pass.
+  read_buffer_.add("hello");
+  EXPECT_CALL(*read_filters[0], onData(BufferString("hello"), false))
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
+        manager.addReadFilter(ReadFilterSharedPtr{added_read_filter});
+        return FilterStatus::Continue;
+      });
+  for (size_t i = 1; i < read_filters.size(); ++i) {
+    EXPECT_CALL(*read_filters[i], onData(BufferString("hello"), false))
+        .WillOnce(Return(FilterStatus::Continue));
+  }
+  EXPECT_CALL(*added_read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*added_read_filter, onData(BufferString("hello"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  manager.onRead();
+
+  // Write filters run newest first; one added mid-iteration only runs on the next write.
+  write_buffer_.add("foo");
+  EXPECT_CALL(*write_filters[3], onWrite(BufferString("foo"), false))
+      .WillOnce([&](Buffer::Instance&, bool) -> FilterStatus {
+        manager.addWriteFilter(WriteFilterSharedPtr{added_write_filter});
+        return FilterStatus::Continue;
+      });
+  for (int i = 2; i >= 0; --i) {
+    EXPECT_CALL(*write_filters[i], onWrite(BufferString("foo"), false))
+        .WillOnce(Return(FilterStatus::Continue));
+  }
+  EXPECT_EQ(FilterStatus::Continue, manager.onWrite());
+
+  EXPECT_CALL(*added_write_filter, onWrite(BufferString("foo"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  for (int i = 3; i >= 0; --i) {
+    EXPECT_CALL(*write_filters[i], onWrite(BufferString("foo"), false))
+        .WillOnce(Return(FilterStatus::Continue));
+  }
+  EXPECT_EQ(FilterStatus::Continue, manager.onWrite());
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

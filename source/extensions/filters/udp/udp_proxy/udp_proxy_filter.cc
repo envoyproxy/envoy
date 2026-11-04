@@ -385,8 +385,8 @@ void UdpProxyFilter::ActiveSession::onSessionComplete() {
     active_read_filter->read_filter_->onSessionComplete();
   }
 
-  for (auto& active_write_filter : write_filters_) {
-    active_write_filter->write_filter_->onSessionComplete();
+  for (auto it = write_filters_.rbegin(); it != write_filters_.rend(); ++it) {
+    (*it)->write_filter_->onSessionComplete();
   }
 
   if (!filter_.config_->sessionAccessLogs().empty()) {
@@ -663,14 +663,14 @@ void UdpProxyFilter::UdpActiveSession::onSessionComplete() {
 bool UdpProxyFilter::ActiveSession::onContinueFilterChain(ActiveReadFilter* filter) {
   ASSERT(filter != nullptr);
 
-  std::list<ActiveReadFilterPtr>::iterator entry = std::next(filter->entry());
-  for (; entry != read_filters_.end(); entry++) {
-    if (!(*entry)->read_filter_ || (*entry)->initialized_) {
+  for (size_t i = filter->index_ + 1; i < read_filters_.size(); ++i) {
+    ActiveReadFilter* entry = read_filters_[i].get();
+    if (!entry->read_filter_ || entry->initialized_) {
       continue;
     }
 
-    (*entry)->initialized_ = true;
-    auto status = (*entry)->read_filter_->onNewSession();
+    entry->initialized_ = true;
+    auto status = entry->read_filter_->onNewSession();
     if (status == ReadFilterStatus::StopIteration) {
       return true;
     }
@@ -811,13 +811,13 @@ void UdpProxyFilter::ActiveSession::onInjectReadDatagramToFilterChain(ActiveRead
                                                                       Network::UdpRecvData& data) {
   ASSERT(filter != nullptr);
 
-  std::list<ActiveReadFilterPtr>::iterator entry = std::next(filter->entry());
-  for (; entry != read_filters_.end(); entry++) {
-    if (!(*entry)->read_filter_) {
+  for (size_t i = filter->index_ + 1; i < read_filters_.size(); ++i) {
+    ActiveReadFilter* entry = read_filters_[i].get();
+    if (!entry->read_filter_) {
       continue;
     }
 
-    auto status = (*entry)->read_filter_->onData(data);
+    auto status = entry->read_filter_->onData(data);
     if (status == ReadFilterStatus::StopIteration) {
       return;
     }
@@ -830,13 +830,14 @@ void UdpProxyFilter::ActiveSession::onInjectWriteDatagramToFilterChain(ActiveWri
                                                                        Network::UdpRecvData& data) {
   ASSERT(filter != nullptr);
 
-  std::list<ActiveWriteFilterPtr>::iterator entry = std::next(filter->entry());
-  for (; entry != write_filters_.end(); entry++) {
-    if (!(*entry)->write_filter_) {
+  // Write filters iterate in reverse, so the next filter is at the previous index.
+  for (size_t remaining = filter->index_; remaining > 0; --remaining) {
+    ActiveWriteFilter* entry = write_filters_[remaining - 1].get();
+    if (!entry->write_filter_) {
       continue;
     }
 
-    auto status = (*entry)->write_filter_->onWrite(data);
+    auto status = entry->write_filter_->onWrite(data);
     if (status == WriteFilterStatus::StopIteration) {
       return;
     }
@@ -875,8 +876,8 @@ void UdpProxyFilter::ActiveSession::resetIdleTimer() {
 }
 
 void UdpProxyFilter::ActiveSession::processUpstreamDatagram(Network::UdpRecvData& recv_data) {
-  for (auto& active_write_filter : write_filters_) {
-    auto status = active_write_filter->write_filter_->onWrite(recv_data);
+  for (auto it = write_filters_.rbegin(); it != write_filters_.rend(); ++it) {
+    auto status = (*it)->write_filter_->onWrite(recv_data);
     if (status == WriteFilterStatus::StopIteration) {
       return;
     }
