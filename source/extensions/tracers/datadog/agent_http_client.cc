@@ -87,7 +87,8 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   auto message = std::make_unique<Http::RequestMessageImpl>();
   Http::RequestHeaderMap& headers = message->headers();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  // The request can outlive `url`: dd-trace-cpp's agent flushes from its destructor.
+  // Copy instead of reference, because `url` belongs to dd-trace-cpp's `DatadogAgent`, which
+  // can free it while the request is pending.
   headers.setPath(url.path);
   headers.setReferenceHost(reference_host_);
 
