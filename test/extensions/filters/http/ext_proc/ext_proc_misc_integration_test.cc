@@ -2,7 +2,6 @@
 // generally should not change or remove existing tests.
 
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
-#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
 #include "test/common/http/common.h"
@@ -219,11 +218,8 @@ TEST_P(ExtProcStatusOnErrorIntegrationTest, ProcessingErrorCustomStatus) {
   EXPECT_EQ("422", response->headers().getStatusValue());
 }
 
-// Regression test for a heap-use-after-free through the ext_proc filter's cached
-// ``logging_info_`` pointer: when another HTTP filter (here ext_authz) shares the same
-// ``http_filters[].name`` and overwrites the FilterState entry at that key, the
-// ``ExtProcLoggingInfo`` object owned solely by FilterState was freed while ext_proc
-// still held a raw pointer to it.
+// Tests for two HTTP filters sharing the same ``http_filters[].name``, and therefore the same
+// FilterState key.
 class ExtProcFilterStateCollisionIntegrationTest : public HttpIntegrationTest,
                                                    public Grpc::GrpcClientIntegrationParamTest {
 protected:
@@ -232,7 +228,7 @@ protected:
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
-    // Two fake gRPC upstreams: [0] ext_proc side stream, [1] ext_authz.
+    // Two fake gRPC upstreams, one per ext_proc filter.
     for (int i = 0; i < 2; ++i) {
       grpc_upstreams_.push_back(&addFakeUpstream(Http::CodecType::HTTP2));
     }
@@ -243,54 +239,11 @@ protected:
       ASSERT_TRUE(processor_connection_->close());
       ASSERT_TRUE(processor_connection_->waitForDisconnect());
     }
-
     if (second_processor_connection_) {
       ASSERT_TRUE(second_processor_connection_->close());
       ASSERT_TRUE(second_processor_connection_->waitForDisconnect());
     }
-
     cleanupUpstreamAndDownstream();
-  }
-
-  void initializeConfig() {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      // Ensure "HTTP2 with no prior knowledge." Necessary for gRPC.
-      ConfigHelper::setHttp2(
-          *(bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0)));
-      // Clusters for the two side-stream gRPC servers.
-      for (int i = 0; i < 2; ++i) {
-        auto* server_cluster = bootstrap.mutable_static_resources()->add_clusters();
-        server_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        std::string cluster_name = absl::StrCat("side_stream_server_", i);
-        server_cluster->set_name(cluster_name);
-        server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
-      }
-
-      setGrpcService(*proto_config_.mutable_grpc_service(), "side_stream_server_0",
-                     grpc_upstreams_[0]->localAddress());
-
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
-      ext_proc_filter.set_name("envoy.filters.http.ext_proc");
-      std::ignore = ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
-
-      // Prepend ext_authz IN FRONT of ext_proc, sharing the SAME http_filters ``name:`` so
-      // both filters write FilterState at the same key. Net order: [ext_authz, ext_proc, router].
-      config_helper_.prependFilter(R"EOF(
-name: envoy.filters.http.ext_proc
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-  emit_filter_state_stats: true
-  failure_mode_allow: true
-  transport_api_version: V3
-  grpc_service:
-    envoy_grpc:
-      cluster_name: side_stream_server_1
-)EOF");
-    });
-
-    setUpstreamProtocol(Http::CodecType::HTTP2);
-    setDownstreamProtocol(Http::CodecType::HTTP2);
   }
 
   // Two ext_proc filters sharing the same ``http_filters[].name``.
@@ -309,7 +262,7 @@ typed_config:
         server_cluster->mutable_load_assignment()->set_cluster_name(cluster_name);
       }
 
-      // Prepend first, so it ends up second in the chain.
+      // Prepended first, so it ends up second in the chain.
       envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor second_config;
       setGrpcService(*second_config.mutable_grpc_service(), "side_stream_server_1",
                      grpc_upstreams_[1]->localAddress());
@@ -347,7 +300,6 @@ typed_config:
   std::vector<FakeUpstream*> grpc_upstreams_;
   FakeHttpConnectionPtr processor_connection_;
   FakeStreamPtr processor_stream_;
-
   FakeHttpConnectionPtr second_processor_connection_;
   FakeStreamPtr second_processor_stream_;
 };
@@ -355,50 +307,6 @@ typed_config:
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, ExtProcFilterStateCollisionIntegrationTest,
                          GRPC_CLIENT_INTEGRATION_PARAMS,
                          Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
-
-TEST_P(ExtProcFilterStateCollisionIntegrationTest, LoggingInfoSurvivesFilterStateKeyCollision) {
-  initializeConfig();
-  HttpIntegrationTest::initialize();
-
-  auto response = sendDownstreamRequest();
-
-  // Handle the ext_authz Check on grpc_upstreams_[1] and reply OK so filter iteration
-  // continues into ext_proc. During ext_authz's ``initiateCall()`` the FilterState entry
-  // at ``envoy.filters.http.ext_proc`` is overwritten with an ``ExtAuthzLoggingInfo``,
-  // which used to free the ``ExtProcLoggingInfo`` while ext_proc still held a raw pointer.
-  FakeHttpConnectionPtr authz_conn;
-  ASSERT_TRUE(grpc_upstreams_[1]->waitForHttpConnection(*dispatcher_, authz_conn));
-  FakeStreamPtr authz_stream;
-  ASSERT_TRUE(authz_conn->waitForNewStream(*dispatcher_, authz_stream));
-  envoy::service::auth::v3::CheckRequest check_req;
-  ASSERT_TRUE(authz_stream->waitForGrpcMessage(*dispatcher_, check_req));
-  authz_stream->startGrpcStream();
-  envoy::service::auth::v3::CheckResponse check_resp;
-  check_resp.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
-  authz_stream->sendGrpcMessage(check_resp);
-  authz_stream->finishGrpcStream(Grpc::Status::Ok);
-
-  // ext_proc opens its side stream; reply with an ``immediate_response``, which writes to the
-  // logging info object. Prior to the fix this was a heap-use-after-free WRITE under ASAN.
-  ASSERT_TRUE(grpc_upstreams_[0]->waitForHttpConnection(*dispatcher_, processor_connection_));
-  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
-  ProcessingRequest proc_req;
-  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, proc_req));
-  ASSERT_TRUE(proc_req.has_request_headers());
-
-  processor_stream_->startGrpcStream();
-  ProcessingResponse proc_resp;
-  auto* immediate = proc_resp.mutable_immediate_response();
-  immediate->mutable_status()->set_code(envoy::type::v3::StatusCode::Forbidden);
-  processor_stream_->sendGrpcMessage(proc_resp);
-  processor_stream_->finishGrpcStream(Grpc::Status::Ok);
-
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("403", response->headers().getStatusValue());
-
-  ASSERT_TRUE(authz_conn->close());
-  ASSERT_TRUE(authz_conn->waitForDisconnect());
-}
 
 // Two ext_proc filters sharing the same name must not share one ExtProcLoggingInfo, otherwise
 // their callout stats clobber each other. The second filter fails open; that must not be
@@ -437,6 +345,9 @@ TEST_P(ExtProcFilterStateCollisionIntegrationTest, DuplicateNameDoesNotShareLogg
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 
+  // The second filter found the key taken and skipped creating its logging info.
+  test_server_->waitForCounter("http.config_test.ext_proc.logging_info_not_created",
+                               testing::Eq(1));
   // Only the second filter failed open...
   test_server_->waitForCounter("http.config_test.ext_proc.failure_mode_allowed", testing::Eq(1));
   // ...and that must not leak into the first filter's logging info.

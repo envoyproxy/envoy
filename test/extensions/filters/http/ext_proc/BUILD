@@ -650,7 +650,6 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

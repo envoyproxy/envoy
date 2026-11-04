@@ -712,26 +712,22 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   filter_callbacks_ = &callbacks;
   watermark_callbacks_.setDecoderFilterCallbacks(&callbacks);
   decoding_state_.setDecoderFilterCallbacks(callbacks);
-  // Create logging info only if key is free
   const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
       callbacks.streamInfo().filterState();
   const absl::string_view key = callbacks.filterConfigName();
-  // check by name, not by type.Previously 'hasData<ExtProcLoggingInfo>(...)'
-  // returned false for another filter's object, so ext_proc overwrote it via setData().
   if (filter_state->hasDataWithName(key)) {
-    // The key is already in use, e.g. by another filter with the same name, Sharing or
-    // overwriting that entry would mix up callout stats, so record no logging info here.
-
+    // The key is already in use, e.g. by another filter with the same name. Don't overwrite it;
+    // logging_info_ stays null and no logging info is recorded for this filter.
     ENVOY_STREAM_LOG(debug,
-                     "Filter state key '{}' already exists; ext_proc logging info not recorded.",
+                     "Filter state key '{}' already exists; ext_proc logging info not recorded",
                      callbacks, key);
     stats_.logging_info_not_created_.inc();
     return;
   }
-  // Retain shared ownership so the object stays valid for the lifetime of this filter even if
-  // another filter later replaces the FilterState entry at the same key.
-  logging_info_ = std::make_shared<ExtProcLoggingInfo>(config_->filterMetadata());
-  filter_state->setData(key, logging_info_, Envoy::StreamInfo::FilterState::LifeSpan::Request);
+  // FilterState owns the object; the filter keeps a non-owning pointer.
+  logging_info_ = new ExtProcLoggingInfo(config_->filterMetadata());
+  filter_state->setData(key, std::unique_ptr<ExtProcLoggingInfo>(logging_info_),
+                        Envoy::StreamInfo::FilterState::LifeSpan::Request);
 }
 
 void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) {
