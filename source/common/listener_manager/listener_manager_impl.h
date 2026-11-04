@@ -176,6 +176,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_removed)                                                                        \
   COUNTER(listener_stopped)                                                                        \
   GAUGE(total_filter_chains_draining, NeverImport)                                                 \
+  GAUGE(total_listener_addresses_draining, NeverImport)                                            \
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
   GAUGE(total_listeners_warming, NeverImport)                                                      \
@@ -194,8 +195,8 @@ struct ListenerManagerStats {
  */
 class DrainingFilterChainsManager {
 public:
-  DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
-                              uint64_t workers_pending_removal);
+  DrainingFilterChainsManager(ListenerImplPtr&& draining_listener, uint64_t workers_pending_removal,
+                              uint32_t num_draining_addresses);
   DrainingFilterChainsManager(
       std::vector<Network::DrainableFilterChainSharedPtr>&& draining_filter_chains,
       uint64_t listener_tag, uint64_t workers_pending_removal);
@@ -223,15 +224,40 @@ public:
     draining_filter_chains_.push_back(&filter_chain);
   }
 
-  uint32_t numDrainingFilterChains() const { return draining_filter_chains_.size(); }
+  // Used by the in-place LDS update for an FCDS filter chain, which the listener does not own.
+  void addFilterChainToDrain(Network::DrainableFilterChainSharedPtr&& filter_chain) {
+    draining_filter_chains_.push_back(filter_chain.get());
+    draining_filter_chain_shared_ptrs_.push_back(std::move(filter_chain));
+  }
+
+  // Excludes the given FCDS filter chains from the removal when the drain completes, unless the
+  // workers already got the filter chains to remove, and returns the number of filter chains that
+  // it newly excludes.
+  uint32_t keepFilterChains(const absl::flat_hash_set<const Network::FilterChain*>& filter_chains);
+
+  // The filter chains whose connections are removed when the drain completes. It must be called
+  // only once, since the workers keep a reference to the list.
+  const std::list<const Network::FilterChain*>& buildRemovedFilterChains();
+
+  uint32_t numDrainingFilterChains() const {
+    return draining_filter_chains_.size() - kept_filter_chains_.size();
+  }
+
+  // The number of addresses of the draining listener that the in place update stopped, which are
+  // removed when the drain completes.
+  uint32_t numDrainingAddresses() const { return num_draining_addresses_; }
 
 private:
   ListenerImplPtr draining_listener_;
   const uint64_t listener_tag_;
+  const uint32_t num_draining_addresses_{};
   std::list<const Network::FilterChain*> draining_filter_chains_;
 
-  // Used by the FCDS to extend the lifetime, assumes draining_listener_ to be nullptr.
-  const std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chain_shared_ptrs_;
+  // Extends the lifetime of the FCDS filter chains, which no listener owns.
+  std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chain_shared_ptrs_;
+  absl::flat_hash_set<const Network::FilterChain*> kept_filter_chains_;
+  std::list<const Network::FilterChain*> removed_filter_chains_;
+  bool removed_filter_chains_built_{false};
 
   uint64_t workers_pending_removal_;
   Event::TimerPtr drain_timer_;
@@ -324,8 +350,21 @@ private:
   };
 
   bool doFinalPreWorkerListenerInit(ListenerImpl& listener);
+  bool
+  doFinalPreWorkerListenerInit(ListenerImpl& listener,
+                               absl::Span<Network::ListenSocketFactory* const> socket_factories);
   void addListenerToWorker(Worker& worker, std::optional<uint64_t> overridden_listener,
                            ListenerImpl& listener, ListenerCompletionCallback completion_callback);
+
+  /**
+   * Stop the workers from accepting connections on the addresses of the given socket factories,
+   * which an in place update removed from the listener, and close the sockets once all workers have
+   * stopped accepting connections on them.
+   * @param listener supplies the listener that the in place update replaced.
+   * @param socket_factories supplies the socket factories of the removed addresses.
+   */
+  void stopListenerAddresses(ListenerImpl& listener,
+                             absl::Span<Network::ListenSocketFactory* const> socket_factories);
 
   ProtobufTypes::MessagePtr dumpListenerConfigs(const Matchers::StringMatcher& name_matcher);
   static ListenerManagerStats generateStats(Stats::Scope& scope);
@@ -360,14 +399,19 @@ private:
   void drainListener(ListenerImplPtr&& listener);
 
   /**
-   * Start to draining filter chains that are owned by draining listener but not owned by
-   * new_listener. The new listener should have taken over the listener socket and partial of the
-   * filter chains from listener. This method is used by in place filter chain update.
+   * Start draining the filter chains that the draining listener uses but new_listener does not.
+   * The new listener should have taken over the listener sockets of the kept addresses and some of
+   * the filter chains of the draining listener. The earlier drains of the listener that have not
+   * completed no longer remove the FCDS filter chains that new_listener uses. This method is used
+   * by in place filter chain update.
    * @param draining_listener supplies the listener to be replaced.
    * @param new_listener supplies the new listener config which is going to replace the draining
    * listener.
+   * @param num_draining_addresses supplies the number of addresses of the draining listener that
+   * the update stopped, which are removed when the drain completes.
    */
-  void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener);
+  void drainFilterChains(ListenerImplPtr&& draining_listener, ListenerImpl& new_listener,
+                         uint32_t num_draining_addresses);
 
   void drainGroup(std::list<DrainingFilterChainsManager>::iterator draining_group);
 
@@ -396,8 +440,26 @@ private:
                                      Network::ListenerConfig& listener_config);
   void notifyListenerRemovalCallbacks(const std::string& listener_name);
 
+  absl::Status validateNoDuplicatedAddress(const std::string& name,
+                                           const ListenerImpl& listener) const;
   absl::Status setNewOrDrainingSocketFactory(const std::string& name, ListenerImpl& listener);
-  absl::Status createListenSocketFactory(ListenerImpl& listener);
+  // Creates the listen socket factory of each address of the listener. An address with a kept
+  // socket factory shares its sockets, and one with a cloned socket factory duplicates them,
+  // instead of creating new ones.
+  absl::Status createListenSocketFactory(
+      ListenerImpl& listener,
+      absl::Span<Network::ListenSocketFactory* const> kept_socket_factories = {},
+      absl::Span<Network::ListenSocketFactory* const> cloned_socket_factories = {});
+  // Returns the socket factory of the warming listener that the in place update of the listener
+  // replaces, if ListenerImpl::reusableSocketFactory() accepts it for the address at the index, or
+  // nullptr.
+  Network::ListenSocketFactory* warmingVersionSocketFactory(const ListenerImpl& listener,
+                                                            uint32_t address_index);
+  // Returns the socket factory of a listener that an earlier in place update of the listener
+  // replaced, if ListenerImpl::reusableSocketFactory() accepts it for the address at the index, or
+  // nullptr.
+  Network::ListenSocketFactory* drainingVersionSocketFactory(const ListenerImpl& listener,
+                                                             uint32_t address_index);
 
   void maybeCloseSocketsForListener(ListenerImpl& listener);
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,

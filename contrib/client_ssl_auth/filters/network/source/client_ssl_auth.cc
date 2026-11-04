@@ -70,7 +70,7 @@ GlobalStats ClientSslAuthConfig::generateStats(Stats::Scope& scope, const std::s
   // auth.clientssl.(<stat_prefix>.)*: the stat prefix is the tag of every stat.
   const Stats::TagStringView tag{Envoy::Config::TagNames::get().CLIENTSSL_PREFIX, prefix};
   Stats::LiteScopeHelper helper(scope, "auth.clientssl", {tag},
-                                absl::StrCat("auth.clientssl.", prefix));
+                                absl::StrCat("auth.clientssl.", prefix), /*sanitize=*/false);
   return {ALL_CLIENT_SSL_AUTH_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};
 }
 

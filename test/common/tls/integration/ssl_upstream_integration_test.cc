@@ -217,5 +217,94 @@ TEST_P(SslUpstreamNulSanIntegrationTest, EmbeddedNulSanValidation) {
   expectCertValidationFailure();
 }
 
+// The upstream rejects the client certificate that Envoy presents. With TLS 1.3, Envoy completes
+// its handshake before the upstream validates the client certificate, so the rejection is reported
+// as a reset after the connection is established rather than as a connection failure.
+class SslUpstreamClientCertRejectedIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  SslUpstreamClientCertRejectedIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    setUpstreamProtocol(Http::CodecType::HTTP1);
+  }
+
+  void initialize() override {
+    config_helper_.configureUpstreamTls(
+        false /* use alpn */, false /* http3 */, std::nullopt,
+        [](envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& ctx) {
+          auto* tls_cert = ctx.mutable_common_tls_context()->add_tls_certificates();
+          tls_cert->mutable_certificate_chain()->set_filename(
+              TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+          tls_cert->mutable_private_key()->set_filename(
+              TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+        });
+    HttpIntegrationTest::initialize();
+  }
+
+  // The upstream requires a client certificate, but trusts a CA that didn't sign Envoy's.
+  Network::DownstreamTransportSocketFactoryPtr createCustomUpstreamTlsContext() {
+    envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+    tls_context.mutable_require_client_certificate()->set_value(true);
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    auto* tls_cert = common_tls_context->add_tls_certificates();
+    tls_cert->mutable_certificate_chain()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+    tls_cert->mutable_private_key()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
+    common_tls_context->mutable_validation_context()->mutable_trusted_ca()->set_filename(
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
+
+    auto cfg_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+        tls_context, factory_context_, {}, false);
+    RELEASE_ASSERT(cfg_or_error.ok(), std::string(cfg_or_error.status().message()));
+    auto factory_or_error = Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
+        std::move(*cfg_or_error), BaseIntegrationTest::context_manager_,
+        server_factory_context_.serverScope());
+    RELEASE_ASSERT(factory_or_error.ok(), std::string(factory_or_error.status().message()));
+    return std::move(*factory_or_error);
+  }
+
+  void createUpstreams() override {
+    for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
+      fake_upstreams_.emplace_back(std::make_unique<AutonomousUpstream>(
+          createCustomUpstreamTlsContext(), upstream_address_fn_(i), upstreamConfig(),
+          autonomous_allow_incomplete_streams_));
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, SslUpstreamClientCertRejectedIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// A client certificate rejected with TLS 1.3 is retried by the `reset` retry policy, but isn't
+// counted as a connection failure.
+TEST_P(SslUpstreamClientCertRejectedIntegrationTest, RetryOnReset) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* retry_policy = hcm.mutable_route_config()
+                                 ->mutable_virtual_hosts(0)
+                                 ->mutable_routes(0)
+                                 ->mutable_route()
+                                 ->mutable_retry_policy();
+        retry_policy->set_retry_on("reset");
+        retry_policy->mutable_num_retries()->set_value(1);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+  codec_client_->close();
+
+  // Both the request and its retry negotiated TLS 1.3 and were rejected after the handshake.
+  test_server_->waitForCounter("cluster.cluster_0.ssl.versions.TLSv1.3", testing::Eq(2));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_retry")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value());
+}
+
 } // namespace Ssl
 } // namespace Envoy

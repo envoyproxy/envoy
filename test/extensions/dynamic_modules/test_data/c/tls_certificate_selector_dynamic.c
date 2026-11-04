@@ -14,7 +14,8 @@
 // its calls. The scheduled hook adds the event ids to a counter. A non-empty config is a PEM
 // certificate chain followed by its private key, which the module provides as the dynamic
 // certificate "dynamic.prefetch.lyft.com", and as 32 other certificates followed by the requested
-// one for the names with the "many." prefix.
+// one for the names with the "many." prefix. The "fail" selector fails its configuration after it
+// provides the certificate.
 
 envoy_dynamic_module_type_abi_version_module_ptr envoy_dynamic_module_on_program_init(void) {
   return envoy_dynamic_modules_abi_version;
@@ -53,7 +54,6 @@ envoy_dynamic_module_on_tls_certificate_selector_config_new(
     envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr config_envoy_ptr,
     envoy_dynamic_module_type_envoy_buffer name,
     envoy_dynamic_module_type_envoy_buffer config_buffer, bool is_upstream) {
-  (void)name;
   (void)is_upstream;
   config* c = calloc(1, sizeof(config));
   c->envoy_ptr = config_envoy_ptr;
@@ -79,6 +79,10 @@ envoy_dynamic_module_on_tls_certificate_selector_config_new(
       free(c);
       return NULL;
     }
+  }
+  if (name.length == strlen("fail") && has_prefix(name, "fail")) {
+    envoy_dynamic_module_on_tls_certificate_selector_config_destroy(c);
+    return NULL;
   }
   return c;
 }

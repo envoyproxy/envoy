@@ -120,16 +120,19 @@ ProxyProtocolStats ProxyProtocolStats::create(Stats::Scope& scope, absl::string_
   if (!stat_prefix.empty()) {
     tags.push_back({Envoy::Config::TagNames::get().PROXY_PROTOCOL_PREFIX, stat_prefix});
   }
-  Stats::LiteScopeHelper general_helper(scope, kProxyProtoStatsPrefix, tags, filter_stat_prefix);
+  Stats::LiteScopeHelper general_helper(scope, kProxyProtoStatsPrefix, tags, filter_stat_prefix,
+                                        /*sanitize=*/false);
 
   // proxy_proto.[<stat_prefix>.]versions.v(<N>).*: the version is a tag on top of the prefix.
   tags.push_back({Envoy::Config::TagNames::get().PROXY_PROTOCOL_VERSION, "1"});
   Stats::LiteScopeHelper v1_helper(scope, kProxyProtoStatsPrefix, tags,
-                                   absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v1"));
+                                   absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v1"),
+                                   /*sanitize=*/false);
   tags.pop_back(); // Remove the version tag for v1 before creating v2.
   tags.push_back({Envoy::Config::TagNames::get().PROXY_PROTOCOL_VERSION, "2"});
   Stats::LiteScopeHelper v2_helper(scope, kProxyProtoStatsPrefix, tags,
-                                   absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v2"));
+                                   absl::StrCat(filter_stat_prefix, kVersionStatsPrefix, "v2"),
+                                   /*sanitize=*/false);
 
   return {
       /*legacy_=*/{LEGACY_PROXY_PROTOCOL_STATS(POOL_COUNTER(scope))},

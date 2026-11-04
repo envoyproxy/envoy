@@ -9,10 +9,12 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -26,7 +28,14 @@ void rebuildRouteConfigVirtualHosts(
     const RouteConfigUpdateReceiverImpl::VirtualHostMap& vhds_vhosts,
     envoy::config::route::v3::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
+  const bool vhds_overrides_rds = Runtime::runtimeFeatureEnabled(
+      "envoy.reloadable_features.vhds_overrides_rds_virtual_hosts_with_same_name");
   for (const auto& vhost : rds_vhosts) {
+    if (vhds_overrides_rds && vhds_vhosts.contains(vhost.first)) {
+      ENVOY_LOG_MISC(debug, "VHDS virtual host '{}' overrides RDS virtual host with the same name",
+                     vhost.first);
+      continue;
+    }
     route_config.mutable_virtual_hosts()->Add()->CheckTypeAndMergeFrom(vhost.second);
   }
   for (const auto& vhost : vhds_vhosts) {

@@ -7,7 +7,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -33,9 +32,7 @@ MockTransport::~MockTransport() = default;
 MockProtocol::MockProtocol() {
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, type()).WillByDefault(Return(type_));
-  ON_CALL(*this, setType(_)).WillByDefault(Invoke([&](ProtocolType type) -> void {
-    type_ = type;
-  }));
+  ON_CALL(*this, setType(_)).WillByDefault([&](ProtocolType type) -> void { type_ = type; });
   ON_CALL(*this, supportsUpgrade()).WillByDefault(Return(false));
 }
 MockProtocol::~MockProtocol() = default;

@@ -119,8 +119,8 @@ struct RouterNamedStats {
   static RouterNamedStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     // The prefix is the parent's flat prefix, "thrift.(<stat_prefix>.)*": the stat prefix is the
     // tag of every stat.
-    const Stats::TaggedStatName tagged_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix,
-                                                                       /*base_name=*/"");
+    const Stats::TaggedStatName tagged_prefix = Stats::mergeStatPrefix(
+        scope.symbolTable(), prefix, /*base_name=*/"", {}, {}, /*sanitize=*/false);
     Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
                                   tagged_prefix.name());
     return RouterNamedStats{

@@ -334,8 +334,8 @@ Key CacheHeadersUtils::makeKey(const Http::RequestHeaderMap& request_headers,
   // TODO(toddmgreer): Let config determine whether to include scheme, host, and
   // query params.
   key.set_cluster_name(cluster_name);
-  key.set_host(std::string(request_headers.getHostValue()));
-  key.set_path(std::string(request_headers.getPathValue()));
+  key.set_host(request_headers.getHostValue());
+  key.set_path(request_headers.getPathValue());
   if (Http::Utility::schemeIsHttp(scheme)) {
     key.set_scheme(Key::HTTP);
   } else if (Http::Utility::schemeIsHttps(scheme)) {
@@ -502,7 +502,7 @@ VaryHeaderUtils::createVaryIdentifier(const VaryAllowList& allow_list,
     // be used as an inspiration for some bucketing configuration. The config
     // should enable and control the bucketing wanted.
     const auto all_values = Http::HeaderUtility::getAllOfHeaderAsString(
-        request_headers, Http::LowerCaseString(std::string(value)), inValueSeparator);
+        request_headers, Http::LowerCaseString(value), inValueSeparator);
     absl::StrAppend(&vary_identifier, value, inValueSeparator,
                     all_values.result().has_value() ? all_values.result().value() : "",
                     headerSeparator);

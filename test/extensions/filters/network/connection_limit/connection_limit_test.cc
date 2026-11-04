@@ -222,6 +222,22 @@ delay: 0.2s
   EXPECT_EQ("connection_limit_stats", limited_connections->tags()[0].value_);
 }
 
+// A ':' in the stat prefix stays in the flat stat names, like the legacy stat creation paths.
+TEST_F(ConnectionLimitFilterTest, ColonInStatPrefixIsPreserved) {
+  initialize(R"EOF(
+stat_prefix: "db:27017"
+max_connections: 1
+delay: 0.2s
+)EOF");
+
+  const Stats::CounterSharedPtr limited_connections =
+      TestUtility::findCounter(stats_store_, "connection_limit.db:27017.limited_connections");
+  ASSERT_NE(limited_connections, nullptr);
+  EXPECT_EQ("connection_limit.limited_connections", limited_connections->tagExtractedName());
+  ASSERT_EQ(1U, limited_connections->tags().size());
+  EXPECT_EQ("db:27017", limited_connections->tags()[0].value_);
+}
+
 } // namespace ConnectionLimitFilter
 } // namespace NetworkFilters
 } // namespace Extensions

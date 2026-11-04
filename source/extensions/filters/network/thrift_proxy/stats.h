@@ -47,7 +47,8 @@ struct ThriftFilterStats {
 
   static ThriftFilterStats generateStats(const std::string& stats_prefix, Stats::Scope& scope) {
     const Stats::TagStringView tag{Envoy::Config::TagNames::get().THRIFT_PREFIX, stats_prefix};
-    Stats::LiteScopeHelper helper(scope, "thrift", {tag}, absl::StrCat("thrift.", stats_prefix));
+    Stats::LiteScopeHelper helper(scope, "thrift", {tag}, absl::StrCat("thrift.", stats_prefix),
+                                  /*sanitize=*/false);
     return ThriftFilterStats{
         ALL_THRIFT_FILTER_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper), POOL_HISTOGRAM(helper))};
   }

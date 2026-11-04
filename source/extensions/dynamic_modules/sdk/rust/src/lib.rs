@@ -42,6 +42,8 @@ pub mod transport_socket;
 pub mod udp_listener;
 pub mod upstream_http_tcp_bridge;
 pub mod utility;
+#[cfg(envoy_dynamic_module_dll)]
+mod windows_delay_load;
 pub use bootstrap::*;
 pub use buffer::*;
 pub use catch_unwind::*;
@@ -580,7 +582,8 @@ pub(crate) fn str_to_module_buffer(s: &str) -> abi::envoy_dynamic_module_type_mo
 ///
 /// The result is a `SmallVec` inlined for the common case of a few labels, so the typical one to
 /// four labels need no heap allocation. Callers must take `as_ptr` or `as_mut_ptr` on the bound
-/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that pointer.
+/// value and must not move it afterward, since moving an inline `SmallVec` invalidates that
+/// pointer.
 pub(crate) fn strs_to_module_buffers(
   strs: &[&str],
 ) -> smallvec::SmallVec<[abi::envoy_dynamic_module_type_module_buffer; 4]> {
@@ -815,8 +818,7 @@ macro_rules! declare_network_filter_init_functions {
 /// - `route_specifier:` — [`NewRouteSpecifierConfigFunction`] for route specifiers
 /// - `stat_sink:` — [`NewStatSinkConfigFunction`] for stats sinks
 /// - `health_checker:` — [`NewHealthCheckerConfigFunction`] for health checkers
-/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header
-///   mutations
+/// - `early_header_mutation:` — [`NewEarlyHeaderMutationConfigFunction`] for early header mutations
 /// - `header_formatter:` — [`NewHeaderFormatterConfigFunction`] for HTTP/1 header formatters
 /// - `tls_certificate_selector:` — [`NewTlsCertificateSelectorConfigFunction`] for TLS certificate
 ///   selectors
@@ -1360,8 +1362,8 @@ pub static NEW_FORMATTER_CONFIG_FUNCTION: OnceLock<NewFormatterConfigFunction> =
 /// # Example
 ///
 /// ```
-/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 /// use envoy_proxy_dynamic_modules_rust_sdk::formatter::*;
+/// use envoy_proxy_dynamic_modules_rust_sdk::*;
 ///
 /// fn program_init() -> bool {
 ///   true
@@ -1768,7 +1770,10 @@ pub static NEW_CLUSTER_CONFIG_FUNCTION: OnceLock<NewClusterConfigFunction> = Onc
 ///     envoy_cluster.pre_init_complete();
 ///   }
 ///
-///   fn new_load_balancer(&self, _envoy_lb: &dyn EnvoyClusterLoadBalancer) -> Option<Box<dyn ClusterLb>> {
+///   fn new_load_balancer(
+///     &self,
+///     _envoy_lb: &dyn EnvoyClusterLoadBalancer,
+///   ) -> Option<Box<dyn ClusterLb>> {
 ///     Some(Box::new(MyClusterLb {}))
 ///   }
 /// }
@@ -1998,8 +2003,12 @@ macro_rules! declare_cert_validator_init_functions {
 /// The `name` is the value of `selector_name` from the `dynamic_modules` TLS certificate selector
 /// configuration, allowing a single module to dispatch to different implementations. The `config`
 /// is the raw bytes from the `selector_config` field. `is_upstream` is true when the configuration
-/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics and provides
-/// the dynamic certificates. Returning `None` causes Envoy to reject the TLS context configuration.
+/// is for upstream TLS contexts. The `envoy_config` handle defines and records metrics, provides
+/// the dynamic certificates and signals the end of the initialization, which the listeners and
+/// clusters that use the TLS context wait for. Dynamic certificates provided during this call, or
+/// before `signal_init_complete`, are available to the first handshake, unless the TLS context
+/// waits for its SDS validation context. Returning `None` causes Envoy to reject the TLS context
+/// configuration.
 pub type NewTlsCertificateSelectorConfigFunction =
   fn(
     name: &str,

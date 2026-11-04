@@ -175,7 +175,7 @@ impl BootstrapExtensionConfig for SignedCalloutConfig {
       0
     };
 
-    if (200..300).contains(&status) {
+    if (200 .. 300).contains(&status) {
       if self.signal_init_complete_once(envoy_extension_config) {
         envoy_log_info!("Bootstrap signed callout test completed successfully!");
       }

@@ -193,8 +193,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     auto on_modify_encoding_buffer = [&data](std::function<void(Buffer::Instance&)> cb) {
       cb(data);
     };
-    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-        .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
     if (response_trailers) {
@@ -236,8 +235,7 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
     auto on_modify_encoding_buffer = [&data](std::function<void(Buffer::Instance&)> cb) {
       cb(data);
     };
-    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-        .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data, true));
     EXPECT_EQ(response_headers.get(Http::LowerCaseString("content-type")).size(), 1);
@@ -298,13 +296,12 @@ E9toc6lgrko2JdbV6TyWLVUc/M0Pn+OVSQ==
 
     EXPECT_CALL(encoder_callbacks_, addEncodedData(_, false))
         .Times(2)
-        .WillRepeatedly(Invoke(
-            [&accumulated_data](Buffer::Instance& data, bool) { accumulated_data.add(data); }));
+        .WillRepeatedly(
+            [&accumulated_data](Buffer::Instance& data, bool) { accumulated_data.add(data); });
 
     auto on_modify_encoding_buffer =
         [&accumulated_data](std::function<void(Buffer::Instance&)> cb) { cb(accumulated_data); };
-    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer)
-        .WillRepeatedly(Invoke(on_modify_encoding_buffer));
+    EXPECT_CALL(encoder_callbacks_, modifyEncodingBuffer).WillRepeatedly(on_modify_encoding_buffer);
 
     Buffer::OwnedImpl chunk1("<html><body>hi!", 15);
     Buffer::OwnedImpl chunk2("</body></html>\n", 15);
@@ -368,10 +365,9 @@ TEST_F(FilterTest, SdsDynamicGenericSecret) {
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   EXPECT_CALL(secret_context, initManager()).Times(0);
-  EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_handle](const Init::Target& target) {
-        init_handle = target.createHandle("test");
-      }));
+  EXPECT_CALL(init_manager, add(_)).WillRepeatedly([&init_handle](const Init::Target& target) {
+    init_handle = target.createHandle("test");
+  });
 
   auto certificate_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
       config_source, "certificate", secret_context.server_context_, init_manager, true);

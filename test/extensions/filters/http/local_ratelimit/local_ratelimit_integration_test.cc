@@ -1,9 +1,11 @@
 #include <chrono>
 
+#include "source/common/config/well_known_names.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/tagged_stats_test_util.h"
 #include "test/test_common/test_runtime.h"
 
 #include "gtest/gtest.h"
@@ -16,6 +18,19 @@ namespace {
 class LocalRateLimitFilterIntegrationTest : public Event::TestUsingSimulatedTime,
                                             public HttpProtocolIntegrationTest {
 protected:
+  // Whether the stats store derives tags with the explicit-tags logic (the tag-friendly scope API)
+  // rather than with the legacy tag-extraction rules. Both modes must produce identical stat names,
+  // tag-extracted names and tags for the filter stats asserted below.
+  bool explicitTags() const { return version_ == Network::Address::IpVersion::v4; }
+
+  void initialize() override {
+    // Exercise both stats modes without doubling the test matrix: the two IP versions run the
+    // server in different modes.
+    Stats::TestUtil::setExplicitStatsTags(explicitTags());
+    HttpProtocolIntegrationTest::initialize();
+    Stats::TestUtil::verifyExplicitStatsTags(*test_server_, explicitTags());
+  }
+
   void initializeFilter(const std::string& filter_config) {
     config_helper_.prependFilter(filter_config);
     initialize();
@@ -615,6 +630,16 @@ TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestPerProcess) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("429", response->headers().getStatusValue());
   EXPECT_EQ(18, response->body().size());
+
+  // The stats are named after the filter's own stat prefix, which is also their tag, identically
+  // in both stats modes.
+  const std::string& prefix_tag = Config::TagNames::get().LOCAL_HTTP_RATELIMIT_PREFIX;
+  Stats::TestUtil::expectStatTags(
+      *test_server_, "http_local_rate_limiter.http_local_rate_limit.enabled",
+      "http_local_rate_limit.enabled", {{prefix_tag, "http_local_rate_limiter"}});
+  Stats::TestUtil::expectStatTags(
+      *test_server_, "http_local_rate_limiter.http_local_rate_limit.rate_limited",
+      "http_local_rate_limit.rate_limited", {{prefix_tag, "http_local_rate_limiter"}});
 }
 
 TEST_P(LocalRateLimitFilterIntegrationTest, DenyRequestWithinSameConnection) {

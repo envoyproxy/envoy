@@ -251,6 +251,8 @@ public:
     return default_filter_chain_;
   }
 
+  const std::vector<FcdsSubscriptionHandleSharedPtr>& fcdsHandles() const { return fcds_handles_; }
+
 private:
   absl::Status convertIPsToTries();
   const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
@@ -482,6 +484,8 @@ public:
   // True when the subscribed chain is committed (active) in the shared manager, using the same
   // active-state test that publishes the worker TLS set.
   virtual bool isActive() const PURE;
+  // The committed chain that this handle subscribes to, or nullptr.
+  virtual Network::DrainableFilterChainSharedPtr activeFilterChain() const PURE;
 };
 using FcdsSubscriptionHandleSharedPtr = std::shared_ptr<FcdsSubscriptionHandle>;
 
@@ -495,6 +499,10 @@ public:
       const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   void initialize(std::function<void()> completion);
+
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() {
+    return saved_context_->transportSocketFactoryContext();
+  }
 
 private:
   std::unique_ptr<FcdsFilterChainFactoryContextImpl> context_;
@@ -524,6 +532,10 @@ public:
   // active-state test that updateTlsState() publishes to workers. Main-thread only.
   bool isFilterChainActive(const std::string& filter_chain_name) const;
 
+  // The committed filter chain of the named subscription, or nullptr. Main-thread only.
+  Network::DrainableFilterChainSharedPtr
+  activeFilterChain(const std::string& filter_chain_name) const;
+
   // FilterChainUpdateCallbacks
   absl::Status onFilterChainUpdated(const FilterChainProto& proto) override;
   void onFilterChainRemoved(Network::DrainableFilterChainSharedPtr&& draining) override;
@@ -537,7 +549,6 @@ private:
   Server::Configuration::ServerFactoryContext& server_context_;
   ListenerComponentFactory& listener_component_factory_;
   ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
-  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
   Stats::ScopeSharedPtr scope_;
   // Shared by all FCDS subscriptions so the resource decoder is built once.
   const Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_;

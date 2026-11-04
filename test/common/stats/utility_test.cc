@@ -474,6 +474,35 @@ TEST_P(StatsUtilityTest, TaggedStatNames) {
   EXPECT_EQ("scope.prefix.total", c2.name());
 }
 
+// The names and tags are sanitized by default; sanitize=false keeps them verbatim to match
+// legacy stat creation paths that never sanitized (e.g. POOL_COUNTER_PREFIX).
+TEST_P(StatsUtilityTest, TaggedStatNameSanitization) {
+  const std::vector<TagStringView> tag_views{{"tag", "db:27017"}};
+  TaggedStatName sanitized(*symbol_table_, "base:name", tag_views, "base:name.db:27017");
+  EXPECT_EQ("base_name", symbol_table_->toString(sanitized.baseName()));
+  EXPECT_EQ("base_name.db_27017", symbol_table_->toString(sanitized.name()));
+  ASSERT_EQ(1, sanitized.tags().size());
+  EXPECT_EQ("db_27017", symbol_table_->toString(sanitized.tags()[0].second));
+
+  TaggedStatName verbatim(*symbol_table_, "base:name", tag_views, "base:name.db:27017",
+                          /*sanitize=*/false);
+  EXPECT_EQ("base:name", symbol_table_->toString(verbatim.baseName()));
+  EXPECT_EQ("base:name.db:27017", symbol_table_->toString(verbatim.name()));
+  ASSERT_EQ(1, verbatim.tags().size());
+  EXPECT_EQ("db:27017", symbol_table_->toString(verbatim.tags()[0].second));
+}
+
+// sanitize=false passes through the helper's string constructor, so a ':' in the prefix
+// reaches the flat stat name unchanged.
+TEST_P(StatsUtilityTest, LiteScopeHelperVerbatimNames) {
+  LiteScopeHelper helper(*scope_, "prefix", {{"tag", "db:27017"}}, "prefix.db:27017",
+                         /*sanitize=*/false);
+  EXPECT_EQ("prefix.db:27017", symbol_table_->toString(helper.prefix()));
+
+  Counter& c = helper.counterFromString("requests");
+  EXPECT_EQ("scope.prefix.db:27017.requests", c.name());
+}
+
 } // namespace
 } // namespace Stats
 } // namespace Envoy

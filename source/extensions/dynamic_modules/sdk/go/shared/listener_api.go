@@ -1,3 +1,4 @@
+//go:generate mockgen -source=listener_api.go -destination=mocks/mock_listener_api.go -package=mocks
 package shared
 
 // ListenerFilter is the interface to implement your own listener filter logic.

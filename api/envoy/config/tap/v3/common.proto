@@ -165,16 +165,30 @@ message OutputConfig {
   // sink types are supported this constraint will be relaxed.
   repeated OutputSink sinks = 1 [(validate.rules).repeated = {min_items: 1 max_items: 1}];
 
-  // For buffered tapping, the maximum amount of received body that will be buffered prior to
-  // truncation. If truncation occurs, the :ref:`truncated
-  // <envoy_v3_api_field_data.tap.v3.Body.truncated>` field will be set. If not specified, the
-  // default is 1KiB.
+  // The maximum amount of received data that will be captured prior to truncation. If truncation
+  // occurs, the :ref:`truncated <envoy_v3_api_field_data.tap.v3.Body.truncated>` field will be set.
+  // If not specified, the default is 1KiB.
+  //
+  // For buffered tapping, this limit applies to the total amount of received data in the trace.
+  // For :ref:`streaming <envoy_v3_api_field_config.tap.v3.OutputConfig.streaming>` tapping, this
+  // limit applies to each individual streamed body chunk or socket event, as well as to any data
+  // buffered while a match cannot yet be determined. To avoid truncating streamed data, set this
+  // to a value at least as large as the largest expected chunk. This limit does not apply to
+  // transport socket streamed tapping when :ref:`min_streamed_sent_bytes
+  // <envoy_v3_api_field_config.tap.v3.OutputConfig.min_streamed_sent_bytes>` is set.
   google.protobuf.UInt32Value max_buffered_rx_bytes = 2;
 
-  // For buffered tapping, the maximum amount of transmitted body that will be buffered prior to
-  // truncation. If truncation occurs, the :ref:`truncated
-  // <envoy_v3_api_field_data.tap.v3.Body.truncated>` field will be set. If not specified, the
-  // default is 1KiB.
+  // The maximum amount of transmitted data that will be captured prior to truncation. If truncation
+  // occurs, the :ref:`truncated <envoy_v3_api_field_data.tap.v3.Body.truncated>` field will be set.
+  // If not specified, the default is 1KiB.
+  //
+  // For buffered tapping, this limit applies to the total amount of transmitted data in the trace.
+  // For :ref:`streaming <envoy_v3_api_field_config.tap.v3.OutputConfig.streaming>` tapping, this
+  // limit applies to each individual streamed body chunk or socket event, as well as to any data
+  // buffered while a match cannot yet be determined. To avoid truncating streamed data, set this
+  // to a value at least as large as the largest expected chunk. This limit does not apply to
+  // transport socket streamed tapping when :ref:`min_streamed_sent_bytes
+  // <envoy_v3_api_field_config.tap.v3.OutputConfig.min_streamed_sent_bytes>` is set.
   google.protobuf.UInt32Value max_buffered_tx_bytes = 3;
 
   // Indicates whether taps produce a single buffered message per tap, or multiple streamed

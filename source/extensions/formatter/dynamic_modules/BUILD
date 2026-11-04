@@ -37,6 +37,7 @@ envoy_cc_extension(
         "//source/common/formatter:substitution_formatter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/formatter/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

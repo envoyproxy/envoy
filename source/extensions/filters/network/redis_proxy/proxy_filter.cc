@@ -96,8 +96,8 @@ Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ProxyFilterConfig::ge
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
   // The prefix is the flat prefix, "redis.(<stat_prefix>.)*": the stat prefix is the tag of
   // every stat.
-  const Stats::TaggedStatName tagged_prefix = Stats::mergeStatPrefix(scope.symbolTable(), prefix,
-                                                                     /*base_name=*/"");
+  const Stats::TaggedStatName tagged_prefix = Stats::mergeStatPrefix(
+      scope.symbolTable(), prefix, /*base_name=*/"", {}, {}, /*sanitize=*/false);
   Stats::LiteScopeHelper helper(scope, tagged_prefix.baseName(), tagged_prefix.tags(),
                                 tagged_prefix.name());
   return {ALL_REDIS_PROXY_STATS(POOL_COUNTER(helper), POOL_GAUGE(helper))};

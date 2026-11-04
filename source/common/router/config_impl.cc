@@ -50,6 +50,8 @@
 #include "source/common/router/route_specifier_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/common/stats/utility.h"
+#include "source/common/stats/well_known_stat_names.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
@@ -826,8 +828,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   if (!route.stat_prefix().empty()) {
     route_stats_context_ = std::make_unique<RouteStatsContextImpl>(
-        factory_context.scope(), factory_context.routerContext().routeStatNames(),
-        vhost->statName(), route.stat_prefix());
+        vhost->statsScope(), factory_context.routerContext().routeStatNames(), vhost->statName(),
+        route.stat_prefix());
   }
 
   if (route.route().has_early_data_policy()) {
@@ -1658,12 +1660,12 @@ bool PathSeparatedPrefixRouteEntryImpl::matches(const RouteMatchContext& route_m
 CommonVirtualHostImpl::CommonVirtualHostImpl(
     const envoy::config::route::v3::VirtualHost& virtual_host,
     const CommonConfigSharedPtr& global_route_config,
-    Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+    Server::Configuration::ServerFactoryContext& factory_context, Stats::ScopeSharedPtr scope,
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     absl::Status& creation_status)
     : name_(virtual_host.name()),
       stat_name_storage_(virtual_host.name(), factory_context.scope().symbolTable()),
-      global_route_config_(global_route_config),
+      stats_scope_(std::move(scope)), global_route_config_(global_route_config),
       per_filter_configs_(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
                                                          factory_context, validator, init_manager),
@@ -1728,11 +1730,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 
   if (!virtual_host.virtual_clusters().empty()) {
-    vcluster_scope_ = Stats::Utility::scopeFromStatNames(
-        scope, {stat_name_storage_.statName(),
-                factory_context.routerContext().virtualClusterStatNames().vcluster_});
+    const VirtualClusterStatNames& stat_names =
+        factory_context.routerContext().virtualClusterStatNames();
     virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
-        *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
+        *stats_scope_, stat_names, stat_name_storage_.statName());
     virtual_clusters_.reserve(virtual_host.virtual_clusters().size());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
       if (virtual_cluster.headers().empty()) {
@@ -1740,8 +1741,8 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
         return;
       }
 
-      virtual_clusters_.emplace_back(virtual_cluster, *vcluster_scope_, factory_context,
-                                     factory_context.routerContext().virtualClusterStatNames());
+      virtual_clusters_.emplace_back(virtual_cluster, *stats_scope_, factory_context, stat_names,
+                                     stat_name_storage_.statName());
     }
   }
 
@@ -1754,15 +1755,39 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
   }
 }
 
+VirtualClusterStats CommonVirtualHostImpl::VirtualClusterBase::createVclusterStats(
+    Stats::Scope& scope, const VirtualClusterStatNames& stat_names, Stats::StatName vhost_stat_name,
+    Stats::StatName vcluster_stat_name) {
+  // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)*: the virtual host and the
+  // virtual cluster are tags of the stats, attached by a stack-local helper so a virtual cluster
+  // needs no dedicated sub-scope. The names are joined from the pre-encoded StatNames rather than
+  // passed through the string-based APIs, which sanitize their input and would silently rename
+  // the stats of a virtual host whose name contains ':'.
+  Stats::SymbolTable& symbol_table = scope.symbolTable();
+  const Stats::WellKnownStatNames& well_known = symbol_table.wellKnownStatNames();
+  const Stats::StatNameTag tags[] = {{well_known.tag_virtual_host_, vhost_stat_name},
+                                     {well_known.tag_virtual_cluster_, vcluster_stat_name}};
+  const Stats::StatNameJoiner base_prefix({well_known.vhost_, well_known.vcluster_}, symbol_table);
+  const Stats::StatNameJoiner prefix(
+      {well_known.vhost_, vhost_stat_name, well_known.vcluster_, vcluster_stat_name}, symbol_table);
+  Stats::LiteScopeHelper helper(scope, base_prefix.statName(), tags, prefix.statName());
+  return {stat_names, helper};
+}
+
 CommonVirtualHostImpl::VirtualClusterEntry::VirtualClusterEntry(
     const envoy::config::route::v3::VirtualCluster& virtual_cluster, Stats::Scope& scope,
-    Server::Configuration::CommonFactoryContext& context, const VirtualClusterStatNames& stat_names)
+    Server::Configuration::CommonFactoryContext& context, const VirtualClusterStatNames& stat_names,
+    Stats::StatName vhost_stat_name)
     : StatNameProvider(virtual_cluster.name(), scope.symbolTable()),
-      VirtualClusterBase(virtual_cluster.name(), stat_name_storage_.statName(),
-                         scope.scopeFromStatName(stat_name_storage_.statName()), stat_names) {
+      VirtualClusterBase(virtual_cluster.name(), stat_name_storage_.statName(), scope, stat_names,
+                         vhost_stat_name) {
   ASSERT(!virtual_cluster.headers().empty());
   headers_ = Http::HeaderUtility::buildHeaderDataVector(virtual_cluster.headers(), context);
 }
+
+CommonVirtualHostImpl::CatchAllVirtualCluster::CatchAllVirtualCluster(
+    Stats::Scope& scope, const VirtualClusterStatNames& stat_names, Stats::StatName vhost_stat_name)
+    : VirtualClusterBase(std::nullopt, stat_names.other_, scope, stat_names, vhost_stat_name) {}
 
 const CommonConfig& CommonVirtualHostImpl::routeConfig() const { return *global_route_config_; }
 
@@ -1809,16 +1834,15 @@ const Envoy::Config::TypedMetadata& CommonVirtualHostImpl::typedMetadata() const
   return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
-absl::StatusOr<std::shared_ptr<CommonVirtualHostImpl>>
-CommonVirtualHostImpl::create(const envoy::config::route::v3::VirtualHost& virtual_host,
-                              const CommonConfigSharedPtr& global_route_config,
-                              Server::Configuration::ServerFactoryContext& factory_context,
-                              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
-                              Init::Manager& init_manager) {
+absl::StatusOr<std::shared_ptr<CommonVirtualHostImpl>> CommonVirtualHostImpl::create(
+    const envoy::config::route::v3::VirtualHost& virtual_host,
+    const CommonConfigSharedPtr& global_route_config,
+    Server::Configuration::ServerFactoryContext& factory_context, Stats::ScopeSharedPtr scope,
+    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::shared_ptr<CommonVirtualHostImpl>(
-      new CommonVirtualHostImpl(virtual_host, global_route_config, factory_context, scope,
-                                validator, init_manager, creation_status));
+      new CommonVirtualHostImpl(virtual_host, global_route_config, factory_context,
+                                std::move(scope), validator, init_manager, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -1826,12 +1850,14 @@ CommonVirtualHostImpl::create(const envoy::config::route::v3::VirtualHost& virtu
 VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
                                  const CommonConfigSharedPtr& global_route_config,
                                  Server::Configuration::ServerFactoryContext& factory_context,
-                                 Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                                 Stats::ScopeSharedPtr scope,
+                                 ProtobufMessage::ValidationVisitor& validator,
                                  Init::Manager& init_manager, bool validate_clusters,
                                  absl::Status& creation_status) {
 
-  auto host_or_error = CommonVirtualHostImpl::create(
-      virtual_host, global_route_config, factory_context, scope, validator, init_manager);
+  auto host_or_error =
+      CommonVirtualHostImpl::create(virtual_host, global_route_config, factory_context,
+                                    std::move(scope), validator, init_manager);
   SET_AND_RETURN_IF_NOT_OK(host_or_error.status(), creation_status);
   shared_virtual_host_ = std::move(host_or_error.value());
 
@@ -2050,13 +2076,15 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
                            Init::Manager& init_manager, bool validate_clusters,
                            absl::Status& creation_status)
     : global_route_config_(global_route_config),
-      vhost_scope_(factory_context.scope().scopeFromStatName(
-          factory_context.routerContext().virtualClusterStatNames().vhost_)),
+      // An unprefixed scope that only scopes the lifetime of the virtual cluster stats to the
+      // route configuration; the names (vhost.*) are built by
+      // VirtualClusterBase::createVclusterStats.
+      vhost_scope_(factory_context.scope().scopeFromStatName(Stats::StatName())),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()),
       vhost_header_(route_config.vhost_header()) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
-        virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
+        virtual_host_config, global_route_config, factory_context, vhost_scope_, validator,
         init_manager, validate_clusters, creation_status);
     SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
     for (const std::string& domain_name : virtual_host_config.domains()) {
@@ -2094,8 +2122,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
   // Fast path the case where we only have a default virtual host.
-  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
-      wildcard_virtual_host_prefixes_.empty()) {
+  if (hasOnlyDefaultVirtualHost()) {
     return default_virtual_host_.get();
   }
 
@@ -2115,12 +2142,24 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     host_header_value = headers.getHostValue();
   }
 
+  return findVirtualHostInternal(host_header_value);
+}
+
+const VirtualHostImpl* RouteMatcher::findVirtualHost(absl::string_view host) const {
+  // Fast path the case where we only have a default virtual host.
+  if (hasOnlyDefaultVirtualHost()) {
+    return default_virtual_host_.get();
+  }
+
+  return findVirtualHostInternal(host);
+}
+
+const VirtualHostImpl* RouteMatcher::findVirtualHostInternal(absl::string_view host) const {
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
   if (ignorePortInHostMatching()) {
-    if (const absl::string_view::size_type port_start =
-            Http::HeaderUtility::getPortStart(host_header_value);
+    if (const absl::string_view::size_type port_start = Http::HeaderUtility::getPortStart(host);
         port_start != absl::string_view::npos) {
-      host_header_value = host_header_value.substr(0, port_start);
+      host = host.substr(0, port_start);
     }
   }
   // TODO (@rshriram) Match Origin header in WebSocket
@@ -2129,11 +2168,10 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   // are overwhelmingly lower-case already (DNS names normalize to lower-case per RFC 3986 3.2.2),
   // so scan first and only build a lower-cased copy when an upper-case byte is present. This keeps
   // the common path allocation-free instead of always constructing a std::string.
-  absl::string_view host = host_header_value;
   std::string lowercase_host;
-  if (std::any_of(host_header_value.begin(), host_header_value.end(),
+  if (std::any_of(host.begin(), host.end(),
                   [](char c) { return absl::ascii_isupper(static_cast<unsigned char>(c)); })) {
-    lowercase_host = absl::AsciiStrToLower(host_header_value);
+    lowercase_host = absl::AsciiStrToLower(host);
     host = lowercase_host;
   }
   const auto iter = virtual_hosts_.find(host);

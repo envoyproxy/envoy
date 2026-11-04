@@ -264,9 +264,23 @@ public:
 
   /**
    * Creates a discovery request for resources.
+   *
+   * NOTE: This method is deprecated in favor of update().
+   *
    * @param add_these_names resource ids for inclusion in the discovery request.
+   * @deprecated Use update() instead.
    */
+  [[deprecated("Use update instead")]]
   virtual void requestOnDemandUpdate(const absl::flat_hash_set<std::string>& add_these_names) PURE;
+
+  /**
+   * Modifies the set of resources the subscription is interested in by adding and/or removing
+   * resources.
+   * @param add_these_names resource ids for inclusion in the discovery request.
+   * @param remove_these_names resource ids to unsubscribe from in the discovery request.
+   */
+  virtual void update(const absl::flat_hash_set<std::string>& add_these_names,
+                      const absl::flat_hash_set<std::string>& remove_these_names) PURE;
 
   /**
    * Declares the resource-name patterns this subscription ACCEPTS for routing. This affects routing

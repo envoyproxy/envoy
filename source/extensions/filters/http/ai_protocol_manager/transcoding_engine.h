@@ -541,6 +541,10 @@ struct TranscodeContext {
   // Some APIs (e.g. Gemini) put `model` and `stream` in the URL instead of the JSON body, so
   // request `ToIr` legs read `request_path` to copy them into the IR body.
   absl::string_view request_path{};
+  // The request's headers, by lower-case name, for the headers a binding writes: a request `ToIr`
+  // leg records what the client sent, a `FromIr` leg decides `keep_existing` against them. Unset
+  // reads as a request with no headers.
+  HeaderLookup request_header{};
 
   // The binding the client's request arrived in, when a filter named it. Request `ToIr` legs read
   // `request_path` under it, or else under the dialect's own and client bindings.
@@ -549,7 +553,8 @@ struct TranscodeContext {
   // fills the parts this one leaves empty.
   const LlmBinding* response_binding{nullptr};
   // What a request `ToIr` leg read (see `read`), for request `FromIr` legs: its path variables fill
-  // the rendered path, and its body fields come back when `response_binding` is the one it read.
+  // the rendered path, and its body fields and headers come back when `response_binding` is the
+  // one it read.
   const LlmBindingRead* arrived{nullptr};
   // Model override for the outbound request (e.g. from a model router) so request `FromIr` legs
   // send the model name the upstream backend expects to run.
@@ -572,6 +577,10 @@ struct TranscodeContext {
   // request must be sent to, which the caller applies along with the body. Every other request leg
   // clears it.
   std::optional<std::string> rewritten_path{};
+  // Set by a successful request leg: the header edits the caller applies along with the body, in
+  // order. A `ToIr` leg takes out the headers the arrived binding writes (see `read`); a `FromIr`
+  // leg writes the ones the backend's binding does. Every other request leg clears it.
+  std::vector<HeaderMutation> header_mutations{};
   // Set by a request `FromIr` leg that fails because its binding needs a value the client's path
   // did not supply: the proxy's configuration, not the request, is at fault.
   bool unresolved{false};

@@ -2,8 +2,11 @@
 #include "envoy/extensions/filters/http/router/v3/router.pb.validate.h"
 #include "envoy/http/filter.h"
 
+#include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
+#include "test/mocks/init/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/status_utility.h"
@@ -46,6 +49,47 @@ public:
                                     Server::Configuration::FactoryContext&) override {
     return [](Envoy::Http::FilterChainFactoryCallbacks&) {};
   }
+};
+
+// A concrete filter factory used to test the GenericFactoryContext entry point of
+// UnifiedFactoryBase. It records what the generic context resolves to.
+class TestUnifiedFactoryBase : public UnifiedFactoryBase<RouterProto> {
+public:
+  TestUnifiedFactoryBase() : UnifiedFactoryBase("test.unified_factory_base") {}
+
+  absl::StatusOr<Envoy::Http::FilterFactoryCb>
+  createFilterFactoryTyped(const RouterProto&,
+                           Server::Configuration::GenericFactoryContext& context) override {
+    server_context_ = &context.serverFactoryContext();
+    visitor_ = &context.messageValidationVisitor();
+    init_manager_ = &context.initManager();
+    scope_ = &context.scope();
+    stats_scope_ = &context.statsScope();
+    return [](Envoy::Http::FilterChainFactoryCallbacks&) {};
+  }
+
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteConfigTyped(const RouterProto&,
+                         Server::Configuration::GenericFactoryContext& context) override {
+    server_context_ = &context.serverFactoryContext();
+    visitor_ = &context.messageValidationVisitor();
+    init_manager_ = &context.initManager();
+    scope_ = &context.scope();
+    stats_scope_ = &context.statsScope();
+    return std::make_shared<Router::RouteSpecificFilterConfig>();
+  }
+
+  Server::Configuration::ServerFactoryContext* server_context_{};
+  ProtobufMessage::ValidationVisitor* visitor_{};
+  Init::Manager* init_manager_{};
+  Stats::Scope* scope_{};
+  Stats::Scope* stats_scope_{};
+};
+
+// A concrete filter factory that overrides none of the UnifiedFactoryBase entry points.
+class TestEmptyUnifiedFactoryBase : public UnifiedFactoryBase<RouterProto> {
+public:
+  TestEmptyUnifiedFactoryBase() : UnifiedFactoryBase("test.empty_unified_factory_base") {}
 };
 
 // A concrete filter factory used to test the default behavior of DualFactoryBase.
@@ -178,6 +222,110 @@ TEST(FactoryBaseTest, DualServerContextNotSupported) {
           .IgnoreError(),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
+}
+
+TEST(FactoryBaseTest, UnifiedGenericContextWithStatsPrefixScope) {
+  TestUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> visitor;
+  testing::NiceMock<Init::MockManager> init_manager;
+  Stats::IsolatedStoreImpl store;
+  Stats::ScopeSharedPtr prefix_scope = store.createScope("http.hcm.");
+  RouterProto proto_config;
+
+  Server::Configuration::ExtraFactoryContext extra_context{visitor, "http.hcm."};
+  extra_context.init_manager = init_manager;
+  extra_context.scope = *store.rootScope();
+  extra_context.stats_prefix_scope = *prefix_scope;
+
+  auto cb = factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context);
+  ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
+  EXPECT_EQ(&server_context, factory.server_context_);
+  EXPECT_EQ(&visitor, factory.visitor_);
+  EXPECT_EQ(&init_manager, factory.init_manager_);
+  EXPECT_EQ(prefix_scope.get(), factory.scope_);
+  EXPECT_EQ(prefix_scope.get(), factory.stats_scope_);
+}
+
+TEST(FactoryBaseTest, UnifiedGenericContextFallsBackToServerContext) {
+  TestUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  RouterProto proto_config;
+
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), "stats."};
+
+  auto cb = factory.createHttpFilterFactoryFromProto(proto_config, server_context, extra_context);
+  ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
+  EXPECT_EQ(&server_context.initManager(), factory.init_manager_);
+  EXPECT_EQ(&server_context.scope(), factory.scope_);
+  EXPECT_EQ(&server_context.scope(), factory.stats_scope_);
+}
+
+TEST(FactoryBaseTest, UnifiedGenericContextFromFactoryContext) {
+  TestUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  RouterProto proto_config;
+
+  auto cb = factory.createFilterFactoryFromProto(proto_config, "stats.", context);
+  ASSERT_THAT(cb, IsOkAndHolds(::testing::NotNull()));
+  EXPECT_EQ(&context.scope(), factory.scope_);
+  EXPECT_EQ(&context.scope(), factory.stats_scope_);
+}
+
+TEST(FactoryBaseTest, UnifiedNoEntryPointImplemented) {
+  TestEmptyUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  RouterProto proto_config;
+
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "stats.", context),
+              HasStatus(absl::StatusCode::kUnimplemented,
+                        "UnifiedFactoryBase: no filter factory creation is implemented for "
+                        "test.empty_unified_factory_base"));
+}
+
+TEST(FactoryBaseTest, UnifiedGenericContextForRouteConfig) {
+  TestUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  testing::NiceMock<ProtobufMessage::MockValidationVisitor> visitor;
+  testing::NiceMock<Init::MockManager> init_manager;
+  RouterProto proto_config;
+
+  Server::Configuration::ExtraFactoryContext extra_context{visitor, EMPTY_STRING, init_manager};
+
+  auto config = factory.createHttpFilterRouteConfig(proto_config, server_context, extra_context);
+  ASSERT_THAT(config, IsOkAndHolds(::testing::NotNull()));
+  EXPECT_EQ(&server_context, factory.server_context_);
+  EXPECT_EQ(&visitor, factory.visitor_);
+  EXPECT_EQ(&init_manager, factory.init_manager_);
+  EXPECT_EQ(&server_context.scope(), factory.scope_);
+  EXPECT_EQ(&server_context.scope(), factory.stats_scope_);
+}
+
+TEST(FactoryBaseTest, UnifiedRouteSpecificFilterConfigSkipsGenericContext) {
+  TestUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  RouterProto proto_config;
+
+  // The legacy entry point only reaches createRouteSpecificFilterConfigTyped().
+  EXPECT_THAT(factory.createRouteSpecificFilterConfig(proto_config, server_context,
+                                                      server_context.messageValidationVisitor()),
+              IsOkAndHolds(nullptr));
+  EXPECT_EQ(nullptr, factory.visitor_);
+}
+
+TEST(FactoryBaseTest, UnifiedRouteConfigDefaultsToNullptr) {
+  TestEmptyUnifiedFactoryBase factory;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  RouterProto proto_config;
+
+  Server::Configuration::ExtraFactoryContext extra_context{
+      server_context.messageValidationVisitor(), EMPTY_STRING};
+  EXPECT_THAT(factory.createHttpFilterRouteConfig(proto_config, server_context, extra_context),
+              IsOkAndHolds(nullptr));
+  EXPECT_THAT(factory.createRouteSpecificFilterConfig(proto_config, server_context,
+                                                      server_context.messageValidationVisitor()),
+              IsOkAndHolds(nullptr));
 }
 
 } // namespace
