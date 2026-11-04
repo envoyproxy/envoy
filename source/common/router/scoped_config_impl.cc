@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
@@ -124,6 +125,23 @@ ScopeKeyPtr ScopeKeyBuilderImpl::computeScopeKey(const Http::HeaderMap& headers)
 
 void ScopedConfigImpl::addOrUpdateRoutingScopes(
     const std::vector<ScopedRouteInfoConstSharedPtr>& scoped_route_infos) {
+  if (scoped_route_infos.size() > 1 &&
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_fast_config_update")) {
+    size_t net_added = 0;
+    if (scoped_route_info_by_name_.empty()) {
+      net_added = scoped_route_infos.size();
+    } else {
+      for (const auto& scoped_route_info : scoped_route_infos) {
+        if (!scoped_route_info_by_name_.contains(scoped_route_info->scopeName())) {
+          ++net_added;
+        }
+      }
+    }
+    if (net_added > 0) {
+      scoped_route_info_by_name_.reserve(scoped_route_info_by_name_.size() + net_added);
+      scoped_route_info_by_key_.reserve(scoped_route_info_by_key_.size() + net_added);
+    }
+  }
   for (auto& scoped_route_info : scoped_route_infos) {
     const auto iter = scoped_route_info_by_name_.find(scoped_route_info->scopeName());
     if (iter != scoped_route_info_by_name_.end()) {
@@ -146,6 +164,15 @@ void ScopedConfigImpl::removeRoutingScopes(const std::vector<std::string>& scope
       scoped_route_info_by_name_.erase(iter);
     }
   }
+}
+
+void ScopedConfigImpl::onConfigUpdate(
+    const std::vector<ScopedRouteInfoConstSharedPtr>& added_or_updated_scopes,
+    const std::vector<std::string>& removed_scope_names) {
+  // Process removals before additions in case a removed scope and a newly added scope
+  // share the same ScopeKey hash.
+  removeRoutingScopes(removed_scope_names);
+  addOrUpdateRoutingScopes(added_or_updated_scopes);
 }
 
 Router::ConfigConstSharedPtr ScopedConfigImpl::getRouteConfig(const ScopeKeyPtr& scope_key) const {

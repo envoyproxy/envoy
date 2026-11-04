@@ -25,10 +25,13 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/rds_impl.h"
 #include "source/common/router/scoped_config_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/prefix_utility.h"
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
@@ -295,13 +298,46 @@ void ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::maybeInitRdsConf
 
 absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources, Init::Manager& init_manager,
-    const std::string& version_info) {
+    const std::string& version_info,
+    std::vector<ScopedRouteInfoConstSharedPtr>* deferred_updated_scopes,
+    std::list<RdsRouteConfigProviderHelperPtr>* delayed_rds_providers) {
   bool any_applied = false;
   envoy::extensions::filters::network::http_connection_manager::v3::Rds rds;
   rds.mutable_config_source()->MergeFrom(rds_config_source_);
-  std::vector<ScopedRouteInfoConstSharedPtr> updated_scopes;
-  std::list<RdsRouteConfigProviderHelperPtr> to_be_removed_rds_providers;
+  std::vector<ScopedRouteInfoConstSharedPtr> local_updated_scopes;
+  std::vector<ScopedRouteInfoConstSharedPtr>& updated_scopes =
+      deferred_updated_scopes != nullptr ? *deferred_updated_scopes : local_updated_scopes;
+  std::list<RdsRouteConfigProviderHelperPtr> local_to_be_removed_rds_providers;
+  std::list<RdsRouteConfigProviderHelperPtr>& to_be_removed_rds_providers =
+      delayed_rds_providers != nullptr ? *delayed_rds_providers : local_to_be_removed_rds_providers;
   std::vector<std::string> exception_msgs;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_fast_config_update")) {
+    updated_scopes.reserve(resources.size());
+    const bool map_initially_empty = scoped_route_map_.empty();
+    const bool rds_providers_initially_empty = route_provider_by_scope_.empty();
+    size_t net_new_scopes = map_initially_empty ? resources.size() : 0;
+    size_t net_new_rds_scopes = 0;
+    for (const auto& resource : resources) {
+      const auto& scoped_route =
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
+              resource.get().resource());
+      if (!map_initially_empty && !scoped_route_map_.contains(scoped_route.name())) {
+        ++net_new_scopes;
+      }
+      if (!scoped_route.has_route_configuration() &&
+          (rds_providers_initially_empty ||
+           !route_provider_by_scope_.contains(scoped_route.name()))) {
+        ++net_new_rds_scopes;
+      }
+    }
+    if (net_new_scopes > 0) {
+      scoped_route_map_.reserve(scoped_route_map_.size() + net_new_scopes);
+      scope_name_by_hash_.reserve(scope_name_by_hash_.size() + net_new_scopes);
+    }
+    if (net_new_rds_scopes > 0) {
+      route_provider_by_scope_.reserve(route_provider_by_scope_.size() + net_new_rds_scopes);
+    }
+  }
   for (const auto& resource : resources) {
     // Explicit copy so that we can std::move later.
     envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config =
@@ -336,7 +372,8 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
       // to one specifying route_configuration, then the RDS subscription is no longer needed. We
       // can remove the RDS config provider, but hold on to them until exiting the loop in case the
       // subscription is reused by another scope still to be added.
-      auto rds_config_provider_helper_iter = route_provider_by_scope_.find(scope_name);
+      auto rds_config_provider_helper_iter =
+          route_provider_by_scope_.find(scoped_route_info->scopeName());
       if (rds_config_provider_helper_iter != route_provider_by_scope_.end()) {
         to_be_removed_rds_providers.emplace_back(
             std::move(rds_config_provider_helper_iter->second));
@@ -367,8 +404,19 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         scoped_route_info =
             std::make_shared<ScopedRouteInfo>(std::move(scoped_route_config), nullptr);
       }
-      route_provider_by_scope_[scoped_route_info->scopeName()] =
-          std::move(rds_config_provider_helper);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_fast_config_update")) {
+        // Hold on to the existing RDS provider helper until exiting the loop in case another scope
+        // in the same batch reuses its RDS subscription.
+        auto [iter, inserted] = route_provider_by_scope_.try_emplace(
+            scoped_route_info->scopeName(), std::move(rds_config_provider_helper));
+        if (!inserted) {
+          to_be_removed_rds_providers.emplace_back(std::move(iter->second));
+          iter->second = std::move(rds_config_provider_helper);
+        }
+      } else {
+        route_provider_by_scope_[scoped_route_info->scopeName()] =
+            std::move(rds_config_provider_helper);
+      }
     }
     if (scope_info_iter != scoped_route_map_.end()) {
       // Remove the old key from scope_names_by_hash_ in case the scope key has changed. (If it
@@ -386,7 +434,7 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
   // scoped_route_info of both eager loading and on demand scopes will be propagated to work
   // threads. Upon a scoped RouteConfiguration miss, if the scope exists, an on demand update
   // callback will be posted to main thread.
-  if (!updated_scopes.empty()) {
+  if (deferred_updated_scopes == nullptr && !updated_scopes.empty()) {
     applyConfigUpdate([updated_scopes](ConfigProvider::ConfigConstSharedPtr config)
                           -> ConfigProvider::ConfigConstSharedPtr {
       auto* thread_local_scoped_config =
@@ -411,10 +459,14 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
 
 std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
 ScopedRdsConfigSubscription::removeScopes(
-    const Protobuf::RepeatedPtrField<std::string>& scope_names, const std::string& version_info) {
+    const Protobuf::RepeatedPtrField<std::string>& scope_names, const std::string& version_info,
+    std::vector<std::string>* deferred_removed_scope_names) {
   std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
       to_be_removed_rds_providers;
-  std::vector<std::string> removed_scope_names;
+  std::vector<std::string> local_removed_scope_names;
+  std::vector<std::string>& removed_scope_names = deferred_removed_scope_names != nullptr
+                                                      ? *deferred_removed_scope_names
+                                                      : local_removed_scope_names;
   for (const auto& scope_name : scope_names) {
     auto iter = scoped_route_map_.find(scope_name);
     if (iter != scoped_route_map_.end()) {
@@ -433,7 +485,7 @@ ScopedRdsConfigSubscription::removeScopes(
                 version_info);
     }
   }
-  if (!removed_scope_names.empty()) {
+  if (deferred_removed_scope_names == nullptr && !removed_scope_names.empty()) {
     applyConfigUpdate([removed_scope_names](ConfigProvider::ConfigConstSharedPtr config)
                           -> ConfigProvider::ConfigConstSharedPtr {
       auto* thread_local_scoped_config =
@@ -488,17 +540,65 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
   // be reused by some to be added scopes.
   std::list<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelperPtr>
-      to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
+      to_be_removed_rds_providers;
+  bool any_applied = false;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_fast_config_update")) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_partial_acceptance")) {
+      for (const auto& resource : added_resources) {
+        const auto& scoped_route =
+            Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
+                resource.get().resource());
+        if (!scoped_route.has_route_configuration() &&
+            scoped_route.route_configuration_name().empty()) {
+          ENVOY_LOG(warn,
+                    "srds: scoped route config '{}' rejected: "
+                    "route_configuration_name is empty.",
+                    name_);
+          return absl::InvalidArgumentError("route_configuration_name is empty.");
+        }
+      }
+    }
 
-  auto status_or_applied = addOrUpdateScopes(
-      added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
-      version_info);
-  if (!status_or_applied.status().ok()) {
-    ENVOY_LOG(warn, "srds: scoped route config '{}' rejected: {}", name_,
-              status_or_applied.status().message());
-    return status_or_applied.status();
+    std::vector<std::string> deferred_removed_scope_names;
+    deferred_removed_scope_names.reserve(clean_removed_resources.size());
+    to_be_removed_rds_providers =
+        removeScopes(clean_removed_resources, version_info, &deferred_removed_scope_names);
+
+    std::vector<ScopedRouteInfoConstSharedPtr> deferred_updated_scopes;
+    auto status_or_applied = addOrUpdateScopes(
+        added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
+        version_info, &deferred_updated_scopes, &to_be_removed_rds_providers);
+    if (!deferred_updated_scopes.empty() || !deferred_removed_scope_names.empty()) {
+      applyConfigUpdate(
+          [deferred_updated_scopes = std::move(deferred_updated_scopes),
+           deferred_removed_scope_names = std::move(deferred_removed_scope_names)](
+              ConfigProvider::ConfigConstSharedPtr config) -> ConfigProvider::ConfigConstSharedPtr {
+            auto* thread_local_scoped_config =
+                const_cast<ScopedConfigImpl*>(static_cast<const ScopedConfigImpl*>(config.get()));
+            thread_local_scoped_config->onConfigUpdate(deferred_updated_scopes,
+                                                       deferred_removed_scope_names);
+            return config;
+          });
+    }
+    if (!status_or_applied.status().ok()) {
+      ENVOY_LOG(warn, "srds: scoped route config '{}' rejected: {}", name_,
+                status_or_applied.status().message());
+      return status_or_applied.status();
+    }
+    any_applied = status_or_applied.value();
+  } else {
+    to_be_removed_rds_providers = removeScopes(clean_removed_resources, version_info);
+
+    auto status_or_applied = addOrUpdateScopes(
+        added_resources, (srds_init_mgr == nullptr ? localInitManager() : *srds_init_mgr),
+        version_info);
+    if (!status_or_applied.status().ok()) {
+      ENVOY_LOG(warn, "srds: scoped route config '{}' rejected: {}", name_,
+                status_or_applied.status().message());
+      return status_or_applied.status();
+    }
+    any_applied = status_or_applied.value();
   }
-  const bool any_applied = status_or_applied.value();
   const auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
   if (!status.ok()) {
     return status;
@@ -551,6 +651,74 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     const std::vector<Envoy::Config::DecodedResourceRef>& resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, std::string& exception_msg) {
   Protobuf::RepeatedPtrField<std::string> clean_removed_resources;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.srds_fast_config_update")) {
+    // All the scope names to be removed or updated.
+    absl::flat_hash_set<absl::string_view> updated_or_removed_scopes;
+    updated_or_removed_scopes.reserve(removed_resources.size() + resources.size());
+    for (const std::string& removed_resource : removed_resources) {
+      updated_or_removed_scopes.insert(removed_resource);
+    }
+    for (const auto& resource : resources) {
+      const auto& scoped_route =
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
+              resource.get().resource());
+      updated_or_removed_scopes.insert(scoped_route.name());
+    }
+
+    absl::flat_hash_set<absl::string_view> scoped_routes;
+    scoped_routes.reserve(resources.size());
+    absl::flat_hash_map<uint64_t, absl::string_view> new_scope_name_by_hash;
+    new_scope_name_by_hash.reserve(resources.size());
+    for (const auto& resource : resources) {
+      // Throws (thus rejects all) on any error.
+      const auto& scoped_route =
+          Envoy::Protobuf::DynamicCastMessage<envoy::config::route::v3::ScopedRouteConfiguration>(
+              resource.get().resource());
+      const std::string& scope_name = scoped_route.name();
+      if (!scoped_routes.insert(scope_name).second) {
+        exception_msg = fmt::format("duplicate scoped route configuration '{}' found", scope_name);
+        return clean_removed_resources;
+      }
+      ScopeKey scope_key;
+      for (const auto& fragment : scoped_route.key().fragments()) {
+        switch (fragment.type_case()) {
+        case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::
+            kStringKey:
+          scope_key.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
+          break;
+        case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::
+            TYPE_NOT_SET:
+          PANIC("not implemented");
+        }
+      }
+      const uint64_t key_fingerprint = scope_key.hash();
+      // Check for key conflict within the incoming batch itself.
+      if (!new_scope_name_by_hash.try_emplace(key_fingerprint, scope_name).second) {
+        exception_msg =
+            fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
+                        new_scope_name_by_hash[key_fingerprint], scope_name);
+        return clean_removed_resources;
+      }
+      // Check for key conflict against existing scopes that are not being updated or removed.
+      auto existing_iter = scope_name_by_hash_.find(key_fingerprint);
+      if (existing_iter != scope_name_by_hash_.end() &&
+          !updated_or_removed_scopes.contains(existing_iter->second)) {
+        exception_msg =
+            fmt::format("scope key conflict found, first scope is '{}', second scope is '{}'",
+                        existing_iter->second, scope_name);
+        return clean_removed_resources;
+      }
+    }
+
+    // Only remove resources that are not going to be updated.
+    for (const std::string& removed_resource : removed_resources) {
+      if (!scoped_routes.contains(removed_resource)) {
+        *clean_removed_resources.Add() = removed_resource;
+      }
+    }
+    return clean_removed_resources;
+  }
+
   // All the scope names to be removed or updated.
   absl::flat_hash_set<std::string> updated_or_removed_scopes;
   for (const std::string& removed_resource : removed_resources) {
