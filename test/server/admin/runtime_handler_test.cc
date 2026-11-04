@@ -107,6 +107,22 @@ TEST_P(AdminInstanceTest, RuntimeModifyParamsInBody) {
   EXPECT_EQ("OK\n", response.toString());
 }
 
+TEST_P(AdminInstanceTest, RuntimeModifyRestartFeature) {
+  Runtime::MockLoader loader;
+  EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
+  const std::string error =
+      "envoy.restart_features.test_feature is a restart feature, it only changes with a restart";
+  EXPECT_CALL(loader, mergeValues(testing::_))
+      .WillOnce(testing::Return(absl::FailedPreconditionError(error)));
+
+  Http::TestResponseHeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::BadRequest,
+            postCallback("/runtime_modify?envoy.restart_features.test_feature=true", header_map,
+                         response));
+  EXPECT_EQ(error, response.toString());
+}
+
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;

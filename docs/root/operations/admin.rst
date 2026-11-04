@@ -974,7 +974,9 @@ modify different aspects of the server:
 
   Adds or modifies runtime values as passed in query parameters. To delete a previously added key,
   use an empty string as the value. Note that deletion only applies to overrides added via this
-  endpoint; values loaded from disk can be modified via override but not deleted.
+  endpoint; values loaded from disk can be modified via override but not deleted. Requests that set
+  or delete :ref:`restart features <arch_overview_runtime_restart_features>` are rejected with
+  ``400 Bad Request``.
 
 .. attention::
 
