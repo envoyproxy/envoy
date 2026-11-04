@@ -331,15 +331,6 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
-  mobile-perf:
-    paths:
-    - .bazelrc
-    - .bazelversion
-    - .github/config.yml
-    - bazel/external/quiche.BUILD
-    - mobile/.bazelrc
-    - mobile/**/*
-    - tools/code_format/check_format.py
   mobile-python:
     paths:
     - .bazelrc

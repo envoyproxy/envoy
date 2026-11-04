@@ -205,6 +205,13 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   EXPECT_EQ(1234, dd_span.trace_id().low);
   ASSERT_TRUE(dd_span.parent_id());
   EXPECT_EQ(5678, *dd_span.parent_id());
+
+  // The span continues the extracted trace, with a span ID of its own.
+  EXPECT_EQ("000000000000000000000000000004d2", span->getTraceId());
+  const std::string span_id = span->getSpanId();
+  EXPECT_EQ(16, span_id.size());
+  EXPECT_NE("00000000000004d2", span_id);
+  EXPECT_NE("000000000000162e", span_id);
 }
 
 TEST_F(DatadogTracerTest, UseLocalDecisionTrue) {

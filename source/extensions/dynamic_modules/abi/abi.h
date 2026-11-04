@@ -18701,6 +18701,29 @@ bool envoy_dynamic_module_callback_route_specifier_set_route_name(
     envoy_dynamic_module_type_module_buffer route_name);
 
 /**
+ * envoy_dynamic_module_callback_route_specifier_set_virtual_cluster selects the virtual cluster of
+ * the request by one of the names that the virtual_cluster_override of the route specifier
+ * declares, or selects none with an empty name. The virtual_cluster_override configures how the
+ * router uses the selection. A later call replaces the selection.
+ *
+ * Like the recorded overrides, the selection takes effect only when the decision is left
+ * Unspecified. It is dropped without failing the decision when there is no route or when the route
+ * answers the request directly, and a selected virtual cluster is also dropped when the route
+ * belongs to a virtual host other than virtual_host_name. A route the built route cache holds
+ * keeps the selection it was built with, so the key the module looks the route up with must also
+ * determine the selection.
+ *
+ * @param context_envoy_ptr is the pointer to the route decision context.
+ * @param virtual_cluster_name is the name of the virtual cluster, or empty to select none. The
+ * buffer is owned by the module. Its pointer may be null only when its length is zero.
+ * @return true if the route specifier declares virtual clusters and the name is empty or one of
+ * them, false otherwise, in which case the selection does not change.
+ */
+bool envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+    envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer virtual_cluster_name);
+
+/**
  * envoy_dynamic_module_callback_route_specifier_set_timeout records the route timeout for the
  * request, replacing the timeout of the route. Zero disables the timeout.
  *

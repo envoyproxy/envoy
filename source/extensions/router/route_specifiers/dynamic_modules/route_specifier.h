@@ -18,7 +18,9 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/router/route_specifier.h"
+#include "envoy/router/router.h"
 #include "envoy/server/factory_context.h"
+#include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -27,6 +29,7 @@
 #include "source/common/common/statusor.h"
 #include "source/common/config/metadata.h"
 #include "source/common/router/delegating_route_impl.h"
+#include "source/common/stats/symbol_table.h"
 #include "source/extensions/dynamic_modules/abi/abi.h"
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/dynamic_modules/metric_registry.h"
@@ -40,6 +43,8 @@ namespace DynamicModules {
 
 using DynamicModuleRouteSpecifierProto =
     envoy::extensions::router::route_specifiers::dynamic_modules::v3::DynamicModuleRouteSpecifier;
+using VirtualClusterOverrideProto =
+    envoy::extensions::router::route_specifiers::dynamic_modules::v3::VirtualClusterOverride;
 
 // Type aliases for function pointers resolved from the module.
 using OnRouteSpecifierConfigNewType = decltype(&envoy_dynamic_module_on_route_specifier_config_new);
@@ -82,6 +87,12 @@ constexpr absl::string_view DefaultMetricsNamespace = "dynamicmodulescustom";
   COUNTER(built_route_cache_verify)                                                                \
   COUNTER(built_route_cache_verify_mismatch)                                                       \
   COUNTER(built_route_cache_evict)                                                                 \
+  COUNTER(virtual_cluster_selected)                                                                \
+  COUNTER(virtual_cluster_none)                                                                    \
+  COUNTER(virtual_cluster_agree)                                                                   \
+  COUNTER(virtual_cluster_disagree)                                                                \
+  COUNTER(virtual_cluster_unknown)                                                                 \
+  COUNTER(virtual_cluster_vhost_mismatch)                                                          \
   GAUGE(built_route_cache_entries, NeverImport)                                                    \
   HISTOGRAM(on_route_duration, Microseconds)                                                       \
   HISTOGRAM(specifier_duration, Microseconds)
@@ -167,6 +178,9 @@ struct RouteOverrides {
   absl::flat_hash_map<std::string, bool> filter_disabled;
   // Name the module recorded for the route it produces. Unset when the module set none.
   std::optional<std::string> route_name;
+  // The virtual cluster the module selected, null when it selected none. Unset when the module made
+  // no selection.
+  std::optional<const Envoy::Router::VirtualCluster*> virtual_cluster;
   std::optional<std::string> path;
   std::optional<PrefixRewriteRule> prefix_rewrite_rule;
   // Whether the regex rewrite of the selected route override applies when the request headers are
@@ -180,7 +194,8 @@ struct RouteOverrides {
 
   // Whether anything that only a route entry can carry was recorded.
   bool hasRouteEntryOverrides() const;
-  // Whether anything that any route can carry was recorded.
+  // Whether anything that any route can carry was recorded. A virtual cluster selection is left
+  // out, since a decision without a route drops it rather than failing.
   bool hasRouteOverrides() const;
 
   // Whether two recordings build the same route. Every field must take part.
@@ -191,6 +206,99 @@ struct RouteOverrides {
 struct RuntimeFraction {
   std::string key;
   envoy::type::v3::FractionalPercent default_value;
+};
+
+/**
+ * A virtual cluster a route specifier declares. It counts a request in the statistics of the
+ * virtual cluster of the same name on the virtual host. The name other declares the catch all
+ * virtual cluster, which has no name.
+ */
+class DeclaredVirtualCluster : public Envoy::Router::VirtualCluster {
+public:
+  DeclaredVirtualCluster(absl::string_view name, Stats::Scope& scope,
+                         const Envoy::Router::VirtualClusterStatNames& stat_names,
+                         Stats::StatName virtual_host_stat_name);
+
+  // Router::VirtualCluster
+  const std::optional<std::string>& name() const override { return name_; }
+  Stats::StatName statName() const override { return stat_name_.statName(); }
+  Envoy::Router::VirtualClusterStats& stats() const override { return stats_; }
+
+private:
+  const std::optional<std::string> name_;
+  const Stats::StatNameManagedStorage stat_name_;
+  mutable Envoy::Router::VirtualClusterStats stats_;
+};
+
+class DeclaredVirtualClusterRegistry;
+
+/**
+ * The virtual clusters a route specifier declares, immutable once built and shared by the route
+ * specifiers that declare the same names for a virtual host.
+ */
+class DeclaredVirtualClusterSet {
+public:
+  DeclaredVirtualClusterSet(std::shared_ptr<DeclaredVirtualClusterRegistry> registry,
+                            const VirtualClusterOverrideProto& declaration,
+                            Server::Configuration::ServerFactoryContext& context);
+
+  /**
+   * @param name the name of the virtual cluster.
+   * @return the declared virtual cluster, or nullptr when the name is not declared.
+   */
+  const Envoy::Router::VirtualCluster* find(absl::string_view name) const;
+
+  // Whether these are exactly the virtual clusters of the declaration, whose names are unique.
+  bool declares(const VirtualClusterOverrideProto& declaration) const;
+
+  const std::string& virtualHostName() const { return virtual_host_name_; }
+  Stats::StatName virtualHostStatName() const { return virtual_host_stat_name_.statName(); }
+
+private:
+  friend class DeclaredVirtualClusterRegistryPeer;
+
+  // Keeps the registry alive, so that the route specifiers configured later find these.
+  const std::shared_ptr<DeclaredVirtualClusterRegistry> registry_;
+  const std::string virtual_host_name_;
+  const Stats::StatNameManagedStorage virtual_host_stat_name_;
+  // Owns the statistics of the virtual clusters, which are created directly in it.
+  const Stats::ScopeSharedPtr scope_;
+  // Keyed by a view of the name the mapped virtual cluster owns, or by other for the catch all
+  // virtual cluster, which has no name.
+  absl::flat_hash_map<absl::string_view, std::unique_ptr<const DeclaredVirtualCluster>> clusters_;
+};
+
+using DeclaredVirtualClusterSetConstSharedPtr = std::shared_ptr<const DeclaredVirtualClusterSet>;
+
+/**
+ * Hands out the virtual clusters route specifiers declare, so that the route specifiers that
+ * declare the same ones share one virtual cluster per name.
+ */
+class DeclaredVirtualClusterRegistry : public Singleton::Instance {
+public:
+  /**
+   * Returns the virtual clusters of a declaration, built on first use. Must be called on the main
+   * thread.
+   * @param declaration the virtual clusters a route specifier declares, with unique names.
+   * @param context the server factory context.
+   * @return the declared virtual clusters.
+   */
+  static DeclaredVirtualClusterSetConstSharedPtr
+  getOrCreate(const VirtualClusterOverrideProto& declaration,
+              Server::Configuration::ServerFactoryContext& context);
+
+private:
+  friend class DeclaredVirtualClusterRegistryPeer;
+
+  // The name of the virtual host and a fingerprint of the declared names.
+  using Key = std::pair<std::string, uint64_t>;
+  static Key keyOf(const VirtualClusterOverrideProto& declaration);
+
+  // Store as weak_ptr to allow release after xDS unload.
+  absl::flat_hash_map<Key, std::vector<std::weak_ptr<const DeclaredVirtualClusterSet>>>
+      declarations_;
+  // The number of entries left after the last sweep of released declarations.
+  size_t swept_size_{0};
 };
 
 /**
@@ -258,9 +366,16 @@ public:
   bool hasBuiltRouteCache() const { return has_built_route_cache_; }
   bool failClosed() const { return fail_closed_; }
   bool continueMatchingOnFailure() const { return continue_matching_on_failure_; }
+  // The virtual clusters the module may select, or nullptr when the configuration declares none.
+  const DeclaredVirtualClusterSet* virtualClusters() const { return virtual_clusters_.get(); }
+  bool preferVirtualClusterSelection() const { return prefer_virtual_cluster_selection_; }
+  // Whether the router also compares a preferred selection with the virtual cluster the virtual
+  // host matches, with a chance of one in verify_one_in.
+  bool sampleVirtualClusterComparison() const;
   Upstream::ClusterManager& clusterManager() const { return cluster_manager_; }
   Runtime::Loader& runtime() const { return runtime_; }
   TimeSource& timeSource() const { return time_source_; }
+  const std::string& statPrefix() const { return stat_prefix_; }
   RouteSpecifierStats& stats() const { return stats_; }
 
   // The corresponding in-module route specifier configuration.
@@ -304,6 +419,7 @@ private:
   absl::flat_hash_map<std::string, Template> templates_;
   std::deque<std::string> template_ids_;
   RouteOverrideMap route_overrides_;
+  DeclaredVirtualClusterSetConstSharedPtr virtual_clusters_;
   // Valid only while the in-module configuration is being created, so that the module can register
   // route templates Envoy builds with the route builder of the configuration.
   Envoy::Router::RouteBuilder* config_new_route_builder_{nullptr};
@@ -313,9 +429,13 @@ private:
   const bool has_built_route_cache_;
   const bool fail_closed_;
   const bool continue_matching_on_failure_;
+  const bool prefer_virtual_cluster_selection_;
+  const uint32_t virtual_cluster_verify_one_in_;
   Upstream::ClusterManager& cluster_manager_;
   Runtime::Loader& runtime_;
   TimeSource& time_source_;
+  Random::RandomGenerator& random_;
+  const std::string stat_prefix_;
   const Stats::ScopeSharedPtr stats_scope_;
   mutable RouteSpecifierStats stats_;
 };
@@ -463,6 +583,58 @@ struct RouteSpecifierContext {
 };
 
 /**
+ * Virtual host of a route that carries a virtual cluster selection. It answers the virtual cluster
+ * lookup of the router from the selection and forwards everything else to the virtual host of the
+ * route it wraps.
+ */
+class VirtualClusterSelectingVirtualHost : public Envoy::Router::VirtualHost,
+                                           public Logger::Loggable<Logger::Id::dynamic_modules> {
+public:
+  VirtualClusterSelectingVirtualHost(const Envoy::Router::VirtualHost& base,
+                                     const DynamicModuleRouteSpecifierConfig& config,
+                                     const Envoy::Router::VirtualCluster* selected)
+      : base_(base), config_(config), selected_(selected) {}
+
+  // Router::VirtualHost
+  const Envoy::Router::CorsPolicy* corsPolicy() const override { return base_.corsPolicy(); }
+  const std::string& name() const override { return base_.name(); }
+  Stats::StatName statName() const override { return base_.statName(); }
+  const Envoy::Router::RateLimitPolicy& rateLimitPolicy() const override {
+    return base_.rateLimitPolicy();
+  }
+  const Envoy::Router::CommonConfig& routeConfig() const override { return base_.routeConfig(); }
+  bool includeAttemptCountInRequest() const override {
+    return base_.includeAttemptCountInRequest();
+  }
+  bool includeAttemptCountInResponse() const override {
+    return base_.includeAttemptCountInResponse();
+  }
+  bool includeIsTimeoutRetryHeader() const override { return base_.includeIsTimeoutRetryHeader(); }
+  const Envoy::Router::RouteSpecificFilterConfig*
+  mostSpecificPerFilterConfig(absl::string_view name) const override {
+    return base_.mostSpecificPerFilterConfig(name);
+  }
+  Envoy::Router::RouteSpecificFilterConfigs
+  perFilterConfigs(absl::string_view name) const override {
+    return base_.perFilterConfigs(name);
+  }
+  const envoy::config::core::v3::Metadata& metadata() const override { return base_.metadata(); }
+  const Envoy::Config::TypedMetadata& typedMetadata() const override {
+    return base_.typedMetadata();
+  }
+  // Counts the request on every call, since the router looks the virtual cluster up once per
+  // request.
+  const Envoy::Router::VirtualCluster*
+  virtualCluster(const Http::HeaderMap& headers) const override;
+
+private:
+  const Envoy::Router::VirtualHost& base_;
+  const DynamicModuleRouteSpecifierConfig& config_;
+  // Null when the module selected no virtual cluster.
+  const Envoy::Router::VirtualCluster* const selected_;
+};
+
+/**
  * Route that delegates to the route a decision produced and applies the overrides a module recorded
  * for the request. It holds the configuration so that the module outlives the request.
  */
@@ -545,6 +717,9 @@ public:
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
 
+protected:
+  const DynamicModuleRouteSpecifierConfigSharedPtr config_;
+
 private:
   // Whether a prefix rewrite rule or a route override regex rewrite applies when the request
   // headers are finalized.
@@ -552,10 +727,43 @@ private:
   // The path the first of those rewrites that applies produces, or nullopt when none applies.
   std::optional<std::string> finalizationRewrite(absl::string_view path) const;
 
-  const DynamicModuleRouteSpecifierConfigSharedPtr config_;
   const RouteOverrides overrides_;
   const Envoy::Config::MetadataPackPtr<Envoy::Router::HttpRouteTypedMetadataFactory> metadata_pack_;
   const std::optional<uint64_t> user_data_;
+};
+
+/**
+ * Route that delegates to the route a decision produced, for a decision that recorded only a
+ * virtual cluster selection. It holds the configuration, which owns the selected virtual cluster.
+ */
+class DynamicModuleVirtualClusterRoute : public Envoy::Router::DelegatingRoute {
+public:
+  DynamicModuleVirtualClusterRoute(Envoy::Router::RouteConstSharedPtr route,
+                                   DynamicModuleRouteSpecifierConfigSharedPtr config)
+      : Envoy::Router::DelegatingRoute(std::move(route)), config_(std::move(config)) {}
+
+protected:
+  const DynamicModuleRouteSpecifierConfigSharedPtr config_;
+};
+
+/**
+ * Route that carries a virtual cluster selection, which answers the virtual cluster lookup of the
+ * router, and otherwise behaves like the route it extends. virtualHostSharedPtr() keeps returning
+ * the virtual host of the route it wraps, so the stream info keeps that one.
+ */
+template <class Wrapper> class VirtualClusterSelectingRoute final : public Wrapper {
+public:
+  // The selected virtual cluster must be one the configuration of the wrapper declares.
+  template <class... Args>
+  VirtualClusterSelectingRoute(const Envoy::Router::VirtualCluster* selected, Args&&... args)
+      : Wrapper(std::forward<Args>(args)...),
+        virtual_host_(this->base_route_->virtualHost(), *this->config_, selected) {}
+
+  // Router::Route
+  const Envoy::Router::VirtualHost& virtualHost() const override { return virtual_host_; }
+
+private:
+  const VirtualClusterSelectingVirtualHost virtual_host_;
 };
 
 // Why Envoy could not honor the decision of a module. There is one value per failure statistic of
@@ -608,8 +816,11 @@ private:
     Envoy::Router::RouteConstSharedPtr route;
     Envoy::Router::OnRouteStatus status{Envoy::Router::OnRouteStatus::Continue};
     Failure failure{Failure::None};
-    // The overrides the route was built from, pointing into it. Null when wrap built no wrapper.
+    // The overrides the route was built from, pointing into it. Null when wrap built no wrapper
+    // that holds them.
     const RouteOverrides* recorded{nullptr};
+    // Whether the decision built a route after the module returned.
+    bool built{false};
   };
 
   // on_route_status is the raw value the module returned, which may be outside the known enum
@@ -618,6 +829,11 @@ private:
   // The route the module asked for, without the failure policy applied.
   Decision wrap(Envoy::Router::RouteConstSharedPtr route, RouteSpecifierContext& context,
                 Envoy::Router::OnRouteStatus status) const;
+  // Drops a virtual cluster selection for a route that answers the request directly, which the
+  // router counts in no virtual cluster, or a selected virtual cluster for a route of a virtual
+  // host other than the declared one, since its statistics would be named after the declared one.
+  void dropUnusableVirtualClusterSelection(const Envoy::Router::Route& route,
+                                           RouteSpecifierContext& context) const;
   // Whether the decision recorded a route the cache can hold, which serves every later request that
   // looks the key up.
   static bool recordsACacheableRoute(const RouteSpecifierContext& context,
