@@ -8,6 +8,10 @@ results are skipped, which is what flake tracking wants), and downloads each tes
 
 The EngFlow calls are the ones its UI uses (no auth needed on this cluster), so treat them as
 best effort: anything that fails is logged and skipped.
+
+Output is grouped by workflow run (<out>/<workflow>/<run id>/...), alongside a run.json of that
+run's git metadata (commit, branch, PR), since each run is its own commit and whatever uploads
+this on needs that rather than whatever happens to be checked out when it runs.
 """
 
 import argparse
@@ -132,6 +136,28 @@ def _safe(name):
     return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_")
 
 
+def run_dir(out, run):
+    return os.path.join(out, _safe(run["name"]), str(run["id"]))
+
+
+def run_meta(run):
+    # Each run is its own commit/branch/PR, so whatever uploads this on needs it alongside the
+    # XML rather than relying on whatever happens to be checked out when it runs.
+    pr = (run.get("pull_requests") or [{}])[0]
+    base = pr.get("base") or {}
+    return {
+        "sha": run.get("head_sha", ""),
+        "branch": run.get("head_branch", ""),
+        "pr": pr.get("number", ""),
+        "base_branch": base.get("ref", ""),
+        "base_sha": base.get("sha", ""),
+        "event": run.get("event", ""),
+        "url": run.get("html_url", ""),
+        # Lets a watermark prune old entries by age without another GitHub API call.
+        "created_at": run.get("created_at", ""),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--repo", required=True)
@@ -194,10 +220,16 @@ def main():
 
     with concurrent.futures.ThreadPoolExecutor(args.workers) as pool:
         tests = []
+        meta_written = set()
         for (run, job), found in zip(jobs, pool.map(lambda rj: find_tests(*rj), jobs)):
             if found:
                 totals["jobs"] += 1
-            job_dir = os.path.join(args.out, _safe(run["name"]), str(run["id"]), _safe(job["name"]))
+                if run["id"] not in meta_written:
+                    meta_written.add(run["id"])
+                    os.makedirs(run_dir(args.out, run), exist_ok=True)
+                    with open(os.path.join(run_dir(args.out, run), "run.json"), "w") as f:
+                        json.dump(run_meta(run), f)
+            job_dir = os.path.join(run_dir(args.out, run), _safe(job["name"]))
             for invocation, labels in found:
                 totals["invocations"] += 1
                 tests += [(job_dir, invocation, label) for label in labels]
