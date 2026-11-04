@@ -3,9 +3,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/callback.h"
+#include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
+#include "envoy/secret/secret_provider.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
@@ -62,6 +65,10 @@ using OnBootstrapExtensionListenerAddOrUpdateType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update);
 using OnBootstrapExtensionListenerRemovalType =
     decltype(&envoy_dynamic_module_on_bootstrap_extension_listener_removal);
+using OnBootstrapExtensionSecretAddOrUpdateType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_secret_add_or_update);
+using OnBootstrapExtensionSecretRemovalType =
+    decltype(&envoy_dynamic_module_on_bootstrap_extension_secret_removal);
 
 class DynamicModuleBootstrapExtension;
 
@@ -172,6 +179,21 @@ public:
   void onListenerRemoval(const std::string& listener_name) override;
 
   /**
+   * Enables secret lifecycle event notifications. When enabled, the module receives
+   * on_bootstrap_extension_secret_add_or_update when a dynamic TLS certificate secret becomes
+   * active or is rotated, and on_bootstrap_extension_secret_removal when one is removed. SDS
+   * secrets are independent xDS resources, so these fire even when no cluster or listener is
+   * re-pushed.
+   *
+   * Secrets whose providers already exist and are active at enable time are replayed immediately,
+   * so a module that enables late still observes them. This must be called on the main thread after
+   * the server is initialized, since the SecretManager is not available before that point.
+   *
+   * @return true if the callbacks were successfully registered, false if already registered.
+   */
+  bool enableSecretLifecycle();
+
+  /**
    * Enumerates the names of the currently active resources of a single kind: the active listeners'
    * filter chains (inline, default and routable FCDS chains), the clusters, the transport socket
    * match names present in every cluster that has matches, or the active dynamic secrets. `emit`
@@ -216,6 +238,8 @@ public:
   OnBootstrapExtensionListenerAddOrUpdateType on_bootstrap_extension_listener_add_or_update_ =
       nullptr;
   OnBootstrapExtensionListenerRemovalType on_bootstrap_extension_listener_removal_ = nullptr;
+  OnBootstrapExtensionSecretAddOrUpdateType on_bootstrap_extension_secret_add_or_update_ = nullptr;
+  OnBootstrapExtensionSecretRemovalType on_bootstrap_extension_secret_removal_ = nullptr;
 
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -260,6 +284,15 @@ public:
   std::string admin_response_body_;
 
 private:
+  // Subscribes to a dynamic TLS certificate secret provider's update and remove callbacks so the
+  // module is notified when its secret becomes active/rotates or is removed. The subscription
+  // handles are retained for the life of the config. Main thread only.
+  void subscribeSecretProvider(const std::string& secret_name,
+                               const Secret::TlsCertificateConfigProviderSharedPtr& provider);
+  // Notifies the module that a dynamic secret became active/was updated or was removed.
+  void onSecretAddOrUpdate(const std::string& secret_name);
+  void onSecretRemoval(const std::string& secret_name);
+
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP
    * callout from the parent bootstrap extension config.
@@ -317,6 +350,12 @@ private:
   // Handle for the shutdown lifecycle callback that cleans up listener_update_callbacks_handle_.
   Server::ServerLifecycleNotifier::HandlePtr listener_lifecycle_shutdown_handle_;
   bool listener_lifecycle_enabled_ = false;
+
+  // Per-provider secret update/remove subscription handles, kept alive for the life of the config
+  // so the module keeps receiving secret lifecycle events. Set when the module enables secret
+  // lifecycle events via enableSecretLifecycle().
+  std::vector<Common::CallbackHandlePtr> secret_callback_handles_;
+  bool secret_lifecycle_enabled_ = false;
 };
 
 using DynamicModuleBootstrapExtensionConfigSharedPtr =
