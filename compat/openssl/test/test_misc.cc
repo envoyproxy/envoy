@@ -1,4 +1,3 @@
-#include <dlfcn.h>
 #include <gtest/gtest.h>
 #include <openssl/asn1.h>
 #include <openssl/digest.h>
