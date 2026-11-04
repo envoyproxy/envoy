@@ -137,6 +137,8 @@ void ScopedConfigImpl::addOrUpdateRoutingScopes(
         }
       }
     }
+    // Reserves sufficient space for the new scoped route info; this avoids repeated memory
+    // allocation and rehashing while updating the maps.
     if (net_added > 0) {
       scoped_route_info_by_name_.reserve(scoped_route_info_by_name_.size() + net_added);
       scoped_route_info_by_key_.reserve(scoped_route_info_by_key_.size() + net_added);

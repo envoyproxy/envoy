@@ -330,6 +330,8 @@ absl::StatusOr<bool> ScopedRdsConfigSubscription::addOrUpdateScopes(
         ++net_new_rds_scopes;
       }
     }
+    // Reserves sufficient space in the maps to avoid memory allocation and rehashing during
+    // resource processing.
     if (net_new_scopes > 0) {
       scoped_route_map_.reserve(scoped_route_map_.size() + net_new_scopes);
       scope_name_by_hash_.reserve(scope_name_by_hash_.size() + net_new_scopes);
