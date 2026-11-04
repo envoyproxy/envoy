@@ -222,6 +222,7 @@ RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 // Disabled by default for now to prevent behavior changes.
 FALSE_RUNTIME_GUARD(envoy_restart_features_shared_cares_dns_resolver);
 RUNTIME_GUARD(envoy_reloadable_features_zipkin_preserve_b3_single_header_format);
+RUNTIME_GUARD(envoy_reloadable_features_zstd_compressor_flush);
 RUNTIME_GUARD(envoy_restart_features_defer_worker_routing_init);
 RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Begin false flags. Most of them should come with a TODO to flip true.
