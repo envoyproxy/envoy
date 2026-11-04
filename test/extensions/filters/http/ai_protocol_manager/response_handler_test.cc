@@ -1,4 +1,6 @@
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/llm_protocol_adapter.h"
@@ -827,6 +829,129 @@ TEST_F(ResponseHandlerTest, SeededProtocolSurvivesEarlyFailure) {
   EXPECT_EQ(handler.usage().llm_protocol, LLMProtocol::AnthropicMessages);
 }
 
+TEST_F(ResponseHandlerTest, OversizedResponsesTerminalWholeHeaderDegrades) {
+  for (const bool pending : {false, true}) {
+    SCOPED_TRACE(pending);
+    SseResponseHandler handler(LLMProtocol::OpenAiResponses,
+                               /*max_event_size=*/256, TestMaxParsedEvents, stats_);
+    Buffer::OwnedImpl header("event: response.completed\n");
+    handler.onData(header);
+    std::string body = "data: {\"type\":\"response.completed\",\"response\":{"
+                       "\"object\":\"response\",\"usage\":{\"input_tokens\":3,"
+                       "\"output_tokens\":4,\"total_tokens\":7},\"padding\":\"" +
+                       std::string(600, 'x') + "\"}}\n";
+    if (!pending) {
+      body += "\n";
+    }
+    Buffer::OwnedImpl frame(body);
+    handler.onData(frame);
+    if (pending) {
+      Buffer::OwnedImpl terminator("\n");
+      handler.onData(terminator);
+    }
+    handler.onEndStream();
+    EXPECT_TRUE(handler.degraded());
+    EXPECT_FALSE(handler.usage().hasAny());
+    EXPECT_FALSE(handler.parsingComplete());
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 2);
+}
+
+TEST_F(ResponseHandlerTest, OversizedResponsesTerminalSplitNameDegrades) {
+  const std::string event =
+      "event: response.completed\ndata: "
+      "{\"type\":\"response.completed\",\"response\":{"
+      "\"object\":\"response\",\"usage\":{\"input_tokens\":3,\"output_tokens\":"
+      "4,"
+      "\"total_tokens\":7},\"padding\":\"" +
+      std::string(600, 'x') + "\"}}\n\n";
+  for (const bool pending : {false, true}) {
+    for (const size_t split : {size_t{0}, size_t{7}, std::string("event: response.").size(),
+                               std::string("event: response.com").size(),
+                               std::string("event: response.completed").size(),
+                               std::string("event: response.completed\n").size()}) {
+      SCOPED_TRACE(testing::Message() << "pending=" << pending << " split=" << split);
+      SseResponseHandler handler(LLMProtocol::OpenAiResponses,
+                                 /*max_event_size=*/256, TestMaxParsedEvents, stats_);
+      if (split != 0) {
+        Buffer::OwnedImpl prefix(event.substr(0, split));
+        handler.onData(prefix);
+      }
+      const size_t end = event.size() - (pending ? 2 : 0);
+      Buffer::OwnedImpl remainder(event.substr(split, end - split));
+      handler.onData(remainder);
+      if (pending) {
+        Buffer::OwnedImpl terminator("\n\n");
+        handler.onData(terminator);
+      }
+      handler.onEndStream();
+      EXPECT_TRUE(handler.degraded());
+      EXPECT_FALSE(handler.usage().hasAny());
+      EXPECT_FALSE(handler.parsingComplete());
+    }
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 12);
+}
+
+TEST_F(ResponseHandlerTest, OversizedResponsesDeltaSplitNameDoesNotDegrade) {
+  SseResponseHandler handler(LLMProtocol::OpenAiResponses,
+                             /*max_event_size=*/256, TestMaxParsedEvents, stats_);
+  Buffer::OwnedImpl prefix("event: response.");
+  handler.onData(prefix);
+  Buffer::OwnedImpl remainder("output_text.delta\ndata: {\"padding\":\"" + std::string(600, 'x') +
+                              "\"}\n\n");
+  handler.onData(remainder);
+  handler.onEndStream();
+  EXPECT_FALSE(handler.degraded());
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 1);
+}
+
+TEST_F(ResponseHandlerTest, NormalResponsesTerminalSplitNameExtractsUsage) {
+  const std::string event =
+      "event: response.completed\ndata: "
+      "{\"type\":\"response.completed\",\"response\":{"
+      "\"object\":\"response\",\"usage\":{\"input_tokens\":3,\"output_tokens\":"
+      "4,"
+      "\"total_tokens\":7}}}\n\n";
+  for (const size_t split : {size_t{0}, std::string("event: response.").size(),
+                             std::string("event: response.com").size(),
+                             std::string("event: response.completed\n").size()}) {
+    SCOPED_TRACE(split);
+    SseResponseHandler handler(LLMProtocol::OpenAiResponses,
+                               /*max_event_size=*/256, TestMaxParsedEvents, stats_);
+    Buffer::OwnedImpl prefix(event.substr(0, split));
+    handler.onData(prefix);
+    Buffer::OwnedImpl remainder(event.substr(split));
+    handler.onData(remainder);
+    handler.onEndStream();
+    EXPECT_FALSE(handler.degraded());
+    EXPECT_TRUE(handler.parsingComplete());
+    EXPECT_EQ(handler.usage().input_tokens, 3);
+    EXPECT_EQ(handler.usage().output_tokens, 4);
+    EXPECT_EQ(handler.usage().total_tokens, 7);
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 0);
+}
+
+TEST_F(ResponseHandlerTest, OversizedResponsesLastEventFieldDeterminesClassification) {
+  SseResponseHandler handler(LLMProtocol::OpenAiResponses,
+                             /*max_event_size=*/256, TestMaxParsedEvents, stats_);
+  Buffer::OwnedImpl prefix("event: response.output_text.delta\n");
+  handler.onData(prefix);
+  Buffer::OwnedImpl remainder(
+      "event: response.completed\ndata: "
+      "{\"type\":\"response.completed\",\"response\":{"
+      "\"object\":\"response\",\"usage\":{\"input_tokens\":3,\"output_tokens\":"
+      "4,"
+      "\"total_tokens\":7},\"padding\":\"" +
+      std::string(600, 'x') + "\"}}\n\n");
+  handler.onData(remainder);
+  handler.onEndStream();
+  EXPECT_TRUE(handler.degraded());
+  EXPECT_FALSE(handler.usage().hasAny());
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 1);
+}
+
 // An oversized event whose `event:` name marks it skippable (a content delta)
 // could never have carried usage: it is dropped without degrading the record,
 // and the terminal usage still publishes as authoritative.
@@ -886,6 +1011,144 @@ TEST_F(ResponseHandlerTest, AbandonOverLimitMatchesIncrementalCap) {
   EXPECT_FALSE(handler.usage().hasAny());
   EXPECT_EQ(handler.usage().llm_protocol, LLMProtocol::GeminiGenerateContent);
   EXPECT_EQ(stats_.response_body_too_large_.value(), 1);
+}
+
+TEST_F(ResponseHandlerTest, OversizedEventClassificationAcrossFrameBoundaries) {
+  const std::vector<std::pair<std::string, bool>> cases = {
+      {"event: response.completed\n", false},
+      {"event: response.failed\n", false},
+      {"event: response.incomplete\n", false},
+      {"event: response.output_text.delta\n", true},
+      {"event: ping\n", true},
+      {"event: content_block_delta\n", true},
+      {"", false},
+      {"event: response.output_text.delta\nevent: response.completed\n", false},
+      {"event: response.completed\nevent: response.output_text.delta\n", true},
+      {": comment\nevent: ping\nid: 1\n", true},
+      {"event: ping\nevent:\n", false},
+      {"event:  ping\n", false},
+      {"event:\tping\n", false},
+      {" event: ping\n", false},
+      {"\xEF\xBB\xBF"
+       "event: ping\n",
+       true},
+      {"event: response." + std::string(512, 'x') + "\nevent: ping\n", true},
+      {"event: response." + std::string(48, 'x') + "\n", true},
+      {"event: response." + std::string(49, 'x') + "\n", false},
+      {"event: ping\nevent: " + std::string(512, 'x') + "\n", false},
+  };
+  for (const auto& [fields, skippable] : cases) {
+    for (const std::string newline : {"\n", "\r\n", "\r"}) {
+      std::string event;
+      for (const char c : fields + "data: " + std::string(512, 'x') + "\n\n") {
+        event += c == '\n' ? newline : std::string(1, c);
+      }
+      for (const uint32_t cap : {8, 64, 256}) {
+        for (const size_t frame_size : {1, 7, 64, 4096}) {
+          SCOPED_TRACE(testing::Message() << "fields=" << fields << " newline=" << newline
+                                          << " cap=" << cap << " frame_size=" << frame_size);
+          const uint64_t oversized_before = stats_.sse_event_too_large_.value();
+          SseResponseHandler handler(LLMProtocol::OpenAiResponses, cap, TestMaxParsedEvents,
+                                     stats_);
+          for (size_t offset = 0; offset < event.size(); offset += frame_size) {
+            Buffer::OwnedImpl frame(absl::string_view(event).substr(offset, frame_size));
+            handler.onData(frame);
+            EXPECT_LE(SseResponseHandlerPeer::bufferedBytes(handler), cap);
+          }
+          handler.onEndStream();
+          EXPECT_EQ(handler.degraded(), !skippable);
+          EXPECT_FALSE(handler.usage().hasAny());
+          EXPECT_FALSE(handler.parsingComplete());
+          EXPECT_EQ(stats_.sse_event_too_large_.value() - oversized_before, 1);
+          EXPECT_EQ(stats_.response_parse_error_.value(), 0);
+          EXPECT_EQ(SseResponseHandlerPeer::bufferedBytes(handler), 0);
+        }
+      }
+    }
+  }
+}
+
+TEST_F(ResponseHandlerTest, OversizedTerminalEventAtEveryNameSplit) {
+  const std::string header = "event: response.completed\n";
+  const std::string event = header + "data: " + std::string(512, 'x') + "\n\n";
+  for (size_t split = 0; split <= header.size(); ++split) {
+    SCOPED_TRACE(split);
+    SseResponseHandler handler(LLMProtocol::OpenAiResponses, 64, TestMaxParsedEvents, stats_);
+    Buffer::OwnedImpl prefix(event.substr(0, split));
+    handler.onData(prefix);
+    Buffer::OwnedImpl tail(event.substr(split));
+    handler.onData(tail);
+    handler.onEndStream();
+    EXPECT_TRUE(handler.degraded());
+    EXPECT_FALSE(handler.usage().hasAny());
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), header.size() + 1);
+  EXPECT_EQ(stats_.response_parse_error_.value(), 0);
+}
+
+TEST_F(ResponseHandlerTest, OversizedEventFollowedByTerminalUsageResetsClassification) {
+  const std::string event =
+      "event: response.output_text.delta\ndata: " + std::string(512, 'x') +
+      "\n\n"
+      "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{"
+      "\"object\":\"response\",\"usage\":{\"input_tokens\":3,\"output_tokens\":4,"
+      "\"total_tokens\":7}}}\n\n";
+  for (const size_t frame_size : {1, 7, 64, 4096}) {
+    SCOPED_TRACE(frame_size);
+    SseResponseHandler handler(LLMProtocol::OpenAiResponses, 256, TestMaxParsedEvents, stats_);
+    feed(handler, event, frame_size);
+    EXPECT_FALSE(handler.degraded());
+    EXPECT_TRUE(handler.parsingComplete());
+    EXPECT_EQ(handler.usage().input_tokens, 3);
+    EXPECT_EQ(handler.usage().output_tokens, 4);
+    EXPECT_EQ(handler.usage().total_tokens, 7);
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 4);
+  EXPECT_EQ(stats_.response_parse_error_.value(), 0);
+}
+
+TEST_F(ResponseHandlerTest, OversizedIncompleteEventAtEndStreamDegrades) {
+  for (const std::string fields : {"event: ping\n", "event: response.", "data: "}) {
+    for (const size_t frame_size : {1, 4096}) {
+      SseResponseHandler handler(LLMProtocol::OpenAiResponses, 64, TestMaxParsedEvents, stats_);
+      feed(handler, fields + std::string(512, 'x'), frame_size);
+      EXPECT_TRUE(handler.degraded());
+      EXPECT_FALSE(handler.usage().hasAny());
+      EXPECT_EQ(SseResponseHandlerPeer::bufferedBytes(handler), 0);
+      handler.onEndStream();
+      EXPECT_TRUE(handler.degraded());
+    }
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 6);
+}
+
+TEST_F(ResponseHandlerTest, SkippableOversizedEventPreservesEarlierDegradation) {
+  for (const size_t frame_size : {1, 4096}) {
+    SseResponseHandler handler(LLMProtocol::OpenAiResponses, 64, TestMaxParsedEvents, stats_);
+    feed(handler, "data: invalid-json\n\n", 4096, /*end_stream=*/false);
+    feed(handler, "event: response.output_text.delta\ndata: " + std::string(512, 'x') + "\n\n",
+         frame_size);
+    EXPECT_TRUE(handler.degraded());
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 2);
+  EXPECT_EQ(stats_.response_parse_error_.value(), 2);
+}
+
+TEST_F(ResponseHandlerTest, ExtremelyLongEventFieldIsBounded) {
+  for (const bool overridden : {false, true}) {
+    auto account = std::make_shared<TestAccount>();
+    SseResponseHandler handler(LLMProtocol::OpenAiResponses, 64, TestMaxParsedEvents, stats_,
+                               account);
+    feed(handler, "event: " + std::string(1024 * 1024, 'x'), 257, /*end_stream=*/false);
+    EXPECT_LE(SseResponseHandlerPeer::bufferedBytes(handler), 64);
+    EXPECT_EQ(account->balance(), 0);
+    EXPECT_LE(account->peak(), 128);
+    feed(handler, overridden ? "\nevent: ping\ndata: ignored\n\n" : "\ndata: ignored\n\n", 1);
+    EXPECT_EQ(handler.degraded(), !overridden);
+    EXPECT_FALSE(handler.usage().hasAny());
+    EXPECT_EQ(account->balance(), 0);
+  }
+  EXPECT_EQ(stats_.sse_event_too_large_.value(), 2);
 }
 
 } // namespace
