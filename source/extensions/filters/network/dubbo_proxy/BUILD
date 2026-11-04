@@ -222,6 +222,7 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
         "//source/extensions/filters/network/dubbo_proxy/router:router_interface",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )

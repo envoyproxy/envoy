@@ -18,6 +18,8 @@
 #include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 #include "source/extensions/filters/network/dubbo_proxy/stats.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -63,8 +65,8 @@ using ActiveResponseDecoderPtr = std::unique_ptr<ActiveResponseDecoder>;
 
 class ActiveMessageFilterBase : public virtual DubboFilters::FilterCallbacksBase {
 public:
-  ActiveMessageFilterBase(ActiveMessage& parent, bool dual_filter)
-      : parent_(parent), dual_filter_(dual_filter) {}
+  ActiveMessageFilterBase(ActiveMessage& parent, bool dual_filter, size_t index)
+      : parent_(parent), index_(index), dual_filter_(dual_filter) {}
   ~ActiveMessageFilterBase() override = default;
 
   // DubboFilters::FilterCallbacksBase
@@ -78,8 +80,12 @@ public:
   Event::Dispatcher& dispatcher() override;
   void resetStream() override;
 
+  // Position of this filter in its owning filter chain.
+  size_t index() const { return index_; }
+
 protected:
   ActiveMessage& parent_;
+  const size_t index_;
   const bool dual_filter_ : 1;
 };
 
@@ -87,11 +93,10 @@ protected:
 // chain continuation.
 class ActiveMessageDecoderFilter : public DubboFilters::DecoderFilterCallbacks,
                                    public ActiveMessageFilterBase,
-                                   public LinkedObject<ActiveMessageDecoderFilter>,
                                    Logger::Loggable<Logger::Id::dubbo> {
 public:
   ActiveMessageDecoderFilter(ActiveMessage& parent, DubboFilters::DecoderFilterSharedPtr filter,
-                             bool dual_filter);
+                             bool dual_filter, size_t index);
   ~ActiveMessageDecoderFilter() override = default;
 
   void continueDecoding() override;
@@ -112,11 +117,10 @@ using ActiveMessageDecoderFilterPtr = std::unique_ptr<ActiveMessageDecoderFilter
 // chain continuation.
 class ActiveMessageEncoderFilter : public ActiveMessageFilterBase,
                                    public DubboFilters::EncoderFilterCallbacks,
-                                   public LinkedObject<ActiveMessageEncoderFilter>,
                                    Logger::Loggable<Logger::Id::dubbo> {
 public:
   ActiveMessageEncoderFilter(ActiveMessage& parent, DubboFilters::EncoderFilterSharedPtr filter,
-                             bool dual_filter);
+                             bool dual_filter, size_t index);
   ~ActiveMessageEncoderFilter() override = default;
 
   void continueEncoding() override;
@@ -143,12 +147,10 @@ public:
   // Indicates which filter to start the iteration with.
   enum class FilterIterationStartState { AlwaysStartFromNext, CanStartFromCurrent };
 
-  // Returns the encoder filter to start iteration with.
-  std::list<ActiveMessageEncoderFilterPtr>::iterator
-  commonEncodePrefix(ActiveMessageEncoderFilter* filter, FilterIterationStartState state);
-  // Returns the decoder filter to start iteration with.
-  std::list<ActiveMessageDecoderFilterPtr>::iterator
-  commonDecodePrefix(ActiveMessageDecoderFilter* filter, FilterIterationStartState state);
+  // Returns the index of the encoder filter to start iteration with.
+  size_t commonEncodePrefix(ActiveMessageEncoderFilter* filter, FilterIterationStartState state);
+  // Returns the index of the decoder filter to start iteration with.
+  size_t commonDecodePrefix(ActiveMessageDecoderFilter* filter, FilterIterationStartState state);
 
   // Dubbo::FilterChainFactoryCallbacks
   void addDecoderFilter(DubboFilters::DecoderFilterSharedPtr filter) override;
@@ -197,10 +199,10 @@ private:
 
   std::optional<Router::RouteConstSharedPtr> cached_route_;
 
-  std::list<ActiveMessageDecoderFilterPtr> decoder_filters_;
+  absl::InlinedVector<ActiveMessageDecoderFilterPtr, 4> decoder_filters_;
   std::function<FilterStatus(DubboFilters::DecoderFilter*)> filter_action_;
 
-  std::list<ActiveMessageEncoderFilterPtr> encoder_filters_;
+  absl::InlinedVector<ActiveMessageEncoderFilterPtr, 4> encoder_filters_;
   std::function<FilterStatus(DubboFilters::EncoderFilter*)> encoder_filter_action_;
 
   // This value is used in the calculation of the weighted cluster.

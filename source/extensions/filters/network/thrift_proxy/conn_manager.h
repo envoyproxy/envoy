@@ -22,6 +22,7 @@
 #include "source/extensions/filters/network/thrift_proxy/stats.h"
 #include "source/extensions/filters/network/thrift_proxy/transport.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/types/variant.h"
 
 namespace Envoy {
@@ -149,7 +150,7 @@ private:
   using ResponseDecoderPtr = std::unique_ptr<ResponseDecoder>;
 
   struct ActiveRpcFilterBase : public virtual ThriftFilters::FilterCallbacks {
-    ActiveRpcFilterBase(ActiveRpc& parent) : parent_(parent) {}
+    ActiveRpcFilterBase(ActiveRpc& parent, size_t index) : parent_(parent), index_(index) {}
 
     // ThriftFilters::FilterCallbacks
     uint64_t streamId() const override { return parent_.stream_id_; }
@@ -170,15 +171,17 @@ private:
     void onReset() override { parent_.onReset(); }
 
     ActiveRpc& parent_;
+    // Position of this filter in its owning filter list.
+    const size_t index_;
   };
 
   // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
   // chain continuation.
   struct ActiveRpcDecoderFilter : public ActiveRpcFilterBase,
-                                  public virtual ThriftFilters::DecoderFilterCallbacks,
-                                  LinkedObject<ActiveRpcDecoderFilter> {
-    ActiveRpcDecoderFilter(ActiveRpc& parent, ThriftFilters::DecoderFilterSharedPtr filter)
-        : ActiveRpcFilterBase(parent), decoder_handle_(filter) {}
+                                  public virtual ThriftFilters::DecoderFilterCallbacks {
+    ActiveRpcDecoderFilter(ActiveRpc& parent, ThriftFilters::DecoderFilterSharedPtr filter,
+                           size_t index)
+        : ActiveRpcFilterBase(parent, index), decoder_handle_(filter) {}
 
     // ThriftFilters::DecoderFilterCallbacks
     void sendLocalReply(const DirectResponse& response, bool end_stream) override {
@@ -200,10 +203,10 @@ private:
   // Wraps a EncoderFilter and acts as the EncoderFilterCallbacks for the filter, enabling filter
   // chain continuation.
   struct ActiveRpcEncoderFilter : public ActiveRpcFilterBase,
-                                  public virtual ThriftFilters::EncoderFilterCallbacks,
-                                  LinkedObject<ActiveRpcEncoderFilter> {
-    ActiveRpcEncoderFilter(ActiveRpc& parent, ThriftFilters::EncoderFilterSharedPtr filter)
-        : ActiveRpcFilterBase(parent), encoder_handle_(filter) {}
+                                  public virtual ThriftFilters::EncoderFilterCallbacks {
+    ActiveRpcEncoderFilter(ActiveRpc& parent, ThriftFilters::EncoderFilterSharedPtr filter,
+                           size_t index)
+        : ActiveRpcFilterBase(parent, index), encoder_handle_(filter) {}
 
     // ThriftFilters::EncoderFilterCallbacks
     void continueEncoding() override;
@@ -300,16 +303,18 @@ private:
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
-      ActiveRpcDecoderFilterPtr wrapper = std::make_unique<ActiveRpcDecoderFilter>(*this, filter);
+      ActiveRpcDecoderFilterPtr wrapper =
+          std::make_unique<ActiveRpcDecoderFilter>(*this, filter, decoder_filters_.size());
       filter->setDecoderFilterCallbacks(*wrapper);
-      LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
+      decoder_filters_.push_back(std::move(wrapper));
       base_filters_.emplace_back(filter);
     }
 
     void addEncoderFilter(ThriftFilters::EncoderFilterSharedPtr filter) override {
-      ActiveRpcEncoderFilterPtr wrapper = std::make_unique<ActiveRpcEncoderFilter>(*this, filter);
+      ActiveRpcEncoderFilterPtr wrapper =
+          std::make_unique<ActiveRpcEncoderFilter>(*this, filter, encoder_filters_.size());
       filter->setEncoderFilterCallbacks(*wrapper);
-      LinkedList::moveIntoList(std::move(wrapper), encoder_filters_);
+      encoder_filters_.push_back(std::move(wrapper));
       base_filters_.emplace_back(filter);
     }
 
@@ -318,14 +323,16 @@ private:
           std::make_unique<ThriftFilters::BidirectionalFilterWrapper>(filter);
 
       ActiveRpcDecoderFilterPtr decoder_wrapper =
-          std::make_unique<ActiveRpcDecoderFilter>(*this, wrapper->decoder_filter_);
+          std::make_unique<ActiveRpcDecoderFilter>(*this, wrapper->decoder_filter_,
+                                                   decoder_filters_.size());
       filter->setDecoderFilterCallbacks(*decoder_wrapper);
-      LinkedList::moveIntoListBack(std::move(decoder_wrapper), decoder_filters_);
+      decoder_filters_.push_back(std::move(decoder_wrapper));
 
       ActiveRpcEncoderFilterPtr encoder_wrapper =
-          std::make_unique<ActiveRpcEncoderFilter>(*this, wrapper->encoder_filter_);
+          std::make_unique<ActiveRpcEncoderFilter>(*this, wrapper->encoder_filter_,
+                                                   encoder_filters_.size());
       filter->setEncoderFilterCallbacks(*encoder_wrapper);
-      LinkedList::moveIntoList(std::move(encoder_wrapper), encoder_filters_);
+      encoder_filters_.push_back(std::move(encoder_wrapper));
 
       base_filters_.emplace_back(wrapper);
     }
@@ -346,9 +353,12 @@ private:
     FilterStatus applyEncoderFilters(DecoderEvent state, FilterContext&& data,
                                      ProtocolConverterSharedPtr protocol_converter,
                                      ActiveRpcEncoderFilter* filter = nullptr);
+    // Filters are stored in configuration order. Decoder filters iterate forward and encoder
+    // filters iterate in reverse.
     template <typename FilterType>
     FilterStatus applyFilters(FilterType* filter,
-                              std::list<std::unique_ptr<FilterType>>& filter_list,
+                              absl::InlinedVector<std::unique_ptr<FilterType>, 4>& filter_list,
+                              bool reverse,
                               ProtocolConverterSharedPtr protocol_converter = nullptr);
 
     // Helper to setup filter_action_
@@ -365,8 +375,8 @@ private:
     StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
     MessageMetadataSharedPtr localReplyMetadata_;
-    std::list<ActiveRpcDecoderFilterPtr> decoder_filters_;
-    std::list<ActiveRpcEncoderFilterPtr> encoder_filters_;
+    absl::InlinedVector<ActiveRpcDecoderFilterPtr, 4> decoder_filters_;
+    absl::InlinedVector<ActiveRpcEncoderFilterPtr, 4> encoder_filters_;
     std::list<ThriftFilters::FilterBaseSharedPtr> base_filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;

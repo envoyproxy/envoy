@@ -507,7 +507,7 @@ FilterStatus ConnectionManager::ActiveRpc::applyDecoderFilters(DecoderEvent stat
     return status;
   }
 
-  return applyFilters<ActiveRpcDecoderFilter>(filter, decoder_filters_);
+  return applyFilters<ActiveRpcDecoderFilter>(filter, decoder_filters_, false);
 }
 
 FilterStatus
@@ -518,7 +518,7 @@ ConnectionManager::ActiveRpc::applyEncoderFilters(DecoderEvent state, FilterCont
   prepareFilterAction(state, std::move(data));
 
   FilterStatus status =
-      applyFilters<ActiveRpcEncoderFilter>(filter, encoder_filters_, protocol_converter);
+      applyFilters<ActiveRpcEncoderFilter>(filter, encoder_filters_, true, protocol_converter);
   // FilterStatus::StopIteration is currently not supported.
   ASSERT(status == FilterStatus::Continue);
 
@@ -526,17 +526,20 @@ ConnectionManager::ActiveRpc::applyEncoderFilters(DecoderEvent state, FilterCont
 }
 
 template <typename FilterType>
-FilterStatus
-ConnectionManager::ActiveRpc::applyFilters(FilterType* filter,
-                                           std::list<std::unique_ptr<FilterType>>& filter_list,
-                                           ProtocolConverterSharedPtr protocol_converter) {
-
-  typename std::list<std::unique_ptr<FilterType>>::iterator entry =
-      !filter ? filter_list.begin() : std::next(filter->entry());
-  for (; entry != filter_list.end(); entry++) {
-    const FilterStatus status = filter_action_((*entry)->decodeEventHandler());
+FilterStatus ConnectionManager::ActiveRpc::applyFilters(
+    FilterType* filter, absl::InlinedVector<std::unique_ptr<FilterType>, 4>& filter_list,
+    bool reverse, ProtocolConverterSharedPtr protocol_converter) {
+  const size_t size = filter_list.size();
+  // Number of filters already applied, in iteration order.
+  size_t applied = 0;
+  if (filter != nullptr) {
+    applied = reverse ? size - filter->index_ : filter->index_ + 1;
+  }
+  for (; applied < size; ++applied) {
+    FilterType* entry = filter_list[reverse ? size - 1 - applied : applied].get();
+    const FilterStatus status = filter_action_(entry->decodeEventHandler());
     ENVOY_STREAM_LOG(trace, "apply filter called: filter={} status={}", *this,
-                     static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+                     static_cast<const void*>(entry), static_cast<uint64_t>(status));
     if (local_response_sent_) {
       // The filter called sendLocalReply but _did not_ close the connection.
       // We return FilterStatus::Continue irrespective of the current result,

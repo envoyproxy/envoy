@@ -419,23 +419,17 @@ settings:
       return FilterStatus::StopIteration;
     };
 
-    std::list<ConnectionManager::ActiveTransDecoderFilterPtr> decoder_filter_list;
-    ConnectionManager::ActiveTransDecoderFilterPtr wrapper =
-        std::make_unique<ConnectionManager::ActiveTransDecoderFilter>(*new_trans, decoder_filter_);
-    decoder_filter_->setDecoderFilterCallbacks(*wrapper);
-    LinkedList::moveIntoListBack(std::move(wrapper), decoder_filter_list);
-
+    new_trans->addDecoderFilter(decoder_filter_);
     std::shared_ptr<SipFilters::MockDecoderFilter> decoder_filter_1 =
         std::make_shared<NiceMock<SipFilters::MockDecoderFilter>>();
-    ConnectionManager::ActiveTransDecoderFilterPtr wrapper2 =
-        std::make_unique<ConnectionManager::ActiveTransDecoderFilter>(*new_trans, decoder_filter_1);
-    LinkedList::moveIntoListBack(std::move(wrapper2), decoder_filter_list);
+    new_trans->addDecoderFilter(decoder_filter_1);
 
-    new_trans->applyDecoderFilters((*(decoder_filter_list.begin())).get());
+    new_trans->applyDecoderFilters(new_trans->decoder_filters_.front().get());
 
     // Other ActiveTransDecoderFilter  function cover
     ConnectionManager::ActiveTransDecoderFilterPtr decoder =
-        std::make_unique<ConnectionManager::ActiveTransDecoderFilter>(*new_trans, decoder_filter_);
+        std::make_unique<ConnectionManager::ActiveTransDecoderFilter>(*new_trans, decoder_filter_,
+                                                                      0);
     EXPECT_EQ(decoder->streamId(), new_trans->streamId());
     EXPECT_EQ(decoder->connection(), new_trans->connection());
     decoder->startUpstreamResponse();

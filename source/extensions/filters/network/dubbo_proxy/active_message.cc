@@ -116,8 +116,8 @@ StreamInfo::StreamInfo& ActiveMessageFilterBase::streamInfo() { return parent_.s
 // class ActiveMessageDecoderFilter
 ActiveMessageDecoderFilter::ActiveMessageDecoderFilter(ActiveMessage& parent,
                                                        DubboFilters::DecoderFilterSharedPtr filter,
-                                                       bool dual_filter)
-    : ActiveMessageFilterBase(parent, dual_filter), handle_(filter) {}
+                                                       bool dual_filter, size_t index)
+    : ActiveMessageFilterBase(parent, dual_filter, index), handle_(filter) {}
 
 void ActiveMessageDecoderFilter::continueDecoding() {
   ASSERT(parent_.context());
@@ -157,8 +157,8 @@ void ActiveMessageDecoderFilter::resetDownstreamConnection() {
 // class ActiveMessageEncoderFilter
 ActiveMessageEncoderFilter::ActiveMessageEncoderFilter(ActiveMessage& parent,
                                                        DubboFilters::EncoderFilterSharedPtr filter,
-                                                       bool dual_filter)
-    : ActiveMessageFilterBase(parent, dual_filter), handle_(filter) {}
+                                                       bool dual_filter, size_t index)
+    : ActiveMessageFilterBase(parent, dual_filter, index), handle_(filter) {}
 
 void ActiveMessageEncoderFilter::continueEncoding() {
   ASSERT(parent_.context());
@@ -201,37 +201,35 @@ ActiveMessage::~ActiveMessage() {
   }
 }
 
-std::list<ActiveMessageEncoderFilterPtr>::iterator
-ActiveMessage::commonEncodePrefix(ActiveMessageEncoderFilter* filter,
-                                  FilterIterationStartState state) {
+size_t ActiveMessage::commonEncodePrefix(ActiveMessageEncoderFilter* filter,
+                                         FilterIterationStartState state) {
   // Only do base state setting on the initial call. Subsequent calls for filtering do not touch
   // the base state.
   if (filter == nullptr) {
     // ASSERT(!state_.local_complete_);
     // state_.local_complete_ = end_stream;
-    return encoder_filters_.begin();
+    return 0;
   }
 
   if (state == FilterIterationStartState::CanStartFromCurrent) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's encoding callback has not be called. Call it now.
-    return filter->entry();
+    return filter->index();
   }
-  return std::next(filter->entry());
+  return filter->index() + 1;
 }
 
-std::list<ActiveMessageDecoderFilterPtr>::iterator
-ActiveMessage::commonDecodePrefix(ActiveMessageDecoderFilter* filter,
-                                  FilterIterationStartState state) {
+size_t ActiveMessage::commonDecodePrefix(ActiveMessageDecoderFilter* filter,
+                                         FilterIterationStartState state) {
   if (!filter) {
-    return decoder_filters_.begin();
+    return 0;
   }
   if (state == FilterIterationStartState::CanStartFromCurrent) {
     // The filter iteration has been stopped for all frame types, and now the iteration continues.
     // The current filter's callback function has not been called. Call it now.
-    return filter->entry();
+    return filter->index();
   }
-  return std::next(filter->entry());
+  return filter->index() + 1;
 }
 
 void ActiveMessage::onStreamDecoded(MessageMetadataSharedPtr metadata, ContextSharedPtr ctx) {
@@ -308,8 +306,8 @@ FilterStatus ActiveMessage::applyDecoderFilters(ActiveMessageDecoderFilter* filt
                                                 FilterIterationStartState state) {
   ASSERT(filter_action_ != nullptr);
   if (!local_response_sent_) {
-    for (auto entry = commonDecodePrefix(filter, state); entry != decoder_filters_.end(); entry++) {
-      const FilterStatus status = filter_action_((*entry)->handler().get());
+    for (size_t i = commonDecodePrefix(filter, state); i < decoder_filters_.size(); ++i) {
+      const FilterStatus status = filter_action_(decoder_filters_[i]->handler().get());
       if (local_response_sent_) {
         break;
       }
@@ -330,8 +328,8 @@ FilterStatus ActiveMessage::applyEncoderFilters(ActiveMessageEncoderFilter* filt
   ASSERT(encoder_filter_action_ != nullptr);
 
   if (!local_response_sent_) {
-    for (auto entry = commonEncodePrefix(filter, state); entry != encoder_filters_.end(); entry++) {
-      const FilterStatus status = encoder_filter_action_((*entry)->handler().get());
+    for (size_t i = commonEncodePrefix(filter, state); i < encoder_filters_.size(); ++i) {
+      const FilterStatus status = encoder_filter_action_(encoder_filters_[i]->handler().get());
       if (local_response_sent_) {
         break;
       }
@@ -445,16 +443,18 @@ void ActiveMessage::addFilter(DubboFilters::CodecFilterSharedPtr filter) {
 void ActiveMessage::addDecoderFilterWorker(DubboFilters::DecoderFilterSharedPtr filter,
                                            bool dual_filter) {
   ActiveMessageDecoderFilterPtr wrapper =
-      std::make_unique<ActiveMessageDecoderFilter>(*this, filter, dual_filter);
+      std::make_unique<ActiveMessageDecoderFilter>(*this, filter, dual_filter,
+                                                   decoder_filters_.size());
   filter->setDecoderFilterCallbacks(*wrapper);
-  LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
+  decoder_filters_.push_back(std::move(wrapper));
 }
 void ActiveMessage::addEncoderFilterWorker(DubboFilters::EncoderFilterSharedPtr filter,
                                            bool dual_filter) {
   ActiveMessageEncoderFilterPtr wrapper =
-      std::make_unique<ActiveMessageEncoderFilter>(*this, filter, dual_filter);
+      std::make_unique<ActiveMessageEncoderFilter>(*this, filter, dual_filter,
+                                                   encoder_filters_.size());
   filter->setEncoderFilterCallbacks(*wrapper);
-  LinkedList::moveIntoListBack(std::move(wrapper), encoder_filters_);
+  encoder_filters_.push_back(std::move(wrapper));
 }
 
 void ActiveMessage::onReset() { parent_.deferredMessage(*this); }

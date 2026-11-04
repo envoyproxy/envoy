@@ -428,15 +428,8 @@ FilterStatus ConnectionManager::ActiveTrans::applyDecoderFilters(ActiveTransDeco
   ASSERT(filter_action_ != nullptr);
 
   if (!local_response_sent_) {
-    std::list<ActiveTransDecoderFilterPtr>::iterator entry;
-    if (!filter) {
-      entry = decoder_filters_.begin();
-    } else {
-      entry = std::next(filter->entry());
-    }
-
-    for (; entry != decoder_filters_.end(); entry++) {
-      const FilterStatus status = filter_action_((*entry)->handle_.get());
+    for (size_t i = filter == nullptr ? 0 : filter->index_ + 1; i < decoder_filters_.size(); ++i) {
+      const FilterStatus status = filter_action_(decoder_filters_[i]->handle_.get());
       if (local_response_sent_) {
         // The filter called sendLocalReply: stop processing filters and return
         // FilterStatus::Continue irrespective of the current result.

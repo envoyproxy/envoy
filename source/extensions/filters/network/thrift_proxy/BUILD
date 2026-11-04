@@ -97,6 +97,7 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/types:any",
     ],
 )

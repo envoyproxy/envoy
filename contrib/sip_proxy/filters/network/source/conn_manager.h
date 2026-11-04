@@ -18,6 +18,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 
+#include "absl/container/inlined_vector.h"
 #include "absl/types/any.h"
 #include "contrib/sip_proxy/filters/network/source/decoder.h"
 #include "contrib/sip_proxy/filters/network/source/filters/filter.h"
@@ -180,10 +181,10 @@ private:
 
   // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
   // chain continuation.
-  struct ActiveTransDecoderFilter : public SipFilters::DecoderFilterCallbacks,
-                                    LinkedObject<ActiveTransDecoderFilter> {
-    ActiveTransDecoderFilter(ActiveTrans& parent, SipFilters::DecoderFilterSharedPtr filter)
-        : parent_(parent), handle_(filter) {}
+  struct ActiveTransDecoderFilter : public SipFilters::DecoderFilterCallbacks {
+    ActiveTransDecoderFilter(ActiveTrans& parent, SipFilters::DecoderFilterSharedPtr filter,
+                             size_t index)
+        : parent_(parent), handle_(filter), index_(index) {}
 
     // SipFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return parent_.streamId(); }
@@ -236,6 +237,8 @@ private:
 
     ActiveTrans& parent_;
     SipFilters::DecoderFilterSharedPtr handle_;
+    // Position of this filter in its owning filter chain.
+    const size_t index_;
   };
   using ActiveTransDecoderFilterPtr = std::unique_ptr<ActiveTransDecoderFilter>;
 
@@ -315,9 +318,9 @@ private:
     // Sip::FilterChainFactoryCallbacks
     void addDecoderFilter(SipFilters::DecoderFilterSharedPtr filter) override {
       ActiveTransDecoderFilterPtr wrapper =
-          std::make_unique<ActiveTransDecoderFilter>(*this, filter);
+          std::make_unique<ActiveTransDecoderFilter>(*this, filter, decoder_filters_.size());
       filter->setDecoderFilterCallbacks(wrapper->parent_);
-      LinkedList::moveIntoListBack(std::move(wrapper), decoder_filters_);
+      decoder_filters_.push_back(std::move(wrapper));
     }
 
     FilterStatus applyDecoderFilters(ActiveTransDecoderFilter* filter);
@@ -337,7 +340,7 @@ private:
     std::string transaction_id_;
     StreamInfo::StreamInfoImpl stream_info_;
     MessageMetadataSharedPtr metadata_;
-    std::list<ActiveTransDecoderFilterPtr> decoder_filters_;
+    absl::InlinedVector<ActiveTransDecoderFilterPtr, 4> decoder_filters_;
     ResponseDecoderPtr response_decoder_;
     std::optional<Router::RouteConstSharedPtr> cached_route_;
 

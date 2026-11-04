@@ -66,6 +66,7 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@abseil-cpp//absl/types:any",
     ],
 )
