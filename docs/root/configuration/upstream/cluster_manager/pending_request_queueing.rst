@@ -57,13 +57,13 @@ Fair queue
 
 The :ref:`fair queue policy
 <envoy_v3_api_msg_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig>` uses Stochastic Fair
-Queuing (SFQ) to isolate tenant or traffic classes waiting in a connection pool's pending request
+Queuing (SFQ) to isolate tenant or traffic classes waiting in a connection pool pending request
 queue.
 
-In a FIFO queue, a single bursty tenant can fill the queue and delay all subsequent requests,
-including requests from well-behaved tenants. Fair queue prevents this head-of-line blocking by
-partitioning pending requests across multiple FIFO sub-queues (buckets) and serving active buckets
-in round-robin order.
+In a FIFO queue, a bursty tenant fills the queue and delays all subsequent requests, including
+requests from well-behaved tenants. Fair queue prevents head-of-line blocking by partitioning
+pending requests across multiple FIFO sub-queues (buckets) and serving active buckets in round-robin
+order.
 
 How it works
 ^^^^^^^^^^^^
@@ -71,19 +71,22 @@ How it works
 1. **Classification**: Envoy extracts the class identifier from dynamic metadata using
    :ref:`class_metadata_key
    <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.class_metadata_key>`.
-   The value may be a string, number, boolean, struct, or list.
+   Supported value types include string, number, boolean, struct, and list.
 2. **Default class**: Envoy assigns requests that lack the specified metadata key to a dedicated
    default class. Unclassified traffic shares a single bucket. This ensures unclassified bursts
    cannot pollute buckets assigned to classified tenants.
-3. **Bucketing**: Envoy hashes the class identifier with 64-bit xxHash into one of
-   :ref:`num_buckets
+3. **Two-choice bucketing**: Envoy hashes the class identifier with 64-bit xxHash to select two
+   candidate buckets out of :ref:`num_buckets
    <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.num_buckets>`
-   per-bucket FIFO queues (default 1024).
+   per-bucket FIFO queues (default 1024). Envoy enqueues the request into the shorter bucket (the
+   power of two choices). If a tenant's primary bucket collides with a noisy neighbor, this
+   two-choice selection directs requests to the secondary bucket immediately, avoiding delay
+   without waiting for hash perturbation.
 4. **Round-robin dequeue**: Non-empty buckets form a round-robin schedule. When an upstream
-   connection becomes available, Envoy dequeues one request from the current bucket and advances
-   to the next non-empty bucket. A burst from one tenant fills only that tenant's bucket, while other
+   connection becomes available, Envoy dequeues one request from the current bucket and advances to
+   the next non-empty bucket. A burst from one tenant fills only that tenant's bucket, while other
    tenants continue to receive service immediately.
-5. **Periodic perturbation**: Two distinct classes can occasionally hash to the same bucket.
+5. **Periodic perturbation**: Two distinct classes can occasionally share both candidate buckets.
    Envoy updates the hash seed every
    :ref:`perturbation_interval
    <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.perturbation_interval>`
@@ -91,6 +94,11 @@ How it works
    Already-queued requests remain in their assigned buckets until dequeued. This periodic rotation
    breaks persistent collisions between tenants over time. Setting the interval to ``0s`` disables
    perturbation.
+6. **Memory and CPU efficiency**: Envoy allocates bucket vectors lazily on the first queued request.
+   Connection pools that never queue requests consume zero bucket memory. Configuring
+   :ref:`num_buckets
+   <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.num_buckets>` as a
+   power of two (such as the default 1024) enables bitmasking instead of hardware division.
 
 Configuration example
 ^^^^^^^^^^^^^^^^^^^^^

@@ -20,6 +20,7 @@ envoy_cc_extension(
         "//source/common/conn_pool:conn_pool_base_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/functional:function_ref",
         "@envoy_api//envoy/extensions/queue_policy/fair_queue/v3:pkg_cc_proto",

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +20,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/queue_policy/queue_policy_base.h"
 
+#include "absl/base/optimization.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/functional/function_ref.h"
 
@@ -29,10 +31,11 @@ namespace QueuePolicy {
 /**
  * Stochastic Fair Queuing (SFQ) implementation of QueueBase.
  *
- * Incoming items are hashed into a fixed number of per-bucket FIFO queues based on a dynamic
- * metadata key read from the item's StreamInfo. Non-empty buckets are serviced in round-robin
- * order. The hash seed is periodically perturbed based on item enqueue timestamps to prevent
- * permanent hash collisions between tenants.
+ * Incoming items are hashed into two candidate buckets out of a fixed number of per-bucket FIFO
+ * queues based on a dynamic metadata key read from the item's StreamInfo, and placed into the
+ * shorter bucket (power of two choices). Non-empty buckets are serviced in round-robin order. The
+ * hash seed is periodically perturbed based on item enqueue timestamps to prevent persistent hash
+ * collisions between tenants.
  */
 template <class ItemType> class FairQueue : public QueueBase<ItemType> {
 public:
@@ -51,8 +54,13 @@ public:
                      std::chrono::milliseconds perturbation_interval =
                          std::chrono::milliseconds(DefaultPerturbationIntervalMs))
       : class_metadata_key_(class_metadata_key), num_buckets_(std::max(1u, num_buckets)),
-        perturbation_interval_(perturbation_interval), buckets_(num_buckets_),
-        bucket_iterators_(num_buckets_) {}
+        is_power_of_two_buckets_((num_buckets_ & (num_buckets_ - 1)) == 0),
+        bucket_mask_(is_power_of_two_buckets_ ? (num_buckets_ - 1) : 0),
+        perturbation_interval_(perturbation_interval),
+        next_perturbation_time_(perturbation_interval_.count() > 0 ? MonotonicTime::min()
+                                                                   : MonotonicTime::max()) {
+    updateSeedCache();
+  }
 
   ~FairQueue() override = default;
 
@@ -69,12 +77,17 @@ public:
   bool empty() const override { return item_index_.empty(); }
 
   /**
-   * Adds an item to the bucket corresponding to its StreamInfo class metadata value.
+   * Adds an item to the shorter of two candidate buckets corresponding to its StreamInfo class
+   * metadata value.
    * @param item item to enqueue. The caller retains ownership while queued.
    * @param metadata enqueue timestamp and optional StreamInfo for class lookup.
    */
   void add(ItemType& item, QueueItemMetadata metadata) override {
     ASSERT(!item_index_.contains(&item));
+    if (ABSL_PREDICT_FALSE(buckets_.empty())) {
+      buckets_.resize(num_buckets_);
+      bucket_iterators_.resize(num_buckets_);
+    }
     maybePerturbSeed(metadata.enqueue_time_);
 
     const uint32_t bucket_idx = computeBucketIndex(metadata);
@@ -173,51 +186,81 @@ private:
     typename ItemList::iterator item_it_;
   };
 
+  // Updates the cached per-kind hash seeds and default bucket index for the current seed epoch.
+  void updateSeedCache() {
+    for (size_t kind = 0; kind < type_seeds_.size(); ++kind) {
+      type_seeds_[kind] = HashUtil::xxHash64Value(static_cast<uint32_t>(kind), perturbation_seed_);
+    }
+    default_bucket_idx_ = hashToBucket(type_seeds_[0]);
+  }
+
+  // Maps a 64-bit hash value to a bucket index in [0, num_buckets_).
+  uint32_t hashToBucket(uint64_t hash) const {
+    if (ABSL_PREDICT_TRUE(is_power_of_two_buckets_)) {
+      return static_cast<uint32_t>(hash) & bucket_mask_;
+    }
+    return static_cast<uint32_t>(hash % num_buckets_);
+  }
+
   // Advances the hash perturbation seed when the configured perturbation interval has elapsed.
   void maybePerturbSeed(MonotonicTime enqueue_time) {
-    if (perturbation_interval_.count() <= 0) {
+    if (ABSL_PREDICT_TRUE(enqueue_time < next_perturbation_time_)) {
       return;
     }
-    if (!last_perturbation_time_.has_value()) {
-      last_perturbation_time_ = enqueue_time;
-      return;
-    }
-    if (enqueue_time >= *last_perturbation_time_ + perturbation_interval_) {
-      last_perturbation_time_ = enqueue_time;
+    if (next_perturbation_time_ != MonotonicTime::min()) {
       ++perturbation_seed_;
+      updateSeedCache();
     }
+    next_perturbation_time_ = enqueue_time + perturbation_interval_;
   }
 
-  // Maps item metadata to a bucket index in [0, num_buckets_).
+  // Maps item metadata to a bucket index in [0, num_buckets_) using two-choice selection.
+  // Requests with missing or null metadata map to a single shared default bucket.
   uint32_t computeBucketIndex(const QueueItemMetadata& metadata) const {
-    return static_cast<uint32_t>(computeClassHash(metadata) % num_buckets_);
+    const std::optional<uint64_t> class_hash = computeClassHash(metadata);
+    if (!class_hash.has_value()) {
+      return default_bucket_idx_;
+    }
+
+    const uint32_t bucket1 = hashToBucket(*class_hash);
+    if (buckets_[bucket1].empty() || num_buckets_ == 1) {
+      return bucket1;
+    }
+
+    uint32_t bucket2 = hashToBucket(*class_hash >> 32);
+    if (bucket2 == bucket1) {
+      bucket2 = (bucket1 + 1 < num_buckets_) ? (bucket1 + 1) : 0;
+    }
+    return buckets_[bucket1].size() <= buckets_[bucket2].size() ? bucket1 : bucket2;
   }
 
-  // Computes a 64-bit hash for the tenant class extracted from StreamInfo dynamic metadata.
-  // Requests with missing or null metadata map to a single shared default class.
-  uint64_t computeClassHash(const QueueItemMetadata& metadata) const {
+  // Computes a 64-bit hash for the tenant class extracted from StreamInfo dynamic metadata,
+  // or std::nullopt if the metadata is absent or null.
+  std::optional<uint64_t> computeClassHash(const QueueItemMetadata& metadata) const {
     if (!metadata.stream_info_.has_value()) {
-      return HashUtil::xxHash64Value(uint32_t{0}, perturbation_seed_);
+      return std::nullopt;
     }
     const Protobuf::Value& value = Envoy::Config::Metadata::metadataValue(
         &metadata.stream_info_->dynamicMetadata(), class_metadata_key_);
-    const uint64_t type_seed =
-        HashUtil::xxHash64Value(static_cast<uint32_t>(value.kind_case()), perturbation_seed_);
     switch (value.kind_case()) {
     case Protobuf::Value::kStringValue:
-      return HashUtil::xxHash64(value.string_value(), type_seed);
+      return HashUtil::xxHash64(value.string_value(), type_seeds_[Protobuf::Value::kStringValue]);
     case Protobuf::Value::kNumberValue:
-      return HashUtil::xxHash64Value(value.number_value(), type_seed);
+      return HashUtil::xxHash64Value(value.number_value(),
+                                     type_seeds_[Protobuf::Value::kNumberValue]);
     case Protobuf::Value::kBoolValue:
-      return HashUtil::xxHash64Value(value.bool_value(), type_seed);
+      return HashUtil::xxHash64Value(value.bool_value(), type_seeds_[Protobuf::Value::kBoolValue]);
     case Protobuf::Value::kStructValue:
+      return HashUtil::xxHash64Value(static_cast<uint64_t>(ValueUtil::hash(value)),
+                                     type_seeds_[Protobuf::Value::kStructValue]);
     case Protobuf::Value::kListValue:
-      return HashUtil::xxHash64Value(static_cast<uint64_t>(ValueUtil::hash(value)), type_seed);
+      return HashUtil::xxHash64Value(static_cast<uint64_t>(ValueUtil::hash(value)),
+                                     type_seeds_[Protobuf::Value::kListValue]);
     case Protobuf::Value::kNullValue:
     case Protobuf::Value::KIND_NOT_SET:
       break;
     }
-    return HashUtil::xxHash64Value(uint32_t{0}, perturbation_seed_);
+    return std::nullopt;
   }
 
   // Collects a snapshot of all queued item pointers ordered by round-robin dequeue turns.
@@ -246,11 +289,17 @@ private:
     return snapshot;
   }
 
+  static constexpr size_t NumValueKindCases = static_cast<size_t>(Protobuf::Value::kListValue) + 1;
+
   const Envoy::Config::MetadataKey class_metadata_key_;
   const uint32_t num_buckets_;
+  const bool is_power_of_two_buckets_;
+  const uint32_t bucket_mask_;
   const std::chrono::milliseconds perturbation_interval_;
-  std::optional<MonotonicTime> last_perturbation_time_;
+  MonotonicTime next_perturbation_time_;
   uint64_t perturbation_seed_{0};
+  std::array<uint64_t, NumValueKindCases> type_seeds_{};
+  uint32_t default_bucket_idx_{0};
   std::vector<ItemList> buckets_;
   BucketList active_buckets_;
   std::vector<typename BucketList::iterator> bucket_iterators_;

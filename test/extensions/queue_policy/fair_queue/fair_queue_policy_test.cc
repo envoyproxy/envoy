@@ -99,6 +99,20 @@ std::vector<int> drainQueueIds(FairQueue<TestQueueItem>& queue) {
   return drained;
 }
 
+// Computes the two candidate bucket indices for a string tenant at a given perturbation seed.
+std::pair<uint32_t, uint32_t> computeTwoChoices(absl::string_view tenant, uint64_t seed,
+                                                uint32_t num_buckets) {
+  const uint64_t type_seed =
+      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), seed);
+  const uint64_t hash = HashUtil::xxHash64(tenant, type_seed);
+  const uint32_t b1 = static_cast<uint32_t>(hash % num_buckets);
+  uint32_t b2 = static_cast<uint32_t>((hash >> 32) % num_buckets);
+  if (b2 == b1 && num_buckets > 1) {
+    b2 = (b1 + 1 < num_buckets) ? (b1 + 1) : 0;
+  }
+  return {b1, b2};
+}
+
 TEST(FairQueueTest, BasicQueueOperationsAndRoundRobinFairness) {
   FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), /*num_buckets=*/1024);
   EXPECT_TRUE(queue.empty());
@@ -130,11 +144,11 @@ TEST(FairQueueTest, BasicQueueOperationsAndRoundRobinFairness) {
   static_assert(std::is_same_v<decltype(const_queue.peek()), const TestQueueItem&>);
   EXPECT_EQ(const_queue.peek().id(), 1);
 
-  // Dequeue order must interleave tenants in round-robin rounds:
-  // Round 1: a1 (1), b1 (10), c1 (100).
-  // Round 2: a2 (2), b2 (20).
-  // Round 3: a3 (3).
-  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 10, 100, 2, 20, 3}));
+  // Two-choice selection places a1 in A's 1st bucket, a2 in A's 2nd bucket, and a3 in A's 1st
+  // bucket; b1 and b2 in B's 1st and 2nd buckets; and c1 in C's 1st bucket.
+  // Round 1 drains one item from each active bucket: a1 (1), a2 (2), b1 (10), b2 (20), c1 (100).
+  // Round 2 drains the remaining item from A's 1st bucket: a3 (3).
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 2, 10, 20, 100, 3}));
   EXPECT_TRUE(queue.empty());
   EXPECT_EQ(queue.size(), 0);
 }
@@ -238,12 +252,13 @@ TEST(FairQueueTest, NestedMetadataKeyPathAndSpecialScalarValues) {
   (*partial_path_info.filterStruct().mutable_fields())["auth"] =
       ValueUtil::stringValue("not_a_struct");
 
-  TestQueueItem a1(1), a2(2), b1(10), partial(99);
+  TestQueueItem a1(1), a2(2), a3(3), b1(10), partial(99);
   queue.add(a1, {timeFromMs(0), nested_a.optRef()});
   queue.add(a2, {timeFromMs(0), nested_a.optRef()});
+  queue.add(a3, {timeFromMs(0), nested_a.optRef()});
   queue.add(b1, {timeFromMs(0), nested_b.optRef()});
   queue.add(partial, {timeFromMs(0), partial_path_info.optRef()});
-  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 10, 99, 2}));
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 2, 10, 99, 3}));
 
   // Verify special floating-point metadata values (0.0, -0.0, NaN, +Inf, -Inf), false, and "".
   FairQueue<TestQueueItem> special_queue(makeTenantMetadataKey(), /*num_buckets=*/1024);
@@ -274,21 +289,23 @@ TEST(FairQueueTest, RemoveHeadMiddleTailAndLastActiveItem) {
   TenantStreamInfo tenant_b("tenant_b");
   TenantStreamInfo tenant_c("tenant_c");
 
-  TestQueueItem a1(1), a2(2), a3(3), a4(4);
+  // Enqueue 4 untagged items into the single default bucket, 2 items for tenant_b, and 1 for
+  // tenant_c.
+  TestQueueItem u1(1), u2(2), u3(3), u4(4);
   TestQueueItem b1(10), b2(20);
   TestQueueItem c1(100);
 
-  queue.add(a1, {timeFromMs(0), tenant_a.optRef()});
-  queue.add(a2, {timeFromMs(0), tenant_a.optRef()});
-  queue.add(a3, {timeFromMs(0), tenant_a.optRef()});
-  queue.add(a4, {timeFromMs(0), tenant_a.optRef()});
+  queue.add(u1, {timeFromMs(0), {}});
+  queue.add(u2, {timeFromMs(0), {}});
+  queue.add(u3, {timeFromMs(0), {}});
+  queue.add(u4, {timeFromMs(0), {}});
   queue.add(b1, {timeFromMs(0), tenant_b.optRef()});
   queue.add(b2, {timeFromMs(0), tenant_b.optRef()});
   queue.add(c1, {timeFromMs(0), tenant_c.optRef()});
 
-  // Remove middle (a2) and tail (a4) from tenant_a's bucket; a1 remains at the front.
-  queue.remove(a2);
-  queue.remove(a4);
+  // Remove middle (u2) and tail (u4) from the default bucket; u1 remains at the front.
+  queue.remove(u2);
+  queue.remove(u4);
   EXPECT_EQ(queue.size(), 5);
   EXPECT_EQ(queue.peek().id(), 1);
 
@@ -296,14 +313,15 @@ TEST(FairQueueTest, RemoveHeadMiddleTailAndLastActiveItem) {
   queue.remove(c1);
   EXPECT_EQ(queue.size(), 4);
 
-  // Remove the head (a1) and remaining item (a3) of tenant_a; tenant_b (b1) becomes the new head.
-  queue.remove(a1);
+  // Remove the head (u1) and remaining item (u3) of the default bucket; tenant_b (b1) becomes the
+  // new head.
+  queue.remove(u1);
   EXPECT_EQ(queue.peek().id(), 3);
-  queue.remove(a3);
+  queue.remove(u3);
   EXPECT_EQ(queue.size(), 2);
   EXPECT_EQ(queue.peek().id(), 10);
 
-  // Drain the remaining items in tenant_b's bucket.
+  // Drain the remaining items in tenant_b's buckets.
   EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{10, 20}));
   EXPECT_TRUE(queue.empty());
 }
@@ -319,29 +337,30 @@ TEST(FairQueueTest, BucketDeactivationAndReactivationJoinBackOfRoundRobin) {
   TestQueueItem b1(10), b2(20), b3(30);
   TestQueueItem c1(100);
 
-  // Initial active bucket order: [A, B].
+  // Initial active bucket order: [A1([a1, a3]), A2([a2]), B1([b1])].
   queue.add(a1, {timeFromMs(0), tenant_a.optRef()});
   queue.add(a2, {timeFromMs(0), tenant_a.optRef()});
   queue.add(a3, {timeFromMs(0), tenant_a.optRef()});
   queue.add(b1, {timeFromMs(0), tenant_b.optRef()});
 
-  // Pop a1: bucket A still has [a2, a3], so active order rotates to [B, A].
+  // Pop a1: bucket A1 still has [a3], so active order rotates to [A2, B1, A1].
   EXPECT_EQ(queue.pop().id(), 1);
-  // Pop b1: bucket B becomes empty and is deactivated; active order is now [A].
+  // Pop a2 and b1: buckets A2 and B1 become empty and are deactivated; active order is now [A1].
+  EXPECT_EQ(queue.pop().id(), 2);
   EXPECT_EQ(queue.pop().id(), 10);
 
-  // Enqueue c1: bucket C activates at the back; active order is [A, C].
+  // Enqueue c1: bucket C1 activates at the back; active order is [A1, C1].
   queue.add(c1, {timeFromMs(0), tenant_c.optRef()});
-  // Reactivate bucket B with b2: bucket B must join at the back; active order is [A, C, B].
+  // Reactivate bucket B1 with b2: bucket B1 must join at the back; active order is [A1, C1, B1].
   queue.add(b2, {timeFromMs(0), tenant_b.optRef()});
 
-  // Deactivate bucket B via remove(b2) and reactivate again with b3: active order remains [A, C,
-  // B].
+  // Deactivate bucket B1 via remove(b2) and reactivate again with b3: active order remains
+  // [A1, C1, B1].
   queue.remove(b2);
   queue.add(b3, {timeFromMs(0), tenant_b.optRef()});
 
-  // Expected dequeue order from [A([a2, a3]), C([c1]), B([b3])]: a2 (2), c1 (100), b3 (30), a3 (3).
-  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{2, 100, 30, 3}));
+  // Expected dequeue order from [A1([a3]), C1([c1]), B1([b3])]: a3 (3), c1 (100), b3 (30).
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{3, 100, 30}));
 }
 
 TEST(FairQueueTest, ForEachRespectsRotatedRoundRobinTurnAndFutureItemRemoval) {
@@ -369,66 +388,59 @@ TEST(FairQueueTest, ForEachRespectsRotatedRoundRobinTurnAndFutureItemRemoval) {
   queue.add(b2, {timeFromMs(0), tenant_b.optRef()});
   queue.add(c1, {timeFromMs(0), tenant_c.optRef()});
 
-  // Pop a1 so the active bucket turn rotates from [A, B, C] to [B, C, A].
+  // Pop a1 so the active bucket turn rotates from [A1([a1, a3]), A2([a2]), B1([b1]), B2([b2]),
+  // C1([c1])] to [A2([a2]), B1([b1]), B2([b2]), C1([c1]), A1([a3])].
   EXPECT_EQ(queue.pop().id(), 1);
 
-  // Full traversal from rotated state visits in exact dequeue order: b1, c1, a2, b2, a3.
+  // Full traversal from rotated state visits in exact dequeue order: a2, b1, b2, c1, a3.
   std::vector<int> visited;
   queue.forEach([&visited](TestQueueItem& item) -> bool {
     visited.push_back(item.id());
     return true;
   });
-  EXPECT_EQ(visited, (std::vector<int>{10, 100, 2, 20, 3}));
+  EXPECT_EQ(visited, (std::vector<int>{2, 10, 20, 100, 3}));
 
   // Returning false stops iteration early.
   visited.clear();
   queue.forEach([&visited](TestQueueItem& item) -> bool {
     visited.push_back(item.id());
-    return item.id() != 100;
+    return item.id() != 10;
   });
-  EXPECT_EQ(visited, (std::vector<int>{10, 100}));
+  EXPECT_EQ(visited, (std::vector<int>{2, 10}));
 
-  // Removing both the currently visited item (b1) and a future unvisited item (b2 and c1) inside
+  // Removing both the currently visited item (a2) and future unvisited items (b2 and c1) inside
   // the callback skips the removed future items safely without visiting them.
   visited.clear();
   queue.forEach([&queue, &visited, &c1, &b2](TestQueueItem& item) -> bool {
     visited.push_back(item.id());
-    if (item.id() == 10) {
+    if (item.id() == 2) {
       queue.remove(item);
       queue.remove(c1);
       queue.remove(b2);
     }
     return true;
   });
-  EXPECT_EQ(visited, (std::vector<int>{10, 2, 3}));
+  EXPECT_EQ(visited, (std::vector<int>{2, 10, 3}));
   EXPECT_EQ(queue.size(), 2);
-  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{2, 3}));
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{10, 3}));
 }
 
 TEST(FairQueueTest, PerturbationPreservesQueuedBucketForRemoveAndHandlesMultiEpochJumps) {
-  // Find two tenants that collide at seed 0 in a 2-bucket table, separate at seed 1, and where
-  // colliding_b changes bucket between seed 0 and seed 2.
-  const uint64_t seed0_type =
-      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), /*seed=*/0);
-  const uint64_t seed1_type =
-      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), /*seed=*/1);
-  const uint64_t seed2_type =
-      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), /*seed=*/2);
-
+  constexpr uint32_t num_buckets = 4;
   std::string colliding_a;
   std::string colliding_b;
   std::string other_seed0;
 
-  for (int i = 0; i < 400; ++i) {
+  for (int i = 0; i < 2000; ++i) {
     const std::string candidate = absl::StrCat("flow_", i);
-    const uint64_t b0 = HashUtil::xxHash64(candidate, seed0_type) % 2;
-    const uint64_t b1 = HashUtil::xxHash64(candidate, seed1_type) % 2;
-    const uint64_t b2 = HashUtil::xxHash64(candidate, seed2_type) % 2;
-    if (colliding_a.empty() && b0 == 0 && b1 == 0 && b2 == 0) {
+    const auto [b1_s0, b2_s0] = computeTwoChoices(candidate, /*seed=*/0, num_buckets);
+    const auto [b1_s1, b2_s1] = computeTwoChoices(candidate, /*seed=*/1, num_buckets);
+    const auto [b1_s2, b2_s2] = computeTwoChoices(candidate, /*seed=*/2, num_buckets);
+    if (colliding_a.empty() && b1_s0 == 0 && b2_s0 == 1 && b1_s1 == 0 && b1_s2 == 0) {
       colliding_a = candidate;
-    } else if (colliding_b.empty() && b0 == 0 && b1 == 1 && b2 == 1) {
+    } else if (colliding_b.empty() && b1_s0 == 0 && b2_s0 == 1 && b1_s1 == 2 && b1_s2 == 3) {
       colliding_b = candidate;
-    } else if (other_seed0.empty() && b0 == 1) {
+    } else if (other_seed0.empty() && b1_s0 == 2) {
       other_seed0 = candidate;
     }
   }
@@ -436,91 +448,224 @@ TEST(FairQueueTest, PerturbationPreservesQueuedBucketForRemoveAndHandlesMultiEpo
   ASSERT_FALSE(colliding_b.empty());
   ASSERT_FALSE(other_seed0.empty());
 
-  FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), /*num_buckets=*/2,
+  FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), num_buckets,
                                  std::chrono::milliseconds(1000));
 
   TenantStreamInfo info_a(colliding_a);
   TenantStreamInfo info_b(colliding_b);
   TenantStreamInfo info_other(other_seed0);
 
-  // At t = 0ms..999ms (seed 0), colliding_a and colliding_b both land in bucket 0.
-  TestQueueItem item_a(1), item_b_early(2), item_other(3);
-  queue.add(item_a, {timeFromMs(0), info_a.optRef()});
+  // At t = 0ms..999ms (seed 0), colliding_a and colliding_b share candidate pair (0, 1).
+  // Enqueue 2 items for colliding_a (filling buckets 0 and 1 to depth 1), then item_b_early (which
+  // lands in bucket 0 behind item_a1), then item_other (landing in bucket 2).
+  TestQueueItem item_a1(1), item_a2(2), item_b_early(3), item_other(4);
+  queue.add(item_a1, {timeFromMs(0), info_a.optRef()});
+  queue.add(item_a2, {timeFromMs(0), info_a.optRef()});
   queue.add(item_b_early, {timeFromMs(999), info_b.optRef()});
   queue.add(item_other, {timeFromMs(999), info_other.optRef()});
-  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 3, 2}));
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 2, 4, 3}));
 
   // Enqueue item_b_pre_perturb at t = 999ms (seed 0, bucket 0) and keep it in the queue while
   // subsequent arrivals advance the seed at t = 1000ms (seed 1) and t = 2500ms (seed 2).
   TestQueueItem item_b_pre_perturb(10), item_a_seed1(11), item_b_seed1(12), item_b_seed2(13);
   queue.add(item_b_pre_perturb, {timeFromMs(999), info_b.optRef()});
-  queue.add(item_a_seed1, {timeFromMs(1000), info_a.optRef()}); // seed 1 -> bucket 0
+  queue.add(item_a_seed1, {timeFromMs(1000), info_a.optRef()});
   // Non-monotonic timestamp (t = 950ms) and sub-interval timestamp (t = 1999ms) stay at seed 1.
-  queue.add(item_b_seed1, {timeFromMs(950), info_b.optRef()});  // seed 1 -> bucket 1
-  queue.add(item_b_seed2, {timeFromMs(2500), info_b.optRef()}); // seed 2 -> bucket 1
+  queue.add(item_b_seed1, {timeFromMs(950), info_b.optRef()});  // seed 1 -> bucket 2
+  queue.add(item_b_seed2, {timeFromMs(2500), info_b.optRef()}); // seed 2 -> bucket 3
 
   // Removing item_b_pre_perturb must remove it from bucket 0 (where it was placed at seed 0)
-  // even though info_b now hashes to bucket 1 under seed 2.
+  // even though info_b now hashes to bucket 3 under seed 2.
   queue.remove(item_b_pre_perturb);
   EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{11, 12, 13}));
 }
 
 TEST(FairQueueTest, ZeroPerturbationIntervalDisablesSeedRotation) {
-  const uint64_t seed0_type =
-      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), /*seed=*/0);
+  constexpr uint32_t num_buckets = 4;
   std::string colliding_a;
   std::string colliding_b;
   std::string other_seed0;
-  for (int i = 0; i < 200; ++i) {
+  for (int i = 0; i < 400; ++i) {
     const std::string candidate = absl::StrCat("flow_", i);
-    const uint64_t b0 = HashUtil::xxHash64(candidate, seed0_type) % 2;
-    if (colliding_a.empty() && b0 == 0) {
+    const auto [b1, b2] = computeTwoChoices(candidate, /*seed=*/0, num_buckets);
+    if (colliding_a.empty() && b1 == 0 && b2 == 1) {
       colliding_a = candidate;
-    } else if (colliding_b.empty() && b0 == 0) {
+    } else if (colliding_b.empty() && b1 == 0 && b2 == 1) {
       colliding_b = candidate;
-    } else if (other_seed0.empty() && b0 == 1) {
+    } else if (other_seed0.empty() && b1 == 2) {
       other_seed0 = candidate;
     }
   }
+  ASSERT_FALSE(colliding_a.empty());
+  ASSERT_FALSE(colliding_b.empty());
+  ASSERT_FALSE(other_seed0.empty());
 
-  FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), /*num_buckets=*/2,
+  FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), num_buckets,
                                  std::chrono::milliseconds(0));
 
   TenantStreamInfo info_a(colliding_a);
   TenantStreamInfo info_b(colliding_b);
   TenantStreamInfo info_other(other_seed0);
 
-  TestQueueItem item_a(1), item_b(2), item_other(3);
-  queue.add(item_a, {timeFromMs(0), info_a.optRef()});
+  TestQueueItem item_a1(1), item_a2(2), item_b(3), item_other(4);
+  queue.add(item_a1, {timeFromMs(0), info_a.optRef()});
+  queue.add(item_a2, {timeFromMs(0), info_a.optRef()});
   queue.add(item_b, {timeFromMs(5000), info_b.optRef()});
   queue.add(item_other, {timeFromMs(5000), info_other.optRef()});
-  // Even after 5000ms, seed remains 0 so colliding_a and colliding_b stay in bucket 0.
-  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 3, 2}));
+  // Even after 5000ms, seed remains 0 so colliding_b still hashes to (0, 1) behind item_a1.
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 2, 4, 3}));
+}
+
+TEST(FairQueueTest, LazyAllocationEmptyQueueOperations) {
+  FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), /*num_buckets=*/1024);
+  EXPECT_TRUE(queue.empty());
+  EXPECT_EQ(queue.size(), 0);
+  EXPECT_FALSE(queue.isOverloaded());
+
+  // Traversal on an unallocated, empty queue is a safe no-op.
+  int visits = 0;
+  queue.forEach([&visits](TestQueueItem&) -> bool {
+    ++visits;
+    return true;
+  });
+  EXPECT_EQ(visits, 0);
+
+  // Enqueueing the first item lazily initializes bucket storage.
+  TenantStreamInfo tenant("tenant");
+  TestQueueItem item(42);
+  queue.add(item, {timeFromMs(0), tenant.optRef()});
+  EXPECT_FALSE(queue.empty());
+  EXPECT_EQ(queue.size(), 1);
+  EXPECT_EQ(queue.pop().id(), 42);
+  EXPECT_TRUE(queue.empty());
+}
+
+TEST(FairQueueTest, TwoChoiceTieBreakerIncrementsCandidateBucket) {
+  constexpr uint32_t num_buckets = 6;
+  FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), num_buckets,
+                                 std::chrono::milliseconds(0));
+
+  const uint64_t type_seed =
+      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), /*seed=*/0);
+
+  std::string tiebreaker_tenant;
+  uint32_t expected_b1 = 0;
+  for (int i = 0; i < 2000; ++i) {
+    const std::string candidate = absl::StrCat("candidate_", i);
+    const uint64_t hash = HashUtil::xxHash64(candidate, type_seed);
+    const uint32_t raw_b1 = static_cast<uint32_t>(hash % num_buckets);
+    const uint32_t raw_b2 = static_cast<uint32_t>((hash >> 32) % num_buckets);
+    if (raw_b1 == raw_b2 && raw_b1 + 1 < num_buckets) {
+      tiebreaker_tenant = candidate;
+      expected_b1 = raw_b1;
+      break;
+    }
+  }
+  ASSERT_FALSE(tiebreaker_tenant.empty());
+
+  const auto [b1, b2] = computeTwoChoices(tiebreaker_tenant, /*seed=*/0, num_buckets);
+  EXPECT_EQ(b1, expected_b1);
+  EXPECT_EQ(b2, expected_b1 + 1);
+
+  TenantStreamInfo tenant_info(tiebreaker_tenant);
+  TestQueueItem item1(1), item2(2), item3(3);
+  // item1 lands in b1 (empty), item2 lands in b2 (empty), item3 lands in b1 (depth 1).
+  queue.add(item1, {timeFromMs(0), tenant_info.optRef()});
+  queue.add(item2, {timeFromMs(0), tenant_info.optRef()});
+  queue.add(item3, {timeFromMs(0), tenant_info.optRef()});
+
+  // Drain order alternates between b1 and b2: item1 (1), item2 (2), item3 (3).
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{1, 2, 3}));
+}
+
+TEST(FairQueueTest, TwoChoiceBucketSelectionAvoidsPrimaryBucketCollisionAndHandlesNonPowerOfTwo) {
+  // Use a non-power-of-two bucket count (6) to also cover the modulo path in hashToBucket().
+  constexpr uint32_t num_buckets = 6;
+  FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), num_buckets,
+                                 std::chrono::milliseconds(0));
+
+  const uint64_t type_seed =
+      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), /*seed=*/0);
+
+  // Find a noisy tenant with choices (0, 1), a colliding tenant with primary bucket 0 but
+  // secondary bucket 2, and a tenant whose raw upper/lower hashes both map to the last bucket (5)
+  // to exercise the wrap-around fallback (bucket2 == bucket1 -> 0).
+  std::string noisy_tenant;
+  std::string colliding_primary_tenant;
+  std::string wraparound_tenant;
+  std::string increment_tiebreaker_tenant;
+  for (int i = 0; i < 2000; ++i) {
+    const std::string candidate = absl::StrCat("candidate_", i);
+    const uint64_t hash = HashUtil::xxHash64(candidate, type_seed);
+    const uint32_t raw_b1 = static_cast<uint32_t>(hash % num_buckets);
+    const uint32_t raw_b2 = static_cast<uint32_t>((hash >> 32) % num_buckets);
+    const auto [b1, b2] = computeTwoChoices(candidate, /*seed=*/0, num_buckets);
+    if (noisy_tenant.empty() && b1 == 0 && b2 == 1) {
+      noisy_tenant = candidate;
+    } else if (colliding_primary_tenant.empty() && b1 == 0 && b2 == 2) {
+      colliding_primary_tenant = candidate;
+    } else if (wraparound_tenant.empty() && raw_b1 == num_buckets - 1 &&
+               raw_b2 == num_buckets - 1) {
+      wraparound_tenant = candidate;
+    } else if (increment_tiebreaker_tenant.empty() && raw_b1 == raw_b2 &&
+               raw_b1 < num_buckets - 1) {
+      increment_tiebreaker_tenant = candidate;
+    }
+  }
+  ASSERT_FALSE(noisy_tenant.empty());
+  ASSERT_FALSE(colliding_primary_tenant.empty());
+  ASSERT_FALSE(wraparound_tenant.empty());
+  ASSERT_FALSE(increment_tiebreaker_tenant.empty());
+
+  TenantStreamInfo noisy_info(noisy_tenant);
+  TenantStreamInfo colliding_info(colliding_primary_tenant);
+  TenantStreamInfo wraparound_info(wraparound_tenant);
+
+  // Enqueue 4 items for noisy_tenant, filling buckets 0 and 1 to depth 2 each.
+  TestQueueItem n1(10), n2(11), n3(12), n4(13);
+  queue.add(n1, {timeFromMs(0), noisy_info.optRef()});
+  queue.add(n2, {timeFromMs(0), noisy_info.optRef()});
+  queue.add(n3, {timeFromMs(0), noisy_info.optRef()});
+  queue.add(n4, {timeFromMs(0), noisy_info.optRef()});
+
+  // Enqueue 1 item for colliding_primary_tenant: its primary bucket (0) has depth 2, so two-choice
+  // selection places it into its empty secondary bucket (2), serving it in the first round-robin
+  // round ahead of n3 and n4.
+  TestQueueItem c1(99);
+  queue.add(c1, {timeFromMs(0), colliding_info.optRef()});
+
+  // Enqueue 2 items for wraparound_tenant: 1st goes to bucket 5, 2nd wraps around to bucket 0.
+  TestQueueItem w1(200), w2(201);
+  queue.add(w1, {timeFromMs(0), wraparound_info.optRef()});
+  queue.add(w2, {timeFromMs(0), wraparound_info.optRef()});
+
+  // Active buckets are [0([n1, n3, w2]), 1([n2, n4]), 2([c1]), 5([w1])].
+  // Round 1 drains: n1 (10), n2 (11), c1 (99), w1 (200).
+  // Round 2 drains: n3 (12), n4 (13).
+  // Round 3 drains: w2 (201).
+  EXPECT_EQ(drainQueueIds(queue), (std::vector<int>{10, 11, 99, 200, 12, 13, 201}));
 }
 
 TEST(FairQueueTest, NoisyNeighborStarvationProtectionHighCardinality) {
   constexpr uint32_t num_buckets = 1024;
   FairQueue<TestQueueItem> queue(makeTenantMetadataKey(), num_buckets);
 
-  const uint64_t type_seed =
-      HashUtil::xxHash64Value(static_cast<uint32_t>(Protobuf::Value::kStringValue), /*seed=*/0);
   const std::string noisy_name = "noisy_tenant";
-  const uint32_t noisy_bucket =
-      static_cast<uint32_t>(HashUtil::xxHash64(noisy_name, type_seed) % num_buckets);
+  const auto [noisy_b1, noisy_b2] = computeTwoChoices(noisy_name, /*seed=*/0, num_buckets);
 
-  // Select 10 well-behaved tenants that hash to distinct buckets different from noisy_bucket.
-  absl::flat_hash_set<uint32_t> used_buckets = {noisy_bucket};
+  // Select 10 well-behaved tenants that hash to distinct primary buckets different from noisy_b1
+  // and noisy_b2.
+  absl::flat_hash_set<uint32_t> used_buckets = {noisy_b1, noisy_b2};
   std::vector<std::unique_ptr<TenantStreamInfo>> wb_tenants;
   for (int i = 0; wb_tenants.size() < 10; ++i) {
     const std::string candidate = absl::StrCat("wb_tenant_", i);
-    const uint32_t bucket =
-        static_cast<uint32_t>(HashUtil::xxHash64(candidate, type_seed) % num_buckets);
-    if (used_buckets.insert(bucket).second) {
+    const auto [b1, b2] = computeTwoChoices(candidate, /*seed=*/0, num_buckets);
+    if (used_buckets.insert(b1).second) {
       wb_tenants.push_back(std::make_unique<TenantStreamInfo>(candidate));
     }
   }
 
-  // Enqueue 100 items for the noisy tenant first.
+  // Enqueue 100 items for the noisy tenant first (50 in noisy_b1, 50 in noisy_b2).
   TenantStreamInfo noisy_info(noisy_name);
   std::vector<TestQueueItem> noisy_items;
   noisy_items.reserve(100);
@@ -537,14 +682,16 @@ TEST(FairQueueTest, NoisyNeighborStarvationProtectionHighCardinality) {
     queue.add(wb_items.back(), {timeFromMs(0), wb_tenants[i]->optRef()});
   }
 
-  // The first pop serves noisy_items[0] (1000), and the next 10 pops immediately serve all 10
-  // well-behaved tenants (1..10) ahead of noisy_items[1..99].
+  // The first 2 pops serve noisy_items[0] (1000) and noisy_items[1] (1001) from the noisy tenant's
+  // two buckets, and the next 10 pops immediately serve all 10 well-behaved tenants (1..10) ahead
+  // of noisy_items[2..99].
   EXPECT_EQ(queue.pop().id(), 1000);
+  EXPECT_EQ(queue.pop().id(), 1001);
   for (int expected_wb_id = 1; expected_wb_id <= 10; ++expected_wb_id) {
     EXPECT_EQ(queue.pop().id(), expected_wb_id);
   }
-  EXPECT_EQ(queue.size(), 99);
-  EXPECT_EQ(queue.peek().id(), 1001);
+  EXPECT_EQ(queue.size(), 98);
+  EXPECT_EQ(queue.peek().id(), 1002);
 }
 
 class FairQueueFactoryTest : public ::testing::Test {

@@ -22,12 +22,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for the Stochastic Fair Queuing (SFQ) pending requests queue policy.
 //
 // This policy isolates tenant or traffic classes waiting in a cluster's upstream connection pool
-// pending stream queue. Each queued request is hashed into one of :ref:`num_buckets
+// pending stream queue. Each queued request is hashed into two candidate buckets out of
+// :ref:`num_buckets
 // <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.num_buckets>`
 // FIFO sub-queues based on the dynamic metadata value at :ref:`class_metadata_key
-// <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.class_metadata_key>`.
-// Active buckets are dequeued in round-robin order so that a burst from a single noisy-neighbor
-// class cannot starve other classes waiting for an upstream connection.
+// <envoy_v3_api_field_extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig.class_metadata_key>`
+// and placed into the shorter bucket (power of two choices). Active buckets are dequeued in
+// round-robin order so that a burst from a single noisy-neighbor class cannot starve other classes
+// waiting for an upstream connection.
 //
 // To prevent sustained hash collisions between two classes, the bucket hash function perturbs its
 // seed at every :ref:`perturbation_interval
@@ -43,7 +45,8 @@ message FairQueuePolicyConfig {
   type.metadata.v3.MetadataKey class_metadata_key = 1 [(validate.rules).message = {required: true}];
 
   // The number of hash buckets used to partition queued requests across classes.
-  // Defaults to 1024 if unset.
+  // Using a power of two (such as the default 1024) allows Envoy to use bitmasking instead of
+  // integer division. Defaults to 1024 if unset.
   google.protobuf.UInt32Value num_buckets = 2 [(validate.rules).uint32 = {gt: 0}];
 
   // The time interval at which the bucket hash function perturbs its seed to break hash collisions
