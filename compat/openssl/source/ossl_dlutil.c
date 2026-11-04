@@ -44,6 +44,18 @@ void ossl_dlopen(int expected_major, int expected_minor) {
     exit(ELIBACC);
   }
 
+  // Another sanity check to confirm that the dynamic loader cannot resolve the
+  // BoringSSL API symbols that we have implemented in the compatibility layer,
+  // such as SSL_read(). If such symbols are visible in the dynamic symbol
+  // table, then the OpenSSL code will get linked against them, when we load it,
+  // which is not what we want! Since there are many ways of achieving this with
+  // various different compile & link options, and such options can easily get
+  // modified or deleted over time, this check acts as a runtime safety net.
+  if (dlsym(RTLD_DEFAULT, "SSL_read") != NULL) {
+    bssl_compat_error("SSL_read() is visible prior to loading OpenSSL\n");
+    exit(ELIBACC);
+  }
+
   char libcrypto_path[PATH_MAX];
   char libssl_path[PATH_MAX];
 
