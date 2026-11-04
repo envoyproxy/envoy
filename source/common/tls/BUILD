@@ -185,7 +185,7 @@ envoy_cc_library(
     # TLS is core functionality.
     visibility = ["//visibility:public"],
     deps = [
-        ":cert_compression_lib",
+        ":cert_decompression_lib",
         ":stats_lib",
         ":utility_lib",
         "//envoy/ssl:context_config_interface",
@@ -233,6 +233,7 @@ envoy_cc_library(
         "server_context_impl.h",
     ],
     deps = [
+        ":cert_compression_lib",
         ":context_lib",
         "//source/common/common:byte_order_lib",
         "//source/common/tls/ocsp:ocsp_lib",
@@ -283,20 +284,36 @@ envoy_cc_library(
     ],
 )
 
+# Certificate compression and decompression, for server contexts.
 envoy_cc_library(
     name = "cert_compression_lib",
     srcs = ["cert_compression.cc"],
     hdrs = ["cert_compression.h"],
     external_deps = ["ssl"],
     deps = [
+        ":cert_decompression_lib",
         "//bazel:zlib",
-        "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:macros",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/synchronization",
-        "@brotli//:brotlidec",
         "@brotli//:brotlienc",
+    ],
+)
+
+# Certificate decompression only, for client contexts. It must not depend on any compressor, so
+# that client-only binaries (e.g. Envoy Mobile) don't link one.
+envoy_cc_library(
+    name = "cert_decompression_lib",
+    srcs = ["cert_decompression.cc"],
+    hdrs = ["cert_decompression.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//bazel:zlib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "@brotli//:brotlidec",
     ],
 )

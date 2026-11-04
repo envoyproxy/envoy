@@ -26,7 +26,6 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/utility.h"
-#include "source/common/tls/cert_compression.h"
 #include "source/common/tls/cert_validator/factory.h"
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
@@ -71,7 +70,8 @@ ContextImpl::ContextImpl(
     Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
     const std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>>& tls_certificates,
     Server::Configuration::CommonFactoryContext& factory_context,
-    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status)
+    Ssl::ContextAdditionalInitFunc additional_init, absl::Status& creation_status,
+    CertCompressionRegistrar register_cert_compression)
     : scope_(scope), stats_(generateSslStats(scope)), factory_context_(factory_context),
       tls_max_version_(config.maxProtocolVersion()),
       builtin_stat_names_(getTlsBuiltinStatNames(factory_context)),
@@ -151,11 +151,11 @@ ContextImpl::ContextImpl(
     }
 
     // Register certificate compression algorithms to reduce TLS handshake size (RFC 8879).
-    // Priority: brotli > zlib (brotli generally provides best compression for certs).
-    if (Runtime::runtimeFeatureEnabled(
+    // The registrar comes from the subclass: clients register decompression only.
+    if (register_cert_compression != nullptr &&
+        Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.tls_certificate_compression_brotli")) {
-      CertCompression::registerBrotli(ctx.ssl_ctx_.get());
-      CertCompression::registerZlib(ctx.ssl_ctx_.get());
+      register_cert_compression(ctx.ssl_ctx_.get());
     }
   }
 

@@ -12,7 +12,10 @@
 #include "source/common/secret/sds_api.h"
 #include "source/common/ssl/ssl.h"
 #include "source/common/stats/isolated_store_impl.h"
+#include "source/common/tls/cert_compression.h"
+#include "source/common/tls/cert_decompression.h"
 #include "source/common/tls/cert_validator/default_validator.h"
+#include "source/common/tls/client_context_impl.h"
 #include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_impl.h"
 #include "source/common/tls/server_context_config_impl.h"
@@ -39,10 +42,14 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/status_utility.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/bytestring.h"
 #include "openssl/crypto.h"
+#include "openssl/ssl3.h"
+#include "openssl/tls1.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
@@ -2069,7 +2076,7 @@ public:
                   Server::Configuration::ServerFactoryContext& factory_context,
                   absl::Status& creation_status)
       : ContextImpl(scope, config, config.tlsCertificates(), factory_context, nullptr,
-                    creation_status),
+                    creation_status, /*register_cert_compression=*/nullptr),
         pool_(scope.symbolTable()), fallback_(pool_.add("fallback")) {}
 
   void incCounter(absl::string_view name, absl::string_view value) {
@@ -2461,6 +2468,203 @@ TEST_F(SslContextImplTest, ClientCertTlsParamsWarns) {
                       client_ctx = *manager_.createSslClientContext(*store_.rootScope(), *cfg));
   auto cleanup = cleanUpHelper(client_ctx);
 }
+
+#ifndef ENVOY_SSL_OPENSSL
+namespace {
+
+struct ContextCertWireStats {
+  std::vector<uint16_t> sent_compressed_algs;
+  std::vector<uint16_t> received_compressed_algs;
+  int sent_uncompressed_certs = 0;
+  int received_uncompressed_certs = 0;
+};
+
+void recordContextCertMessages(int is_write, int /*version*/, int content_type, const void* buf,
+                               size_t len, SSL* /*ssl*/, void* arg) {
+  if (content_type != SSL3_RT_HANDSHAKE) {
+    return;
+  }
+  CBS cbs;
+  CBS_init(&cbs, static_cast<const uint8_t*>(buf), len);
+  uint8_t msg_type = 0;
+  CBS body;
+  if (!CBS_get_u8(&cbs, &msg_type) || !CBS_get_u24_length_prefixed(&cbs, &body)) {
+    return;
+  }
+  auto* stats = static_cast<ContextCertWireStats*>(arg);
+  if (msg_type == SSL3_MT_COMPRESSED_CERTIFICATE) {
+    uint16_t alg_id = 0;
+    if (CBS_get_u16(&body, &alg_id)) {
+      if (is_write) {
+        stats->sent_compressed_algs.push_back(alg_id);
+      } else {
+        stats->received_compressed_algs.push_back(alg_id);
+      }
+    }
+  } else if (msg_type == SSL3_MT_CERTIFICATE) {
+    if (is_write) {
+      stats->sent_uncompressed_certs++;
+    } else {
+      stats->received_uncompressed_certs++;
+    }
+  }
+}
+
+bool completeBioPairHandshake(SSL* client, SSL* server) {
+  SSL_set_connect_state(client);
+  SSL_set_accept_state(server);
+
+  BIO* client_bio = nullptr;
+  BIO* server_bio = nullptr;
+  RELEASE_ASSERT(BIO_new_bio_pair(&client_bio, 1 << 17, &server_bio, 1 << 17) == 1, "bio_pair");
+  SSL_set0_rbio(client, client_bio);
+  BIO_up_ref(client_bio);
+  SSL_set0_wbio(client, client_bio);
+  SSL_set0_rbio(server, server_bio);
+  BIO_up_ref(server_bio);
+  SSL_set0_wbio(server, server_bio);
+
+  for (int i = 0; i < 100; i++) {
+    SSL_do_handshake(client);
+    SSL_do_handshake(server);
+    if (SSL_is_init_finished(client) && SSL_is_init_finished(server)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bssl::UniquePtr<SSL_CTX> makeTls13TestServerCtx(bool register_brotli, bool register_zlib) {
+  bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+  RELEASE_ASSERT(SSL_CTX_set_min_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
+  RELEASE_ASSERT(SSL_CTX_set_max_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
+  const std::string cert_path =
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem");
+  const std::string key_path =
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem");
+  RELEASE_ASSERT(SSL_CTX_use_certificate_file(ctx.get(), cert_path.c_str(), SSL_FILETYPE_PEM) == 1,
+                 "");
+  RELEASE_ASSERT(SSL_CTX_use_PrivateKey_file(ctx.get(), key_path.c_str(), SSL_FILETYPE_PEM) == 1,
+                 "");
+  if (register_brotli) {
+    CertCompression::registerBrotli(ctx.get());
+  }
+  if (register_zlib) {
+    CertCompression::registerZlib(ctx.get());
+  }
+  return ctx;
+}
+
+} // namespace
+
+// ClientContextImpl registers certificate decompression only (compress == nullptr), not full
+// certificate compression, so client SSL_CTX instances decompress brotli/zlib server certificates
+// without referencing or registering the compression callbacks.
+TEST_F(SslContextImplTest, ClientContextRegistersDecompressionOnly) {
+  const std::string client_yaml = R"EOF(
+  max_session_keys: 0
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_3
+      tls_maximum_protocol_version: TLSv1_3
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/unittest_key.pem"
+  )EOF";
+
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(client_yaml), tls_context);
+  auto cfg = *ClientContextConfigImpl::create(tls_context, factory_context_);
+  Envoy::Ssl::ClientContextSharedPtr client_ctx =
+      *manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  auto cleanup = cleanUpHelper(client_ctx);
+  SSL_CTX* client_ssl_ctx = client_ctx->getTlsContext().ssl_ctx_.get();
+  ASSERT_NE(client_ssl_ctx, nullptr);
+
+  // 1. Connecting to a brotli+zlib server negotiates brotli CompressedCertificate (brotli > zlib).
+  {
+    bssl::UniquePtr<SSL_CTX> server_ctx =
+        makeTls13TestServerCtx(/*register_brotli=*/true, /*register_zlib=*/true);
+    bssl::UniquePtr<SSL> client(SSL_new(client_ssl_ctx));
+    SSL_set_verify(client.get(), SSL_VERIFY_NONE, nullptr);
+    bssl::UniquePtr<SSL> server(SSL_new(server_ctx.get()));
+    ContextCertWireStats client_stats;
+    SSL_set_msg_callback(client.get(), recordContextCertMessages);
+    SSL_set_msg_callback_arg(client.get(), &client_stats);
+
+    ASSERT_TRUE(completeBioPairHandshake(client.get(), server.get()));
+    EXPECT_EQ(client_stats.received_compressed_algs,
+              std::vector<uint16_t>{TLSEXT_cert_compression_brotli});
+    EXPECT_EQ(client_stats.received_uncompressed_certs, 0);
+  }
+
+  // 2. Connecting to a zlib-only server negotiates zlib CompressedCertificate.
+  {
+    bssl::UniquePtr<SSL_CTX> server_ctx =
+        makeTls13TestServerCtx(/*register_brotli=*/false, /*register_zlib=*/true);
+    bssl::UniquePtr<SSL> client(SSL_new(client_ssl_ctx));
+    SSL_set_verify(client.get(), SSL_VERIFY_NONE, nullptr);
+    bssl::UniquePtr<SSL> server(SSL_new(server_ctx.get()));
+    ContextCertWireStats client_stats;
+    SSL_set_msg_callback(client.get(), recordContextCertMessages);
+    SSL_set_msg_callback_arg(client.get(), &client_stats);
+
+    ASSERT_TRUE(completeBioPairHandshake(client.get(), server.get()));
+    EXPECT_EQ(client_stats.received_compressed_algs,
+              std::vector<uint16_t>{TLSEXT_cert_compression_zlib});
+    EXPECT_EQ(client_stats.received_uncompressed_certs, 0);
+  }
+
+  // 3. Driving ClientContextImpl's SSL_CTX as an accepting TLS 1.3 endpoint against a peer client
+  // that advertises [brotli, zlib] decompression sends an uncompressed Certificate message rather
+  // than CompressedCertificate, proving compress == nullptr on ClientContextImpl's SSL_CTX.
+  {
+    bssl::UniquePtr<SSL_CTX> peer_client_ctx(SSL_CTX_new(TLS_method()));
+    ASSERT_EQ(1, SSL_CTX_set_min_proto_version(peer_client_ctx.get(), TLS1_3_VERSION));
+    ASSERT_EQ(1, SSL_CTX_set_max_proto_version(peer_client_ctx.get(), TLS1_3_VERSION));
+    SSL_CTX_set_verify(peer_client_ctx.get(), SSL_VERIFY_NONE, nullptr);
+    CertDecompression::registerBrotli(peer_client_ctx.get());
+    CertDecompression::registerZlib(peer_client_ctx.get());
+
+    bssl::UniquePtr<SSL> peer_client(SSL_new(peer_client_ctx.get()));
+    bssl::UniquePtr<SSL> accepting_from_client_ctx(SSL_new(client_ssl_ctx));
+    ContextCertWireStats accepting_stats;
+    SSL_set_msg_callback(accepting_from_client_ctx.get(), recordContextCertMessages);
+    SSL_set_msg_callback_arg(accepting_from_client_ctx.get(), &accepting_stats);
+
+    ASSERT_TRUE(completeBioPairHandshake(peer_client.get(), accepting_from_client_ctx.get()));
+    EXPECT_TRUE(accepting_stats.sent_compressed_algs.empty());
+    EXPECT_EQ(accepting_stats.sent_uncompressed_certs, 1);
+  }
+
+  // 4. With the runtime guard disabled, ClientContextImpl does not advertise cert decompression.
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "false"}});
+  Envoy::Ssl::ClientContextSharedPtr disabled_client_ctx =
+      *manager_.createSslClientContext(*store_.rootScope(), *cfg);
+  auto disabled_cleanup = cleanUpHelper(disabled_client_ctx);
+  {
+    bssl::UniquePtr<SSL_CTX> server_ctx =
+        makeTls13TestServerCtx(/*register_brotli=*/true, /*register_zlib=*/true);
+    bssl::UniquePtr<SSL> client(SSL_new(disabled_client_ctx->getTlsContext().ssl_ctx_.get()));
+    SSL_set_verify(client.get(), SSL_VERIFY_NONE, nullptr);
+    bssl::UniquePtr<SSL> server(SSL_new(server_ctx.get()));
+    ContextCertWireStats client_stats;
+    SSL_set_msg_callback(client.get(), recordContextCertMessages);
+    SSL_set_msg_callback_arg(client.get(), &client_stats);
+
+    ASSERT_TRUE(completeBioPairHandshake(client.get(), server.get()));
+    EXPECT_TRUE(client_stats.received_compressed_algs.empty());
+    EXPECT_EQ(client_stats.received_uncompressed_certs, 1);
+  }
+}
+#endif // ENVOY_SSL_OPENSSL
 
 } // namespace Tls
 } // namespace TransportSockets

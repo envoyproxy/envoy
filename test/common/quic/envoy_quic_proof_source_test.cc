@@ -21,6 +21,9 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/bytestring.h"
+#include "openssl/ssl3.h"
+#include "openssl/tls1.h"
 #include "quiche/quic/core/crypto/certificate_view.h"
 #include "quiche/quic/test_tools/test_certificates.h"
 
@@ -395,6 +398,165 @@ TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxDoesNotInstallKeylogCallbackWhenFlag
   proof_source_.OnNewSslCtx(ssl_ctx.get());
   EXPECT_EQ(nullptr, SSL_CTX_get_keylog_callback(ssl_ctx.get()));
 }
+
+#ifndef ENVOY_SSL_OPENSSL
+namespace {
+
+struct QuicCertWireStats {
+  std::vector<uint16_t> sent_compressed_algs;
+  std::vector<uint16_t> received_compressed_algs;
+  int sent_uncompressed_certs = 0;
+  int received_uncompressed_certs = 0;
+};
+
+void recordQuicCertMessages(int is_write, int /*version*/, int content_type, const void* buf,
+                            size_t len, SSL* /*ssl*/, void* arg) {
+  if (content_type != SSL3_RT_HANDSHAKE) {
+    return;
+  }
+  CBS cbs;
+  CBS_init(&cbs, static_cast<const uint8_t*>(buf), len);
+  uint8_t msg_type = 0;
+  CBS body;
+  if (!CBS_get_u8(&cbs, &msg_type) || !CBS_get_u24_length_prefixed(&cbs, &body)) {
+    return;
+  }
+  auto* stats = static_cast<QuicCertWireStats*>(arg);
+  if (msg_type == SSL3_MT_COMPRESSED_CERTIFICATE) {
+    uint16_t alg_id = 0;
+    if (CBS_get_u16(&body, &alg_id)) {
+      if (is_write) {
+        stats->sent_compressed_algs.push_back(alg_id);
+      } else {
+        stats->received_compressed_algs.push_back(alg_id);
+      }
+    }
+  } else if (msg_type == SSL3_MT_CERTIFICATE) {
+    if (is_write) {
+      stats->sent_uncompressed_certs++;
+    } else {
+      stats->received_uncompressed_certs++;
+    }
+  }
+}
+
+void loadQuicTestCertAndKey(SSL_CTX* ctx) {
+  bssl::UniquePtr<BIO> cert_bio(BIO_new_mem_buf(quic::test::kTestCertificatePem, -1));
+  bssl::UniquePtr<X509> cert(PEM_read_bio_X509(cert_bio.get(), nullptr, nullptr, nullptr));
+  RELEASE_ASSERT(cert != nullptr, "");
+  RELEASE_ASSERT(SSL_CTX_use_certificate(ctx, cert.get()) == 1, "");
+
+  bssl::UniquePtr<BIO> key_bio(BIO_new_mem_buf(quic::test::kTestCertificatePrivateKeyPem, -1));
+  bssl::UniquePtr<EVP_PKEY> key(PEM_read_bio_PrivateKey(key_bio.get(), nullptr, nullptr, nullptr));
+  RELEASE_ASSERT(key != nullptr, "");
+  RELEASE_ASSERT(SSL_CTX_use_PrivateKey(ctx, key.get()) == 1, "");
+}
+
+bool completeQuicTls13Handshake(SSL* client, SSL* server) {
+  SSL_set_connect_state(client);
+  SSL_set_accept_state(server);
+
+  BIO* client_bio = nullptr;
+  BIO* server_bio = nullptr;
+  RELEASE_ASSERT(BIO_new_bio_pair(&client_bio, 1 << 17, &server_bio, 1 << 17) == 1, "bio_pair");
+  SSL_set0_rbio(client, client_bio);
+  BIO_up_ref(client_bio);
+  SSL_set0_wbio(client, client_bio);
+  SSL_set0_rbio(server, server_bio);
+  BIO_up_ref(server_bio);
+  SSL_set0_wbio(server, server_bio);
+
+  for (int i = 0; i < 100; i++) {
+    SSL_do_handshake(client);
+    SSL_do_handshake(server);
+    if (SSL_is_init_finished(client) && SSL_is_init_finished(server)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+} // namespace
+
+// QUIC server contexts (OnNewSslCtx) compress their certificate; QUIC client contexts
+// (registerClientCertDecompression) only decompress.
+TEST_F(EnvoyQuicProofSourceTest, OnNewSslCtxRegistersCertCompressionClientDecompressionOnly) {
+  auto make_tls13_ctx = []() {
+    bssl::UniquePtr<SSL_CTX> ctx(SSL_CTX_new(TLS_method()));
+    RELEASE_ASSERT(SSL_CTX_set_min_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
+    RELEASE_ASSERT(SSL_CTX_set_max_proto_version(ctx.get(), TLS1_3_VERSION) == 1, "");
+    SSL_CTX_set_verify(ctx.get(), SSL_VERIFY_NONE, nullptr);
+    return ctx;
+  };
+
+  // With brotli disabled, QUIC client contexts decompress zlib while QUIC server contexts compress
+  // with zlib.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_certificate_compression_brotli", "false"}});
+
+    bssl::UniquePtr<SSL_CTX> client_ctx = make_tls13_ctx();
+    registerClientCertDecompression(client_ctx.get());
+
+    bssl::UniquePtr<SSL_CTX> server_ctx = make_tls13_ctx();
+    loadQuicTestCertAndKey(server_ctx.get());
+    proof_source_.OnNewSslCtx(server_ctx.get());
+
+    bssl::UniquePtr<SSL> client(SSL_new(client_ctx.get()));
+    bssl::UniquePtr<SSL> server(SSL_new(server_ctx.get()));
+    QuicCertWireStats client_stats;
+    SSL_set_msg_callback(client.get(), recordQuicCertMessages);
+    SSL_set_msg_callback_arg(client.get(), &client_stats);
+
+    ASSERT_TRUE(completeQuicTls13Handshake(client.get(), server.get()));
+    EXPECT_EQ(client_stats.received_compressed_algs,
+              std::vector<uint16_t>{TLSEXT_cert_compression_zlib});
+    EXPECT_EQ(client_stats.received_uncompressed_certs, 0);
+  }
+
+  // With brotli enabled, QUIC client contexts negotiate brotli decompression (over zlib), but
+  // leave compress == nullptr so acting as a server sends an uncompressed Certificate message.
+  {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
+
+    bssl::UniquePtr<SSL_CTX> client_ctx = make_tls13_ctx();
+    loadQuicTestCertAndKey(client_ctx.get());
+    registerClientCertDecompression(client_ctx.get());
+
+    bssl::UniquePtr<SSL_CTX> server_ctx = make_tls13_ctx();
+    loadQuicTestCertAndKey(server_ctx.get());
+    proof_source_.OnNewSslCtx(server_ctx.get());
+
+    // Client decompresses brotli server cert.
+    bssl::UniquePtr<SSL> client(SSL_new(client_ctx.get()));
+    bssl::UniquePtr<SSL> server(SSL_new(server_ctx.get()));
+    QuicCertWireStats client_stats;
+    SSL_set_msg_callback(client.get(), recordQuicCertMessages);
+    SSL_set_msg_callback_arg(client.get(), &client_stats);
+
+    ASSERT_TRUE(completeQuicTls13Handshake(client.get(), server.get()));
+    EXPECT_EQ(client_stats.received_compressed_algs,
+              std::vector<uint16_t>{TLSEXT_cert_compression_brotli});
+    EXPECT_EQ(client_stats.received_uncompressed_certs, 0);
+
+    // Driving client_ctx as an accepting server against a brotli+zlib client sends an
+    // uncompressed Certificate message, proving registerClientCertDecompression registers no
+    // compressors.
+    bssl::UniquePtr<SSL> peer_client(SSL_new(client_ctx.get()));
+    bssl::UniquePtr<SSL> accepting_from_client_ctx(SSL_new(client_ctx.get()));
+    QuicCertWireStats accepting_stats;
+    SSL_set_msg_callback(accepting_from_client_ctx.get(), recordQuicCertMessages);
+    SSL_set_msg_callback_arg(accepting_from_client_ctx.get(), &accepting_stats);
+
+    ASSERT_TRUE(completeQuicTls13Handshake(peer_client.get(), accepting_from_client_ctx.get()));
+    EXPECT_TRUE(accepting_stats.sent_compressed_algs.empty());
+    EXPECT_EQ(accepting_stats.sent_uncompressed_certs, 1);
+  }
+}
+#endif // ENVOY_SSL_OPENSSL
 
 } // namespace Quic
 } // namespace Envoy

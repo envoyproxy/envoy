@@ -10,7 +10,6 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
-#include "brotli/decode.h"
 #include "brotli/encode.h"
 #include "openssl/tls1.h"
 
@@ -117,14 +116,14 @@ std::optional<std::string> doBrotliCompress(const uint8_t* in, size_t in_len) {
 
 void CertCompression::registerBrotli(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_brotli,
-                                              compressBrotli, decompressBrotli);
+                                              compressBrotli, CertDecompression::decompressBrotli);
   ASSERT(ret == 1);
   ensureCompressedCertCache(ssl_ctx);
 }
 
 void CertCompression::registerZlib(SSL_CTX* ssl_ctx) {
   auto ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib, compressZlib,
-                                              decompressZlib);
+                                              CertDecompression::decompressZlib);
   ASSERT(ret == 1);
   ensureCompressedCertCache(ssl_ctx);
 }
@@ -136,40 +135,6 @@ int CertCompression::compressBrotli(SSL* ssl, CBB* out, const uint8_t* in, size_
     ENVOY_LOG(trace, "Cert brotli compression successful");
   }
   return rc;
-}
-
-int CertCompression::decompressBrotli(SSL*, CRYPTO_BUFFER** out, size_t uncompressed_len,
-                                      const uint8_t* in, size_t in_len) {
-  uint8_t* out_buf = nullptr;
-  bssl::UniquePtr<CRYPTO_BUFFER> decompressed_data(CRYPTO_BUFFER_alloc(&out_buf, uncompressed_len));
-  if (!decompressed_data) {
-    IS_ENVOY_BUG("Failed to allocate CRYPTO_BUFFER for brotli decompression");
-    return FAILURE;
-  }
-
-  size_t decoded_size = uncompressed_len;
-  BrotliDecoderResult result = BrotliDecoderDecompress(in_len, in, &decoded_size, out_buf);
-
-  if (result != BROTLI_DECODER_RESULT_SUCCESS) {
-    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                       "Cert brotli decompression failure, possibly caused by invalid "
-                       "compressed cert from peer: result={}, decoded_size={}, uncompressed_len={}",
-                       static_cast<int>(result), decoded_size, uncompressed_len);
-    return FAILURE;
-  }
-
-  if (decoded_size != uncompressed_len) {
-    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                       "Brotli decompression length did not match peer provided uncompressed "
-                       "length, caused by either invalid peer handshake data or decompression "
-                       "error: decoded_size={}, uncompressed_len={}",
-                       decoded_size, uncompressed_len);
-    return FAILURE;
-  }
-
-  ENVOY_LOG(trace, "Cert brotli decompression successful");
-  *out = decompressed_data.release();
-  return SUCCESS;
 }
 
 namespace {
@@ -229,56 +194,6 @@ int CertCompression::compressZlib(SSL* ssl, CBB* out, const uint8_t* in, size_t 
     ENVOY_LOG(trace, "Cert zlib compression successful");
   }
   return rc;
-}
-
-int CertCompression::decompressZlib(SSL*, CRYPTO_BUFFER** out, size_t uncompressed_len,
-                                    const uint8_t* in, size_t in_len) {
-  z_stream z = {};
-  // The inflateInit macro from zlib.h contains an old-style cast, so we need to suppress the
-  // warning for this call.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-  int rv = inflateInit(&z);
-#pragma GCC diagnostic pop
-  if (rv != Z_OK) {
-    IS_ENVOY_BUG(fmt::format("Cert decompression failure in inflateInit: {}", rv));
-    return FAILURE;
-  }
-
-  ScopedZStream deleter(z, inflateEnd);
-
-  z.next_in = in;
-  z.avail_in = in_len;
-  uint8_t* out_buf = nullptr;
-  bssl::UniquePtr<CRYPTO_BUFFER> decompressed_data(CRYPTO_BUFFER_alloc(&out_buf, uncompressed_len));
-  if (!decompressed_data) {
-    IS_ENVOY_BUG("Failed to allocate CRYPTO_BUFFER for zlib decompression");
-    return FAILURE;
-  }
-  z.next_out = out_buf;
-  z.avail_out = uncompressed_len;
-
-  rv = inflate(&z, Z_FINISH);
-  if (rv != Z_STREAM_END) {
-    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                       "Cert zlib decompression failure, possibly caused by invalid "
-                       "compressed cert from peer: {}, z.total_out {}, uncompressed_len {}",
-                       rv, z.total_out, uncompressed_len);
-    return FAILURE;
-  }
-
-  if (z.total_out != uncompressed_len) {
-    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                       "Zlib decompression length did not match peer provided uncompressed "
-                       "length, caused by either invalid peer handshake data or decompression "
-                       "error: z.total_out={}, uncompressed_len={}",
-                       z.total_out, uncompressed_len);
-    return FAILURE;
-  }
-
-  ENVOY_LOG(trace, "Cert zlib decompression successful");
-  *out = decompressed_data.release();
-  return SUCCESS;
 }
 #endif // ENVOY_SSL_OPENSSL
 

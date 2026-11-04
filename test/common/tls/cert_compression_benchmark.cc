@@ -4,6 +4,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/tls/cert_compression.h"
+#include "source/common/tls/cert_decompression.h"
 
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
@@ -442,27 +443,27 @@ BENCHMARK_CAPTURE(benchmarkCompressCached, zlib_ecdsaP256, CertCompression::comp
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, brotli_rsa2048, CertCompression::compressBrotli,
-                  CertCompression::decompressBrotli, rsa2048Chain)
+                  CertDecompression::decompressBrotli, rsa2048Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, brotli_rsa4096, CertCompression::compressBrotli,
-                  CertCompression::decompressBrotli, rsa4096Chain)
+                  CertDecompression::decompressBrotli, rsa4096Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, brotli_ecdsaP256, CertCompression::compressBrotli,
-                  CertCompression::decompressBrotli, ecdsaP256Chain)
+                  CertDecompression::decompressBrotli, ecdsaP256Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, zlib_rsa2048, CertCompression::compressZlib,
-                  CertCompression::decompressZlib, rsa2048Chain)
+                  CertDecompression::decompressZlib, rsa2048Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, zlib_rsa4096, CertCompression::compressZlib,
-                  CertCompression::decompressZlib, rsa4096Chain)
+                  CertDecompression::decompressZlib, rsa4096Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 BENCHMARK_CAPTURE(benchmarkDecompress, zlib_ecdsaP256, CertCompression::compressZlib,
-                  CertCompression::decompressZlib, ecdsaP256Chain)
+                  CertDecompression::decompressZlib, ecdsaP256Chain)
     ->DenseRange(1, 3, 1)
     ->Unit(::benchmark::kMicrosecond);
 

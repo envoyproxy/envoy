@@ -15,12 +15,14 @@
 #include "test/mocks/network/connection.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/ssl.h"
+#include "openssl/tls1.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -168,6 +170,45 @@ TEST_F(HandshakerFactoryTest, SetSpecificSslCtxOption) {
   // not set this option.
   EXPECT_TRUE(SSL_CTX_get_options(ssl_ctx) & SSL_OP_NO_TLSv1);
 }
+
+#ifndef ENVOY_SSL_OPENSSL
+// Envoy registers TLS certificate (de)compression before invoking the handshaker's `sslctxCb`, so
+// the callback sees Envoy's registration and can't make Envoy's own registration fail.
+TEST_F(HandshakerFactoryTest, CertCompressionRegisteredBeforeSslCtxCb) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.tls_certificate_compression_brotli", "true"}});
+
+  int brotli_ret = -1;
+  int zlib_ret = -1;
+  CustomProcessObjectForTest custom_process_object_for_test(/*cb=*/[&](SSL_CTX* ssl_ctx) {
+    auto decompress = [](SSL*, CRYPTO_BUFFER**, size_t, const uint8_t*, size_t) -> int {
+      return 0;
+    };
+    brotli_ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_brotli,
+                                                  /*compress=*/nullptr, decompress);
+    zlib_ret = SSL_CTX_add_cert_compression_alg(ssl_ctx, TLSEXT_cert_compression_zlib,
+                                                /*compress=*/nullptr, decompress);
+  });
+  auto process_context_impl = std::make_unique<Envoy::ProcessContextImpl>(
+      static_cast<Envoy::ProcessObject&>(custom_process_object_for_test));
+
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  EXPECT_CALL(mock_factory_ctx.server_context_.api_, processContext())
+      .WillRepeatedly(Return(ProcessContextOptRef(*process_context_impl)));
+
+  auto socket_factory = *Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
+      /*config=*/
+      *Extensions::TransportSockets::Tls::ClientContextConfigImpl::create(tls_context_,
+                                                                          mock_factory_ctx),
+      *context_manager_, *stats_store_.rootScope());
+
+  // BoringSSL rejects a second registration of the same algorithm, so 0 shows Envoy registered
+  // both algorithms before the callback ran.
+  EXPECT_EQ(brotli_ret, 0);
+  EXPECT_EQ(zlib_ret, 0);
+}
+#endif // ENVOY_SSL_OPENSSL
 
 TEST_F(HandshakerFactoryTest, HandshakerContextProvidesObjectsFromParentContext) {
   CustomProcessObjectForTest custom_process_object_for_test(
