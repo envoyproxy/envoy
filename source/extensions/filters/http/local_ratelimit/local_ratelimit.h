@@ -232,11 +232,8 @@ private:
   const FilterConfig* used_config_{};
   std::shared_ptr<const Filters::Common::LocalRateLimit::TokenBucketContext> token_bucket_context_;
   RateLimit::XRateLimitOption x_ratelimit_option_{};
-  // Set only when embedded rate limits have apply_on_stream_done entries.
-  const Http::RequestHeaderMap* request_headers_{};
-  const Http::ResponseHeaderMap* response_headers_{};
-  // Retain the route and per-filter config through completion, including route-cache changes.
-  Router::RouteConstSharedPtr route_;
+  // Whether decodeHeaders() ran with the filter enabled. Completion accounting respects it.
+  bool rate_limit_enabled_{false};
 
   VhRateLimitOptions vh_rate_limits_;
 };

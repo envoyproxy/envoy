@@ -182,7 +182,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     used_config_ = route_config; // Overwrite the used configuration.
   }
 
-  if (!used_config_->enabled()) {
+  rate_limit_enabled_ = used_config_->enabled();
+  if (!rate_limit_enabled_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -194,11 +195,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       used_config_->populateDescriptors(headers, /*response_headers=*/nullptr,
                                         decoder_callbacks_->streamInfo(), descriptors,
                                         /*on_stream_done=*/false);
-      if (used_config_->hasStreamDoneActions()) {
-        // Keep the request headers and the route that owns per-route config for onDestroy().
-        request_headers_ = &headers;
-        route_ = decoder_callbacks_->routeSharedPtr();
-      }
     } else {
       populateDescriptors(descriptors, headers);
     }
@@ -258,8 +254,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  // Stream-owned headers outlive onDestroy(), as in the global rate limit filter.
-  response_headers_ = &headers;
   // We can never assume the decodeHeaders() was called before encodeHeaders().
   if (!token_bucket_context_) {
     return Http::FilterHeadersStatus::Continue;
@@ -281,12 +275,19 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
 }
 
 void Filter::onDestroy() {
-  // Only set when the used config's embedded rate limits have apply_on_stream_done entries.
-  if (request_headers_ == nullptr) {
+  // Completion accounting needs local descriptors and embedded apply_on_stream_done rate limits.
+  if (!rate_limit_enabled_ || !used_config_->hasDescriptors() ||
+      !used_config_->hasStreamDoneActions()) {
     return;
   }
+  // Read the headers from the stream rather than keeping references to them.
+  const auto request_headers = decoder_callbacks_->requestHeaders();
+  if (!request_headers.has_value()) {
+    return;
+  }
+  const auto response_headers = decoder_callbacks_->responseHeaders();
   std::vector<RateLimit::Descriptor> descriptors;
-  used_config_->populateDescriptors(*request_headers_, response_headers_,
+  used_config_->populateDescriptors(*request_headers, response_headers.ptr(),
                                     decoder_callbacks_->streamInfo(), descriptors,
                                     /*on_stream_done=*/true);
   if (descriptors.empty()) {

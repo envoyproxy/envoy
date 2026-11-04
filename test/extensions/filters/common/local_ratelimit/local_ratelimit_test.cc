@@ -735,27 +735,69 @@ public:
   MOCK_METHOD(MonotonicTime, monotonicTime, (), (override));
 };
 
-TEST(RateLimitTokenBucketTest, PartialConsumptionDoesNotRefundAfterInterleavedDrain) {
+TEST(RateLimitTokenBucketTest, OverdraftChargesFullCostBeyondRemainingTokens) {
+  testing::StrictMock<MockRateLimitTimeSource> time_source;
+  const MonotonicTime start(std::chrono::seconds(10));
+  testing::InSequence sequence;
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  RateLimitTokenBucket bucket(3, 1, std::chrono::milliseconds(1000), time_source, false);
+
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_FALSE(bucket.consume(1.0, 5));
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_TRUE(bucket.consume(1.0, 5, /*overdraft=*/true));
+
+  // Two tokens are owed, so the bucket stays empty until three seconds of refill.
+  EXPECT_CALL(time_source, monotonicTime()).WillRepeatedly(Return(start + std::chrono::seconds(2)));
+  EXPECT_EQ(0, bucket.remainingTokens());
+  EXPECT_FALSE(bucket.consume());
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start + std::chrono::seconds(3)));
+  EXPECT_TRUE(bucket.consume());
+}
+
+TEST(RateLimitTokenBucketTest, OverdraftDebtIsCappedAtMaxTokens) {
+  testing::StrictMock<MockRateLimitTimeSource> time_source;
+  const MonotonicTime start(std::chrono::seconds(10));
+  testing::InSequence sequence;
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  RateLimitTokenBucket bucket(2, 1, std::chrono::milliseconds(1000), time_source, false);
+
+  // A cost far beyond the bucket overdraws it by only max_tokens.
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_TRUE(bucket.consume(1.0, 1000, /*overdraft=*/true));
+  // At the cap, further overdrafts add no debt.
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start));
+  EXPECT_FALSE(bucket.consume(1.0, 1, /*overdraft=*/true));
+
+  // Two tokens are owed, so the bucket recovers after three seconds instead of ~1000.
+  EXPECT_CALL(time_source, monotonicTime()).WillRepeatedly(Return(start + std::chrono::seconds(2)));
+  EXPECT_EQ(0, bucket.remainingTokens());
+  EXPECT_FALSE(bucket.consume());
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(start + std::chrono::seconds(3)));
+  EXPECT_TRUE(bucket.consume());
+}
+
+TEST(RateLimitTokenBucketTest, OverdraftKeepsFullCostAfterInterleavedDrain) {
   testing::StrictMock<MockRateLimitTimeSource> time_source;
   const MonotonicTime earlier(std::chrono::seconds(10));
   const MonotonicTime later = earlier + std::chrono::seconds(1);
   testing::InSequence sequence;
   EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(earlier));
-  RateLimitTokenBucket bucket(1, 1, std::chrono::milliseconds(1000), time_source, false);
+  RateLimitTokenBucket bucket(2, 1, std::chrono::milliseconds(1000), time_source, false);
 
   // Drain at a later time before returning this caller's earlier time sample.
   EXPECT_CALL(time_source, monotonicTime()).WillOnce(testing::Invoke([&]() {
-    EXPECT_TRUE(bucket.consume());
+    EXPECT_TRUE(bucket.consume(1.0, 2));
     return earlier;
   }));
   EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(later));
-  EXPECT_FALSE(bucket.consume(1.0, 1, /*allow_partial=*/true));
+  EXPECT_TRUE(bucket.consume(1.0, 1, /*overdraft=*/true));
 
-  // The delayed consume must preserve the later timestamp and keep the bucket empty.
-  EXPECT_CALL(time_source, monotonicTime()).WillRepeatedly(Return(later));
+  // The delayed charge is not lost or refunded: the bucket owes one token beyond the drain.
+  EXPECT_CALL(time_source, monotonicTime()).WillRepeatedly(Return(later + std::chrono::seconds(1)));
   EXPECT_EQ(0, bucket.remainingTokens());
   EXPECT_FALSE(bucket.consume());
-  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(later + std::chrono::seconds(1)));
+  EXPECT_CALL(time_source, monotonicTime()).WillOnce(Return(later + std::chrono::seconds(2)));
   EXPECT_TRUE(bucket.consume());
 }
 
@@ -772,7 +814,7 @@ TEST_F(CompletedUsageTest, CompletedUsageConsumesAllMatchingBuckets) {
   descriptors[0].hits_addend_ = 3;
   descriptors[1].hits_addend_ = 3;
   rate_limiter_->consumeDescriptors(descriptors);
-  // Over-budget usage drains the first bucket without skipping the second.
+  // Over-budget usage overdraws the first bucket without skipping the second.
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
   auto result = rate_limiter_->requestAllowed(descriptor2_);
   EXPECT_TRUE(result.allowed);

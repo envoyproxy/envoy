@@ -88,7 +88,7 @@ RateLimitTokenBucket::RateLimitTokenBucket(uint64_t max_tokens, uint64_t tokens_
       fill_interval_(fill_interval), shadow_mode_(shadow_mode),
       preserve_one_request_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.local_ratelimit_local_cluster_preserve_one_request")) {}
-bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume, bool allow_partial) {
+bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume, bool overdraft) {
   ASSERT(!(factor <= 0.0 || factor > 1.0));
   const double max_tokens = token_bucket_.maxTokens();
   const double tokens = to_consume / factor;
@@ -99,11 +99,13 @@ bool RateLimitTokenBucket::consume(double factor, uint64_t to_consume, bool allo
   const double threshold = preserve_one_request_ && max_tokens > 0 && to_consume <= max_tokens
                                ? std::min(tokens, max_tokens)
                                : tokens;
-  auto cb = [tokens, threshold, allow_partial](double total) {
-    if (allow_partial) {
-      return std::max(0.0, std::min(total, tokens));
+  auto cb = [tokens, threshold, overdraft, max_tokens](double total) {
+    if (overdraft) {
+      // Borrow future tokens when the bucket is short, but by at most max_tokens, so a single
+      // large cost can't block the bucket indefinitely.
+      return std::max(0.0, std::min(tokens, total + max_tokens));
     }
-    return total < threshold ? 0.0 : tokens;
+    return total >= threshold ? tokens : 0.0;
   };
   return token_bucket_.consume(cb) != 0.0;
 }
@@ -216,7 +218,7 @@ void LocalRateLimiterImpl::consumeDescriptors(
     if (descriptor.is_negative_hits_ && descriptor.hits_addend_.has_value()) {
       bucket->refill(descriptor.hits_addend_.value());
     } else {
-      bucket->consume(share_factor, descriptor.hits_addend_.value_or(1), /*allow_partial=*/true);
+      bucket->consume(share_factor, descriptor.hits_addend_.value_or(1), /*overdraft=*/true);
     }
   }
 }

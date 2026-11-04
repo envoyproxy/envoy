@@ -186,7 +186,9 @@ The first action enforces the budget and consumes one token on the request path.
 charges additional usage reported in the ``x-usage`` response header when the stream completes.
 Both actions must match a configured local descriptor. Completion actions update every matching
 descriptor bucket without blocking the completed request. Usage exceeding the remaining budget
-drains the bucket to zero. The default token bucket is consumed only on the request path.
+overdraws the bucket: it borrows future tokens, and later requests are rejected until the refill
+repays the debt. The debt is capped at the bucket's ``max_tokens``, and usage beyond the cap is
+dropped. The default token bucket is consumed only on the request path.
 Missing or empty formatted usage is skipped quietly. Invalid nonempty usage does not generate a
 descriptor and logs a warning. Negative hits addends refund tokens using the existing local
 descriptor behavior.
