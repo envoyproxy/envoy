@@ -139,7 +139,7 @@ void GrpcClientImpl::subscribeTrafficRoutingAssistant(const std::string& type,
               "Unable to establish new stream to tra server", parent_span);
     return;
   }
-  LinkedList::moveIntoList(std::move(callback), stream_callbacks_);
+  stream_callbacks_.push(std::move(callback));
 }
 
 void GrpcClientImpl::sendRequest(
@@ -155,7 +155,7 @@ void GrpcClientImpl::sendRequest(
                           Http::AsyncClient::RequestOptions().setTimeout(timeout_).setParentContext(
                               Http::AsyncClient::ParentContext{&stream_info}));
   if (callback->request_ != nullptr) {
-    LinkedList::moveIntoList(std::move(callback), request_callbacks_);
+    request_callbacks_.push(std::move(callback));
   }
 
   // Already invoke `onFailure` asynchronously, no need to call it explicitly here.

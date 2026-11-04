@@ -500,7 +500,7 @@ TEST_F(FilterTest, ActiveStreamRouteEntry) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
   EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
   EXPECT_EQ(active_stream->routeEntry().ptr(), route_matcher_->route_entry_.get());
 }
 
@@ -570,7 +570,7 @@ TEST_F(FilterTest, ActiveStreamAddFilters) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_EQ(1, active_stream->decoderFiltersForTest().size());
   EXPECT_EQ(0, active_stream->encoderFiltersForTest().size());
@@ -612,7 +612,7 @@ TEST_F(FilterTest, ActiveStreamAddFiltersOrder) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_EQ(3, active_stream->decoderFiltersForTest().size());
   EXPECT_EQ(3, active_stream->encoderFiltersForTest().size());
@@ -638,7 +638,7 @@ TEST_F(FilterTest, ActiveStreamSingleFrameFiltersContinueDecoding) {
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   // Decoding is stopped when `decodeHeaderFrame` of `mock_stream_filter_0` is called.
   // Next filter is `mock_1`.
@@ -676,7 +676,7 @@ TEST_F(FilterTest, ActiveStreamSingleFrameFiltersContinueDecodingAfterSendLocalR
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   // Decoding is stopped when `decodeHeaderFrame` of `mock_stream_filter_0` is called.
   // Next filter is `mock_1`.
@@ -720,7 +720,7 @@ TEST_F(FilterTest, FilterSendLocalReplyButRespondReturnNull) {
 
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(*server_codec_, respond(_, _, _)).WillOnce(Return(ByMove(nullptr)));
   EXPECT_CALL(*mock_stream_filter_1, decodeHeaderFrame(_)).WillOnce([&](const RequestHeaderFrame&) {
@@ -750,7 +750,7 @@ TEST_F(FilterTest, ActiveStreamSingleFrameFiltersContinueEncoding) {
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
 
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(*mock_encoder_filter_2, encodeHeaderFrame(_))
       .WillOnce(Return(HeaderFilterStatus::StopIteration));
@@ -800,7 +800,7 @@ TEST_F(FilterTest, ActiveStreamSingleFrameFiltersContinueEncodingButResponseEnco
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
 
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(*mock_stream_filter_2, encodeHeaderFrame(_))
       .WillOnce(Return(HeaderFilterStatus::StopIteration));
@@ -844,7 +844,7 @@ TEST_F(FilterTest, ActiveStreamSingleFrameFiltersContinueEncodingAfterSendLocalR
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
 
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(*mock_stream_filter_2, encodeHeaderFrame(_))
       .WillOnce(Return(HeaderFilterStatus::StopIteration));
@@ -904,7 +904,7 @@ TEST_F(FilterTest, ActiveStreamMultipleFrameFiltersContinueDecoding) {
   auto request_frame_2 = std::make_unique<FakeStreamCodecFactory::FakeCommonFrame>();
 
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   // Decoding is stopped when `decodeHeaderFrame` of `mock_stream_filter_0` is called.
   // Next filter is `mock_1`.
@@ -970,7 +970,7 @@ TEST_F(FilterTest, ActiveStreamMultipleFrameFiltersContinueEncoding) {
   auto request = std::make_unique<FakeStreamCodecFactory::FakeRequest>();
 
   filter_->onDecodingSuccess(std::move(request));
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   auto response = std::make_unique<FakeStreamCodecFactory::FakeResponse>();
   response->stream_frame_flags_ = FrameFlags(0, FrameFlags::FLAG_EMPTY);
@@ -1070,7 +1070,7 @@ TEST_F(FilterTest, UpstreamResponseAfterPreviousUpstreamResponse) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
   EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
   // never notified of a drain: no drain close.
@@ -1113,7 +1113,7 @@ TEST_F(FilterTest, UpstreamResponseAfterPreviousLocalReply) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
   EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
   // never notified of a drain: no drain close.
@@ -1157,7 +1157,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousLocalReply) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
   EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
   // never notified of a drain: no drain close.
@@ -1215,7 +1215,7 @@ TEST_F(FilterTest, SendLocalReplyAfterPreviousUpstreamResponseHeaderIsSent) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
   EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   // Connection-level drain is enabled, so the DrainDecision is never polled and the connection is
   // never notified of a drain: no drain close.
@@ -1536,7 +1536,7 @@ TEST_F(FilterTest, ActiveStreamCompleteDirectly) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
   EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   active_stream->completeStream();
 
@@ -1559,7 +1559,7 @@ TEST_F(FilterTest, ActiveStreamCompleteDirectlyFromFilter) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_total_.value(), 1);
   EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   active_stream->decoderFiltersForTest()[0]->completeDirectly();
 
@@ -1598,7 +1598,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormally) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
   EXPECT_EQ(filter_config_->stats().downstream_rq_reset_.value(), 0);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
@@ -1683,7 +1683,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithMultipleFrames) {
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
   EXPECT_EQ(0, filter_->frameHandlersForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(*factory_context_.server_factory_context_.access_log_manager_.file_,
               write("host-value /path-value method-value protocol-value request-value "
@@ -1745,7 +1745,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainClose) {
   EXPECT_EQ(filter_config_->stats().downstream_rq_active_.value(), 1);
   EXPECT_EQ(filter_config_->stats().downstream_rq_error_.value(), 0);
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
@@ -1797,7 +1797,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithDrainCloseViaConnectionDrain) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
   EXPECT_CALL(*server_codec_, encode(_, _)).WillOnce([&](const StreamFrame&, EncodingContext&) {
@@ -1830,7 +1830,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithStreamDrainClose) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferString("test"), false));
 
@@ -1888,7 +1888,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracing) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   absl::flat_hash_map<std::string, std::string> final_tags;
   EXPECT_CALL(*span, setTag(_, _))
@@ -1955,7 +1955,7 @@ TEST_F(FilterTest, NewStreamAndReplyNormallyWithTracingAndSamplingToTrue) {
   filter_->onDecodingSuccess(std::move(request));
   EXPECT_EQ(1, filter_->activeStreamsForTest().size());
 
-  auto active_stream = filter_->activeStreamsForTest().begin()->get();
+  auto active_stream = filter_->activeStreamsForTest().front();
 
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   EXPECT_CALL(*span, finishSpan());
