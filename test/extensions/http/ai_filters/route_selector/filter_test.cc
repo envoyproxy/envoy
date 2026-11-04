@@ -218,6 +218,7 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   const std::vector<std::pair<std::string, std::string>> stale_headers = {
       {"authorization", "Bearer stale-client-token"},
       {"x-goog-api-key", "stale-google-key"},
+      {"x-api-key", "stale-anthropic-key"},
   };
 
   // Attempt 1: OpenAI Chat Completions with binding and api_key.
@@ -234,6 +235,7 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
       request_headers_.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       "Bearer sk-openai-1");
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
 
   // Attempt 2: OpenAI Responses without binding or api_key clears BindingResponse and removes
   // authentication headers so client credentials are not leaked.
@@ -249,8 +251,10 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
   EXPECT_EQ(request_headers_.getHostValue(), "api.openai.com");
   EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
 
-  // Attempt 3: Anthropic Messages sets Authorization and binding, and strips x-goog-api-key.
+  // Attempt 3: Anthropic Messages sets Authorization and binding, and strips x-goog-api-key and
+  // x-api-key.
   run(3, stale_headers);
   EXPECT_FALSE(reply_code_.has_value());
   EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::AnthropicMessages);
@@ -263,8 +267,9 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
       request_headers_.get(Http::CustomHeaders::get().Authorization)[0]->value().getStringView(),
       "Bearer sk-anthropic");
   EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-goog-api-key")).empty());
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
 
-  // Attempt 4: Gemini Generate Content sets x-goog-api-key and strips Authorization.
+  // Attempt 4: Gemini Generate Content sets x-goog-api-key and strips Authorization and x-api-key.
   run(4, stale_headers);
   EXPECT_FALSE(reply_code_.has_value());
   EXPECT_EQ(responseProtocolObject()->protocol(), LLMProtocol::GeminiGenerateContent);
@@ -278,6 +283,7 @@ TEST_F(RouteSelectorFilterTest, SelectsRoutesAndUpdatesHeadersAndFilterStateAcro
       request_headers_.get(Http::LowerCaseString("x-goog-api-key"))[0]->value().getStringView(),
       "gemini-key-123");
   EXPECT_TRUE(request_headers_.get(Http::CustomHeaders::get().Authorization).empty());
+  EXPECT_TRUE(request_headers_.get(Http::LowerCaseString("x-api-key")).empty());
 
   EXPECT_EQ(counterValue("success"), 4);
   EXPECT_EQ(counterValue("invalid_route_data"), 0);

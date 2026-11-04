@@ -1,4 +1,7 @@
+#include <iterator>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
@@ -10,6 +13,10 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_replace.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/strip.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 
@@ -33,6 +40,41 @@ constexpr absl::string_view ClaudeSonnetUnaryResponse = R"({
   "stop_reason": "end_turn", "stop_sequence": null,
   "usage": {"input_tokens": 12, "output_tokens": 6}
 })";
+
+constexpr std::pair<absl::string_view, absl::string_view> ClaudeStreamEvents[] = {
+    {"message_start",
+     R"({"type":"message_start","message":{"id":"msg_01","type":"message",)"
+     R"("role":"assistant","model":"claude-haiku-5-5","content":[],)"
+     R"("stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":12,"output_tokens":1}}})"},
+    {"content_block_start",
+     R"({"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}})"},
+    {"ping", R"({"type":"ping"})"},
+    {"content_block_delta",
+     R"({"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}})"},
+    {"content_block_delta", R"({"type":"content_block_delta","index":0,)"
+                            R"("delta":{"type":"text_delta","text":" from Claude."}})"},
+    {"content_block_stop", R"({"type":"content_block_stop","index":0})"},
+    {"message_delta", R"({"type":"message_delta","delta":{"stop_reason":"end_turn",)"
+                      R"("stop_sequence":null},"usage":{"output_tokens":6}})"},
+    {"message_stop", R"({"type":"message_stop"})"},
+};
+
+std::vector<std::pair<std::string, nlohmann::json>> sseEvents(absl::string_view body) {
+  std::vector<std::pair<std::string, nlohmann::json>> events;
+  const std::string text = absl::StrReplaceAll(body, {{"\r\n", "\n"}});
+  for (absl::string_view block : absl::StrSplit(text, "\n\n", absl::SkipEmpty())) {
+    std::pair<std::string, nlohmann::json> event;
+    for (absl::string_view line : absl::StrSplit(block, '\n')) {
+      if (absl::ConsumePrefix(&line, "event: ")) {
+        event.first = std::string(line);
+      } else if (absl::ConsumePrefix(&line, "data: ")) {
+        event.second = nlohmann::json::parse(line);
+      }
+    }
+    events.push_back(std::move(event));
+  }
+  return events;
+}
 
 constexpr absl::string_view DownstreamAiProtocolManagerConfig = R"EOF(
 name: envoy.filters.http.ai_protocol_manager
@@ -153,6 +195,20 @@ public:
           std::ignore =
               (*route->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
                   .PackFrom(per_route);
+
+          auto* gemini_route = virtual_host->add_routes();
+          gemini_route->mutable_match()->set_prefix("/v1beta/models/");
+          gemini_route->mutable_route()->set_cluster("anthropic_cluster");
+          *gemini_route->mutable_route()->mutable_retry_policy() = *retry_policy;
+
+          envoy::extensions::filters::http::ai_protocol_manager::v3::AiProtocolManagerPerRoute
+              gemini_per_route;
+          gemini_per_route.mutable_request()->set_llm_protocol(
+              envoy::type::ai::v3::GEMINI_GENERATE_CONTENT);
+          std::ignore =
+              (*gemini_route
+                    ->mutable_typed_per_filter_config())["envoy.filters.http.ai_protocol_manager"]
+                  .PackFrom(gemini_per_route);
 
           hcm.clear_http_filters();
           TestUtility::loadFromYaml(std::string(DownstreamAiProtocolManagerConfig),
@@ -295,6 +351,74 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
   EXPECT_EQ(reply["usage"]["completion_tokens"], 6);
 
   EXPECT_EQ(2, test_server_->counter("cluster.anthropic_cluster.upstream_rq_total")->value());
+}
+
+TEST_P(ModelRouterIntegrationTest, GeminiSseStreamGenerateContentToAnthropicMessages) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const nlohmann::json request_body = {
+      {"contents", {{{"role", "user"}, {"parts", {{{"text", Question}}}}}}},
+      {"generationConfig", {{"maxOutputTokens", 1024}}},
+  };
+  IntegrationStreamDecoderPtr response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/v1beta/models/send_me_to_anthropic:streamGenerateContent?alt=sse"},
+          {":scheme", "http"},
+          {":authority", "ai-gateway.example.com"},
+          {"x-goog-api-key", "client-google-key"},
+          {"content-type", "application/json"}},
+      request_body.dump());
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  const Http::RequestHeaderMap& headers = upstream_request_->headers();
+  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
+  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
+  EXPECT_THAT(headers,
+              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
+  EXPECT_THAT(headers, ContainsHeader("anthropic-version", "2023-06-01"));
+  EXPECT_TRUE(headers.get(Http::LowerCaseString("x-goog-api-key")).empty());
+  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
+            (nlohmann::json{
+                {"model", "claude-haiku-5-5"},
+                {"max_tokens", 1024},
+                {"stream", true},
+                {"messages", {{{"role", "user"}, {"content", Question}}}},
+            }));
+
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
+      false);
+  for (size_t i = 0; i < std::size(ClaudeStreamEvents); ++i) {
+    const auto& [name, data] = ClaudeStreamEvents[i];
+    upstream_request_->encodeData(absl::StrCat("event: ", name, "\ndata: ", data, "\n\n"),
+                                  i + 1 == std::size(ClaudeStreamEvents));
+  }
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_THAT(response->headers(), Http::HttpStatusIs("200")) << response->body();
+  EXPECT_EQ(response->headers().getContentTypeValue(), "text/event-stream");
+  EXPECT_THAT(response->body(), testing::Not(testing::HasSubstr("[DONE]")));
+
+  std::string text;
+  nlohmann::json last;
+  for (const auto& [name, data] : sseEvents(response->body())) {
+    EXPECT_EQ(name, "");
+    EXPECT_EQ(data["modelVersion"], "send_me_to_anthropic");
+    for (const nlohmann::json& part : data["candidates"][0]["content"]["parts"]) {
+      text += part["text"].get<std::string>();
+    }
+    last = data;
+  }
+  EXPECT_EQ(text, "Hello from Claude.");
+  EXPECT_EQ(last["candidates"][0]["finishReason"], "STOP");
+  EXPECT_EQ(last["usageMetadata"]["candidatesTokenCount"], 6);
+  EXPECT_EQ(1, test_server_->counter("cluster.anthropic_cluster.upstream_rq_total")->value());
 }
 
 } // namespace

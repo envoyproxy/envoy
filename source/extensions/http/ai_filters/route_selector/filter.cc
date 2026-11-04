@@ -16,6 +16,10 @@ const Http::LowerCaseString& googleApiKeyHeader() {
   CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-goog-api-key");
 }
 
+const Http::LowerCaseString& apiKeyHeader() {
+  CONSTRUCT_ON_FIRST_USE(Http::LowerCaseString, "x-api-key");
+}
+
 } // namespace
 
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
@@ -68,6 +72,7 @@ RouteSelectorFilter::decodeSync(HttpFilters::AiProtocolManager::AiRequest&,
   // Cleanup headers we manage in this filter.
   context_.request_headers.remove(Http::CustomHeaders::get().Authorization);
   context_.request_headers.remove(googleApiKeyHeader());
+  context_.request_headers.remove(apiKeyHeader());
 
   if (!route.api_key.empty()) {
     switch (route.llm_protocol) {
