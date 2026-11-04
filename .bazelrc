@@ -315,6 +315,8 @@ build:macos-asan --dynamic_mode=off
 # Base MSAN config
 build:msan --action_env=ENVOY_MSAN=1
 build:msan --config=sanitizer
+# msan runs tests at 4-5x the unsanitized time; scale the per-size timeouts as tsan does.
+build:msan --test_timeout=120,600,1500,4800
 build:msan --build_tag_filters=-no_san
 build:msan --test_tag_filters=-no_san
 build:msan --define ENVOY_CONFIG_MSAN=1

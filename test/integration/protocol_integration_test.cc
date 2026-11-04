@@ -3133,8 +3133,12 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestHeadersAccepted) {
 }
 
 TEST_P(ProtocolIntegrationTest, ManyLargeRequestHeadersAccepted) {
-  // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
-  testLargeRequestHeaders(100, 70, 8192, 100, TestUtility::DefaultTimeout);
+  // Send 70 headers each of size 20 kB (1.4 MB in total) with limit 1600 kB and 100 headers:
+  // many headers whose total is far above the 60 kB default and close to the configured limit.
+  // The maximum size and count are covered by VeryLargeRequestHeadersAccepted and
+  // ManyRequestHeadersAccepted. This used to send 7 MB against the 8 MB maximum, which made it
+  // the slowest case in quic_protocol_integration_test (10-20s under the sanitizers).
+  testLargeRequestHeaders(20, 70, 1600, 100, TestUtility::DefaultTimeout);
 }
 
 namespace {
@@ -3235,8 +3239,9 @@ TEST_P(ProtocolIntegrationTest, VeryLargeRequestHeadersAcceptedWithIncreasedPerH
 
 // Test a single header of the maximum allowed size.
 TEST_P(ProtocolIntegrationTest, ManyLargeResponseHeadersAccepted) {
-  // Send 70 headers each of size 100 kB with limit 8192 kB (8 MB) and 100 headers.
-  testLargeResponseHeaders(100, 70, 8192, 100, TestUtility::DefaultTimeout);
+  // Send 70 headers each of size 20 kB (1.4 MB in total) with limit 1600 kB and 100 headers, as
+  // for ManyLargeRequestHeadersAccepted above.
+  testLargeResponseHeaders(20, 70, 1600, 100, TestUtility::DefaultTimeout);
 }
 
 // Test a single header of the maximum allowed size.
