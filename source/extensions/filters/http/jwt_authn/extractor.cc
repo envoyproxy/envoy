@@ -174,6 +174,7 @@ private:
     absl::string_view token;
     absl::string_view rest;
   };
+
   // @return the first token in value_str, or nullopt if the required_prefix was not found in it.
   static std::optional<HeaderToken> extractHeaderToken(absl::string_view required_prefix,
                                                         absl::string_view value_str);
