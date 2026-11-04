@@ -57,6 +57,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/integration/filters:refresh_route_cluster_filter_lib",
         "//test/test_common:utility_lib",
         "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/extensions/load_balancing_policies/subset/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/dynamic_modules/v3:pkg_cc_proto",
     ],
 )

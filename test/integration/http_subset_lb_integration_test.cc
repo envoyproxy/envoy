@@ -3,6 +3,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -56,14 +57,14 @@ public:
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
+    // Create subsets based on type value of the "type" metadata.
+    subset_config_.add_subset_selectors()->add_keys(type_key_);
+
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
 
-      cluster->set_lb_policy(GetParam());
-
-      // Create subsets based on type value of the "type" metadata.
-      cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
+      ConfigHelper::setSubsetLbPolicy(*cluster, subset_config_, child_lb_policy_);
 
       cluster->clear_load_assignment();
 
@@ -197,18 +198,17 @@ public:
   void runSpilloverTest(std::vector<EndpointConfig> endpoint_config,
                         uint32_t overprovisioning_factor, bool weighted_priority_health,
                         uint32_t expected_host_count) {
+    // We specifically don't want to use a load balancing policy that does consistent
+    // hashing because we want our requests to be load balanced across all hosts.
+    child_lb_policy_ = envoy::config::cluster::v3::Cluster::ROUND_ROBIN;
+    subset_config_.set_fallback_policy(
+        envoy::extensions::load_balancing_policies::subset::v3::Subset::ANY_ENDPOINT);
+
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       ASSERT(endpoint_config.size() == 4);
 
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
-
-      // We specifically don't want to use a load balancing policy that does consistent
-      // hashing because we want our requests to be load balanced across all hosts.
-      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
-
-      cluster->mutable_lb_subset_config()->set_fallback_policy(
-          envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT);
 
       cluster->clear_load_assignment();
 
@@ -267,6 +267,8 @@ public:
 
   const uint32_t num_hosts_{4};
   const bool is_hash_lb_;
+  envoy::config::cluster::v3::Cluster::LbPolicy child_lb_policy_{GetParam()};
+  envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config_;
 
   const std::string hash_header_{"x-hash"};
   const std::string host_type_header_{"x-host-type"};
@@ -298,14 +300,13 @@ TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancer) {
 // Tests subset-compatible load balancer policy without metadata does not crash on initialization
 // with single_host_per_subset set to be true.
 TEST_P(HttpSubsetLbIntegrationTest, SubsetLoadBalancerSingleHostPerSubsetNoMetadata) {
+  // Set single_host_per_subset to be true. This will avoid function
+  // SubsetLoadBalancer::rebuildSingle() bailout early. Thus exercise the no metadata logic.
+  subset_config_.mutable_subset_selectors(0)->set_single_host_per_subset(true);
+
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
-
-    // Set single_host_per_subset to be true. This will avoid function
-    // SubsetLoadBalancer::rebuildSingle() bailout early. Thus exercise the no metadata logic.
-    auto* subset_selector = cluster->mutable_lb_subset_config()->mutable_subset_selectors(0);
-    subset_selector->set_single_host_per_subset(true);
 
     // Clear the metadata for each host
     auto* load_assignment = cluster->mutable_load_assignment();

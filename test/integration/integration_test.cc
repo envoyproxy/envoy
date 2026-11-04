@@ -2852,10 +2852,12 @@ TEST_P(IntegrationTest, SetRouteToDelegatingRouteWithClusterOverride) {
     std::string cluster_yaml = R"EOF(
             name: cluster_override
             connect_timeout: 1.250s
-            type: ORIGINAL_DST
+            cluster_type:
+              name: envoy.cluster.original_dst
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.clusters.original_dst.v3.OriginalDstCluster
+                use_http_header: true
             lb_policy: CLUSTER_PROVIDED
-            original_dst_lb_config:
-              use_http_header: true
           )EOF";
     envoy::config::cluster::v3::Cluster cluster_config;
     TestUtility::loadFromYaml(cluster_yaml, cluster_config);

@@ -93,7 +93,7 @@ The least request load balancer uses different algorithms depending on whether h
 same or different weights.
 
 * *all weights equal*: An O(1) algorithm which selects N random available hosts as specified in the
-  :ref:`configuration <envoy_v3_api_msg_config.cluster.v3.Cluster.LeastRequestLbConfig>` (2 by default) and picks the
+  :ref:`configuration <envoy_v3_api_msg_extensions.load_balancing_policies.least_request.v3.LeastRequest>` (2 by default) and picks the
   host which has the fewest active requests (`Mitzenmacher et al.
   <https://www.eecs.harvard.edu/~michaelm/postscripts/handbook2001.pdf>`_ has shown that this
   approach is nearly as good as an O(N) full scan). This is also known as P2C (power of two
@@ -109,7 +109,7 @@ same or different weights.
 
   ``weight = load_balancing_weight / (active_requests + 1)^active_request_bias``.
 
-  :ref:`active_request_bias<envoy_v3_api_field_config.cluster.v3.Cluster.LeastRequestLbConfig.active_request_bias>`
+  :ref:`active_request_bias<envoy_v3_api_field_extensions.load_balancing_policies.least_request.v3.LeastRequest.active_request_bias>`
   can be configured via runtime and defaults to 1.0. It must be greater than or equal to 0.0.
 
   The larger the active request bias is, the more aggressively active requests will lower the
@@ -144,7 +144,7 @@ in the ``"envoy.lb"`` :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpo
       envoy.lb:
         hash_key: "YOUR HASH KEY"
 
-This will override :ref:`use_hostname_for_hashing <envoy_v3_api_field_config.cluster.v3.cluster.commonlbconfig.consistent_hashing_lb_config>`.
+This will override :ref:`use_hostname_for_hashing <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig.use_hostname_for_hashing>`.
 
 Each host is hashed and placed on the ring some number of times proportional to its weight. For
 example, if host A has a weight of 1 and host B has a weight of 2, then there might be three entries
@@ -153,8 +153,8 @@ partitioning of the circle, however, since the computed hashes could be coincide
 one another; so it is necessary to multiply the number of hashes per host---for example inserting
 100 entries on the ring for host A and 200 entries for host B---to better approximate the desired
 distribution. Best practice is to explicitly set
-:ref:`minimum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.minimum_ring_size>` and
-:ref:`maximum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.maximum_ring_size>`, and monitor
+:ref:`minimum_ring_size<envoy_v3_api_field_extensions.load_balancing_policies.ring_hash.v3.RingHash.minimum_ring_size>` and
+:ref:`maximum_ring_size<envoy_v3_api_field_extensions.load_balancing_policies.ring_hash.v3.RingHash.maximum_ring_size>`, and monitor
 the :ref:`min_hashes_per_host and max_hashes_per_host
 gauges<config_cluster_manager_cluster_stats_ring_hash_lb>` to ensure good distribution. With the
 ring partitioned appropriately, the addition or removal of one host from a set of N hosts will
@@ -185,7 +185,7 @@ semantic name of your host in a Kubernetes StatefulSet), then you can specify it
       envoy.lb:
         hash_key: "YOUR HASH KEY"
 
-This will override :ref:`use_hostname_for_hashing <envoy_v3_api_field_config.cluster.v3.cluster.commonlbconfig.consistent_hashing_lb_config>`.
+This will override :ref:`use_hostname_for_hashing <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig.use_hostname_for_hashing>`.
 
 The table construction algorithm places each host in the table some number of times proportional
 to its weight, until the table is completely filled. For example, if host A has a weight of 1 and
@@ -203,7 +203,7 @@ table lookup build times as well as host selection times (approximately 10x and 
 when using a large ring size of 256K entries). While Maglev aims for minimal disruption, it is not
 as stable as ring hash when upstream hosts change. More keys will move position when hosts are removed
 (simulations show approximately double the keys will move). The amount of disruption can be minimized
-by increasing the :ref:`table_size<envoy_v3_api_field_config.cluster.v3.Cluster.MaglevLbConfig.table_size>`.
+by increasing the :ref:`table_size<envoy_v3_api_field_extensions.load_balancing_policies.maglev.v3.Maglev.table_size>`.
 With that said, for many applications
 including Redis, Maglev is very likely a superior drop in replacement for ring hash. The advanced reader can use
 :repo:`this benchmark </test/common/upstream/load_balancer_benchmark.cc>` to compare ring hash

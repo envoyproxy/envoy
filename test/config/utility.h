@@ -17,6 +17,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/udp/udp_proxy/v3/udp_proxy.pb.h"
+#include "envoy/extensions/load_balancing_policies/subset/v3/subset.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
@@ -251,6 +252,18 @@ public:
   static envoy::config::cluster::v3::Cluster buildH1ClusterWithHighCircuitBreakersLimits(
       const std::string& name, int port, const std::string& address,
       const envoy::config::cluster::v3::Cluster::LbPolicy lb_policy);
+
+  // Builds the load_balancing_policy matching an LbPolicy enum value.
+  static envoy::config::cluster::v3::LoadBalancingPolicy
+  buildLbPolicy(envoy::config::cluster::v3::Cluster::LbPolicy lb_policy);
+
+  // Replaces the cluster's load_balancing_policy with the subset load balancer, using
+  // child_lb_policy for endpoint picking within the chosen subset.
+  static void
+  setSubsetLbPolicy(envoy::config::cluster::v3::Cluster& cluster,
+                    envoy::extensions::load_balancing_policies::subset::v3::Subset subset_config,
+                    envoy::config::cluster::v3::Cluster::LbPolicy child_lb_policy =
+                        envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
   // ADS configurations
   static envoy::config::cluster::v3::Cluster

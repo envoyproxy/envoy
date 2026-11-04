@@ -2740,9 +2740,14 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
       name: name
       connect_timeout: 0.25s
       type: EDS
-      lb_policy: ROUND_ROBIN
-      common_lb_config:
-        locality_weighted_lb_config: {}
+      load_balancing_policy:
+        policies:
+        - typed_extension_config:
+            name: envoy.load_balancing_policies.round_robin
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin
+              locality_lb_config:
+                locality_weighted_lb_config: {}
       eds_cluster_config:
         service_name: fare
         eds_config:

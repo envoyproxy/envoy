@@ -16,8 +16,9 @@ namespace Upstream {
 DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase& input) {
   try {
     TestUtility::validate(input);
-  } catch (const ProtoValidationException& e) {
-    ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
+  } catch (const EnvoyException& e) {
+    // Also rejects deprecated fields when deprecated features are disabled at compile time.
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
   }
 

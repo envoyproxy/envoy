@@ -13,7 +13,7 @@ not be used with subsets because the upstream hosts are not known in advance. Su
 with zone aware routing, but be aware that the use of subsets may easily violate the minimum hosts
 condition described above.
 
-If subsets are :ref:`configured <envoy_v3_api_field_config.cluster.v3.Cluster.lb_subset_config>` and a route
+If subsets are :ref:`configured <envoy_v3_api_msg_extensions.load_balancing_policies.subset.v3.Subset>` and a route
 specifies no metadata or no subset matching the metadata exists, the subset load balancer initiates
 its fallback policy. The default policy is ``NO_FALLBACK``, in which case the request fails as if
 the cluster had no hosts. Conversely, the ``ANY_ENDPOINT`` fallback policy load balances across all
@@ -38,7 +38,7 @@ Subsets can be configured with only a single host in each subset, which can be u
 similar to :ref:`Maglev <arch_overview_load_balancing_types_maglev>` or
 :ref:`ring hash <arch_overview_load_balancing_types_ring_hash>`, such as load balancing based on a cookie,
 but when it is important to select the same host even after new hosts are added to the cluster. Endpoint
-configuration changes may use less CPU if :ref:`single_host_per_subset <envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.single_host_per_subset>`
+configuration changes may use less CPU if :ref:`single_host_per_subset <envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.single_host_per_subset>`
 is enabled.
 
 Host metadata is only supported when hosts are defined using
@@ -82,18 +82,28 @@ The cluster may enable subset load balancing like this:
       path: '.../eds.conf'
   connect_timeout:
     seconds: 10
-  lb_policy: LEAST_REQUEST
-  lb_subset_config:
-    fallback_policy: DEFAULT_SUBSET
-    default_subset:
-      stage: prod
-    subset_selectors:
-    - keys:
-      - v
-      - stage
-    - keys:
-      - stage
-      fallback_policy: NO_FALLBACK
+  load_balancing_policy:
+    policies:
+    - typed_extension_config:
+        name: envoy.load_balancing_policies.subset
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.subset.v3.Subset
+          fallback_policy: DEFAULT_SUBSET
+          default_subset:
+            stage: prod
+          subset_selectors:
+          - keys:
+            - v
+            - stage
+          - keys:
+            - stage
+            fallback_policy: NO_FALLBACK
+          subset_lb_policy:
+            policies:
+            - typed_extension_config:
+                name: envoy.load_balancing_policies.least_request
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.least_request.v3.LeastRequest
 
 The following table describes some routes and the result of their application to the
 cluster. Typically the match criteria would be used with routes matching specific aspects of the

@@ -125,20 +125,37 @@ Given this CDS `envoy::config::cluster::v3::Cluster`:
 ``` json
 {
   "name": "c1",
-  "lb_policy": "ROUND_ROBIN",
-  "lb_subset_config": {
-    "fallback_policy": "DEFAULT_SUBSET",
-    "default_subset": {
-      "stage": "prod",
-      "version": "1.0",
-      "type": "std"
-    },
-    "subset_selectors": [
-      { "keys": [ "stage", "type" ] },
-      { "keys": [ "stage", "version" ] },
-      { "keys": [ "version" ] },
-      { "keys": [ "xlarge", "version" ] },
-    ]
+  "load_balancing_policy": {
+    "policies": [{
+      "typed_extension_config": {
+        "name": "envoy.load_balancing_policies.subset",
+        "typed_config": {
+          "@type": "type.googleapis.com/envoy.extensions.load_balancing_policies.subset.v3.Subset",
+          "fallback_policy": "DEFAULT_SUBSET",
+          "default_subset": {
+            "stage": "prod",
+            "version": "1.0",
+            "type": "std"
+          },
+          "subset_selectors": [
+            { "keys": [ "stage", "type" ] },
+            { "keys": [ "stage", "version" ] },
+            { "keys": [ "version" ] },
+            { "keys": [ "xlarge", "version" ] },
+          ],
+          "subset_lb_policy": {
+            "policies": [{
+              "typed_extension_config": {
+                "name": "envoy.load_balancing_policies.round_robin",
+                "typed_config": {
+                  "@type": "type.googleapis.com/envoy.extensions.load_balancing_policies.round_robin.v3.RoundRobin"
+                }
+              }
+            }]
+          }
+        }
+      }
+    }]
   }
 }
 ```
