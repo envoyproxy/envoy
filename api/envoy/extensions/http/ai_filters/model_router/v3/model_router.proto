@@ -91,7 +91,8 @@ message RoutingEntry {
   // Ordered list of candidate routing targets for this requested model.
   //
   // Attempt 1 uses the first target. Subsequent targets are attempted in order upon retries if the
-  // previous attempt fails, enabling automatic multi-model and multi-provider fallback.
+  // previous attempt fails, enabling automatic multi-model fallback. All models in a route must
+  // have the same provider.
   repeated RoutingTarget targets = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
@@ -109,10 +110,8 @@ message RoutingEntry {
 //
 // .. note::
 //
-//   Multi-host fallbacks (targets across providers with different ``host_and_port`` values) only
-//   work when using a :ref:`composite cluster
-//   <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>` with ``STATIC`` or
-//   ``STRICT_DNS`` sub-clusters; they do not work with a Dynamic Forward Proxy cluster.
+//   All models in a route must have the same provider; cross-provider fallbacks are not
+//   supported yet.
 message ModelRouter {
   // Configured LLM backend providers.
   repeated Provider providers = 1;

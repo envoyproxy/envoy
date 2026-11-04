@@ -2,7 +2,6 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/composite/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/ai_protocol_manager/v3/ai_protocol_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/type/ai/v3/llm_protocol.pb.h"
@@ -27,16 +26,12 @@ constexpr absl::string_view ClaudeUnaryResponse = R"({
   "usage": {"input_tokens": 12, "output_tokens": 6}
 })";
 
-constexpr absl::string_view GeminiUnaryResponse = R"({
-  "candidates": [{
-    "content": {"role": "model", "parts": [{"text": "Hello from Gemini."}]},
-    "finishReason": "STOP"
-  }],
-  "usageMetadata": {
-    "promptTokenCount": 9, "candidatesTokenCount": 5, "totalTokenCount": 14
-  },
-  "modelVersion": "gemini-3.5-flash-lite",
-  "responseId": "gemini-resp-1"
+constexpr absl::string_view ClaudeSonnetUnaryResponse = R"({
+  "id": "msg_02", "type": "message", "role": "assistant",
+  "model": "claude-sonnet-5-5",
+  "content": [{"type": "text", "text": "Hello from Claude Sonnet."}],
+  "stop_reason": "end_turn", "stop_sequence": null,
+  "usage": {"input_tokens": 12, "output_tokens": 6}
 })";
 
 constexpr absl::string_view DownstreamAiProtocolManagerConfig = R"EOF(
@@ -60,27 +55,22 @@ typed_config:
         host_and_port: "api.anthropic.com"
         binding:
           uri_pattern: "/v1/messages"
-      - name: gemini
-        llm_protocol: GEMINI_GENERATE_CONTENT
-        host_and_port: "generativelanguage.googleapis.com"
-        binding:
-          uri_pattern: "/v1beta/models/{model}:generateContent"
       models:
-      - name: antroclaude-5-5
+      - name: antroclaude-haiku
         provider: anthropic
         model: "claude-haiku-5-5"
         api_key:
           inline_string: "Bearer ANTHROPIC_KEY"
-      - name: gemini-3-5
-        provider: gemini
-        model: "gemini-3.5-flash-lite"
+      - name: antroclaude-sonnet
+        provider: anthropic
+        model: "claude-sonnet-5-5"
         api_key:
-          inline_string: "GEMINI_KEY"
+          inline_string: "Bearer ANTHROPIC_KEY"
       routes:
       - requested_model: "send_me_to_anthropic"
         targets:
-        - model: antroclaude-5-5
-        - model: gemini-3-5
+        - model: antroclaude-haiku
+        - model: antroclaude-sonnet
 )EOF";
 
 constexpr absl::string_view RouterWithUpstreamAiProtocolManagerConfig = R"EOF(
@@ -119,41 +109,26 @@ public:
   ModelRouterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
-    // Upstream 0 represents the Anthropic cluster; Upstream 1 represents the Gemini cluster.
-    setUpstreamCount(2);
+    // Upstream 0 represents the Anthropic cluster.
+    setUpstreamCount(1);
 
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([ip_version = GetParam()](
+                                         envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       bootstrap.mutable_static_resources()->clear_clusters();
 
-      const std::string cluster_names[] = {"anthropic_cluster", "gemini_cluster"};
-      for (int i = 0; i < 2; ++i) {
-        auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-        cluster->set_name(cluster_names[i]);
-        cluster->mutable_connect_timeout()->set_seconds(5);
-        cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
-        cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
+      auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+      cluster->set_name("anthropic_cluster");
+      cluster->mutable_connect_timeout()->set_seconds(5);
+      cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+      cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::ROUND_ROBIN);
 
-        auto* load_assignment = cluster->mutable_load_assignment();
-        load_assignment->set_cluster_name(cluster->name());
-        auto* endpoints = load_assignment->add_endpoints();
-        auto* lb_endpoint = endpoints->add_lb_endpoints();
-        auto* address =
-            lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
-        address->set_address(Network::Test::getLoopbackAddressString(GetParam()));
-        address->set_port_value(fake_upstreams_[i]->localAddress()->ip()->port());
-      }
-
-      auto* composite_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      composite_cluster->set_name("composite_cluster");
-      composite_cluster->mutable_connect_timeout()->set_seconds(5);
-      composite_cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-      composite_cluster->mutable_cluster_type()->set_name("envoy.clusters.composite");
-
-      envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
-      composite_config.add_clusters()->set_name("anthropic_cluster");
-      composite_config.add_clusters()->set_name("gemini_cluster");
-      std::ignore = composite_cluster->mutable_cluster_type()->mutable_typed_config()->PackFrom(
-          composite_config);
+      auto* load_assignment = cluster->mutable_load_assignment();
+      load_assignment->set_cluster_name(cluster->name());
+      auto* endpoints = load_assignment->add_endpoints();
+      auto* lb_endpoint = endpoints->add_lb_endpoints();
+      auto* address = lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+      address->set_address(Network::Test::getLoopbackAddressString(ip_version));
+      address->set_port_value(0);
     });
 
     config_helper_.addConfigModifier(
@@ -164,7 +139,7 @@ public:
 
           auto* route = virtual_host->mutable_routes(0);
           route->mutable_match()->set_path("/chat/completions");
-          route->mutable_route()->set_cluster("composite_cluster");
+          route->mutable_route()->set_cluster("anthropic_cluster");
 
           auto* retry_policy = route->mutable_route()->mutable_retry_policy();
           retry_policy->set_retry_on("5xx,connect-failure,reset,retriable-status-codes");
@@ -187,7 +162,7 @@ public:
         });
 
     HttpIntegrationTest::initialize();
-    test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(3));
+    test_server_->waitForGauge("cluster_manager.active_clusters", testing::Ge(1));
   }
 
   IntegrationStreamDecoderPtr sendChatCompletionsRequest() {
@@ -252,15 +227,15 @@ TEST_P(ModelRouterIntegrationTest, FirstTargetSucceeds) {
   EXPECT_EQ(reply["usage"]["completion_tokens"], 6);
 
   EXPECT_EQ(1, test_server_->counter("cluster.anthropic_cluster.upstream_rq_total")->value());
-  EXPECT_EQ(0, test_server_->counter("cluster.gemini_cluster.upstream_rq_total")->value());
 }
 
-TEST_P(ModelRouterIntegrationTest, MultiHostFallbackAcrossRetries) {
+TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
   initialize();
 
   IntegrationStreamDecoderPtr response = sendChatCompletionsRequest();
 
-  // Attempt 1 goes to the Anthropic cluster (`fake_upstreams_[0]`) and fails with 503.
+  // Attempt 1 goes to the Anthropic cluster (`fake_upstreams_[0]`) with the primary model and fails
+  // with 503.
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
@@ -284,30 +259,29 @@ TEST_P(ModelRouterIntegrationTest, MultiHostFallbackAcrossRetries) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
-  // Attempt 2 fails over via the composite cluster to the Gemini cluster (`fake_upstreams_[1]`).
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  // Attempt 2 fails over to the fallback model on the same provider (`fake_upstreams_[0]`).
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   const Http::RequestHeaderMap& attempt2_headers = upstream_request_->headers();
   EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
+  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
   EXPECT_THAT(attempt2_headers,
-              ContainsHeader(Http::Headers::get().Path,
-                             "/v1beta/models/gemini-3.5-flash-lite:generateContent"));
-  EXPECT_THAT(attempt2_headers,
-              ContainsHeader(Http::Headers::get().Host, "generativelanguage.googleapis.com"));
-  EXPECT_THAT(attempt2_headers, ContainsHeader("x-goog-api-key", "GEMINI_KEY"));
-  EXPECT_TRUE(attempt2_headers.get(Http::CustomHeaders::get().Authorization).empty());
+              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
+  EXPECT_THAT(attempt2_headers, ContainsHeader("anthropic-version", "2023-06-01"));
   EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
             (nlohmann::json{
-                {"contents", {{{"role", "user"}, {"parts", {{{"text", Question}}}}}}},
-                {"generationConfig", {{"maxOutputTokens", 1024}}},
+                {"model", "claude-sonnet-5-5"},
+                {"max_tokens", 1024},
+                {"messages", {{{"role", "user"}, {"content", Question}}}},
             }));
 
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       false);
-  upstream_request_->encodeData(std::string(GeminiUnaryResponse), true);
+  upstream_request_->encodeData(std::string(ClaudeSonnetUnaryResponse), true);
 
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_THAT(response->headers(), Http::HttpStatusIs("200")) << response->body();
@@ -316,12 +290,11 @@ TEST_P(ModelRouterIntegrationTest, MultiHostFallbackAcrossRetries) {
   EXPECT_EQ(reply["object"], "chat.completion");
   ASSERT_EQ(reply["choices"].size(), 1);
   EXPECT_EQ(reply["choices"][0]["message"]["role"], "assistant");
-  EXPECT_EQ(reply["choices"][0]["message"]["content"], "Hello from Gemini.");
-  EXPECT_EQ(reply["usage"]["prompt_tokens"], 9);
-  EXPECT_EQ(reply["usage"]["completion_tokens"], 5);
+  EXPECT_EQ(reply["choices"][0]["message"]["content"], "Hello from Claude Sonnet.");
+  EXPECT_EQ(reply["usage"]["prompt_tokens"], 12);
+  EXPECT_EQ(reply["usage"]["completion_tokens"], 6);
 
-  EXPECT_EQ(1, test_server_->counter("cluster.anthropic_cluster.upstream_rq_total")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.gemini_cluster.upstream_rq_total")->value());
+  EXPECT_EQ(2, test_server_->counter("cluster.anthropic_cluster.upstream_rq_total")->value());
 }
 
 } // namespace

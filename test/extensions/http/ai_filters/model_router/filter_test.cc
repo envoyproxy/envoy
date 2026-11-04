@@ -53,16 +53,6 @@ providers:
     host_and_port: primary.llm.example.com:8443
     binding:
       uri_pattern: /v1/chat/completions
-  - name: primary_anthropic
-    llm_protocol: ANTHROPIC_MESSAGES
-    host_and_port: primary.llm.example.com:8443
-    binding:
-      uri_pattern: /v1/messages
-  - name: primary_gemini
-    llm_protocol: GEMINI_GENERATE_CONTENT
-    host_and_port: primary.llm.example.com:8443
-    binding:
-      uri_pattern: /v1beta/models/{model}:{generateContent|streamGenerateContent}
 models:
   - name: haiku
     provider: anthropic
@@ -74,16 +64,16 @@ models:
     model: gpt-4o
     api_key:
       inline_string: "Bearer sk-oai"
-  - name: sonnet
-    provider: primary_anthropic
-    model: claude-sonnet-4-5
+  - name: gpt4o_mini
+    provider: primary_openai
+    model: gpt-4o-mini
     api_key:
-      inline_string: "Bearer sk-sonnet"
-  - name: gemini_pro
-    provider: primary_gemini
-    model: gemini-2.5-pro
+      inline_string: "Bearer sk-mini"
+  - name: gpt4o_nano
+    provider: primary_openai
+    model: gpt-4o-nano
     api_key:
-      inline_string: "Bearer g-pro"
+      inline_string: "Bearer sk-nano"
 routes:
   - requested_model: send_me_to_anthropic
     targets:
@@ -91,8 +81,8 @@ routes:
   - requested_model: multi_fallback_model
     targets:
       - model: gpt4o
-      - model: sonnet
-      - model: gemini_pro
+      - model: gpt4o_mini
+      - model: gpt4o_nano
 )EOF",
                               proto);
     auto config_or = ModelRouterFilterConfig::create(proto, *api_, *stats_store_.rootScope());
@@ -204,16 +194,15 @@ TEST_F(ModelRouterFilterTest, MultipleTargetsRouteSetsMaxRetriesAndPrimaryAuthor
   ASSERT_NE(routes_obj, nullptr);
   ASSERT_EQ(routes_obj->routes().size(), 3);
   EXPECT_EQ(routes_obj->routes()[0].model, "gpt-4o");
-  EXPECT_EQ(routes_obj->routes()[1].model, "claude-sonnet-4-5");
-  EXPECT_EQ(routes_obj->routes()[2].model, "gemini-2.5-pro");
+  EXPECT_EQ(routes_obj->routes()[1].model, "gpt-4o-mini");
+  EXPECT_EQ(routes_obj->routes()[2].model, "gpt-4o-nano");
 
   ASSERT_NE(routes_obj->routes()[0].binding, nullptr);
   ASSERT_NE(routes_obj->routes()[1].binding, nullptr);
   ASSERT_NE(routes_obj->routes()[2].binding, nullptr);
   EXPECT_EQ(routes_obj->routes()[0].binding->pattern()->source(), "/v1/chat/completions");
-  EXPECT_EQ(routes_obj->routes()[1].binding->pattern()->source(), "/v1/messages");
-  EXPECT_EQ(routes_obj->routes()[2].binding->pattern()->source(),
-            "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
+  EXPECT_EQ(routes_obj->routes()[1].binding->pattern()->source(), "/v1/chat/completions");
+  EXPECT_EQ(routes_obj->routes()[2].binding->pattern()->source(), "/v1/chat/completions");
 
   EXPECT_EQ(request_headers_.getHostValue(), "primary.llm.example.com:8443");
   EXPECT_EQ(request_headers_.getEnvoyMaxRetriesValue(), "2");

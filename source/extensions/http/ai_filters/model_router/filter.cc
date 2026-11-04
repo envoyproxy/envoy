@@ -75,6 +75,7 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
   absl::flat_hash_map<std::string, std::vector<LlmRoute>> routes_by_model;
   for (const Config::RoutingEntry& entry : proto.routes()) {
     std::vector<LlmRoute>& resolved = routes_by_model[entry.requested_model()];
+    std::optional<std::string> route_provider;
 
     for (const Config::RoutingTarget& target : entry.targets()) {
       auto model_it = models.find(target.model());
@@ -84,6 +85,13 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
       auto provider_it = providers.find(model_it->second.provider());
       if (provider_it == providers.end()) {
         return absl::InvalidArgumentError("Unknown provider " + model_it->second.provider());
+      }
+
+      // Until routing policies are aware of AI routes, cross-provider fallbacks are not supported.
+      if (!route_provider) {
+        route_provider = provider_it->first;
+      } else if (route_provider != provider_it->first) {
+        return absl::InvalidArgumentError("All models in the route must have the same provider");
       }
 
       LlmRoute route;
