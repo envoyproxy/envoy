@@ -167,10 +167,10 @@ createUpstreamSslContext(ContextManager& context_manager, Api::Api& api, bool us
   return *config_factory.createTransportSocketFactory(quic_config, mock_factory_ctx, server_names);
 }
 
-Network::DownstreamTransportSocketFactoryPtr createFakeUpstreamSslContext(
-    const std::string& upstream_cert_name, ContextManager& context_manager,
-    Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::Scope& stats_scope) {
+Network::DownstreamTransportSocketFactoryPtr
+createFakeUpstreamSslContext(const std::string& upstream_cert_name, ContextManager& context_manager,
+                             Server::Configuration::TransportSocketFactoryContext& factory_context,
+                             Stats::Scope& stats_scope) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   auto* common_tls_context = tls_context.mutable_common_tls_context();
   auto* tls_cert = common_tls_context->add_tls_certificates();
