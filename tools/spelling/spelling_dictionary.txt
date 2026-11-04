@@ -197,6 +197,7 @@ DESC
 DFATAL
 DGRAM
 DLOG
+DMA
 DNS
 DQUOTE
 DS
@@ -605,6 +606,7 @@ VM
 VPN
 WAITFORONE
 WASM
+WGS
 WIP
 WKT
 WRONGPASS
@@ -1545,6 +1547,7 @@ subnets
 subobject
 suboptimal
 subprocess
+subregion
 subsecond
 subseconds
 subsegment
