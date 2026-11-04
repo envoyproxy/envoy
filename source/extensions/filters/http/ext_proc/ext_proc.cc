@@ -1476,7 +1476,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
 void Filter::sendStreamedBodyChunk(ProcessorState& state, Buffer::Instance& data,
                                    ProcessorState::CallbackState new_state, bool end_stream) {
   if (!max_streamed_body_chunk_size_.has_value() ||
-      data.length() < *max_streamed_body_chunk_size_) {
+      data.length() <= *max_streamed_body_chunk_size_) {
     auto req = setupBodyChunk(state, data, end_stream);
     if (state.bodyMode() != ProcessingMode::FULL_DUPLEX_STREAMED) {
       state.enqueueStreamingChunk(data, end_stream);
