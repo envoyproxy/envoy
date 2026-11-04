@@ -87,7 +87,8 @@ AgentHTTPClient::post(const URL& url, HeadersSetter set_headers, std::string bod
   auto message = std::make_unique<Http::RequestMessageImpl>();
   Http::RequestHeaderMap& headers = message->headers();
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
-  headers.setReferencePath(url.path);
+  // The request can outlive `url`: dd-trace-cpp's agent flushes from its destructor.
+  headers.setPath(url.path);
   headers.setReferenceHost(reference_host_);
 
   RequestHeaderWriter writer{message->headers()};

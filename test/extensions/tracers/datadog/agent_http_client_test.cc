@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <chrono>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -72,7 +74,7 @@ protected:
 
 TEST_F(DatadogAgentHttpClientTest, PathFromURL) {
   // The `.path` portion of the `URL` argument to `AgentHTTPClient::post` ends
-  // up as the "reference path" of the `Http::RequestHeaderMap`.
+  // up as the path of the `Http::RequestHeaderMap`.
   // That is, the URL "http://foobar.com/trace/v04" results in "/trace/v04".
 
   EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -91,6 +93,32 @@ TEST_F(DatadogAgentHttpClientTest, PathFromURL) {
   EXPECT_TRUE(result) << result.error();
   EXPECT_EQ(0, stats_.reports_skipped_no_cluster_.value());
   EXPECT_EQ(0, stats_.reports_failed_.value());
+}
+
+TEST_F(DatadogAgentHttpClientTest, PathOutlivesURL) {
+  // The request keeps its own copy of the path, so it remains valid after the
+  // `URL` passed to `post` is modified or destroyed.
+  Http::RequestMessagePtr sent;
+  EXPECT_CALL(cluster_manager_.instance_.thread_local_cluster_.async_client_, send_(_, _, _))
+      .WillOnce(
+          [this, &sent](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
+                        const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            sent = std::move(message);
+            return &request_;
+          });
+  EXPECT_CALL(request_, cancel());
+
+  auto url = std::make_unique<datadog::tracing::HTTPClient::URL>(url_);
+  const auto ignore = [](auto&&...) {};
+  datadog::tracing::Expected<void> result = client_.post(
+      *url, ignore, "", ignore, ignore, time_.monotonicTime() + std::chrono::seconds(1));
+  EXPECT_TRUE(result) << result.error();
+
+  std::fill(url->path.begin(), url->path.end(), 'x');
+  url.reset();
+
+  ASSERT_NE(nullptr, sent);
+  EXPECT_EQ("/foo/bar", sent->headers().getPathValue());
 }
 
 TEST_F(DatadogAgentHttpClientTest, MissingThreadLocalCluster) {
