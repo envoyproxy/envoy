@@ -2247,6 +2247,10 @@ WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_route_name, fa
           envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
           envoy_dynamic_module_type_module_buffer)
 
+WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_virtual_cluster, false,
+          envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+          envoy_dynamic_module_type_module_buffer)
+
 WEAK_STUB(bool, envoy_dynamic_module_callback_route_specifier_set_cluster_not_found_response_code,
           false, envoy_dynamic_module_type_route_specifier_context_envoy_ptr, uint32_t)
 

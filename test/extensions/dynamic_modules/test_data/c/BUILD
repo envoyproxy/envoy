@@ -245,6 +245,8 @@ test_program(name = "route_specifier_built_route_cache")
 
 test_program(name = "route_specifier_user_data")
 
+test_program(name = "route_specifier_virtual_cluster")
+
 test_program(name = "cluster_async_host_selection")
 
 test_program(name = "cluster_no_op")
