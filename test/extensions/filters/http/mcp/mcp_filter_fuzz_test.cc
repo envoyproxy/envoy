@@ -31,7 +31,6 @@ namespace {
 namespace McpConstants = Filters::Common::Mcp::McpConstants;
 using McpProto = envoy::extensions::filters::http::mcp::v3::Mcp;
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -50,8 +49,6 @@ std::optional<absl::string_view> firstHeaderValue(const Http::RequestHeaderMap& 
   return values[0]->value().getStringView();
 }
 
-// Decodes an MCP header value as specified by MCP 2026-07-28: a value wrapped in "=?base64?" and
-// "?=" is Base64-encoded, anything else is a literal. Returns nullopt for malformed Base64.
 std::optional<std::string> decodeMcpHeaderValue(absl::string_view value) {
   const absl::string_view prefix = McpConstants::MCP_BASE64_PREFIX;
   const absl::string_view suffix = McpConstants::MCP_BASE64_SUFFIX;
@@ -68,7 +65,6 @@ std::optional<std::string> decodeMcpHeaderValue(absl::string_view value) {
   return decoded;
 }
 
-// Returns the value at `path`, a list of literal object keys, or nullptr if it is absent.
 const nlohmann::json* findJsonPath(const nlohmann::json& json,
                                    const std::vector<absl::string_view>& path) {
   const nlohmann::json* value = &json;
@@ -85,7 +81,6 @@ const nlohmann::json* findJsonPath(const nlohmann::json& json,
   return value;
 }
 
-// Returns the error code of a JSON local reply, or nullopt for a plain-text local reply.
 std::optional<double> jsonRpcErrorCode(const LocalReply& reply) {
   if (reply.content_type != Http::Headers::get().ContentTypeValues.Json) {
     return std::nullopt;
@@ -100,9 +95,6 @@ std::optional<double> jsonRpcErrorCode(const LocalReply& reply) {
   return code->get<double>();
 }
 
-// Parses the request body, returning a discarded value for invalid JSON and for bodies with
-// duplicate or empty object keys. The MCP JSON parser does not handle those consistently with
-// other JSON parsers (e.g. it ignores an array-valued duplicate key), which is tracked separately.
 nlohmann::json parseUnambiguousJson(absl::string_view body) {
   std::vector<absl::flat_hash_set<std::string>> object_keys;
   bool ambiguous = false;
@@ -125,13 +117,9 @@ nlohmann::json parseUnambiguousJson(absl::string_view body) {
   return ambiguous ? nlohmann::json(nlohmann::json::value_t::discarded) : json;
 }
 
-// A request that passed MCP 2026-07-28 validation in REJECT_NO_MCP mode must agree with its MCP
-// request headers when the body is parsed by an independent JSON parser.
 void verifyAcceptedNewSpecRequest(const McpFilterConfig& config,
                                   const Http::RequestHeaderMap& headers, absl::string_view body) {
   const nlohmann::json json = parseUnambiguousJson(body);
-  // Bodies that are not exactly one unambiguous JSON object, e.g. with bytes after the root object
-  // that the filter does not inspect, and messages without a string method are out of scope.
   const nlohmann::json* method = findJsonPath(json, {McpConstants::METHOD_FIELD});
   if (method == nullptr || !method->is_string()) {
     return;
@@ -157,7 +145,6 @@ void verifyAcceptedNewSpecRequest(const McpFilterConfig& config,
     FUZZ_ASSERT(version->get_ref<const std::string&>() == McpConstants::MCP_VERSION_2026_07_28);
   }
 
-  // Requests, unlike notifications, must declare the client capabilities.
   const nlohmann::json* id = findJsonPath(json, {McpConstants::ID_FIELD});
   if (id != nullptr && (id->is_string() || id->is_number())) {
     FUZZ_ASSERT(meta != nullptr &&
@@ -173,7 +160,6 @@ void verifyInvariants(const McpProto& proto_config, const McpFilterConfig& confi
   const bool new_spec = firstHeaderValue(headers, McpConstants::MCP_PROTOCOL_VERSION_HEADER) ==
                         McpConstants::MCP_VERSION_2026_07_28;
 
-  // Only REJECT_NO_MCP rejects requests, and NOOP does not inspect them at all.
   FUZZ_ASSERT(reject_mode || replies.empty());
   if (proto_config.traffic_mode() == McpProto::NOOP) {
     FUZZ_ASSERT(
@@ -183,7 +169,6 @@ void verifyInvariants(const McpProto& proto_config, const McpFilterConfig& confi
   for (const LocalReply& reply : replies) {
     FUZZ_ASSERT(reply.code == Http::Code::BadRequest || reply.code == Http::Code::MethodNotAllowed);
     const std::optional<double> error_code = jsonRpcErrorCode(reply);
-    // 405s and the JSON-RPC errors introduced for 2026-07-28 never apply to legacy requests.
     if (reply.code == Http::Code::MethodNotAllowed ||
         error_code == McpConstants::MCP_HEADER_MISMATCH_ERROR_CODE ||
         error_code == McpConstants::JSONRPC_INVALID_PARAMS_ERROR_CODE) {
@@ -200,19 +185,15 @@ void verifyInvariants(const McpProto& proto_config, const McpFilterConfig& confi
   }
 }
 
-// Feeds requests to McpFilter and records its local replies. Like UberFilterFuzzer, it stops
-// feeding a request once the filter sends a local reply. The mocks are reused across inputs
-// because creating them dominates the cost of an iteration.
 class McpFilterFuzzer : public HttpFilterFuzzer {
 public:
   McpFilterFuzzer() {
     ON_CALL(callbacks_, requestHeaders())
         .WillByDefault(Return(makeOptRef<Http::RequestHeaderMap>(request_headers_)));
     ON_CALL(callbacks_, sendLocalReply(_, _, _, _, _))
-        .WillByDefault(Invoke([this](Http::Code code, absl::string_view body,
-                                     std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                                     const std::optional<Grpc::Status::GrpcStatus>,
-                                     absl::string_view) {
+        .WillByDefault([this](Http::Code code, absl::string_view body,
+                              std::function<void(Http::ResponseHeaderMap&)> modify_headers,
+                              const std::optional<Grpc::Status::GrpcStatus>, absl::string_view) {
           Http::TestResponseHeaderMapImpl headers;
           if (modify_headers != nullptr) {
             modify_headers(headers);
@@ -220,7 +201,7 @@ public:
           ENVOY_LOG_MISC(debug, "MCP filter local reply {}: {}", static_cast<int>(code), body);
           replies_.push_back({code, std::string(body), std::string(headers.getContentTypeValue())});
           enabled_ = false;
-        }));
+        });
   }
 
   void fuzz(const ::test::extensions::filters::http::mcp::McpFilterFuzzTestCase& input) {
