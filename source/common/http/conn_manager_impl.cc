@@ -419,6 +419,8 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  stream.state_.waiting_for_vhds_ = false;
+  stream.vhds_update_callback_.reset();
   if (!stream.state_.is_internally_destroyed_) {
     ++closed_non_internally_destroyed_requests_;
     if (isPrematureRstStream(stream)) {
@@ -1794,11 +1796,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
   ASSERT(!cached_route_);
   refreshCachedRoute();
 
-  if (!hasCachedRoute() && snapped_route_config_ != nullptr &&
-      snapped_route_config_->awaitingInitialVhdsUpdate() &&
+  // Holding unmatched requests until the initial VHDS response arrives requires a top-level
+  // RouteConfigProvider; Scoped RDS (SRDS) does not support on-demand VHDS updates.
+  if (!hasCachedRoute() && connection_manager_.config_->routeConfigProvider() != nullptr &&
+      snapped_route_config_ != nullptr && snapped_route_config_->awaitingInitialVhdsUpdate() &&
       route_config_update_requester_.has_value() && !request_headers_->getHostValue().empty()) {
     state_.waiting_for_vhds_ = true;
     state_.deferred_end_stream_ = end_stream;
+    response_encoder_->getStream().readDisable(true);
     vhds_update_callback_ = std::make_shared<Http::RouteConfigUpdatedCallback>(
         [this](bool) -> void { onInitialVhdsUpdateComplete(); });
     requestRouteConfigUpdate(vhds_update_callback_);
@@ -2903,6 +2908,7 @@ void ConnectionManagerImpl::ActiveStream::onInitialVhdsUpdateComplete() {
   }
   state_.waiting_for_vhds_ = false;
   vhds_update_callback_.reset();
+  response_encoder_->getStream().readDisable(false);
 
   refreshRouteConfigSnapshot();
   clearRouteCache();
