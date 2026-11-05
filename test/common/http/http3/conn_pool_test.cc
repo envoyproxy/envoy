@@ -364,6 +364,37 @@ TEST_F(Http3ConnPoolImplTest, ZeroRttClientAcceptsRaisedStreamLimitBeforeHandsha
   EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Ready, client.state());
 }
 
+TEST_F(Http3ConnPoolImplTest, ZeroRttClientRaisedStreamLimitBeforeHandshakeGuardDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.quic_report_zero_stream_limit_before_handshake", "false"}});
+  initialize();
+
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  auto* cancellable = pool_->newStream(decoder, callbacks,
+                                       {/*can_send_early_data_=*/true,
+                                        /*can_use_http3_=*/true});
+  ASSERT_NE(nullptr, cancellable);
+  async_connect_callback->invokeCallback();
+  // No stream is pending, so the old path's move to Ready attaches nothing.
+  cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
+
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  ASSERT_EQ(1u, clients.size());
+  auto& client = dynamic_cast<ActiveClient&>(*clients.front());
+
+  pool_->onConnectionEvent(client, "", Network::ConnectionEvent::ConnectedZeroRtt);
+  client.onMaxStreamsChanged(0);
+  EXPECT_EQ(Envoy::ConnectionPool::ActiveClient::State::Busy, client.state());
+
+  EXPECT_ENVOY_BUG(client.onMaxStreamsChanged(1),
+                   "Received MAX_STREAM frame before handshake completed.");
+}
+
 TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
   quic_info_->migration_config_.migrate_session_on_network_change = true;
   createNewStream();

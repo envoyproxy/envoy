@@ -95,7 +95,9 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
 void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
   updateCapacity(num_streams);
   if (state() == ActiveClient::State::Busy && currentUnusedCapacity() != 0) {
-    if (!hasHandshakeCompleted()) {
+    if (!hasHandshakeCompleted() &&
+        Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.quic_report_zero_stream_limit_before_handshake")) {
       // A client only goes Busy before the handshake through 0-RTT, e.g. on a stream limit of zero
       // resumed from cached transport parameters, and the limit then rises when the handshake
       // negotiates the real one.
@@ -103,6 +105,7 @@ void ActiveClient::onMaxStreamsChanged(uint32_t num_streams) {
       parent_.onUpstreamReadyForEarlyData(*this);
       return;
     }
+    ENVOY_BUG(hasHandshakeCompleted(), "Received MAX_STREAM frame before handshake completed.");
     parent_.transitionActiveClientState(*this, ActiveClient::State::Ready);
     // If there's waiting streams, make sure the pool will now serve them.
     parent_.onUpstreamReady();

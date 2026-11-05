@@ -3,3 +3,5 @@ transport parameters is zero. QUICHE only reports increases, so the pool kept it
 until the handshake completed and could attach a stream QUICHE had no stream ID for. A client that
 went busy that way and then had its limit raised before the handshake completed also hit an
 ``ENVOY_BUG`` instead of going back to accepting early data streams.
+This change can be temporarily reverted by setting the runtime guard
+``envoy.reloadable_features.quic_report_zero_stream_limit_before_handshake`` to ``false``.

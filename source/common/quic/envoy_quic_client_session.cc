@@ -377,7 +377,9 @@ void EnvoyQuicClientSession::OnConfigNegotiated() {
   // reports the limit only once the handshake completes. During 0-RTT, a limit of zero resumed
   // from cached transport parameters would otherwise leave the connection pool with its optimistic
   // initial capacity and let it create a stream QUICHE cannot open.
-  if (connection()->connected() && streamsAvailable() == 0) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.quic_report_zero_stream_limit_before_handshake") &&
+      connection()->connected() && streamsAvailable() == 0) {
     OnCanCreateNewOutgoingStream(false);
   }
 }
