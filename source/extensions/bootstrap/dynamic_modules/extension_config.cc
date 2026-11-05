@@ -414,8 +414,7 @@ newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
-    Stats::Store& stats_store,
-    OptRef<const envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter> cluster_writer) {
+    Stats::Store& stats_store, bool has_cluster_writer) {
 
   // Resolve the required symbols from the dynamic module.
   auto constructor =
@@ -582,7 +581,7 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_cluster_writer_update_done_ =
       on_cluster_writer_update_done.ok() ? on_cluster_writer_update_done.value() : nullptr;
 
-  if (cluster_writer.has_value()) {
+  if (has_cluster_writer) {
     DynamicModuleClusterWriter::UpdateDoneCallback update_done;
     if (config->on_bootstrap_extension_cluster_writer_update_done_ != nullptr) {
       update_done = [config = config.get()](
@@ -595,8 +594,8 @@ newDynamicModuleBootstrapExtensionConfig(
             {error_details.data(), error_details.size()});
       };
     }
-    config->cluster_writer_ = std::make_unique<DynamicModuleClusterWriter>(
-        extension_name, *cluster_writer, context, std::move(update_done));
+    config->cluster_writer_ = std::make_unique<DynamicModuleClusterWriter>(extension_name, context,
+                                                                           std::move(update_done));
   }
 
   config->stat_creation_frozen_ = true;

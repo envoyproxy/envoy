@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "envoy/event/schedulable_cb.h"
-#include "envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
@@ -27,14 +26,7 @@ namespace Extensions {
 namespace Bootstrap {
 namespace DynamicModules {
 
-/**
- * Registers the cluster writer of a bootstrap extension with the server. Returns an error when the
- * extension name is empty or taken, or when the name prefix overlaps the prefix of another writer.
- */
-absl::Status registerClusterWriter(Server::Configuration::ServerFactoryContext& context,
-                                   absl::string_view extension_name, absl::string_view name_prefix);
-
-class ClusterWriterRegistry;
+class ClusterWriterSharedState;
 
 /**
  * Adds, updates and removes the clusters of a bootstrap dynamic module. Writes are queued and
@@ -52,15 +44,13 @@ public:
 
   /**
    * @param extension_name the name of the bootstrap extension.
-   * @param config the cluster writer configuration.
    * @param context the server factory context.
    * @param update_done the callback that reports outcomes, or nullptr when the module has no done
    * hook.
    */
-  DynamicModuleClusterWriter(
-      absl::string_view extension_name,
-      const envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter& config,
-      Server::Configuration::ServerFactoryContext& context, UpdateDoneCallback update_done);
+  DynamicModuleClusterWriter(absl::string_view extension_name,
+                             Server::Configuration::ServerFactoryContext& context,
+                             UpdateDoneCallback update_done);
 
   /**
    * Called once the server is initialized. Writes are not allowed before this.
@@ -127,10 +117,7 @@ private:
 
   struct WriterStats {
     Stats::Counter& update_submitted_;
-    Stats::Counter& update_rejected_not_allowed_;
-    Stats::Counter& update_rejected_outside_name_prefix_;
-    Stats::Counter& update_rejected_limit_reached_;
-    Stats::Counter& update_rejected_too_large_;
+    Stats::Counter& update_rejected_;
     Stats::Counter& update_active_;
     Stats::Counter& update_superseded_;
     Stats::Counter& update_removed_;
@@ -141,7 +128,7 @@ private:
     Stats::Gauge& updates_pending_;
   };
 
-  static WriterStats generateStats(Stats::Scope& scope, absl::string_view extension_name);
+  static WriterStats generateStats(Stats::Scope& scope, absl::string_view config_name);
 
   void onClustersInitialized();
   bool writesAllowed() const;
@@ -164,11 +151,10 @@ private:
   void deliverOutcomes();
   void eraseIfUnused(absl::string_view cluster_name);
 
-  const std::string extension_name_;
-  const std::string name_prefix_;
-  const uint32_t max_clusters_;
+  // The extension name, or "default" when it is empty.
+  const std::string config_name_;
   Server::Configuration::ServerFactoryContext& context_;
-  const std::shared_ptr<ClusterWriterRegistry> registry_;
+  const std::shared_ptr<ClusterWriterSharedState> shared_state_;
   const UpdateDoneCallback update_done_;
   // Owned, since the server scope goes away before the bootstrap extensions at shutdown.
   const Stats::ScopeSharedPtr stats_scope_;

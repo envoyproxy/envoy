@@ -70,8 +70,7 @@ public:
         extension_config:
           "@type": type.googleapis.com/google.protobuf.BytesValue
           value: "{}"
-        cluster_writer:
-          name_prefix: writer.
+        cluster_writer: {{}}
     )EOF",
                     Base64::encode(startup_cluster.data(), startup_cluster.size())));
     HttpIntegrationTest::initialize();
@@ -784,15 +783,13 @@ TEST_P(DynamicModulesBootstrapIntegrationTest, ClusterWriterRust) {
   EXPECT_EQ("200", response->headers().getStatusValue());
   cleanupUpstreamAndDownstream();
 
-  // A cluster whose configuration has another name fails, and names outside the prefix are
-  // refused.
+  // A cluster whose configuration has another name fails.
   EXPECT_EQ("Success 2", clusterWriterRequest("add=writer.b", serialized_cluster));
   test_server_->waitForCounter("dynamic_modules.cluster_writer.update_failed.config_name.writer",
                                testing::Eq(1));
   test_server_->waitForCounter("dynamicmodulescustom.update_done_total", testing::Eq(2));
   EXPECT_THAT(clusterWriterRequest("outcomes", ""),
               testing::HasSubstr("2 writer.b Failed cluster writer.b is named writer.a"));
-  EXPECT_EQ("OutsideNamePrefix 0", clusterWriterRequest("add=other.a", serialized_cluster));
 
   EXPECT_EQ("Success", clusterWriterRequest("remove=writer.a", ""));
   test_server_->waitForGauge("dynamic_modules.cluster_writer.clusters_owned.config_name.writer",

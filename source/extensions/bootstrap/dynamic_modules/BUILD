@@ -32,13 +32,11 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules/abi",
-        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/container:node_hash_map",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/bootstrap/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
@@ -65,7 +63,6 @@ envoy_cc_library(
         "//source/common/stats:utility_lib",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
         "//source/extensions/dynamic_modules:metric_registry",
-        "@envoy_api//envoy/extensions/bootstrap/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
 
@@ -106,7 +103,6 @@ envoy_cc_extension(
     hdrs = ["factory.h"],
     deps = [
         ":abi_impl",
-        ":cluster_writer_lib",
         ":extension_lib",
         "//envoy/registry",
         "//envoy/server:bootstrap_extension_config_interface",

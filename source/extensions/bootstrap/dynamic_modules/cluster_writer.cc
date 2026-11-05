@@ -20,9 +20,7 @@
 #include "source/common/stats/utility.h"
 #include "source/extensions/dynamic_modules/dynamic_module_stats.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
-#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -32,9 +30,6 @@ namespace DynamicModules {
 
 namespace {
 
-constexpr uint32_t DefaultMaxClusters = 10000;
-constexpr size_t MaxClusterSize = 4 * 1024 * 1024;
-constexpr size_t MaxVersionInfoSize = 1024;
 // How long an apply pass may run before it yields to the event loop.
 constexpr std::chrono::milliseconds ApplyPassBudget{5};
 // How long the passes of a burst may hold back the requests of the dependent xDS types.
@@ -43,65 +38,36 @@ constexpr absl::string_view ClusterWriterStatPrefix = "cluster_writer";
 
 } // namespace
 
-// The name prefixes of the cluster writers of a server, keyed by extension name, and the hold on
-// the requests of the xDS types that clusters depend on, which the apply passes of all the writers
-// share so that its time limit holds when their bursts overlap.
-class ClusterWriterRegistry : public Singleton::Instance {
+// The hold on the requests of the xDS types that clusters depend on. The apply passes of all the
+// cluster writers of a server share it, so that its time limit holds when their bursts overlap.
+class ClusterWriterSharedState : public Singleton::Instance {
 public:
-  static std::shared_ptr<ClusterWriterRegistry>
+  static std::shared_ptr<ClusterWriterSharedState>
   get(Server::Configuration::ServerFactoryContext& context);
 
-  absl::flat_hash_map<std::string, std::string> name_prefixes_;
   // The writers whose burst of writes is not fully applied yet.
   absl::flat_hash_set<const DynamicModuleClusterWriter*> writers_applying_;
   Config::ScopedResume dependent_type_pause_;
   MonotonicTime dependent_type_pause_start_;
 };
 
-SINGLETON_MANAGER_REGISTRATION(dynamic_modules_bootstrap_cluster_writer_registry);
+SINGLETON_MANAGER_REGISTRATION(dynamic_modules_bootstrap_cluster_writer_shared_state);
 
-std::shared_ptr<ClusterWriterRegistry>
-ClusterWriterRegistry::get(Server::Configuration::ServerFactoryContext& context) {
-  return context.singletonManager().getTyped<ClusterWriterRegistry>(
-      SINGLETON_MANAGER_REGISTERED_NAME(dynamic_modules_bootstrap_cluster_writer_registry),
-      [] { return std::make_shared<ClusterWriterRegistry>(); }, /*pin=*/true);
-}
-
-absl::Status registerClusterWriter(Server::Configuration::ServerFactoryContext& context,
-                                   absl::string_view extension_name,
-                                   absl::string_view name_prefix) {
-  if (extension_name.empty()) {
-    return absl::InvalidArgumentError("cluster_writer requires a non-empty extension_name");
-  }
-  std::shared_ptr<ClusterWriterRegistry> registry = ClusterWriterRegistry::get(context);
-  for (const auto& [other_extension_name, other_name_prefix] : registry->name_prefixes_) {
-    if (other_extension_name == extension_name) {
-      return absl::InvalidArgumentError(
-          fmt::format("cluster_writer extension_name {} is used by another bootstrap extension",
-                      extension_name));
-    }
-    if (absl::StartsWith(name_prefix, other_name_prefix) ||
-        absl::StartsWith(other_name_prefix, name_prefix)) {
-      return absl::InvalidArgumentError(
-          fmt::format("cluster_writer name_prefix {} of {} overlaps name_prefix {} of {}",
-                      name_prefix, extension_name, other_name_prefix, other_extension_name));
-    }
-  }
-  registry->name_prefixes_.emplace(extension_name, name_prefix);
-  return absl::OkStatus();
+std::shared_ptr<ClusterWriterSharedState>
+ClusterWriterSharedState::get(Server::Configuration::ServerFactoryContext& context) {
+  return context.singletonManager().getTyped<ClusterWriterSharedState>(
+      SINGLETON_MANAGER_REGISTERED_NAME(dynamic_modules_bootstrap_cluster_writer_shared_state),
+      [] { return std::make_shared<ClusterWriterSharedState>(); });
 }
 
 DynamicModuleClusterWriter::DynamicModuleClusterWriter(
-    absl::string_view extension_name,
-    const envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter& config,
-    Server::Configuration::ServerFactoryContext& context, UpdateDoneCallback update_done)
-    : extension_name_(extension_name), name_prefix_(config.name_prefix()),
-      max_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_clusters, DefaultMaxClusters)),
-      context_(context), registry_(ClusterWriterRegistry::get(context)),
-      update_done_(std::move(update_done)),
+    absl::string_view extension_name, Server::Configuration::ServerFactoryContext& context,
+    UpdateDoneCallback update_done)
+    : config_name_(extension_name.empty() ? "default" : extension_name), context_(context),
+      shared_state_(ClusterWriterSharedState::get(context)), update_done_(std::move(update_done)),
       stats_scope_(context.serverScope().store().createScope("")),
-      stats_(generateStats(*stats_scope_, extension_name)),
-      init_target_(absl::StrCat("dynamic_modules_bootstrap_cluster_writer:", extension_name),
+      stats_(generateStats(*stats_scope_, config_name_)),
+      init_target_(absl::StrCat("dynamic_modules_bootstrap_cluster_writer:", config_name_),
                    [this]() { onClustersInitialized(); }),
       apply_callback_(context.mainThreadDispatcher().createSchedulableCallback(
           [this]() { applyQueuedOperations(); })),
@@ -113,11 +79,10 @@ DynamicModuleClusterWriter::DynamicModuleClusterWriter(
 }
 
 DynamicModuleClusterWriter::WriterStats
-DynamicModuleClusterWriter::generateStats(Stats::Scope& scope, absl::string_view extension_name) {
+DynamicModuleClusterWriter::generateStats(Stats::Scope& scope, absl::string_view config_name) {
   Stats::StatNameDynamicPool pool(scope.symbolTable());
   const Stats::StatNameTagVector tags{
-      {pool.add("config_name"), pool.add(Stats::Utility::sanitizeStatsName(extension_name))}};
-  const Stats::StatName reason_tag = pool.add("reason");
+      {pool.add("config_name"), pool.add(Stats::Utility::sanitizeStatsName(config_name))}};
   const auto elements = [](absl::string_view name) -> Stats::ElementVec {
     return {Stats::DynamicName(Extensions::DynamicModules::DynamicModulesStatRoot),
             Stats::DynamicName(ClusterWriterStatPrefix), Stats::DynamicName(name)};
@@ -125,20 +90,15 @@ DynamicModuleClusterWriter::generateStats(Stats::Scope& scope, absl::string_view
   const auto counter = [&](absl::string_view name) -> Stats::Counter& {
     return Stats::Utility::counterFromElements(scope, elements(name), tags);
   };
-  const auto rejected = [&](absl::string_view reason) -> Stats::Counter& {
-    const Stats::StatNameTagVector rejected_tags{tags[0], {reason_tag, pool.add(reason)}};
-    return Stats::Utility::counterFromElements(scope, elements("update_rejected"), rejected_tags);
-  };
   const auto gauge = [&](absl::string_view name) -> Stats::Gauge& {
     return Stats::Utility::gaugeFromElements(scope, elements(name),
                                              Stats::Gauge::ImportMode::NeverImport, tags);
   };
-  return WriterStats{
-      counter("update_submitted"),      rejected("not_allowed"),   rejected("outside_name_prefix"),
-      rejected("limit_reached"),        rejected("too_large"),     counter("update_active"),
-      counter("update_superseded"),     counter("update_removed"), counter("update_failed"),
-      counter("update_ownership_lost"), counter("ownership_lost"), gauge("clusters_owned"),
-      gauge("updates_pending")};
+  return WriterStats{counter("update_submitted"),      counter("update_rejected"),
+                     counter("update_active"),         counter("update_superseded"),
+                     counter("update_removed"),        counter("update_failed"),
+                     counter("update_ownership_lost"), counter("ownership_lost"),
+                     gauge("clusters_owned"),          gauge("updates_pending")};
 }
 
 void DynamicModuleClusterWriter::onServerInitialized() { server_initialized_ = true; }
@@ -161,9 +121,9 @@ void DynamicModuleClusterWriter::onShutdown() {
   cluster_update_callbacks_handle_.reset();
   apply_callback_->cancel();
   deliver_callback_->cancel();
-  registry_->writers_applying_.erase(this);
-  if (registry_->writers_applying_.empty()) {
-    registry_->dependent_type_pause_.reset();
+  shared_state_->writers_applying_.erase(this);
+  if (shared_state_->writers_applying_.empty()) {
+    shared_state_->dependent_type_pause_.reset();
   }
   clusters_.clear();
   queue_.clear();
@@ -183,36 +143,11 @@ DynamicModuleClusterWriter::addOrUpdateCluster(absl::string_view cluster_name,
                                                uint64_t& update_id) {
   update_id = 0;
   if (!writesAllowed()) {
-    stats_.update_rejected_not_allowed_.inc();
+    stats_.update_rejected_.inc();
     return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed;
   }
-  if (!absl::StartsWith(cluster_name, name_prefix_)) {
-    stats_.update_rejected_outside_name_prefix_.inc();
-    return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_OutsideNamePrefix;
-  }
-  if (cluster_name.size() > MaxClusterSize || cluster.size() > MaxClusterSize ||
-      version_info.size() > MaxVersionInfoSize) {
-    stats_.update_rejected_too_large_.inc();
-    ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(10),
-                       "dynamic module cluster writer {} rejected a write since the name has {} "
-                       "bytes, the cluster has {} bytes and the version has {} bytes",
-                       extension_name_, cluster_name.size(), cluster.size(), version_info.size());
-    return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_TooLarge;
-  }
-  auto it = clusters_.find(cluster_name);
-  if (it == clusters_.end()) {
-    if (clusters_.size() >= max_clusters_) {
-      stats_.update_rejected_limit_reached_.inc();
-      ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(10),
-                         "dynamic module cluster writer {} rejected cluster {} since it reached "
-                         "max_clusters {}",
-                         extension_name_, cluster_name, max_clusters_);
-      return envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_LimitReached;
-    }
-    it = clusters_.try_emplace(cluster_name, queue_.end()).first;
-  }
 
-  ClusterState& state = it->second;
+  ClusterState& state = clusters_.try_emplace(cluster_name, queue_.end()).first->second;
   update_id = next_update_id_++;
   stats_.update_submitted_.inc();
   stats_.updates_pending_.inc();
@@ -284,10 +219,10 @@ void DynamicModuleClusterWriter::scheduleApplyPass() {
 void DynamicModuleClusterWriter::applyQueuedOperations() {
   TimeSource& time_source = context_.mainThreadDispatcher().timeSource();
   // Send the EDS, LEDS and SDS requests of a burst of written clusters together, as CDS does.
-  if (registry_->dependent_type_pause_ == nullptr) {
-    registry_->dependent_type_pause_ = context_.xdsManager().pause(
+  if (shared_state_->dependent_type_pause_ == nullptr) {
+    shared_state_->dependent_type_pause_ = context_.xdsManager().pause(
         Config::dependentTypeUrls(Config::getTypeUrl<envoy::config::cluster::v3::Cluster>()));
-    registry_->dependent_type_pause_start_ = time_source.monotonicTime();
+    shared_state_->dependent_type_pause_start_ = time_source.monotonicTime();
   }
   // Operations queued while this pass runs wait for the next pass, so that every pass ends.
   const uint64_t sequence_cutoff = next_sequence_;
@@ -311,15 +246,15 @@ void DynamicModuleClusterWriter::applyQueuedOperations() {
     applied_any = true;
   }
   if (queue_.empty()) {
-    registry_->writers_applying_.erase(this);
+    shared_state_->writers_applying_.erase(this);
   } else {
-    registry_->writers_applying_.insert(this);
+    shared_state_->writers_applying_.insert(this);
   }
   // Modules that write all the time must not hold back these requests for long.
-  if (registry_->writers_applying_.empty() ||
-      time_source.monotonicTime() - registry_->dependent_type_pause_start_ >=
+  if (shared_state_->writers_applying_.empty() ||
+      time_source.monotonicTime() - shared_state_->dependent_type_pause_start_ >=
           MaxDependentTypePause) {
-    registry_->dependent_type_pause_.reset();
+    shared_state_->dependent_type_pause_.reset();
   }
   scheduleApplyPass();
 }
@@ -369,7 +304,7 @@ void DynamicModuleClusterWriter::applyUpdate(QueuedOperation& operation) {
     ENVOY_LOG_PERIODIC(
         warn, std::chrono::seconds(10),
         "dynamic module cluster writer {} rejected update {} of cluster {} at version {}: {}",
-        extension_name_, operation.update_id, operation.cluster_name, operation.version_info,
+        config_name_, operation.update_id, operation.cluster_name, operation.version_info,
         status.message());
     completeUpdate(operation.update_id, operation.cluster_name,
                    envoy_dynamic_module_type_bootstrap_cluster_writer_update_status_Failed,
@@ -397,7 +332,7 @@ void DynamicModuleClusterWriter::applyUpdate(QueuedOperation& operation) {
     ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(10),
                        "dynamic module cluster writer {} failed to apply update {} of cluster {} "
                        "at version {}: {}",
-                       extension_name_, operation.update_id, operation.cluster_name,
+                       config_name_, operation.update_id, operation.cluster_name,
                        operation.version_info, update_or_error.status().message());
     // The cluster manager keeps the new cluster when its load balancer failed to initialize.
     setOwned(state, state.owned || context_.clusterManager().hasCluster(operation.cluster_name));
@@ -498,7 +433,7 @@ void DynamicModuleClusterWriter::setOwned(ClusterState& state, bool owned) {
 
 void DynamicModuleClusterWriter::loseOwnership(absl::string_view cluster_name, ClusterState& state,
                                                absl::string_view error_details) {
-  ENVOY_LOG(warn, "dynamic module cluster writer {} no longer owns cluster {}: {}", extension_name_,
+  ENVOY_LOG(warn, "dynamic module cluster writer {} no longer owns cluster {}: {}", config_name_,
             cluster_name, error_details);
   stats_.ownership_lost_.inc();
   completeWarmingUpdate(

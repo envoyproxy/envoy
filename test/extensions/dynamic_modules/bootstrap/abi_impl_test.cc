@@ -2,7 +2,6 @@
 #include <thread>
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/extensions/bootstrap/dynamic_modules/extension.h"
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
@@ -48,16 +47,15 @@ protected:
   }
 
   // Creates a config backed by the bootstrap_optional_hooks module.
-  DynamicModuleBootstrapExtensionConfigSharedPtr newOptionalHooksConfig(
-      OptRef<const envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter>
-          cluster_writer = {},
-      absl::string_view extension_config = "config") {
+  DynamicModuleBootstrapExtensionConfigSharedPtr
+  newOptionalHooksConfig(bool has_cluster_writer = false,
+                         absl::string_view extension_config = "config") {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         testDataDir() + "/libbootstrap_optional_hooks.so", false);
     EXPECT_OK(dynamic_module);
     auto config = newDynamicModuleBootstrapExtensionConfig(
         "test", extension_config, DefaultMetricsNamespace, std::move(dynamic_module.value()),
-        dispatcher_, context_, context_.store_, cluster_writer);
+        dispatcher_, context_, context_.store_, has_cluster_writer);
     EXPECT_OK(config);
     return config.value();
   }
@@ -2358,7 +2356,8 @@ TEST_F(BootstrapAbiImplTest, SignalInitCompleteOffMainThreadStillSignals) {
     init_target_handles.push_back(target.createHandle("test"));
   });
   // The module does not signal from config_new with this configuration.
-  auto config = newOptionalHooksConfig({}, "run_on_all_workers_at_startup");
+  auto config =
+      newOptionalHooksConfig(/*has_cluster_writer=*/false, "run_on_all_workers_at_startup");
   ASSERT_EQ(1, init_target_handles.size());
   testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
   init_target_handles[0]->initialize(init_watcher);
@@ -2394,7 +2393,8 @@ TEST_F(BootstrapAbiImplTest, PostedSignalInitCompleteReachesOnlyALiveConfigurati
   });
   for (const bool live : {true, false}) {
     // The module does not signal from config_new with this configuration.
-    auto config = newOptionalHooksConfig({}, "run_on_all_workers_at_startup");
+    auto config =
+        newOptionalHooksConfig(/*has_cluster_writer=*/false, "run_on_all_workers_at_startup");
     testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
     init_target_handles.back()->initialize(init_watcher);
     Event::PostCb posted;
@@ -2666,9 +2666,7 @@ TEST_F(BootstrapAbiImplTest, ClusterWriterReportsOutcomesToTheModule) {
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
   auto* apply_callback =
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-  envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter cluster_writer;
-  cluster_writer.set_name_prefix("writer.");
-  auto config = newOptionalHooksConfig(cluster_writer);
+  auto config = newOptionalHooksConfig(/*has_cluster_writer=*/true);
   ASSERT_NE(nullptr, config->cluster_writer_);
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);

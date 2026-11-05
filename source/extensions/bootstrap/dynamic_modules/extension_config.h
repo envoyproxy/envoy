@@ -5,7 +5,6 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.pb.h"
 #include "envoy/filesystem/watcher.h"
 #include "envoy/http/async_client.h"
 #include "envoy/server/factory_context.h"
@@ -460,7 +459,7 @@ private:
  * @param main_thread_dispatcher the main thread dispatcher.
  * @param context the server factory context for accessing cluster manager lazily.
  * @param stats_store the stats store for accessing metrics.
- * @param cluster_writer the cluster writer configuration, if the extension has one.
+ * @param has_cluster_writer whether the extension configuration sets cluster_writer.
  * @return an error status if the module could not be loaded or the configuration could not be
  * created, or a shared pointer to the config.
  */
@@ -470,9 +469,7 @@ newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
-    Stats::Store& stats_store,
-    OptRef<const envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter> cluster_writer =
-        {});
+    Stats::Store& stats_store, bool has_cluster_writer = false);
 
 } // namespace DynamicModules
 } // namespace Bootstrap

@@ -1,6 +1,5 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
-#include "envoy/extensions/bootstrap/dynamic_modules/v3/dynamic_modules.pb.h"
 
 #include "source/common/common/cleanup.h"
 #include "source/common/config/dependent_type_urls.h"
@@ -15,7 +14,6 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/status_utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
@@ -73,12 +71,7 @@ public:
         }));
   }
 
-  void createWriter(uint32_t max_clusters = 0, bool with_done_hook = true) {
-    envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter config;
-    config.set_name_prefix("writer.");
-    if (max_clusters > 0) {
-      config.mutable_max_clusters()->set_value(max_clusters);
-    }
+  void createWriter(bool with_done_hook = true, absl::string_view extension_name = "writer") {
     DynamicModuleClusterWriter::UpdateDoneCallback update_done;
     if (with_done_hook) {
       update_done = [this](uint64_t update_id, absl::string_view cluster_name,
@@ -91,13 +84,13 @@ public:
     // The writer creates its apply callback first, and the newest expectation matches first.
     deliver_callback_ = new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
     apply_callback_ = new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-    writer_ = std::make_unique<DynamicModuleClusterWriter>("writer", config, context_,
+    writer_ = std::make_unique<DynamicModuleClusterWriter>(extension_name, context_,
                                                            std::move(update_done));
   }
 
   // Creates a writer that accepts writes and applies them.
-  void createInitializedWriter(uint32_t max_clusters = 0) {
-    createWriter(max_clusters);
+  void createInitializedWriter() {
+    createWriter();
     writer_->onServerInitialized();
     init_target_handle_->initialize(init_watcher_);
   }
@@ -126,12 +119,9 @@ public:
     writer_->onClusterAddOrUpdate(cluster_name, command);
   }
 
-  uint64_t counter(absl::string_view name, absl::string_view reason = "") {
+  uint64_t counter(absl::string_view name, absl::string_view config_name = "writer") {
     Stats::StatNameDynamicPool pool(context_.store_.symbolTable());
-    Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add("writer")}};
-    if (!reason.empty()) {
-      tags.push_back({pool.add("reason"), pool.add(reason)});
-    }
+    const Stats::StatNameTagVector tags{{pool.add("config_name"), pool.add(config_name)}};
     return Stats::Utility::counterFromElements(context_.serverScope(), elements(name), tags)
         .value();
   }
@@ -171,7 +161,16 @@ TEST_F(ClusterWriterTest, RejectsWritesBeforeServerInitialized) {
   EXPECT_EQ(0, update_id);
   EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed,
             writer_->removeCluster("writer.a"));
-  EXPECT_EQ(1, counter("update_rejected", "not_allowed"));
+  EXPECT_EQ(1, counter("update_rejected"));
+}
+
+TEST_F(ClusterWriterTest, StatsOfAnUnnamedExtensionUseTheDefaultConfigName) {
+  createWriter(/*with_done_hook=*/true, /*extension_name=*/"");
+  uint64_t update_id = 0;
+  EXPECT_EQ(
+      envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed,
+      writer_->addOrUpdateCluster("writer.a", serializedCluster("writer.a"), "v1", update_id));
+  EXPECT_EQ(1, counter("update_rejected", "default"));
 }
 
 TEST_F(ClusterWriterTest, ShutdownRefusesWritesAndDropsQueuedWork) {
@@ -218,66 +217,6 @@ TEST_F(ClusterWriterTest, ShutdownBeforeClusterInitializationSkipsTheClusterMana
   EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_)).Times(0);
   EXPECT_CALL(init_watcher_, ready());
   init_target_handle_->initialize(init_watcher_);
-}
-
-TEST_F(ClusterWriterTest, RejectsNamesOutsideThePrefix) {
-  createInitializedWriter();
-  uint64_t update_id = 1;
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_OutsideNamePrefix,
-            writer_->addOrUpdateCluster("other.a", serializedCluster("other.a"), "v1", update_id));
-  EXPECT_EQ(0, update_id);
-  EXPECT_EQ(1, counter("update_rejected", "outside_name_prefix"));
-}
-
-TEST_F(ClusterWriterTest, RejectsTooLargeWrites) {
-  createInitializedWriter();
-  uint64_t update_id = 0;
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_TooLarge,
-            writer_->addOrUpdateCluster("writer.a", std::string(4 * 1024 * 1024 + 1, 'x'), "v1",
-                                        update_id));
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_TooLarge,
-            writer_->addOrUpdateCluster("writer.a", serializedCluster("writer.a"),
-                                        std::string(1025, 'v'), update_id));
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_TooLarge,
-            writer_->addOrUpdateCluster(absl::StrCat("writer.", std::string(4 * 1024 * 1024, 'n')),
-                                        serializedCluster("writer.a"), "v1", update_id));
-  EXPECT_EQ(0, update_id);
-  EXPECT_EQ(3, counter("update_rejected", "too_large"));
-  // Writes at the limits are accepted.
-  EXPECT_EQ(Success, writer_->addOrUpdateCluster("writer.a", std::string(4 * 1024 * 1024, 'x'),
-                                                 std::string(1024, 'v'), update_id));
-}
-
-TEST_F(ClusterWriterTest, RejectsNewClustersOverTheLimit) {
-  createInitializedWriter(/*max_clusters=*/1);
-  write("writer.a");
-  uint64_t update_id = 0;
-  EXPECT_EQ(
-      envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_LimitReached,
-      writer_->addOrUpdateCluster("writer.b", serializedCluster("writer.b"), "v1", update_id));
-  EXPECT_EQ(1, counter("update_rejected", "limit_reached"));
-  // A write of a cluster that the writer already tracks does not count against the limit.
-  write("writer.a", "v2");
-  runApplyPass();
-
-  // A queued removal frees the slot of its cluster once it is applied.
-  writer_->removeCluster("writer.a");
-  EXPECT_EQ(
-      envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_LimitReached,
-      writer_->addOrUpdateCluster("writer.b", serializedCluster("writer.b"), "v1", update_id));
-  runApplyPass();
-  write("writer.b");
-}
-
-TEST_F(ClusterWriterTest, DefaultLimitIsTenThousandClusters) {
-  createInitializedWriter();
-  for (int i = 0; i < 10000; i++) {
-    write(absl::StrCat("writer.", i));
-  }
-  uint64_t update_id = 0;
-  EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_LimitReached,
-            writer_->addOrUpdateCluster("writer.last", serializedCluster("writer.last"), "v1",
-                                        update_id));
 }
 
 TEST_F(ClusterWriterTest, OutcomesAreDeliveredInALaterLoopIteration) {
@@ -698,9 +637,7 @@ TEST_F(ClusterWriterTest, WritersShareOneDependentXdsPause) {
   // The writer creates its apply callback first, and the newest expectation matches first.
   new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
   auto* second_apply_callback = new NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-  envoy::extensions::bootstrap::dynamic_modules::v3::ClusterWriter config;
-  config.set_name_prefix("second.");
-  DynamicModuleClusterWriter second_writer("second", config, context_, nullptr);
+  DynamicModuleClusterWriter second_writer("second", context_, nullptr);
   second_writer.onServerInitialized();
   init_target_handle_->initialize(init_watcher_);
   write("writer.a");
@@ -968,7 +905,7 @@ TEST_F(ClusterWriterTest, RemovalDuringTheFirstApplyRemovesTheCluster) {
 }
 
 TEST_F(ClusterWriterTest, WritesAreAppliedWithoutADoneHook) {
-  createWriter(/*max_clusters=*/0, /*with_done_hook=*/false);
+  createWriter(/*with_done_hook=*/false);
   writer_->onServerInitialized();
   init_target_handle_->initialize(init_watcher_);
   write("writer.a");
@@ -976,21 +913,6 @@ TEST_F(ClusterWriterTest, WritesAreAppliedWithoutADoneHook) {
   runApplyPass();
   EXPECT_FALSE(deliver_callback_->enabled_);
   EXPECT_EQ(1, counter("update_active"));
-}
-
-TEST(RegisterClusterWriterTest, RejectsInvalidRegistrations) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_EQ("cluster_writer requires a non-empty extension_name",
-            registerClusterWriter(context, "", "writer.").message());
-  EXPECT_OK(registerClusterWriter(context, "first", "first.a"));
-  EXPECT_OK(registerClusterWriter(context, "second", "second."));
-  EXPECT_EQ("cluster_writer extension_name first is used by another bootstrap extension",
-            registerClusterWriter(context, "first", "third.").message());
-  EXPECT_THAT(registerClusterWriter(context, "third", "first.").message(),
-              HasSubstr("overlaps name_prefix first.a of first"));
-  EXPECT_THAT(registerClusterWriter(context, "third", "second.b").message(),
-              HasSubstr("overlaps name_prefix second. of second"));
-  EXPECT_OK(registerClusterWriter(context, "third", "first.b"));
 }
 
 } // namespace

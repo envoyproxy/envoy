@@ -9106,12 +9106,6 @@ typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_update_result {
   // before envoy_dynamic_module_on_bootstrap_extension_server_initialized or after shutdown began.
   // A call off the main thread also reports an Envoy bug.
   envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed = 1,
-  // The cluster name does not start with cluster_writer.name_prefix.
-  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_OutsideNamePrefix = 2,
-  // Adding the cluster would exceed cluster_writer.max_clusters.
-  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_LimitReached = 3,
-  // The name or the serialized cluster is larger than 4 MiB, or the version is larger than 1 KiB.
-  envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_TooLarge = 4,
 } envoy_dynamic_module_type_bootstrap_cluster_writer_update_result;
 
 /**
@@ -10213,14 +10207,13 @@ void envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
  * The extension owns the clusters it writes, and CDS does not remove them. When another component,
  * for example CDS, replaces an active cluster that the extension owns, the extension no longer owns
  * it and later writes of the cluster complete as Failed. Envoy does not notice a replacement of a
- * cluster that is still warming, so no other component should write clusters with the name prefix.
- * Writes submitted before Envoy finishes initializing its static and CDS clusters are applied once
- * it has. Envoy does not wait for written clusters before it finishes initializing, so to serve
- * them from the first request, call
+ * cluster that is still warming, so the module should only write clusters that no other component
+ * writes. Writes submitted before Envoy finishes initializing its static and CDS clusters are
+ * applied once it has. Envoy does not wait for written clusters before it finishes initializing, so
+ * to serve them from the first request, call
  * envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete only after their
- * writes completed as Active. When the module writes a cluster again before its
- * previous write is applied, Envoy applies only the latest write and the previous one completes as
- * Superseded.
+ * writes completed as Active. When the module writes a cluster again before its previous write is
+ * applied, Envoy applies only the latest write and the previous one completes as Superseded.
  *
  * A written cluster has the same authority as a cluster delivered by CDS, so build clusters from a
  * schema that the module owns. On the ADS stream and the xDS-TP authority streams, a written
@@ -10240,7 +10233,7 @@ void envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
  *
  * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
  * object.
- * @param cluster_name is the name of the cluster. It must start with cluster_writer.name_prefix.
+ * @param cluster_name is the name of the cluster.
  * @param cluster is the serialized envoy.config.cluster.v3.Cluster. Its name must equal
  * cluster_name.
  * @param version_info is the version that Envoy stores with the cluster when the write changes it,
