@@ -25,8 +25,6 @@
 using testing::_;
 using testing::Eq;
 using testing::InSequence;
-using testing::Invoke;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 #ifdef WIN32
 using testing::Return;
@@ -183,31 +181,31 @@ public:
     // In some cases the syscall used for windows is recv, not readv.
     if (windows_recv) {
       EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
-          .WillOnce(Invoke([=, &client_hello](os_fd_t, void* buffer, size_t length,
-                                              int) -> Api::SysCallSizeResult {
+          .WillOnce([=, &client_hello](os_fd_t, void* buffer, size_t length,
+                                       int) -> Api::SysCallSizeResult {
             const size_t amount_to_copy = std::min(length, client_hello.size());
             memcpy(buffer, client_hello.data(), amount_to_copy);
             return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-          }));
+          });
     } else {
       EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-          .WillOnce(Invoke(
+          .WillOnce(
               [&client_hello](os_fd_t fd, const iovec* iov, int iovcnt) -> Api::SysCallSizeResult {
                 const size_t amount_to_copy = std::min(iov->iov_len, client_hello.size());
                 memcpy(iov->iov_base, client_hello.data(), amount_to_copy);
                 return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-              }))
+              })
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     }
 #else
     (void)windows_recv;
     EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&client_hello](os_fd_t, void* buffer, size_t length, int) -> Api::SysCallSizeResult {
               const size_t amount_to_copy = std::min(length, client_hello.size());
               memcpy(buffer, client_hello.data(), amount_to_copy);
               return Api::SysCallSizeResult{ssize_t(amount_to_copy), 0};
-            }));
+            });
 #endif
   }
 
@@ -321,30 +319,29 @@ TEST_P(TlsInspectorTest, MultipleReads) {
         .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     for (size_t i = 0; i < client_hello.size(); i++) {
       EXPECT_CALL(os_sys_calls_, readv(_, _, _))
-          .WillOnce(Invoke([&client_hello, i](os_fd_t fd, const iovec* iov,
-                                              int iovcnt) -> Api::SysCallSizeResult {
+          .WillOnce([&client_hello, i](os_fd_t fd, const iovec* iov,
+                                       int iovcnt) -> Api::SysCallSizeResult {
             ASSERT(iov->iov_len >= client_hello.size());
             memcpy(iov->iov_base, client_hello.data() + i, 1);
             return Api::SysCallSizeResult{ssize_t(1), 0};
-          }))
+          })
           .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
     }
   }
 #else
   {
     InSequence s;
-    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-        .WillOnce(InvokeWithoutArgs([]() -> Api::SysCallSizeResult {
-          return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
-        }));
+    EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK)).WillOnce([]() -> Api::SysCallSizeResult {
+      return Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN};
+    });
     for (size_t i = 1; i <= client_hello.size(); i++) {
       EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
-          .WillOnce(Invoke([&client_hello, i](os_fd_t, void* buffer, size_t length,
-                                              int) -> Api::SysCallSizeResult {
+          .WillOnce([&client_hello, i](os_fd_t, void* buffer, size_t length,
+                                       int) -> Api::SysCallSizeResult {
             ASSERT(length >= client_hello.size());
             memcpy(buffer, client_hello.data(), client_hello.size());
             return Api::SysCallSizeResult{ssize_t(i), 0};
-          }));
+          });
     }
   }
 #endif

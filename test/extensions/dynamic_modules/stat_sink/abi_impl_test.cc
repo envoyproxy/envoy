@@ -20,7 +20,6 @@ namespace DynamicModules {
 namespace {
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::ReturnRef;
 
@@ -873,7 +872,7 @@ TEST_F(DynamicModuleStatsSinkConfigAbiTest, SchedulerNewCommitDelete) {
 
   auto* scheduler = envoy_dynamic_module_callback_stat_sink_config_scheduler_new(configHandle());
   ASSERT_NE(nullptr, scheduler);
-  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce(Invoke([](Event::PostCb cb) { cb(); }));
+  EXPECT_CALL(context_.dispatcher_, post(_)).WillOnce([](Event::PostCb cb) { cb(); });
   envoy_dynamic_module_callback_stat_sink_config_scheduler_commit(scheduler, 77);
   envoy_dynamic_module_callback_stat_sink_config_scheduler_delete(scheduler);
 

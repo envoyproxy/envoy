@@ -21,8 +21,11 @@ envoy_extension_cc_dyn_module_test(
         "//test/extensions/dynamic_modules/test_data/c:network_no_op",
         "//test/extensions/dynamic_modules/test_data/c:network_stop_iteration",
         "//test/extensions/dynamic_modules/test_data/c:no_op",
+        "//test/extensions/dynamic_modules/test_data/cpp:network_integration_test",
+        "//test/extensions/dynamic_modules/test_data/go:network_integration_test",
         "//test/extensions/dynamic_modules/test_data/rust:network_integration_test",
     ],
+    env = {"GODEBUG": "cgocheck=0"},
     extension_names = ["envoy.filters.network.dynamic_modules"],
     rbe_pool = "linux_x64_small",
     deps = [

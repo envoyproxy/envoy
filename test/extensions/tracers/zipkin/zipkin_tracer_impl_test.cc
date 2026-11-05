@@ -23,7 +23,6 @@
 
 using testing::_;
 using testing::DoAll;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -87,18 +86,17 @@ public:
 
     EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
                 send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-        .WillOnce(
-            Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-              callback = &callbacks;
+        .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                      const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+          callback = &callbacks;
 
-              const std::string& expected_hostname = !hostname.empty() ? hostname : "fake_cluster";
-              EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-              EXPECT_EQ(expected_hostname, message->headers().getHostValue());
-              EXPECT_EQ(content_type, message->headers().getContentTypeValue());
+          const std::string& expected_hostname = !hostname.empty() ? hostname : "fake_cluster";
+          EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+          EXPECT_EQ(expected_hostname, message->headers().getHostValue());
+          EXPECT_EQ(content_type, message->headers().getContentTypeValue());
 
-              return &request;
-            }));
+          return &request;
+        });
 
     EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
         .Times(2)
@@ -372,17 +370,16 @@ TEST_F(ZipkinDriverTest, FlushOneSpanReportFailure) {
 
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
-            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+        EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+        EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+        EXPECT_EQ("application/json", message->headers().getContentTypeValue());
 
-            return &request;
-          }));
+        return &request;
+      });
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
@@ -1101,31 +1098,30 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersVerifyHeaders) {
   // Set up expectations for the HTTP request with custom headers
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            callback = &callbacks;
+      .WillOnce([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        callback = &callbacks;
 
-            // Verify standard headers are present
-            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-            EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
-            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+        // Verify standard headers are present
+        EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+        EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
+        EXPECT_EQ("application/json", message->headers().getContentTypeValue());
 
-            // Verify custom headers are present
-            auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
-            EXPECT_FALSE(auth_header.empty());
-            EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
+        // Verify custom headers are present
+        auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
+        EXPECT_FALSE(auth_header.empty());
+        EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
 
-            auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
-            EXPECT_FALSE(custom_header.empty());
-            EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
+        auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
+        EXPECT_FALSE(custom_header.empty());
+        EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
 
-            auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
-            EXPECT_FALSE(api_key_header.empty());
-            EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
+        auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
+        EXPECT_FALSE(api_key_header.empty());
+        EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
 
-            return &request;
-          }));
+        return &request;
+      });
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
       .WillOnce(Return(1));

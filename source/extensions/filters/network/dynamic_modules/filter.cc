@@ -325,9 +325,8 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onSuccess(
 
 void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
     const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason reason) {
-  // Copy the filter shared_ptr and callout id to the local scope since
-  // on_network_filter_http_callout_done_ might cause destruction of the filter. That eventually
-  // ends up deallocating this callback itself.
+  // Copy the filter shared_ptr and callout id to the local scope since removing the callout below
+  // frees this callback.
   DynamicModuleNetworkFilterSharedPtr filter = filter_.lock();
   uint64_t callout_id = callout_id_;
   // request_ is set only after the async client accepts the callout. Gating on it avoids a
@@ -338,7 +337,6 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
     return;
   }
 
-  DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
   envoy_dynamic_module_type_http_callout_result result =
       envoy_dynamic_module_type_http_callout_result_Reset;
   switch (reason) {
@@ -350,9 +348,17 @@ void DynamicModuleNetworkFilter::HttpCalloutCallback::onFailure(
     break;
   }
 
-  filter->config_->on_network_filter_http_callout_done_(filter->thisAsVoidPtr(),
-                                                        filter->in_module_filter_, callout_id,
-                                                        result, nullptr, 0, nullptr, 0);
+  // This can run inside a cluster manager update, so report it from a posted callback.
+  filter->dispatcher()->post([weak_filter = filter_, callout_id, result]() {
+    DynamicModuleNetworkFilterSharedPtr filter = weak_filter.lock();
+    if (filter == nullptr || filter->in_module_filter_ == nullptr) {
+      return;
+    }
+    DynamicModuleNetworkFilter::HookScope hook_scope(*filter);
+    filter->config_->on_network_filter_http_callout_done_(filter->thisAsVoidPtr(),
+                                                          filter->in_module_filter_, callout_id,
+                                                          result, nullptr, 0, nullptr, 0);
+  });
 
   // Remove the callout from the map.
   filter->http_callouts_.erase(callout_id);

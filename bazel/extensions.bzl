@@ -1,11 +1,6 @@
-# TODO(phlax): Move this to toolsheds toolchain alias
-"""Module extensions for Envoy's non-module dependencies.
+"""Module extensions for Envoy build configuration, dependency metadata, and repositories."""
 
-This file defines module extensions to support Envoy's bzlmod migration while
-respecting existing WORKSPACE patches and custom BUILD files.
-"""
-
-load("@envoy_toolshed//compile:llvm_minimal.bzl", "render_llvm_repo_build")
+load("@envoy_toolshed//compile:llvm_minimal.bzl", "llvm_toolchain_alias", "setup_llvm_minimal")
 load("@envoy_toolshed//repository:utils.bzl", "arch_alias")
 load("//bazel/external/cargo/remote:crates.bzl", "crate_repositories")
 load(":envoy_build_config.bzl", "default_envoy_build_config")
@@ -14,201 +9,6 @@ load(":repo.bzl", "envoy_repo")
 _LOCKFILE_LABEL = Label("//:MODULE.bazel.lock")
 _MODULES_SEGMENT = "/modules/"
 _SOURCE_JSON_SUFFIX = "/source.json"
-_LLVM_VERSION = "22.1.8"
-
-def _llvm_repo_build(llvm_version):
-    return render_llvm_repo_build(llvm_version.split(".")[0])
-
-def _write_llvm_bzl(repository_ctx, llvm_version, llvm_lib_dir, is_host):
-    major = llvm_version.split(".")[0]
-    major_minor = ".".join(llvm_version.split(".")[:2])
-    repository_ctx.file("llvm.bzl", """
-LLVM_VERSION = %r
-LLVM_MAJOR = %r
-LLVM_MAJOR_MINOR = %r
-LLVM_LIB_DIR = %r
-LLVM_IS_HOST = %s
-""" % (llvm_version, major, major_minor, llvm_lib_dir, is_host))
-
-def _detect_llvm_version(repository_ctx, llvm_root, declared_version, clang_name = "bin/clang"):
-    clang = llvm_root.get_child(clang_name)
-    result = repository_ctx.execute([str(clang), "--version"])
-    if result.return_code != 0:
-        fail("Could not run %s --version (exit code %s): %s" % (clang, result.return_code, result.stderr))
-
-    version = ""
-    marker = "clang version "
-    for line in result.stdout.split("\n"):
-        if marker in line:
-            version_parts = line[line.find(marker) + len(marker):].strip().split(" ")
-            if version_parts:
-                version = version_parts[0].split("-")[0]
-                components = version.split(".")
-                if len(components) != 3:
-                    version = ""
-                else:
-                    for component in components:
-                        if not component.isdigit():
-                            version = ""
-                            break
-            break
-    if not version:
-        fail("Could not parse a full clang version from %s --version output: %s" % (clang, result.stdout))
-    if declared_version and declared_version.split(".")[0] != version.split(".")[0]:
-        fail(
-            "envoy_llvm.host(llvm_version = %r) does not match the installed clang version %s" %
-            (declared_version, version),
-        )
-    return version
-
-def _detect_llvm_lib_dir(llvm_root, major):
-    library_name = "libclang-cpp.so.%s" % major
-    for candidate in ["lib", "lib64", "lib/x86_64-linux-gnu", "lib/aarch64-linux-gnu"]:
-        directory = llvm_root.get_child(candidate)
-        if not directory.exists:
-            continue
-        for library in directory.readdir():
-            if library.basename == library_name or library.basename.startswith(library_name + "."):
-                return candidate
-    fail("Could not find %s under %s in lib, lib64, lib/x86_64-linux-gnu, or lib/aarch64-linux-gnu" % (library_name, llvm_root))
-
-def _host_llvm_repo_impl(repository_ctx):
-    llvm_root = repository_ctx.path(repository_ctx.attr.path)
-    version = _detect_llvm_version(repository_ctx, llvm_root, repository_ctx.attr.llvm_version)
-    lib_dir = _detect_llvm_lib_dir(llvm_root, version.split(".")[0])
-    for directory in ["bin", "include", "lib", "lib64"]:
-        path = llvm_root.get_child(directory)
-        if not path.exists and directory in ["bin", "include"]:
-            fail("Host LLVM directory does not exist: %s" % path)
-        if path.exists:
-            _symlink_directory_contents(repository_ctx, path, directory)
-    repository_ctx.file(
-        "BUILD.bazel",
-        _llvm_repo_build(version),
-    )
-    _write_llvm_bzl(repository_ctx, version, lib_dir, True)
-
-_host_llvm_repo = repository_rule(
-    implementation = _host_llvm_repo_impl,
-    local = True,
-    attrs = {
-        "llvm_version": attr.string(default = ""),
-        "path": attr.string(mandatory = True),
-    },
-)
-
-def _symlink_directory_contents(repository_ctx, source, destination):
-    for child in source.readdir():
-        repository_ctx.symlink(child, destination + "/" + child.basename)
-
-def _windows_llvm_repo(repository_ctx):
-    # Windows builds use the host clang-cl toolchain, so there is no hermetic LLVM to alias.
-    # Expose the tools Envoy needs from the host LLVM that clang-cl comes from, located the same
-    # way as the rules_cc Windows toolchain does it.
-    llvm_root = repository_ctx.path(
-        (repository_ctx.getenv("BAZEL_LLVM") or "C:/Program Files/LLVM").replace("\\", "/").rstrip("/"),
-    )
-    objcopy = llvm_root.get_child("bin/llvm-objcopy.exe")
-    if not objcopy.exists:
-        fail("Could not find %s. Set BAZEL_LLVM to the host LLVM installation." % objcopy)
-    repository_ctx.symlink(objcopy, "bin/llvm-objcopy.exe")
-    nm = llvm_root.get_child("bin/llvm-nm.exe")
-    if not nm.exists:
-        fail("Could not find %s. Set BAZEL_LLVM to the host LLVM installation." % nm)
-    repository_ctx.symlink(nm, "bin/llvm-nm.exe")
-    repository_ctx.file(
-        "BUILD.bazel",
-        """
-package(default_visibility = ["//visibility:public"])
-
-exports_files(["llvm.bzl"])
-
-alias(
-    name = "objcopy",
-    actual = "bin/llvm-objcopy.exe",
-)
-
-alias(
-    name = "nm",
-    actual = "bin/llvm-nm.exe",
-)
-""",
-    )
-    version = _detect_llvm_version(repository_ctx, llvm_root, "", "bin/clang.exe")
-    _write_llvm_bzl(repository_ctx, version, "lib", True)
-
-def _llvm_alias_repo_impl(repository_ctx):
-    os_name = repository_ctx.os.name.lower()
-    arch = repository_ctx.os.arch.lower()
-    if os_name.startswith("linux") and (arch.startswith("x86_64") or arch.startswith("amd64")):
-        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_linux_x64).dirname
-    elif os_name.startswith("linux") and (arch.startswith("aarch64") or arch.startswith("arm64")):
-        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_linux_arm64).dirname
-    elif (os_name.startswith("mac os x") or os_name.startswith("darwin")) and (
-        arch.startswith("aarch64") or arch.startswith("arm64")
-    ):
-        llvm_root = repository_ctx.path(repository_ctx.attr.minimal_macos_arm64).dirname
-    elif os_name.startswith("windows"):
-        _windows_llvm_repo(repository_ctx)
-        return
-    else:
-        fail(
-            "Unsupported host platform for llvm_toolchain_llvm: %s %s" %
-            (repository_ctx.os.name, repository_ctx.os.arch),
-        )
-
-    for directory in ["bin", "include", "lib"]:
-        _symlink_directory_contents(repository_ctx, llvm_root.get_child(directory), directory)
-    repository_ctx.file(
-        "BUILD.bazel",
-        _llvm_repo_build(_LLVM_VERSION),
-    )
-    _write_llvm_bzl(repository_ctx, _LLVM_VERSION, "lib", False)
-
-_llvm_alias_repo = repository_rule(
-    implementation = _llvm_alias_repo_impl,
-    attrs = {
-        "minimal_linux_arm64": attr.label(mandatory = True),
-        "minimal_linux_x64": attr.label(mandatory = True),
-        "minimal_macos_arm64": attr.label(mandatory = True),
-    },
-)
-
-def _envoy_llvm_impl(module_ctx):
-    host = None
-    for module in module_ctx.modules:
-        for tag in module.tags.host:
-            if not module.is_root:
-                fail("envoy_llvm_extension.host may only be specified by the root module")
-            if host != None:
-                fail("envoy_llvm_extension.host may only be specified once")
-            host = tag
-
-    if host:
-        _host_llvm_repo(
-            name = "llvm_toolchain_llvm",
-            llvm_version = host.llvm_version,
-            path = host.path,
-        )
-    else:
-        _llvm_alias_repo(
-            name = "llvm_toolchain_llvm",
-            minimal_linux_x64 = Label("@llvm_minimal_linux_x64//:BUILD.bazel"),
-            minimal_linux_arm64 = Label("@llvm_minimal_linux_arm64//:BUILD.bazel"),
-            minimal_macos_arm64 = Label("@llvm_minimal_macos_arm64//:BUILD.bazel"),
-        )
-
-_host_llvm = tag_class(
-    attrs = {
-        "llvm_version": attr.string(default = ""),
-        "path": attr.string(mandatory = True),
-    },
-)
-
-envoy_llvm_extension = module_extension(
-    implementation = _envoy_llvm_impl,
-    tag_classes = {"host": _host_llvm},
-)
 
 def _module_dep_from_lock_entry(url):
     if not url.endswith(_SOURCE_JSON_SUFFIX):
@@ -294,30 +94,6 @@ def _envoy_repo_impl(module_ctx):
     """
     envoy_repo()
 
-def _envoy_toolchains_impl(module_ctx):
-    """Implementation of the envoy_toolchains module extension.
-
-    This extension registers toolchains needed for Envoy builds in bzlmod mode,
-    including the clang_platform alias used in various BUILD files.
-
-    In WORKSPACE mode, this is handled by calling envoy_toolchains() from WORKSPACE.
-    In bzlmod mode, we need to use this extension to make the same repositories available.
-
-    Args:
-        module_ctx: The module extension context
-    """
-
-    # Create the clang_platform repository using arch_alias
-    # Note: We can't call envoy_toolchains() directly here because it uses native.register_toolchains
-    # which is not allowed in module extensions. Instead, we only create the arch_alias repository.
-    arch_alias(
-        name = "clang_platform",
-        aliases = {
-            "amd64": str(Label("//bazel/platforms/rbe:linux_x64")),
-            "aarch64": str(Label("//bazel/platforms/rbe:linux_arm64")),
-        },
-    )
-
 envoy_repo_extension = module_extension(
     implementation = _envoy_repo_impl,
     doc = """
@@ -333,22 +109,6 @@ envoy_repo_extension = module_extension(
     """,
 )
 
-envoy_toolchains_extension = module_extension(
-    implementation = _envoy_toolchains_impl,
-    doc = """
-    Extension for Envoy toolchain setup in bzlmod mode.
-
-    This extension creates toolchain-related repositories needed for Envoy builds:
-    - clang_platform: Architecture-specific platform aliases for RBE builds
-
-    In WORKSPACE mode, these are created by calling envoy_toolchains() from WORKSPACE.
-    In bzlmod mode, this extension provides the same functionality.
-
-    Note: Toolchain registration itself is handled by MODULE.bazel using the LLVM
-    toolchain extension. This extension only creates auxiliary repositories.
-    """,
-)
-
 def _wasm_cargo_impl(module_ctx):
     direct_deps = crate_repositories()
     return module_ctx.extension_metadata(
@@ -358,3 +118,79 @@ def _wasm_cargo_impl(module_ctx):
     )
 
 wasm_cargo = module_extension(implementation = _wasm_cargo_impl)
+
+_LLVM_MIGRATION = """
+`envoy_llvm_extension` (@envoy//bazel:extensions.bzl) is deprecated and will be removed.
+Migrate your MODULE.bazel to the toolshed extension:
+
+    llvm_toolchain_alias_ext = use_extension(
+        "@envoy_toolshed//compile:extensions.bzl",
+        "llvm_toolchain_alias_extension",
+    )
+    # Optional, root module only, to use a host LLVM install:
+    # llvm_toolchain_alias_ext.host(path = "/usr/lib/llvm-22")
+    use_repo(llvm_toolchain_alias_ext, "llvm_toolchain_llvm")
+
+See bazel/README.md and bazel/tests/codeql for a complete example.
+"""
+
+# TODO(phlax): Remove once downstream modules have migrated.
+def _envoy_llvm_impl(module_ctx):
+    # buildifier: disable=print
+    print("DEPRECATED: " + _LLVM_MIGRATION)
+    for module in module_ctx.modules:
+        if module.tags.host:
+            # A host tag here can no longer redirect Envoy's own @llvm_toolchain_llvm
+            # (that now comes from the toolshed extension), so fail rather than
+            # silently produce an unused repo.
+            fail(
+                "envoy_llvm_extension.host() is no longer supported (set by module %r)." % module.name +
+                _LLVM_MIGRATION,
+            )
+
+    # Deprecated no-tag path: mirror toolshed's llvm_toolchain_alias_extension so an
+    # existing `use_repo(envoy_llvm_ext, "llvm_toolchain_llvm")` keeps resolving.
+    setup_llvm_minimal()
+    llvm_toolchain_alias(
+        name = "llvm_toolchain_llvm",
+        minimal_linux_x64 = "@llvm_minimal_linux_x64//:BUILD.bazel",
+        minimal_linux_arm64 = "@llvm_minimal_linux_arm64//:BUILD.bazel",
+        minimal_macos_arm64 = "@llvm_minimal_macos_arm64//:BUILD.bazel",
+    )
+
+_host_llvm = tag_class(
+    attrs = {
+        "llvm_version": attr.string(default = ""),
+        "path": attr.string(mandatory = True),
+    },
+)
+
+envoy_llvm_extension = module_extension(
+    implementation = _envoy_llvm_impl,
+    tag_classes = {"host": _host_llvm},
+    doc = "Deprecated: use @envoy_toolshed//compile:extensions.bzl%llvm_toolchain_alias_extension.",
+)
+
+# TODO(phlax): Remove once envoy-examples (and any other registry modules) use
+# @envoy_toolshed//repository:extensions.bzl%arch_alias_extension directly.
+def _envoy_toolchains_impl(module_ctx):
+    # buildifier: disable=print
+    print(
+        "DEPRECATED: `envoy_toolchains_extension` is deprecated; use " +
+        "@envoy_toolshed//repository:extensions.bzl%arch_alias_extension with " +
+        "`.alias(name = \"clang_platform\", amd64 = \"@envoy//bazel/platforms/rbe:linux_x64\", " +
+        "aarch64 = \"@envoy//bazel/platforms/rbe:linux_arm64\")` and " +
+        "`use_repo(arch_alias_ext, \"clang_platform\")`.",
+    )
+    arch_alias(
+        name = "clang_platform",
+        aliases = {
+            "amd64": str(Label("//bazel/platforms/rbe:linux_x64")),
+            "aarch64": str(Label("//bazel/platforms/rbe:linux_arm64")),
+        },
+    )
+
+envoy_toolchains_extension = module_extension(
+    implementation = _envoy_toolchains_impl,
+    doc = "Deprecated: use @envoy_toolshed arch_alias_extension instead.",
+)

@@ -20,6 +20,7 @@
 #include "source/common/config/resource_type_helper.h"
 #include "source/common/init/manager_impl.h"
 #include "source/common/init/target_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -132,6 +133,12 @@ public:
                                     const FilterChainProto& filter_chain);
   void initialize(std::function<void()> completion);
 
+  // The context of the transport socket, whose init targets, such as SDS secrets, warm the filter
+  // chain.
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() {
+    return transport_socket_factory_context_;
+  }
+
   // DrainDecision
   bool drainClose(Network::DrainDirection) const override;
   Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection, DrainCloseCb) const override;
@@ -154,6 +161,7 @@ private:
   Stats::ScopeSharedPtr scope_;
   Stats::ScopeSharedPtr prefixed_scope_;
   Init::ManagerImpl init_manager_;
+  Configuration::TransportSocketFactoryContextImpl transport_socket_factory_context_;
   std::atomic<bool> is_draining_{false};
   std::unique_ptr<Init::WatcherImpl> init_watcher_;
 };

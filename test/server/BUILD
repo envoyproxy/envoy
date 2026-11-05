@@ -214,16 +214,22 @@ envoy_cc_test(
     srcs = envoy_select_hot_restart(["hot_restarting_parent_test.cc"]),
     rbe_pool = "linux_x64_small",
     deps = [
+        ":hot_restart_udp_forwarding_test_helper",
         ":utility_lib",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/stats:allocator_lib",
         "//source/common/stats:stats_lib",
         "//source/common/stats:tag_producer_lib",
         "//source/common/stats:thread_local_store_lib",
         "//source/server:hot_restart_lib",
         "//source/server:hot_restarting_child",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:test_runtime_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
     ],
 )
@@ -237,6 +243,7 @@ envoy_cc_test(
         "//source/server:hot_restarting_base",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
@@ -413,6 +420,7 @@ envoy_cc_test(
         ":runtime_test_data",
         ":server_test_data",
         ":static_validation_test_data",
+        "//test/common/tls/ocsp/test_data:certs",
     ],
     rbe_pool = "linux_x64_small",
     deps = [
@@ -423,6 +431,7 @@ envoy_cc_test(
         "//source/common/stats:allocator_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/tls:server_context_config_lib",
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -436,6 +445,7 @@ envoy_cc_test(
         "//source/extensions/tracers/zipkin:config",
         "//source/server:process_context_lib",
         "//source/server:server_lib",
+        "//source/server:transport_socket_config_lib",
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/common/stats:stat_test_utility_lib",
         "//test/config:v2_link_hacks",
@@ -460,6 +470,7 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 

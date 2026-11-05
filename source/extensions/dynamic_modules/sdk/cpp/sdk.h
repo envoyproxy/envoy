@@ -880,6 +880,11 @@ public:
   virtual void sendGoAwayAndClose(bool graceful) = 0;
 
   /**
+   * Marks the downstream connection to be drained once the current HTTP stream completes.
+   */
+  virtual void drainConnectionUponCompletion() = 0;
+
+  /**
    * Recreates the current stream, optionally with replacement headers. Returns false if the
    * recreation could not be initiated, for example when the request body has not been fully
    * received. On success the filter chain is destroyed before the current event hook returns and
@@ -1003,20 +1008,24 @@ public:
                   HttpStreamCallback& cb) = 0;
 
   /**
-   * Sends data on an existing HTTP stream.
+   * Sends data on an existing HTTP stream. When Envoy reset the stream and did not call the reset
+   * callback yet, the data is dropped, and the reset callback follows unless the filter is
+   * destroyed first.
    * @param stream_id The ID of the stream.
    * @param body The body data to send.
    * @param end_of_stream Whether this is the end of the stream.
-   * @return True if successful, false otherwise.
+   * @return False if the stream does not exist, and true otherwise.
    */
   virtual bool sendHttpStreamData(uint64_t stream_id, std::string_view body,
                                   bool end_of_stream) = 0;
 
   /**
-   * Sends trailers on an existing HTTP stream.
+   * Sends trailers on an existing HTTP stream. When Envoy reset the stream and did not call the
+   * reset callback yet, the trailers are dropped, and the reset callback follows unless the filter
+   * is destroyed first.
    * @param stream_id The ID of the stream.
    * @param trailers The trailers to send.
-   * @return True if successful, false otherwise.
+   * @return False if the stream does not exist, and true otherwise.
    */
   virtual bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) = 0;
 
@@ -1294,20 +1303,24 @@ public:
                   HttpStreamCallback& cb) = 0;
 
   /**
-   * Sends data on an active stream started via startHttpStream.
+   * Sends data on an active stream started via startHttpStream. When Envoy reset the stream and
+   * did not call the reset callback yet, the data is dropped, and the reset callback follows unless
+   * the configuration is destroyed first.
    * @param stream_id The stream handle returned from startHttpStream.
    * @param body The data to send.
    * @param end_of_stream If true, this is the last data chunk.
-   * @return True if successful, false if the stream is not found.
+   * @return False if the stream is not found, and true otherwise.
    */
   virtual bool sendHttpStreamData(uint64_t stream_id, std::string_view body,
                                   bool end_of_stream) = 0;
 
   /**
-   * Sends trailers on an active stream, implicitly ending the stream.
+   * Sends trailers on an active stream, implicitly ending the stream. When Envoy reset the stream
+   * and did not call the reset callback yet, the trailers are dropped, and the reset callback
+   * follows unless the configuration is destroyed first.
    * @param stream_id The stream handle returned from startHttpStream.
    * @param trailers The trailers to send.
-   * @return True if successful, false if the stream is not found.
+   * @return False if the stream is not found, and true otherwise.
    */
   virtual bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) = 0;
 

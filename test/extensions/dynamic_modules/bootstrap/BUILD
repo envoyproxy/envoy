@@ -5,6 +5,7 @@ load(
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_extension_cc_dyn_module_test",
+    "envoy_extension_cc_test",
 )
 
 licenses(["notice"])  # Apache 2
@@ -50,11 +51,34 @@ envoy_extension_cc_dyn_module_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "cluster_writer_test",
+    srcs = ["cluster_writer_test.cc"],
+    extension_names = ["envoy.bootstrap.dynamic_modules"],
+    deps = [
+        "//source/common/common:cleanup_lib",
+        "//source/common/config:dependent_type_urls_lib",
+        "//source/common/config:resource_name_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:utility_lib",
+        "//source/extensions/bootstrap/dynamic_modules:cluster_writer_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_dyn_module_test(
     name = "abi_impl_test",
     srcs = ["abi_impl_test.cc"],
     data = [
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_optional_hooks",
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
@@ -66,6 +90,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/filesystem:filesystem_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:admin_stream_mocks",
@@ -80,6 +105,7 @@ envoy_extension_cc_dyn_module_test(
         "//test/test_common:logging_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
@@ -130,8 +156,10 @@ envoy_extension_cc_dyn_module_test(
     data = [
         "//test/config/integration/certs",
         "//test/extensions/dynamic_modules/test_data/c:bootstrap_no_op",
+        "//test/extensions/dynamic_modules/test_data/c:bootstrap_optional_hooks",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_admin_handler_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_cluster_lifecycle_test",
+        "//test/extensions/dynamic_modules/test_data/rust:bootstrap_cluster_writer_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_config_names_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_file_watcher_test",
         "//test/extensions/dynamic_modules/test_data/rust:bootstrap_function_registry_test",
@@ -146,6 +174,7 @@ envoy_extension_cc_dyn_module_test(
     ],
     extension_names = ["envoy.bootstrap.dynamic_modules"],
     deps = [
+        "//source/common/common:base64_lib",
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",
@@ -153,6 +182,8 @@ envoy_extension_cc_dyn_module_test(
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )

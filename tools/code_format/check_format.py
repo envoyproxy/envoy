@@ -7,12 +7,12 @@ import multiprocessing
 import os
 import pathlib
 import re
-import subprocess
+import shlex
+import shutil
 import stat
+import subprocess
 import sys
 import traceback
-import shutil
-import shlex
 from functools import cached_property
 from typing import Callable, Dict, Iterator, List, Pattern, Tuple, Union
 
@@ -1089,9 +1089,12 @@ class FormatChecker:
             print("PASS")
 
     def check_visibility(self):
+        # CI sets `GIT_BIN` to the hermetic git toolchain.
+        git = shlex.quote(os.environ.get("GIT_BIN", "git"))
+        excludes = "".join([f"':(exclude){c}' " for c in self.config["visibility_excludes"]])
         command = (
-            "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % "".join([f"':(exclude){c}' " for c in self.config["visibility_excludes"]]))
+            f"{git} diff $(tools/git/last_github_commit.sh) -- source/extensions/* {excludes}"
+            "|grep '+.*visibility ='")
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:

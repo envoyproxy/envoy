@@ -1,5 +1,5 @@
 {
-  "checksum": "381dbb62ff203d83f038d485e1da1d113a7a9618cb865d993867264e73881640",
+  "checksum": "57f80681498aa30b6c87c6e650813ecf6121189e0575f5be0d5bfdb1a2cb17d0",
   "conditions": {
     "aarch64-apple-darwin": [
       "aarch64-apple-darwin"
@@ -2246,7 +2246,7 @@
               "target": "ring"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -2488,7 +2488,7 @@
               "target": "resolv_conf"
             },
             {
-              "id": "rustls 0.23.45",
+              "id": "rustls 0.23.46",
               "target": "rustls"
             },
             {
@@ -5441,7 +5441,7 @@
       ],
       "version": "0.4.1"
     },
-    "rustls 0.23.45": {
+    "rustls 0.23.46": {
       "build_script_attrs": {
         "link_deps": [
           {
@@ -5506,8 +5506,8 @@
       "package_url": "https://github.com/rustls/rustls",
       "repository": {
         "Http": {
-          "sha256": "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634",
-          "url": "https://static.crates.io/crates/rustls/0.23.45/download"
+          "sha256": "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf",
+          "url": "https://static.crates.io/crates/rustls/0.23.46/download"
         }
       },
       "targets": [
@@ -5524,7 +5524,7 @@
           }
         }
       ],
-      "version": "0.23.45"
+      "version": "0.23.46"
     },
     "rustls-pki-types 1.14.0": {
       "common_attrs": {
@@ -7053,7 +7053,7 @@
         ],
         "deps": [
           {
-            "id": "rustls 0.23.45",
+            "id": "rustls 0.23.46",
             "target": "rustls"
           },
           {

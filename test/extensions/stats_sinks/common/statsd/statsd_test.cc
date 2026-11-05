@@ -21,7 +21,6 @@
 
 using testing::_;
 using testing::InSequence;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -270,15 +269,14 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
   snapshot_.counters_.resize(2000, {1, counter});
 
   expectCreateConnection();
-  EXPECT_CALL(*connection_, write(_, _))
-      .WillOnce(Invoke([](Buffer::Instance& buffer, bool) -> void {
-        std::string compare;
-        for (int i = 0; i < 2000; i++) {
-          compare += "envoy.test_counter:1|c\n";
-        }
-        EXPECT_EQ(compare, buffer.toString());
-        buffer.drain(buffer.length());
-      }));
+  EXPECT_CALL(*connection_, write(_, _)).WillOnce([](Buffer::Instance& buffer, bool) -> void {
+    std::string compare;
+    for (int i = 0; i < 2000; i++) {
+      compare += "envoy.test_counter:1|c\n";
+    }
+    EXPECT_EQ(compare, buffer.toString());
+    buffer.drain(buffer.length());
+  });
   sink_->flush(snapshot_);
 }
 
@@ -330,11 +328,11 @@ TEST_F(TcpStatsdSinkTest, LargeStatNameNoOverflow) {
 
   expectCreateConnection();
   EXPECT_CALL(*connection_, write(_, _))
-      .WillOnce(Invoke([&large_name](Buffer::Instance& buffer, bool) -> void {
+      .WillOnce([&large_name](Buffer::Instance& buffer, bool) -> void {
         std::string compare = fmt::format("envoy.{}:1|c\n", large_name);
         EXPECT_EQ(compare, buffer.toString());
         buffer.drain(buffer.length());
-      }));
+      });
   sink_->flush(snapshot_);
 }
 

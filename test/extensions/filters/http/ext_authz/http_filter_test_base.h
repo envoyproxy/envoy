@@ -75,7 +75,8 @@ public:
   void initialize(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config) {
     absl::Status creation_status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
-                                             "ext_authz_prefix", factory_context_, creation_status);
+                                             *stats_store_.rootScope(), "ext_authz_prefix",
+                                             factory_context_, creation_status);
     ASSERT_OK(creation_status);
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
@@ -145,11 +146,11 @@ public:
     auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
 
     EXPECT_CALL(*client_, check(_, _, _, _))
-        .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                             const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                             const StreamInfo::StreamInfo&) -> void {
+        .WillOnce([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                      const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                      const StreamInfo::StreamInfo&) -> void {
           callbacks.onComplete(std::move(response_ptr));
-        }));
+        });
     EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));

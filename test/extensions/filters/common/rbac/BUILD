@@ -66,6 +66,7 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "//test/mocks/server:server_factory_context_mocks",

@@ -1,6 +1,8 @@
 #include <optional>
 #include <string>
+#include <tuple>
 
+#include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 #include "envoy/extensions/filters/http/composite/v3/composite.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -1335,6 +1337,181 @@ TEST_P(NamedFilterChainIntegrationTest, TestMultipleNamedFilterChains) {
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
   }
+}
+
+// Delivers the composite filter itself through ECDS, behind a filter that pauses decoding until the
+// request body arrives. This allows replacing the composite filter configuration while a stream
+// that was created from the previous configuration is paused before the composite filter runs.
+class CompositeFilterEcdsIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  CompositeFilterEcdsIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void TearDown() override { cleanUpXdsConnection(); }
+
+  void createUpstreams() override {
+    HttpIntegrationTest::createUpstreams();
+    // The ECDS upstream.
+    addFakeUpstream(Http::CodecType::HTTP2);
+  }
+
+  void initialize() override {
+    // The initial configuration delegates to a filter that is itself discovered dynamically, whose
+    // configuration provider must be destroyed on the main thread.
+    TestEnvironment::writeStringToFileForTest("set_response_code.yaml", R"EOF(
+resources:
+  - "@type": type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig
+    name: set-response-code
+    typed_config:
+      "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+      code: 403)EOF",
+                                              false);
+    const auto initial_config = compositeConfig(TestEnvironment::substitute(R"EOF(
+                    dynamic_config:
+                      name: set-response-code
+                      config_discovery:
+                        config_source:
+                          path_config_source:
+                            path: "{{ test_tmpdir }}/set_response_code.yaml"
+                        type_urls:
+                        - type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+)EOF"));
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* ecds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+      ecds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      ecds_cluster->set_name("ecds_cluster");
+      ecds_cluster->mutable_load_assignment()->set_cluster_name("ecds_cluster");
+      ConfigHelper::setHttp2(*ecds_cluster);
+    });
+    config_helper_.addConfigModifier([initial_config](ConfigHelper::HttpConnectionManager& hcm) {
+      auto* filter = hcm.add_http_filters();
+      filter->set_name("composite");
+      auto* discovery = filter->mutable_config_discovery();
+      discovery->add_type_urls(
+          "type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite");
+      // Serve the initial configuration as the default configuration, so that the listener
+      // does not have to wait for ECDS.
+      std::ignore = discovery->mutable_default_config()->PackFrom(initial_config);
+      discovery->set_apply_default_config_without_warming(true);
+      auto* config_source = discovery->mutable_config_source();
+      config_source->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+      auto* api_config_source = config_source->mutable_api_config_source();
+      api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+      api_config_source->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+      api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name(
+          "ecds_cluster");
+      // Keep the router last.
+      const int size = hcm.http_filters_size();
+      hcm.mutable_http_filters()->SwapElements(size - 2, size - 1);
+    });
+    // This is applied right away, ahead of the config modifiers, so it lands before the composite
+    // filter.
+    config_helper_.prependFilter(R"EOF(
+      name: stop-in-headers-continue-in-body-filter
+      typed_config:
+        "@type": type.googleapis.com/test.integration.filters.StopInHeadersContinueInBodyFilterConfig
+    )EOF");
+    HttpIntegrationTest::initialize();
+
+    AssertionResult result =
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, xds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = xds_connection_->waitForNewStream(*dispatcher_, xds_stream_);
+    RELEASE_ASSERT(result, result.message());
+    xds_stream_->startGrpcStream();
+  }
+
+  // Returns a composite filter configuration that runs the given action for requests carrying the
+  // match header.
+  static envoy::extensions::filters::http::composite::v3::Composite
+  compositeConfig(const std::string& action_yaml) {
+    envoy::extensions::filters::http::composite::v3::Composite config;
+    TestUtility::loadFromYaml(R"EOF(
+      matcher:
+        matcher_tree:
+          input:
+            name: request-headers
+            typed_config:
+              "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+              header_name: match-header
+          exact_match_map:
+            map:
+              match:
+                action:
+                  name: composite-action
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+)EOF" + action_yaml,
+                              config);
+    return config;
+  }
+
+  void sendCompositeConfig(const envoy::extensions::filters::http::composite::v3::Composite& config,
+                           const std::string& version) {
+    envoy::config::core::v3::TypedExtensionConfig typed_config;
+    typed_config.set_name("composite");
+    std::ignore = typed_config.mutable_typed_config()->PackFrom(config);
+    sendDiscoveryResponse<envoy::config::core::v3::TypedExtensionConfig>(
+        "type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig", {typed_config},
+        {typed_config}, {}, version);
+  }
+
+  const Http::TestRequestHeaderMapImpl match_request_headers_ = {{":method", "POST"},
+                                                                 {":path", "/somepath"},
+                                                                 {":scheme", "http"},
+                                                                 {"match-header", "match"},
+                                                                 {":authority", "blah"}};
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, CompositeFilterEcdsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Verifies that a stream that is paused before the composite filter runs keeps using the
+// composite filter configuration it was created with when an ECDS update replaces that
+// configuration in the meantime, and that the replaced configuration is released safely once the
+// stream completes.
+TEST_P(CompositeFilterEcdsIntegrationTest, UpdateWhileStreamIsPausedBeforeCompositeFilter) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // The composite filter is created from the initial configuration together with the rest of the
+  // filter chain, but the stream is paused before the composite filter runs.
+  auto encoder_decoder = codec_client_->startRequest(match_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  test_server_->waitForGauge("http.config_test.downstream_rq_active", testing::Eq(1));
+
+  // Replace the composite filter configuration. The update is complete once the workers and the
+  // main thread have all dropped their reference to the initial configuration.
+  sendCompositeConfig(compositeConfig(R"EOF(
+                    typed_config:
+                      name: set-response-code
+                      typed_config:
+                        "@type": type.googleapis.com/test.integration.filters.SetResponseCodeFilterConfig
+                        code: 401
+)EOF"),
+                      "1");
+  test_server_->waitForCounter("extension_config_discovery.http_filter.composite.config_reload",
+                               testing::Eq(1));
+
+  // Resume the paused stream. It still delegates according to the initial configuration.
+  codec_client_->sendData(encoder_decoder.first, 10, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("403"));
+  test_server_->waitForCounter("http.config_test.composite.filter_delegation_success",
+                               testing::Eq(1));
+
+  // New streams use the updated configuration. The local reply may be sent before the end of the
+  // request has been read, in which case the connection is closed, so use a new one.
+  codec_client_->close();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  response = codec_client_->makeRequestWithBody(match_request_headers_, 10);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("401"));
+  test_server_->waitForCounter("http.config_test.composite.filter_delegation_success",
+                               testing::Eq(2));
 }
 
 } // namespace

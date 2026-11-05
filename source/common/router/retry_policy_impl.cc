@@ -152,5 +152,17 @@ RetryStatePtr RetryPolicyImpl::createRetryState(
   return RetryStateImpl::create(*this, request_headers, cluster, context, dispatcher, priority);
 }
 
+absl::StatusOr<RetryPolicyConstSharedPtr>
+DefaultRetryPolicyFactory::createRetryPolicy(const Protobuf::Message& config,
+                                             ProtobufMessage::ValidationVisitor& validation_visitor,
+                                             Server::Configuration::CommonFactoryContext& context) {
+  return RetryPolicyImpl::create(
+      MessageUtil::downcastAndValidate<const envoy::config::route::v3::RetryPolicy&>(
+          config, validation_visitor),
+      validation_visitor, context);
+}
+
+REGISTER_FACTORY(DefaultRetryPolicyFactory, RetryPolicyFactory);
+
 } // namespace Router
 } // namespace Envoy

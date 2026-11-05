@@ -41,7 +41,6 @@ using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
 using testing::InSequence;
-using testing::Invoke;
 using testing::IsNull;
 using testing::Key;
 using testing::NiceMock;
@@ -360,33 +359,32 @@ protected:
                 envoy::config::route::v3::RouteConfiguration().GetDescriptor()->full_name())),
             _, _, _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(
-            Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                          Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                          Envoy::Config::OpaqueResourceDecoderSharedPtr,
-                          const Envoy::Config::SubscriptionOptions&) {
-              auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-              rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
-              EXPECT_CALL(*ret, start(_))
-                  .WillOnce(Invoke([this, config_sub_addr = ret.get()](
-                                       const absl::flat_hash_set<std::string>& resource_names) {
-                    EXPECT_EQ(resource_names.size(), 1);
-                    auto iter = rds_subscription_by_config_subscription_.find(config_sub_addr);
-                    EXPECT_NE(iter, rds_subscription_by_config_subscription_.end());
-                    rds_subscription_by_name_[*resource_names.begin()] = iter->second;
-                  }));
-              return ret;
-            }));
+        .WillRepeatedly([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                               Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
+                               Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                               const Envoy::Config::SubscriptionOptions&) {
+          auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+          rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
+          EXPECT_CALL(*ret, start(_))
+              .WillOnce([this, config_sub_addr = ret.get()](
+                            const absl::flat_hash_set<std::string>& resource_names) {
+                EXPECT_EQ(resource_names.size(), 1);
+                auto iter = rds_subscription_by_config_subscription_.find(config_sub_addr);
+                EXPECT_NE(iter, rds_subscription_by_config_subscription_.end());
+                rds_subscription_by_name_[*resource_names.begin()] = iter->second;
+              });
+          return ret;
+        });
 
-    ON_CALL(context_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
+    ON_CALL(context_init_manager_, add(_)).WillByDefault([this](const Init::Target& target) {
       target_handles_.push_back(target.createHandle("test"));
-    }));
+    });
     ON_CALL(context_init_manager_, initialize(_))
-        .WillByDefault(Invoke([this](const Init::Watcher& watcher) {
+        .WillByDefault([this](const Init::Watcher& watcher) {
           for (auto& handle_ : target_handles_) {
             handle_->initialize(watcher);
           }
-        }));
+        });
 
     const std::string config_yaml = R"EOF(
 name: foo_scoped_routes
@@ -605,14 +603,13 @@ key:
                   Eq(Grpc::Common::typeUrl(
                       envoy::config::route::v3::VirtualHost().GetDescriptor()->full_name())),
                   _, _, _, _))
-      .WillOnce(
-          Invoke([&vhds_callbacks](const envoy::config::core::v3::ConfigSource&, absl::string_view,
-                                   Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                                   Envoy::Config::OpaqueResourceDecoderSharedPtr,
-                                   const Envoy::Config::SubscriptionOptions&) {
-            vhds_callbacks = &callbacks;
-            return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
-          }));
+      .WillOnce([&vhds_callbacks](const envoy::config::core::v3::ConfigSource&, absl::string_view,
+                                  Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
+                                  Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                                  const Envoy::Config::SubscriptionOptions&) {
+        vhds_callbacks = &callbacks;
+        return std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
+      });
 
   // RDS gives foo_routes a VHDS config source and a single virtual host.
   constexpr absl::string_view vhds_route_config_tmpl = R"EOF(

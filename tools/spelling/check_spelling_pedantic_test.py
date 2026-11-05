@@ -6,6 +6,7 @@ from __future__ import print_function
 
 from run_command import run_command
 import argparse
+import itertools
 import logging
 import os
 import sys
@@ -58,6 +59,33 @@ def check_file_expecting_errors(filename, expected_substrings):
     return expect_error(filename, status, stdout, expected_substrings)
 
 
+def marked_words(stdout):
+    # The words the check marked: with --mark each reported line is followed by a line of carets
+    # under the start of each misspelled word.
+    words = []
+    for line, marks in zip(stdout, stdout[1:]):
+        if not marks.strip() or not set(marks.strip()) <= {"^", " "}:
+            continue
+        for i, c in enumerate(marks):
+            if c == "^":
+                words.append(
+                    "".join(itertools.takewhile(lambda ch: ch.isalpha() or ch == "'", line[i:])))
+    return words
+
+
+def check_file_expecting_exact_errors(filename, expected_words):
+    # As check_file_expecting_errors, but every marked word must be expected (in order), so
+    # tokens that must not be checked (host names, URLs, non-ASCII words) are verified too.
+    command, status, stdout = run_check_format("check --mark", get_input_file(filename))
+    errors = expect_error(filename, status, stdout, expected_words)
+    actual = marked_words(stdout)
+    if actual != expected_words:
+        logging.error("%s: Expected errors %s, got %s in:\n" % (filename, expected_words, actual))
+        emit_stdout_as_error(stdout)
+        errors += 1
+    return errors
+
+
 def check_file_path_expecting_ok(filename):
     command, status, stdout = run_check_format("check", filename)
     if status != 0:
@@ -87,6 +115,9 @@ def run_checks():
     errors += check_file_expecting_errors("on_off", ["speelinga", "speelingb"])
     errors += check_file_expecting_errors("rst_code_block", ["speelinga", "speelingb"])
     errors += check_file_expecting_errors("word_splitting", ["Speeled", "Korrectly"])
+    errors += check_file_expecting_exact_errors(
+        "punctuation", ["mistaek", "mistaak", "sentense", "speling"])
+    errors += check_file_expecting_exact_errors("non_ascii", ["mistaek", "mistaak"])
 
     return errors
 
