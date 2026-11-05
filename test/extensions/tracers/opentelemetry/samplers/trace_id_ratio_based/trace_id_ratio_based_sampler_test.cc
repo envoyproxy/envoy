@@ -228,9 +228,12 @@ TEST(TraceIdRatioBasedSamplerTest, TestTraceIdRandomness) {
             0x48eb211c80319cULL);
   EXPECT_EQ(TraceIdRatioBasedSampler::traceIdRandomness("000000000000000000ffffffffffffff"),
             (uint64_t{1} << 56) - 1);
-  EXPECT_EQ(TraceIdRatioBasedSampler::traceIdRandomness(""), 0);
-  EXPECT_EQ(TraceIdRatioBasedSampler::traceIdRandomness("5b8aa5a2d2c872e8"), 0);
-  EXPECT_EQ(TraceIdRatioBasedSampler::traceIdRandomness("0af7651916cd43dd8448eb211c80319z"), 0);
+  EXPECT_ENVOY_BUG(TraceIdRatioBasedSampler::traceIdRandomness("5b8aa5a2d2c872e8"),
+                   "trace id is not 32 hex characters");
+  EXPECT_ENVOY_BUG(TraceIdRatioBasedSampler::traceIdRandomness("0af7651916cd43dd8448eb211c80319z"),
+                   "trace id is not 32 hex characters");
+  EXPECT_ENVOY_BUG(TraceIdRatioBasedSampler::traceIdRandomness("0af7651916cd43dd84 0x2211c80319c"),
+                   "trace id is not 32 hex characters");
 }
 
 TEST(TraceIdRatioBasedSamplerTest, TestRejectionThreshold) {
@@ -286,13 +289,10 @@ TEST(TraceIdRatioBasedSamplerTest, TestRuntimeGuardDisabledReadsFirstEightBytes)
   NiceMock<StreamInfo::MockStreamInfo> info;
   auto sampler = makeSampler(50, envoy::type::v3::FractionalPercent::HUNDRED, context);
 
-  // The first 8 bytes are 0, and 0 % 100 < 50.
+  // The first 8 bytes read the same in either byte order: 0 % 100 < 50 and 0x0101010101010101 %
+  // 100 = 73.
   EXPECT_EQ(sample(*sampler, info, "00000000000000000000000000000001"), Decision::RecordAndSample);
-
-  // A timestamp in the high bits makes the first 8 bytes nearly constant, so a 1% ratio samples
-  // nothing. This is the behavior that the runtime guard replaces.
-  auto one_percent = makeSampler(1, envoy::type::v3::FractionalPercent::HUNDRED, context);
-  EXPECT_EQ(countSampledWithTimestampPrefix(*one_percent, 2000), 0);
+  EXPECT_EQ(sample(*sampler, info, "010101010101010100ffffffffffffff"), Decision::Drop);
 }
 
 TEST(TraceIdRatioBasedSamplerTest, TestRuntimeGuardEnabledReadsRightmostBytes) {
@@ -300,8 +300,9 @@ TEST(TraceIdRatioBasedSamplerTest, TestRuntimeGuardEnabledReadsRightmostBytes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   auto sampler = makeSampler(50, envoy::type::v3::FractionalPercent::HUNDRED, context);
 
-  // R = 1 is below T = 2^55.
+  // T = 2^55.
   EXPECT_EQ(sample(*sampler, info, "00000000000000000000000000000001"), Decision::Drop);
+  EXPECT_EQ(sample(*sampler, info, "010101010101010100ffffffffffffff"), Decision::RecordAndSample);
 }
 
 } // namespace OpenTelemetry
