@@ -73,6 +73,44 @@ impl std::ops::Deref for EnvoyBuffer<'_> {
   }
 }
 
+impl PartialEq for EnvoyBuffer<'_> {
+  fn eq(&self, other: &Self) -> bool {
+    self.as_slice() == other.as_slice()
+  }
+}
+
+impl Eq for EnvoyBuffer<'_> {}
+
+impl PartialEq<[u8]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &[u8]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl PartialEq<EnvoyBuffer<'_>> for [u8] {
+  fn eq(&self, other: &EnvoyBuffer<'_>) -> bool {
+    self == other.as_slice()
+  }
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &[u8; N]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl<const N: usize> PartialEq<&[u8; N]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &&[u8; N]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
+impl PartialEq<&[u8]> for EnvoyBuffer<'_> {
+  fn eq(&self, other: &&[u8]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
 /// This is exactly the same as [`EnvoyBuffer`] except that it is mutable and data can be written
 /// in-place. See [`EnvoyBuffer`] for more details.
 #[repr(C)]
@@ -163,6 +201,44 @@ impl std::ops::Deref for EnvoyMutBuffer<'_> {
 impl std::ops::DerefMut for EnvoyMutBuffer<'_> {
   fn deref_mut(&mut self) -> &mut [u8] {
     self.as_mut_slice()
+  }
+}
+
+impl PartialEq for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &Self) -> bool {
+    self.as_slice() == other.as_slice()
+  }
+}
+
+impl Eq for EnvoyMutBuffer<'_> {}
+
+impl PartialEq<[u8]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &[u8]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl PartialEq<EnvoyMutBuffer<'_>> for [u8] {
+  fn eq(&self, other: &EnvoyMutBuffer<'_>) -> bool {
+    self == other.as_slice()
+  }
+}
+
+impl<const N: usize> PartialEq<[u8; N]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &[u8; N]) -> bool {
+    self.as_slice() == other
+  }
+}
+
+impl<const N: usize> PartialEq<&[u8; N]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &&[u8; N]) -> bool {
+    self.as_slice() == *other
+  }
+}
+
+impl PartialEq<&[u8]> for EnvoyMutBuffer<'_> {
+  fn eq(&self, other: &&[u8]) -> bool {
+    self.as_slice() == *other
   }
 }
 
@@ -320,6 +396,36 @@ mod tests {
   }
 
   #[test]
+  fn test_envoy_buffer_partial_eq() {
+    let x = Vec::from(*b"same");
+    let y = Vec::from(*b"same");
+    let cases: &[(&str, EnvoyBuffer, &[u8], bool)] = &[
+      ("same content", EnvoyBuffer::new(b"hello"), b"hello", true),
+      (
+        "different content",
+        EnvoyBuffer::new(b"hello"),
+        b"world",
+        false,
+      ),
+      ("both empty", EnvoyBuffer::new(b""), b"", true),
+      ("empty vs non-empty", EnvoyBuffer::new(b""), b"a", false),
+      ("content not pointers", EnvoyBuffer::new(&x), &y, true),
+      ("null default", EnvoyBuffer::default(), b"", true),
+    ];
+    for (name, buf, expected, eq) in cases {
+      assert_eq!((*buf == *expected), *eq, "{name}");
+    }
+  }
+
+  #[test]
+  fn test_envoy_mut_buffer_partial_eq() {
+    let mut data = *b"hello";
+    let buf = unsafe { EnvoyMutBuffer::new_from_raw(data.as_mut_ptr(), data.len()) };
+    assert_eq!(buf, b"hello");
+    assert_ne!(buf, b"world");
+  }
+
+  #[test]
   fn read_buffer_chunks_sums_lengths_across_varying_chunks() {
     // Two chunks of differing lengths report the summed byte length and reassemble in order.
     static DATA: [u8; 5] = *b"abcde";
@@ -338,8 +444,8 @@ mod tests {
     });
     assert_eq!(total, 5);
     assert_eq!(chunks.len(), 2);
-    assert_eq!(chunks[0].as_slice(), b"ab");
-    assert_eq!(chunks[1].as_slice(), b"cde");
+    assert_eq!(chunks[0], b"ab");
+    assert_eq!(chunks[1], b"cde");
   }
 
   #[test]

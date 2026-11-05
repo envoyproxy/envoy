@@ -998,8 +998,7 @@ fn test_listener_get_dynamic_metadata_string() {
   assert_eq!(
     mock
       .get_dynamic_metadata_string("my.namespace", "my_key")
-      .unwrap()
-      .as_slice(),
+      .unwrap(),
     b"my_value"
   );
 }
@@ -2032,7 +2031,7 @@ fn test_get_upstream_host_address_with_host() {
   let result = filter.get_upstream_host_address();
   assert!(result.is_some());
   let (addr, port) = result.unwrap();
-  assert_eq!(addr.as_slice(), b"192.168.1.100");
+  assert_eq!(addr, b"192.168.1.100");
   assert_eq!(port, 8080);
 }
 
@@ -2082,7 +2081,7 @@ fn test_get_upstream_host_hostname_with_host() {
 
   let result = filter.get_upstream_host_hostname();
   assert!(result.is_some());
-  assert_eq!(result.unwrap().as_slice(), b"api.example.com");
+  assert_eq!(result.unwrap(), b"api.example.com");
 }
 
 #[test]
@@ -2131,7 +2130,7 @@ fn test_get_upstream_host_cluster_with_host() {
 
   let result = filter.get_upstream_host_cluster();
   assert!(result.is_some());
-  assert_eq!(result.unwrap().as_slice(), b"backend_cluster");
+  assert_eq!(result.unwrap(), b"backend_cluster");
 }
 
 #[test]
@@ -2344,10 +2343,7 @@ fn test_http_get_downstream_direct_remote_address() {
     raw_ptr: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE as *mut _,
   };
   assert_eq!(
-    filter
-      .get_downstream_direct_remote_address()
-      .unwrap()
-      .as_slice(),
+    filter.get_downstream_direct_remote_address().unwrap(),
     HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS
   );
 }
@@ -2446,13 +2442,13 @@ fn test_http_get_upstream_connection_attempts() {
   };
 
   assert_eq!(
-    filter.get_upstream_remote_address().unwrap().as_slice(),
+    filter.get_upstream_remote_address().unwrap(),
     HTTP_UPSTREAM_REMOTE_ADDRESS
   );
   let hosts = filter.get_upstream_hosts_attempted();
   assert_eq!(hosts.len(), 2);
-  assert_eq!(hosts[0].as_slice(), HTTP_UPSTREAM_HOSTS_ATTEMPTED[0]);
-  assert_eq!(hosts[1].as_slice(), HTTP_UPSTREAM_HOSTS_ATTEMPTED[1]);
+  assert_eq!(hosts[0], HTTP_UPSTREAM_HOSTS_ATTEMPTED[0]);
+  assert_eq!(hosts[1], HTTP_UPSTREAM_HOSTS_ATTEMPTED[1]);
   assert_eq!(
     filter.get_upstream_connection_ids_attempted(),
     HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED
@@ -2561,7 +2557,7 @@ fn test_http_get_header_values_fast_path() {
   HTTP_HEADER_VALUE_COUNT.store(1, std::sync::atomic::Ordering::SeqCst);
   let single = filter.get_request_header_values("x-test");
   assert_eq!(single.len(), 1);
-  assert_eq!(single[0].as_slice(), HTTP_HEADER_VALUE_0);
+  assert_eq!(single[0], HTTP_HEADER_VALUE_0);
   assert_eq!(
     HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
     1
@@ -2577,8 +2573,8 @@ fn test_http_get_header_values_fast_path() {
   HTTP_HEADER_VALUE_COUNT.store(2, std::sync::atomic::Ordering::SeqCst);
   let multiple = filter.get_request_header_values("x-test");
   assert_eq!(multiple.len(), 2);
-  assert_eq!(multiple[0].as_slice(), HTTP_HEADER_VALUE_0);
-  assert_eq!(multiple[1].as_slice(), HTTP_HEADER_VALUE_1);
+  assert_eq!(multiple[0], HTTP_HEADER_VALUE_0);
+  assert_eq!(multiple[1], HTTP_HEADER_VALUE_1);
   assert_eq!(
     HTTP_GET_HEADER_CALLS.load(std::sync::atomic::Ordering::SeqCst),
     1
@@ -2687,19 +2683,16 @@ fn test_upstream_host_full_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr.as_slice(), b"10.20.30.40");
+  assert_eq!(addr, b"10.20.30.40");
   assert_eq!(port, 8443);
 
   let hostname_result = filter.get_upstream_host_hostname();
   assert!(hostname_result.is_some());
-  assert_eq!(
-    hostname_result.unwrap().as_slice(),
-    b"secure-backend.example.com"
-  );
+  assert_eq!(hostname_result.unwrap(), b"secure-backend.example.com");
 
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap().as_slice(), b"secure_cluster");
+  assert_eq!(cluster_result.unwrap(), b"secure_cluster");
 }
 
 #[test]
@@ -2723,7 +2716,7 @@ fn test_upstream_host_partial_info() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr.as_slice(), b"192.168.0.1");
+  assert_eq!(addr, b"192.168.0.1");
   assert_eq!(port, 3000);
 
   // Hostname should be None.
@@ -2732,7 +2725,7 @@ fn test_upstream_host_partial_info() {
   // Cluster should be available.
   let cluster_result = filter.get_upstream_host_cluster();
   assert!(cluster_result.is_some());
-  assert_eq!(cluster_result.unwrap().as_slice(), b"partial_cluster");
+  assert_eq!(cluster_result.unwrap(), b"partial_cluster");
 }
 
 #[test]
@@ -2752,7 +2745,7 @@ fn test_upstream_host_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr.as_slice(), b"::1");
+  assert_eq!(addr, b"::1");
   assert_eq!(port, 8080);
 }
 
@@ -2773,7 +2766,7 @@ fn test_upstream_host_full_ipv6_address() {
   let addr_result = filter.get_upstream_host_address();
   assert!(addr_result.is_some());
   let (addr, port) = addr_result.unwrap();
-  assert_eq!(addr.as_slice(), b"2001:0db8:85a3:0000:0000:8a2e:0370:7334");
+  assert_eq!(addr, b"2001:0db8:85a3:0000:0000:8a2e:0370:7334");
   assert_eq!(port, 443);
 }
 
@@ -2791,8 +2784,7 @@ fn test_network_get_dynamic_metadata_string() {
   assert_eq!(
     mock
       .get_dynamic_metadata_string("my.namespace", "my_key")
-      .unwrap()
-      .as_slice(),
+      .unwrap(),
     b"my_value"
   );
 }
@@ -5031,16 +5023,13 @@ fn test_tls_certificate_selector_context_reads_the_handshake() {
         assert!(context.get_filter_state("tenant").is_none());
         return tls_certificate_selector::TlsCertificateSelection::PassThrough;
       };
-      assert_eq!(server_name.as_slice(), b"www.lyft.com");
+      assert_eq!(server_name, b"www.lyft.com");
       assert_eq!(
-        context.get_client_hello_extension(16).unwrap().as_slice(),
+        context.get_client_hello_extension(16).unwrap(),
         b"\x00\x03\x02h2"
       );
       assert!(context.get_client_hello_extension(5).is_none());
-      assert_eq!(
-        context.get_filter_state("tenant").unwrap().as_slice(),
-        b"lyft"
-      );
+      assert_eq!(context.get_filter_state("tenant").unwrap(), b"lyft");
       assert!(context.get_filter_state("other").is_none());
       tls_certificate_selector::TlsCertificateSelection::Configured(0)
     }
@@ -5675,10 +5664,7 @@ fn test_lb_get_cluster_name() {
   mock_lb
     .expect_get_cluster_name()
     .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
-  assert_eq!(
-    mock_lb.get_cluster_name().unwrap().as_slice(),
-    b"my_cluster"
-  );
+  assert_eq!(mock_lb.get_cluster_name().unwrap(), b"my_cluster");
 }
 
 #[test]
@@ -5696,7 +5682,7 @@ fn test_lb_get_healthy_host_address() {
     .withf(|priority, index| *priority == 0 && *index == 1)
     .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
   assert_eq!(
-    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
+    mock_lb.get_healthy_host_address(0, 1).unwrap(),
     b"10.0.0.1:8080"
   );
 }
@@ -5707,10 +5693,7 @@ fn test_lb_get_host_address() {
   mock_lb
     .expect_get_host_address()
     .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
-  assert_eq!(
-    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
-    b"192.168.0.1:443"
-  );
+  assert_eq!(mock_lb.get_host_address(0, 0).unwrap(), b"192.168.0.1:443");
 }
 
 #[test]
@@ -5731,9 +5714,9 @@ fn test_lb_get_host_locality() {
     ))
   });
   let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
-  assert_eq!(region.as_slice(), b"us-east-1");
-  assert_eq!(zone.as_slice(), b"us-east-1a");
-  assert_eq!(sub_zone.as_slice(), b"sub-1");
+  assert_eq!(region, b"us-east-1");
+  assert_eq!(zone, b"us-east-1a");
+  assert_eq!(sub_zone, b"sub-1");
 }
 
 #[test]
@@ -5744,8 +5727,8 @@ fn test_lb_context_get_downstream_headers() {
     .returning(|| vec![(EnvoyBuffer::new(b"host"), EnvoyBuffer::new(b"example.com"))]);
   let headers = mock_lb.context_get_downstream_headers();
   assert_eq!(headers.len(), 1);
-  assert_eq!(headers[0].0.as_slice(), b"host");
-  assert_eq!(headers[0].1.as_slice(), b"example.com");
+  assert_eq!(headers[0].0, b"host");
+  assert_eq!(headers[0].1, b"example.com");
 }
 
 #[test]
@@ -5756,7 +5739,7 @@ fn test_lb_context_get_downstream_header() {
     .withf(|key, index| key == "host" && *index == 0)
     .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
   let result = mock_lb.context_get_downstream_header("host", 0).unwrap();
-  assert_eq!(result.0.as_slice(), b"example.com");
+  assert_eq!(result.0, b"example.com");
   assert_eq!(result.1, 1);
 }
 
@@ -5767,7 +5750,7 @@ fn test_lb_context_get_override_host() {
     .expect_context_get_override_host()
     .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
   let result = mock_lb.context_get_override_host().unwrap();
-  assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
+  assert_eq!(result.0, b"10.0.0.2:9090");
   assert!(!result.1);
 }
 
@@ -7406,7 +7389,7 @@ fn test_cluster_get_cluster_name() {
   mock_cluster
     .expect_get_cluster_name()
     .returning(|| EnvoyBuffer::new(b"my_cluster"));
-  assert_eq!(mock_cluster.get_cluster_name().as_slice(), b"my_cluster");
+  assert_eq!(mock_cluster.get_cluster_name(), b"my_cluster");
 }
 
 #[test]
@@ -7733,10 +7716,10 @@ fn test_cluster_lb_context_get_downstream_headers() {
   });
   let headers = mock_ctx.get_downstream_headers();
   assert_eq!(headers.len(), 2);
-  assert_eq!(headers[0].0.as_slice(), b":method");
-  assert_eq!(headers[0].1.as_slice(), b"GET");
-  assert_eq!(headers[1].0.as_slice(), b"host");
-  assert_eq!(headers[1].1.as_slice(), b"example.com");
+  assert_eq!(headers[0].0, b":method");
+  assert_eq!(headers[0].1, b"GET");
+  assert_eq!(headers[1].0, b"host");
+  assert_eq!(headers[1].1, b"example.com");
 }
 
 #[test]
@@ -7754,7 +7737,7 @@ fn test_cluster_lb_context_get_downstream_header() {
     .withf(|key, index| key == "host" && *index == 0)
     .returning(|_, _| Some((EnvoyBuffer::new(b"example.com"), 1)));
   let result = mock_ctx.get_downstream_header("host", 0).unwrap();
-  assert_eq!(result.0.as_slice(), b"example.com");
+  assert_eq!(result.0, b"example.com");
   assert_eq!(result.1, 1);
 }
 
@@ -7802,7 +7785,7 @@ fn test_cluster_lb_context_get_override_host() {
     .expect_get_override_host()
     .returning(|| Some((EnvoyBuffer::new(b"10.0.0.1:8080"), true)));
   let result = mock_ctx.get_override_host().unwrap();
-  assert_eq!(result.0.as_slice(), b"10.0.0.1:8080");
+  assert_eq!(result.0, b"10.0.0.1:8080");
   assert!(result.1);
 }
 
@@ -7813,7 +7796,7 @@ fn test_cluster_lb_context_get_override_host_non_strict() {
     .expect_get_override_host()
     .returning(|| Some((EnvoyBuffer::new(b"10.0.0.2:9090"), false)));
   let result = mock_ctx.get_override_host().unwrap();
-  assert_eq!(result.0.as_slice(), b"10.0.0.2:9090");
+  assert_eq!(result.0, b"10.0.0.2:9090");
   assert!(!result.1);
 }
 
@@ -7831,7 +7814,7 @@ fn test_cluster_lb_context_get_downstream_connection_sni() {
     .expect_get_downstream_connection_sni()
     .returning(|| Some(EnvoyBuffer::new(b"example.com")));
   assert_eq!(
-    mock_ctx.get_downstream_connection_sni().unwrap().as_slice(),
+    mock_ctx.get_downstream_connection_sni().unwrap(),
     b"example.com"
   );
 }
@@ -7882,10 +7865,7 @@ fn test_cluster_lb_get_cluster_name() {
   mock_lb
     .expect_get_cluster_name()
     .returning(|| Some(EnvoyBuffer::new(b"my_cluster")));
-  assert_eq!(
-    mock_lb.get_cluster_name().unwrap().as_slice(),
-    b"my_cluster"
-  );
+  assert_eq!(mock_lb.get_cluster_name().unwrap(), b"my_cluster");
 }
 
 #[test]
@@ -7903,7 +7883,7 @@ fn test_cluster_lb_get_healthy_host_address() {
     .withf(|priority, index| *priority == 0 && *index == 1)
     .returning(|_, _| Some(EnvoyBuffer::new(b"10.0.0.1:8080")));
   assert_eq!(
-    mock_lb.get_healthy_host_address(0, 1).unwrap().as_slice(),
+    mock_lb.get_healthy_host_address(0, 1).unwrap(),
     b"10.0.0.1:8080"
   );
 }
@@ -7914,10 +7894,7 @@ fn test_cluster_lb_get_host_address() {
   mock_lb
     .expect_get_host_address()
     .returning(|_, _| Some(EnvoyBuffer::new(b"192.168.0.1:443")));
-  assert_eq!(
-    mock_lb.get_host_address(0, 0).unwrap().as_slice(),
-    b"192.168.0.1:443"
-  );
+  assert_eq!(mock_lb.get_host_address(0, 0).unwrap(), b"192.168.0.1:443");
 }
 
 #[test]
@@ -7999,9 +7976,9 @@ fn test_cluster_lb_get_host_locality() {
     ))
   });
   let (region, zone, sub_zone) = mock_lb.get_host_locality(0, 0).unwrap();
-  assert_eq!(region.as_slice(), b"us-east-1");
-  assert_eq!(zone.as_slice(), b"us-east-1a");
-  assert_eq!(sub_zone.as_slice(), b"sub-1");
+  assert_eq!(region, b"us-east-1");
+  assert_eq!(zone, b"us-east-1a");
+  assert_eq!(sub_zone, b"sub-1");
 }
 
 #[test]
@@ -8121,13 +8098,13 @@ fn test_cluster_lb_context_full_workflow() {
         Some(s) => s,
         None => return cluster::HostSelectionResult::NoHost,
       };
-      assert_eq!(sni.as_slice(), b"backend.example.com");
+      assert_eq!(sni, b"backend.example.com");
 
       let (host_header, _) = match ctx.get_downstream_header("host", 0) {
         Some(h) => h,
         None => return cluster::HostSelectionResult::NoHost,
       };
-      assert_eq!(host_header.as_slice(), b"backend.example.com");
+      assert_eq!(host_header, b"backend.example.com");
 
       let hash = match ctx.compute_hash_key() {
         Some(h) => h,
@@ -9558,10 +9535,10 @@ fn test_matcher_get_all_headers() {
   MOCK_MATCHER_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
   let headers = ctx.get_all_headers(abi::envoy_dynamic_module_type_http_header_type::RequestHeader);
   assert_eq!(2, headers.len());
-  assert_eq!(b":path".as_slice(), headers[0].0.as_slice());
-  assert_eq!(b"/index".as_slice(), headers[0].1.as_slice());
-  assert_eq!(b"content-type".as_slice(), headers[1].0.as_slice());
-  assert_eq!(b"text/plain".as_slice(), headers[1].1.as_slice());
+  assert_eq!(headers[0].0, b":path");
+  assert_eq!(headers[0].1, b"/index");
+  assert_eq!(headers[1].0, b"content-type");
+  assert_eq!(headers[1].1, b"text/plain");
 
   // An empty map yields an empty vector.
   MOCK_MATCHER_MAP_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -11832,10 +11809,10 @@ fn test_early_header_mutation_get_all_headers_single_allocation() {
   EHM_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
   let headers = ctx.get_all_headers();
   assert_eq!(headers.len(), 2);
-  assert_eq!(headers[0].0.as_slice(), b"h1");
-  assert_eq!(headers[0].1.as_slice(), b"v1");
-  assert_eq!(headers[1].0.as_slice(), b"h2");
-  assert_eq!(headers[1].1.as_slice(), b"v2");
+  assert_eq!(headers[0].0, b"h1");
+  assert_eq!(headers[0].1, b"v1");
+  assert_eq!(headers[1].0, b"h2");
+  assert_eq!(headers[1].1, b"v2");
 
   EHM_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
   assert!(ctx.get_all_headers().is_empty());
@@ -11854,10 +11831,10 @@ fn test_formatter_get_all_headers_single_allocation() {
   FMT_FILL_SUCCEEDS.store(true, std::sync::atomic::Ordering::SeqCst);
   let headers = ctx.get_all_headers(request);
   assert_eq!(headers.len(), 2);
-  assert_eq!(headers[0].0.as_slice(), b"h1");
-  assert_eq!(headers[0].1.as_slice(), b"v1");
-  assert_eq!(headers[1].0.as_slice(), b"h2");
-  assert_eq!(headers[1].1.as_slice(), b"v2");
+  assert_eq!(headers[0].0, b"h1");
+  assert_eq!(headers[0].1, b"v1");
+  assert_eq!(headers[1].0, b"h2");
+  assert_eq!(headers[1].1, b"v2");
 
   FMT_HEADERS_EMPTY.store(true, std::sync::atomic::Ordering::SeqCst);
   assert!(ctx.get_all_headers(request).is_empty());
@@ -12376,21 +12353,20 @@ fn test_cluster_specifier_context_reads_request_state() {
     headers
   );
 
-  assert_eq!(b"prod", ctx.get_request_header("env").unwrap().as_slice());
+  assert_eq!(ctx.get_request_header("env").unwrap(), b"prod");
   // The indexed accessor also reports how many values the key has, which stays zero if the callback
   // leaves the out parameter alone.
   let (value, total_count) = ctx.get_request_header_value("env", 0).unwrap();
-  assert_eq!(b"prod", value.as_slice());
+  assert_eq!(value, b"prod");
   assert_eq!(1, total_count);
   assert!(ctx.get_request_header("x-absent").is_none());
   assert!(ctx.get_request_header_value("env", 1).is_none());
 
   assert_eq!(
-    b"HTTP/2",
     ctx
       .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestProtocol)
-      .unwrap()
-      .as_slice()
+      .unwrap(),
+    b"HTTP/2"
   );
   assert_eq!(
     Some(7),
@@ -12401,11 +12377,8 @@ fn test_cluster_specifier_context_reads_request_state() {
     ctx.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::HealthCheck)
   );
   assert_eq!(
-    b"shard-a",
-    ctx
-      .get_dynamic_metadata("envoy.test", "shard")
-      .unwrap()
-      .as_slice()
+    ctx.get_dynamic_metadata("envoy.test", "shard").unwrap(),
+    b"shard-a"
   );
   assert_eq!(
     Some(0.25),
@@ -12416,8 +12389,8 @@ fn test_cluster_specifier_context_reads_request_state() {
     ctx.get_dynamic_metadata_bool("envoy.test", "canary")
   );
   assert_eq!(
-    STUB_SPECIFIER_ROUTE_NAME.as_bytes(),
-    ctx.route_name().unwrap().as_slice()
+    ctx.route_name().unwrap(),
+    STUB_SPECIFIER_ROUTE_NAME.as_bytes()
   );
   assert_eq!(STUB_SPECIFIER_RANDOM_VALUE, ctx.random_value());
   let counts = ctx.get_cluster_host_count("prod", 0).unwrap();
@@ -14065,25 +14038,21 @@ fn test_route_specifier_context_reads_request_state() {
     .get_all_request_headers()
     .expect("request headers present");
   assert_eq!(2, headers.len());
-  assert_eq!(b":path".as_slice(), headers[0].0.as_slice());
-  assert_eq!(b"/index".as_slice(), headers[0].1.as_slice());
-  assert_eq!(
-    b"/index".as_slice(),
-    ctx.get_request_header(":path").unwrap().as_slice()
-  );
+  assert_eq!(headers[0].0, b":path");
+  assert_eq!(headers[0].1, b"/index");
+  assert_eq!(ctx.get_request_header(":path").unwrap(), b"/index");
   let (value, total_count) = ctx.get_request_header_value("env", 0).unwrap();
-  assert_eq!(b"prod".as_slice(), value.as_slice());
+  assert_eq!(value, b"prod");
   assert_eq!(1, total_count);
   assert!(ctx.get_request_header_value("env", 1).is_none());
   assert!(ctx.get_request_header("missing").is_none());
 
   assert_eq!(STUB_ROUTE_RANDOM_VALUE, ctx.get_random_value());
   assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
     ctx
       .get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::RequestPath)
-      .unwrap()
-      .as_slice()
+      .unwrap(),
+    STUB_ROUTE_VALUE.as_bytes()
   );
   assert_eq!(
     Some(42),
@@ -14094,17 +14063,14 @@ fn test_route_specifier_context_reads_request_state() {
     ctx.get_attribute_bool(abi::envoy_dynamic_module_type_attribute_id::RequestPath)
   );
   assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    ctx
-      .get_dynamic_metadata_string("filter", "key")
-      .unwrap()
-      .as_slice()
+    ctx.get_dynamic_metadata_string("filter", "key").unwrap(),
+    STUB_ROUTE_VALUE.as_bytes()
   );
   assert_eq!(Some(2.5), ctx.get_dynamic_metadata_number("filter", "key"));
   assert_eq!(Some(true), ctx.get_dynamic_metadata_bool("filter", "key"));
   assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    ctx.get_filter_state_bytes("key").unwrap().as_slice()
+    ctx.get_filter_state_bytes("key").unwrap(),
+    STUB_ROUTE_VALUE.as_bytes()
   );
   let host_count = ctx.get_cluster_host_count("cluster", 0).unwrap();
   assert_eq!(5, host_count.total);
@@ -14133,8 +14099,8 @@ fn test_route_specifier_context_reads_request_state() {
     assert_eq!(2, view.len());
     assert!(!view.is_empty());
     let (key, value) = view.get(0).unwrap();
-    assert_eq!(b":path".as_slice(), key.as_slice());
-    assert_eq!(b"/index".as_slice(), value.as_slice());
+    assert_eq!(key, b":path");
+    assert_eq!(value, b"/index");
     assert!(view.get(2).is_none());
     assert_eq!(2, view.iter().count());
   }
@@ -14184,16 +14150,10 @@ fn test_route_specifier_context_reads_input_route_in_one_call() {
 
   let input = ctx.input_route().unwrap();
   assert_eq!(route_specifier::RouteKind::RouteEntry, input.kind);
-  assert_eq!(STUB_SPECIFIER_ROUTE_NAME.as_bytes(), input.name.as_slice());
-  assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    input.virtual_host_name.as_slice()
-  );
+  assert_eq!(input.name, STUB_SPECIFIER_ROUTE_NAME.as_bytes());
+  assert_eq!(input.virtual_host_name, STUB_ROUTE_VALUE.as_bytes());
   assert!(input.has_metadata);
-  assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    input.cluster_name.unwrap().as_slice()
-  );
+  assert_eq!(input.cluster_name.unwrap(), STUB_ROUTE_VALUE.as_bytes());
   assert_eq!(Some(std::time::Duration::from_millis(1500)), input.timeout);
   assert_eq!(
     Some(std::time::Duration::from_millis(2000)),
@@ -14245,24 +14205,24 @@ fn test_route_specifier_context_reads_input_route() {
     ctx.input_route_kind()
   );
   assert_eq!(
-    STUB_SPECIFIER_ROUTE_NAME.as_bytes(),
-    ctx.input_route_name().unwrap().as_slice()
+    ctx.input_route_name().unwrap(),
+    STUB_SPECIFIER_ROUTE_NAME.as_bytes()
   );
   assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    ctx.input_route_virtual_host_name().unwrap().as_slice()
+    ctx.input_route_virtual_host_name().unwrap(),
+    STUB_ROUTE_VALUE.as_bytes()
   );
   assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    ctx.input_route_cluster_name().unwrap().as_slice()
+    ctx.input_route_cluster_name().unwrap(),
+    STUB_ROUTE_VALUE.as_bytes()
   );
   assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    ctx.input_route_redirect_location().unwrap().as_slice()
+    ctx.input_route_redirect_location().unwrap(),
+    STUB_ROUTE_VALUE.as_bytes()
   );
   assert_eq!(
-    STUB_ROUTE_TEMPLATE_ID.as_bytes(),
-    ctx.selected_template_id().unwrap().as_slice()
+    ctx.selected_template_id().unwrap(),
+    STUB_ROUTE_TEMPLATE_ID.as_bytes()
   );
   assert_eq!(
     Some(std::time::Duration::from_millis(1500)),
@@ -14270,11 +14230,8 @@ fn test_route_specifier_context_reads_input_route() {
   );
   assert_eq!(Some(302), ctx.input_route_response_code());
   assert_eq!(
-    STUB_ROUTE_VALUE.as_bytes(),
-    ctx
-      .input_route_metadata_string("ns", "key")
-      .unwrap()
-      .as_slice()
+    ctx.input_route_metadata_string("ns", "key").unwrap(),
+    STUB_ROUTE_VALUE.as_bytes()
   );
   assert_eq!(Some(1.5), ctx.input_route_metadata_number("ns", "key"));
 
