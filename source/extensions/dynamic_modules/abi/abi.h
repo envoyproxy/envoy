@@ -16143,8 +16143,11 @@ void envoy_dynamic_module_on_stat_sink_config_scheduled(
  *
  * The returned handle may be read and released on any thread, but by one thread at a time. The
  * module must release it with envoy_dynamic_module_callback_stat_sink_snapshot_release, and must
- * do so before envoy_dynamic_module_on_stat_sink_config_destroy returns. Removed stats stay alive
- * until the handles that reference them are released.
+ * do so before envoy_dynamic_module_on_stat_sink_config_destroy returns. A stat stays in the
+ * store while a handle references it, even after its scope is removed or it is evicted, so it
+ * keeps appearing in later flush snapshots and a stat created again under its name gets it back
+ * with its value. A handle still held when the next flush starts keeps such stats in that flush,
+ * and retaining every flush before releasing the previous one keeps them indefinitely.
  *
  * With the handle passed to envoy_dynamic_module_on_stat_sink_flush, this must be called on the
  * main thread during that hook. With a retained handle that has not been released, it may be called

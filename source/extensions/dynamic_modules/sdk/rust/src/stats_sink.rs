@@ -521,8 +521,14 @@ impl<'a> MetricSnapshot<'a> {
 /// It dereferences to [`MetricSnapshot`], so it is read with the same methods, which report the
 /// values copied when it was retained. It is `Send` but not `Sync`: move it to another thread, for
 /// example into a Tokio task, to read and format the metrics off the main thread, where only that
-/// thread reads it. Dropping it releases the Envoy-side snapshot and its stat references, which
-/// keep removed stats alive until then.
+/// thread reads it. Dropping it releases the Envoy-side snapshot and its stat references.
+///
+/// A stat stays in the store while a retained snapshot references it, even after its scope is
+/// removed or it is evicted, so it keeps appearing in later flush snapshots, and a stat created
+/// again under its name gets it back with its value. A retained snapshot still held when the next
+/// flush starts keeps such stats in that flush, and retaining every flush before dropping the
+/// previous one keeps them indefinitely. To let removed stats go, drop each retained snapshot
+/// before the next [`StatSink::on_flush`].
 ///
 /// Every retained snapshot must be dropped before the [`StatSink`] that retained it is dropped, so
 /// a sink that hands them to worker threads should stop and join those workers in its [`Drop`]
