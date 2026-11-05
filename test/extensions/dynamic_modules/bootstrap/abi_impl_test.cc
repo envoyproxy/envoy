@@ -2674,12 +2674,12 @@ TEST_F(BootstrapAbiImplTest, EnableClusterWriter) {
   EXPECT_NE(nullptr, config->cluster_writer_);
   EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
       config->thisAsVoidPtr()));
-  EXPECT_THAT(init_target_names, testing::ElementsAre("dynamic_modules_bootstrap"));
+  EXPECT_THAT(init_target_names, testing::ElementsAre("target dynamic_modules_bootstrap"));
   testing::NiceMock<Server::MockListenerManager> listener_manager;
   config->setListenerManager(listener_manager);
   EXPECT_THAT(init_target_names,
-              testing::ElementsAre("dynamic_modules_bootstrap",
-                                   "dynamic_modules_bootstrap_cluster_writer:test"));
+              testing::ElementsAre("target dynamic_modules_bootstrap",
+                                   "target dynamic_modules_bootstrap_cluster_writer:test"));
 
   auto shut_down_config = newOptionalHooksConfig();
   shut_down_config->onShutdown();
