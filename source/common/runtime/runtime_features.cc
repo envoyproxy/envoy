@@ -184,6 +184,7 @@ RUNTIME_GUARD(envoy_reloadable_features_skip_partition_original_dst_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_skip_pending_overflow_count_on_active_rq);
 RUNTIME_GUARD(envoy_reloadable_features_spiffe_validator_reject_empty_trust_bundle);
 RUNTIME_GUARD(envoy_reloadable_features_spiffe_validator_use_upstream_subject_alt_names);
+RUNTIME_GUARD(envoy_reloadable_features_srds_fast_config_update);
 RUNTIME_GUARD(envoy_reloadable_features_ssl_socket_report_connection_reset);
 RUNTIME_GUARD(envoy_reloadable_features_strip_dotdot_segments_with_parameters);
 RUNTIME_GUARD(envoy_reloadable_features_strip_path_parameters_per_segment);
@@ -228,7 +229,6 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
-RUNTIME_GUARD(envoy_reloadable_features_srds_fast_config_update);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
 // When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
 // scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
