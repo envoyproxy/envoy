@@ -248,6 +248,42 @@ TEST_F(AdminStatsTest, HandlerStatsHtml) {
   test("&usedonly", {"foo.c0: 0", "foo.c1: 1"},      // expected
        {"scope1.scope2.unset"});                     // not expected
 }
+
+// Stat names may contain downstream-controlled bytes, so every place a stat name
+// is written into the HTML stats page must be escaped.
+TEST_F(AdminStatsTest, HandlerStatsHtmlSanitizesNames) {
+  const std::string payload = "</script><script>alert(1)</script>";
+  const std::string html_escaped = "&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;";
+
+  store_->counterFromString(absl::StrCat("counter", payload)).add(1);
+  store_->gaugeFromString(absl::StrCat("gauge", payload), Stats::Gauge::ImportMode::Accumulate)
+      .set(2);
+  store_->textReadoutFromString(absl::StrCat("text", payload)).set(payload);
+  endpoints_helper_.makeCluster(absl::StrCat("cluster", payload), 1);
+  Stats::Histogram& h = store_->histogramFromString(absl::StrCat("histogram", payload),
+                                                    Stats::Histogram::Unit::Unspecified);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h), 200));
+  h.recordValue(200);
+  store_->mergeHistograms([]() -> void {});
+
+  const std::vector<std::string> expected_names = {
+      absl::StrCat("counter", html_escaped, ": 1"),
+      absl::StrCat("gauge", html_escaped, ": 2"),
+      absl::StrCat("text", html_escaped, ": \"", html_escaped, "\""),
+      absl::StrCat("cluster.cluster", html_escaped, ".endpoint.127.0.0.1_80.c1: 11"),
+      absl::StrCat("histogram", html_escaped),
+  };
+  for (absl::string_view buckets :
+       {"", "&histogram_buckets=summary", "&histogram_buckets=cumulative",
+        "&histogram_buckets=disjoint", "&histogram_buckets=detailed"}) {
+    CodeResponse code_response = handlerStats(absl::StrCat("/stats?format=html", buckets));
+    EXPECT_EQ(Http::Code::OK, code_response.first);
+    EXPECT_THAT(code_response.second, Not(HasSubstr(payload))) << buckets;
+    for (const std::string& expected : expected_names) {
+      EXPECT_THAT(code_response.second, HasSubstr(expected)) << buckets;
+    }
+  }
+}
 #endif
 
 TEST_F(AdminStatsTest, HandlerStatsPlainTextHistogramBucketsCumulative) {
