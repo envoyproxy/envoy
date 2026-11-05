@@ -1,0 +1,5 @@
+body: "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Internal reasoning step...\",\"thought\":true},{\"text\":\"The answer is 42.\"}]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":50,\"cachedContentTokenCount\":15,\"candidatesTokenCount\":12,\"thoughtsTokenCount\":8,\"totalTokenCount\":70},\"modelVersion\":\"gemini-2.5-flash\",\"responseId\":\"gem_resp_001\"}"
+fragmentation_seed: 11150031904436409976
+request_protocol: ANTHROPIC_MESSAGES
+response_protocol: GEMINI_GENERATE_CONTENT
+max_json_body_size: 4095

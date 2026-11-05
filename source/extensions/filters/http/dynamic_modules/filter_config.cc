@@ -398,8 +398,8 @@ envoy_dynamic_module_type_http_callout_init_result DynamicModuleHttpFilterConfig
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
 
   const uint64_t callout_id = getNextCalloutId();
-  auto http_callout_callback =
-      std::make_unique<DynamicModuleHttpFilterConfig::HttpCalloutCallback>(*this, callout_id);
+  auto http_callout_callback = std::make_unique<DynamicModuleHttpFilterConfig::HttpCalloutCallback>(
+      *this, callout_id, cluster->httpAsyncClient().dispatcher());
   DynamicModuleHttpFilterConfig::HttpCalloutCallback& callback = *http_callout_callback;
 
   auto request = cluster->httpAsyncClient().send(std::move(message), callback, options);
@@ -478,9 +478,16 @@ void DynamicModuleHttpFilterConfig::HttpCalloutCallback::onFailure(
       result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
       break;
     }
-    config.on_http_filter_config_http_callout_done_(config.thisAsVoidPtr(),
-                                                    config.in_module_config_, callout_id, result,
-                                                    nullptr, 0, nullptr, 0);
+    // This can run inside a cluster manager update, so report it from a posted callback.
+    dispatcher_.post([weak_config = config.weak_from_this(), callout_id, result]() {
+      DynamicModuleHttpFilterConfigSharedPtr config = weak_config.lock();
+      if (config == nullptr) {
+        return;
+      }
+      config->on_http_filter_config_http_callout_done_(config->thisAsVoidPtr(),
+                                                       config->in_module_config_, callout_id,
+                                                       result, nullptr, 0, nullptr, 0);
+    });
   }
 }
 
@@ -496,8 +503,8 @@ envoy_dynamic_module_type_http_callout_init_result DynamicModuleHttpFilterConfig
   }
 
   const uint64_t callout_id = getNextCalloutId();
-  auto callback =
-      std::make_unique<DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback>(*this, callout_id);
+  auto callback = std::make_unique<DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback>(
+      *this, callout_id, cluster->httpAsyncClient().dispatcher());
 
   Http::AsyncClient::StreamOptions options;
   options.setTimeout(std::chrono::milliseconds(timeout_milliseconds));
@@ -536,17 +543,46 @@ envoy_dynamic_module_type_http_callout_init_result DynamicModuleHttpFilterConfig
 
 void DynamicModuleHttpFilterConfig::resetHttpStream(uint64_t stream_id) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+  if (it == http_stream_callouts_.end()) {
     return;
   }
+  // Envoy reset the stream and has not reported it yet.
+  if (it->second->stream_ == nullptr) {
+    reportHttpStreamReset(stream_id);
+    return;
+  }
+  it->second->reset_by_module_ = true;
   it->second->stream_->reset();
+}
+
+void DynamicModuleHttpFilterConfig::reportHttpStreamReset(uint64_t stream_id) {
+  auto it = http_stream_callouts_.find(stream_id);
+  if (it == http_stream_callouts_.end()) {
+    return;
+  }
+  // Get the async client callback out of the map first to ensure it's cleaned up when this function
+  // returns.
+  auto callback = std::move(it->second);
+  http_stream_callouts_.erase(it);
+
+  if (in_module_config_ == nullptr || on_http_filter_config_http_stream_reset_ == nullptr) {
+    return;
+  }
+
+  on_http_filter_config_http_stream_reset_(
+      thisAsVoidPtr(), in_module_config_, stream_id,
+      envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
 }
 
 bool DynamicModuleHttpFilterConfig::sendStreamData(uint64_t stream_id, Buffer::Instance& data,
                                                    bool end_stream) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+  if (it == http_stream_callouts_.end()) {
     return false;
+  }
+  // Envoy reset the stream and reports it later, so the data is dropped.
+  if (it->second->stream_ == nullptr) {
+    return true;
   }
   it->second->stream_->sendData(data, end_stream);
   return true;
@@ -555,8 +591,12 @@ bool DynamicModuleHttpFilterConfig::sendStreamData(uint64_t stream_id, Buffer::I
 bool DynamicModuleHttpFilterConfig::sendStreamTrailers(uint64_t stream_id,
                                                        Http::RequestTrailerMapPtr trailers) {
   auto it = http_stream_callouts_.find(stream_id);
-  if (it == http_stream_callouts_.end() || !it->second->stream_) {
+  if (it == http_stream_callouts_.end()) {
     return false;
+  }
+  // Envoy reset the stream and reports it later, so the trailers are dropped.
+  if (it->second->stream_ == nullptr) {
+    return true;
   }
   it->second->request_trailers_ = std::move(trailers);
   it->second->stream_->sendTrailers(*it->second->request_trailers_);
@@ -684,27 +724,28 @@ void DynamicModuleHttpFilterConfig::HttpStreamCalloutCallback::onReset() {
   DynamicModuleHttpFilterConfig& config = config_;
   const uint64_t callout_id = callout_id_;
 
-  // Get the async client callback out of the map first to ensure it's cleaned up when this function
-  // returns.
-  auto it = config.http_stream_callouts_.find(callout_id);
-  if (it == config.http_stream_callouts_.end()) {
+  if (!config.http_stream_callouts_.contains(callout_id)) {
     return;
   }
-  auto callback = std::move(it->second);
-  config.http_stream_callouts_.erase(it);
 
   // Any in map callback must have a non-null stream_.
   ASSERT(stream_ != nullptr);
   stream_ = nullptr;
 
-  if (config.in_module_config_ == nullptr ||
-      config.on_http_filter_config_http_stream_reset_ == nullptr) {
+  // The module hears about a reset that it requested before its call returns.
+  if (reset_by_module_) {
+    config.reportHttpStreamReset(callout_id);
     return;
   }
 
-  config.on_http_filter_config_http_stream_reset_(
-      config.thisAsVoidPtr(), config.in_module_config_, callout_id,
-      envoy_dynamic_module_type_http_stream_reset_reason_LocalReset);
+  // This can run inside a cluster manager update, so report it from a posted callback. Until then
+  // the stream stays in the map, so that a reset by the module still reaches it inline.
+  dispatcher_.post([weak_config = config.weak_from_this(), callout_id]() {
+    DynamicModuleHttpFilterConfigSharedPtr config = weak_config.lock();
+    if (config != nullptr) {
+      config->reportHttpStreamReset(callout_id);
+    }
+  });
 }
 
 } // namespace HttpFilters

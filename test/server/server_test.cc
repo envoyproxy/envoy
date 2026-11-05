@@ -9,6 +9,7 @@
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/xds_config_tracker.h"
+#include "envoy/extensions/transport_sockets/tls/v3/tls.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/server/fatal_action_config.h"
@@ -25,9 +26,11 @@
 #include "source/common/stats/symbol_table.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/version/version.h"
 #include "source/server/instance_impl.h"
 #include "source/server/process_context_impl.h"
+#include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/config/dummy_config.pb.h"
 #include "test/common/stats/stat_test_utility.h"
@@ -981,6 +984,40 @@ TEST_P(ServerStatsTest, FlushStats) {
   Stats::StatNameDynamicStorage dynamic_stat("c.d", stats_store_.symbolTable());
   flushStats();
   EXPECT_EQ(recent_lookups.value(), strobed_recent_lookups);
+}
+
+// A flush resets the expiration of the first OCSP response once no TLS context has one.
+TEST_P(ServerStatsTest, FlushResetsOcspResponseExpirationWithoutOcspResponse) {
+  initialize("test/server/test_data/server/empty_bootstrap.yaml");
+  Stats::Gauge& ocsp_response_expiration = stats_store_.gaugeFromString(
+      "server.seconds_until_first_ocsp_response_expiring", Stats::Gauge::ImportMode::NeverImport);
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/ocsp/test_data/good_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/ocsp/test_data/good_key.pem"
+      ocsp_staple:
+        filename: "{{ test_rundir }}/test/common/tls/ocsp/test_data/good_ocsp_resp.der"
+  )EOF"),
+                            tls_context);
+  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+      server_->serverFactoryContext(), *stats_store_.rootScope(),
+      server_->serverFactoryContext().messageValidationVisitor());
+  auto config = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, factory_context, /*server_names=*/{}, /*for_quic=*/false);
+  ASSERT_TRUE(config.ok()) << config.status();
+  auto context = server_->sslContextManager().createSslServerContext(*stats_store_.rootScope(),
+                                                                     **config, nullptr);
+  ASSERT_TRUE(context.ok()) << context.status();
+  flushStats();
+  EXPECT_LT(0, ocsp_response_expiration.value());
+
+  server_->sslContextManager().removeContext(*context);
+  flushStats();
+  EXPECT_EQ(0, ocsp_response_expiration.value());
 }
 
 TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {

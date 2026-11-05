@@ -251,6 +251,9 @@ static void record_varied(envoy_dynamic_module_type_route_specifier_context_envo
         ctx, named(name, sizeof(name), "filter_", value), true);
   } else if (header_is(field, "route-name")) {
     envoy_dynamic_module_callback_route_specifier_set_route_name(ctx, value_buffer);
+  } else if (header_is(field, "virtual-cluster")) {
+    envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+        ctx, named(name, sizeof(name), "vcluster_", value));
   } else if (header_is(field, "path")) {
     envoy_dynamic_module_callback_route_specifier_set_path(ctx,
                                                            named(name, sizeof(name), "/", value));

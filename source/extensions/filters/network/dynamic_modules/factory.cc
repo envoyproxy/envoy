@@ -8,6 +8,8 @@
 #include "source/extensions/filters/network/dynamic_modules/filter.h"
 #include "source/extensions/filters/network/dynamic_modules/filter_config.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Server {
 namespace Configuration {
@@ -55,8 +57,8 @@ DynamicModuleNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     Extensions::DynamicModules::incrementLoadFailure(
         server_context, proto_config.filter_name(),
         Extensions::DynamicModules::ConfigInitErrorStat);
-    return absl::InvalidArgumentError("Failed to create filter config: " +
-                                      std::string(filter_config.status().message()));
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to create filter config: ", filter_config.status().message()));
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.

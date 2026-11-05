@@ -192,7 +192,7 @@ void Span::setOperation(absl::string_view operation) { operation_ = std::string(
 
 // Adds a tag to the span
 void Span::setTag(absl::string_view name, absl::string_view value) {
-  tags_[std::string(name)] = std::string(value);
+  tags_[std::string(name)] = value;
 }
 
 // Log an event as a Fluentd entry

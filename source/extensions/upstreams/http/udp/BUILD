@@ -48,6 +48,7 @@ envoy_cc_library(
         "//source/common/network:transport_socket_options_lib",
         "//source/common/router:router_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:udp_source_address_policy_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "@quiche//:quiche_common_capsule_lib",
         "@quiche//:quiche_common_connect_udp_datagram_payload_lib",

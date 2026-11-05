@@ -500,6 +500,10 @@ public:
 
   void initialize(std::function<void()> completion);
 
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() {
+    return saved_context_->transportSocketFactoryContext();
+  }
+
 private:
   std::unique_ptr<FcdsFilterChainFactoryContextImpl> context_;
   FcdsFilterChainFactoryContextImpl* saved_context_;
@@ -545,7 +549,6 @@ private:
   Server::Configuration::ServerFactoryContext& server_context_;
   ListenerComponentFactory& listener_component_factory_;
   ThreadLocal::TypedSlotPtr<ThreadLocalState> tls_slot_;
-  Server::Configuration::TransportSocketFactoryContextImplPtr transport_factory_context_;
   Stats::ScopeSharedPtr scope_;
   // Shared by all FCDS subscriptions so the resource decoder is built once.
   const Config::ResourceTypeHelper<FilterChainProto> resource_type_helper_;

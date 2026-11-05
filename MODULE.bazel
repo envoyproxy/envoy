@@ -12,7 +12,7 @@ bazel_dep(name = "antlr4-cpp-runtime", version = "4.13.2.bcr.2")
 bazel_dep(name = "apple_support", version = "2.10.1")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aws-c-auth-testdata", version = "0.10.4.envoy")
-bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy")
+bazel_dep(name = "bazel-compdb", version = "0.0.0-20220906-4086479.envoy.1")
 bazel_dep(name = "bazel_features", version = "1.53.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "boringssl", version = "0.20260929.0")
@@ -27,7 +27,7 @@ bazel_dep(name = "colm", version = "0.14.7-211228-2d8ba76.envoy")
 bazel_dep(name = "cpp2sky", version = "0.6.0.envoy")
 bazel_dep(name = "dd-trace-cpp", version = "2.1.1.envoy")
 bazel_dep(name = "envoy_api", version = "1.41.0-dev")
-bazel_dep(name = "envoy_toolshed", version = "0.5.11.envoy")
+bazel_dep(name = "envoy_toolshed", version = "0.5.17.envoy")
 bazel_dep(name = "flatbuffers", version = "25.12.19.bcr.1")
 bazel_dep(name = "fmt", version = "12.2.0.bcr.1")
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -118,7 +118,7 @@ bazel_dep(name = "zstd", version = "1.5.7.bcr.3")
 # deps: Dev
 ####################################################################################
 
-bazel_dep(name = "google_benchmark", version = "1.9.5", dev_dependency = True, repo_name = "benchmark")
+bazel_dep(name = "google_benchmark", version = "1.10.0", dev_dependency = True, repo_name = "benchmark")
 
 bazel_dep(name = "rules_fuzzing", version = "0.6.0")
 
@@ -168,21 +168,44 @@ single_version_override(
 # setup: Compilers
 ####################################################################################
 
-# GCC toolchain configuration
-register_toolchains("@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain")
+# GCC is opt-in (`--config=gcc`): hermetic, linking with hermetic lld, unless the root module
+# sets `gcc.host(path = ..., toolchains = ["gcc_linux_x86_64"])`. Downstreams register their own
+# GCC toolchains.
+gcc = use_extension("@envoy_toolshed//toolchains/gcc:extensions.bzl", "gcc_extension", dev_dependency = True)
+gcc.toolchain(
+    name = "gcc_linux_x86_64",
+    arch = "x86_64",
+    dwp = "@llvm_minimal_linux_x64//:bin/llvm-dwp",
+    lld = "@llvm_minimal_linux_x64//:bin/lld",
+    sysroot = "@sysroot_linux_amd64//sysroot",
+)
+use_repo(gcc, "gcc_linux_x86_64")
+
+# Hermetic libstdc++ for //compat/openssl/prefixer. Not dev-only, as the prefixer is also built
+# when Envoy is a dependency, and kept out of any host GCC override. Only fetched when used.
+gcc_runtime = use_extension("@envoy_toolshed//toolchains/gcc:extensions.bzl", "gcc_extension")
+gcc_runtime.toolchain(
+    name = "gcc_runtime_linux_x86_64",
+    arch = "x86_64",
+    dwp = "@llvm_minimal_linux_x64//:bin/llvm-dwp",
+    lld = "@llvm_minimal_linux_x64//:bin/lld",
+    sysroot = "@sysroot_linux_amd64//sysroot",
+)
+use_repo(gcc_runtime, "gcc_runtime_linux_x86_64")
+
+register_toolchains(
+    "//bazel/gcc:linux_x86_64_toolchain",
+    "//bazel/gcc:unavailable_linux_toolchain",
+    "//bazel/gcc:unavailable_macos_toolchain",
+    "//bazel/gcc:unavailable_windows_toolchain",
+    dev_dependency = True,
+)
 
 # LLVM toolchain configuration
 sysroot_ext = use_extension("@envoy_toolshed//sysroot:extensions.bzl", "sysroot_extension")
 sysroot_ext.setup()
-
-# TODO(phlax): remove once the hermetic gcc toolchain provides libstdc++ for //compat/openssl/prefixer
-sysroot_ext.setup(
-    name_prefix = "libstdcxx",
-    stdcc_version = "13",
-)
 use_repo(
     sysroot_ext,
-    "libstdcxx_sysroot_linux_amd64",
     "sysroot_linux_amd64",
     "sysroot_linux_arm64",
 )
@@ -194,6 +217,21 @@ use_repo(sanitizer_ext, "msan_libs", "tsan_libs")
 grcov_ext = use_extension("@envoy_toolshed//coverage/grcov:extensions.bzl", "grcov_extension")
 grcov_ext.setup()
 use_repo(grcov_ext, "grcov")
+
+# Hermetic (prebuilt) git toolchain.
+git_prebuilt_ext = use_extension("@envoy_toolshed//git:extensions.bzl", "git_prebuilt_extension")
+git_prebuilt_ext.setup()
+use_repo(git_prebuilt_ext, "git_toolchains")
+
+register_toolchains("@git_toolchains//:all")
+
+# Hermetic hunspell spell checker for //tools/spelling: prebuilt for Linux, built from source
+# (registered by envoy_toolshed as a fallback) elsewhere, eg macOS.
+hunspell_ext = use_extension("@envoy_toolshed//hunspell:extensions.bzl", "hunspell_prebuilt_extension")
+hunspell_ext.setup()
+use_repo(hunspell_ext, "hunspell_toolchains")
+
+register_toolchains("@hunspell_toolchains//:all")
 
 unwind_ext = use_extension("@envoy_toolshed//compile:extensions.bzl", "unwind_extension")
 unwind_ext.setup()

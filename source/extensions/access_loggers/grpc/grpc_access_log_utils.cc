@@ -197,7 +197,7 @@ void Utility::extractCommonAccessLogProperties(
   }
   if (!stream_info.downstreamAddressProvider().ja3Hash().empty()) {
     common_access_log.mutable_tls_properties()->set_ja3_fingerprint(
-        std::string(stream_info.downstreamAddressProvider().ja3Hash()));
+        stream_info.downstreamAddressProvider().ja3Hash());
   }
   if (stream_info.downstreamAddressProvider().sslConnection() != nullptr) {
     auto* tls_properties = common_access_log.mutable_tls_properties();
@@ -342,7 +342,7 @@ void Utility::extractCommonAccessLogProperties(
 
   // Set stream unique id from the stream info.
   if (auto provider = stream_info.getStreamIdProvider(); provider.has_value()) {
-    common_access_log.set_stream_id(std::string(provider->toStringView().value_or("")));
+    common_access_log.set_stream_id(provider->toStringView().value_or(""));
   }
 
   if (const auto& reason = stream_info.downstreamTransportFailureReason(); !reason.empty()) {

@@ -114,7 +114,7 @@
 # AWS common signing components
 /*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
-/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
+/*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123 @wbpcode
 # admission control extension.
 /*/extensions/filters/http/admission_control @tonya11en @mattklein123
 # http inspector
