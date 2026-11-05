@@ -11,6 +11,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/xds_manager.h"
+#include "envoy/init/manager.h"
 #include "envoy/singleton/manager.h"
 
 #include "source/common/common/fmt.h"
@@ -69,15 +70,14 @@ DynamicModuleClusterWriter::DynamicModuleClusterWriter(
       stats_scope_(context.serverScope().store().createScope("")),
       stats_(generateStats(*stats_scope_, config_name_)),
       init_target_(absl::StrCat("dynamic_modules_bootstrap_cluster_writer:", config_name_),
-                   [this]() { onClustersInitialized(); }),
+                   [this]() {
+                     onClustersInitialized();
+                     init_target_.ready();
+                   }),
       apply_callback_(context.mainThreadDispatcher().createSchedulableCallback(
           [this]() { applyQueuedOperations(); })),
       deliver_callback_(context.mainThreadDispatcher().createSchedulableCallback(
-          [this]() { deliverOutcomes(); })) {
-  // The server init manager starts once Envoy initialized its static and CDS clusters. A write
-  // applied before that could finish the cluster manager initialization early.
-  context.initManager().add(init_target_);
-}
+          [this]() { deliverOutcomes(); })) {}
 
 DynamicModuleClusterWriter::WriterStats
 DynamicModuleClusterWriter::generateStats(Stats::Scope& scope, absl::string_view config_name) {
@@ -102,18 +102,26 @@ DynamicModuleClusterWriter::generateStats(Stats::Scope& scope, absl::string_view
                      gauge("clusters_owned"),          gauge("updates_pending")};
 }
 
-void DynamicModuleClusterWriter::onServerInitialized() { server_initialized_ = true; }
+void DynamicModuleClusterWriter::onServerInitialized() {
+  server_initialized_ = true;
+  // The server init manager starts once Envoy initialized its static and CDS clusters. A write
+  // applied before that could finish the cluster manager initialization early.
+  if (context_.initManager().state() == Init::Manager::State::Uninitialized) {
+    context_.initManager().add(init_target_);
+  } else {
+    onClustersInitialized();
+  }
+}
 
 void DynamicModuleClusterWriter::onClustersInitialized() {
   clusters_initialized_ = true;
-  // Only a running server, which initialized this extension, calls onShutdown() before it frees
-  // the cluster manager.
-  if (server_initialized_ && !shut_down_) {
+  // Only a running server starts its init manager, and it calls onShutdown() before it frees the
+  // cluster manager.
+  if (!shut_down_) {
     cluster_update_callbacks_handle_ =
         context_.clusterManager().addThreadLocalClusterUpdateCallbacks(*this);
   }
   scheduleApplyPass();
-  init_target_.ready();
 }
 
 void DynamicModuleClusterWriter::onShutdown() {

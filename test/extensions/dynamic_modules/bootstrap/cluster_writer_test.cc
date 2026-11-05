@@ -203,11 +203,26 @@ TEST_F(ClusterWriterTest, ShutdownRefusesWritesAndDropsQueuedWork) {
   EXPECT_TRUE(deliveredOutcomes().empty());
 }
 
-TEST_F(ClusterWriterTest, ClusterInitializationBeforeServerInitializationSkipsTheClusterManager) {
+TEST_F(ClusterWriterTest, AddsItsInitTargetWhenTheServerIsInitialized) {
   createWriter();
-  EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_)).Times(0);
+  EXPECT_EQ(nullptr, init_target_handle_);
+  writer_->onServerInitialized();
+  ASSERT_NE(nullptr, init_target_handle_);
+  EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_));
   EXPECT_CALL(init_watcher_, ready());
   init_target_handle_->initialize(init_watcher_);
+}
+
+TEST_F(ClusterWriterTest, StartsWithoutAnInitTargetOnceTheServerInitManagerStarted) {
+  ON_CALL(context_.init_manager_, state()).WillByDefault(Return(Init::Manager::State::Initialized));
+  EXPECT_CALL(context_.init_manager_, add(_)).Times(0);
+  createWriter();
+  EXPECT_CALL(context_.cluster_manager_, addThreadLocalClusterUpdateCallbacks_(_));
+  writer_->onServerInitialized();
+  const uint64_t update_id = write("writer.a");
+  EXPECT_CALL(context_.cluster_manager_, addOrUpdateCluster(_, "v1", true)).WillOnce(Return(false));
+  runApplyPass();
+  EXPECT_THAT(deliveredOutcomes(), testing::ElementsAre(IsOutcome(update_id, Active)));
 }
 
 TEST_F(ClusterWriterTest, ShutdownBeforeClusterInitializationSkipsTheClusterManager) {

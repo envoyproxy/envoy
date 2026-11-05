@@ -70,7 +70,6 @@ public:
         extension_config:
           "@type": type.googleapis.com/google.protobuf.BytesValue
           value: "{}"
-        cluster_writer: {{}}
     )EOF",
                     Base64::encode(startup_cluster.data(), startup_cluster.size())));
     HttpIntegrationTest::initialize();

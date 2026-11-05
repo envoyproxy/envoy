@@ -217,6 +217,13 @@ public:
   bool runOnAllWorkers(uint64_t event_id);
 
   /**
+   * Creates the cluster writer, which lets the module add, update and remove clusters. Must be
+   * called on the main thread.
+   * @return false if the cluster writer already exists or shutdown began.
+   */
+  bool enableClusterWriter();
+
+  /**
    * Called on the main thread when the server begins to shut down and when the extension is
    * destroyed.
    */
@@ -266,6 +273,9 @@ public:
   OnBootstrapExtensionClusterWriterUpdateDoneType
       on_bootstrap_extension_cluster_writer_update_done_ = nullptr;
 
+  // The name of the extension.
+  const std::string extension_name_;
+
   // The dynamic module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 
@@ -308,7 +318,7 @@ public:
   // on_bootstrap_extension_admin_request, then consumed by the admin handler lambda.
   std::string admin_response_body_;
 
-  // The cluster writer, or nullptr when the extension has no cluster_writer configuration.
+  // The cluster writer, or nullptr until the module enables it.
   DynamicModuleClusterWriterPtr cluster_writer_;
 
 private:
@@ -459,7 +469,6 @@ private:
  * @param main_thread_dispatcher the main thread dispatcher.
  * @param context the server factory context for accessing cluster manager lazily.
  * @param stats_store the stats store for accessing metrics.
- * @param has_cluster_writer whether the extension configuration sets cluster_writer.
  * @return an error status if the module could not be loaded or the configuration could not be
  * created, or a shared pointer to the config.
  */
@@ -469,7 +478,7 @@ newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
-    Stats::Store& stats_store, bool has_cluster_writer = false);
+    Stats::Store& stats_store);
 
 } // namespace DynamicModules
 } // namespace Bootstrap

@@ -22,8 +22,8 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store)
-    : dynamic_module_(std::move(dynamic_module)), main_thread_dispatcher_(main_thread_dispatcher),
-      context_(context), stats_store_(stats_store),
+    : extension_name_(extension_name), dynamic_module_(std::move(dynamic_module)),
+      main_thread_dispatcher_(main_thread_dispatcher), context_(context), stats_store_(stats_store),
       stats_scope_(stats_store.createScope(absl::StrCat(metrics_namespace, "."))),
       metrics_(*stats_scope_) {
   ASSERT(dynamic_module_ != nullptr);
@@ -263,6 +263,28 @@ bool DynamicModuleBootstrapExtensionConfig::runOnAllWorkers(uint64_t event_id) {
   return true;
 }
 
+bool DynamicModuleBootstrapExtensionConfig::enableClusterWriter() {
+  if (cluster_writer_ != nullptr || shutdown_started_) {
+    return false;
+  }
+  DynamicModuleClusterWriter::UpdateDoneCallback update_done;
+  if (on_bootstrap_extension_cluster_writer_update_done_ != nullptr) {
+    update_done = [this](uint64_t update_id, absl::string_view cluster_name,
+                         envoy_dynamic_module_type_bootstrap_cluster_writer_update_status status,
+                         absl::string_view error_details) {
+      on_bootstrap_extension_cluster_writer_update_done_(
+          thisAsVoidPtr(), in_module_config_, update_id, {cluster_name.data(), cluster_name.size()},
+          status, {error_details.data(), error_details.size()});
+    };
+  }
+  cluster_writer_ = std::make_unique<DynamicModuleClusterWriter>(extension_name_, context_,
+                                                                 std::move(update_done));
+  if (server_initialized_) {
+    cluster_writer_->onServerInitialized();
+  }
+  return true;
+}
+
 void DynamicModuleBootstrapExtensionConfig::onShutdown() {
   shutdown_started_ = true;
   if (cluster_writer_ != nullptr) {
@@ -414,7 +436,7 @@ newDynamicModuleBootstrapExtensionConfig(
     const absl::string_view metrics_namespace,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
-    Stats::Store& stats_store, bool has_cluster_writer) {
+    Stats::Store& stats_store) {
 
   // Resolve the required symbols from the dynamic module.
   auto constructor =
@@ -534,6 +556,24 @@ newDynamicModuleBootstrapExtensionConfig(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
 
+  // The module constructor can enable the cluster writer, which captures its done hook, so the
+  // optional hooks are resolved first.
+  auto on_worker_event =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
+          "envoy_dynamic_module_on_bootstrap_extension_worker_event");
+  config->on_bootstrap_extension_worker_event_ =
+      on_worker_event.ok() ? on_worker_event.value() : nullptr;
+  auto on_run_on_all_workers_done =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRunOnAllWorkersDoneType>(
+          "envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done");
+  config->on_bootstrap_extension_run_on_all_workers_done_ =
+      on_run_on_all_workers_done.ok() ? on_run_on_all_workers_done.value() : nullptr;
+  auto on_cluster_writer_update_done =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionClusterWriterUpdateDoneType>(
+          "envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done");
+  config->on_bootstrap_extension_cluster_writer_update_done_ =
+      on_cluster_writer_update_done.ok() ? on_cluster_writer_update_done.value() : nullptr;
+
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call
   // signal_init_complete during config creation.
@@ -564,39 +604,6 @@ newDynamicModuleBootstrapExtensionConfig(
   config->on_bootstrap_extension_cluster_removal_ = on_cluster_removal.value();
   config->on_bootstrap_extension_listener_add_or_update_ = on_listener_add_or_update.value();
   config->on_bootstrap_extension_listener_removal_ = on_listener_removal.value();
-
-  auto on_worker_event =
-      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
-          "envoy_dynamic_module_on_bootstrap_extension_worker_event");
-  config->on_bootstrap_extension_worker_event_ =
-      on_worker_event.ok() ? on_worker_event.value() : nullptr;
-  auto on_run_on_all_workers_done =
-      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRunOnAllWorkersDoneType>(
-          "envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done");
-  config->on_bootstrap_extension_run_on_all_workers_done_ =
-      on_run_on_all_workers_done.ok() ? on_run_on_all_workers_done.value() : nullptr;
-  auto on_cluster_writer_update_done =
-      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionClusterWriterUpdateDoneType>(
-          "envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done");
-  config->on_bootstrap_extension_cluster_writer_update_done_ =
-      on_cluster_writer_update_done.ok() ? on_cluster_writer_update_done.value() : nullptr;
-
-  if (has_cluster_writer) {
-    DynamicModuleClusterWriter::UpdateDoneCallback update_done;
-    if (config->on_bootstrap_extension_cluster_writer_update_done_ != nullptr) {
-      update_done = [config = config.get()](
-                        uint64_t update_id, absl::string_view cluster_name,
-                        envoy_dynamic_module_type_bootstrap_cluster_writer_update_status status,
-                        absl::string_view error_details) {
-        config->on_bootstrap_extension_cluster_writer_update_done_(
-            config->thisAsVoidPtr(), config->in_module_config_, update_id,
-            {cluster_name.data(), cluster_name.size()}, status,
-            {error_details.data(), error_details.size()});
-      };
-    }
-    config->cluster_writer_ = std::make_unique<DynamicModuleClusterWriter>(extension_name, context,
-                                                                           std::move(update_done));
-  }
 
   config->stat_creation_frozen_ = true;
 

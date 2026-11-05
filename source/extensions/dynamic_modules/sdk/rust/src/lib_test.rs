@@ -3469,6 +3469,13 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_run_on_all_w
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  true
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   cluster_name: abi::envoy_dynamic_module_type_module_buffer,
@@ -8646,6 +8653,7 @@ fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
   let envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
   assert!(envoy_config.run_on_all_workers(7));
   assert!(!envoy_config.run_on_all_workers(8));
+  assert!(envoy_config.enable_cluster_writer());
 
   // The stub encodes the lengths of the name, the cluster and the version in the update ID.
   assert_eq!(

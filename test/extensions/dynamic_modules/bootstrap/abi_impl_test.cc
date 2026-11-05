@@ -48,14 +48,13 @@ protected:
 
   // Creates a config backed by the bootstrap_optional_hooks module.
   DynamicModuleBootstrapExtensionConfigSharedPtr
-  newOptionalHooksConfig(bool has_cluster_writer = false,
-                         absl::string_view extension_config = "config") {
+  newOptionalHooksConfig(absl::string_view extension_config = "config") {
     auto dynamic_module = Extensions::DynamicModules::newDynamicModule(
         testDataDir() + "/libbootstrap_optional_hooks.so", false);
     EXPECT_OK(dynamic_module);
     auto config = newDynamicModuleBootstrapExtensionConfig(
         "test", extension_config, DefaultMetricsNamespace, std::move(dynamic_module.value()),
-        dispatcher_, context_, context_.store_, has_cluster_writer);
+        dispatcher_, context_, context_.store_);
     EXPECT_OK(config);
     return config.value();
   }
@@ -2323,6 +2322,11 @@ TEST_F(BootstrapAbiImplTest, MainThreadCallbacksOffMainThreadFailClosed) {
          EXPECT_FALSE(
              envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(nullptr, 1));
        }},
+      {"envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer",
+       [] {
+         EXPECT_FALSE(
+             envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(nullptr));
+       }},
       {"envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update",
        [] {
          uint64_t update_id = 1;
@@ -2356,8 +2360,7 @@ TEST_F(BootstrapAbiImplTest, SignalInitCompleteOffMainThreadStillSignals) {
     init_target_handles.push_back(target.createHandle("test"));
   });
   // The module does not signal from config_new with this configuration.
-  auto config =
-      newOptionalHooksConfig(/*has_cluster_writer=*/false, "run_on_all_workers_at_startup");
+  auto config = newOptionalHooksConfig("run_on_all_workers_at_startup");
   ASSERT_EQ(1, init_target_handles.size());
   testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
   init_target_handles[0]->initialize(init_watcher);
@@ -2393,8 +2396,7 @@ TEST_F(BootstrapAbiImplTest, PostedSignalInitCompleteReachesOnlyALiveConfigurati
   });
   for (const bool live : {true, false}) {
     // The module does not signal from config_new with this configuration.
-    auto config =
-        newOptionalHooksConfig(/*has_cluster_writer=*/false, "run_on_all_workers_at_startup");
+    auto config = newOptionalHooksConfig("run_on_all_workers_at_startup");
     testing::StrictMock<Init::ExpectableWatcherImpl> init_watcher;
     init_target_handles.back()->initialize(init_watcher);
     Event::PostCb posted;
@@ -2640,10 +2642,11 @@ TEST_F(BootstrapAbiImplTest, ServerCallbacksRefusedOnceTheExtensionIsDestroyed) 
       envoy_dynamic_module_callback_bootstrap_extension_enable_listener_lifecycle(config_ptr));
 }
 
-// Test that the cluster writer callbacks are refused without a cluster_writer configuration.
-TEST_F(BootstrapAbiImplTest, ClusterWriterNotAllowedWithoutConfiguration) {
+// Test that the cluster writer callbacks are refused until the module enables the cluster writer.
+TEST_F(BootstrapAbiImplTest, ClusterWriterNotAllowedUntilEnabled) {
   auto config = newOptionalHooksConfig();
-  EXPECT_EQ(nullptr, config->cluster_writer_);
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
   uint64_t update_id = 1;
   EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed,
             envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
@@ -2652,6 +2655,37 @@ TEST_F(BootstrapAbiImplTest, ClusterWriterNotAllowedWithoutConfiguration) {
   EXPECT_EQ(envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result_NotAllowed,
             envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
                 config->thisAsVoidPtr(), {"writer.a", 8}));
+  EXPECT_EQ(nullptr, config->cluster_writer_);
+}
+
+// Test that the module enables the cluster writer at most once and not once shutdown began, and
+// that a writer enabled before the server is initialized adds its init target then.
+TEST_F(BootstrapAbiImplTest, EnableClusterWriter) {
+  std::vector<std::string> init_target_names;
+  ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
+    init_target_names.emplace_back(target.name());
+  });
+  auto config = newOptionalHooksConfig();
+  // The writer creates its schedulable callbacks when the module enables it.
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
+  EXPECT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_NE(nullptr, config->cluster_writer_);
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      config->thisAsVoidPtr()));
+  EXPECT_THAT(init_target_names, testing::ElementsAre("dynamic_modules_bootstrap"));
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
+  EXPECT_THAT(init_target_names,
+              testing::ElementsAre("dynamic_modules_bootstrap",
+                                   "dynamic_modules_bootstrap_cluster_writer:test"));
+
+  auto shut_down_config = newOptionalHooksConfig();
+  shut_down_config->onShutdown();
+  EXPECT_FALSE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      shut_down_config->thisAsVoidPtr()));
+  EXPECT_EQ(nullptr, shut_down_config->cluster_writer_);
 }
 
 // Test that a write through the callbacks is applied once Envoy initialized its clusters, that its
@@ -2661,15 +2695,16 @@ TEST_F(BootstrapAbiImplTest, ClusterWriterReportsOutcomesToTheModule) {
   ON_CALL(context_.init_manager_, add(_)).WillByDefault([&](const Init::Target& target) {
     init_target_handles.push_back(target.createHandle("test"));
   });
+  auto config = newOptionalHooksConfig();
+  testing::NiceMock<Server::MockListenerManager> listener_manager;
+  config->setListenerManager(listener_manager);
   // The writer creates its apply callback first, and the newest expectation matches first.
   auto* deliver_callback =
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
   auto* apply_callback =
       new testing::NiceMock<Event::MockSchedulableCallback>(&context_.dispatcher_);
-  auto config = newOptionalHooksConfig(/*has_cluster_writer=*/true);
-  ASSERT_NE(nullptr, config->cluster_writer_);
-  testing::NiceMock<Server::MockListenerManager> listener_manager;
-  config->setListenerManager(listener_manager);
+  ASSERT_TRUE(envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+      config->thisAsVoidPtr()));
 
   envoy::config::cluster::v3::Cluster cluster;
   cluster.set_name("writer.a");

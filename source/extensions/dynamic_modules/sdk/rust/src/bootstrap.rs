@@ -309,7 +309,19 @@ pub trait EnvoyBootstrapExtensionConfig {
   /// thread also reports an Envoy bug.
   fn run_on_all_workers(&self, event_id: u64) -> bool;
 
-  /// Queue a write of a cluster. This needs `cluster_writer` in the extension configuration.
+  /// Enable the cluster writer. Until this is called,
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_add_or_update`] and
+  /// [`EnvoyBootstrapExtensionConfig::cluster_writer_remove`] return `NotAllowed`.
+  ///
+  /// This must be called on the main thread. It can be called before the server is initialized,
+  /// for example from the config creation function.
+  ///
+  /// This should be called at most once. Subsequent calls are no-ops and return `false`. This
+  /// also returns `false` once the server began to shut down.
+  fn enable_cluster_writer(&self) -> bool;
+
+  /// Queue a write of a cluster. This needs
+  /// [`EnvoyBootstrapExtensionConfig::enable_cluster_writer`] first.
   ///
   /// * `cluster_name` is the name of the cluster. Only write clusters that no other component
   ///   writes. A write of a cluster that exists and that this extension does not own completes as
@@ -1367,6 +1379,12 @@ impl EnvoyBootstrapExtensionConfig for EnvoyBootstrapExtensionConfigImpl {
   fn run_on_all_workers(&self, event_id: u64) -> bool {
     unsafe {
       abi::envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(self.raw, event_id)
+    }
+  }
+
+  fn enable_cluster_writer(&self) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(self.raw)
     }
   }
 

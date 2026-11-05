@@ -77,9 +77,8 @@ must not hold a lock across it that its worker event hook takes.
 Cluster Writer
 --------------
 
-With :ref:`cluster_writer
-<envoy_v3_api_field_extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension.cluster_writer>`
-set, the module can add, update and remove clusters. It passes a serialized
+Once the module calls ``envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer``,
+it can add, update and remove clusters. It passes a serialized
 :ref:`Cluster <envoy_v3_api_msg_config.cluster.v3.Cluster>` to
 ``envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update``, and Envoy
 reports the outcome of each write through
@@ -89,17 +88,6 @@ module should only write clusters that no other component writes. Envoy does not
 clusters before it finishes initializing, so to serve them from the first request, call
 ``envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete`` only after their
 writes completed as active.
-
-.. code-block:: yaml
-
-  bootstrap_extensions:
-  - name: envoy.bootstrap.dynamic_modules
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.bootstrap.dynamic_modules.v3.DynamicModuleBootstrapExtension
-      dynamic_module_config:
-        name: my_module
-      extension_name: my_writer
-      cluster_writer: {}
 
 A written cluster has the same authority as a cluster delivered by CDS, so build clusters from a
 schema that the module owns. On the ADS stream and the xDS-TP authority streams, a written cluster

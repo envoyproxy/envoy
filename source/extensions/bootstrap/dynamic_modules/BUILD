@@ -19,6 +19,7 @@ envoy_cc_library(
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:xds_manager_interface",
         "//envoy/event:schedulable_cb_interface",
+        "//envoy/init:manager_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/singleton:manager_interface",
         "//envoy/stats:stats_interface",

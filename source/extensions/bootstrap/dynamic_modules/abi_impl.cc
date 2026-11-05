@@ -773,6 +773,16 @@ bool envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
 
 // -------------------- Cluster Writer Callbacks --------------------
 
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG(absl::StrCat(__func__, " must be called on the main thread"));
+    return false;
+  }
+  auto* config = static_cast<DynamicModuleBootstrapExtensionConfig*>(extension_config_envoy_ptr);
+  return config->enableClusterWriter();
+}
+
 envoy_dynamic_module_type_bootstrap_cluster_writer_update_result
 envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
     envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr,

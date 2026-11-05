@@ -9102,9 +9102,10 @@ typedef void (*envoy_dynamic_module_type_bootstrap_active_resource_name_fn)(
 typedef enum envoy_dynamic_module_type_bootstrap_cluster_writer_update_result {
   // The write is queued. The done hook reports its outcome with the returned update ID.
   envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_Success = 0,
-  // The extension has no cluster_writer configuration, or the call was made off the main thread,
-  // before envoy_dynamic_module_on_bootstrap_extension_server_initialized or after shutdown began.
-  // A call off the main thread also reports an Envoy bug.
+  // The module has not called
+  // envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer, or the call was made
+  // off the main thread, before envoy_dynamic_module_on_bootstrap_extension_server_initialized or
+  // after shutdown began. A call off the main thread also reports an Envoy bug.
   envoy_dynamic_module_type_bootstrap_cluster_writer_update_result_NotAllowed = 1,
 } envoy_dynamic_module_type_bootstrap_cluster_writer_update_result;
 
@@ -10197,6 +10198,26 @@ void envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
     uint64_t update_id, envoy_dynamic_module_type_envoy_buffer cluster_name,
     envoy_dynamic_module_type_bootstrap_cluster_writer_update_status status,
     envoy_dynamic_module_type_envoy_buffer error_details);
+
+/**
+ * envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer is called by the module
+ * to opt in to adding, updating and removing clusters. Until it is called,
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update and
+ * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove return NotAllowed.
+ *
+ * This must be called on the main thread. It can be called before
+ * envoy_dynamic_module_on_bootstrap_extension_server_initialized, for example from
+ * envoy_dynamic_module_on_bootstrap_extension_config_new.
+ *
+ * This should be called at most once. Subsequent calls are no-ops and return false. This also
+ * returns false once shutdown began.
+ *
+ * @param extension_config_envoy_ptr is the pointer to the DynamicModuleBootstrapExtensionConfig
+ * object.
+ * @return true if the cluster writer was enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+    envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr extension_config_envoy_ptr);
 
 /**
  * envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update is called by the

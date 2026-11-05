@@ -1,10 +1,11 @@
 //! Test module for the bootstrap extension cluster writer and worker events.
 //!
 //! The integration test drives this module through the `/cluster_writer?<action>=<argument>` admin
-//! endpoint. A write takes the serialized cluster from the request body. When the extension config
-//! carries a serialized cluster, the module writes it as `writer.startup` from a scheduler event
-//! that it commits in config_new. Metrics count the worker events and the writer outcomes, and the
-//! `outcomes` action returns the recorded outcomes.
+//! endpoint. The module enables the cluster writer in config_new, and a write takes the serialized
+//! cluster from the request body. When the extension config carries a serialized cluster, the
+//! module writes it as `writer.startup` from a scheduler event that it commits in config_new.
+//! Metrics count the worker events and the writer outcomes, and the `outcomes` action returns the
+//! recorded outcomes.
 
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::Mutex;
@@ -35,6 +36,7 @@ fn my_new_bootstrap_extension_config_fn(
     false,
     false,
   );
+  envoy_extension_config.enable_cluster_writer();
   if !config.is_empty() {
     envoy_extension_config.new_scheduler().commit(1);
   }

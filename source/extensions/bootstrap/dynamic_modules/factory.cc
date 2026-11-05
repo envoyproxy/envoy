@@ -60,7 +60,7 @@ Server::BootstrapExtensionPtr DynamicModuleBootstrapExtensionFactory::createBoot
   auto extension_config = newDynamicModuleBootstrapExtensionConfig(
       proto_config.extension_name(), extension_config_str, metrics_namespace,
       std::move(dynamic_module), context.mainThreadDispatcher(), context,
-      context.serverScope().store(), proto_config.has_cluster_writer());
+      context.serverScope().store());
 
   if (!extension_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(

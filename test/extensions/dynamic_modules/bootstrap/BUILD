@@ -142,7 +142,6 @@ envoy_extension_cc_dyn_module_test(
     deps = [
         "//source/extensions/bootstrap/dynamic_modules:config",
         "//test/extensions/dynamic_modules:util",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",

@@ -72,12 +72,4 @@ message DynamicModuleBootstrapExtension {
   //    value: aGVsbG8=  # echo -n "hello" | base64
   //
   google.protobuf.Any extension_config = 3;
-
-  // Lets the module add, update and remove clusters. If not specified, the cluster writer
-  // callbacks that the module calls return ``NotAllowed``.
-  ClusterWriter cluster_writer = 4;
-}
-
-// Configuration for the cluster writer of a dynamic module bootstrap extension.
-message ClusterWriter {
 }
