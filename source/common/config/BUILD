@@ -363,6 +363,7 @@ envoy_cc_library(
         ":singleton_subscription_adapter_lib",
         ":subscription_factory_lib",
         ":utility_lib",
+        ":xds_symbol_table_lib",
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:thread_lib",

@@ -299,6 +299,8 @@ envoy_cc_test(
     rbe_pool = "linux_x64_medium",
     deps = [
         "//source/common/config:xds_manager_lib",
+        "//source/common/config:xds_symbol_table_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/local_info:local_info_mocks",

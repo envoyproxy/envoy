@@ -5,6 +5,7 @@
 #include "source/common/common/thread.h"
 #include "source/common/config/subscription_factory_impl.h"
 #include "source/common/config/xds_resource.h"
+#include "source/common/config/xds_symbol_table.h"
 
 namespace Envoy {
 namespace Config {
@@ -42,6 +43,7 @@ public:
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
+  XdsSymbolTable& xdsSymbolTable() override { return *xds_symbol_table_; }
 
 private:
   class AuthorityData {
@@ -83,6 +85,7 @@ private:
   Stats::Store& stats_;
   const LocalInfo::LocalInfo& local_info_;
   ProtobufMessage::ValidationContext& validation_context_;
+  XdsSymbolTableSharedPtr xds_symbol_table_{XdsSymbolTable::create()};
   XdsResourcesDelegatePtr xds_resources_delegate_;
   XdsConfigTrackerPtr xds_config_tracker_;
   std::unique_ptr<SubscriptionFactoryImpl> subscription_factory_;

@@ -3,6 +3,8 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/xds_manager_impl.h"
+#include "source/common/config/xds_symbol_table.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -2569,6 +2571,49 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, PauseResume) {
     EXPECT_TRUE(authority_a_resumed);
     EXPECT_TRUE(default_authority_resumed);
   }
+}
+
+// Validates that XdsManagerImpl owns a single server-wide XdsSymbolTable across its lifecycle,
+// and that MockXdsManager provides a working default XdsSymbolTable.
+TEST_P(XdsManagerImplTest, XdsSymbolTableLifecycleAndMockDefault) {
+  XdsSymbolTable& symbol_table = xds_manager_impl_.xdsSymbolTable();
+  const uint64_t initial_active = symbol_table.numActiveSymbols();
+
+  initialize();
+  EXPECT_EQ(&symbol_table, &xds_manager_impl_.xdsSymbolTable());
+
+  constexpr absl::string_view ResourceA =
+      "xdstp://authority_a/envoy.config.cluster.v3.Cluster/service_a";
+  constexpr absl::string_view ResourceB =
+      "xdstp://authority_a/envoy.config.cluster.v3.Cluster/service_b";
+  {
+    XdsResourceNameStorage storage_a = symbol_table.encode(ResourceA);
+    XdsResourceNameStorage storage_b = symbol_table.encode(ResourceB);
+    EXPECT_EQ(symbol_table.toString(storage_a.resourceName()), ResourceA);
+    EXPECT_EQ(symbol_table.toString(storage_b.resourceName()), ResourceB);
+    EXPECT_NE(storage_a.resourceName(), storage_b.resourceName());
+    EXPECT_GT(symbol_table.numActiveSymbols(), initial_active);
+  }
+  EXPECT_EQ(symbol_table.numActiveSymbols(), initial_active);
+
+  xds_manager_impl_.shutdown();
+  EXPECT_EQ(&symbol_table, &xds_manager_impl_.xdsSymbolTable());
+
+  // Validate MockXdsManager default symbol table wiring via ServerFactoryContext.
+  XdsSymbolTable& mock_symbol_table = server_context_.xdsManager().xdsSymbolTable();
+  EXPECT_NE(&symbol_table, &mock_symbol_table);
+  XdsResourceNameStorage mock_storage = mock_symbol_table.encode(ResourceA);
+  EXPECT_EQ(mock_symbol_table.toString(mock_storage.resourceName()), ResourceA);
+}
+
+// Validates the reloadable runtime guard for xDS resource name compression.
+TEST_P(XdsManagerImplTest, CompressXdsResourceNamesRuntimeGuard) {
+  EXPECT_TRUE(
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compress_xds_resource_names"));
+
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.compress_xds_resource_names", "false"}});
+  EXPECT_FALSE(
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compress_xds_resource_names"));
 }
 
 } // namespace
