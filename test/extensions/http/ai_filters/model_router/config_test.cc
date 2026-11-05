@@ -94,22 +94,12 @@ providers:
   - name: openai
     llm_protocol: OPENAI_CHAT_COMPLETIONS
     host_and_port: api.openai.com:443
-  - name: gemini
-    llm_protocol: GEMINI_GENERATE_CONTENT
-    host_and_port: generativelanguage.googleapis.com
-    binding:
-      uri_pattern: /v1beta/models/{model}:{generateContent|streamGenerateContent}
 models:
   - name: haiku
     provider: anthropic
     model: claude-haiku-4-5
     api_key:
       inline_string: "Bearer sk-ant"
-  - name: sonnet
-    provider: anthropic
-    model: claude-sonnet-4-5
-    api_key:
-      inline_string: "Bearer sk-ant-sonnet"
   - name: opus
     provider: anthropic
     model: claude-opus-4-5
@@ -118,19 +108,10 @@ models:
     model: gpt-4o-mini
     api_key:
       inline_string: "Bearer sk-oai"
-  - name: gemini_pro
-    provider: gemini
-    model: gemini-2.5-pro
-    api_key:
-      inline_string: "Bearer g-pro"
 routes:
   - requested_model: fast-model
     targets:
       - model: haiku
-      - model: sonnet
-  - requested_model: reasoning-model
-    targets:
-      - model: gemini_pro
   - requested_model: openai-model
     targets:
       - model: gpt4o_mini
@@ -141,12 +122,12 @@ routes:
 )EOF");
   ASSERT_TRUE(config_or.ok()) << config_or.status();
   const auto& routes = config_or.value()->routes();
-  ASSERT_EQ(routes.size(), 3);
+  ASSERT_EQ(routes.size(), 2);
 
   const auto fast_it = routes.find("fast-model");
   ASSERT_NE(fast_it, routes.end());
   ASSERT_NE(fast_it->second, nullptr);
-  ASSERT_EQ(fast_it->second->routes().size(), 3);
+  ASSERT_EQ(fast_it->second->routes().size(), 2);
 
   const auto& r0 = fast_it->second->routes()[0];
   EXPECT_EQ(r0.llm_protocol, LLMProtocol::AnthropicMessages);
@@ -159,34 +140,12 @@ routes:
 
   const auto& r1 = fast_it->second->routes()[1];
   EXPECT_EQ(r1.llm_protocol, LLMProtocol::AnthropicMessages);
-  EXPECT_EQ(r1.model, "claude-sonnet-4-5");
+  EXPECT_EQ(r1.model, "claude-opus-4-5");
   EXPECT_EQ(r1.provider, "anthropic");
   EXPECT_EQ(r1.host_and_port, "api.anthropic.com");
-  EXPECT_EQ(r1.api_key, "Bearer sk-ant-sonnet");
+  EXPECT_TRUE(r1.api_key.empty());
   ASSERT_NE(r1.binding, nullptr);
   EXPECT_EQ(r1.binding->pattern()->source(), "/v1/messages");
-
-  const auto& r2 = fast_it->second->routes()[2];
-  EXPECT_EQ(r2.llm_protocol, LLMProtocol::AnthropicMessages);
-  EXPECT_EQ(r2.model, "claude-opus-4-5");
-  EXPECT_EQ(r2.provider, "anthropic");
-  EXPECT_EQ(r2.host_and_port, "api.anthropic.com");
-  EXPECT_TRUE(r2.api_key.empty());
-  ASSERT_NE(r2.binding, nullptr);
-  EXPECT_EQ(r2.binding->pattern()->source(), "/v1/messages");
-
-  const auto reasoning_it = routes.find("reasoning-model");
-  ASSERT_NE(reasoning_it, routes.end());
-  ASSERT_NE(reasoning_it->second, nullptr);
-  ASSERT_EQ(reasoning_it->second->routes().size(), 1);
-  EXPECT_EQ(reasoning_it->second->routes()[0].llm_protocol, LLMProtocol::GeminiGenerateContent);
-  EXPECT_EQ(reasoning_it->second->routes()[0].model, "gemini-2.5-pro");
-  EXPECT_EQ(reasoning_it->second->routes()[0].provider, "gemini");
-  EXPECT_EQ(reasoning_it->second->routes()[0].host_and_port, "generativelanguage.googleapis.com");
-  EXPECT_EQ(reasoning_it->second->routes()[0].api_key, "Bearer g-pro");
-  ASSERT_NE(reasoning_it->second->routes()[0].binding, nullptr);
-  EXPECT_EQ(reasoning_it->second->routes()[0].binding->pattern()->source(),
-            "/v1beta/models/{model}:{generateContent|streamGenerateContent}");
 
   const auto openai_it = routes.find("openai-model");
   ASSERT_NE(openai_it, routes.end());

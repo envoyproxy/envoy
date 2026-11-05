@@ -35,7 +35,6 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.ai_filters.route_selector"],
     rbe_pool = "linux_x64_small",
     deps = [
-        "//source/common/http:headers_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",

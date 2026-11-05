@@ -1,41 +1,27 @@
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/file_event.h"
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 
 #include "source/common/coroutine/dispatcher_executor.h"
 #include "source/common/coroutine/launch.h"
-#include "source/common/coroutine/status_macros.h"
 #include "source/common/coroutine/task.h"
 #include "source/extensions/http/ai_filters/model_router/redis_quota.h"
 
+#include "test/extensions/http/ai_filters/model_router/fake_redis_server.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
-#include "absl/container/flat_hash_map.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "absl/strings/ascii.h"
-#include "absl/strings/numbers.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
-#include "hiredis/hiredis.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,161 +34,6 @@ using StatusHelpers::HasStatusCode;
 using StatusHelpers::IsOk;
 using StatusHelpers::IsOkAndHolds;
 
-class FakeRedisServer {
-public:
-  explicit FakeRedisServer(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {
-    listen_fd_ = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    RELEASE_ASSERT(listen_fd_ >= 0, "socket() failed");
-
-    int opt = 1;
-    RELEASE_ASSERT(::setsockopt(listen_fd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == 0,
-                   "setsockopt() failed");
-
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = 0;
-    RELEASE_ASSERT(::bind(listen_fd_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0,
-                   "bind() failed");
-    RELEASE_ASSERT(::listen(listen_fd_, 16) == 0, "listen() failed");
-
-    socklen_t len = sizeof(addr);
-    RELEASE_ASSERT(::getsockname(listen_fd_, reinterpret_cast<sockaddr*>(&addr), &len) == 0,
-                   "getsockname() failed");
-    port_ = ntohs(addr.sin_port);
-
-    listen_event_ = dispatcher_.createFileEvent(
-        listen_fd_, [this](uint32_t) { return onAccept(); }, Event::FileTriggerType::Level,
-        Event::FileReadyType::Read);
-  }
-
-  ~FakeRedisServer() {
-    closeClient();
-    listen_event_.reset();
-    if (listen_fd_ >= 0) {
-      ::close(listen_fd_);
-      listen_fd_ = -1;
-    }
-  }
-
-  int port() const { return port_; }
-  size_t acceptedConnections() const { return accepted_connections_; }
-  const absl::flat_hash_map<std::string, uint64_t>& expirations() const { return expirations_; }
-
-  void closeClient() {
-    client_event_.reset();
-    if (client_fd_ >= 0) {
-      ::close(client_fd_);
-      client_fd_ = -1;
-    }
-    if (reader_ != nullptr) {
-      redisReaderFree(reader_);
-      reader_ = nullptr;
-    }
-  }
-
-private:
-  absl::Status onAccept() {
-    while (true) {
-      sockaddr_in client_addr{};
-      socklen_t len = sizeof(client_addr);
-      const int fd =
-          ::accept4(listen_fd_, reinterpret_cast<sockaddr*>(&client_addr), &len, SOCK_NONBLOCK);
-      if (fd < 0) {
-        break;
-      }
-      ++accepted_connections_;
-      closeClient();
-      client_fd_ = fd;
-      reader_ = redisReaderCreate();
-      client_event_ = dispatcher_.createFileEvent(
-          client_fd_, [this](uint32_t) { return onClientRead(); }, Event::FileTriggerType::Level,
-          Event::FileReadyType::Read);
-    }
-    return absl::OkStatus();
-  }
-
-  absl::Status onClientRead() {
-    char buf[8192];
-    while (client_fd_ >= 0) {
-      const ssize_t n = ::recv(client_fd_, buf, sizeof(buf), 0);
-      if (n <= 0) {
-        if (n == 0) {
-          closeClient();
-        }
-        break;
-      }
-      RELEASE_ASSERT(redisReaderFeed(reader_, buf, static_cast<size_t>(n)) == REDIS_OK,
-                     "redisReaderFeed failed");
-
-      void* raw_reply = nullptr;
-      while (client_fd_ >= 0 && redisReaderGetReply(reader_, &raw_reply) == REDIS_OK &&
-             raw_reply != nullptr) {
-        auto* parsed = static_cast<redisReply*>(raw_reply);
-        std::vector<std::string> cmd;
-        if (parsed->type == REDIS_REPLY_ARRAY) {
-          cmd.reserve(parsed->elements);
-          for (size_t i = 0; i < parsed->elements; ++i) {
-            cmd.emplace_back(parsed->element[i]->str, parsed->element[i]->len);
-          }
-        }
-        freeReplyObject(raw_reply);
-        handleCommand(cmd);
-      }
-    }
-    return absl::OkStatus();
-  }
-
-  void sendRawReply(absl::string_view raw) {
-    RELEASE_ASSERT(client_fd_ >= 0, "no connected client");
-    const ssize_t written = ::send(client_fd_, raw.data(), raw.size(), MSG_NOSIGNAL);
-    RELEASE_ASSERT(written == static_cast<ssize_t>(raw.size()), "send() failed");
-  }
-
-  void handleCommand(const std::vector<std::string>& cmd) {
-    if (cmd.empty()) {
-      return;
-    }
-    const std::string op = absl::AsciiStrToUpper(cmd[0]);
-    if (op == "MGET" && cmd.size() >= 2) {
-      std::string out = absl::StrCat("*", cmd.size() - 1, "\r\n");
-      for (size_t i = 1; i < cmd.size(); ++i) {
-        auto it = counters_.find(cmd[i]);
-        if (it == counters_.end()) {
-          absl::StrAppend(&out, "$-1\r\n");
-        } else {
-          const std::string s = absl::StrCat(it->second);
-          absl::StrAppend(&out, "$", s.size(), "\r\n", s, "\r\n");
-        }
-      }
-      sendRawReply(out);
-    } else if (op == "INCRBY" && cmd.size() == 3) {
-      int64_t delta = 0;
-      RELEASE_ASSERT(absl::SimpleAtoi(cmd[2], &delta), "SimpleAtoi failed");
-      const int64_t val = (counters_[cmd[1]] += delta);
-      sendRawReply(absl::StrCat(":", val, "\r\n"));
-    } else if (op == "EXPIRE" && cmd.size() == 3) {
-      uint64_t seconds = 0;
-      RELEASE_ASSERT(absl::SimpleAtoi(cmd[2], &seconds), "SimpleAtoi failed");
-      expirations_[cmd[1]] = seconds;
-      sendRawReply(":1\r\n");
-    } else {
-      sendRawReply("-ERR unknown command\r\n");
-    }
-  }
-
-  Event::Dispatcher& dispatcher_;
-  int listen_fd_{-1};
-  int client_fd_{-1};
-  int port_{0};
-  size_t accepted_connections_{0};
-  Event::FileEventPtr listen_event_;
-  Event::FileEventPtr client_event_;
-  redisReader* reader_{nullptr};
-  absl::flat_hash_map<std::string, int64_t> counters_;
-  absl::flat_hash_map<std::string, uint64_t> expirations_;
-};
-
 class RedisQuotaTest : public Event::TestUsingSimulatedTime, public testing::Test {
 protected:
   RedisQuotaTest()
@@ -213,24 +44,7 @@ protected:
   }
 
   template <typename T> T runTask(Coroutine::Task<T> task) {
-    std::optional<T> result;
-    bool running = false;
-    auto handle = Coroutine::launch(
-        std::move(task), executor_,
-        [this, &result, &running](T value) {
-          result.emplace(std::move(value));
-          if (running) {
-            dispatcher_->exit();
-          }
-        },
-        Coroutine::StartMode::Inline);
-    if (!result.has_value()) {
-      running = true;
-      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-      running = false;
-    }
-    RELEASE_ASSERT(result.has_value(), "Task did not complete");
-    return std::move(*result);
+    return runTaskOnDispatcher(*dispatcher_, executor_, std::move(task));
   }
 
   template <typename D> void advanceTime(const D& duration) {
@@ -362,68 +176,33 @@ TEST_F(RedisQuotaTest, EnforcesTokensQuotaAndHandlesNegativeDebt) {
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 301)), IsOkAndHolds(false));
 }
 
-TEST_F(RedisQuotaTest, EnforcesHourAndDayWindowsAndMultipleQuotas) {
+TEST_F(RedisQuotaTest, EnforcesHourDayAndUnitMultiplierWindows) {
   Config::ModelRouter proto;
   auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
-  addQuota(*model, Config::REQUESTS, Config::HOUR, 1);
-  addQuota(*model, Config::TOKENS, Config::DAY, 86400);
-
-  // Align timestamp to a 15-minute (900s) boundary.
-  simTime().setSystemTime(std::chrono::seconds(900000));
-
-  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
-
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 100)),
-              IsOkAndHolds(true));
-  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 50, 50)), IsOk());
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
-              IsOkAndHolds(false));
-
-  // Advance 59 minutes: 1-hour request quota (60x1m buckets) is still exhausted.
-  advanceTime(std::chrono::minutes(59));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
-              IsOkAndHolds(false));
-
-  // Advance 1 more minute (60 minutes total): hour request quota rolls out, while day token quota
-  // still counts the 100 tokens consumed at t = 0.
-  advanceTime(std::chrono::minutes(1));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86300)),
-              IsOkAndHolds(true));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86301)),
-              IsOkAndHolds(false));
-
-  // Advance 23 more hours (24 hours total = 96x15m buckets): day token quota rolls out completely.
-  advanceTime(std::chrono::hours(23));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86400)),
-              IsOkAndHolds(true));
-}
-
-TEST_F(RedisQuotaTest, EnforcesUnitMultiplierWithScaledSubBucketsAndDistinctKeys) {
-  Config::ModelRouter proto;
-  auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
-  // Configure both a 1-hour request quota (2 req/1h) and a 6-hour request quota (2 req/6h), plus a
-  // 6-hour token quota (1000 tok/6h).
+  // Configure a 1-hour request quota (2 req/1h), a 6-hour request quota (2 req/6h), and a 1-day
+  // token quota (86400 tok/1d).
   addQuota(*model, Config::REQUESTS, Config::HOUR, 2, /*unit_multiplier=*/1);
   addQuota(*model, Config::REQUESTS, Config::HOUR, 2, /*unit_multiplier=*/6);
-  addQuota(*model, Config::TOKENS, Config::HOUR, 1000, /*unit_multiplier=*/6);
+  addQuota(*model, Config::TOKENS, Config::DAY, 86400);
 
-  // Align timestamp to a 6-minute (360s) boundary: 1080000 / 360 = 3000, 1080000 / 60 = 18000.
+  // Align timestamp to both 6-minute (360s) and 15-minute (900s) boundaries:
+  // 1080000 / 60 = 18000, 1080000 / 360 = 3000, 1080000 / 900 = 1200.
   simTime().setSystemTime(std::chrono::seconds(1080000));
 
   RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
-  // Consume 1 request (400 tokens) at t = 0, and 1 request (400 tokens) at t + 30m.
-  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 200, 200)), IsOk());
+  // Consume 1 request (200 tokens) at t = 0, and 1 request (200 tokens) at t + 30m.
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 100, 100)), IsOk());
   advanceTime(std::chrono::minutes(30));
-  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 200, 200)), IsOk());
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 100, 100)), IsOk());
 
-  // Verify distinct Redis keys and TTLs for 1h (3600s) vs 6h (21600s).
+  // Verify distinct Redis keys and TTLs for 1h (3600s), 6h (21600s), and 1d (86400s).
   EXPECT_EQ(server_.expirations().at("model_router:anthropic:claude-sonnet-4-5:req:1h:18000"),
             3600);
   EXPECT_EQ(server_.expirations().at("model_router:anthropic:claude-sonnet-4-5:req:6h:3000"),
             21600);
-  EXPECT_EQ(server_.expirations().at("model_router:anthropic:claude-sonnet-4-5:tok:6h:3000"),
-            21600);
+  EXPECT_EQ(server_.expirations().at("model_router:anthropic:claude-sonnet-4-5:tok:1d:1200"),
+            86400);
 
   // Both 1h and 6h request quotas are now at 2/2.
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 100)),
@@ -442,12 +221,18 @@ TEST_F(RedisQuotaTest, EnforcesUnitMultiplierWithScaledSubBucketsAndDistinctKeys
               IsOkAndHolds(false));
 
   // Advance 6 more minutes to t + 6h (360m total, bucket 3060): bucket 3000 (from t = 0) rolls
-  // out of the 60-bucket window, leaving 1 request and 400 tokens from t + 30m.
+  // out of the 60-bucket 6h window, while the 1-day token quota (96x15m buckets) still counts all
+  // 400 tokens consumed at t = 0 and t + 30m.
   advanceTime(std::chrono::minutes(6));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 600)),
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86000)),
               IsOkAndHolds(true));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 601)),
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86001)),
               IsOkAndHolds(false));
+
+  // Advance 18 more hours to t + 24h30m: all 1-day token sub-buckets roll out completely.
+  advanceTime(std::chrono::hours(18) + std::chrono::minutes(30));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86400)),
+              IsOkAndHolds(true));
 }
 
 TEST_F(RedisQuotaTest, NonBlockingConcurrentConnectFailsOpenForSecondCaller) {

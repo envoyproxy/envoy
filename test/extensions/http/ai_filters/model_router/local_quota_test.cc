@@ -161,46 +161,19 @@ TEST_F(LocalQuotaTest, EnforcesTokensQuotaAndHandlesNegativeDebt) {
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 11)), IsOkAndHolds(false));
 }
 
-TEST_F(LocalQuotaTest, EnforcesHourAndDayWindowsAndMultipleQuotas) {
+TEST_F(LocalQuotaTest, EnforcesHourDayAndUnitMultiplierWindows) {
   Config::ModelRouter proto;
   auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
-  addQuota(*model, Config::REQUESTS, Config::HOUR, 1);
-  addQuota(*model, Config::TOKENS, Config::DAY, 86400); // 1 token/sec.
-
-  LocalQuota quota(proto, simTime());
-
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 100)),
-              IsOkAndHolds(true));
-
-  // Consume 1 request and 100 tokens. Request quota (1/hour) is now exhausted.
-  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 50, 50)), IsOk());
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
-              IsOkAndHolds(false));
-
-  // Advance 59 minutes: request quota still exhausted.
-  simTime().advanceTimeWait(std::chrono::minutes(59));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
-              IsOkAndHolds(false));
-
-  // Advance 1 more minute (1 hour total): request quota refilled, token quota also capped at 86400.
-  simTime().advanceTimeWait(std::chrono::minutes(1));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86400)),
-              IsOkAndHolds(true));
-}
-
-TEST_F(LocalQuotaTest, EnforcesUnitMultiplierOverMultiHourWindow) {
-  Config::ModelRouter proto;
-  auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
-  // 2 requests per 6 hours (1 request refills every 3 hours) and 21600 tokens per 6 hours (1
+  // 2 requests per 6 hours (1 request refills every 3 hours) and 86400 tokens per day (1
   // token/sec).
   addQuota(*model, Config::REQUESTS, Config::HOUR, 2, /*unit_multiplier=*/6);
-  addQuota(*model, Config::TOKENS, Config::HOUR, 21600, /*unit_multiplier=*/6);
+  addQuota(*model, Config::TOKENS, Config::DAY, 86400);
 
   LocalQuota quota(proto, simTime());
 
-  // Consume both requests and 3600 tokens.
-  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 1000, 800)), IsOk());
-  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 1000, 800)), IsOk());
+  // Consume both requests and 21600 tokens.
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 5000, 5800)), IsOk());
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 5000, 5800)), IsOk());
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
               IsOkAndHolds(false));
 
@@ -214,11 +187,13 @@ TEST_F(LocalQuotaTest, EnforcesUnitMultiplierOverMultiHourWindow) {
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
               IsOkAndHolds(false));
 
-  // At 3 hours total, 1 request has refilled and 3 hours * 3600 = 10800 tokens have refilled
-  // (capped at 21600 max, so 18000 remaining + 10800 -> 21600).
+  // At 3 hours total, 1 request has refilled and 3 hours * 3600 = 10800 tokens have refilled in the
+  // 1-day token bucket (64800 remaining + 10800 = 75600 available).
   simTime().advanceTimeWait(std::chrono::minutes(1));
-  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 21600)),
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 75600)),
               IsOkAndHolds(true));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 75601)),
+              IsOkAndHolds(false));
 }
 
 TEST_F(LocalQuotaTest, SharesStateAcrossCopiedInstances) {

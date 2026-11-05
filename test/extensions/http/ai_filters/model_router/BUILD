@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 load(
@@ -11,16 +12,32 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+envoy_cc_test_library(
+    name = "fake_redis_server_lib",
+    hdrs = ["fake_redis_server.h"],
+    copts = ["-Wno-old-style-cast"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:file_event_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/coroutine:launch_lib",
+        "//source/common/coroutine:task_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+        "@hiredis",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "async_redis_test",
     srcs = ["async_redis_test.cc"],
-    copts = ["-Wno-old-style-cast"],
     extension_names = ["envoy.http.ai_filters.model_router"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":fake_redis_server_lib",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
-        "//envoy/event:file_event_interface",
         "//source/common/coroutine:dispatcher_executor_lib",
         "//source/common/coroutine:launch_lib",
         "//source/common/coroutine:status_macros_lib",
@@ -28,11 +45,8 @@ envoy_extension_cc_test(
         "//source/extensions/http/ai_filters/model_router:async_redis_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings",
-        "@hiredis",
     ],
 )
 
@@ -57,27 +71,22 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "redis_quota_test",
     srcs = ["redis_quota_test.cc"],
-    copts = ["-Wno-old-style-cast"],
     extension_names = ["envoy.http.ai_filters.model_router"],
     rbe_pool = "linux_x64_small",
     deps = [
+        ":fake_redis_server_lib",
         "//envoy/api:api_interface",
         "//envoy/event:dispatcher_interface",
-        "//envoy/event:file_event_interface",
         "//source/common/coroutine:dispatcher_executor_lib",
         "//source/common/coroutine:launch_lib",
-        "//source/common/coroutine:status_macros_lib",
         "//source/common/coroutine:task_lib",
         "//source/extensions/http/ai_filters/model_router:redis_quota_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
-        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
-        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",
-        "@hiredis",
     ],
 )
 
@@ -116,7 +125,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_state_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/http/ai_filters/model_router:filter_lib",
-        "//source/extensions/http/ai_filters/model_router:local_quota_lib",
         "//source/extensions/http/ai_filters/model_router:quota_interface_lib",
         "//test/common/coroutine:manual_executor_lib",
         "//test/mocks/stats:stats_mocks",

@@ -237,6 +237,30 @@ public:
                                        {"content-type", "application/json"}},
         request_body.dump());
   }
+
+  void waitForAnthropicUpstreamRequest(absl::string_view expected_model, bool stream = false) {
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+    const Http::RequestHeaderMap& headers = upstream_request_->headers();
+    EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Method, "POST"));
+    EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
+    EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
+    EXPECT_THAT(headers,
+                ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
+    EXPECT_THAT(headers, ContainsHeader("anthropic-version", "2023-06-01"));
+
+    nlohmann::json expected_body = {
+        {"model", expected_model},
+        {"max_tokens", 1024},
+        {"messages", {{{"role", "user"}, {"content", Question}}}},
+    };
+    if (stream) {
+      expected_body["stream"] = true;
+    }
+    EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()), expected_body);
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ModelRouterIntegrationTest,
@@ -247,24 +271,7 @@ TEST_P(ModelRouterIntegrationTest, FirstTargetSucceeds) {
   initialize();
 
   IntegrationStreamDecoderPtr response = sendChatCompletionsRequest();
-
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& headers = upstream_request_->headers();
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-haiku-5-5"},
-                {"max_tokens", 1024},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
+  waitForAnthropicUpstreamRequest("claude-haiku-5-5");
 
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
@@ -292,48 +299,14 @@ TEST_P(ModelRouterIntegrationTest, MultiModelFallbackAcrossRetries) {
 
   // Attempt 1 goes to the Anthropic cluster (`fake_upstreams_[0]`) with the primary model and fails
   // with 503.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& attempt1_headers = upstream_request_->headers();
-  EXPECT_THAT(attempt1_headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(attempt1_headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(attempt1_headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(attempt1_headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(attempt1_headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-haiku-5-5"},
-                {"max_tokens", 1024},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
-
+  waitForAnthropicUpstreamRequest("claude-haiku-5-5");
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
   ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
 
   // Attempt 2 fails over to the fallback model on the same provider (`fake_upstreams_[0]`).
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& attempt2_headers = upstream_request_->headers();
-  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(attempt2_headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(attempt2_headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(attempt2_headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-sonnet-5-5"},
-                {"max_tokens", 1024},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
-
+  waitForAnthropicUpstreamRequest("claude-sonnet-5-5");
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
       false);
@@ -371,25 +344,8 @@ TEST_P(ModelRouterIntegrationTest, GeminiSseStreamGenerateContentToAnthropicMess
           {"content-type", "application/json"}},
       request_body.dump());
 
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
-
-  const Http::RequestHeaderMap& headers = upstream_request_->headers();
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Path, "/v1/messages"));
-  EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().Host, "api.anthropic.com"));
-  EXPECT_THAT(headers,
-              ContainsHeader(Http::CustomHeaders::get().Authorization, "Bearer ANTHROPIC_KEY"));
-  EXPECT_THAT(headers, ContainsHeader("anthropic-version", "2023-06-01"));
-  EXPECT_TRUE(headers.get(Http::LowerCaseString("x-goog-api-key")).empty());
-  EXPECT_EQ(nlohmann::json::parse(upstream_request_->body().toString()),
-            (nlohmann::json{
-                {"model", "claude-haiku-5-5"},
-                {"max_tokens", 1024},
-                {"stream", true},
-                {"messages", {{{"role", "user"}, {"content", Question}}}},
-            }));
+  waitForAnthropicUpstreamRequest("claude-haiku-5-5", /*stream=*/true);
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-goog-api-key")).empty());
 
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "text/event-stream"}},
