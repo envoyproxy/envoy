@@ -355,3 +355,13 @@ envoy_benchmark_test(
     name = "xds_resource_decoder_benchmark_test",
     benchmark_binary = "xds_resource_decoder_benchmark",
 )
+
+envoy_cc_test(
+    name = "xds_symbol_table_test",
+    srcs = ["xds_symbol_table_test.cc"],
+    rbe_pool = "linux_x64_small",
+    deps = [
+        "//source/common/config:xds_symbol_table_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
