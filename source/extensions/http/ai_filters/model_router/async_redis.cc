@@ -433,6 +433,11 @@ Coroutine::Task<absl::Status> AsyncRedis::ping() {
   co_return co_await CommandAwaitable<absl::Status>(context_, {"PING"}, &parsePingReply);
 }
 
+bool AsyncRedis::isConnected() const {
+  return context_ != nullptr && context_->err == 0 && (context_->c.flags & REDIS_CONNECTED) != 0 &&
+         (context_->c.flags & (REDIS_DISCONNECTING | REDIS_FREEING)) == 0;
+}
+
 Coroutine::Task<absl::StatusOr<int64_t>> AsyncRedis::get(absl::string_view key) {
   co_return co_await CommandAwaitable<absl::StatusOr<int64_t>>(context_, {"GET", std::string(key)},
                                                                &parseCounterReply);

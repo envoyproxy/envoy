@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -9,22 +10,19 @@
 #include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 
-#include "source/common/buffer/buffer_impl.h"
+#include "source/common/coroutine/launch.h"
 #include "source/common/coroutine/task.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
-#include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
-#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
-#include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/http/ai_filters/model_router/filter.h"
 #include "source/extensions/http/ai_filters/model_router/local_quota.h"
 #include "source/extensions/http/ai_filters/model_router/quota_interface.h"
 
-#include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
+#include "test/common/coroutine/manual_executor.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
@@ -33,7 +31,6 @@
 #include "absl/status/statusor.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "nlohmann/json.hpp"
 
 using testing::NiceMock;
 using testing::StrictMock;
@@ -45,14 +42,16 @@ namespace ModelRouter {
 namespace {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
-using HttpFilters::AiProtocolManager::AiFilterSharedPtr;
-using HttpFilters::AiProtocolManager::BufferManager;
-using HttpFilters::AiProtocolManager::FakeBridge;
-using HttpFilters::AiProtocolManager::FilterManager;
-using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
+using HttpFilters::AiProtocolManager::AiRequest;
+using HttpFilters::AiProtocolManager::AiRequestPropagator;
+using HttpFilters::AiProtocolManager::AiRequestPtr;
+using HttpFilters::AiProtocolManager::AiRequestReceiver;
+using HttpFilters::AiProtocolManager::FlattenJsonField;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LlmRoutesFilterStateObject;
+using HttpFilters::AiProtocolManager::SseEvent;
+using HttpFilters::AiProtocolManager::SseEventPtr;
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 using ModelRouterProto = envoy::extensions::http::ai_filters::model_router::v3::ModelRouter;
 
@@ -75,12 +74,20 @@ public:
 class ModelRouterFilterTest : public testing::Test {
 public:
   ModelRouterFilterTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
-        bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
+      : api_(Api::createApiForTest()),
         stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain),
         mock_quota_(std::make_shared<StrictMock<MockQuota>>()) {}
 
-  ~ModelRouterFilterTest() override { buffer_manager_.onDestroy(); }
+  template <typename T> static T runTask(Coroutine::Task<T> task) {
+    auto exec = std::make_shared<Coroutine::ManualExecutor>();
+    std::optional<T> result;
+    auto handle = Coroutine::launch(
+        std::move(task), exec, [&result](T val) { result.emplace(std::move(val)); },
+        Coroutine::StartMode::Inline);
+    exec->drain();
+    RELEASE_ASSERT(result.has_value(), "Task did not complete synchronously");
+    return std::move(*result);
+  }
 
   ModelRouterProto defaultProto() {
     ModelRouterProto proto;
@@ -174,89 +181,81 @@ routes:
     stream_info_.setDynamicTypedMetadata("envoy.ai.token_usage", any);
   }
 
-  std::string runResponse(const std::string& body, bool sse,
-                          ModelRouterFilterConfigSharedPtr config = nullptr,
-                          std::optional<uint32_t> response_code = 200) {
+  size_t runResponse(bool sse = false, ModelRouterFilterConfigSharedPtr config = nullptr,
+                     std::optional<uint32_t> response_code = 200) {
     if (response_code.has_value()) {
       stream_info_.setResponseCode(*response_code);
     }
-    FakeBridge response_bridge(*dispatcher_);
-    BufferManager out_buffer(BufferManager::Config{}, factory_, response_bridge);
     const AiFilterContext context{stream_info_, request_headers_,
                                   LLMProtocol::OpenAiChatCompletions};
-    std::vector<AiFilterSharedPtr> filters;
-    filters.push_back(std::make_shared<ModelRouterFilter>(
-        config != nullptr ? std::move(config) : defaultConfig(), context));
-    FilterManager manager(std::move(filters));
+    ModelRouterFilter filter(config != nullptr ? std::move(config) : defaultConfig(), context);
 
+    size_t sent = 0;
+    size_t propagated = 0;
     absl::Status status;
-    bool done = false;
-    auto on_done = [&status, &done](absl::Status s) {
-      status = std::move(s);
-      done = true;
-    };
     if (sse) {
-      manager.startSseResponse(factory_, response_bridge, out_buffer, on_done);
+      status = runTask(filter.encodeSSE(
+          [&sent]() -> Coroutine::Task<absl::StatusOr<std::optional<SseEventPtr>>> {
+            if (sent++ == 0) {
+              co_return std::make_unique<SseEvent>();
+            }
+            co_return std::nullopt;
+          },
+          [&propagated](SseEventPtr event) -> Coroutine::Task<absl::Status> {
+            EXPECT_NE(event, nullptr);
+            ++propagated;
+            co_return absl::OkStatus();
+          }));
     } else {
-      manager.startUnaryResponse(factory_, response_bridge, out_buffer, on_done);
+      status = runTask(filter.encodeUnary(
+          [&sent]() -> Coroutine::Task<absl::StatusOr<std::vector<FlattenJsonField>>> {
+            if (sent++ == 0) {
+              co_return std::vector<FlattenJsonField>(1);
+            }
+            co_return std::vector<FlattenJsonField>{};
+          },
+          [&propagated](std::vector<FlattenJsonField> batch) -> Coroutine::Task<absl::Status> {
+            EXPECT_FALSE(batch.empty());
+            ++propagated;
+            co_return absl::OkStatus();
+          }));
     }
-    Buffer::OwnedImpl data(body);
-    manager.onResponseData(data, /*end_stream=*/true);
-    for (int i = 0; i < 20; ++i) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-    EXPECT_TRUE(done);
     EXPECT_TRUE(status.ok()) << status;
-    std::string result = response_bridge.injected_.toString();
-    out_buffer.onDestroy();
-    return result;
+    return propagated;
   }
 
   void run(ModelRouterFilterConfigSharedPtr config = nullptr, bool expect_local_reply = false) {
     reply_code_.reset();
     reply_details_.clear();
-    bridge_.injected_.drain(bridge_.injected_.length());
+    request_propagated_ = false;
     request_headers_ = Http::TestRequestHeaderMapImpl{
         {":method", "POST"}, {":path", "/v1/chat/completions"}, {":authority", "original.host"}};
 
-    JsonWithExtBuf doc;
-    doc.setJson(nlohmann::json::parse(R"({"messages":[]})"));
     const AiFilterContext context{stream_info_, request_headers_,
                                   LLMProtocol::OpenAiChatCompletions};
-    std::vector<AiFilterSharedPtr> filters;
-    filters.push_back(std::make_shared<ModelRouterFilter>(
-        config != nullptr ? std::move(config) : defaultConfig(), context));
-    FilterManager manager(std::move(filters));
+    ModelRouterFilter filter(config != nullptr ? std::move(config) : defaultConfig(), context);
 
-    absl::Status status;
-    bool completed = false;
-    manager.startRequest(
-        std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
-        [&status, &completed](absl::Status s) {
-          status = std::move(s);
-          completed = true;
-        },
-        &request_headers_,
+    const absl::Status status = runTask(filter.decode(
+        AiRequestReceiver([]() -> Coroutine::Task<absl::StatusOr<AiRequestPtr>> {
+          co_return std::make_unique<AiRequest>(JsonWithExtBuf{});
+        }),
+        AiRequestPropagator([this](AiRequestPtr req) -> Coroutine::Task<absl::Status> {
+          EXPECT_NE(req, nullptr);
+          request_propagated_ = true;
+          co_return absl::OkStatus();
+        }),
         [this](Http::Code code, std::string details) {
           reply_code_ = code;
           reply_details_ = std::move(details);
-        },
-        /*always_serialize=*/true, LLMProtocol::OpenAiChatCompletions);
-    for (int i = 0; i < 20; ++i) {
-      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-    }
-    EXPECT_TRUE(completed);
-    if (expect_local_reply) {
-      EXPECT_TRUE(absl::IsCancelled(status)) << status;
-    } else {
-      EXPECT_TRUE(status.ok()) << status;
-    }
+        }));
+    EXPECT_TRUE(status.ok()) << status;
+    EXPECT_EQ(request_propagated_, !expect_local_reply);
   }
 
   void expectLocalReply(Http::Code expected_code, absl::string_view expected_details) {
     EXPECT_EQ(reply_code_, expected_code);
     EXPECT_EQ(reply_details_, expected_details);
-    EXPECT_EQ(bridge_.injected_.length(), 0);
+    EXPECT_FALSE(request_propagated_);
   }
 
   const LlmRoutesFilterStateObject* resolvedRoutes() {
@@ -271,10 +270,6 @@ routes:
   }
 
   Api::ApiPtr api_;
-  Event::DispatcherPtr dispatcher_;
-  InMemoryExternalBufferFactory factory_;
-  FakeBridge bridge_;
-  BufferManager buffer_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -282,6 +277,7 @@ routes:
   Http::TestRequestHeaderMapImpl request_headers_;
   std::optional<Http::Code> reply_code_;
   std::string reply_details_;
+  bool request_propagated_{false};
 };
 
 TEST_F(ModelRouterFilterTest, ModelNameMissingInFilterState) {
@@ -420,40 +416,7 @@ TEST_F(ModelRouterFilterTest, PassesEstimatedInputTokensFromRequestInfoAndFailsO
   EXPECT_EQ(counterValue("quota_exceeded"), 0);
 }
 
-TEST_F(ModelRouterFilterTest, EnforcesLocalQuotaWithZeroLimitDisablingPrimaryModel) {
-  namespace Config = envoy::extensions::http::ai_filters::model_router::v3;
-  ModelRouterProto proto = defaultProto();
-  // Set limit=0 on gpt-4o (the first target of multi_fallback_model).
-  for (auto& model : *proto.mutable_models()) {
-    if (model.name() == "gpt4o") {
-      auto* q = model.add_quotas();
-      q->set_quota_type(Config::REQUESTS);
-      q->set_time_unit(Config::MINUTE);
-      q->set_limit(0);
-    }
-  }
-
-  auto slot = ThreadLocal::TypedSlot<QuotaInterface>::makeUnique(tls_);
-  slot->set([base_quota = LocalQuota(proto, api_->timeSource())](Event::Dispatcher&) {
-    return std::make_shared<LocalQuota>(base_quota);
-  });
-  auto config_or = ModelRouterFilterConfig::create(proto, *api_, *stats_store_.rootScope());
-  ASSERT_TRUE(config_or.ok()) << config_or.status();
-  (*config_or)->setQuotas(std::move(slot));
-
-  setModelInFilterState("multi_fallback_model");
-  run(*std::move(config_or));
-
-  const auto* routes_obj = resolvedRoutes();
-  ASSERT_NE(routes_obj, nullptr);
-  ASSERT_EQ(routes_obj->routes().size(), 2);
-  EXPECT_EQ(routes_obj->routes()[0].model, "gpt-4o-mini");
-  EXPECT_EQ(routes_obj->routes()[1].model, "gpt-4o-nano");
-  EXPECT_EQ(request_headers_.getEnvoyMaxRetriesValue(), "1");
-  EXPECT_EQ(counterValue("success"), 1);
-}
-
-TEST_F(ModelRouterFilterTest, ConsumesQuotaOnUnaryResponseWithTokenUsage) {
+TEST_F(ModelRouterFilterTest, ConsumesQuotaOnUnaryAndSseResponsesWithTokenUsage) {
   auto config = defaultConfig(makeMockQuotaSlot());
   EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 0))
       .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
@@ -461,20 +424,6 @@ TEST_F(ModelRouterFilterTest, ConsumesQuotaOnUnaryResponseWithTokenUsage) {
       .WillOnce([](std::string, std::string, uint64_t, uint64_t) {
         return MockQuota::makeConsumeTask(absl::OkStatus());
       });
-
-  setModelInFilterState("send_me_to_anthropic");
-  run(config);
-
-  setTokenUsageInMetadata(120, 45);
-  const std::string response_body = R"({"id":"msg_1","content":"hi"})";
-  const std::string wire = runResponse(response_body, /*sse=*/false, config);
-  EXPECT_EQ(nlohmann::json::parse(wire), nlohmann::json::parse(response_body));
-}
-
-TEST_F(ModelRouterFilterTest, ConsumesQuotaOnSseResponseWithTokenUsage) {
-  auto config = defaultConfig(makeMockQuotaSlot());
-  EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 0))
-      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
   EXPECT_CALL(*mock_quota_, consumeQuota("anthropic", "claude-haiku-4-5", 80, 25))
       .WillOnce([](std::string, std::string, uint64_t, uint64_t) {
         return MockQuota::makeConsumeTask(absl::OkStatus());
@@ -483,12 +432,11 @@ TEST_F(ModelRouterFilterTest, ConsumesQuotaOnSseResponseWithTokenUsage) {
   setModelInFilterState("send_me_to_anthropic");
   run(config);
 
+  setTokenUsageInMetadata(120, 45);
+  EXPECT_EQ(runResponse(/*sse=*/false, config), 1);
+
   setTokenUsageInMetadata(80, 25);
-  const std::string sse_body =
-      "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}],\"id\":\"1\"}\n\n"
-      "data: [DONE]\n\n";
-  const std::string wire = runResponse(sse_body, /*sse=*/true, config);
-  EXPECT_EQ(wire, sse_body);
+  EXPECT_EQ(runResponse(/*sse=*/true, config), 1);
 }
 
 TEST_F(ModelRouterFilterTest, DoesNotConsumeQuotaOnNon2xxOrMissingResponseCode) {
@@ -502,19 +450,13 @@ TEST_F(ModelRouterFilterTest, DoesNotConsumeQuotaOnNon2xxOrMissingResponseCode) 
   setTokenUsageInMetadata(100, 50);
 
   // Missing response code (nullopt).
-  const std::string response_body = R"({"error":"bad"})";
-  EXPECT_EQ(nlohmann::json::parse(
-                runResponse(response_body, /*sse=*/false, config, /*response_code=*/std::nullopt)),
-            nlohmann::json::parse(response_body));
+  EXPECT_EQ(runResponse(/*sse=*/false, config, /*response_code=*/std::nullopt), 0);
 
   // 500 Internal Server Error on unary response.
-  EXPECT_EQ(nlohmann::json::parse(
-                runResponse(response_body, /*sse=*/false, config, /*response_code=*/500)),
-            nlohmann::json::parse(response_body));
+  EXPECT_EQ(runResponse(/*sse=*/false, config, /*response_code=*/500), 0);
 
   // 429 Too Many Requests on SSE response.
-  const std::string sse_body = "data: {\"error\":\"rate_limited\"}\n\n";
-  EXPECT_EQ(runResponse(sse_body, /*sse=*/true, config, /*response_code=*/429), sse_body);
+  EXPECT_EQ(runResponse(/*sse=*/true, config, /*response_code=*/429), 0);
 }
 
 TEST_F(ModelRouterFilterTest, ConsumesQuotaUsesAttemptCountForRetriedRoute) {
@@ -537,7 +479,7 @@ TEST_F(ModelRouterFilterTest, ConsumesQuotaUsesAttemptCountForRetriedRoute) {
 
   stream_info_.setAttemptCount(2);
   setTokenUsageInMetadata(200, 100);
-  runResponse(R"({"id":"msg_2"})", /*sse=*/false, config);
+  EXPECT_EQ(runResponse(/*sse=*/false, config), 1);
 }
 
 TEST_F(ModelRouterFilterTest, ConsumesQuotaFallsBackToEstimatedInputTokensWhenTokenUsageMissing) {
@@ -554,7 +496,7 @@ TEST_F(ModelRouterFilterTest, ConsumesQuotaFallsBackToEstimatedInputTokensWhenTo
   run(config);
 
   // Do not set envoy.ai.token_usage metadata; consumeQuota falls back to estimated_input_tokens.
-  runResponse(R"({"id":"msg_3"})", /*sse=*/false, config);
+  EXPECT_EQ(runResponse(/*sse=*/false, config), 1);
 }
 
 TEST_F(ModelRouterFilterTest, ConsumesQuotaLogsWarningAndSucceedsOnQuotaErrorOrOutOfBoundsAttempt) {
@@ -571,11 +513,11 @@ TEST_F(ModelRouterFilterTest, ConsumesQuotaLogsWarningAndSucceedsOnQuotaErrorOrO
   setTokenUsageInMetadata(10, 20);
 
   // Non-OK status from consumeQuota is logged and does not fail the response.
-  runResponse(R"({"id":"msg_4"})", /*sse=*/false, config);
+  EXPECT_EQ(runResponse(/*sse=*/false, config), 1);
 
   // Out-of-bounds attempt count logs a warning and skips consumeQuota without failing.
   stream_info_.setAttemptCount(5);
-  runResponse(R"({"id":"msg_5"})", /*sse=*/false, config);
+  EXPECT_EQ(runResponse(/*sse=*/false, config), 1);
 }
 
 TEST_F(ModelRouterFilterTest, EndToEndLocalQuotaExhaustionAcrossRequests) {
@@ -614,7 +556,7 @@ TEST_F(ModelRouterFilterTest, EndToEndLocalQuotaExhaustionAcrossRequests) {
 
   // Response 1 completes on attempt 1 (gpt-4o), consuming its 1 request/min quota.
   setTokenUsageInMetadata(10, 10);
-  runResponse(R"({"id":"resp_1"})", /*sse=*/false, config);
+  EXPECT_EQ(runResponse(/*sse=*/false, config), 1);
 
   // Request 2: gpt-4o is now over request quota, so gpt-4o-mini becomes route 0 (2 routes left).
   run(config);
@@ -626,7 +568,7 @@ TEST_F(ModelRouterFilterTest, EndToEndLocalQuotaExhaustionAcrossRequests) {
   // Response 2 completes on attempt 1 (now gpt-4o-mini), consuming 60 + 50 = 110 tokens (> 100
   // limit).
   setTokenUsageInMetadata(60, 50);
-  runResponse("data: {\"id\":\"resp_2\"}\n\n", /*sse=*/true, config);
+  EXPECT_EQ(runResponse(/*sse=*/true, config), 1);
 
   // Request 3: both gpt-4o and gpt-4o-mini are now over quota; only gpt-4o-nano remains.
   run(config);

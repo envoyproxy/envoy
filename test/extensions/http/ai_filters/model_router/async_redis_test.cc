@@ -4,7 +4,6 @@
 #include <unistd.h>
 
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -16,7 +15,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/coroutine/dispatcher_executor.h"
 #include "source/common/coroutine/launch.h"
 #include "source/common/coroutine/status_macros.h"

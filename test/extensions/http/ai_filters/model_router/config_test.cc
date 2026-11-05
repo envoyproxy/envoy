@@ -471,6 +471,45 @@ routes:
       - {}
 )EOF",
        "RoutingTargetValidationError\\.Model:"},
+      {R"EOF(
+models:
+  - name: haiku
+    provider: anthropic
+    model: claude-haiku-4-5
+    quotas:
+      - quota_type: QUOTA_UNSPECIFIED
+        time_unit: MINUTE
+        limit: 10
+)EOF",
+       "QuotaValidationError\\.QuotaType"},
+      {R"EOF(
+models:
+  - name: haiku
+    provider: anthropic
+    model: claude-haiku-4-5
+    quotas:
+      - quota_type: REQUESTS
+        time_unit: TIME_UNSPECIFIED
+        limit: 10
+)EOF",
+       "QuotaValidationError\\.TimeUnit"},
+      {R"EOF(
+redis:
+  host: ""
+)EOF",
+       "RedisConfigValidationError\\.Host"},
+      {R"EOF(
+redis:
+  host: 127.0.0.1
+  port: 70000
+)EOF",
+       "RedisConfigValidationError\\.Port"},
+      {R"EOF(
+redis:
+  host: 127.0.0.1
+  timeout: 0s
+)EOF",
+       "RedisConfigValidationError\\.Timeout"},
   };
 
   for (const auto& c : cases) {
@@ -479,8 +518,9 @@ routes:
   }
 }
 
-TEST_F(ModelRouterConfigTest, AcceptsValidQuotasIncludingZeroLimit) {
-  const auto factory_cb = createFactoryFromYaml(R"EOF(
+TEST_F(ModelRouterConfigTest, AcceptsValidQuotasAndRedisConfig) {
+  for (const std::string& yaml : {
+           R"EOF(
 providers:
   - name: openai
     llm_protocol: OPENAI_CHAT_COMPLETIONS
@@ -503,51 +543,16 @@ routes:
   - requested_model: chat
     targets:
       - model: gpt4o
-)EOF");
-  ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
-}
-
-TEST_F(ModelRouterConfigTest, RejectsInvalidQuotaTypeOrTimeUnit) {
-  {
-    const std::string yaml = R"EOF(
-models:
-  - name: haiku
-    provider: anthropic
-    model: claude-haiku-4-5
-    quotas:
-      - quota_type: QUOTA_UNSPECIFIED
-        time_unit: MINUTE
-        limit: 10
-)EOF";
-    EXPECT_THROW_WITH_REGEX(createFactoryFromYaml(yaml).IgnoreError(), EnvoyException,
-                            "QuotaValidationError\\.QuotaType");
-
-    const auto config_or = createConfig(yaml);
-    ASSERT_FALSE(config_or.ok());
-    EXPECT_EQ(config_or.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(std::string(config_or.status().message()),
-                HasSubstr("Invalid quota type for model haiku"));
-  }
-
-  {
-    const std::string yaml = R"EOF(
-models:
-  - name: haiku
-    provider: anthropic
-    model: claude-haiku-4-5
-    quotas:
-      - quota_type: REQUESTS
-        time_unit: TIME_UNSPECIFIED
-        limit: 10
-)EOF";
-    EXPECT_THROW_WITH_REGEX(createFactoryFromYaml(yaml).IgnoreError(), EnvoyException,
-                            "QuotaValidationError\\.TimeUnit");
-
-    const auto config_or = createConfig(yaml);
-    ASSERT_FALSE(config_or.ok());
-    EXPECT_EQ(config_or.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(std::string(config_or.status().message()),
-                HasSubstr("Invalid quota time unit for model haiku"));
+)EOF",
+           R"EOF(
+redis:
+  host: 127.0.0.1
+  port: 6379
+  timeout: 2s
+)EOF",
+       }) {
+    const auto factory_cb = createFactoryFromYaml(yaml);
+    ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
   }
 }
 

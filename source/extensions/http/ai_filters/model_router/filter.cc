@@ -90,17 +90,6 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
     if (models.contains(entry.name())) {
       return absl::InvalidArgumentError("Duplicate model name " + entry.name());
     }
-    for (const Config::Quota& quota : entry.quotas()) {
-      if (quota.quota_type() != Config::REQUESTS && quota.quota_type() != Config::TOKENS) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("Invalid quota type for model ", entry.name()));
-      }
-      if (quota.time_unit() != Config::MINUTE && quota.time_unit() != Config::HOUR &&
-          quota.time_unit() != Config::DAY) {
-        return absl::InvalidArgumentError(
-            absl::StrCat("Invalid quota time unit for model ", entry.name()));
-      }
-    }
     models[entry.name()] = entry;
   }
 

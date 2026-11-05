@@ -6,6 +6,8 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
+import "google/protobuf/duration.proto";
+
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/sensitive.proto";
@@ -140,6 +142,18 @@ message RoutingEntry {
   repeated RoutingTarget targets = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
+// Connection parameters for the Redis backend used to track model usage quotas.
+message RedisConfig {
+  // IP address or hostname of the Redis server.
+  string host = 1 [(validate.rules).string = {min_len: 1}];
+
+  // TCP port of the Redis server. If unset or ``0``, defaults to ``6379``.
+  uint32 port = 2 [(validate.rules).uint32 = {lte: 65535}];
+
+  // Connection and command timeout for Redis operations. If unset, defaults to 1000ms.
+  google.protobuf.Duration timeout = 3 [(validate.rules).duration = {gt {}}];
+}
+
 // Configuration for the Model Router AI filter.
 //
 // The Model Router AI filter maps the client's requested model (populated in the
@@ -165,4 +179,8 @@ message ModelRouter {
 
   // Routing rules mapping incoming requested model names to candidate targets.
   repeated RoutingEntry routes = 3;
+
+  // Optional Redis connection parameters for distributed quota tracking. When unset, quotas are
+  // tracked locally in memory.
+  RedisConfig redis = 4;
 }

@@ -59,6 +59,27 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "redis_quota_lib",
+    srcs = ["redis_quota.cc"],
+    hdrs = ["redis_quota.h"],
+    deps = [
+        ":async_redis_lib",
+        ":quota_interface_lib",
+        "//envoy/common:time_interface",
+        "//envoy/event:dispatcher_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/coroutine:status_macros_lib",
+        "//source/common/coroutine:task_lib",
+        "//source/common/protobuf:utility_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "filter_lib",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
@@ -99,6 +120,7 @@ envoy_cc_extension(
         ":filter_lib",
         ":local_quota_lib",
         ":quota_interface_lib",
+        ":redis_quota_lib",
         "//envoy/registry",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/protobuf:utility_lib",

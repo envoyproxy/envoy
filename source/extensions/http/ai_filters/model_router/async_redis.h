@@ -44,6 +44,7 @@ public:
   Coroutine::Task<absl::Status> connect();
   Coroutine::Task<absl::Status> close();
   Coroutine::Task<absl::Status> ping();
+  bool isConnected() const;
 
   Coroutine::Task<absl::StatusOr<int64_t>> get(absl::string_view key);
   Coroutine::Task<absl::StatusOr<std::vector<int64_t>>> mget(absl::Span<const std::string> keys);

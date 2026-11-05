@@ -10,6 +10,7 @@
 #include "source/extensions/http/ai_filters/model_router/filter.h"
 #include "source/extensions/http/ai_filters/model_router/local_quota.h"
 #include "source/extensions/http/ai_filters/model_router/quota_interface.h"
+#include "source/extensions/http/ai_filters/model_router/redis_quota.h"
 
 #include "absl/status/status_macros.h"
 
@@ -35,9 +36,17 @@ ModelRouterFilterConfigFactory::createAiFilterFactory(
   ThreadLocal::SlotAllocator& slot_allocator = context.threadLocal();
   ModelRouterFilterConfig::QuotaPtr tl_quota =
       ThreadLocal::TypedSlot<QuotaInterface>::makeUnique(slot_allocator);
-  tl_quota->set([base_quota = LocalQuota(proto, context.timeSource())](Event::Dispatcher&) {
-    return std::make_shared<LocalQuota>(base_quota);
-  });
+  if (proto.has_redis()) {
+    tl_quota->set([proto, &time_source = context.timeSource()](
+                      Event::Dispatcher& dispatcher) -> std::shared_ptr<QuotaInterface> {
+      return std::make_shared<RedisQuota>(proto, dispatcher, time_source);
+    });
+  } else {
+    tl_quota->set([base_quota = LocalQuota(proto, context.timeSource())](
+                      Event::Dispatcher&) -> std::shared_ptr<QuotaInterface> {
+      return std::make_shared<LocalQuota>(base_quota);
+    });
+  }
   filter_config->setQuotas(std::move(tl_quota));
 
   return [filter_config](const HttpFilters::AiProtocolManager::AiFilterContext& stream_context)
