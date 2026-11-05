@@ -260,7 +260,7 @@ typed_config:
   void createUpstreams() override {
     if (upstream_tls_ && !upstream_cert_name_.empty()) {
       addFakeUpstream(Ssl::createFakeUpstreamSslContext(upstream_cert_name_, context_manager_,
-                                                        factory_context_),
+                                                        factory_context_, upstreamStatsScope()),
                       upstreamProtocol(), /*autonomous_upstream=*/false);
     } else {
       HttpIntegrationTest::createUpstreams();
