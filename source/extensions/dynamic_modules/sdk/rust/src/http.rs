@@ -1293,7 +1293,7 @@ pub trait EnvoyHttpFilter {
   /// Set multiple string-typed dynamic metadata entries under `namespace` in a single call.
   ///
   /// Equivalent to calling [`Self::set_dynamic_metadata_string`] once per entry but resolves the
-  /// namespace and merges into the metadata struct only once. Existing entries with the same key
+  /// namespace once and writes each entry into it in order. Existing entries with the same key
   /// are overwritten. Within `entries`, a later entry overwrites an earlier one with the same key.
   /// An empty `entries` is a no-op and does not create the namespace.
   fn set_dynamic_metadata_string_batch<'a>(

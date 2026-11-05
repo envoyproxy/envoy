@@ -2391,9 +2391,11 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch is called by the module to
  * set multiple string-valued dynamic metadata entries under a single namespace in one call. It is
  * equivalent to calling envoy_dynamic_module_callback_http_set_dynamic_metadata_string once per
- * entry but resolves the namespace and merges into the metadata struct only once. Existing entries
+ * entry but resolves the namespace once and writes each entry into it in order. Existing entries
  * with the same key are overwritten. Within a single call, a later entry overwrites an earlier
- * entry with the same key. An empty array is a no-op and does not create the namespace.
+ * entry with the same key. An empty array is a no-op and does not create the namespace. An entry's
+ * key and value must not point into this filter's dynamic metadata, such as a buffer a metadata
+ * getter returned, since writing an entry replaces the value under its key.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
