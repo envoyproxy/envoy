@@ -666,6 +666,34 @@ void envoy_dynamic_module_callback_network_set_dynamic_metadata_string_batch(
   metadata_namespace->MergeFrom(metadata_value);
 }
 
+bool envoy_dynamic_module_callback_network_set_dynamic_metadata_struct(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_struct) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (!isValidModuleBuffer(filter_namespace) || !isValidModuleBuffer(serialized_struct)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicMetadataStruct(
+      filter->connection().streamInfo(),
+      absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_struct.ptr, serialized_struct.length));
+}
+
+bool envoy_dynamic_module_callback_network_set_dynamic_typed_metadata(
+    envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_module_buffer filter_namespace,
+    envoy_dynamic_module_type_module_buffer serialized_any) {
+  auto* filter = static_cast<DynamicModuleNetworkFilter*>(filter_envoy_ptr);
+  if (!isValidModuleBuffer(filter_namespace) || !isValidModuleBuffer(serialized_any)) {
+    return false;
+  }
+  return ContextAccessor::setDynamicTypedMetadata(
+      filter->connection().streamInfo(),
+      absl::string_view(filter_namespace.ptr, filter_namespace.length),
+      absl::string_view(serialized_any.ptr, serialized_any.length));
+}
+
 envoy_dynamic_module_type_http_callout_init_result
 envoy_dynamic_module_callback_network_filter_http_callout(
     envoy_dynamic_module_type_network_filter_envoy_ptr filter_envoy_ptr, uint64_t* callout_id_out,

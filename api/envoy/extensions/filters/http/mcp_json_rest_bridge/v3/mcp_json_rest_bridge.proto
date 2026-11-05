@@ -237,6 +237,19 @@ message ServerInfo {
 
 // Configuration for sending locally-generated responses to tools/list requests.
 message ToolsListLocal {
+  // Cache configuration advertised in locally-generated ``tools/list`` responses.
+  //
+  // When multiple endpoint configurations match a request, the selected policy applies to the
+  // entire merged ``tools/list`` response and is resolved by endpoint precedence: exact
+  // ``(host, path)``, host-only ``(host, "")``, path-only ``("", path)``, and global ``("", "")``.
+  // The first matching ``tool_list_local`` tier that explicitly sets ``cache_config`` is used. If a
+  // higher-precedence tier sets ``tool_list_local`` without ``cache_config`` (e.g.,
+  // ``tool_list_local: {}``), it inherits ``cache_config`` from the next matching tier; an explicit
+  // empty ``cache_config: {}`` overrides fallback tiers and resets to defaults.
+  //
+  // If no matching tier sets ``cache_config``: the response advertises ``ttlMs: 0`` and
+  // ``cacheScope: public``.
+  CacheConfig cache_config = 1;
 }
 
 // Configuration for the MCP tool capability of the server.

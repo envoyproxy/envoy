@@ -83,11 +83,11 @@ public:
     options->push_back(socket_option_);
     ON_CALL(*mockHost().cluster_.upstream_local_address_selector_,
             getUpstreamLocalAddressImpl(_, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [](const Network::Address::InstanceConstSharedPtr&,
                OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
               return Upstream::UpstreamLocalAddress({nullptr, nullptr});
-            }));
+            });
     pool_ = allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default,
                              options, transport_socket_options_, state_, quic_stat_names_, {},
                              *store_.rootScope(),
@@ -210,7 +210,7 @@ void Http3ConnPoolImplTest::createNewStream() {
   mockHost().cluster_.cluster_socket_options_->push_back(cluster_socket_option);
   EXPECT_CALL(*mockHost().cluster_.upstream_local_address_selector_,
               getUpstreamLocalAddressImpl(_, _))
-      .WillOnce(Invoke(
+      .WillOnce(
           [&](const Network::Address::InstanceConstSharedPtr& address,
               OptRef<const Network::TransportSocketOptions>) -> Upstream::UpstreamLocalAddress {
             if (happy_eyeballs_ && address_list_->size() == 2) {
@@ -222,7 +222,7 @@ void Http3ConnPoolImplTest::createNewStream() {
                 std::make_shared<Network::ConnectionSocket::Options>();
             Network::Socket::appendOptions(options, mockHost().cluster_.cluster_socket_options_);
             return Upstream::UpstreamLocalAddress({nullptr, options});
-          }));
+          });
   EXPECT_CALL(*cluster_socket_option, setOption(_, _)).Times(3u);
   EXPECT_CALL(*socket_option_, setOption(_, _)).Times(3u);
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
@@ -238,9 +238,9 @@ void Http3ConnPoolImplTest::createNewStream() {
       Http3ConnPoolImplPeer::connectingClients(*pool_);
   EXPECT_EQ(1u, clients.size());
   EXPECT_EQ(1u, observers_.registeredQuicObservers().size());
-  EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce(Invoke([cancellable]() {
+  EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce([cancellable]() {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
-  }));
+  });
   pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
 }
 

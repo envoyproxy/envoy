@@ -63,6 +63,16 @@ public:
   static absl::StatusOr<xds::core::v3::ResourceLocator> decodeUrl(absl::string_view resource_url);
 
   /**
+   * Normalize an xDS resource name. If the resource name has an xdstp: scheme, decode and
+   * re-encode it with sorted context parameters; otherwise return it unchanged.
+   *
+   * @param resource_name resource name.
+   * @return absl::StatusOr<std::string> normalized resource name, or an error status if decoding
+   *         an xdstp: URN fails.
+   */
+  static absl::StatusOr<std::string> normalizeResourceName(absl::string_view resource_name);
+
+  /**
    * @param resource_name resource name.
    * @return bool does resource_name have a xdstp: scheme?
    */

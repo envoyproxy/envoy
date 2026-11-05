@@ -7,7 +7,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Invoke;
 using testing::NiceMock;
 
 namespace Envoy {
@@ -33,10 +32,10 @@ TEST(OriginalSrcConfigFactoryTest, TestCreateFactory) {
   Network::MockListenerFilterManager manager;
   Network::ListenerFilterPtr added_filter;
   EXPECT_CALL(manager, addAcceptFilter_(_, _))
-      .WillOnce(Invoke([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
-                                       Network::ListenerFilterPtr& filter) {
+      .WillOnce([&added_filter](const Network::ListenerFilterMatcherSharedPtr&,
+                                Network::ListenerFilterPtr& filter) {
         added_filter = std::move(filter);
-      }));
+      });
   cb(manager);
 
   // Make sure we actually create the correct type!

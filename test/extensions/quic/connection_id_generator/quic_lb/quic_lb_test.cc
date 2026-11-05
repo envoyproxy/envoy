@@ -462,10 +462,10 @@ TEST(QuicLbTest, EmptySecretCallback) {
   EXPECT_CALL(*secret_provider, addValidationCallback(_));
   std::function<absl::Status()> update_callback;
   EXPECT_CALL(*secret_provider, addUpdateCallback(_))
-      .WillOnce(testing::Invoke([&](std::function<absl::Status()> cb) {
+      .WillOnce([&](std::function<absl::Status()> cb) {
         update_callback = cb;
         return nullptr;
-      }));
+      });
   EXPECT_CALL(*secret_provider, secret()).WillRepeatedly(testing::Return(nullptr));
 
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =

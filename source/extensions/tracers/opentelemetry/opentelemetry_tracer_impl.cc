@@ -285,7 +285,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
       continue;
     }
     if (!span_context->ok()) {
-      ENVOY_LOG(trace, "Unable to extract span context: {}", span_context->status());
+      ENVOY_LOG(debug, "Unable to extract span context: {}", span_context->status());
       malformed_trace_context = true;
       continue;
     }
@@ -295,6 +295,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
   if (malformed_trace_context) {
     // Trace context was present but could not be extracted, so the request is not traced.
+    ENVOY_LOG(debug, "No valid span context in any incoming trace context format, returning null "
+                     "span");
     return std::make_unique<Tracing::NullSpan>();
   }
   const bool b3_incoming =

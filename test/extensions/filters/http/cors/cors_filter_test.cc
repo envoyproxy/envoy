@@ -55,9 +55,9 @@ public:
     cors_policy_->max_age_ = "0";
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
-        .WillByDefault(Invoke([this]() -> Router::RouteSpecificFilterConfigs {
+        .WillByDefault([this]() -> Router::RouteSpecificFilterConfigs {
           return {cors_policy_.get(), cors_policy_.get()};
-        }));
+        });
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
@@ -97,8 +97,8 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
-        .WillByDefault(Invoke(
-            [this]() -> Router::RouteSpecificFilterConfigs { return {cors_policy_.get()}; }));
+        .WillByDefault(
+            [this]() -> Router::RouteSpecificFilterConfigs { return {cors_policy_.get()}; });
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
     EXPECT_EQ(false, isCorsRequest());
@@ -116,7 +116,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     EXPECT_CALL(*decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
-        .WillByDefault(Invoke([]() -> Router::RouteSpecificFilterConfigs { return {}; }));
+        .WillByDefault([]() -> Router::RouteSpecificFilterConfigs { return {}; });
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
     EXPECT_EQ(false, isCorsRequest());
@@ -132,7 +132,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
     EXPECT_CALL(*decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillOnce(Return(nullptr));
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
-        .WillByDefault(Invoke([]() -> Router::RouteSpecificFilterConfigs { return {}; }));
+        .WillByDefault([]() -> Router::RouteSpecificFilterConfigs { return {}; });
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
     EXPECT_EQ(false, isCorsRequest());
@@ -149,7 +149,7 @@ TEST_F(CorsFilterTest, InitializeCorsPoliciesTest) {
         .WillOnce(Return(cors_policy_.get()));
 
     ON_CALL(decoder_callbacks_, perFilterConfigs())
-        .WillByDefault(Invoke([]() -> Router::RouteSpecificFilterConfigs { return {}; }));
+        .WillByDefault([]() -> Router::RouteSpecificFilterConfigs { return {}; });
 
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
     EXPECT_EQ(false, isCorsRequest());
@@ -704,7 +704,7 @@ TEST_F(CorsFilterTest, NoCorsEntry) {
 
   // No cors policy in the 'typed_per_filter_config'.
   ON_CALL(decoder_callbacks_, perFilterConfigs())
-      .WillByDefault(Invoke([]() -> Router::RouteSpecificFilterConfigs { return {}; }));
+      .WillByDefault([]() -> Router::RouteSpecificFilterConfigs { return {}; });
   // No cors policy in route entry or virtual host.
   ON_CALL(decoder_callbacks_.route_->route_entry_, corsPolicy()).WillByDefault(Return(nullptr));
   ON_CALL(*decoder_callbacks_.route_->virtual_host_, corsPolicy()).WillByDefault(Return(nullptr));
@@ -731,7 +731,7 @@ TEST_F(CorsFilterTest, NoRouteCorsEntry) {
 
   ON_CALL(decoder_callbacks_, perFilterConfigs())
       .WillByDefault(
-          Invoke([this]() -> Router::RouteSpecificFilterConfigs { return {cors_policy_.get()}; }));
+          [this]() -> Router::RouteSpecificFilterConfigs { return {cors_policy_.get()}; });
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},
@@ -763,7 +763,7 @@ TEST_F(CorsFilterTest, NoVHostCorsEntry) {
 
   ON_CALL(decoder_callbacks_, perFilterConfigs())
       .WillByDefault(
-          Invoke([this]() -> Router::RouteSpecificFilterConfigs { return {cors_policy_.get()}; }));
+          [this]() -> Router::RouteSpecificFilterConfigs { return {cors_policy_.get()}; });
 
   Http::TestResponseHeaderMapImpl response_headers{
       {":status", "200"},

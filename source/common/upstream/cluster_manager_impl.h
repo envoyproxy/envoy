@@ -38,6 +38,7 @@
 #include "source/common/quic/quic_stat_names.h"
 #include "source/common/tcp/async_tcp_client_impl.h"
 #include "source/common/upstream/cluster_discovery_manager.h"
+#include "source/common/upstream/cluster_dns_resolver_cache.h"
 #include "source/common/upstream/host_utility.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -92,6 +93,9 @@ protected:
   Server::Configuration::ServerFactoryContext& context_;
   Stats::Store& stats_;
   LazyCreateDnsResolver dns_resolver_fn_;
+  // Lets clusters configured with an identical DNS resolver configuration share a resolver. Owned
+  // here so that the sharing is scoped to this server's clusters and to the main thread.
+  ClusterDnsResolverCache dns_resolver_cache_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
 };
@@ -470,19 +474,20 @@ protected:
     ClusterInitializationObject(const ThreadLocalClusterUpdateParams& params,
                                 ClusterInfoConstSharedPtr cluster_info,
                                 LoadBalancerFactorySharedPtr load_balancer_factory,
-                                HostLookupMapConstSharedPtr map, UnitFloat drop_overload,
-                                absl::string_view drop_category);
+                                HostSetFactory host_set_factory, HostLookupMapConstSharedPtr map,
+                                UnitFloat drop_overload, absl::string_view drop_category);
 
     ClusterInitializationObject(
         const absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority>&
             per_priority_state,
         const ThreadLocalClusterUpdateParams& update_params, ClusterInfoConstSharedPtr cluster_info,
-        LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
-        UnitFloat drop_overload, absl::string_view drop_category);
+        LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+        HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
 
     absl::flat_hash_map<int, ThreadLocalClusterUpdateParams::PerPriority> per_priority_state_;
     const ClusterInfoConstSharedPtr cluster_info_;
     const LoadBalancerFactorySharedPtr load_balancer_factory_;
+    const HostSetFactory host_set_factory_;
     const HostLookupMapConstSharedPtr cross_priority_host_map_;
     UnitFloat drop_overload_{0};
     const std::string drop_category_;
@@ -615,8 +620,9 @@ private:
 
     class ClusterEntry : public ThreadLocalCluster {
     public:
+      // `host_set_factory` is the main-thread cluster's, so worker host sets have its type.
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-                   const LoadBalancerFactorySharedPtr& lb_factory);
+                   const LoadBalancerFactorySharedPtr& lb_factory, HostSetFactory host_set_factory);
       ~ClusterEntry() override;
 
       // Upstream::ThreadLocalCluster
@@ -754,6 +760,7 @@ private:
     struct LocalClusterParams {
       LoadBalancerFactorySharedPtr load_balancer_factory_;
       ClusterInfoConstSharedPtr info_;
+      HostSetFactory host_set_factory_{};
     };
 
     ThreadLocalClusterManagerImpl(ClusterManagerImpl& parent, Event::Dispatcher& dispatcher,
@@ -996,8 +1003,8 @@ private:
    */
   ClusterInitializationObjectConstSharedPtr addOrUpdateClusterInitializationObjectIfSupported(
       const ThreadLocalClusterUpdateParams& params, ClusterInfoConstSharedPtr cluster_info,
-      LoadBalancerFactorySharedPtr load_balancer_factory, HostLookupMapConstSharedPtr map,
-      UnitFloat drop_overload, absl::string_view drop_category);
+      LoadBalancerFactorySharedPtr load_balancer_factory, HostSetFactory host_set_factory,
+      HostLookupMapConstSharedPtr map, UnitFloat drop_overload, absl::string_view drop_category);
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 

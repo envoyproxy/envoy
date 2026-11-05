@@ -3460,6 +3460,45 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_liste
   false
 }
 
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  event_id: u64,
+) -> bool {
+  event_id == 7
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  cluster: abi::envoy_dynamic_module_type_module_buffer,
+  version_info: abi::envoy_dynamic_module_type_module_buffer,
+  update_id_out: *mut u64,
+) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result {
+  // Reports the argument lengths through the update ID so that the test can check them.
+  unsafe {
+    *update_id_out =
+      (cluster_name.length * 10000 + cluster.length * 100 + version_info.length) as u64;
+  }
+  abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
+  abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+}
+
 // =============================================================================
 // Bootstrap Extension Tests
 // =============================================================================
@@ -4696,6 +4735,14 @@ pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+) {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_config_call("signal_init_complete".to_string());
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(
   config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
 ) -> abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr {
@@ -5249,6 +5296,7 @@ fn test_tls_certificate_selector_envoy_config_calls_envoy() {
   assert!(envoy_config.set_certificate("dynamic.lyft.com", b"chain", b"key", b""));
   assert!(!envoy_config.set_certificate("invalid", b"chain", b"key", b"ocsp"));
   envoy_config.remove_certificate("dynamic.lyft.com");
+  envoy_config.signal_init_complete();
   // A boxed scheduler is itself a scheduler, so generic module code can take it.
   fn commit_event(scheduler: &impl EnvoyTlsCertificateSelectorConfigScheduler, event_id: u64) {
     scheduler.commit(event_id);
@@ -5281,6 +5329,7 @@ fn test_tls_certificate_selector_envoy_config_calls_envoy() {
       "set_certificate dynamic.lyft.com chain key ",
       "set_certificate invalid chain key ocsp",
       "remove_certificate dynamic.lyft.com",
+      "signal_init_complete",
       "scheduler_new",
       "scheduler_commit 42",
       "scheduler_delete",
@@ -5749,6 +5798,25 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   _details: abi::envoy_dynamic_module_type_module_buffer,
 ) {
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+static DRAIN_CONNECTION_UPON_COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) {
+  DRAIN_CONNECTION_UPON_COMPLETION_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_http_drain_connection_upon_completion() {
+  DRAIN_CONNECTION_UPON_COMPLETION_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  envoy_filter.drain_connection_upon_completion();
+  assert!(DRAIN_CONNECTION_UPON_COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
 }
 
 // Single-slot store backing the filter state object FFI stubs below.
@@ -6413,6 +6481,13 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_use_persistent_host_map(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+  cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+) -> bool {
+  !cluster_config_envoy_ptr.is_null()
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_update_host_health(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
@@ -6473,6 +6548,47 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_hos
   _result: *mut abi::envoy_dynamic_module_type_packed_address,
 ) -> bool {
   false
+}
+
+/// Reports two health-changed hosts for a null load balancer and an unknown count otherwise, so the
+/// real wrapper's `Some` and `None` arms are both reachable.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  result: *mut usize,
+) -> bool {
+  if !lb_envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe {
+    *result = 2;
+  }
+  true
+}
+
+/// Index 0 is a degraded host at priority 1, index 1 a healthy host at priority 0, and any other
+/// index is out of bounds.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  index: usize,
+  priority: *mut u32,
+  health: *mut abi::envoy_dynamic_module_type_host_health,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  let (host, host_priority, host_health) = match index {
+    0 => (
+      0xAB,
+      1,
+      abi::envoy_dynamic_module_type_host_health::Degraded,
+    ),
+    1 => (0xCD, 0, abi::envoy_dynamic_module_type_host_health::Healthy),
+    _ => return std::ptr::null_mut(),
+  };
+  unsafe {
+    *priority = host_priority;
+    *health = host_health;
+  }
+  host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr
 }
 
 #[no_mangle]
@@ -6606,6 +6722,48 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_m
       String::from_utf8_lossy(value).into_owned(),
     ));
   }
+  true
+}
+
+// Records the setter, context, namespace and buffer of each serialized metadata call so a test can
+// assert the wrappers forward them unchanged.
+pub(crate) static MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA: std::sync::Mutex<
+  Vec<(&'static str, usize, String, Vec<u8>)>,
+> = std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_struct: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+    .lock()
+    .unwrap()
+    .push((
+      "struct",
+      context_envoy_ptr as usize,
+      unsafe { stub_specifier_string(ns) },
+      unsafe { stub_specifier_bytes(serialized_struct) },
+    ));
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_any: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+    .lock()
+    .unwrap()
+    .push((
+      "typed",
+      context_envoy_ptr as usize,
+      unsafe { stub_specifier_string(ns) },
+      unsafe { stub_specifier_bytes(serialized_any) },
+    ));
   true
 }
 
@@ -8309,6 +8467,206 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
+}
+
+#[test]
+fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  // Calling the worker and cluster writer hooks with default implementations should not panic.
+  envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 1);
+  envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+  );
+  envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+    cluster_name_buf,
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  );
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
+  use std::sync::atomic::{AtomicU64, Ordering};
+  static WORKER_EVENT_ID: AtomicU64 = AtomicU64::new(0);
+  static DONE_EVENT_ID: AtomicU64 = AtomicU64::new(0);
+  type UpdateDone = (
+    u64,
+    String,
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    String,
+  );
+  static UPDATE_DONE: std::sync::Mutex<Option<UpdateDone>> = std::sync::Mutex::new(None);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_worker_event(
+      &self,
+      _envoy_extension_config: &dyn EnvoyBootstrapExtensionConfig,
+      event_id: u64,
+    ) {
+      WORKER_EVENT_ID.store(event_id, Ordering::SeqCst);
+    }
+
+    fn on_run_on_all_workers_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      event_id: u64,
+    ) {
+      DONE_EVENT_ID.store(event_id, Ordering::SeqCst);
+    }
+
+    fn on_cluster_writer_update_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      update_id: u64,
+      cluster_name: &str,
+      status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+      error_details: &str,
+    ) {
+      *UPDATE_DONE.lock().unwrap() = Some((
+        update_id,
+        cluster_name.to_string(),
+        status,
+        error_details.to_string(),
+      ));
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 3);
+  assert_eq!(WORKER_EVENT_ID.load(Ordering::SeqCst), 3);
+
+  envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    4,
+  );
+  assert_eq!(DONE_EVENT_ID.load(Ordering::SeqCst), 4);
+
+  let cluster_name = "writer.a";
+  let error_details = "invalid cluster";
+  envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    5,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: cluster_name.as_ptr() as *const _,
+      length: cluster_name.len(),
+    },
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: error_details.as_ptr() as *const _,
+      length: error_details.len(),
+    },
+  );
+  assert_eq!(
+    *UPDATE_DONE.lock().unwrap(),
+    Some((
+      5,
+      "writer.a".to_string(),
+      abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Failed,
+      "invalid cluster".to_string(),
+    ))
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
+  let envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  assert!(envoy_config.run_on_all_workers(7));
+  assert!(!envoy_config.run_on_all_workers(8));
+  assert!(envoy_config.enable_cluster_writer());
+
+  // The stub encodes the lengths of the name, the cluster and the version in the update ID.
+  assert_eq!(
+    envoy_config.cluster_writer_add_or_update("writer.a", b"xyz", "v1"),
+    (
+      abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result::Success,
+      80302
+    )
+  );
+  assert_eq!(
+    envoy_config.cluster_writer_remove("writer.a"),
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+  );
 }
 
 #[test]
@@ -12492,11 +12850,13 @@ const STUB_ROUTE_HEADERS: [(&[u8], &[u8]); 2] = [(b":path", b"/index"), (b"env",
 const STUB_ROUTE_VALUE: &str = "route-value";
 const STUB_ROUTE_RANDOM_VALUE: u64 = 0x1234;
 const STUB_ROUTE_TEMPLATE_ID: &str = "canary";
+const STUB_ROUTE_VIRTUAL_CLUSTER: &str = "rides";
 
 // Toggles that let a single test drive both the found and the not-found branch of a callback.
 static STUB_ROUTE_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
 static STUB_ROUTE_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
 static STUB_ROUTE_STATE_PRESENT: AtomicBool = AtomicBool::new(true);
+static STUB_ROUTE_HAS_BUILT_ROUTE_CACHE: AtomicBool = AtomicBool::new(true);
 // When set, the bulk input route stub reports a direct response instead of a route entry.
 static STUB_ROUTE_DIRECT: AtomicBool = AtomicBool::new(false);
 
@@ -12519,8 +12879,14 @@ struct StubRouteDecision {
   route_typed_metadata: Option<(String, Vec<u8>)>,
   filter_disabled: Option<(String, bool)>,
   path: Option<String>,
+  prefix_rewrite_rule: Option<(
+    abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+    String,
+    String,
+  )>,
   host: Option<String>,
   route_name: Option<String>,
+  virtual_cluster: Option<String>,
   request_headers: Vec<(
     String,
     String,
@@ -12553,8 +12919,10 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     route_typed_metadata: None,
     filter_disabled: None,
     path: None,
+    prefix_rewrite_rule: None,
     host: None,
     route_name: None,
+    virtual_cluster: None,
     request_headers: Vec::new(),
     removed_request_headers: Vec::new(),
     response_headers: Vec::new(),
@@ -12626,6 +12994,13 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_get_speci
       length: 0,
     };
   }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
+) -> bool {
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[no_mangle]
@@ -13272,6 +13647,36 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_path(
   true
 }
 
+// Maps each key onto a result, so a test can observe every arm of the SDK conversion.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  key: u64,
+) -> abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result {
+  match key {
+    1 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Miss,
+    2 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Hit,
+    3 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::HitVerify,
+    _ => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Disabled,
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  span: abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+  matched: abi::envoy_dynamic_module_type_module_buffer,
+  replacement: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let replacement = unsafe { stub_specifier_string(replacement) };
+  if replacement.is_empty() {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().prefix_rewrite_rule =
+    Some((span, unsafe { stub_specifier_string(matched) }, replacement));
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_host(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
@@ -13295,6 +13700,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_name(
     return false;
   }
   STUB_ROUTE_DECISION.lock().unwrap().route_name = Some(route_name);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  virtual_cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let virtual_cluster = unsafe { stub_specifier_string(virtual_cluster_name) };
+  if !virtual_cluster.is_empty() && virtual_cluster != STUB_ROUTE_VIRTUAL_CLUSTER {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().virtual_cluster = Some(virtual_cluster);
   true
 }
 
@@ -13547,6 +13965,53 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_specifier_user_data_discard() {
+  // Drives the user data discard hook through the FFI entry point, so the boxed trait object gets
+  // the value Envoy hands back.
+  static DISCARDED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+  struct DiscardingConfig;
+  impl route_specifier::RouteSpecifierConfig for DiscardingConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_specifier::RouteSpecifierContext,
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
+    }
+    fn on_user_data_discard(&self, user_data: u64) {
+      DISCARDED.store(user_data, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  struct DefaultConfig;
+  impl route_specifier::RouteSpecifierConfig for DefaultConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_specifier::RouteSpecifierContext,
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
+    }
+  }
+
+  let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| Some(Box::new(DiscardingConfig));
+  let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
+    std::ptr::null_mut(),
+    "test_route_specifier",
+    b"",
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_user_data_discard(config_ptr, 42);
+  }
+  assert_eq!(42, DISCARDED.load(std::sync::atomic::Ordering::SeqCst));
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
+  }
+
+  // The default hook takes the value without panicking.
+  route_specifier::RouteSpecifierConfig::on_user_data_discard(&DefaultConfig, 7);
 }
 
 #[test]
@@ -13861,10 +14326,40 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_filter_disabled("", true));
   assert!(ctx.set_path("/rewritten"));
   assert!(!ctx.set_path("rewritten"));
+  for (key, result) in [
+    (0, route_specifier::BuiltRouteLookupResult::Disabled),
+    (1, route_specifier::BuiltRouteLookupResult::Miss),
+    (2, route_specifier::BuiltRouteLookupResult::Hit),
+    (3, route_specifier::BuiltRouteLookupResult::HitVerify),
+  ] {
+    assert_eq!(result, ctx.lookup_built_route(key));
+  }
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::WholePath, "", "/fixed"));
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::WholePath,
+      String::new(),
+      "/fixed".to_string()
+    )),
+    STUB_ROUTE_DECISION
+      .lock()
+      .unwrap()
+      .prefix_rewrite_rule
+      .clone()
+  );
+  assert!(!ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", ""));
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", "/internal"));
   assert!(ctx.set_host("example.com"));
   assert!(!ctx.set_host(""));
   assert!(ctx.set_route_name("module_route"));
   assert!(!ctx.set_route_name(""));
+  assert!(!ctx.set_virtual_cluster("unknown"));
+  assert!(ctx.set_virtual_cluster(""));
+  assert_eq!(
+    Some(String::new()),
+    STUB_ROUTE_DECISION.lock().unwrap().virtual_cluster.clone()
+  );
+  assert!(ctx.set_virtual_cluster(STUB_ROUTE_VIRTUAL_CLUSTER));
   assert!(ctx.add_request_header(
     "x-add",
     "value",
@@ -13931,8 +14426,20 @@ fn test_route_specifier_context_records_decision() {
   );
   assert_eq!(Some(("filter".to_string(), true)), decision.filter_disabled);
   assert_eq!(Some("/rewritten".to_string()), decision.path);
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::Literal,
+      "/api".to_string(),
+      "/internal".to_string()
+    )),
+    decision.prefix_rewrite_rule
+  );
   assert_eq!(Some("example.com".to_string()), decision.host);
   assert_eq!(Some("module_route".to_string()), decision.route_name);
+  assert_eq!(
+    Some(STUB_ROUTE_VIRTUAL_CLUSTER.to_string()),
+    decision.virtual_cluster
+  );
   assert_eq!(
     vec![(
       "x-add".to_string(),
@@ -14004,6 +14511,10 @@ fn test_envoy_route_specifier_config_impl() {
   );
   assert!(config.has_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!config.has_route_override("unknown"));
+  assert!(config.has_built_route_cache());
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(!config.has_built_route_cache());
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.store(true, std::sync::atomic::Ordering::SeqCst);
   assert!(config.register_route_template("built", &[1, 2, 3]));
   assert!(!config.register_route_template("", &[1, 2, 3]));
   assert!(!config.register_route_template("built", &[]));

@@ -29,6 +29,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/types.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/functional/function_ref.h"
 #include "absl/strings/string_view.h"
 #include "fmt/format.h"
@@ -365,6 +366,19 @@ public:
    * 0 if no response has been recorded.
    */
   virtual std::optional<uint64_t> lastHealthCheckHttpStatus() const PURE;
+
+  /**
+   * Replace the string metadata attached to the host by the last active health check. Used by HDS
+   * to forward health checker supplied details to the control plane. Main thread only.
+   */
+  virtual void
+  setHealthCheckMetadata(absl::flat_hash_map<std::string, std::string>&& metadata) PURE;
+
+  /**
+   * @return the string metadata attached to the host by the last active health check. Main thread
+   * only.
+   */
+  virtual const absl::flat_hash_map<std::string, std::string>& healthCheckMetadata() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -474,6 +488,20 @@ using LocalityWeights = std::vector<uint32_t>;
 using LocalityWeightsSharedPtr = std::shared_ptr<LocalityWeights>;
 using LocalityWeightsConstSharedPtr = std::shared_ptr<const LocalityWeights>;
 
+// A host set's hosts in a form other than flat vectors. Defined in upstream_impl.h.
+class HostSetSnapshot;
+using HostSetSnapshotConstSharedPtr = std::shared_ptr<const HostSetSnapshot>;
+
+/**
+ * Sizes of a host set's hosts(), healthyHosts(), degradedHosts() and excludedHosts().
+ */
+struct HostCounts {
+  size_t hosts{};
+  size_t healthy{};
+  size_t degraded{};
+  size_t excluded{};
+};
+
 /**
  * Base host set interface. This contains all of the endpoints for a given LocalityLbEndpoints
  * priority level.
@@ -505,6 +533,20 @@ public:
    * @return a shared ptr to the vector returned by healthyHosts().
    */
   virtual HealthyHostVectorConstSharedPtr healthyHostsPtr() const PURE;
+
+  /**
+   * @return the host counts. An implementation that keeps its hosts in another form can answer
+   *         without building the vectors.
+   */
+  virtual HostCounts hostCounts() const {
+    return {hosts().size(), healthyHosts().size(), degradedHosts().size(), excludedHosts().size()};
+  }
+
+  /**
+   * @return a snapshot of this set's hosts for workers to adopt, or nullptr when the flat vectors
+   *         are the current representation.
+   */
+  virtual HostSetSnapshotConstSharedPtr snapshot() const { return nullptr; }
 
   /**
    * @return all degraded hosts contained in the set at the current time. NOTE: This set is
@@ -657,6 +699,9 @@ public:
     HostsPerLocalityConstSharedPtr healthy_hosts_per_locality;
     HostsPerLocalityConstSharedPtr degraded_hosts_per_locality;
     HostsPerLocalityConstSharedPtr excluded_hosts_per_locality;
+    // When set, a snapshot for the host set to adopt in place of the flat views above, which are
+    // then null.
+    HostSetSnapshotConstSharedPtr snapshot;
   };
 
   /**

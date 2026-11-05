@@ -1370,6 +1370,7 @@ public:
                          const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
+  const VirtualHostImpl* findVirtualHost(absl::string_view host) const;
 
 private:
   RouteMatcher(const envoy::config::route::v3::RouteConfiguration& config,
@@ -1384,6 +1385,11 @@ private:
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;
+  bool hasOnlyDefaultVirtualHost() const {
+    return virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
+           wildcard_virtual_host_prefixes_.empty();
+  }
+  const VirtualHostImpl* findVirtualHostInternal(absl::string_view host) const;
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   // Keeps the shared part of the route config alive and gives access to the route configuration
@@ -1502,8 +1508,8 @@ public:
          ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
          bool validate_clusters_default);
 
-  bool virtualHostExists(const Http::RequestHeaderMap& headers) const {
-    return route_matcher_->findVirtualHost(headers) != nullptr;
+  bool virtualHostExists(absl::string_view domain) const {
+    return route_matcher_->findVirtualHost(domain) != nullptr;
   }
 
   // Router::Config

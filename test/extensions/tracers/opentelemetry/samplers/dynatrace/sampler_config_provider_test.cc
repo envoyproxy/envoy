@@ -51,7 +51,7 @@ public:
     timer_ = new NiceMock<Event::MockTimer>(
         &tracer_factory_context_.server_factory_context_.dispatcher_);
     ON_CALL(tracer_factory_context_.server_factory_context_.dispatcher_, createTimer_(_))
-        .WillByDefault(Invoke([this](Event::TimerCb) { return timer_; }));
+        .WillByDefault([this](Event::TimerCb) { return timer_; });
   }
 
 protected:

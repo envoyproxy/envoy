@@ -19,7 +19,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -83,16 +82,16 @@ public:
     ON_CALL(*udp_listener_config_, packetWriterFactory())
         .WillByDefault(ReturnRef(udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _, _, _))
-        .WillByDefault(
-            Invoke([&](Network::IoHandle& io_handle, Stats::Scope& scope, Envoy::Event::Dispatcher&,
-                       absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
+        .WillByDefault([&](Network::IoHandle& io_handle, Stats::Scope& scope,
+                           Envoy::Event::Dispatcher&,
+                           absl::AnyInvocable<void() &&>) -> Network::UdpPacketWriterPtr {
 #if UDP_GSO_BATCH_WRITER_COMPILETIME_SUPPORT
-              return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
+          return std::make_unique<Quic::UdpGsoBatchWriter>(io_handle, scope);
 #else
-              UNREFERENCED_PARAMETER(scope);
-              return std::make_unique<Network::UdpDefaultWriter>(io_handle);
+          UNREFERENCED_PARAMETER(scope);
+          return std::make_unique<Network::UdpDefaultWriter>(io_handle);
 #endif
-            }));
+        });
 
     EXPECT_CALL(cb_.udp_listener_, onDestroy());
 
@@ -131,15 +130,14 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnData) {
   setup();
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
-  EXPECT_CALL(*test_filter, onData(_))
-      .WillOnce(Invoke([](Network::UdpRecvData&) -> Network::FilterStatus {
-        return Network::FilterStatus::Continue;
-      }));
+  EXPECT_CALL(*test_filter, onData(_)).WillOnce([](Network::UdpRecvData&) -> Network::FilterStatus {
+    return Network::FilterStatus::Continue;
+  });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onData(_))
-      .WillOnce(Invoke([](Network::UdpRecvData&) -> Network::FilterStatus {
+      .WillOnce([](Network::UdpRecvData&) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter});
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter2});
@@ -151,10 +149,9 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnDataStopIteration) {
   setup();
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
-  EXPECT_CALL(*test_filter, onData(_))
-      .WillOnce(Invoke([](Network::UdpRecvData&) -> Network::FilterStatus {
-        return Network::FilterStatus::StopIteration;
-      }));
+  EXPECT_CALL(*test_filter, onData(_)).WillOnce([](Network::UdpRecvData&) -> Network::FilterStatus {
+    return Network::FilterStatus::StopIteration;
+  });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onData(_)).Times(0);
 
@@ -169,14 +166,14 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveError) {
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter, onReceiveError(_))
-      .WillOnce(Invoke([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
+      .WillOnce([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
         return Network::FilterStatus::Continue;
-      }));
+      });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onReceiveError(_))
-      .WillOnce(Invoke([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
+      .WillOnce([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
-      }));
+      });
 
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter});
   active_listener_->addReadFilter(Network::UdpListenerReadFilterPtr{test_filter2});
@@ -189,9 +186,9 @@ TEST_P(ActiveUdpListenerTest, MultipleFiltersOnReceiveErrorStopIteration) {
 
   auto* test_filter = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter, onReceiveError(_))
-      .WillOnce(Invoke([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
+      .WillOnce([](Api::IoError::IoErrorCode) -> Network::FilterStatus {
         return Network::FilterStatus::StopIteration;
-      }));
+      });
   auto* test_filter2 = new NiceMock<Network::MockUdpListenerReadFilter>(cb_);
   EXPECT_CALL(*test_filter2, onReceiveError(_)).Times(0);
 

@@ -14,6 +14,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/router/router.h"
+#include "source/common/upstream/udp_source_address_policy.h"
 #include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "quiche/common/masque/connect_udp_datagram_payload.h"
@@ -28,21 +29,21 @@ namespace Udp {
 void UdpConnPool::newStream(Router::GenericConnectionPoolCallbacks* callbacks) {
   Envoy::Network::SocketPtr socket = createSocket(host_);
   auto source_address_selector = host_->cluster().getUpstreamLocalAddressSelector();
-  auto upstream_local_address = source_address_selector->getUpstreamLocalAddress(
-      host_->address(), /*socket_options=*/nullptr, /*transport_socket_options=*/{});
-  if (!Envoy::Network::Socket::applyOptions(upstream_local_address.socket_options_, *socket,
-                                            envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
-    callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                             "Failed to apply socket option for UDP upstream", host_);
-    return;
-  }
-  if (upstream_local_address.address_) {
-    Envoy::Api::SysCallIntResult bind_result = socket->bind(upstream_local_address.address_);
-    if (bind_result.return_value_ < 0) {
+  const auto source_address_policy = Upstream::UdpSourceAddressPolicy::fromUpstreamLocalAddress(
+      source_address_selector->getUpstreamLocalAddress(host_->address(), /*socket_options=*/nullptr,
+                                                       /*transport_socket_options=*/{}));
+  const auto socket_setup_result = source_address_policy.prepareSocket(*socket);
+  if (!socket_setup_result.ok()) {
+    using FailureReason = Upstream::UdpSourceAddressPolicy::SocketSetupResult::FailureReason;
+    if (socket_setup_result.failure_reason_ == FailureReason::SocketOption) {
+      callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                               "Failed to apply socket option for UDP upstream", host_);
+    } else {
+      ASSERT(socket_setup_result.failure_reason_ == FailureReason::Bind);
       callbacks->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                "Failed to bind for UDP upstream", host_);
-      return;
     }
+    return;
   }
 
   const Network::ConnectionInfoProvider& connection_info_provider =

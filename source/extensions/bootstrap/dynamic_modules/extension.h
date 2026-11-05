@@ -77,6 +77,9 @@ private:
 
   // Handle for the shutdown lifecycle callback registration.
   Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
+
+  // Handle for the shutdown lifecycle callback that notifies the configuration of shutdown.
+  Server::ServerLifecycleNotifier::HandlePtr config_shutdown_handle_;
 };
 
 } // namespace DynamicModules

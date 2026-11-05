@@ -32,7 +32,6 @@
 
 using testing::_;
 using testing::AtLeast;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -74,31 +73,31 @@ public:
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
     ON_CALL(server_.api_, randomGenerator()).WillByDefault(ReturnRef(random_));
     ON_CALL(server_.api_, customStatNamespaces()).WillByDefault(ReturnRef(custom_stat_namespaces_));
-    ON_CALL(server_.api_, threadFactory()).WillByDefault(Invoke([&]() -> Thread::ThreadFactory& {
+    ON_CALL(server_.api_, threadFactory()).WillByDefault([&]() -> Thread::ThreadFactory& {
       return api_->threadFactory();
-    }));
+    });
     ON_CALL(file_system_, fileReadToEnd(_))
-        .WillByDefault(Invoke([&](const std::string& file) -> absl::StatusOr<std::string> {
+        .WillByDefault([&](const std::string& file) -> absl::StatusOr<std::string> {
           return api_->fileSystem().fileReadToEnd(file);
-        }));
+        });
     ON_CALL(os_sys_calls_, close(_)).WillByDefault(Return(Api::SysCallIntResult{0, 0}));
     EXPECT_CALL(os_sys_calls_, getaddrinfo(_, _, _, _))
-        .WillRepeatedly(Invoke([&](const char* node, const char* service,
-                                   const struct addrinfo* hints, struct addrinfo** res) {
+        .WillRepeatedly([&](const char* node, const char* service, const struct addrinfo* hints,
+                            struct addrinfo** res) {
           Api::OsSysCallsImpl real;
           return real.getaddrinfo(node, service, hints, res);
-        }));
+        });
 
     // Here we setup runtime to mimic the actual deprecated feature list used in the
     // production code. Note that this test is actually more strict than production because
     // in production runtime is not setup until after the bootstrap config is loaded. This seems
     // better for configuration tests.
     ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
-        .WillByDefault(Invoke([](absl::string_view, bool default_value) { return default_value; }));
+        .WillByDefault([](absl::string_view, bool default_value) { return default_value; });
 
-    ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault(Invoke([this]() {
+    ON_CALL(server_.runtime_loader_, threadsafeSnapshot()).WillByDefault([this]() {
       return snapshot_;
-    }));
+    });
 
     // For configuration/example tests we don't fail if WIP APIs are used.
     EXPECT_CALL(server_.validation_context_.static_validation_visitor_, onWorkInProgress(_))
@@ -132,35 +131,35 @@ public:
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
         server_.quic_stat_names_);
 
-    ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
+    ON_CALL(server_, clusterManager()).WillByDefault([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
-    }));
+    });
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
                 Server::Configuration::FilterChainFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, context, *network_config_provider_manager_);
-            }));
+            });
     ON_CALL(component_factory_, getTcpListenerConfigProviderManager())
         .WillByDefault(Return(tcp_listener_config_provider_manager_.get()));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                     filters,
                 Server::Configuration::ListenerFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                   filters, context, *component_factory_.getTcpListenerConfigProviderManager());
-            }));
+            });
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
-        .WillByDefault(Invoke(
+        .WillByDefault(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                     filters,
                 Server::Configuration::ListenerFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   filters, context);
-            }));
+            });
 
     try {
       THROW_IF_NOT_OK(main_config.initialize(bootstrap, server_, *cluster_manager_factory_));
