@@ -331,6 +331,9 @@ TEST_P(OnDemandIntegrationTest, ClientInterruptedHandshake) {
   setup();
   auto conn1 = std::make_unique<ClientSslConnection>(*this);
   waitCertsRequested(1);
+  // cert_active is incremented on the main thread right after cert_requested, so it may not be
+  // visible yet when the counter wait returns: establish it before closing the client.
+  test_server_->waitForGaugeEq(onDemandStat("cert_active"), 1);
   conn1->ssl_client_->close(Network::ConnectionCloseType::NoFlush);
   conn1.reset();
   dispatcher_->run(Event::Dispatcher::RunType::Block);
