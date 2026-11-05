@@ -75,6 +75,10 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
       debug,
       "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
       fd_, connection_key_);
+  // A handle disposed without an explicit close(), for example a listener filter timeout or
+  // rejection, must still run the terminal cleanup so the parent drops the tunnel key and redials.
+  // close() is idempotent through its fd_ guard, so this is a no-op when close() already ran.
+  close();
   if (parent_ != nullptr) {
     parent_->unregisterChildIoHandle(*this);
   }

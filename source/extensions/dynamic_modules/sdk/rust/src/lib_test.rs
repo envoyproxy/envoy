@@ -239,6 +239,41 @@ fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
 }
 
 #[test]
+fn test_envoy_dynamic_module_on_http_filter_config_scheduled() {
+  // The hook receives the config object the event was scheduled on, so it can emit the metrics
+  // defined on it.
+  static SCHEDULED: std::sync::Mutex<Vec<(usize, u64)>> = std::sync::Mutex::new(Vec::new());
+  struct TestHttpFilterConfig;
+  impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for TestHttpFilterConfig {
+    fn on_scheduled(&self, envoy_config: &mut EnvoyHttpFilterConfigImpl, event_id: u64) {
+      SCHEDULED
+        .lock()
+        .unwrap()
+        .push((envoy_config.raw_ptr as usize, event_id));
+    }
+  }
+
+  let new_fn: NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl> =
+    |_, _, _| Some(Box::new(TestHttpFilterConfig));
+  let config_ptr = envoy_dynamic_module_on_http_filter_config_new_impl(
+    &mut EnvoyHttpFilterConfigImpl {
+      raw_ptr: std::ptr::null_mut(),
+    },
+    "test_name",
+    b"test_config",
+    &new_fn,
+  );
+  // Only handed on, never dereferenced.
+  let envoy_config_ptr = 0x1234 as abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr;
+
+  unsafe {
+    envoy_dynamic_module_on_http_filter_config_scheduled(envoy_config_ptr, config_ptr, 7);
+    envoy_dynamic_module_on_http_filter_config_destroy(config_ptr);
+  }
+  assert_eq!(*SCHEDULED.lock().unwrap(), vec![(0x1234, 7)]);
+}
+
+#[test]
 // This tests the round-trip of the envoy_dynamic_module_on_http_filter_new_impl and
 // envoy_dynamic_module_on_http_filter_destroy.
 fn test_envoy_dynamic_module_on_http_filter_new_destroy() {
@@ -2279,6 +2314,54 @@ const HTTP_UPSTREAM_REMOTE_ADDRESS: &[u8] = b"10.0.0.3:9443";
 const HTTP_UPSTREAM_HOSTS_ATTEMPTED: [&[u8]; 2] = [b"10.0.0.1:443", b"10.0.0.2:8443"];
 const HTTP_UPSTREAM_CONNECTION_IDS_ATTEMPTED: [u64; 3] = [10, 20, 30];
 
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE: usize = 4;
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL: usize = 5;
+const HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS: &[u8] = b"[2001:db8::40]:54321";
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+  filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  result: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  match filter_envoy_ptr as usize {
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE => {
+      unsafe {
+        *result = abi::envoy_dynamic_module_type_envoy_buffer {
+          ptr: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS.as_ptr() as *mut _,
+          length: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS.len(),
+        };
+      }
+      true
+    },
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL => true,
+    _ => false,
+  }
+}
+
+#[test]
+fn test_http_get_downstream_direct_remote_address() {
+  let filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_AVAILABLE as *mut _,
+  };
+  assert_eq!(
+    filter
+      .get_downstream_direct_remote_address()
+      .unwrap()
+      .as_slice(),
+    HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS
+  );
+}
+
+#[test]
+fn test_http_get_downstream_direct_remote_address_unavailable() {
+  for raw_ptr in [0, HTTP_DOWNSTREAM_DIRECT_REMOTE_ADDRESS_NULL] {
+    let filter = http::EnvoyHttpFilterImpl {
+      raw_ptr: raw_ptr as *mut _,
+    };
+    assert!(filter.get_downstream_direct_remote_address().is_none());
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_http_get_upstream_remote_address(
   filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
@@ -3182,6 +3265,15 @@ fn test_bootstrap_iterate_counters_continue_and_stop() {
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_get_active_resource_names(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _kind: abi::envoy_dynamic_module_type_bootstrap_active_resource_kind,
+  _name_fn: abi::envoy_dynamic_module_type_bootstrap_active_resource_name_fn,
+  _user_data: *mut std::os::raw::c_void,
+) {
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_config_define_counter(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   _name: abi::envoy_dynamic_module_type_module_buffer,
@@ -3366,6 +3458,45 @@ pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_liste
   _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
 ) -> bool {
   false
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_run_on_all_workers(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  event_id: u64,
+) -> bool {
+  event_id == 7
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_enable_cluster_writer(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+) -> bool {
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+  cluster: abi::envoy_dynamic_module_type_module_buffer,
+  version_info: abi::envoy_dynamic_module_type_module_buffer,
+  update_id_out: *mut u64,
+) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result {
+  // Reports the argument lengths through the update ID so that the test can check them.
+  unsafe {
+    *update_id_out =
+      (cluster_name.length * 10000 + cluster.length * 100 + version_info.length) as u64;
+  }
+  abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_remove(
+  _extension_config_envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
+  _cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result {
+  abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
 }
 
 // =============================================================================
@@ -4303,6 +4434,963 @@ fn test_cert_validator_update_digest() {
 }
 
 // =============================================================================
+// TLS Certificate Selector callback stubs.
+// =============================================================================
+
+// A null selection context stands for a handshake without any of the requested state.
+fn tls_certificate_selector_stub_result(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  value: &'static [u8],
+  result_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  if context_envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe {
+    *result_out = abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: value.as_ptr() as *const _,
+      length: value.len(),
+    };
+  }
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_get_requested_server_name(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  result_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  tls_certificate_selector_stub_result(context_envoy_ptr, b"www.lyft.com", result_out)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_get_client_hello_extension(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  extension_type: u16,
+  result_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  extension_type == 16
+    && tls_certificate_selector_stub_result(context_envoy_ptr, b"\x00\x03\x02h2", result_out)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_get_filter_state(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+  key: abi::envoy_dynamic_module_type_module_buffer,
+  value_out: *mut abi::envoy_dynamic_module_type_envoy_buffer,
+) -> bool {
+  let key = unsafe { std::slice::from_raw_parts(key.ptr as *const u8, key.length) };
+  key == b"tenant" && tls_certificate_selector_stub_result(context_envoy_ptr, b"lyft", value_out)
+}
+
+thread_local! {
+  // The configuration callbacks received on this thread, so each test checks only its own calls.
+  static TLS_CERTIFICATE_SELECTOR_CONFIG_CALLS: std::cell::RefCell<Vec<String>> =
+    const { std::cell::RefCell::new(Vec::new()) };
+}
+
+// Stands for the Envoy side configuration, so the stubs can check that the SDK passes it on.
+fn tls_certificate_selector_envoy_config(
+) -> abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr {
+  static ENVOY_CONFIG: u8 = 0;
+  &ENVOY_CONFIG as *const u8 as *mut _
+}
+
+fn assert_tls_certificate_selector_envoy_config(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+) {
+  assert_eq!(config_envoy_ptr, tls_certificate_selector_envoy_config());
+}
+
+fn record_tls_certificate_selector_config_call(call: String) {
+  TLS_CERTIFICATE_SELECTOR_CONFIG_CALLS.with(|calls| calls.borrow_mut().push(call));
+}
+
+fn take_tls_certificate_selector_config_calls() -> Vec<String> {
+  TLS_CERTIFICATE_SELECTOR_CONFIG_CALLS.with(|calls| calls.take())
+}
+
+fn tls_certificate_selector_buffer_string(
+  buffer: abi::envoy_dynamic_module_type_module_buffer,
+) -> String {
+  String::from_utf8_lossy(unsafe {
+    crate::ffi_helpers::slice_from_raw_or_empty(buffer.ptr as *const u8, buffer.length)
+  })
+  .into_owned()
+}
+
+fn tls_certificate_selector_buffers_string(
+  buffers: *mut abi::envoy_dynamic_module_type_module_buffer,
+  length: usize,
+) -> String {
+  unsafe { crate::ffi_helpers::slice_from_raw_or_empty(buffers as *const _, length) }
+    .iter()
+    .map(|buffer| tls_certificate_selector_buffer_string(*buffer))
+    .collect::<Vec<_>>()
+    .join(",")
+}
+
+// Every metric gets the id 7, and a metric named "frozen" cannot be defined.
+fn define_tls_certificate_selector_metric(
+  kind: &str,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  id_out: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let name = tls_certificate_selector_buffer_string(name);
+  let labels = tls_certificate_selector_buffers_string(label_names, label_names_length);
+  record_tls_certificate_selector_config_call(format!("define_{kind} {name} [{labels}]"));
+  if name == "frozen" {
+    return abi::envoy_dynamic_module_type_metrics_result::Frozen;
+  }
+  unsafe { *id_out = 7 };
+  abi::envoy_dynamic_module_type_metrics_result::Success
+}
+
+fn record_tls_certificate_selector_metric(
+  callback: &str,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  let labels = tls_certificate_selector_buffers_string(label_values, label_values_length);
+  record_tls_certificate_selector_config_call(format!("{callback} {id} [{labels}] {value}"));
+  if id == 7 {
+    abi::envoy_dynamic_module_type_metrics_result::Success
+  } else {
+    abi::envoy_dynamic_module_type_metrics_result::MetricNotFound
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_define_counter(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  counter_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  define_tls_certificate_selector_metric(
+    "counter",
+    name,
+    label_names,
+    label_names_length,
+    counter_id_ptr,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_increment_counter(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "increment_counter",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_define_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  gauge_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  define_tls_certificate_selector_metric(
+    "gauge",
+    name,
+    label_names,
+    label_names_length,
+    gauge_id_ptr,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_set_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric("set_gauge", id, label_values, label_values_length, value)
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_increment_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "increment_gauge",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_decrement_gauge(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "decrement_gauge",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_define_histogram(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  label_names: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_names_length: usize,
+  histogram_id_ptr: *mut usize,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  define_tls_certificate_selector_metric(
+    "histogram",
+    name,
+    label_names,
+    label_names_length,
+    histogram_id_ptr,
+  )
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_record_histogram_value(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  id: usize,
+  label_values: *mut abi::envoy_dynamic_module_type_module_buffer,
+  label_values_length: usize,
+  value: u64,
+) -> abi::envoy_dynamic_module_type_metrics_result {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_metric(
+    "record_histogram_value",
+    id,
+    label_values,
+    label_values_length,
+    value,
+  )
+}
+
+// A certificate named "invalid" is rejected.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_set_certificate(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+  certificate_chain: abi::envoy_dynamic_module_type_module_buffer,
+  private_key: abi::envoy_dynamic_module_type_module_buffer,
+  ocsp_staple: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  let name = tls_certificate_selector_buffer_string(name);
+  record_tls_certificate_selector_config_call(format!(
+    "set_certificate {name} {} {} {}",
+    tls_certificate_selector_buffer_string(certificate_chain),
+    tls_certificate_selector_buffer_string(private_key),
+    tls_certificate_selector_buffer_string(ocsp_staple)
+  ));
+  name != "invalid"
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_config_call(format!(
+    "remove_certificate {}",
+    tls_certificate_selector_buffer_string(name)
+  ));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+) {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_config_call("signal_init_complete".to_string());
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_new(
+  config_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_envoy_ptr,
+) -> abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr {
+  assert_tls_certificate_selector_envoy_config(config_envoy_ptr);
+  record_tls_certificate_selector_config_call("scheduler_new".to_string());
+  std::ptr::dangling_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_commit(
+  scheduler: abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr,
+  event_id: u64,
+) {
+  assert_eq!(scheduler, std::ptr::dangling_mut());
+  record_tls_certificate_selector_config_call(format!("scheduler_commit {event_id}"));
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_tls_certificate_selector_config_scheduler_delete(
+  scheduler: abi::envoy_dynamic_module_type_tls_certificate_selector_config_scheduler_module_ptr,
+) {
+  assert_eq!(scheduler, std::ptr::dangling_mut());
+  record_tls_certificate_selector_config_call("scheduler_delete".to_string());
+}
+
+// =============================================================================
+// TLS Certificate Selector tests.
+// =============================================================================
+
+fn select_with_tls_certificate_selector(
+  selection: tls_certificate_selector::TlsCertificateSelection,
+  context_envoy_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_context_envoy_ptr,
+) -> (
+  abi::envoy_dynamic_module_type_tls_certificate_selector_status,
+  usize,
+  Vec<u8>,
+) {
+  struct TestSelector {
+    selection: tls_certificate_selector::TlsCertificateSelection,
+  }
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      _context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      self.selection.clone()
+    }
+  }
+
+  let selector: Box<dyn tls_certificate_selector::TlsCertificateSelector> =
+    Box::new(TestSelector { selection });
+  let selector_ptr = wrap_into_c_void_ptr!(selector);
+  let mut certificate_index = 0;
+  let mut certificate_name = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let status = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_select(
+      selector_ptr,
+      context_envoy_ptr,
+      &mut certificate_index,
+      &mut certificate_name,
+    )
+  };
+  let name = unsafe {
+    crate::ffi_helpers::slice_from_raw_or_empty(
+      certificate_name.ptr as *const u8,
+      certificate_name.length,
+    )
+  }
+  .to_vec();
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+  (status, certificate_index, name)
+}
+
+fn request_tls_certificate(
+  config_ptr: abi::envoy_dynamic_module_type_tls_certificate_selector_config_module_ptr,
+  name: &[u8],
+) {
+  use tls_certificate_selector::*;
+  unsafe {
+    envoy_dynamic_module_on_tls_certificate_selector_config_certificate_requested(
+      tls_certificate_selector_envoy_config(),
+      config_ptr,
+      abi::envoy_dynamic_module_type_envoy_buffer {
+        ptr: name.as_ptr() as *const _,
+        length: name.len(),
+      },
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_config_new_and_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestConfig {
+    _envoy_config: std::sync::Arc<dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig>,
+  }
+  impl Drop for TestConfig {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+  }
+
+  let new_config_fn: NewTlsCertificateSelectorConfigFunction =
+    |name, config, is_upstream, envoy_config| {
+      assert_eq!(name, "selector");
+      assert_eq!(config, b"config");
+      assert_eq!(
+        envoy_config.define_counter_vec("selected", &["outcome"]),
+        Ok(EnvoyCounterVecId(1))
+      );
+      if is_upstream {
+        Some(Box::new(TestConfig {
+          _envoy_config: envoy_config,
+        }))
+      } else {
+        None
+      }
+    };
+  let envoy_config =
+    || -> std::sync::Arc<dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig> {
+      let mut mock_config = tls_certificate_selector::MockEnvoyTlsCertificateSelectorConfig::new();
+      mock_config
+        .expect_define_counter_vec()
+        .withf(|name, label_names| name == "selected" && label_names == ["outcome"])
+        .times(1)
+        .returning(|_, _| Ok(EnvoyCounterVecId(1)));
+      std::sync::Arc::new(mock_config)
+    };
+
+  let config_ptr = tls_certificate_selector::init_tls_certificate_selector_config(
+    "selector",
+    b"config",
+    false,
+    envoy_config(),
+    &new_config_fn,
+  );
+  assert!(config_ptr.is_null());
+
+  let config_ptr = tls_certificate_selector::init_tls_certificate_selector_config(
+    "selector",
+    b"config",
+    true,
+    envoy_config(),
+    &new_config_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
+#[test]
+fn test_tls_certificate_selector_new_and_destroy() {
+  static DROPPED: AtomicBool = AtomicBool::new(false);
+
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      assert_eq!(certificates, [b"certificate".as_slice(), b"".as_slice()]);
+      Some(Box::new(TestSelector))
+    }
+  }
+
+  struct TestSelector;
+  impl Drop for TestSelector {
+    fn drop(&mut self) {
+      DROPPED.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      _context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      tls_certificate_selector::TlsCertificateSelection::PassThrough
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  let certificate = b"certificate";
+  let certificates = [
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: certificate.as_ptr() as *const _,
+      length: certificate.len(),
+    },
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  ];
+  let selector_ptr = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_new(
+      config_ptr,
+      certificates.as_ptr(),
+      certificates.len(),
+    )
+  };
+  assert!(!selector_ptr.is_null());
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+  assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_selections() {
+  use tls_certificate_selector::TlsCertificateSelection;
+  let context_envoy_ptr = std::ptr::null_mut();
+
+  let (status, ..) =
+    select_with_tls_certificate_selector(TlsCertificateSelection::PassThrough, context_envoy_ptr);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::PassThrough
+  );
+
+  let (status, certificate_index, _) =
+    select_with_tls_certificate_selector(TlsCertificateSelection::Configured(1), context_envoy_ptr);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Configured
+  );
+  assert_eq!(certificate_index, 1);
+
+  // The name stays valid after the hook returns, since Envoy reads it then.
+  let (status, _, certificate_name) = select_with_tls_certificate_selector(
+    TlsCertificateSelection::Dynamic("dynamic.lyft.com".to_string()),
+    context_envoy_ptr,
+  );
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Dynamic
+  );
+  assert_eq!(certificate_name, b"dynamic.lyft.com");
+
+  let (status, ..) =
+    select_with_tls_certificate_selector(TlsCertificateSelection::Failed, context_envoy_ptr);
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Failed
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_context_reads_the_handshake() {
+  // Checks the state of the handshake, which is only available with a selection context.
+  struct TestSelector;
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      let Some(server_name) = context.get_requested_server_name() else {
+        assert!(context.get_client_hello_extension(16).is_none());
+        assert!(context.get_filter_state("tenant").is_none());
+        return tls_certificate_selector::TlsCertificateSelection::PassThrough;
+      };
+      assert_eq!(server_name.as_slice(), b"www.lyft.com");
+      assert_eq!(
+        context.get_client_hello_extension(16).unwrap().as_slice(),
+        b"\x00\x03\x02h2"
+      );
+      assert!(context.get_client_hello_extension(5).is_none());
+      assert_eq!(
+        context.get_filter_state("tenant").unwrap().as_slice(),
+        b"lyft"
+      );
+      assert!(context.get_filter_state("other").is_none());
+      tls_certificate_selector::TlsCertificateSelection::Configured(0)
+    }
+  }
+
+  let selector: Box<dyn tls_certificate_selector::TlsCertificateSelector> = Box::new(TestSelector);
+  let selector_ptr = wrap_into_c_void_ptr!(selector);
+  let mut context = 0u8;
+  for (context_envoy_ptr, expected_status) in [
+    (
+      &mut context as *mut u8 as *mut _,
+      abi::envoy_dynamic_module_type_tls_certificate_selector_status::Configured,
+    ),
+    (
+      std::ptr::null_mut(),
+      abi::envoy_dynamic_module_type_tls_certificate_selector_status::PassThrough,
+    ),
+  ] {
+    let mut certificate_index = 0;
+    let mut certificate_name = abi::envoy_dynamic_module_type_module_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    };
+    let status = unsafe {
+      tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_select(
+        selector_ptr,
+        context_envoy_ptr,
+        &mut certificate_index,
+        &mut certificate_name,
+      )
+    };
+    assert_eq!(status, expected_status);
+  }
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_new_failure() {
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      assert!(certificates.is_empty());
+      None
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  let selector_ptr = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_new(
+      config_ptr,
+      std::ptr::null(),
+      0,
+    )
+  };
+  assert!(selector_ptr.is_null());
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+}
+
+#[test]
+fn test_tls_certificate_selector_default_hooks() {
+  use tls_certificate_selector::TlsCertificateSelectorConfig;
+  struct TestConfig;
+  impl TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+  }
+
+  // By default a requested certificate is declined and a scheduled event does nothing.
+  let mut envoy_config = tls_certificate_selector::MockEnvoyTlsCertificateSelectorConfig::new();
+  envoy_config
+    .expect_remove_certificate()
+    .withf(|name| name == "dynamic.lyft.com")
+    .times(1)
+    .return_const(());
+  TestConfig.on_certificate_requested(&envoy_config, "dynamic.lyft.com");
+  TestConfig.on_scheduled(&envoy_config, 1);
+}
+
+#[test]
+fn test_tls_certificate_selector_hooks() {
+  static REQUESTED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+  static SCHEDULED: std::sync::Mutex<Vec<u64>> = std::sync::Mutex::new(Vec::new());
+
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+    fn on_certificate_requested(
+      &self,
+      envoy_config: &dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig,
+      name: &str,
+    ) {
+      REQUESTED.lock().unwrap().push(name.to_string());
+      assert!(envoy_config.set_certificate(name, b"chain", b"key", b""));
+    }
+    fn on_scheduled(
+      &self,
+      envoy_config: &dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig,
+      event_id: u64,
+    ) {
+      SCHEDULED.lock().unwrap().push(event_id);
+      envoy_config.remove_certificate("dynamic.lyft.com");
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  request_tls_certificate(config_ptr, b"dynamic.lyft.com");
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_scheduled(
+      tls_certificate_selector_envoy_config(),
+      config_ptr,
+      7,
+    );
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+  assert_eq!(*REQUESTED.lock().unwrap(), vec!["dynamic.lyft.com"]);
+  assert_eq!(*SCHEDULED.lock().unwrap(), vec![7]);
+  assert_eq!(
+    take_tls_certificate_selector_config_calls(),
+    vec![
+      "set_certificate dynamic.lyft.com chain key ",
+      "remove_certificate dynamic.lyft.com",
+    ]
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_certificate_requested_panic_declines_the_certificate() {
+  struct TestConfig;
+  impl tls_certificate_selector::TlsCertificateSelectorConfig for TestConfig {
+    fn new_selector(
+      &self,
+      _certificates: &[&[u8]],
+    ) -> Option<Box<dyn tls_certificate_selector::TlsCertificateSelector>> {
+      None
+    }
+    fn on_certificate_requested(
+      &self,
+      _envoy_config: &dyn tls_certificate_selector::EnvoyTlsCertificateSelectorConfig,
+      _name: &str,
+    ) {
+      panic!("requested panic");
+    }
+  }
+
+  let config: Box<dyn tls_certificate_selector::TlsCertificateSelectorConfig> =
+    Box::new(TestConfig);
+  let config_ptr = wrap_into_c_void_ptr!(config);
+  request_tls_certificate(config_ptr, b"dynamic.lyft.com");
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_config_destroy(
+      config_ptr,
+    );
+  }
+  assert_eq!(
+    take_tls_certificate_selector_config_calls(),
+    vec!["remove_certificate dynamic.lyft.com"]
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_envoy_config_calls_envoy() {
+  use tls_certificate_selector::{
+    EnvoyTlsCertificateSelectorConfig,
+    EnvoyTlsCertificateSelectorConfigScheduler,
+  };
+  let envoy_config = tls_certificate_selector::EnvoyTlsCertificateSelectorConfigImpl {
+    raw: tls_certificate_selector_envoy_config(),
+  };
+
+  assert_eq!(
+    envoy_config.define_counter("counter"),
+    Ok(EnvoyCounterId(7))
+  );
+  assert_eq!(
+    envoy_config.define_counter_vec("counter_vec", &["a", "b"]),
+    Ok(EnvoyCounterVecId(7))
+  );
+  assert_eq!(envoy_config.define_gauge("gauge"), Ok(EnvoyGaugeId(7)));
+  assert_eq!(
+    envoy_config.define_gauge_vec("gauge_vec", &["a"]),
+    Ok(EnvoyGaugeVecId(7))
+  );
+  assert_eq!(
+    envoy_config.define_histogram("histogram"),
+    Ok(EnvoyHistogramId(7))
+  );
+  assert_eq!(
+    envoy_config.define_histogram_vec("histogram_vec", &["a"]),
+    Ok(EnvoyHistogramVecId(7))
+  );
+  assert_eq!(
+    envoy_config.define_counter("frozen"),
+    Err(abi::envoy_dynamic_module_type_metrics_result::Frozen)
+  );
+  assert_eq!(envoy_config.increment_counter(EnvoyCounterId(7), 1), Ok(()));
+  assert_eq!(
+    envoy_config.increment_counter_vec(EnvoyCounterVecId(7), &["x", "y"], 2),
+    Ok(())
+  );
+  assert_eq!(envoy_config.set_gauge(EnvoyGaugeId(7), 3), Ok(()));
+  assert_eq!(
+    envoy_config.set_gauge_vec(EnvoyGaugeVecId(7), &["x"], 4),
+    Ok(())
+  );
+  assert_eq!(envoy_config.increase_gauge(EnvoyGaugeId(7), 5), Ok(()));
+  assert_eq!(
+    envoy_config.increase_gauge_vec(EnvoyGaugeVecId(7), &["x"], 6),
+    Ok(())
+  );
+  assert_eq!(envoy_config.decrease_gauge(EnvoyGaugeId(7), 7), Ok(()));
+  assert_eq!(
+    envoy_config.decrease_gauge_vec(EnvoyGaugeVecId(7), &["x"], 8),
+    Ok(())
+  );
+  assert_eq!(
+    envoy_config.record_histogram_value(EnvoyHistogramId(7), 9),
+    Ok(())
+  );
+  assert_eq!(
+    envoy_config.record_histogram_value_vec(EnvoyHistogramVecId(7), &["x"], 10),
+    Ok(())
+  );
+  assert_eq!(
+    envoy_config.increment_counter(EnvoyCounterId(8), 1),
+    Err(abi::envoy_dynamic_module_type_metrics_result::MetricNotFound)
+  );
+  assert!(envoy_config.set_certificate("dynamic.lyft.com", b"chain", b"key", b""));
+  assert!(!envoy_config.set_certificate("invalid", b"chain", b"key", b"ocsp"));
+  envoy_config.remove_certificate("dynamic.lyft.com");
+  envoy_config.signal_init_complete();
+  // A boxed scheduler is itself a scheduler, so generic module code can take it.
+  fn commit_event(scheduler: &impl EnvoyTlsCertificateSelectorConfigScheduler, event_id: u64) {
+    scheduler.commit(event_id);
+  }
+  let scheduler = envoy_config.new_scheduler();
+  commit_event(&scheduler, 42);
+  drop(scheduler);
+
+  assert_eq!(
+    take_tls_certificate_selector_config_calls(),
+    vec![
+      "define_counter counter []",
+      "define_counter counter_vec [a,b]",
+      "define_gauge gauge []",
+      "define_gauge gauge_vec [a]",
+      "define_histogram histogram []",
+      "define_histogram histogram_vec [a]",
+      "define_counter frozen []",
+      "increment_counter 7 [] 1",
+      "increment_counter 7 [x,y] 2",
+      "set_gauge 7 [] 3",
+      "set_gauge 7 [x] 4",
+      "increment_gauge 7 [] 5",
+      "increment_gauge 7 [x] 6",
+      "decrement_gauge 7 [] 7",
+      "decrement_gauge 7 [x] 8",
+      "record_histogram_value 7 [] 9",
+      "record_histogram_value 7 [x] 10",
+      "increment_counter 8 [] 1",
+      "set_certificate dynamic.lyft.com chain key ",
+      "set_certificate invalid chain key ocsp",
+      "remove_certificate dynamic.lyft.com",
+      "signal_init_complete",
+      "scheduler_new",
+      "scheduler_commit 42",
+      "scheduler_delete",
+    ]
+  );
+}
+
+#[test]
+fn test_tls_certificate_selector_scheduler_mock() {
+  // The scheduler is a trait so module authors can unit test their off-thread logic with a mock.
+  use crate::tls_certificate_selector::EnvoyTlsCertificateSelectorConfigScheduler;
+  let mut mock_scheduler =
+    tls_certificate_selector::MockEnvoyTlsCertificateSelectorConfigScheduler::new();
+  mock_scheduler
+    .expect_commit()
+    .with(mockall::predicate::eq(42u64))
+    .times(1)
+    .return_const(());
+  mock_scheduler.commit(42);
+}
+
+#[test]
+fn test_tls_certificate_selector_select_panic_fails_closed() {
+  struct TestSelector;
+  impl tls_certificate_selector::TlsCertificateSelector for TestSelector {
+    fn select(
+      &self,
+      _context: &tls_certificate_selector::TlsCertificateSelectionContext,
+    ) -> tls_certificate_selector::TlsCertificateSelection {
+      panic!("select panic");
+    }
+  }
+
+  let selector: Box<dyn tls_certificate_selector::TlsCertificateSelector> = Box::new(TestSelector);
+  let selector_ptr = wrap_into_c_void_ptr!(selector);
+  let mut certificate_index = 7;
+  let mut certificate_name = abi::envoy_dynamic_module_type_module_buffer {
+    ptr: std::ptr::null(),
+    length: 0,
+  };
+  let status = unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_select(
+      selector_ptr,
+      std::ptr::null_mut(),
+      &mut certificate_index,
+      &mut certificate_name,
+    )
+  };
+  assert_eq!(
+    status,
+    abi::envoy_dynamic_module_type_tls_certificate_selector_status::Failed
+  );
+  assert_eq!(certificate_index, 7);
+  unsafe {
+    tls_certificate_selector::envoy_dynamic_module_on_tls_certificate_selector_destroy(
+      selector_ptr,
+    );
+  }
+}
+
+// =============================================================================
 // Load Balancer Metrics Tests
 // =============================================================================
 
@@ -4712,6 +5800,25 @@ pub extern "C" fn envoy_dynamic_module_callback_http_filter_reset_stream(
   RESET_STREAM_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
 }
 
+static DRAIN_CONNECTION_UPON_COMPLETION_CALLED: AtomicBool = AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_drain_connection_upon_completion(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+) {
+  DRAIN_CONNECTION_UPON_COMPLETION_CALLED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[test]
+fn test_http_drain_connection_upon_completion() {
+  DRAIN_CONNECTION_UPON_COMPLETION_CALLED.store(false, std::sync::atomic::Ordering::SeqCst);
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  envoy_filter.drain_connection_upon_completion();
+  assert!(DRAIN_CONNECTION_UPON_COMPLETION_CALLED.load(std::sync::atomic::Ordering::SeqCst));
+}
+
 // Single-slot store backing the filter state object FFI stubs below.
 static FILTER_STATE_OBJECT: std::sync::atomic::AtomicPtr<std::ffi::c_void> =
   std::sync::atomic::AtomicPtr::new(std::ptr::null_mut());
@@ -4774,6 +5881,55 @@ fn test_http_filter_state_object_round_trip() {
   // once with no double free.
   destructor(recovered.unwrap());
   assert_eq!(DROPPED.load(Ordering::SeqCst), 1);
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_set_filter_state_value(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+  _value: abi::envoy_dynamic_module_type_module_buffer,
+  _life_span: abi::envoy_dynamic_module_type_filter_state_life_span,
+  _stream_sharing: abi::envoy_dynamic_module_type_filter_state_stream_sharing,
+) -> bool {
+  true
+}
+
+#[test]
+fn test_http_set_filter_state_value() {
+  let mut envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+  assert!(envoy_filter.set_filter_state_value(
+    b"key",
+    b"value",
+    abi::envoy_dynamic_module_type_filter_state_life_span::Request,
+    abi::envoy_dynamic_module_type_filter_state_stream_sharing::SharedWithUpstreamConnection,
+  ));
+}
+
+// Single-slot store backing the has_filter_state FFI stub below.
+static HAS_FILTER_STATE_RESULT: std::sync::atomic::AtomicBool =
+  std::sync::atomic::AtomicBool::new(false);
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_http_has_filter_state(
+  _filter_envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  _key: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  HAS_FILTER_STATE_RESULT.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[test]
+fn test_http_has_filter_state() {
+  let envoy_filter = http::EnvoyHttpFilterImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
+  HAS_FILTER_STATE_RESULT.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(!envoy_filter.has_filter_state(b"key"));
+
+  HAS_FILTER_STATE_RESULT.store(true, std::sync::atomic::Ordering::SeqCst);
+  assert!(envoy_filter.has_filter_state(b"key"));
 }
 
 // =========================================================================
@@ -5252,7 +6408,7 @@ fn write_mock_cluster_host_ptrs(
   result_host_ptrs: *mut abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
   count: usize,
 ) {
-  for index in 0..count {
+  for index in 0 .. count {
     unsafe {
       result_host_ptrs
         .add(index)
@@ -5319,6 +6475,19 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_pre_init_complete(
 }
 
 #[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_use_persistent_host_map(
+  _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
+) {
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_config_use_persistent_host_partitions(
+  cluster_config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
+) -> bool {
+  !cluster_config_envoy_ptr.is_null()
+}
+
+#[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_cluster_update_host_health(
   _cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   _host_envoy_ptr: abi::envoy_dynamic_module_type_cluster_host_envoy_ptr,
@@ -5379,6 +6548,47 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_hos
   _result: *mut abi::envoy_dynamic_module_type_packed_address,
 ) -> bool {
   false
+}
+
+/// Reports two health-changed hosts for a null load balancer and an unknown count otherwise, so the
+/// real wrapper's `Some` and `None` arms are both reachable.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host_count(
+  lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  result: *mut usize,
+) -> bool {
+  if !lb_envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe {
+    *result = 2;
+  }
+  true
+}
+
+/// Index 0 is a degraded host at priority 1, index 1 a healthy host at priority 0, and any other
+/// index is out of bounds.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_get_member_update_health_changed_host(
+  _lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
+  index: usize,
+  priority: *mut u32,
+  health: *mut abi::envoy_dynamic_module_type_host_health,
+) -> abi::envoy_dynamic_module_type_cluster_host_envoy_ptr {
+  let (host, host_priority, host_health) = match index {
+    0 => (
+      0xAB,
+      1,
+      abi::envoy_dynamic_module_type_host_health::Degraded,
+    ),
+    1 => (0xCD, 0, abi::envoy_dynamic_module_type_host_health::Healthy),
+    _ => return std::ptr::null_mut(),
+  };
+  unsafe {
+    *priority = host_priority;
+    *health = host_health;
+  }
+  host as abi::envoy_dynamic_module_type_cluster_host_envoy_ptr
 }
 
 #[no_mangle]
@@ -5502,7 +6712,7 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_m
 ) -> bool {
   let mut recorded = MOCK_CLUSTER_LB_CONTEXT_METADATA_BATCH.lock().unwrap();
   recorded.clear();
-  for i in 0..entries_size {
+  for i in 0 .. entries_size {
     let entry = unsafe { &*entries.add(i) };
     let key = unsafe { std::slice::from_raw_parts(entry.key_ptr as *const u8, entry.key_length) };
     let value =
@@ -5512,6 +6722,48 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_m
       String::from_utf8_lossy(value).into_owned(),
     ));
   }
+  true
+}
+
+// Records the setter, context, namespace and buffer of each serialized metadata call so a test can
+// assert the wrappers forward them unchanged.
+pub(crate) static MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA: std::sync::Mutex<
+  Vec<(&'static str, usize, String, Vec<u8>)>,
+> = std::sync::Mutex::new(Vec::new());
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_metadata_struct(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_struct: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+    .lock()
+    .unwrap()
+    .push((
+      "struct",
+      context_envoy_ptr as usize,
+      unsafe { stub_specifier_string(ns) },
+      unsafe { stub_specifier_bytes(serialized_struct) },
+    ));
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_cluster_lb_context_set_dynamic_typed_metadata(
+  context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
+  ns: abi::envoy_dynamic_module_type_module_buffer,
+  serialized_any: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  MOCK_CLUSTER_LB_CONTEXT_SERIALIZED_METADATA
+    .lock()
+    .unwrap()
+    .push((
+      "typed",
+      context_envoy_ptr as usize,
+      unsafe { stub_specifier_string(ns) },
+      unsafe { stub_specifier_bytes(serialized_any) },
+    ));
   true
 }
 
@@ -7215,6 +8467,206 @@ fn test_bootstrap_extension_cluster_lifecycle_default_noop() {
   unsafe {
     envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
   }
+}
+
+#[test]
+fn test_bootstrap_extension_worker_and_cluster_writer_default_noop() {
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  let cluster_name = "test_cluster";
+  let cluster_name_buf = abi::envoy_dynamic_module_type_envoy_buffer {
+    ptr: cluster_name.as_ptr() as *const _,
+    length: cluster_name.len(),
+  };
+
+  // Calling the worker and cluster writer hooks with default implementations should not panic.
+  envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 1);
+  envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+  );
+  envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    1,
+    cluster_name_buf,
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Active,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: std::ptr::null(),
+      length: 0,
+    },
+  );
+
+  // Clean up.
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_worker_event_and_cluster_writer_hooks() {
+  use std::sync::atomic::{AtomicU64, Ordering};
+  static WORKER_EVENT_ID: AtomicU64 = AtomicU64::new(0);
+  static DONE_EVENT_ID: AtomicU64 = AtomicU64::new(0);
+  type UpdateDone = (
+    u64,
+    String,
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+    String,
+  );
+  static UPDATE_DONE: std::sync::Mutex<Option<UpdateDone>> = std::sync::Mutex::new(None);
+
+  struct TestBootstrapExtensionConfig;
+  impl BootstrapExtensionConfig for TestBootstrapExtensionConfig {
+    fn new_bootstrap_extension(
+      &self,
+      _envoy_extension: &mut dyn EnvoyBootstrapExtension,
+    ) -> Box<dyn BootstrapExtension> {
+      Box::new(TestBootstrapExtension)
+    }
+
+    fn on_worker_event(
+      &self,
+      _envoy_extension_config: &dyn EnvoyBootstrapExtensionConfig,
+      event_id: u64,
+    ) {
+      WORKER_EVENT_ID.store(event_id, Ordering::SeqCst);
+    }
+
+    fn on_run_on_all_workers_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      event_id: u64,
+    ) {
+      DONE_EVENT_ID.store(event_id, Ordering::SeqCst);
+    }
+
+    fn on_cluster_writer_update_done(
+      &self,
+      _envoy_extension_config: &mut dyn EnvoyBootstrapExtensionConfig,
+      update_id: u64,
+      cluster_name: &str,
+      status: abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status,
+      error_details: &str,
+    ) {
+      *UPDATE_DONE.lock().unwrap() = Some((
+        update_id,
+        cluster_name.to_string(),
+        status,
+        error_details.to_string(),
+      ));
+    }
+  }
+
+  struct TestBootstrapExtension;
+  impl BootstrapExtension for TestBootstrapExtension {}
+
+  fn new_config(
+    _envoy_config: &mut dyn EnvoyBootstrapExtensionConfig,
+    _name: &str,
+    _config: &[u8],
+  ) -> Option<Box<dyn BootstrapExtensionConfig>> {
+    Some(Box::new(TestBootstrapExtensionConfig))
+  }
+
+  let mut envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  let config_ptr = bootstrap::init_bootstrap_extension_config(
+    &mut envoy_config,
+    "test",
+    b"config",
+    &(new_config as NewBootstrapExtensionConfigFunction),
+  );
+  assert!(!config_ptr.is_null());
+
+  envoy_dynamic_module_on_bootstrap_extension_worker_event(std::ptr::null_mut(), config_ptr, 3);
+  assert_eq!(WORKER_EVENT_ID.load(Ordering::SeqCst), 3);
+
+  envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    4,
+  );
+  assert_eq!(DONE_EVENT_ID.load(Ordering::SeqCst), 4);
+
+  let cluster_name = "writer.a";
+  let error_details = "invalid cluster";
+  envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done(
+    std::ptr::null_mut(),
+    config_ptr,
+    5,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: cluster_name.as_ptr() as *const _,
+      length: cluster_name.len(),
+    },
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Failed,
+    abi::envoy_dynamic_module_type_envoy_buffer {
+      ptr: error_details.as_ptr() as *const _,
+      length: error_details.len(),
+    },
+  );
+  assert_eq!(
+    *UPDATE_DONE.lock().unwrap(),
+    Some((
+      5,
+      "writer.a".to_string(),
+      abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_status::Failed,
+      "invalid cluster".to_string(),
+    ))
+  );
+
+  unsafe {
+    envoy_dynamic_module_on_bootstrap_extension_config_destroy(config_ptr);
+  }
+}
+
+#[test]
+fn test_bootstrap_extension_config_run_on_all_workers_and_cluster_writer() {
+  let envoy_config = bootstrap::EnvoyBootstrapExtensionConfigImpl::new(std::ptr::null_mut());
+  assert!(envoy_config.run_on_all_workers(7));
+  assert!(!envoy_config.run_on_all_workers(8));
+  assert!(envoy_config.enable_cluster_writer());
+
+  // The stub encodes the lengths of the name, the cluster and the version in the update ID.
+  assert_eq!(
+    envoy_config.cluster_writer_add_or_update("writer.a", b"xyz", "v1"),
+    (
+      abi::envoy_dynamic_module_type_bootstrap_cluster_writer_update_result::Success,
+      80302
+    )
+  );
+  assert_eq!(
+    envoy_config.cluster_writer_remove("writer.a"),
+    abi::envoy_dynamic_module_type_bootstrap_cluster_writer_removal_result::NotFound
+  );
 }
 
 #[test]
@@ -9081,7 +10533,7 @@ fn test_envoy_dynamic_module_on_stat_sink_flush_reads_snapshot() {
     fn on_flush(&self, snapshot: &stats_sink::MetricSnapshot<'_>) {
       let mut seen = SEEN_COUNTERS.lock().unwrap();
       let mut name = Vec::new();
-      for index in 0..snapshot.counter_count() {
+      for index in 0 .. snapshot.counter_count() {
         if let Some(counter) = snapshot.counter(index, &mut name) {
           seen.push((
             String::from_utf8_lossy(&name).into_owned(),
@@ -9512,6 +10964,11 @@ fn test_transport_socket_io_result_conversions() {
   assert_eq!(close.bytes_processed, 3);
   assert!(!close.end_stream_read);
 
+  let reset = IoResult::reset(5);
+  assert_eq!(reset.action, PostIoAction::Reset);
+  assert_eq!(reset.bytes_processed, 5);
+  assert!(!reset.end_stream_read);
+
   // Round-trip through the ABI representation in both directions.
   let abi_result: abi::envoy_dynamic_module_type_transport_socket_io_result = keep.into();
   assert_eq!(abi_result.bytes_processed, 7);
@@ -9521,7 +10978,11 @@ fn test_transport_socket_io_result_conversions() {
 
 #[test]
 fn test_transport_socket_post_io_action_conversions() {
-  for action in [PostIoAction::KeepOpen, PostIoAction::Close] {
+  for action in [
+    PostIoAction::KeepOpen,
+    PostIoAction::Close,
+    PostIoAction::Reset,
+  ] {
     let abi_action: abi::envoy_dynamic_module_type_transport_socket_post_io_action = action.into();
     assert_eq!(PostIoAction::from(abi_action), action);
   }
@@ -9714,7 +11175,7 @@ fn test_mock_envoy_transport_socket_do_read() {
       let mut buffer = [0u8; 8];
       let (status, n) = envoy.io_read(&mut buffer);
       assert_eq!(status, IoStatus::Success);
-      envoy.read_buffer_add(&buffer[..n]);
+      envoy.read_buffer_add(&buffer[.. n]);
       IoResult::keep_open(n, false)
     }
     fn on_do_write(
@@ -9753,7 +11214,7 @@ fn test_mock_envoy_transport_socket_do_read() {
 
   let mut mock = transport_socket::MockEnvoyTransportSocket::new();
   mock.expect_io_read().times(1).returning(|buffer| {
-    buffer[..5].copy_from_slice(b"hello");
+    buffer[.. 5].copy_from_slice(b"hello");
     (IoStatus::Success, 5)
   });
   mock
@@ -10083,6 +11544,126 @@ fn test_mock_envoy_transport_socket_fd_and_write_rearm() {
     socket.on_do_write(&mut mock, false),
     IoResult::keep_open(0, false)
   );
+}
+
+// =============================================================================
+// Transport Socket Relay FFI stubs and tests.
+// =============================================================================
+
+const STUB_TRANSPORT_SOCKET_CONNECTION_ID: u64 = 41;
+const STUB_TRANSPORT_SOCKET_UPSTREAM_CONNECTION_ID: u64 = 42;
+const STUB_TRANSPORT_SOCKET_BYTES_WRITTEN: usize = 4;
+
+// Single-slot store backing the add_wire_bytes FFI stub below.
+static STUB_TRANSPORT_SOCKET_WIRE_BYTES: std::sync::Mutex<(u64, u64)> =
+  std::sync::Mutex::new((0, 0));
+
+// A null pointer stands in for a transport socket whose callbacks are unavailable.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_io_read_to_read_buffer(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  max_length: usize,
+  bytes_read: *mut usize,
+) -> abi::envoy_dynamic_module_type_transport_socket_io_status {
+  if envoy_ptr.is_null() {
+    return abi::envoy_dynamic_module_type_transport_socket_io_status::Error;
+  }
+  unsafe { *bytes_read = max_length };
+  abi::envoy_dynamic_module_type_transport_socket_io_status::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_io_write_from_write_buffer(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  bytes_written: *mut usize,
+) -> abi::envoy_dynamic_module_type_transport_socket_io_status {
+  if envoy_ptr.is_null() {
+    return abi::envoy_dynamic_module_type_transport_socket_io_status::Error;
+  }
+  unsafe { *bytes_written = STUB_TRANSPORT_SOCKET_BYTES_WRITTEN };
+  abi::envoy_dynamic_module_type_transport_socket_io_status::Success
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_get_connection_id(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  connection_id_out: *mut u64,
+) -> bool {
+  if envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe { *connection_id_out = STUB_TRANSPORT_SOCKET_CONNECTION_ID };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_get_upstream_connection_id(
+  envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  connection_id_out: *mut u64,
+) -> bool {
+  if envoy_ptr.is_null() {
+    return false;
+  }
+  unsafe { *connection_id_out = STUB_TRANSPORT_SOCKET_UPSTREAM_CONNECTION_ID };
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_transport_socket_add_wire_bytes(
+  _envoy_ptr: abi::envoy_dynamic_module_type_transport_socket_envoy_ptr,
+  bytes_received: u64,
+  bytes_sent: u64,
+) {
+  *STUB_TRANSPORT_SOCKET_WIRE_BYTES.lock().unwrap() = (bytes_received, bytes_sent);
+}
+
+// Any non-null pointer works because the stubs never dereference it.
+fn stub_transport_socket_envoy_ptr() -> abi::envoy_dynamic_module_type_transport_socket_envoy_ptr {
+  1 as abi::envoy_dynamic_module_type_transport_socket_envoy_ptr
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_envoy_ptr_round_trips() {
+  let raw = stub_transport_socket_envoy_ptr();
+  assert_eq!(EnvoyTransportSocketImpl::new(raw).envoy_ptr(), raw);
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_buffer_io() {
+  let envoy = EnvoyTransportSocketImpl::new(stub_transport_socket_envoy_ptr());
+  assert_eq!(envoy.io_read_to_read_buffer(3), (IoStatus::Success, 3));
+  assert_eq!(
+    envoy.io_write_from_write_buffer(),
+    (IoStatus::Success, STUB_TRANSPORT_SOCKET_BYTES_WRITTEN)
+  );
+
+  let unset = EnvoyTransportSocketImpl::new(std::ptr::null_mut());
+  assert_eq!(unset.io_read_to_read_buffer(3), (IoStatus::Error, 0));
+  assert_eq!(unset.io_write_from_write_buffer(), (IoStatus::Error, 0));
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_connection_ids() {
+  let envoy = EnvoyTransportSocketImpl::new(stub_transport_socket_envoy_ptr());
+  assert_eq!(
+    envoy.get_connection_id(),
+    Some(STUB_TRANSPORT_SOCKET_CONNECTION_ID)
+  );
+  assert_eq!(
+    envoy.get_upstream_connection_id(),
+    Some(STUB_TRANSPORT_SOCKET_UPSTREAM_CONNECTION_ID)
+  );
+
+  let unset = EnvoyTransportSocketImpl::new(std::ptr::null_mut());
+  assert_eq!(unset.get_connection_id(), None);
+  assert_eq!(unset.get_upstream_connection_id(), None);
+}
+
+#[test]
+fn test_envoy_transport_socket_impl_add_wire_bytes() {
+  let envoy = EnvoyTransportSocketImpl::new(stub_transport_socket_envoy_ptr());
+  envoy.add_wire_bytes(5, 7);
+  assert_eq!(*STUB_TRANSPORT_SOCKET_WIRE_BYTES.lock().unwrap(), (5, 7));
 }
 
 // =============================================================================
@@ -10511,7 +12092,7 @@ pub extern "C" fn envoy_dynamic_module_callback_cluster_specifier_set_cluster_no
   _context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_specifier_context_envoy_ptr,
   status_code: u32,
 ) -> bool {
-  if !(200..600).contains(&status_code) {
+  if !(200 .. 600).contains(&status_code) {
     return false;
   }
   STUB_SPECIFIER_SELECTION
@@ -11269,11 +12850,13 @@ const STUB_ROUTE_HEADERS: [(&[u8], &[u8]); 2] = [(b":path", b"/index"), (b"env",
 const STUB_ROUTE_VALUE: &str = "route-value";
 const STUB_ROUTE_RANDOM_VALUE: u64 = 0x1234;
 const STUB_ROUTE_TEMPLATE_ID: &str = "canary";
+const STUB_ROUTE_VIRTUAL_CLUSTER: &str = "rides";
 
 // Toggles that let a single test drive both the found and the not-found branch of a callback.
 static STUB_ROUTE_HEADERS_EMPTY: AtomicBool = AtomicBool::new(false);
 static STUB_ROUTE_FILL_SUCCEEDS: AtomicBool = AtomicBool::new(true);
 static STUB_ROUTE_STATE_PRESENT: AtomicBool = AtomicBool::new(true);
+static STUB_ROUTE_HAS_BUILT_ROUTE_CACHE: AtomicBool = AtomicBool::new(true);
 // When set, the bulk input route stub reports a direct response instead of a route entry.
 static STUB_ROUTE_DIRECT: AtomicBool = AtomicBool::new(false);
 
@@ -11281,7 +12864,7 @@ static STUB_ROUTE_DIRECT: AtomicBool = AtomicBool::new(false);
 #[derive(Default)]
 struct StubRouteDecision {
   template_id: Option<String>,
-  chain_status: Option<abi::envoy_dynamic_module_type_route_specifier_chain_status>,
+  decision: Option<abi::envoy_dynamic_module_type_route_specifier_decision>,
   cluster_name: Option<String>,
   timeout_ms: Option<u64>,
   idle_timeout_ms: Option<u64>,
@@ -11296,8 +12879,14 @@ struct StubRouteDecision {
   route_typed_metadata: Option<(String, Vec<u8>)>,
   filter_disabled: Option<(String, bool)>,
   path: Option<String>,
+  prefix_rewrite_rule: Option<(
+    abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+    String,
+    String,
+  )>,
   host: Option<String>,
   route_name: Option<String>,
+  virtual_cluster: Option<String>,
   request_headers: Vec<(
     String,
     String,
@@ -11315,7 +12904,7 @@ struct StubRouteDecision {
 static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
   std::sync::Mutex::new(StubRouteDecision {
     template_id: None,
-    chain_status: None,
+    decision: None,
     cluster_name: None,
     timeout_ms: None,
     idle_timeout_ms: None,
@@ -11330,8 +12919,10 @@ static STUB_ROUTE_DECISION: std::sync::Mutex<StubRouteDecision> =
     route_typed_metadata: None,
     filter_disabled: None,
     path: None,
+    prefix_rewrite_rule: None,
     host: None,
     route_name: None,
+    virtual_cluster: None,
     request_headers: Vec::new(),
     removed_request_headers: Vec::new(),
     response_headers: Vec::new(),
@@ -11403,6 +12994,13 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_get_speci
       length: 0,
     };
   }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_config_has_built_route_cache(
+  _config_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_config_envoy_ptr,
+) -> bool {
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[no_mangle]
@@ -11853,11 +13451,25 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_templa
 }
 
 #[no_mangle]
-pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_chain_status(
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_unset_route_template(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
-  status: abi::envoy_dynamic_module_type_route_specifier_chain_status,
+  template_id: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let template_id = unsafe { stub_specifier_string(template_id) };
+  let mut decision = STUB_ROUTE_DECISION.lock().unwrap();
+  if decision.template_id.as_deref() != Some(template_id.as_str()) {
+    return false;
+  }
+  decision.template_id = None;
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_decision(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  decision: abi::envoy_dynamic_module_type_route_specifier_decision,
 ) {
-  STUB_ROUTE_DECISION.lock().unwrap().chain_status = Some(status);
+  STUB_ROUTE_DECISION.lock().unwrap().decision = Some(decision);
 }
 
 #[no_mangle]
@@ -11918,7 +13530,7 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_cluster_not_
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
   status_code: u32,
 ) -> bool {
-  if !(200..600).contains(&status_code) {
+  if !(200 .. 600).contains(&status_code) {
     return false;
   }
   STUB_ROUTE_DECISION
@@ -11938,6 +13550,20 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_overri
     return false;
   }
   STUB_ROUTE_DECISION.lock().unwrap().route_override = Some(name);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_unset_route_override(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let name = unsafe { stub_specifier_string(name) };
+  let mut decision = STUB_ROUTE_DECISION.lock().unwrap();
+  if decision.route_override.as_deref() != Some(name.as_str()) {
+    return false;
+  }
+  decision.route_override = None;
   true
 }
 
@@ -12021,6 +13647,36 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_path(
   true
 }
 
+// Maps each key onto a result, so a test can observe every arm of the SDK conversion.
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_lookup_built_route(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  key: u64,
+) -> abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result {
+  match key {
+    1 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Miss,
+    2 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Hit,
+    3 => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::HitVerify,
+    _ => abi::envoy_dynamic_module_type_route_specifier_built_route_lookup_result::Disabled,
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_prefix_rewrite_rule(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  span: abi::envoy_dynamic_module_type_route_specifier_rewrite_span,
+  matched: abi::envoy_dynamic_module_type_module_buffer,
+  replacement: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let replacement = unsafe { stub_specifier_string(replacement) };
+  if replacement.is_empty() {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().prefix_rewrite_rule =
+    Some((span, unsafe { stub_specifier_string(matched) }, replacement));
+  true
+}
+
 #[no_mangle]
 pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_host(
   _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
@@ -12044,6 +13700,19 @@ pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_route_name(
     return false;
   }
   STUB_ROUTE_DECISION.lock().unwrap().route_name = Some(route_name);
+  true
+}
+
+#[no_mangle]
+pub extern "C" fn envoy_dynamic_module_callback_route_specifier_set_virtual_cluster(
+  _context_envoy_ptr: abi::envoy_dynamic_module_type_route_specifier_context_envoy_ptr,
+  virtual_cluster_name: abi::envoy_dynamic_module_type_module_buffer,
+) -> bool {
+  let virtual_cluster = unsafe { stub_specifier_string(virtual_cluster_name) };
+  if !virtual_cluster.is_empty() && virtual_cluster != STUB_ROUTE_VIRTUAL_CLUSTER {
+    return false;
+  }
+  STUB_ROUTE_DECISION.lock().unwrap().virtual_cluster = Some(virtual_cluster);
   true
 }
 
@@ -12126,8 +13795,8 @@ fn test_envoy_dynamic_module_on_route_specifier_config_new_impl() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
-      route_specifier::RouteDecision::PassThrough
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
     }
   }
 
@@ -12164,8 +13833,8 @@ fn test_envoy_dynamic_module_on_route_specifier_config_destroy() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
-      route_specifier::RouteDecision::PassThrough
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
     }
   }
   impl Drop for TestRouteSpecifierConfig {
@@ -12191,27 +13860,27 @@ fn test_envoy_dynamic_module_on_route_specifier_config_destroy() {
 #[test]
 fn test_envoy_dynamic_module_on_route_specifier_on_route() {
   // Drives the route hook through the FFI entry point so the boxed trait object, the context
-  // wrapper, and the returned decision are all exercised.
+  // wrapper, and the returned status are all exercised.
   static CONFIG_BYTES_SEEN: std::sync::Mutex<Vec<u8>> = std::sync::Mutex::new(Vec::new());
   static RANDOM_VALUE_SEEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
   struct TestRouteSpecifierConfig {
-    decision: route_specifier::RouteDecision,
+    status: route_specifier::OnRouteStatus,
   }
   impl route_specifier::RouteSpecifierConfig for TestRouteSpecifierConfig {
     fn on_route(
       &self,
       ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
+    ) -> route_specifier::OnRouteStatus {
       RANDOM_VALUE_SEEN.store(ctx.get_random_value(), std::sync::atomic::Ordering::SeqCst);
-      self.decision
+      self.status
     }
   }
 
   let new_fn: NewRouteSpecifierConfigFunction = |_, config, _| {
     CONFIG_BYTES_SEEN.lock().unwrap().extend_from_slice(config);
     Some(Box::new(TestRouteSpecifierConfig {
-      decision: route_specifier::RouteDecision::SelectTemplate,
+      status: route_specifier::OnRouteStatus::StopIteration,
     }))
   };
   let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
@@ -12226,15 +13895,15 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
     CONFIG_BYTES_SEEN.lock().unwrap().as_slice()
   );
 
-  let decision = unsafe {
+  let status = unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
       config_ptr,
       std::ptr::null_mut(),
     )
   };
   assert_eq!(
-    abi::envoy_dynamic_module_type_route_specifier_decision::SelectTemplate,
-    decision
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIteration,
+    status
   );
   assert_eq!(
     STUB_ROUTE_RANDOM_VALUE,
@@ -12244,10 +13913,10 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
 
-  // A config that reports no decision leaves the resolved route in place.
+  // A config that lets the chain carry on maps to the Continue status across the ABI.
   let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| {
     Some(Box::new(TestRouteSpecifierConfig {
-      decision: route_specifier::RouteDecision::PassThrough,
+      status: route_specifier::OnRouteStatus::Continue,
     }))
   };
   let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
@@ -12256,24 +13925,25 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
     b"",
     &new_fn,
   );
-  let decision = unsafe {
+  let status = unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
       config_ptr,
       std::ptr::null_mut(),
     )
   };
   assert_eq!(
-    abi::envoy_dynamic_module_type_route_specifier_decision::PassThrough,
-    decision
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue,
+    status
   );
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
 
-  // A config that asks matching to carry on maps to the ContinueMatching decision across the ABI.
+  // A config that asks matching to carry on maps to the StopIterationAndSkipRoute status across
+  // the ABI.
   let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| {
     Some(Box::new(TestRouteSpecifierConfig {
-      decision: route_specifier::RouteDecision::ContinueMatching,
+      status: route_specifier::OnRouteStatus::StopIterationAndSkipRoute,
     }))
   };
   let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
@@ -12282,19 +13952,66 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route() {
     b"",
     &new_fn,
   );
-  let decision = unsafe {
+  let status = unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
       config_ptr,
       std::ptr::null_mut(),
     )
   };
   assert_eq!(
-    abi::envoy_dynamic_module_type_route_specifier_decision::ContinueMatching,
-    decision
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::StopIterationAndSkipRoute,
+    status
   );
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
   }
+}
+
+#[test]
+fn test_envoy_dynamic_module_on_route_specifier_user_data_discard() {
+  // Drives the user data discard hook through the FFI entry point, so the boxed trait object gets
+  // the value Envoy hands back.
+  static DISCARDED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+  struct DiscardingConfig;
+  impl route_specifier::RouteSpecifierConfig for DiscardingConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_specifier::RouteSpecifierContext,
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
+    }
+    fn on_user_data_discard(&self, user_data: u64) {
+      DISCARDED.store(user_data, std::sync::atomic::Ordering::SeqCst);
+    }
+  }
+  struct DefaultConfig;
+  impl route_specifier::RouteSpecifierConfig for DefaultConfig {
+    fn on_route(
+      &self,
+      _ctx: &mut route_specifier::RouteSpecifierContext,
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
+    }
+  }
+
+  let new_fn: NewRouteSpecifierConfigFunction = |_, _, _| Some(Box::new(DiscardingConfig));
+  let config_ptr = route_specifier::envoy_dynamic_module_on_route_specifier_config_new_impl(
+    std::ptr::null_mut(),
+    "test_route_specifier",
+    b"",
+    &new_fn,
+  );
+  assert!(!config_ptr.is_null());
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_user_data_discard(config_ptr, 42);
+  }
+  assert_eq!(42, DISCARDED.load(std::sync::atomic::Ordering::SeqCst));
+  unsafe {
+    route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
+  }
+
+  // The default hook takes the value without panicking.
+  route_specifier::RouteSpecifierConfig::on_user_data_discard(&DefaultConfig, 7);
 }
 
 #[test]
@@ -12306,22 +14023,29 @@ fn test_envoy_dynamic_module_on_route_specifier_on_route_recovers_from_panic() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
+    ) -> route_specifier::OnRouteStatus {
       panic!("intentional panic in on_route");
     }
   }
 
+  STUB_ROUTE_DECISION.lock().unwrap().decision = None;
   let config: Box<dyn route_specifier::RouteSpecifierConfig> = Box::new(PanicConfig);
   let config_ptr = Box::into_raw(Box::new(config)) as *const std::ffi::c_void;
-  let decision = unsafe {
+  let status = unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_on_route(
       config_ptr,
       std::ptr::null_mut(),
     )
   };
+  // The panic records the Error decision, which Envoy resolves through the failure policy, so
+  // the returned status is not acted on.
   assert_eq!(
-    abi::envoy_dynamic_module_type_route_specifier_decision::Error,
-    decision
+    Some(abi::envoy_dynamic_module_type_route_specifier_decision::Error),
+    STUB_ROUTE_DECISION.lock().unwrap().decision
+  );
+  assert_eq!(
+    abi::envoy_dynamic_module_type_route_specifier_on_route_status::Continue,
+    status
   );
   unsafe {
     route_specifier::envoy_dynamic_module_on_route_specifier_config_destroy(config_ptr);
@@ -12573,7 +14297,12 @@ fn test_route_specifier_context_records_decision() {
 
   assert!(ctx.select_template(STUB_ROUTE_TEMPLATE_ID));
   assert!(!ctx.select_template("unknown"));
-  ctx.set_chain_status(route_specifier::ChainStatus::StopIteration);
+  // Unselecting the selected template reverts it; a second unselect has nothing to match. The
+  // final selection is what the assertions below observe.
+  assert!(ctx.unselect_template(STUB_ROUTE_TEMPLATE_ID));
+  assert!(!ctx.unselect_template(STUB_ROUTE_TEMPLATE_ID));
+  assert!(ctx.select_template(STUB_ROUTE_TEMPLATE_ID));
+  ctx.set_decision(route_specifier::RouteDecision::NoRoute);
   assert!(ctx.set_cluster_name("cluster_a"));
   ctx.set_timeout(std::time::Duration::from_millis(250));
   ctx.set_idle_timeout(std::time::Duration::from_millis(500));
@@ -12584,6 +14313,11 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_cluster_not_found_response_code(99));
   assert!(ctx.set_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!ctx.set_route_override("unknown"));
+  // Unsetting the selected override reverts it; a second unset has nothing to match. The final
+  // selection is what the assertions below observe.
+  assert!(ctx.unset_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  assert!(!ctx.unset_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
+  assert!(ctx.set_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   ctx.set_route_metadata_string("ns", "key", "value");
   ctx.set_route_metadata_number("ns", "num", 1.5);
   ctx.set_route_metadata_bool("ns", "flag", true);
@@ -12592,10 +14326,40 @@ fn test_route_specifier_context_records_decision() {
   assert!(!ctx.set_filter_disabled("", true));
   assert!(ctx.set_path("/rewritten"));
   assert!(!ctx.set_path("rewritten"));
+  for (key, result) in [
+    (0, route_specifier::BuiltRouteLookupResult::Disabled),
+    (1, route_specifier::BuiltRouteLookupResult::Miss),
+    (2, route_specifier::BuiltRouteLookupResult::Hit),
+    (3, route_specifier::BuiltRouteLookupResult::HitVerify),
+  ] {
+    assert_eq!(result, ctx.lookup_built_route(key));
+  }
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::WholePath, "", "/fixed"));
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::WholePath,
+      String::new(),
+      "/fixed".to_string()
+    )),
+    STUB_ROUTE_DECISION
+      .lock()
+      .unwrap()
+      .prefix_rewrite_rule
+      .clone()
+  );
+  assert!(!ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", ""));
+  assert!(ctx.set_prefix_rewrite_rule(route_specifier::RewriteSpan::Literal, "/api", "/internal"));
   assert!(ctx.set_host("example.com"));
   assert!(!ctx.set_host(""));
   assert!(ctx.set_route_name("module_route"));
   assert!(!ctx.set_route_name(""));
+  assert!(!ctx.set_virtual_cluster("unknown"));
+  assert!(ctx.set_virtual_cluster(""));
+  assert_eq!(
+    Some(String::new()),
+    STUB_ROUTE_DECISION.lock().unwrap().virtual_cluster.clone()
+  );
+  assert!(ctx.set_virtual_cluster(STUB_ROUTE_VIRTUAL_CLUSTER));
   assert!(ctx.add_request_header(
     "x-add",
     "value",
@@ -12627,8 +14391,8 @@ fn test_route_specifier_context_records_decision() {
     decision.template_id
   );
   assert_eq!(
-    Some(abi::envoy_dynamic_module_type_route_specifier_chain_status::StopIteration),
-    decision.chain_status
+    Some(abi::envoy_dynamic_module_type_route_specifier_decision::NoRoute),
+    decision.decision
   );
   assert_eq!(Some("cluster_a".to_string()), decision.cluster_name);
   assert_eq!(Some(250), decision.timeout_ms);
@@ -12662,8 +14426,20 @@ fn test_route_specifier_context_records_decision() {
   );
   assert_eq!(Some(("filter".to_string(), true)), decision.filter_disabled);
   assert_eq!(Some("/rewritten".to_string()), decision.path);
+  assert_eq!(
+    Some((
+      abi::envoy_dynamic_module_type_route_specifier_rewrite_span::Literal,
+      "/api".to_string(),
+      "/internal".to_string()
+    )),
+    decision.prefix_rewrite_rule
+  );
   assert_eq!(Some("example.com".to_string()), decision.host);
   assert_eq!(Some("module_route".to_string()), decision.route_name);
+  assert_eq!(
+    Some(STUB_ROUTE_VIRTUAL_CLUSTER.to_string()),
+    decision.virtual_cluster
+  );
   assert_eq!(
     vec![(
       "x-add".to_string(),
@@ -12703,8 +14479,8 @@ fn test_envoy_route_specifier_config_impl() {
     fn on_route(
       &self,
       _ctx: &mut route_specifier::RouteSpecifierContext,
-    ) -> route_specifier::RouteDecision {
-      route_specifier::RouteDecision::PassThrough
+    ) -> route_specifier::OnRouteStatus {
+      route_specifier::OnRouteStatus::Continue
     }
   }
 
@@ -12735,6 +14511,10 @@ fn test_envoy_route_specifier_config_impl() {
   );
   assert!(config.has_route_override(STUB_SPECIFIER_OVERRIDE_NAME));
   assert!(!config.has_route_override("unknown"));
+  assert!(config.has_built_route_cache());
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.store(false, std::sync::atomic::Ordering::SeqCst);
+  assert!(!config.has_built_route_cache());
+  STUB_ROUTE_HAS_BUILT_ROUTE_CACHE.store(true, std::sync::atomic::Ordering::SeqCst);
   assert!(config.register_route_template("built", &[1, 2, 3]));
   assert!(!config.register_route_template("", &[1, 2, 3]));
   assert!(!config.register_route_template("built", &[]));

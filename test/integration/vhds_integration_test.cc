@@ -441,6 +441,47 @@ public:
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
+
+  // vhost.first with a single route for /foo: VHDS resolves the host, but /bar matches no route.
+  envoy::config::route::v3::VirtualHost buildVirtualHostWithoutMatchingRoute() {
+    return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
+name: my_route/vhost_1
+domains: ["vhost.first"]
+routes:
+- match: { prefix: "/foo" }
+  route: { cluster: "my_service" }
+)EOF");
+  }
+
+  // Sends a header-only request for /bar on the unknown vhost.first, which VHDS resolves to a
+  // virtual host without a route for /bar, and expects a 404 without another VHDS request.
+  void runVhdsOnDemandNoMatchingRoute() {
+    initialize();
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/bar"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "vhost.first"},
+                                                   {"x-lyft-user-id", "123"}};
+    IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                             {vhdsRequestResourceName("vhost.first")}, {},
+                                             vhds_stream_.get()));
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHostWithoutMatchingRoute()}, {}, "2",
+        vhds_stream_.get(), {"my_route/vhost.first"});
+    // Only the ACK follows, no new request for vhost.first.
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
+                                             vhds_stream_.get()));
+
+    // Waiting for VHDS again would only end the request at the stream idle timeout.
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_EQ("404", response->headers().getStatusValue());
+    // The stream was neither recreated nor sent through add-header-filter again.
+    EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_total")->value());
+  }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, OnDemandVhdsRecreateStreamRegressionTest,
@@ -552,6 +593,22 @@ TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                            vhds_stream_.get()));
 
+  cleanupUpstreamAndDownstream();
+}
+
+// VHDS resolves the vhost, but none of its routes match the request: the request gets a 404
+// instead of waiting for VHDS again.
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest, VhdsOnDemandUpdateNoMatchingRouteReturns404) {
+  runVhdsOnDemandNoMatchingRoute();
+  cleanupUpstreamAndDownstream();
+}
+
+// Same as above with the legacy recreateStream() path.
+TEST_P(OnDemandVhdsRecreateStreamRegressionTest,
+       VhdsOnDemandUpdateNoMatchingRouteLegacyRecreateStreamReturns404) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.on_demand_vhds_no_recreate_stream",
+                                    "false");
+  runVhdsOnDemandNoMatchingRoute();
   cleanupUpstreamAndDownstream();
 }
 

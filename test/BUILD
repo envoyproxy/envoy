@@ -47,6 +47,7 @@ envoy_cc_test_library(
         "//bazel:cpp_runfiles",
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
+        "//source/common/coroutine:backtrace_lib",
         "//source/common/event:libevent_lib",
         "//source/exe:process_wide_lib",
         "//source/server:backtrace_lib",
@@ -68,7 +69,6 @@ envoy_cc_test_library(
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/runtime:runtime_features_lib",
-        "//test/test_common:global_lib",
     ],
 )
 

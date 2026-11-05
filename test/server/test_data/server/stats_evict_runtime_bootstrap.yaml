@@ -1,0 +1,21 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  locality:
+    zone: bootstrap_zone
+    sub_zone: bootstrap_sub_zone
+stats_sinks:
+- name: envoy.custom_stats_sink
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+runtime_stats_eviction_interval:
+  default_value: 10000
+  runtime_key: stats.eviction_interval_ms
+layered_runtime:
+  layers:
+  - name: static_layer
+    static_layer:
+      stats:
+        eviction_interval_ms: 10000
+  - name: admin
+    admin_layer: {}

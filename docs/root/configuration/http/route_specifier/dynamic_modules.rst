@@ -38,16 +38,22 @@ request the match accepts.
 Decisions
 ---------
 
-The module returns one of seven decisions:
+The module records one of five decisions with ``set_decision``:
 
-* ``PassThrough`` uses the route the specifier was given, unchanged.
-* ``Override`` uses that route with the properties the module recorded applied on top.
-* ``SelectTemplate`` uses the selected template, with the recorded properties applied on top.
+* ``Unspecified`` is the default, in effect when the module records no decision: Envoy generates
+  a new route based on what the setter callbacks recorded, from the selected template, or from
+  the route the specifier was given when no template was selected, with the recorded properties
+  applied on top. With nothing recorded it uses the route the specifier was given, unchanged.
+* ``PassThrough`` uses the route the specifier was given, unchanged, ignoring whatever the module
+  recorded.
 * ``NoRoute`` uses no route, so the request is handled as if nothing had matched.
 * ``Error`` reports that the module could not decide.
 * ``ReusePrevious`` uses the previous route of the stream unchanged, without building a new route.
-* ``ContinueMatching`` drops the route the specifier was given and lets route matching carry on with
-  the next route.
+
+The hook returns a status rather than the decision: ``Continue`` hands the produced route to the
+route specifiers configured after this one, ``StopIteration`` makes it the final route, and
+``StopIterationAndSkipRoute`` drops the route and lets route matching carry on with the next
+route, ignoring the recorded decision.
 
 A decision Envoy cannot honor is handled by the configured
 :ref:`failure_policy <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.failure_policy>`,
@@ -74,7 +80,13 @@ built is alive. ``set_route_user_data`` records a ``u64`` on the produced route,
 route to be wrapped even with no other override, and
 :ref:`on_route_specifier_route_destroy <arch_overview_dynamic_modules>` fires with that value when
 the route is destroyed. The hook may run on any thread and after the stream is gone, since another
-owner may retain the route, so a module must treat it as a lease release only. The
+owner may retain the route, so a module must treat it as a lease release only. A decision that
+builds no route to carry the value hands it instead to
+:ref:`on_route_specifier_user_data_discard <arch_overview_dynamic_modules>`,
+``on_user_data_discard`` in the Rust SDK. This happens for a decision other than ``Unspecified``, a
+skipped route, a decision Envoy cannot honor and a ``Hit`` from ``lookup_built_route``. The hook
+runs on the thread that resolves the route, before the specifier returns. With both hooks exported,
+a module gets back the last value it records for each decision. The
 :ref:`specifier_instance_id
 <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.specifier_instance_id>`
 lets two specifier instances sharing one module tell their routes apart.
@@ -85,8 +97,8 @@ Shadowing a routing change
 A module receives the route that route matching resolved through its context, so it can shadow a
 routing change on its own without any support from Envoy. In a dry run the module computes the route
 it would ask for, compares it against the resolved route, counts the outcome on its own metrics, and
-returns ``PassThrough`` so that routing stays unchanged. Once the counts give confidence, the same
-module returns ``Override`` or ``SelectTemplate`` to apply the decision. The
+records ``PassThrough`` so that routing stays unchanged. Once the counts give confidence, the same
+module records its overrides or selects its template to apply the decision. The
 ``route_specifier_shadow.rs`` test module under ``test/extensions/dynamic_modules/test_data/rust``
 shows both runs, comparing the cluster name.
 
@@ -96,10 +108,10 @@ Migrating routing to a module
 A module can take over the routing of a virtual host one step at a time, while the route table it
 replaces stays in place as a fallback. The pattern is a catch all route placed first in the route
 table, carrying the specifier at the route level. The catch all route matches every request, so the
-specifier runs first for each one. For a request the module owns it returns ``Override`` or
-``SelectTemplate``, and for a request the module leaves to the route table it returns
-``ContinueMatching``, which drops the catch all route and lets route matching carry on with the
-routes below it. Setting :ref:`failure_policy
+specifier runs first for each one. For a request the module owns it records its overrides or
+selects its template, and for a request the module leaves to the route table it returns the
+``StopIterationAndSkipRoute`` status, which drops the catch all route and lets route matching
+carry on with the routes below it. Setting :ref:`failure_policy
 <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.failure_policy>`
 to ``CONTINUE_MATCHING`` makes a module failure fall back to the route table as well, rather than to
 the catch all route's own action. When the module owns the whole virtual host, the routes below the
@@ -120,6 +132,125 @@ any route including a direct response or a redirect, unlike the retry policy and
 entry properties. Module selected route metadata can change authorization decisions, rate limiting
 descriptors and access log fields, so the override set is static configuration chosen by trusted in
 process code.
+
+Virtual clusters
+----------------
+
+A virtual host matches a request against its
+:ref:`virtual_clusters <envoy_v3_api_field_config.route.v3.VirtualHost.virtual_clusters>` in order,
+and the router counts the request in the
+:ref:`statistics <config_http_filters_router_vcluster_stats>` of the first one that matches. A
+module that knows which virtual cluster a request belongs to can select it with
+``set_virtual_cluster`` from the names that :ref:`virtual_cluster_override
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.virtual_cluster_override>`
+declares. The selected virtual cluster uses the statistics of the virtual cluster of the same name
+on the virtual host, so the statistics keep their names when the module takes over.
+
+When :ref:`prefer_selection
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterOverride.prefer_selection>`
+is ``true``, the router counts the request in the selected virtual cluster, which
+``%VIRTUAL_CLUSTER_NAME%`` reports, and with a chance of one in :ref:`verify_one_in
+<envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.VirtualClusterOverride.verify_one_in>`
+also compares it with the one the virtual host matches. Otherwise the router counts the request in
+the virtual cluster the virtual host matches and compares the two. A virtual host without virtual
+clusters leaves nothing to compare with, so in either mode the router counts the request in the
+selected one. ``other`` selects the catch all virtual cluster, which counts the requests that match
+none of the virtual clusters of the virtual host and reports no name. Selecting ``other`` also
+agrees with a virtual cluster the virtual host itself names ``other``, since both count in the
+same statistics, but such a request reports no name once the selection is preferred. An empty name
+selects none, which leaves the request to the virtual host and is never compared. A request whose
+route carries no selection is counted in none of ``virtual_cluster_selected``,
+``virtual_cluster_none``, ``virtual_cluster_agree`` and ``virtual_cluster_disagree``. The module
+selects from the request as route matching saw it, while the virtual host matches the request as it
+reaches the router, so a filter that changes a header the selection depends on must clear the route
+cache.
+
+Like the recorded overrides, the selection takes effect only when the decision is left
+``Unspecified``. ``PassThrough`` ignores it, so a module that only selects a virtual cluster leaves
+the decision ``Unspecified``. A route reused with ``ReusePrevious`` keeps the selection it was built
+with. A selection is dropped without failing the decision when there is no route or when the route
+answers the request directly, and a selected virtual cluster is also dropped when the route belongs
+to a virtual host other than ``virtual_host_name``, which is counted in
+``virtual_cluster_vhost_mismatch``. A route the built route cache holds keeps the selection it was
+built with, so the key must also determine the selection. Only one route specifier in a chain should
+select a virtual cluster, since a later one that consults the virtual host does so through an
+earlier one, which then counts the request too.
+
+Before setting ``prefer_selection``, check that ``virtual_cluster_selected``,
+``virtual_cluster_disagree``, ``virtual_cluster_unknown`` and ``virtual_cluster_vhost_mismatch``
+do not grow while ``virtual_cluster_agree`` does. Envoy logs each disagreement with the method and
+path of the request at debug level, and at most one of them every 10 seconds at warning level, on
+the ``dynamic_modules`` logger. It also warns on that logger at the same rate about a selection
+dropped for another virtual host. A rejected selection is logged at debug level on the ``misc``
+logger. Once ``prefer_selection`` is set, the virtual clusters of the virtual host only decide the
+requests whose route carries no selection or a selection of none, so set it back to ``false`` before
+changing them or the selections of the module. Keep ``verify_one_in`` above zero so that
+``virtual_cluster_agree`` keeps growing and ``virtual_cluster_disagree`` keeps showing a difference.
+
+Rewriting the path
+------------------
+
+``set_prefix_rewrite`` records the path a prefix rewrite produces for the current request, so the
+route it produces is specific to that request. ``set_prefix_rewrite_rule`` records the rewrite as a
+rule instead, which Envoy applies to the path the request carries when the request headers are
+finalized, the way a configured route applies its
+:ref:`prefix_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.prefix_rewrite>`. A rule
+replaces a literal prefix of the path without its query string, or all of that path, with a
+replacement that starts with a slash, and it is checked against the request the decision is taken
+for.
+
+Envoy takes the path sent upstream from the first of these that yields one, whatever the call
+order.
+
+* The path recorded with ``set_path`` or ``set_prefix_rewrite``.
+* The rule recorded with ``set_prefix_rewrite_rule``.
+* The regex rewrite of the selected route override.
+* The rewrites of the route.
+
+The regex rewrite applies when the decision resolves, or when the request headers are finalized
+once a rule is recorded or the built route cache looks the decision up, and like a configured regex
+rewrite it yields the path unchanged when its pattern does not match. A rewrite applied when the
+request headers are finalized records ``x-envoy-original-path`` the way a configured route does,
+replacing one the request carries. A request for which neither the rule nor the regex rewrite after
+it yields a path at that point, for example because a filter changed the path without clearing the
+route cache, is counted in ``rewrite_not_applied``.
+
+Caching built routes
+--------------------
+
+A module whose routes are a function of a small key can let each worker cache them with
+:ref:`built_route_cache <envoy_v3_api_field_extensions.router.route_specifiers.dynamic_modules.v3.DynamicModuleRouteSpecifier.built_route_cache>`.
+After selecting a template, the module calls ``lookup_built_route`` with a key. On a hit Envoy uses
+the route a previous request on the worker built for the key and the template, and the module
+records nothing more, though a decision or a skip it records still wins over the hit. On a miss the
+module records the route as usual, and Envoy caches the route the decision builds unless a route is
+already cached for the key. A module whose routes rely on the cache can reject a configuration
+without one from its configuration hook, through ``config_has_built_route_cache``,
+``has_built_route_cache`` in the Rust SDK.
+
+The route built for a key serves later requests, so it must be a function of the key. The key covers
+whatever the module reads to decide, including the route it runs for, since one cache serves every
+route of a virtual host that shares the specifier. It identifies the route exactly, since a
+collision serves the route of one key for the other, and a module whose routes change over time
+folds a version of what they depend on into it. A route configuration update starts with empty
+caches, and releases the cached routes of the replaced configuration once no stream uses it.
+
+Envoy keeps the dependencies it introduces itself out of the cache. A cached route that carries a
+rule recorded with ``set_prefix_rewrite_rule`` serves only the paths the rule applies to. A
+recording that calls ``set_prefix_rewrite``, or for which ``set_prefix_rewrite_rule`` rejected a
+rule or replaced one it accepted, only serves the current request. A template whose cluster is
+resolved per request, such as one with weighted clusters, a cluster header or a cluster specifier
+plugin, is not cached.
+
+A worker evicts a route it has not used recently when it is full, and a route idle for longer than
+``max_idle_time``. A hit is verified with a chance of one in ``verify_one_in``, for which
+``lookup_built_route`` returns ``HitVerify``. The module then records the route exactly as on a
+miss and Envoy uses the route the recording builds. When the decision fails or its recording
+depends on the path of the request through Envoy or differs from the one the cached route was built
+from, Envoy counts ``built_route_cache_verify_mismatch`` and evicts the cached route. A ``Hit``
+ignores the overrides the module records and hands its user data to
+``on_route_specifier_user_data_discard``. A route that carries user data fires
+``on_route_specifier_route_destroy`` once neither the cache nor a stream holds it.
 
 Notes
 -----
@@ -146,23 +277,39 @@ of the specifier, sharing the ``metrics_namespace`` of the module-defined metric
   :widths: 1, 1, 2
 
   decision_pass_through, Counter, Requests for which the module kept the resolved route.
-  decision_override, Counter, Requests for which the module refined the resolved route.
-  decision_select_template, Counter, Requests for which the module selected a route template.
+  decision_has_override, Counter, Requests the default decision resolved from the route the specifier was given with the recorded overrides applied.
+  decision_has_template, Counter, Requests for which the module selected a route template.
   decision_no_route, Counter, Requests for which the module dropped the route.
   decision_error, Counter, Requests for which the module could not decide.
   decision_reuse_previous, Counter, Requests for which the module reused the previous route.
-  decision_continue_matching, Counter, Requests for which the module let route matching carry on with the next route.
+  route_skipped, Counter, Requests for which the module let route matching carry on with the next route.
+  unknown_status, Counter, Requests for which the module returned a status Envoy does not know.
   runtime_skipped, Counter, Requests outside ``runtime_fraction``.
   failure_module_error, Counter, Decisions not honored because the module reported an error.
-  failure_template_not_selected, Counter, Decisions not honored because no known template was selected.
+  failure_template_not_selected, Counter, Decisions not honored because a template selection named an identifier that is not declared.
   failure_template_match_failed, Counter, Decisions not honored because the match of the selected template did not hold.
   failure_override_without_route, Counter, Decisions not honored because there was no route to refine.
   failure_override_on_non_route_entry, Counter, Decisions not honored because route entry properties were recorded for a direct response.
   failure_route_metadata, Counter, Decisions not honored because a typed metadata factory rejected the recorded metadata.
   reuse_previous_rejected, Counter, ReusePrevious decisions rejected because the stream had no previous route.
   route_destroy, Counter, Routes built with user data that were destroyed and fired the route destroy hook.
+  user_data_discard, Counter, User data that no route carried and that the user data discard hook received.
+  rewrite_not_applied, Counter, Requests for which neither the prefix rewrite rule nor the route override regex rewrite yielded a path when the request headers were finalized.
+  built_route_cache_disabled, Counter, Built route cache lookups that returned ``Disabled``.
+  built_route_cache_hit, Counter, Built route cache lookups that found a route.
+  built_route_cache_miss, Counter, Built route cache lookups that found no route for the request.
+  built_route_cache_verify, Counter, Built route cache hits verified against what the module recorded.
+  built_route_cache_verify_mismatch, Counter, Verified hits that evicted the cached route.
+  built_route_cache_evict, Counter, Cached routes evicted because a worker was full or the route was idle for longer than ``max_idle_time``.
+  virtual_cluster_selected, Counter, Requests the router counted in the selected virtual cluster without comparing it with the virtual host.
+  virtual_cluster_none, Counter, Requests for which the module selected none and that the virtual host then matched against its virtual clusters.
+  virtual_cluster_agree, Counter, Compared requests whose selection agreed with the virtual cluster the virtual host matched.
+  virtual_cluster_disagree, Counter, Compared requests whose selection disagreed with the virtual cluster the virtual host matched.
+  virtual_cluster_unknown, Counter, Virtual cluster selections rejected because the name is not declared or the buffer is null with a non-zero length. Nothing is counted when ``virtual_cluster_override`` is not set.
+  virtual_cluster_vhost_mismatch, Counter, Virtual cluster selections dropped because the route belongs to a virtual host other than ``virtual_host_name``.
+  built_route_cache_entries, Gauge, Routes cached by the workers of the specifiers that share the stat prefix.
   on_route_duration, Histogram, Time in microseconds the module spent deciding.
-  specifier_duration, Histogram, Time in microseconds the specifier spent on a request.
+  specifier_duration, Histogram, Time in microseconds the specifier spent on a request that ``runtime_fraction`` does not skip.
 
 Configuration
 -------------

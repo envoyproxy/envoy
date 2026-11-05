@@ -59,22 +59,21 @@ public:
     EXPECT_CALL(cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
     EXPECT_CALL(conn_pool_, newConnection(_))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&](Tcp::ConnectionPool::Callbacks& callbacks) -> Tcp::ConnectionPool::Cancellable* {
               auto data =
                   std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
               EXPECT_CALL(*data, connectionState())
-                  .WillRepeatedly(Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* {
-                    return conn_state_.get();
-                  }));
+                  .WillRepeatedly(
+                      [&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); });
               EXPECT_CALL(*data, setConnectionState_(_))
-                  .WillOnce(Invoke([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
+                  .WillOnce([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
                     conn_state_.swap(cs);
-                  }));
+                  });
               EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(connection));
               callbacks.onPoolReady(std::move(data), host_);
               return nullptr;
-            }));
+            });
 
     auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                                 ProtocolType::Binary);
@@ -90,10 +89,10 @@ public:
     if (!oneway) {
       auto& shadow_router = *(shadow_writer_->tls_->activeRouters().front());
       shadow_router.dispatcher();
-      EXPECT_CALL(connection, close(_)).WillRepeatedly(Invoke([&](Network::ConnectionCloseType) {
+      EXPECT_CALL(connection, close(_)).WillRepeatedly([&](Network::ConnectionCloseType) {
         // Simulate that router is destroyed.
         shadow_router.router_destroyed_ = router_destroyed;
-      }));
+      });
       ;
     }
 
@@ -115,23 +114,22 @@ public:
     EXPECT_CALL(cluster_, tcpConnPool(_, _))
         .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
     EXPECT_CALL(conn_pool_, newConnection(_))
-        .WillOnce(Invoke(
+        .WillOnce(
             [&](Tcp::ConnectionPool::Callbacks& callbacks) -> Tcp::ConnectionPool::Cancellable* {
               auto data =
                   std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
               EXPECT_CALL(*data, connectionState())
-                  .WillRepeatedly(Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* {
-                    return conn_state_.get();
-                  }));
+                  .WillRepeatedly(
+                      [&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); });
               EXPECT_CALL(*data, setConnectionState_(_))
-                  .WillOnce(Invoke([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
+                  .WillOnce([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void {
                     conn_state_.swap(cs);
-                  }));
+                  });
 
               EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(connection));
               callbacks.onPoolReady(std::move(data), host_);
               return nullptr;
-            }));
+            });
 
     ShadowRouterImpl shadow_router(*shadow_writer_, "shadow_cluster", metadata_,
                                    TransportType::Framed, ProtocolType::Binary);
@@ -335,9 +333,9 @@ TEST_F(ShadowWriterTest, SubmitConnectionNotReady) {
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(cancellable_, cancel(_));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks&) -> Tcp::ConnectionPool::Cancellable* {
         return &cancellable_;
-      }));
+      });
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
   EXPECT_NE(std::nullopt, router_handle);
@@ -365,11 +363,10 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   EXPECT_CALL(cluster_, tcpConnPool(_, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(
-          Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-            callbacks = &cb;
-            return &cancellable_;
-          }));
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
+        callbacks = &cb;
+        return &cancellable_;
+      });
 
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
@@ -383,11 +380,9 @@ TEST_F(ShadowWriterTest, ShadowRequestWriteBeforePoolReady) {
   auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
   EXPECT_CALL(*data, connection()).WillRepeatedly(ReturnRef(connection));
   EXPECT_CALL(*data, connectionState())
-      .WillRepeatedly(
-          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+      .WillRepeatedly([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); });
   EXPECT_CALL(*data, setConnectionState_(_))
-      .WillOnce(Invoke(
-          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
+      .WillOnce([&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); });
 
   EXPECT_CALL(connection, write(_, false));
   callbacks->onPoolReady(std::move(data), host_);
@@ -406,13 +401,13 @@ TEST_F(ShadowWriterTest, ShadowRequestPoolFailure) {
   EXPECT_CALL(cluster_, tcpConnPool(_, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool_)));
   EXPECT_CALL(conn_pool_, newConnection(_))
-      .WillOnce(Invoke([&](Tcp::ConnectionPool::Callbacks& callbacks)
-                           -> Tcp::ConnectionPool::Cancellable* {
+      .WillOnce([&](Tcp::ConnectionPool::Callbacks& callbacks)
+                    -> Tcp::ConnectionPool::Cancellable* {
         auto data = std::make_unique<NiceMock<Envoy::Tcp::ConnectionPool::MockConnectionData>>();
         EXPECT_CALL(*data, connection()).Times(0);
         callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, "failure", nullptr);
         return nullptr;
-      }));
+      });
 
   auto router_handle = shadow_writer_->submit("shadow_cluster", metadata_, TransportType::Framed,
                                               ProtocolType::Binary);
@@ -484,18 +479,18 @@ TEST_F(ShadowWriterTest, NullResponseDecoderExceptionHandling) {
   auto decoder_ptr = std::make_unique<MockOnDataNullResponseDecoder>(*transport_ptr, *protocol_ptr);
 
   {
-    EXPECT_CALL(*decoder_ptr, onData()).WillOnce(Invoke([&]() -> bool {
+    EXPECT_CALL(*decoder_ptr, onData()).WillOnce([&]() -> bool {
       throw EnvoyException("exception");
-    }));
+    });
 
     Buffer::OwnedImpl buffer;
     EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, decoder_ptr->upstreamData(buffer));
   }
 
   {
-    EXPECT_CALL(*decoder_ptr, onData()).WillOnce(Invoke([&]() -> bool {
+    EXPECT_CALL(*decoder_ptr, onData()).WillOnce([&]() -> bool {
       throw AppException(AppExceptionType::InternalError, "exception");
-    }));
+    });
 
     Buffer::OwnedImpl buffer;
     EXPECT_EQ(ThriftFilters::ResponseStatus::Reset, decoder_ptr->upstreamData(buffer));

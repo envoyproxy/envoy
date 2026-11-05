@@ -348,6 +348,18 @@ enum class SocketOptionState : uint32_t {
 
 enum class SocketDirection : uint32_t { Upstream, Downstream };
 
+enum class FilterStateLifeSpan : uint32_t {
+  FilterChain = 0,
+  Request = 1,
+  Connection = 2,
+};
+
+enum class FilterStateStreamSharing : uint32_t {
+  None = 0,
+  SharedWithUpstreamConnection = 1,
+  SharedWithUpstreamConnectionOnce = 2,
+};
+
 struct ClusterHostCounts {
   uint64_t total;
   uint64_t healthy;
@@ -484,6 +496,16 @@ public:
    * @return The bool value if found, otherwise nullopt.
    */
   virtual std::optional<bool> getMetadataBool(std::string_view ns, std::string_view key) = 0;
+
+  /**
+   * Retrieves the type URL and serialized message payload of typed dynamic metadata.
+   * The returned views are valid until the end of the current event hook unless a setter modifies
+   * the metadata.
+   * @param ns The typed metadata namespace.
+   * @return The type URL and payload if found, otherwise nullopt. Empty fields are valid results.
+   */
+  virtual std::optional<std::pair<std::string_view, std::string_view>>
+  getTypedMetadata(std::string_view ns) = 0;
 
   /**
    * Retrieves all keys in a metadata namespace.
@@ -641,6 +663,19 @@ public:
   virtual void setFilterState(std::string_view key, std::string_view value) = 0;
 
   /**
+   * Sets the serialized filter state value of the stream with the given lifespan and upstream
+   * sharing options.
+   * @param key The filter state key.
+   * @param value The filter state value.
+   * @param life_span The lifespan of the filter state entry.
+   * @param stream_sharing The upstream sharing option of the filter state entry.
+   * @return true if the value was stored successfully.
+   */
+  virtual bool setFilterStateValue(std::string_view key, std::string_view value,
+                                   FilterStateLifeSpan life_span,
+                                   FilterStateStreamSharing stream_sharing) = 0;
+
+  /**
    * Retrieves a string attribute value.
    * @param id The attribute ID.
    * @return Pair of string view and bool indicating if attribute was found.
@@ -753,6 +788,14 @@ public:
   virtual bool setFilterStateTyped(std::string_view key, std::string_view value) = 0;
 
   /**
+   * Checks whether a filter state entry with the given key exists, regardless of its type. Unlike
+   * the getter methods, this does not read or serialize the stored object.
+   * @param key The filter state key.
+   * @return true if the key exists.
+   */
+  virtual bool hasFilterState(std::string_view key) = 0;
+
+  /**
    * Returns the worker index assigned to the current filter instance.
    */
   virtual uint32_t getWorkerIndex() = 0;
@@ -806,6 +849,12 @@ public:
   virtual std::optional<std::string_view> getUpstreamRemoteAddress() = 0;
 
   /**
+   * Retrieves the downstream socket peer address, including the port, before XFF processing.
+   * Returns std::nullopt if unavailable. The buffer is valid until the current event hook returns.
+   */
+  virtual std::optional<std::string_view> getDownstreamDirectRemoteAddress() = 0;
+
+  /**
    * Retrieves the upstream host addresses attempted for the current request in attempt order.
    */
   virtual std::vector<std::string_view> getUpstreamHostsAttempted() = 0;
@@ -829,6 +878,11 @@ public:
    * Sends GOAWAY and closes the downstream connection.
    */
   virtual void sendGoAwayAndClose(bool graceful) = 0;
+
+  /**
+   * Marks the downstream connection to be drained once the current HTTP stream completes.
+   */
+  virtual void drainConnectionUponCompletion() = 0;
 
   /**
    * Recreates the current stream, optionally with replacement headers. Returns false if the
@@ -954,20 +1008,24 @@ public:
                   HttpStreamCallback& cb) = 0;
 
   /**
-   * Sends data on an existing HTTP stream.
+   * Sends data on an existing HTTP stream. When Envoy reset the stream and did not call the reset
+   * callback yet, the data is dropped, and the reset callback follows unless the filter is
+   * destroyed first.
    * @param stream_id The ID of the stream.
    * @param body The body data to send.
    * @param end_of_stream Whether this is the end of the stream.
-   * @return True if successful, false otherwise.
+   * @return False if the stream does not exist, and true otherwise.
    */
   virtual bool sendHttpStreamData(uint64_t stream_id, std::string_view body,
                                   bool end_of_stream) = 0;
 
   /**
-   * Sends trailers on an existing HTTP stream.
+   * Sends trailers on an existing HTTP stream. When Envoy reset the stream and did not call the
+   * reset callback yet, the trailers are dropped, and the reset callback follows unless the filter
+   * is destroyed first.
    * @param stream_id The ID of the stream.
    * @param trailers The trailers to send.
-   * @return True if successful, false otherwise.
+   * @return False if the stream does not exist, and true otherwise.
    */
   virtual bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) = 0;
 
@@ -1245,20 +1303,24 @@ public:
                   HttpStreamCallback& cb) = 0;
 
   /**
-   * Sends data on an active stream started via startHttpStream.
+   * Sends data on an active stream started via startHttpStream. When Envoy reset the stream and
+   * did not call the reset callback yet, the data is dropped, and the reset callback follows unless
+   * the configuration is destroyed first.
    * @param stream_id The stream handle returned from startHttpStream.
    * @param body The data to send.
    * @param end_of_stream If true, this is the last data chunk.
-   * @return True if successful, false if the stream is not found.
+   * @return False if the stream is not found, and true otherwise.
    */
   virtual bool sendHttpStreamData(uint64_t stream_id, std::string_view body,
                                   bool end_of_stream) = 0;
 
   /**
-   * Sends trailers on an active stream, implicitly ending the stream.
+   * Sends trailers on an active stream, implicitly ending the stream. When Envoy reset the stream
+   * and did not call the reset callback yet, the trailers are dropped, and the reset callback
+   * follows unless the configuration is destroyed first.
    * @param stream_id The stream handle returned from startHttpStream.
    * @param trailers The trailers to send.
-   * @return True if successful, false if the stream is not found.
+   * @return False if the stream is not found, and true otherwise.
    */
   virtual bool sendHttpStreamTrailers(uint64_t stream_id, std::span<const HeaderView> trailers) = 0;
 

@@ -13,7 +13,6 @@
 #include "envoy/admin/v3/certs.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/singleton/manager.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -59,50 +58,6 @@ void logSslErrorChain() {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
-
-SINGLETON_MANAGER_REGISTRATION(tls_builtin_stat_names);
-
-TlsBuiltinStatNames::TlsBuiltinStatNames(Stats::SymbolTable& symbol_table)
-    : stat_name_set_(symbol_table.makeSet("TransportSockets::Tls")),
-      unknown_ssl_cipher_(stat_name_set_->add("unknown_ssl_cipher")),
-      unknown_ssl_curve_(stat_name_set_->add("unknown_ssl_curve")),
-      unknown_ssl_algorithm_(stat_name_set_->add("unknown_ssl_algorithm")),
-      unknown_ssl_version_(stat_name_set_->add("unknown_ssl_version")),
-      ssl_ciphers_(stat_name_set_->add("ssl.ciphers")),
-      ssl_versions_(stat_name_set_->add("ssl.versions")),
-      ssl_curves_(stat_name_set_->add("ssl.curves")),
-      ssl_sigalgs_(stat_name_set_->add("ssl.sigalgs")) {
-  // Register stat names based on lists reported by BoringSSL. These are compile-time constant
-  // tables, so the resulting set is identical for every TLS context in the process.
-  std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
-  SSL_get_all_cipher_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_curve_names(nullptr, 0));
-  SSL_get_all_curve_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_signature_algorithm_names(nullptr, 0));
-  SSL_get_all_signature_algorithm_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-
-  list.resize(SSL_get_all_version_names(nullptr, 0));
-  SSL_get_all_version_names(list.data(), list.size());
-  stat_name_set_->rememberBuiltins(list);
-}
-
-namespace {
-// Returns the server-wide shared TLS builtin stat names, creating them on first use. The set is
-// owned by the singleton manager (per-server, hence tied to a single symbol table) and kept alive
-// by the returned shared_ptr held by each ContextImpl.
-std::shared_ptr<TlsBuiltinStatNames>
-getTlsBuiltinStatNames(Server::Configuration::CommonFactoryContext& factory_context) {
-  return factory_context.singletonManager().getTyped<TlsBuiltinStatNames>(
-      SINGLETON_MANAGER_REGISTERED_NAME(tls_builtin_stat_names), [&factory_context] {
-        return std::make_shared<TlsBuiltinStatNames>(factory_context.serverScope().symbolTable());
-      });
-}
-} // namespace
 
 int ContextImpl::sslExtendedSocketInfoIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
@@ -553,13 +508,17 @@ ValidationResults ContextImpl::customVerifyCertChain(
   return result;
 }
 
-void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value,
-                             const Stats::StatName fallback) const {
+void ContextImpl::incCounter(const Stats::StatName name, const Stats::StatName tag_name,
+                             absl::string_view value, const Stats::StatName fallback) const {
   const Stats::StatName value_stat_name =
       builtin_stat_names_->statNameSet().getBuiltin(value, fallback);
   ENVOY_BUG(value_stat_name != fallback,
             absl::StrCat("Unexpected ", scope_.symbolTable().toString(name), " value: ", value));
-  Stats::Utility::counterFromElements(scope_, {name, value_stat_name}).inc();
+  // The flat name is "<name>.<value>" and the value is the stat's tag, leaving the tag-extracted
+  // name "<name>".
+  const Stats::StatNameJoiner flat_name({name, value_stat_name}, scope_.symbolTable());
+  const Stats::StatNameTag tag{tag_name, value_stat_name};
+  scope_.counterFromTaggedName(name, Stats::StatNameTagSpan{tag}, flat_name.statName()).inc();
 }
 
 void ContextImpl::logHandshake(SSL* ssl) const {
@@ -569,21 +528,25 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.session_reused_.inc();
   }
 
-  incCounter(builtin_stat_names_->ssl_ciphers_, SSL_get_cipher_name(ssl),
-             builtin_stat_names_->unknown_ssl_cipher_);
-  incCounter(builtin_stat_names_->ssl_versions_, SSL_get_version(ssl),
-             builtin_stat_names_->unknown_ssl_version_);
+  // The cipher tag name of the legacy extraction rules differs between the server (listener) and
+  // client (cluster) sides; the other tag names are shared.
+  incCounter(builtin_stat_names_->ssl_ciphers_,
+             SSL_is_server(ssl) ? builtin_stat_names_->ssl_cipher_tag_name_
+                                : builtin_stat_names_->ssl_cipher_suite_tag_name_,
+             SSL_get_cipher_name(ssl), builtin_stat_names_->unknown_ssl_cipher_);
+  incCounter(builtin_stat_names_->ssl_versions_, builtin_stat_names_->ssl_version_tag_name_,
+             SSL_get_version(ssl), builtin_stat_names_->unknown_ssl_version_);
 
   const uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
-    incCounter(builtin_stat_names_->ssl_curves_, SSL_get_curve_name(curve_id),
-               builtin_stat_names_->unknown_ssl_curve_);
+    incCounter(builtin_stat_names_->ssl_curves_, builtin_stat_names_->ssl_curve_tag_name_,
+               SSL_get_curve_name(curve_id), builtin_stat_names_->unknown_ssl_curve_);
   }
 
   const uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
-    incCounter(builtin_stat_names_->ssl_sigalgs_, sigalg,
+    incCounter(builtin_stat_names_->ssl_sigalgs_, builtin_stat_names_->ssl_sigalg_tag_name_, sigalg,
                builtin_stat_names_->unknown_ssl_algorithm_);
   }
 

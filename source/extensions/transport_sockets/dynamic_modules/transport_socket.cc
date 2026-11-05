@@ -1,5 +1,6 @@
 #include "source/extensions/transport_sockets/dynamic_modules/transport_socket.h"
 
+#include "envoy/api/io_error.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/common/empty_string.h"
@@ -26,11 +27,18 @@ toAbiConnectionEvent(Network::ConnectionEvent event) {
   return envoy_dynamic_module_type_network_connection_event_LocalClose;
 }
 
-Network::PostIoAction
-toPostIoAction(envoy_dynamic_module_type_transport_socket_post_io_action action) {
-  return action == envoy_dynamic_module_type_transport_socket_post_io_action_Close
-             ? Network::PostIoAction::Close
-             : Network::PostIoAction::KeepOpen;
+Network::IoResult toIoResult(const envoy_dynamic_module_type_transport_socket_io_result& result,
+                             bool end_stream_read, bool peer_reset) {
+  if (result.action == envoy_dynamic_module_type_transport_socket_post_io_action_Reset ||
+      (result.action == envoy_dynamic_module_type_transport_socket_post_io_action_Close &&
+       peer_reset)) {
+    return {Network::PostIoAction::Close, result.bytes_processed, end_stream_read,
+            Api::IoError::IoErrorCode::ConnectionReset};
+  }
+  return {result.action == envoy_dynamic_module_type_transport_socket_post_io_action_Close
+              ? Network::PostIoAction::Close
+              : Network::PostIoAction::KeepOpen,
+          result.bytes_processed, end_stream_read};
 }
 
 } // namespace
@@ -111,6 +119,7 @@ absl::StatusOr<DynamicModuleTransportSocketConfigSharedPtr> newDynamicModuleTran
   auto config = std::make_shared<DynamicModuleTransportSocketConfig>(implements_secure_transport,
                                                                      std::move(dynamic_module));
 
+  config->is_upstream_ = is_upstream;
   config->on_factory_config_destroy_ = on_config_destroy.value();
   config->on_new_ = on_new.value();
   config->on_destroy_ = on_destroy.value();
@@ -156,7 +165,9 @@ void DynamicModuleTransportSocket::setTransportSocketCallbacks(
     Network::TransportSocketCallbacks& callbacks) {
   callbacks_ = &callbacks;
   if (in_module_socket_ != nullptr) {
+    in_set_callbacks_ = true;
     config_->on_set_callbacks_(this, in_module_socket_);
+    in_set_callbacks_ = false;
   }
 }
 
@@ -205,22 +216,30 @@ Network::IoResult DynamicModuleTransportSocket::doRead(Buffer::Instance& buffer)
   if (in_module_socket_ == nullptr) {
     return {Network::PostIoAction::Close, 0, false};
   }
+  // The engine pump owns the fd once spliced. A splice started from do_write can still be followed
+  // by a read in the same file event.
+  if (spliced_) {
+    return {Network::PostIoAction::KeepOpen, 0, false};
+  }
   current_read_buffer_ = &buffer;
   auto result = config_->on_do_read_(this, in_module_socket_);
   current_read_buffer_ = nullptr;
-  return {toPostIoAction(result.action), result.bytes_processed, result.end_stream_read};
+  return toIoResult(result, result.end_stream_read, peer_reset_);
 }
 
 Network::IoResult DynamicModuleTransportSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
   if (in_module_socket_ == nullptr) {
     return {Network::PostIoAction::Close, 0, false};
   }
+  if (spliced_) {
+    return {Network::PostIoAction::KeepOpen, 0, false};
+  }
   current_write_buffer_ = &buffer;
   auto result = config_->on_do_write_(this, in_module_socket_, end_stream);
   current_write_buffer_ = nullptr;
   // end_stream_read is only meaningful for reads. The connection layer asserts it is never set on a
   // write result, so it is forced to false here regardless of what the module reports.
-  return {toPostIoAction(result.action), result.bytes_processed, false};
+  return toIoResult(result, false, peer_reset_);
 }
 
 void DynamicModuleTransportSocket::onConnected() {

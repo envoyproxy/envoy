@@ -14,8 +14,9 @@ envoy_dynamic_module_on_route_specifier_config_new(
   return &config_dummy;
 }
 
-envoy_dynamic_module_type_route_specifier_decision envoy_dynamic_module_on_route_specifier_on_route(
+envoy_dynamic_module_type_route_specifier_on_route_status
+envoy_dynamic_module_on_route_specifier_on_route(
     envoy_dynamic_module_type_route_specifier_config_module_ptr config_module_ptr,
     envoy_dynamic_module_type_route_specifier_context_envoy_ptr context_envoy_ptr) {
-  return envoy_dynamic_module_type_route_specifier_decision_PassThrough;
+  return envoy_dynamic_module_type_route_specifier_on_route_status_Continue;
 }

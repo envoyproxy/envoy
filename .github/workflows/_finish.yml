@@ -47,7 +47,7 @@ jobs:
       actions: read
       contents: read
     steps:
-    - uses: envoyproxy/toolshed/actions/jq@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Incoming data
       id: needs
       with:
@@ -128,7 +128,7 @@ jobs:
                    summary: "Check has finished",
                    text: ($text + $allowed_failure_text)}}}}
 
-    - uses: envoyproxy/toolshed/actions/jq@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+    - uses: envoyproxy/toolshed/actions/jq@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Print summary
       with:
         input: ${{ toJSON(steps.needs.outputs.value).summary-title }}
@@ -136,13 +136,13 @@ jobs:
           "## \(.)"
         options: -Rr
         output-path: GITHUB_STEP_SUMMARY
-    - uses: envoyproxy/toolshed/actions/appauth@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+    - uses: envoyproxy/toolshed/actions/appauth@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Appauth
       id: appauth
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/actions/github/checks@16ee2e312bbd80a2db5d76d22233722d0cfd82fa  # actions-v0.4.28
+    - uses: envoyproxy/toolshed/actions/github/checks@9bd3b300cf19f67cd2ef8b6e4aaa920f79894c24  # actions-v0.4.29
       name: Update check
       with:
         action: update
@@ -155,7 +155,7 @@ jobs:
         && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
         && github.repository == 'envoyproxy/envoy'
         && fromJSON(steps.needs.outputs.value)['notify-required'] != null
-      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d  # v4.0.0
       with:
         method: chat.postMessage
         token: ${{ secrets.slack-bot-token }}
@@ -173,7 +173,7 @@ jobs:
         && (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'release/v'))
         && github.repository == 'envoyproxy/envoy'
         && fromJSON(steps.needs.outputs.value)['notify-openssl'] != null
-      uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c  # v3.0.3
+      uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d  # v4.0.0
       with:
         method: chat.postMessage
         token: ${{ secrets.slack-bot-token }}

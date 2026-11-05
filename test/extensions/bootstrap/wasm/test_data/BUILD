@@ -3,6 +3,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
 )
+load("//bazel:envoy_select.bzl", "envoy_select_wasm_v8_bool")
 load("//bazel/wasm:wasm.bzl", "envoy_wasm_cc_binary", "wasm_rust_binary")
 
 licenses(["notice"])  # Apache 2
@@ -13,6 +14,7 @@ wasm_rust_binary(
     name = "logging_rust.wasm",
     srcs = ["logging_rust.rs"],
     wasi = True,
+    precompile = envoy_select_wasm_v8_bool(),
     deps = [
         "@proxy-wasm-rust-sdk//:proxy_wasm",
         "@proxy-wasm-rust-sdk//bazel/cargo/remote:log",
@@ -70,6 +72,7 @@ envoy_cc_test_library(
 envoy_wasm_cc_binary(
     name = "asm2wasm_cpp.wasm",
     srcs = ["asm2wasm_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_wasm_cc_binary(
@@ -80,16 +83,19 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "emscripten_cpp.wasm",
     srcs = ["emscripten_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_wasm_cc_binary(
     name = "http_cpp.wasm",
     srcs = ["http_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_wasm_cc_binary(
     name = "logging_cpp.wasm",
     srcs = ["logging_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_wasm_cc_binary(
@@ -103,20 +109,24 @@ envoy_wasm_cc_binary(
 envoy_wasm_cc_binary(
     name = "segv_cpp.wasm",
     srcs = ["segv_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_wasm_cc_binary(
     name = "speed_cpp.wasm",
     srcs = ["speed_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
     protobuf = "full",
 )
 
 envoy_wasm_cc_binary(
     name = "start_cpp.wasm",
     srcs = ["start_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )
 
 envoy_wasm_cc_binary(
     name = "stats_cpp.wasm",
     srcs = ["stats_cpp.cc"],
+    precompile = envoy_select_wasm_v8_bool(),
 )

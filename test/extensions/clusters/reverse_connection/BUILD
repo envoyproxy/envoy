@@ -1,6 +1,5 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -12,13 +11,14 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "reverse_connection_cluster_test",
     srcs = ["reverse_connection_cluster_test.cc"],
     copts = select({
         "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
         "//conditions:default": [],
     }),
+    extension_names = ["envoy.clusters.reverse_connection"],
     tags = ["skip_on_windows"],
     deps = [
         "//envoy/registry",

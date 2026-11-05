@@ -68,6 +68,10 @@ load(
     _envoy_py_test_binary = "envoy_py_test_binary",
     _envoy_sh_test = "envoy_sh_test",
 )
+load(
+    ":execution_context_transition.bzl",
+    _execution_context_dual_test = "execution_context_dual_test",
+)
 
 _DBG_BUILD = Label("//bazel:dbg_build")
 _LINUX = Label("//bazel:linux")
@@ -278,6 +282,7 @@ envoy_benchmark_test = _envoy_benchmark_test
 envoy_py_test = _envoy_py_test
 envoy_py_test_binary = _envoy_py_test_binary
 envoy_sh_test = _envoy_sh_test
+execution_context_dual_test = _execution_context_dual_test
 
 # Envoy Mobile defines (from envoy_mobile_defines.bz)
 envoy_mobile_defines = _envoy_mobile_defines

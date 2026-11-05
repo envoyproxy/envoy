@@ -46,6 +46,34 @@ enum class StreamSharingMayImpactPooling {
   SharedWithUpstreamConnectionOnce,
 };
 
+#ifdef ENVOY_ENABLE_EXECUTION_CONTEXT
+#define ENVOY_EXECUTION_CONTEXT_KEY_X(X)                                                           \
+  X(ConnectionExecutionContext, "envoy.network.connection_execution_context")
+#else
+#define ENVOY_EXECUTION_CONTEXT_KEY_X(X)
+#endif
+
+#define FOR_EACH_FILTER_STATE_INDEX(X)                                                             \
+  X(LocalReplyOwner, "envoy.filters.network.http_connection_manager.local_reply_owner")            \
+  X(UpstreamServerName, "envoy.network.upstream_server_name")                                      \
+  X(UpstreamSocketOptions, "envoy.network.upstream_socket_options")                                \
+  X(UpstreamSubjectAltNames, "envoy.network.upstream_subject_alt_names")                           \
+  X(NetworkNamespace, "envoy.network.network_namespace")                                           \
+  X(OriginalConnectPort, "envoy.router.original_connect_port")                                     \
+  ENVOY_EXECUTION_CONTEXT_KEY_X(X)
+
+enum class FilterStateIndex : uint32_t {
+#define GENERATE_INDEX_ENUM(enum_val, string_val) enum_val,
+  FOR_EACH_FILTER_STATE_INDEX(GENERATE_INDEX_ENUM)
+#undef GENERATE_INDEX_ENUM
+};
+
+constexpr size_t FilterStateIndexCount = 0
+#define GENERATE_COUNT(enum_val, string_val) +1
+    FOR_EACH_FILTER_STATE_INDEX(GENERATE_COUNT)
+#undef GENERATE_COUNT
+    ;
+
 /**
  * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
  * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
@@ -231,6 +259,30 @@ public:
    * @return filter objects that are shared with the upstream connection.
    **/
   virtual ObjectsPtr objectsSharedWithUpstreamConnection() const PURE;
+
+  static absl::string_view indexToName(FilterStateIndex index);
+  static std::optional<FilterStateIndex> nameToIndex(absl::string_view name);
+
+  virtual void setIndexedData(
+      FilterStateIndex index, std::shared_ptr<Object> data,
+      LifeSpan life_span = LifeSpan::FilterChain,
+      StreamSharingMayImpactPooling stream_sharing = StreamSharingMayImpactPooling::None) PURE;
+
+  template <typename T> const T* getIndexedDataReadOnly(FilterStateIndex index) const {
+    return dynamic_cast<const T*>(getIndexedDataReadOnlyGeneric(index));
+  }
+
+  virtual const Object* getIndexedDataReadOnlyGeneric(FilterStateIndex index) const PURE;
+
+  template <typename T> T* getIndexedDataMutable(FilterStateIndex index) {
+    return dynamic_cast<T*>(getIndexedDataMutableGeneric(index));
+  }
+
+  virtual Object* getIndexedDataMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual std::shared_ptr<Object> getIndexedDataSharedMutableGeneric(FilterStateIndex index) PURE;
+
+  virtual bool hasIndexedData(FilterStateIndex index) const PURE;
 };
 
 } // namespace StreamInfo

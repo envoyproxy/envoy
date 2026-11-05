@@ -6,6 +6,7 @@
 #include "source/extensions/tracers/datadog/span.h"
 #include "source/extensions/tracers/datadog/tracer.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -204,6 +205,13 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   EXPECT_EQ(1234, dd_span.trace_id().low);
   ASSERT_TRUE(dd_span.parent_id());
   EXPECT_EQ(5678, *dd_span.parent_id());
+
+  // The span continues the extracted trace, with a span ID of its own.
+  EXPECT_EQ("000000000000000000000000000004d2", span->getTraceId());
+  const std::string span_id = span->getSpanId();
+  EXPECT_EQ(16, span_id.size());
+  EXPECT_NE("00000000000004d2", span_id);
+  EXPECT_NE("000000000000162e", span_id);
 }
 
 TEST_F(DatadogTracerTest, UseLocalDecisionTrue) {
@@ -253,6 +261,59 @@ TEST_F(DatadogTracerTest, UseLocalDecisionFalse) {
   // The `useLocalDecision` method is false because the span has an external trace sampling
   // decision.
   EXPECT_EQ(false, span->useLocalDecision());
+}
+
+TEST_F(DatadogTracerTest, FinalFlushBeforeThreadShutdown) {
+  // Destroying the thread local tracer sends the finished traces, then cancels
+  // the request when its HTTP client is shut down.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+  config.telemetry.enabled = false;
+  config.trace_sampler.sample_rate = 1.0; // 100%
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  ON_CALL(stream_info_, startTime())
+      .WillByDefault(testing::Return(time_.timeSystem().systemTime()));
+  Tracing::TestTraceContextImpl context{};
+  Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, "do.thing",
+                                           {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+  span.reset();
+
+  Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_,
+              send_(testing::_, testing::_, testing::_))
+      .WillOnce(testing::Return(&request));
+  EXPECT_CALL(request, cancel());
+  thread_local_slot_allocator_.shutdownThread();
+}
+
+TEST_F(DatadogTracerTest, SpanOutlivesThreadLocalTracer) {
+  // A span still open when the thread local tracer is destroyed keeps the
+  // collector alive. Finishing it later, for example from a stream reset while
+  // the thread local cluster manager is torn down, must not send a request.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+  config.telemetry.enabled = false;
+  config.trace_sampler.sample_rate = 1.0; // 100%
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  ON_CALL(stream_info_, startTime())
+      .WillByDefault(testing::Return(time_.timeSystem().systemTime()));
+  Tracing::TestTraceContextImpl context{};
+  Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, "do.thing",
+                                           {Tracing::Reason::Sampling, true});
+
+  EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_,
+              send_(testing::_, testing::_, testing::_))
+      .Times(0);
+  thread_local_slot_allocator_.shutdownThread();
+  span->finishSpan();
+  span.reset();
 }
 
 TEST_F(DatadogTracerTest, ExtractionFailure) {

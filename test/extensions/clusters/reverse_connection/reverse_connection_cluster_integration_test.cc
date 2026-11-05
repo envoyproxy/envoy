@@ -21,6 +21,7 @@
 
 using testing::Eq;
 using testing::Ge;
+using testing::HasSubstr;
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -59,6 +60,8 @@ typed_config:
     // Call parent initialize to complete setup.
     HttpIntegrationTest::initialize();
   }
+
+  void TearDown() override { cleanupLdsConnection(); }
 
 protected:
   LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
@@ -120,6 +123,32 @@ protected:
     }
     ASSERT_NE(nullptr, lds_upstream_info_.stream_);
     lds_upstream_info_.stream_->sendGrpcMessage(response);
+  }
+
+  // Close the LDS stream and connection before the fixture tears down. Envoy may still be sending
+  // discovery requests (e.g. a NACK) on the fake upstream thread, so destroying the FakeStream
+  // without this races with that thread.
+  void cleanupLdsConnection() {
+    // Return early if no LDS connection or stream was created, or if already cleaned up. This
+    // ensures idempotency when called from both test bodies and TearDown(), avoids compounding
+    // sleep overhead from advanceTimeWait() in real time across non-LDS tests, and prevents
+    // advancing simulated clocks when there are no LDS worker closures to drain.
+    if (lds_upstream_info_.stream_ == nullptr && lds_upstream_info_.connection_ == nullptr) {
+      return;
+    }
+    if (lds_upstream_info_.stream_) {
+      lds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
+    }
+    if (lds_upstream_info_.connection_) {
+      AssertionResult result = lds_upstream_info_.connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = lds_upstream_info_.connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
+    }
+    // Allow worker threads time to process the stream closure before destroying objects.
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+    lds_upstream_info_.stream_.reset();
+    lds_upstream_info_.connection_.reset();
   }
 
   // Helper function to configure reverse tunnel setup.
@@ -1234,22 +1263,7 @@ typed_config:
   ENVOY_LOG_MISC(info, "Initiator resilience test completed successfully!");
 
   // Cleanup LDS connection first to prevent race with FakeStream destruction.
-  // Finish the gRPC stream to ensure no more messages are being processed.
-  if (lds_upstream_info_.stream_) {
-    lds_upstream_info_.stream_->finishGrpcStream(Grpc::Status::Ok);
-  }
-  if (lds_upstream_info_.connection_) {
-    AssertionResult result = lds_upstream_info_.connection_->close();
-    RELEASE_ASSERT(result, result.message());
-    result = lds_upstream_info_.connection_->waitForDisconnect();
-    RELEASE_ASSERT(result, result.message());
-  }
-  // Allow worker threads time to process the stream closure before destroying objects.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
-
-  // Now reset the pointers.
-  lds_upstream_info_.stream_.reset();
-  lds_upstream_info_.connection_.reset();
+  cleanupLdsConnection();
 
   // Cleanup connections before server shutdown.
   cleanupUpstreamAndDownstream();
@@ -1432,6 +1446,262 @@ TEST_P(ReverseConnectionClusterIntegrationTest, MultiWorkerEndToEndReverseTunnel
 
   // Wait for listeners to be fully stopped before test cleanup.
   test_server_->waitForCounter("listener_manager.listener_stopped", Eq(3),
+                               std::chrono::milliseconds(5000));
+}
+
+// An rc:// initiator listener whose per-host connection count is outside the supported [0, 1024]
+// range is cleanly rejected when it arrives over LDS.
+TEST_P(ReverseConnectionClusterIntegrationTest, OutOfRangeReverseConnectionListenerRejectedViaLds) {
+  const std::string loopback_addr = loopbackAddress();
+
+  // Serve dynamic listeners over LDS from a static gRPC cluster. With no static listeners the
+  // server comes up purely from LDS, so the rejected update is observed in isolation.
+  config_helper_.addConfigModifier(
+      [loopback_addr](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        bootstrap.mutable_static_resources()->clear_listeners();
+
+        auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+        lds_cluster->set_name("lds_cluster");
+        lds_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+        lds_cluster->mutable_connect_timeout()->set_seconds(5);
+
+        envoy::extensions::upstreams::http::v3::HttpProtocolOptions lds_http_options;
+        lds_http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+        std::ignore = (*lds_cluster->mutable_typed_extension_protocol_options())
+                          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                              .PackFrom(lds_http_options);
+
+        auto* lds_endpoint =
+            lds_cluster->mutable_load_assignment()->add_endpoints()->add_lb_endpoints();
+        lds_cluster->mutable_load_assignment()->set_cluster_name("lds_cluster");
+        auto* lds_address =
+            lds_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+        lds_address->set_address(loopback_addr);
+        lds_address->set_port_value(0); // Filled in by the fake upstream.
+
+        auto* lds_config = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+        lds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+        auto* lds_api = lds_config->mutable_api_config_source();
+        lds_api->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+        lds_api->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+        lds_api->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("lds_cluster");
+      });
+
+  use_lds_ = false;
+  setUpstreamCount(2); // cluster_0 + lds_cluster.
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+
+  on_server_init_function_ = [this]() {
+    createLdsStream();
+
+    envoy::service::discovery::v3::DiscoveryRequest initial_request;
+    ASSERT_TRUE(lds_upstream_info_.stream_->waitForGrpcMessage(*dispatcher_, initial_request));
+    EXPECT_FALSE(initial_request.has_error_detail());
+
+    envoy::config::listener::v3::Listener listener;
+    listener.set_name("out_of_range_reverse_conn_listener");
+    listener.set_stat_prefix("out_of_range_reverse_conn_listener");
+
+    // A per-host connection count of 1025 is above the supported range, so the resolver rejects
+    // the address and listener creation fails.
+    auto* address = listener.mutable_address()->mutable_socket_address();
+    address->set_address("rc://node:cluster:tenant@remote_cluster:1025");
+    address->set_port_value(0);
+    address->set_resolver_name("envoy.resolvers.reverse_connection");
+
+    auto* hcm_filter = listener.add_filter_chains()->add_filters();
+    hcm_filter->set_name("envoy.filters.network.http_connection_manager");
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+    hcm.set_stat_prefix("out_of_range");
+    auto* virtual_host = hcm.mutable_route_config()->add_virtual_hosts();
+    virtual_host->set_name("backend");
+    virtual_host->add_domains("*");
+    auto* route = virtual_host->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_route()->set_cluster("cluster_0");
+    hcm.add_http_filters()->set_name("envoy.filters.http.router");
+    std::ignore = hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::router::v3::Router());
+    std::ignore = hcm_filter->mutable_typed_config()->PackFrom(hcm);
+
+    sendLdsResponse({listener}, "1");
+  };
+
+  // Assert on the resolver's specific error so the test cannot pass on an unrelated rejection.
+  EXPECT_LOG_CONTAINS("warning", "outside the supported range", {
+    HttpIntegrationTest::initialize();
+    test_server_->waitForCounter("listener_manager.lds.update_rejected", Ge(1));
+  });
+
+  // Consume and assert the NACK sent by Envoy in response to the rejected listener config.
+  envoy::service::discovery::v3::DiscoveryRequest nack;
+  ASSERT_TRUE(lds_upstream_info_.stream_->waitForGrpcMessage(*dispatcher_, nack));
+  EXPECT_TRUE(nack.has_error_detail());
+  EXPECT_THAT(nack.error_detail().message(), HasSubstr("outside the supported range"));
+
+  cleanupLdsConnection();
+}
+
+// An rc:// initiator listener with a per-host connection count of 0 loads over LDS and dials
+// nothing. Raising the count over LDS replaces the listener, which then dials, and lowering it back
+// to 0 drains the tunnel without redialing.
+TEST_P(ReverseConnectionClusterIntegrationTest, ZeroCountReverseConnectionListenerUpdatedViaLds) {
+  DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for cleanup.
+
+  const uint32_t tunnel_listener_port = reserveTunnelListenerPort();
+  const std::string loopback_addr = loopbackAddress();
+
+  config_helper_.addConfigModifier([tunnel_listener_port, loopback_addr](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()->clear_listeners();
+
+    // Serve the initiator listener over LDS from a static gRPC cluster.
+    auto* lds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    lds_cluster->set_name("lds_cluster");
+    lds_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    lds_cluster->mutable_connect_timeout()->set_seconds(5);
+    envoy::extensions::upstreams::http::v3::HttpProtocolOptions lds_http_options;
+    lds_http_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    std::ignore = (*lds_cluster->mutable_typed_extension_protocol_options())
+                      ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+                          .PackFrom(lds_http_options);
+    lds_cluster->mutable_load_assignment()->set_cluster_name("lds_cluster");
+    auto* lds_address = lds_cluster->mutable_load_assignment()
+                            ->add_endpoints()
+                            ->add_lb_endpoints()
+                            ->mutable_endpoint()
+                            ->mutable_address()
+                            ->mutable_socket_address();
+    lds_address->set_address(loopback_addr);
+    lds_address->set_port_value(0); // Filled in by the fake upstream.
+
+    auto* lds_config = bootstrap.mutable_dynamic_resources()->mutable_lds_config();
+    lds_config->set_resource_api_version(envoy::config::core::v3::ApiVersion::V3);
+    auto* lds_api = lds_config->mutable_api_config_source();
+    lds_api->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+    lds_api->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
+    lds_api->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("lds_cluster");
+
+    // Responder listener whose downstream_cx_total counts every connection the initiator opens.
+    auto* tunnel_listener = bootstrap.mutable_static_resources()->add_listeners();
+    tunnel_listener->set_name("tunnel_listener");
+    tunnel_listener->set_stat_prefix("tunnel_listener");
+    auto* tunnel_listener_address = tunnel_listener->mutable_address()->mutable_socket_address();
+    tunnel_listener_address->set_address(loopback_addr);
+    tunnel_listener_address->set_port_value(tunnel_listener_port);
+    auto* rt_filter = tunnel_listener->add_filter_chains()->add_filters();
+    rt_filter->set_name("envoy.filters.network.reverse_tunnel");
+    envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
+    rt_config.mutable_ping_interval()->set_seconds(60);
+    rt_config.set_request_path("/reverse_connections/request");
+    rt_config.set_request_method(envoy::config::core::v3::GET);
+    std::ignore = rt_filter->mutable_typed_config()->PackFrom(rt_config);
+
+    // Remote cluster that the initiator listener dials.
+    auto* tunnel_cluster = bootstrap.mutable_static_resources()->add_clusters();
+    tunnel_cluster->set_name("tunnel_cluster");
+    tunnel_cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+    tunnel_cluster->mutable_connect_timeout()->set_seconds(5);
+    tunnel_cluster->mutable_load_assignment()->set_cluster_name("tunnel_cluster");
+    auto* tunnel_cluster_address = tunnel_cluster->mutable_load_assignment()
+                                       ->add_endpoints()
+                                       ->add_lb_endpoints()
+                                       ->mutable_endpoint()
+                                       ->mutable_address()
+                                       ->mutable_socket_address();
+    tunnel_cluster_address->set_address(loopback_addr);
+    tunnel_cluster_address->set_port_value(tunnel_listener_port);
+  });
+
+  // Only the per-host connection count changes between LDS versions.
+  auto initiator_listener = [](uint32_t connection_count) {
+    envoy::config::listener::v3::Listener listener;
+    listener.set_name("reverse_conn_listener");
+    listener.set_stat_prefix("reverse_conn_listener");
+    listener.mutable_listener_filters_timeout()->set_seconds(0);
+    auto* address = listener.mutable_address()->mutable_socket_address();
+    address->set_address(
+        fmt::format("rc://node:cluster:tenant@tunnel_cluster:{}", connection_count));
+    address->set_port_value(0);
+    address->set_resolver_name("envoy.resolvers.reverse_connection");
+
+    auto* hcm_filter = listener.add_filter_chains()->add_filters();
+    hcm_filter->set_name("envoy.filters.network.http_connection_manager");
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
+    hcm.set_stat_prefix("reverse_conn_initiator");
+    auto* virtual_host = hcm.mutable_route_config()->add_virtual_hosts();
+    virtual_host->set_name("backend");
+    virtual_host->add_domains("*");
+    auto* route = virtual_host->add_routes();
+    route->mutable_match()->set_prefix("/");
+    route->mutable_route()->set_cluster("cluster_0");
+    hcm.add_http_filters()->set_name("envoy.filters.http.router");
+    std::ignore = hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(
+        envoy::extensions::filters::http::router::v3::Router());
+    std::ignore = hcm_filter->mutable_typed_config()->PackFrom(hcm);
+    return listener;
+  };
+
+  use_lds_ = false;
+  setUpstreamCount(2); // cluster_0 + lds_cluster.
+  setUpstreamProtocol(Http::CodecType::HTTP2);
+  setDrainTime(std::chrono::seconds(3));
+
+  config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+)EOF");
+  // Re-check every 100ms, the minimum, so the idle phases span several maintenance ticks.
+  config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+  maintain_interval: 0.1s
+)EOF");
+
+  on_server_init_function_ = [this, &initiator_listener]() {
+    createLdsStream();
+    sendLdsResponse({initiator_listener(0)}, "1");
+  };
+
+  // The count 0 listener loads and its maintenance loop runs, but nothing reaches the responder.
+  EXPECT_LOG_CONTAINS("debug", "tunnel_cluster with 0 requested connections per host", {
+    HttpIntegrationTest::initialize();
+    test_server_->waitForCounter("listener_manager.lds.update_success", Ge(1));
+    test_server_->waitUntilListenersReady();
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+  });
+  EXPECT_EQ(0, test_server_->counter("listener.tunnel_listener.downstream_cx_total")->value());
+
+  // Raising the count changes the listener address, so the update replaces the listener and the
+  // replacement dials.
+  sendLdsResponse({initiator_listener(1)}, "2");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(2));
+  test_server_->waitForCounter("reverse_tunnel.handshake.accepted", Ge(1),
+                               std::chrono::milliseconds(5000));
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(1));
+
+  // Lowering the count back to 0 drains the tunnel, and the replacement neither redials nor reports
+  // its idle ticks as failures.
+  sendLdsResponse({initiator_listener(0)}, "3");
+  test_server_->waitForCounter("listener_manager.lds.update_success", Ge(3));
+  test_server_->waitForGauge("listener.reverse_conn_listener.downstream_cx_active", Eq(0),
+                             std::chrono::milliseconds(15000));
+  EXPECT_LOG_NOT_CONTAINS("error", "Failed to create any reverse connections",
+                          timeSystem().advanceTimeWait(std::chrono::milliseconds(1000)));
+  EXPECT_EQ(1, test_server_->counter("listener.tunnel_listener.downstream_cx_total")->value());
+  EXPECT_EQ(1, test_server_->counter("reverse_tunnel.handshake.accepted")->value());
+
+  cleanupLdsConnection();
+
+  // Drain listeners via admin interface to ensure proper cleanup of reverse connection sockets
+  // before workers are destroyed.
+  BufferingStreamDecoderPtr drain_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(drain_response->complete());
+  EXPECT_EQ("200", drain_response->headers().getStatusValue());
+  test_server_->waitForCounter("listener_manager.listener_stopped", Eq(2),
                                std::chrono::milliseconds(5000));
 }
 

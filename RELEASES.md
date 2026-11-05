@@ -85,6 +85,7 @@ actual mechanics of the release itself.
 | 2026 Q1 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 | 2026 Q2 | Ryan Northey ([phlax](https://github.com/phlax))               | Boteng Yao ([botengyao](https://github.com/botengyao))                   |
 | 2026 Q3 | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))    | Yan Avlasov ([yanavlasov](https://github.com/yanavlasov))                |
+| 2026 Q4 | Jonh Wendell ([jwendell](https://github.com/jwendell))    | Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik))                |
 
 ## Major release schedule
 
@@ -122,7 +123,8 @@ deadline of 3 weeks.
 | 1.37.0  | 2026/01/13 | 2026/01/13 |    0 days  | 2027/01/13  |
 | 1.38.0  | 2026/04/14 | 2026/04/23 |   +9 days  | 2027/04/23  |
 | 1.39.0  | 2026/07/14 | 2026/07/14 |    0 days  | 2027/07/14  |
-| 1.40.0  | 2026/10/13 |            |            |             |
+| 1.40.0  | 2026/10/13 | 2026/10/13 |    0 days  | 2027/10/13  |
+| 1.41.0  | 2027/01/19 |            |            |             |
 
 ### Cutting a major release
 

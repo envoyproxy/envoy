@@ -18,7 +18,6 @@
 
 using testing::_;
 using testing::Eq;
-using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 
@@ -252,11 +251,11 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
   Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
-      .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillRepeatedly([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
         EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
         EXPECT_NE(nullptr, headers.EnvoyImmediateHealthCheckFail());
-      }));
+      });
 
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
@@ -323,10 +322,10 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
   Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
-      .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillRepeatedly([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
         EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
-      }));
+      });
 
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
@@ -344,10 +343,10 @@ TEST_F(HealthCheckFilterCachingTest, CachedOkCallbackNotCalled) {
   Http::TestResponseHeaderMapImpl health_check_response{{":status", "200"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
-      .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillRepeatedly([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
         EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
-      }));
+      });
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
@@ -372,10 +371,10 @@ TEST_F(HealthCheckFilterCachingTest, All) {
               setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
-      .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillRepeatedly([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
         EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
 
@@ -406,10 +405,10 @@ TEST_F(HealthCheckFilterCachingTest, DegradedHeader) {
               setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
-      .WillRepeatedly(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillRepeatedly([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
         EXPECT_EQ("cluster_name", headers.getEnvoyUpstreamHealthCheckedClusterValue());
-      }));
+      });
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, true));
 
@@ -518,9 +517,9 @@ TEST_F(HealthCheckFilterCachingTest, DegradedStats) {
   Http::TestResponseHeaderMapImpl health_check_response{{":status", "503"},
                                                         {"x-envoy-degraded", ""}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
-      .WillOnce(Invoke([&](Http::ResponseHeaderMap& headers, bool end_stream) {
+      .WillOnce([&](Http::ResponseHeaderMap& headers, bool end_stream) {
         filter_->encodeHeaders(headers, end_stream);
-      }));
+      });
 
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck));

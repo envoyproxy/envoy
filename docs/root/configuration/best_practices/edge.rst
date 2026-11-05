@@ -39,8 +39,7 @@ Additionally the :ref:`path_with_escaped_slashes_action setting <envoy_v3_api_fi
 * KEEP_UNCHANGED for servers that are not `RFC 3986 <https://www.ietf.org/rfc/rfc3986.txt>`_ compliant and require encoded slashes.
 * UNESCAPE_AND_FORWARD for servers that are known to treat escaped and unescaped slashes equivalently. Choosing this option may increase probablity of path confusion vulnerabilities if intermediaries perform path based access control.
 
-The following is a YAML example of the above recommendation (taken from the :ref:`Google VRP
-<arch_overview_google_vrp>` edge server configuration):
+The following is a YAML example of the above recommendations:
 
 .. literalinclude:: _include/edge.yaml
     :language: yaml

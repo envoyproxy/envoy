@@ -87,6 +87,16 @@ public:
   void updateWatch(const std::string& type_url, Watch* watch,
                    const absl::flat_hash_set<std::string>& resources,
                    const SubscriptionOptions& options);
+  // Additionally adds and/or removes resources in the given watch's interest, updating both the
+  // watch-map routing and the subscription (see GrpcMuxWatch::update).
+  void updateWatch(const std::string& type_url, Watch* watch,
+                   const absl::flat_hash_set<std::string>& resources_to_add,
+                   const absl::flat_hash_set<std::string>& resources_to_remove,
+                   const SubscriptionOptions& options);
+  // Registers glob interest for the given watch; routing only, never affects the subscription
+  // (see GrpcMuxWatch::accept).
+  void accept(const std::string& type_url, Watch* watch,
+              const absl::flat_hash_set<std::string>& patterns);
   void removeWatch(const std::string& type_url, Watch* watch);
 
   ScopedResume pause(const std::string& type_url) override;
@@ -118,9 +128,8 @@ public:
     return makeOptRefFromPtr(eds_resources_cache_.get());
   }
 
-  // TODO(adisuissa): finish implementation.
-  Upstream::LoadStatsReporter* loadStatsReporter() const override { return nullptr; }
-  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override { return nullptr; }
+  Upstream::LoadStatsReporter* loadStatsReporter() const override;
+  Upstream::LoadStatsReporter* maybeCreateLoadStatsReporter() override;
 
   GrpcStreamInterface<RQ, RS>& grpcStreamForTest() {
     // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
@@ -151,6 +160,15 @@ protected:
       parent_.updateWatch(type_url_, watch_, resources, options_);
     }
 
+    void update(const absl::flat_hash_set<std::string>& resources_to_add,
+                const absl::flat_hash_set<std::string>& resources_to_remove) override {
+      parent_.updateWatch(type_url_, watch_, resources_to_add, resources_to_remove, options_);
+    }
+
+    void accept(const absl::flat_hash_set<std::string>& patterns) override {
+      parent_.accept(type_url_, watch_, patterns);
+    }
+
   private:
     const std::string type_url_;
     Watch* watch_;
@@ -166,6 +184,11 @@ protected:
 
   S& subscriptionStateFor(const std::string& type_url);
   WatchMap& watchMapFor(const std::string& type_url);
+  // Normalizes xdstp:// resource names for the transport (adds extra context parameters and sorts
+  // them); non-xdstp names are returned unchanged.
+  absl::flat_hash_set<std::string>
+  effectiveResources(const absl::flat_hash_set<std::string>& resources,
+                     const SubscriptionOptions& options);
   void handleEstablishedStream();
   void handleStreamEstablishmentFailure(bool next_attempt_may_send_initial_resource_version);
   // May modify the order of the resources in response_proto to put all the
@@ -259,6 +282,12 @@ private:
   // True iff Envoy is shutting down; no messages should be sent on the `grpc_stream_` when this is
   // true because it may contain dangling pointers.
   std::atomic<bool> shutdown_{false};
+
+  // A Load-Stats-Reporter factory method that allows to lazily create the
+  // reporter if needed.
+  std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory_;
+  // The load stats reporter, lazily created.
+  std::unique_ptr<Upstream::LoadStatsReporter> lrs_server_;
 };
 
 class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptionStateFactory,
@@ -266,10 +295,6 @@ class GrpcMuxDelta : public GrpcMuxImpl<DeltaSubscriptionState, DeltaSubscriptio
                                         envoy::service::discovery::v3::DeltaDiscoveryResponse> {
 public:
   explicit GrpcMuxDelta(GrpcMuxContext& grpc_mux_context);
-
-  // GrpcStreamCallbacks
-  void requestOnDemandUpdate(const std::string& type_url,
-                             const absl::flat_hash_set<std::string>& for_update) override;
 
 private:
   absl::string_view methodName() const override {
@@ -282,11 +307,6 @@ class GrpcMuxSotw : public GrpcMuxImpl<SotwSubscriptionState, SotwSubscriptionSt
                                        envoy::service::discovery::v3::DiscoveryResponse> {
 public:
   explicit GrpcMuxSotw(GrpcMuxContext& grpc_mux_context);
-
-  // GrpcStreamCallbacks
-  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    ENVOY_BUG(false, "unexpected request for on demand update");
-  }
 
 private:
   absl::string_view methodName() const override {
@@ -314,10 +334,6 @@ public:
       BackOffStrategyPtr&&, const envoy::config::core::v3::ApiConfigSource&,
       std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> = nullptr) override {
     return absl::UnimplementedError("");
-  }
-
-  void requestOnDemandUpdate(const std::string&, const absl::flat_hash_set<std::string>&) override {
-    ENVOY_BUG(false, "unexpected request for on demand update");
   }
 
   EdsResourcesCacheOptRef edsResourcesCache() override { return {}; }

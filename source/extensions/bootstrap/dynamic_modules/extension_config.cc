@@ -1,7 +1,14 @@
 #include "source/extensions/bootstrap/dynamic_modules/extension_config.h"
 
-#include "source/common/common/assert.h"
+#include <algorithm>
+#include <vector>
 
+#include "envoy/server/options.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/thread.h"
+
+#include "absl/container/flat_hash_set.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -15,8 +22,8 @@ DynamicModuleBootstrapExtensionConfig::DynamicModuleBootstrapExtensionConfig(
     Extensions::DynamicModules::DynamicModulePtr dynamic_module,
     Event::Dispatcher& main_thread_dispatcher, Server::Configuration::ServerFactoryContext& context,
     Stats::Store& stats_store)
-    : dynamic_module_(std::move(dynamic_module)), main_thread_dispatcher_(main_thread_dispatcher),
-      context_(context), stats_store_(stats_store),
+    : extension_name_(extension_name), dynamic_module_(std::move(dynamic_module)),
+      main_thread_dispatcher_(main_thread_dispatcher), context_(context), stats_store_(stats_store),
       stats_scope_(stats_store.createScope(absl::StrCat(metrics_namespace, "."))),
       metrics_(*stats_scope_) {
   ASSERT(dynamic_module_ != nullptr);
@@ -48,12 +55,25 @@ void DynamicModuleBootstrapExtensionConfig::signalInitComplete() {
                    "traffic");
 }
 
+void DynamicModuleBootstrapExtensionConfig::postSignalInitComplete() {
+  main_thread_dispatcher_.post([weak_config = weak_from_this()]() {
+    DynamicModuleBootstrapExtensionConfigSharedPtr config = weak_config.lock();
+    if (config != nullptr) {
+      config->signalInitComplete();
+    }
+  });
+}
+
 bool DynamicModuleBootstrapExtensionConfig::enableClusterLifecycle() {
   if (cluster_lifecycle_enabled_) {
     return false;
   }
   if (!server_initialized_) {
     ENVOY_LOG(error, "cannot enable cluster lifecycle before server is initialized");
+    return false;
+  }
+  if (!shutdownNotificationExpected()) {
+    ENVOY_LOG(error, "cannot enable cluster lifecycle once shutdown started or in init only mode");
     return false;
   }
   cluster_lifecycle_enabled_ = true;
@@ -90,6 +110,10 @@ bool DynamicModuleBootstrapExtensionConfig::enableListenerLifecycle() {
     ENVOY_LOG(error, "cannot enable listener lifecycle before server is initialized");
     return false;
   }
+  if (!shutdownNotificationExpected()) {
+    ENVOY_LOG(error, "cannot enable listener lifecycle once shutdown started or in init only mode");
+    return false;
+  }
   listener_lifecycle_enabled_ = true;
   listener_update_callbacks_handle_ = listener_manager_->addListenerUpdateCallbacks(*this);
   // Register a shutdown callback to release the handle before the ListenerManager is destroyed.
@@ -114,10 +138,174 @@ void DynamicModuleBootstrapExtensionConfig::onListenerRemoval(const std::string&
   }
 }
 
+void DynamicModuleBootstrapExtensionConfig::getActiveResourceNames(
+    envoy_dynamic_module_type_bootstrap_active_resource_kind kind,
+    absl::FunctionRef<void(absl::string_view)> emit) {
+  // The cluster manager and listener manager are not available until the server is initialized,
+  // and the server context can be gone once the extension is destroyed.
+  if (!server_initialized_ || extension_destroyed_) {
+    return;
+  }
+  // Each name is emitted at most once, e.g. an FCDS chain shared by several listeners.
+  absl::flat_hash_set<absl::string_view> seen;
+  auto emit_once = [&seen, &emit](absl::string_view name) {
+    if (seen.insert(name).second) {
+      emit(name);
+    }
+  };
+  switch (kind) {
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_FilterChain: {
+    // Filter chains across all active listeners. filterChainNames() returns the listener's inline
+    // and default chains plus, for an fcds_config listener, the FCDS chains its matcher references
+    // that are active. Reporting only via active listeners ties a reported name to being routable
+    // (an active listener's matcher dispatches to it) and active: a chain active in the
+    // process-wide FCDS manager but referenced only by a warming listener is not reported. An FCDS
+    // chain shared by several listeners is reported once.
+    if (listener_manager_ != nullptr) {
+      for (Network::ListenerConfig& listener :
+           listener_manager_->listeners(Server::ListenerManager::ListenerState::ACTIVE)) {
+        for (absl::string_view name : listener.filterChainManager().filterChainNames()) {
+          emit_once(name);
+        }
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_Cluster:
+    for (const auto& cluster_entry : context_.clusterManager().clusters().active_clusters_) {
+      emit_once(cluster_entry.first);
+    }
+    break;
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_TransportSocketMatch: {
+    // A transport socket match is emitted only when present in every cluster that has matches, so a
+    // match is observed only once it has landed in all the clusters that carry per-endpoint
+    // matches. Clusters with no matches do not constrain the intersection.
+    std::vector<std::vector<absl::string_view>> per_cluster_matches;
+    for (const auto& [cluster_name, cluster] :
+         context_.clusterManager().clusters().active_clusters_) {
+      per_cluster_matches.push_back(cluster.get().info()->transportSocketMatcher().matchNames());
+    }
+    for (absl::string_view match_name : transportSocketMatchIntersection(per_cluster_matches)) {
+      emit_once(match_name);
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_bootstrap_active_resource_kind_Secret:
+    for (absl::string_view secret_name : context_.secretManager().dynamicActiveSecretNames()) {
+      emit_once(secret_name);
+    }
+    break;
+  }
+}
+
+std::vector<absl::string_view>
+DynamicModuleBootstrapExtensionConfig::transportSocketMatchIntersection(
+    const std::vector<std::vector<absl::string_view>>& per_cluster_matches) {
+  std::vector<absl::string_view> result;
+  bool initialized = false;
+  for (const auto& cluster_matches : per_cluster_matches) {
+    // A cluster with no matches carries no per-endpoint matches, so it does not constrain the
+    // intersection.
+    if (cluster_matches.empty()) {
+      continue;
+    }
+    if (!initialized) {
+      result.assign(cluster_matches.begin(), cluster_matches.end());
+      initialized = true;
+      continue;
+    }
+    const absl::flat_hash_set<absl::string_view> names(cluster_matches.begin(),
+                                                       cluster_matches.end());
+    result.erase(std::remove_if(result.begin(), result.end(),
+                                [&names](absl::string_view n) { return !names.contains(n); }),
+                 result.end());
+  }
+  return result;
+}
+
 void DynamicModuleBootstrapExtensionConfig::onScheduled(uint64_t event_id) {
   if (in_module_config_ != nullptr && on_bootstrap_extension_config_scheduled_ != nullptr) {
     on_bootstrap_extension_config_scheduled_(thisAsVoidPtr(), in_module_config_, event_id);
   }
+}
+
+bool DynamicModuleBootstrapExtensionConfig::runOnAllWorkers(uint64_t event_id) {
+  if (!server_initialized_ || shutdown_started_) {
+    return false;
+  }
+  if (worker_slot_ == nullptr) {
+    worker_slot_ = ThreadLocal::TypedSlot<>::makeUnique(context_.threadLocal());
+    // The slot must be set before it can run callbacks on the threads.
+    worker_slot_->set(
+        [](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return nullptr; });
+  }
+  std::weak_ptr<DynamicModuleBootstrapExtensionConfig> weak_config = weak_from_this();
+  worker_slot_->runOnAllThreads(
+      [weak_config, event_id](OptRef<ThreadLocal::ThreadLocalObject>) {
+        // The thread local engine runs this on the main thread too.
+        if (Thread::MainThread::isMainOrTestThread()) {
+          return;
+        }
+        DynamicModuleBootstrapExtensionConfigSharedPtr config = weak_config.lock();
+        if (config != nullptr && config->on_bootstrap_extension_worker_event_ != nullptr) {
+          config->on_bootstrap_extension_worker_event_(config->thisAsVoidPtr(),
+                                                       config->in_module_config_, event_id);
+        }
+      },
+      [weak_config, event_id]() {
+        DynamicModuleBootstrapExtensionConfigSharedPtr config = weak_config.lock();
+        if (config != nullptr && !config->shutdown_started_ &&
+            config->on_bootstrap_extension_run_on_all_workers_done_ != nullptr) {
+          config->on_bootstrap_extension_run_on_all_workers_done_(
+              config->thisAsVoidPtr(), config->in_module_config_, event_id);
+        }
+      });
+  return true;
+}
+
+bool DynamicModuleBootstrapExtensionConfig::enableClusterWriter() {
+  if (cluster_writer_ != nullptr || shutdown_started_) {
+    return false;
+  }
+  DynamicModuleClusterWriter::UpdateDoneCallback update_done;
+  if (on_bootstrap_extension_cluster_writer_update_done_ != nullptr) {
+    update_done = [this](uint64_t update_id, absl::string_view cluster_name,
+                         envoy_dynamic_module_type_bootstrap_cluster_writer_update_status status,
+                         absl::string_view error_details) {
+      on_bootstrap_extension_cluster_writer_update_done_(
+          thisAsVoidPtr(), in_module_config_, update_id, {cluster_name.data(), cluster_name.size()},
+          status, {error_details.data(), error_details.size()});
+    };
+  }
+  cluster_writer_ = std::make_unique<DynamicModuleClusterWriter>(extension_name_, context_,
+                                                                 std::move(update_done));
+  if (server_initialized_) {
+    cluster_writer_->onServerInitialized();
+  }
+  return true;
+}
+
+void DynamicModuleBootstrapExtensionConfig::onShutdown() {
+  shutdown_started_ = true;
+  if (cluster_writer_ != nullptr) {
+    cluster_writer_->onShutdown();
+  }
+}
+
+void DynamicModuleBootstrapExtensionConfig::onExtensionDestroyed() {
+  onShutdown();
+  extension_destroyed_ = true;
+}
+
+OptRef<Server::Admin> DynamicModuleBootstrapExtensionConfig::admin() {
+  if (extension_destroyed_) {
+    return {};
+  }
+  return context_.admin();
+}
+
+bool DynamicModuleBootstrapExtensionConfig::shutdownNotificationExpected() const {
+  return !shutdown_started_ && context_.options().mode() != Server::Mode::InitOnly;
 }
 
 envoy_dynamic_module_type_http_callout_init_result
@@ -127,7 +315,8 @@ DynamicModuleBootstrapExtensionConfig::sendHttpCallout(uint64_t* callout_id_out,
                                                        uint64_t timeout_milliseconds) {
   // The cluster manager is not available during bootstrap extension creation, so accessing it
   // before the server is initialized would dereference a null cluster manager in release builds.
-  if (!server_initialized_) {
+  // The server context can be gone once the extension is destroyed.
+  if (!server_initialized_ || extension_destroyed_) {
     return envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound;
   }
   // Access cluster manager lazily since it's not available during bootstrap extension creation.
@@ -167,8 +356,10 @@ void DynamicModuleBootstrapExtensionConfig::HttpCalloutCallback::onSuccess(
   DynamicModuleBootstrapExtensionConfigSharedPtr config = std::move(config_);
   uint64_t callout_id = callout_id_;
 
-  // Check if the config still has the in-module config.
-  if (!config->in_module_config_) {
+  // Check if the config still has the in-module config. request_ is set only after the async client
+  // accepts the callout, and a callout that send completes inline is already reported by the return
+  // code.
+  if (!config->in_module_config_ || request_ == nullptr) {
     config->http_callouts_.erase(callout_id);
     return;
   }
@@ -221,9 +412,18 @@ void DynamicModuleBootstrapExtensionConfig::HttpCalloutCallback::onFailure(
       result = envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit;
       break;
     }
-    config->on_bootstrap_extension_http_callout_done_(config->thisAsVoidPtr(),
-                                                      config->in_module_config_, callout_id, result,
-                                                      nullptr, 0, nullptr, 0);
+    // This can run inside a cluster manager update, so report it from a posted callback.
+    config->main_thread_dispatcher_.post(
+        [weak_config = std::weak_ptr<DynamicModuleBootstrapExtensionConfig>(config), callout_id,
+         result]() {
+          DynamicModuleBootstrapExtensionConfigSharedPtr config = weak_config.lock();
+          if (config == nullptr) {
+            return;
+          }
+          config->on_bootstrap_extension_http_callout_done_(config->thisAsVoidPtr(),
+                                                            config->in_module_config_, callout_id,
+                                                            result, nullptr, 0, nullptr, 0);
+        });
   }
 
   // Clean up the callout.
@@ -355,6 +555,24 @@ newDynamicModuleBootstrapExtensionConfig(
   auto config = std::make_shared<DynamicModuleBootstrapExtensionConfig>(
       extension_name, extension_config, metrics_namespace, std::move(dynamic_module),
       main_thread_dispatcher, context, stats_store);
+
+  // The module constructor can enable the cluster writer, which captures its done hook, so the
+  // optional hooks are resolved first.
+  auto on_worker_event =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionWorkerEventType>(
+          "envoy_dynamic_module_on_bootstrap_extension_worker_event");
+  config->on_bootstrap_extension_worker_event_ =
+      on_worker_event.ok() ? on_worker_event.value() : nullptr;
+  auto on_run_on_all_workers_done =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionRunOnAllWorkersDoneType>(
+          "envoy_dynamic_module_on_bootstrap_extension_run_on_all_workers_done");
+  config->on_bootstrap_extension_run_on_all_workers_done_ =
+      on_run_on_all_workers_done.ok() ? on_run_on_all_workers_done.value() : nullptr;
+  auto on_cluster_writer_update_done =
+      config->dynamic_module_->getFunctionPointer<OnBootstrapExtensionClusterWriterUpdateDoneType>(
+          "envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done");
+  config->on_bootstrap_extension_cluster_writer_update_done_ =
+      on_cluster_writer_update_done.ok() ? on_cluster_writer_update_done.value() : nullptr;
 
   // Always register an init target so that Envoy blocks traffic until the module signals readiness.
   // This must happen before calling the module constructor so the module can call

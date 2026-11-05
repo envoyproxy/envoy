@@ -188,14 +188,17 @@ envoy_cc_test(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/config:xds_resource_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
+        "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:od_cds_api_mocks",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
     ],
 )
 
 envoy_cc_test(
     name = "cluster_manager_lifecycle_test",
     srcs = ["cluster_manager_lifecycle_test.cc"],
+    rbe_pool = "linux_x64_small",
     deps = [
         ":cluster_manager_impl_test_common",
         "//source/extensions/clusters/dns:dns_cluster_lib",
@@ -364,6 +367,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:health_checker_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
@@ -673,6 +677,7 @@ envoy_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//test/test_common:status_utility_lib",
+        ":snapshot_host_set_lib",
         ":test_local_address_selector",
         ":utility_lib",
         "//envoy/api:api_interface",
@@ -686,6 +691,7 @@ envoy_cc_test(
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
         "//source/common/queue_policy:queue_policy_base_lib",
+        "//source/common/upstream:host_lookup_map_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/eds:eds_lib",
         # TODO(mattklein123): Split this into 2 tests for each cluster.
@@ -729,6 +735,15 @@ envoy_cc_test(
     ] + envoy_select_enable_http3([
         "//source/common/quic:quic_transport_socket_factory_lib",
     ]),
+)
+
+envoy_cc_test_library(
+    name = "snapshot_host_set_lib",
+    hdrs = ["snapshot_host_set.h"],
+    deps = [
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -789,6 +804,23 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "cluster_dns_resolver_cache_test",
+    srcs = ["cluster_dns_resolver_cache_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
+        "//source/common/upstream:cluster_dns_resolver_cache_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/cares/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "cluster_factory_impl_test",
     srcs = ["cluster_factory_impl_test.cc"],
     rbe_pool = "linux_x64_small",
@@ -830,6 +862,7 @@ envoy_cc_test_library(
     srcs = ["health_check_fuzz.cc"],
     hdrs = ["health_check_fuzz.h"],
     rbe_pool = "linux_x64_small",
+    tags = ["skip_on_windows"],
     deps = [
         ":health_check_fuzz_proto_cc_proto",
         ":health_check_fuzz_utils_lib",

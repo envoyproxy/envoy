@@ -324,7 +324,7 @@ private:
     OptRef<const Tracing::Config> tracingConfig() const override;
     const ScopeTrackedObject& scope() override;
     OptRef<DownstreamStreamFilterCallbacks> downstreamCallbacks() override { return *this; }
-    bool isHalfCloseEnabled() override { return connection_manager_.allow_upstream_half_close_; }
+    bool isHalfCloseEnabled() override { return state_.half_close_enabled_; }
 
     // DownstreamStreamFilterCallbacks
     void setRoute(Router::RouteConstSharedPtr route) override;
@@ -336,6 +336,7 @@ private:
     void recreateClusterInfo() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    void enableHalfClose() override { state_.half_close_enabled_ = true; }
 
     void setVirtualHostRoute(Router::VirtualHostRoute route);
     // Set cached route. This method should never be called directly. This is only called in the
@@ -408,6 +409,11 @@ private:
       // structure, so it can be atomically created and cleared.
       bool deferred_to_next_io_iteration_ : 1 = false;
       bool deferred_end_stream_ : 1 = false;
+
+      // If true, the stream is destroyed once both request and response are complete and the
+      // response is a success (2xx). Otherwise it is destroyed when the response completes, and
+      // reset if the request is still incomplete.
+      bool half_close_enabled_ : 1 = false;
     };
 
     bool canDestroyStream() const {
@@ -628,6 +634,12 @@ private:
   void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
+  // Called when the drain sequence the connection was notified of (see onDrain()) is about to end
+  // and the connection has to be drained without waiting for a response to decide on.
+  void onProactiveDrainTimeout();
+  // Resets the upgraded and CONNECT streams of a drained connection. Unlike ordinary requests they
+  // are not expected to complete on their own before the end of the drain sequence.
+  void resetTunnelingStreams();
   Tracing::Tracer& tracer() { return *config_->tracer(); }
   void handleCodecErrorImpl(absl::string_view error, absl::string_view details,
                             StreamInfo::CoreResponseFlag response_flag);
@@ -637,6 +649,8 @@ private:
                          std::optional<StreamInfo::CoreResponseFlag> response_flag,
                          absl::string_view details);
   void sendGoAwayAndClose(bool graceful = false);
+  void incIdleConnectionsStat();
+  void decIdleConnectionsStat();
 
   // Returns true if a RST_STREAM for the given stream is premature. Premature
   // means the RST_STREAM arrived before response headers were sent and than
@@ -669,7 +683,7 @@ private:
   const Network::DrainDecision& drain_close_;
   // Set when the connection is notified of a drain sequence via onDrain(). Carries the drain start
   // time and strategy so the drain-close decision can be computed at the connection level (see
-  // shouldDrainClose()).
+  // shouldDrainClose()). Only set when use_connection_event_drain_ is enabled.
   std::optional<Network::ConnectionDrainEvent> connection_drain_event_;
   DrainState drain_state_{DrainState::NotDraining};
   UserAgent user_agent_;
@@ -680,6 +694,12 @@ private:
   // A connection duration timer. Armed during handling new connection if enabled in config.
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
+  // Armed in onDrain() to fire at a random point near the end of the drain sequence, so that a
+  // connection that sent no response in the meantime is still drained before it is torn down.
+  Event::TimerPtr proactive_drain_timer_;
+  // Set once proactive_drain_timer_ has fired. From then on tunneling streams are reset as soon as
+  // the connection is closing, see resetTunnelingStreams().
+  bool proactive_drain_{false};
   // When set to true, add Connection:close response header to nudge downstream client to reconnect.
   bool soft_drain_http1_{false};
   Random::RandomGenerator& random_generator_;
@@ -726,22 +746,6 @@ private:
   // Latched when the connection manager is created so it is not re-read on every response. See
   // shouldDrainClose().
   const bool use_connection_event_drain_ = false;
-
-  // If independent half-close is enabled and the upstream protocol is either HTTP/2 or HTTP/3
-  // protocols the stream is destroyed after both request and response are complete i.e. reach their
-  // respective end-of-stream, by receiving trailers or the header/body with end-stream set in both
-  // directions AND response has success (2xx) status code.
-  //
-  // For HTTP/1 upstream protocol or if independent half-close is disabled the stream is destroyed
-  // when the response is complete and reaches its end-of-stream, i.e. when trailers or the response
-  // header/body with end-stream set are received, even if the request has not yet completed. If
-  // request was incomplete at response completion, the stream is reset.
-
-  const bool allow_upstream_half_close_{};
-  // Whether to call checkForDeferredClose() when zombie streams complete.
-  // This fixes a potential FD leak where connections with zombie streams in draining state
-  // would not be properly closed.
-  const bool close_connection_on_zombie_stream_complete_{};
 
   // Whether the connection manager is drained due to premature resets.
   bool drained_due_to_premature_resets_{false};

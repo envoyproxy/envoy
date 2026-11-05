@@ -8,6 +8,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -234,6 +235,24 @@ token_bucket:
   }
 
   configs.clear();
+}
+
+// The filter's stats carry the stat prefix as an explicit tag.
+TEST_F(LocalRateLimitFilterTest, StatsAreTagged) {
+  initialize(R"EOF(
+stat_prefix: local_rate_limit_stats
+token_bucket:
+  max_tokens: 1
+  fill_interval: 0.2s
+)EOF");
+
+  const Stats::CounterSharedPtr rate_limited = TestUtility::findCounter(
+      stats_store_, "local_rate_limit.local_rate_limit_stats.rate_limited");
+  ASSERT_NE(rate_limited, nullptr);
+  EXPECT_EQ("local_rate_limit.rate_limited", rate_limited->tagExtractedName());
+  ASSERT_EQ(1U, rate_limited->tags().size());
+  EXPECT_EQ("envoy.local_network_ratelimit_prefix", rate_limited->tags()[0].name_);
+  EXPECT_EQ("local_rate_limit_stats", rate_limited->tags()[0].value_);
 }
 
 } // namespace LocalRateLimitFilter

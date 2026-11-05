@@ -43,13 +43,14 @@ running tests that reflects the latest built Windows 2019 Envoy image.
 The source for these images is located in the [envoyproxy/envoy-build-tools](https://github.com/envoyproxy/envoy-build-tools)
 repository.
 
-The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC which builds binary only, configured with `--config=gcc`.
+The default toolchain uses the Clang compiler with libc++ for all Linux CI runs with tests and requires no configuration flag. We have an additional Linux CI run with GCC, configured with `--config=gcc`, which builds the binary and runs the tests
+(`ci/do_ci.sh gcc`; `gcc.server_only` and `gcc.test_only` run just one of the two).
 
 # Supported compiler configurations
 
 Envoy supports the following compiler toolchain configurations:
 * No configuration flag - Clang compiler with libc++ standard library (default)
-* `--config=gcc` - GCC compiler with libstdc++ standard library
+* `--config=gcc` - Hermetic GCC compiler with libstdc++ standard library (Linux x86_64 only)
 
 # C++ standard library
 
@@ -62,6 +63,22 @@ The standard library is derived from the compiler toolchain:
 
 These are the only supported configurations. Other combinations, such as Clang with libstdc++, are not supported or tested;
 if you need one, you will need to set up your own `cc_toolchain`.
+
+# Hermetic git
+
+CI does not use a `git` installed in the build image. `ci/do_ci.sh` resolves toolshed's prebuilt
+git toolchain (`//tools/git:bin`) once and exports it as `GIT_BIN`, which the CI scripts and
+`bazel/get_workspace_status` use. On macOS, where no prebuilt is published, it uses the host's
+`git` from `PATH`.
+
+To use your own git instead, set `GIT_BIN` before running `ci/do_ci.sh` (inside the container
+when using `ci/run_envoy_docker.sh`, eg `./ci/run_envoy_docker.sh 'GIT_BIN=/usr/bin/git ./ci/do_ci.sh format-api'`).
+Outside `ci/do_ci.sh`, `bazel/get_workspace_status` and `tools/git/*` fall back to `git` on `PATH`
+when `GIT_BIN` is unset.
+
+Bazel actions that need git (eg the `proto_format` genrules) use the git toolchain
+(`@envoy_toolshed//git:toolchain_type`), not `GIT_BIN`. To use a different git there, register
+your own `git_toolchain` (from `@envoy_toolshed//git:defs.bzl`) with `--extra_toolchains`.
 
 # Building and running tests as a developer
 
@@ -193,12 +210,16 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `fix_proto_format`&mdash; fix configuration, formatting and build issues in API proto files.
 * `check_and_fix_proto_format` &mdash; check and fix configuration, fomatting and build issues in API proto files.
 * `format`&mdash; run validation, linting and formatting tools.
-* `lockfiles`/`lockfiles.regenerate` &mdash; regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
-* `lockfiles.check` &mdash; regenerate all `MODULE.bazel.lock` files and fail with a diff summary if any lockfile changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
-* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, and dependabot configuration.
-* `registry` &mdash; update the Envoy bazel-registry hash in `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate all `MODULE.bazel.lock` files. Set `ENVOY_REGISTRY_HASH` to use a specific hash, `ENVOY_REGISTRY_REPO` to override the repository used for `git ls-remote`, or `ENVOY_REGISTRY_BRANCH` to override the branch used for the bump and checked by `deps`/`registry.check`.
-* `registry.check` &mdash; verify the pinned bazel-registry commit exists, is an ancestor of the target branch (`ENVOY_REGISTRY_BRANCH`, default `main`), and (for non-`-dev` versions) is tagged.
+* `lockfiles`/`lockfiles.regenerate` &mdash; repin `Cargo.Bazel.envoy.lock` from `Cargo.toml` and `Cargo.lock` with `CARGO_BAZEL_REPIN=true`, then regenerate all `MODULE.bazel.lock` files with `bazel mod deps --lockfile_mode=update`.
+* `lockfiles.check` &mdash; regenerate the lockfiles as `lockfiles` does and fail with a diff summary if any lockfile, including `Cargo.lock`, changes; the full diff is written to `LOCKFILES_DIFF_OUTPUT` (default `/build/fix_lockfiles.diff`, uploaded as an artifact in CI). Run `ci/do_ci.sh lockfiles` to update them.
+* `modules.version` &mdash; set the `module()` version, and the `bazel_dep` versions of in-repo modules (`envoy`, `envoy_api`, `envoy-docs`, `envoy_mobile`, `envoy_build_config`), in all `MODULE.bazel` files to match `VERSION.txt`, then regenerate the lockfiles as `lockfiles` does.
+* `deps` &mdash; validate dependency metadata ordering, reachability, graph structure, the pinned bazel-registry commit, lockfile sync, and dependabot configuration.
+* `deps.report` &mdash; run the per-workspace bzlmod dependency report targets and print the current/latest version status for each workspace.
+* `deps.update <name[=version]>` &mdash; run the per-workspace bzlmod dependency updater for the requested module, skipping workspaces where that dependency is not declared, then regenerate the lockfiles as `lockfiles` does.
+* `registry` &mdash; run the per-workspace Bazel registry updater targets for `.bazelrc`, `api/.bazelrc`, and `bazel/tests/external/.bazelrc`, then regenerate the lockfiles as `lockfiles` does. Set `ENVOY_REGISTRY_HASH` to request a specific hash, and set `ENVOY_REGISTRY_ALLOW_UNSAFE` to allow non-ancestor pins for testing.
+* `registry.check` &mdash; run the per-workspace Bazel registry status targets, verify they all report the same pinned hash, and require a tagged registry pin for non-`-dev` releases.
 * `docs`&mdash; build documentation tree in `generated/docs`.
+* `execution_context` &mdash; build and run the execution_context-enabled test (`//test/common/common:execution_context_enabled_test`) via the `//bazel:execution_context` build setting transition.
 
 ## On Windows
 

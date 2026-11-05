@@ -53,11 +53,17 @@ config_env() {
 
     if [[ "${DOCKER_PLATFORM}" == *","*  ]]; then
         echo "> docker run --rm --privileged tonistiigi/binfmt --install all"
-        docker run --rm --privileged tonistiigi/binfmt:qemu-v7.0.0 --install all
+        if [[ -z "$DOCKER_CI_DRYRUN" ]]; then
+            docker run --rm --privileged tonistiigi/binfmt:qemu-v7.0.0 --install all
+        fi
     fi
 
     echo "> docker buildx rm envoy-builder 2> /dev/null || :"
     echo "> docker buildx create --use --name envoy-builder --platform ${DOCKER_PLATFORM}"
+
+    if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+        return
+    fi
 
     # Remove older build instance
     docker buildx rm envoy-builder 2> /dev/null || :
@@ -65,10 +71,6 @@ config_env() {
 }
 
 BUILD_TYPES=("" "-debug" "-contrib" "-contrib-debug" "-contrib-distroless" "-distroless" "-tools")
-
-if [[ "$DOCKER_PLATFORM" == "linux/amd64" ]]; then
-    BUILD_TYPES+=("-google-vrp")
-fi
 
 # Configure docker-buildx tools
 BUILD_COMMAND=("buildx" "build")
@@ -157,6 +159,10 @@ build_image () {
         .)
     echo ">> ${action}: ${build_tag}"
     echo "> docker ${docker_build_args[*]}"
+
+    if [[ -n "$DOCKER_CI_DRYRUN" ]]; then
+        return
+    fi
 
     timeout "$DOCKER_BUILD_TIMEOUT" docker "${docker_build_args[@]}" || {
         if [[ "$?" == 124 ]]; then

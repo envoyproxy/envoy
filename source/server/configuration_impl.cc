@@ -83,7 +83,8 @@ bool FilterChainUtility::buildQuicFilterChain(
 
 StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                                  absl::Status& status)
-    : deferred_stat_options_(bootstrap.deferred_stat_options()) {
+    : deferred_stat_options_(bootstrap.deferred_stat_options()),
+      eviction_interval_runtime_key_(bootstrap.runtime_stats_eviction_interval().runtime_key()) {
   status = absl::OkStatus();
   if (bootstrap.has_stats_flush_interval() &&
       bootstrap.stats_flush_case() !=
@@ -100,7 +101,10 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
     flush_on_admin_ = bootstrap.stats_flush_on_admin();
   }
 
-  const auto evict_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_eviction_interval, 0);
+  const uint64_t evict_interval_ms =
+      bootstrap.has_runtime_stats_eviction_interval()
+          ? bootstrap.runtime_stats_eviction_interval().default_value()
+          : PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_eviction_interval, 0);
   if (evict_interval_ms % flush_interval_.count() != 0) {
     status = absl::InvalidArgumentError(
         "stats_eviction_interval must be a multiple of stats_flush_interval");

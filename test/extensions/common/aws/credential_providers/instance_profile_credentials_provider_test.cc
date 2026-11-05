@@ -80,9 +80,9 @@ public:
                                            {":method", "PUT"},
                                            {"X-aws-ec2-metadata-token-ttl-seconds", "21600"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code, token = std::move(token)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code,
+                         token = std::move(token)](Http::RequestMessage&, Tracing::Span&,
+                                                   MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!token.empty()) {
               receiver.onMetadataSuccess(std::move(token));
@@ -99,7 +99,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   void expectCredentialListing(const uint64_t status_code, const std::string&& instance_role) {
@@ -108,9 +108,9 @@ public:
                                            {":scheme", "http"},
                                            {":method", "GET"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code, instance_role = std::move(instance_role)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code, instance_role = std::move(instance_role)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!instance_role.empty()) {
               receiver.onMetadataSuccess(std::move(instance_role));
@@ -127,7 +127,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   void expectCredentialListingIMDSv2(const uint64_t status_code,
@@ -138,9 +138,9 @@ public:
                                            {":method", "GET"},
                                            {"X-aws-ec2-metadata-token", "TOKEN"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code, instance_role = std::move(instance_role)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code, instance_role = std::move(instance_role)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!instance_role.empty()) {
               receiver.onMetadataSuccess(std::move(instance_role));
@@ -157,7 +157,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   void expectDocument(const uint64_t status_code, const std::string&& credential_document_value) {
@@ -167,10 +167,10 @@ public:
         {":scheme", "http"},
         {":method", "GET"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code,
-                                credential_document_value = std::move(credential_document_value)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code,
+                         credential_document_value = std::move(credential_document_value)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!credential_document_value.empty()) {
               receiver.onMetadataSuccess(std::move(credential_document_value));
@@ -187,7 +187,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   void expectDocumentIMDSv2(const uint64_t status_code,
@@ -199,10 +199,10 @@ public:
         {":method", "GET"},
         {"X-aws-ec2-metadata-token", "TOKEN"}};
     EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers), _, _))
-        .WillRepeatedly(Invoke([this, status_code,
-                                credential_document_value = std::move(credential_document_value)](
-                                   Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
+        .WillRepeatedly([this, status_code,
+                         credential_document_value = std::move(credential_document_value)](
+                            Http::RequestMessage&, Tracing::Span&,
+                            MetadataFetcher::MetadataReceiver& receiver) {
           if (status_code == enumToInt(Http::Code::OK)) {
             if (!credential_document_value.empty()) {
               receiver.onMetadataSuccess(std::move(credential_document_value));
@@ -219,7 +219,7 @@ public:
                 .WillRepeatedly(testing::Return("Network"));
             receiver.onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
           }
-        }));
+        });
   }
 
   TestScopedRuntime scoped_runtime_;
@@ -776,10 +776,10 @@ TEST_F(InstanceProfileCredentialsProviderTest, DeferredCompletionCallbackSafeAft
   std::function<void()> captured_callback;
 
   EXPECT_CALL(context_.thread_local_, runOnAllThreads(testing::_, testing::_))
-      .WillOnce(testing::Invoke([&captured_callback](const std::function<void()>&,
-                                                     const std::function<void()>& complete_cb) {
+      .WillOnce([&captured_callback](const std::function<void()>&,
+                                     const std::function<void()>& complete_cb) {
         captured_callback = complete_cb;
-      }));
+      });
 
   setupProvider();
 

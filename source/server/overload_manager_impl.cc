@@ -323,14 +323,16 @@ private:
 class ThreadLocalOverloadStateImpl : public ThreadLocalOverloadState {
 public:
   explicit ThreadLocalOverloadStateImpl(
+      const Event::Dispatcher& dispatcher,
       const NamedOverloadActionSymbolTable& action_symbol_table,
       std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>&
           proactive_resources)
-      : action_symbol_table_(action_symbol_table),
+      : dispatcher_(dispatcher), action_symbol_table_(action_symbol_table),
         actions_(action_symbol_table.size(), OverloadActionState(UnitFloat::min())),
         proactive_resources_(proactive_resources) {}
 
   const OverloadActionState& getState(const std::string& action) override {
+    ASSERT(dispatcher_.isThreadSafe());
     if (const auto symbol = action_symbol_table_.lookup(action); symbol != std::nullopt) {
       return actions_[symbol->index()];
     }
@@ -338,11 +340,13 @@ public:
   }
 
   void setState(NamedOverloadActionSymbolTable::Symbol action, OverloadActionState state) {
+    ASSERT(dispatcher_.isThreadSafe());
     actions_[action.index()] = state;
   }
 
   bool tryAllocateResource(OverloadProactiveResourceName resource_name,
                            int64_t increment) override {
+    ASSERT(dispatcher_.isThreadSafe());
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
       ENVOY_LOG_MISC(warn, "Failed to allocate resource usage, resource monitor is not configured");
@@ -354,6 +358,7 @@ public:
 
   bool tryDeallocateResource(OverloadProactiveResourceName resource_name,
                              int64_t decrement) override {
+    ASSERT(dispatcher_.isThreadSafe());
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
       ENVOY_LOG_MISC(warn,
@@ -365,12 +370,14 @@ public:
   }
 
   bool isResourceMonitorEnabled(OverloadProactiveResourceName resource_name) override {
+    ASSERT(dispatcher_.isThreadSafe());
     const auto proactive_resource = proactive_resources_->find(resource_name);
     return proactive_resource != proactive_resources_->end();
   }
 
   ProactiveResourceMonitorOptRef
   getProactiveResourceMonitorForTest(OverloadProactiveResourceName resource_name) override {
+    ASSERT(dispatcher_.isThreadSafe());
     const auto proactive_resource = proactive_resources_->find(resource_name);
     if (proactive_resource == proactive_resources_->end()) {
       ENVOY_LOG_MISC(warn, "Failed to get resource usage, resource monitor is not configured");
@@ -381,6 +388,7 @@ public:
 
 private:
   static const OverloadActionState always_inactive_;
+  const Event::Dispatcher& dispatcher_;
   const NamedOverloadActionSymbolTable& action_symbol_table_;
   std::vector<OverloadActionState> actions_;
   std::shared_ptr<absl::node_hash_map<OverloadProactiveResourceName, ProactiveResource>>
@@ -751,8 +759,8 @@ void OverloadManagerImpl::start() {
   ASSERT(!started_);
   started_ = true;
 
-  tls_.set([this](Event::Dispatcher&) {
-    return std::make_shared<ThreadLocalOverloadStateImpl>(action_symbol_table_,
+  tls_.set([this](Event::Dispatcher& dispatcher) {
+    return std::make_shared<ThreadLocalOverloadStateImpl>(dispatcher, action_symbol_table_,
                                                           proactive_resources_);
   });
 

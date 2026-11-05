@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <vector>
 
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
@@ -44,10 +45,12 @@ public:
   }
 
   FakeResourceMonitor* monitor() const { return monitor_; }
+  const std::vector<FakeResourceMonitor*>& monitors() const { return monitors_; }
   void onMonitorDestroyed();
 
 private:
   FakeResourceMonitor* monitor_{nullptr};
+  std::vector<FakeResourceMonitor*> monitors_;
 };
 
 class FakeSynchronousFeedbackResourceMonitorFactory;
