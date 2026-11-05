@@ -311,7 +311,9 @@ pub trait EnvoyBootstrapExtensionConfig {
 
   /// Queue a write of a cluster. This needs `cluster_writer` in the extension configuration.
   ///
-  /// * `cluster_name` is the name of the cluster.
+  /// * `cluster_name` is the name of the cluster. Only write clusters that no other component
+  ///   writes. A write of a cluster that exists and that this extension does not own completes as
+  ///   `Failed`.
   /// * `cluster` is the serialized `envoy.config.cluster.v3.Cluster`, whose name must equal
   ///   `cluster_name`.
   /// * `version_info` is stored with the cluster when the write changes it, and shown in the config

@@ -5,10 +5,8 @@ package envoy.extensions.bootstrap.dynamic_modules.v3;
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
 
 import "google/protobuf/any.proto";
-import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.bootstrap.dynamic_modules.v3";
 option java_outer_classname = "DynamicModulesProto";
@@ -76,23 +74,10 @@ message DynamicModuleBootstrapExtension {
   google.protobuf.Any extension_config = 3;
 
   // Lets the module add, update and remove clusters. If not specified, the cluster writer
-  // callbacks that the module calls return ``NotAllowed``. When this is set, ``extension_name``
-  // must be non-empty and unique among the bootstrap extensions that set this field, or Envoy
-  // rejects the configuration.
+  // callbacks that the module calls return ``NotAllowed``.
   ClusterWriter cluster_writer = 4;
 }
 
-// Settings for the clusters that a dynamic module bootstrap extension writes.
+// Configuration for the cluster writer of a dynamic module bootstrap extension.
 message ClusterWriter {
-  // Every cluster that the module writes must have a name that starts with this prefix. Envoy
-  // rejects the configuration when the prefix of one bootstrap extension starts with the prefix of
-  // another. Choose a prefix that no other component uses, for example the extension name followed
-  // by a dot.
-  string name_prefix = 1 [(validate.rules).string = {min_len: 1}];
-
-  // The maximum number of clusters that the module may own at once, counting queued additions.
-  // Writes of new clusters beyond it return ``LimitReached``. Removing a cluster frees its slot
-  // once Envoy applies the removal, or right away when the cluster was only queued. If not
-  // specified, defaults to 10000.
-  google.protobuf.UInt32Value max_clusters = 2 [(validate.rules).uint32 = {gt: 0}];
 }

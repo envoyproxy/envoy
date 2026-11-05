@@ -84,9 +84,9 @@ set, the module can add, update and remove clusters. It passes a serialized
 ``envoy_dynamic_module_callback_bootstrap_extension_cluster_writer_add_or_update``, and Envoy
 reports the outcome of each write through
 ``envoy_dynamic_module_on_bootstrap_extension_cluster_writer_update_done``. A write is active once
-the cluster finished warming. CDS does not remove the clusters that a module writes, and no other
-component should write clusters with the name prefix. Envoy does not wait for written clusters
-before it finishes initializing, so to serve them from the first request, call
+the cluster finished warming. CDS does not remove the clusters that the module writes, and the
+module should only write clusters that no other component writes. Envoy does not wait for written
+clusters before it finishes initializing, so to serve them from the first request, call
 ``envoy_dynamic_module_callback_bootstrap_extension_config_signal_init_complete`` only after their
 writes completed as active.
 
@@ -99,8 +99,7 @@ writes completed as active.
       dynamic_module_config:
         name: my_module
       extension_name: my_writer
-      cluster_writer:
-        name_prefix: my_writer.
+      cluster_writer: {}
 
 A written cluster has the same authority as a cluster delivered by CDS, so build clusters from a
 schema that the module owns. On the ADS stream and the xDS-TP authority streams, a written cluster
@@ -119,14 +118,14 @@ CDS requests until the module writes the cluster again or removes it, and a modu
 are active should bound that wait itself.
 
 The cluster writer emits the following statistics with the ``dynamic_modules.cluster_writer.``
-prefix, tagged with ``config_name`` set to the extension name.
+prefix, tagged with ``config_name`` set to the extension name, or ``default`` if it is empty.
 
 .. csv-table::
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
   update_submitted, Counter, Writes that Envoy accepted
-  update_rejected, Counter, "Writes that the cluster writer refused on the main thread, tagged with ``reason`` set to ``not_allowed``, ``outside_name_prefix``, ``limit_reached`` or ``too_large``"
+  update_rejected, Counter, Writes that Envoy refused before the server was initialized or after shutdown began
   update_active, Counter, Writes that became active
   update_superseded, Counter, Writes that a later write replaced before they became active
   update_removed, Counter, Writes that a removal ended before they became active

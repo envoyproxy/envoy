@@ -38,8 +38,9 @@ constexpr absl::string_view ClusterWriterStatPrefix = "cluster_writer";
 
 } // namespace
 
-// The hold on the requests of the xDS types that clusters depend on. The apply passes of all the
-// cluster writers of a server share it, so that its time limit holds when their bursts overlap.
+// The state that the cluster writers of a server share. Their apply passes hold back the requests
+// of the xDS types that clusters depend on with one pause, so that its time limit holds when their
+// bursts overlap.
 class ClusterWriterSharedState : public Singleton::Instance {
 public:
   static std::shared_ptr<ClusterWriterSharedState>
