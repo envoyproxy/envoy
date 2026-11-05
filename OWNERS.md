@@ -24,7 +24,7 @@ routing PRs, questions, etc. to the right place.
 * Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@gmail.com)
   * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 * Boteng Yao ([botengyao](https://github.com/botengyao)) (boteng@google.com)
-  * Overload manager, security, logging, wasm, data plane.
+  * AI protocol manager, MCP, overload manager, security, logging, wasm, data plane, website.
 * Rohit Agrawal ([agrawroh](https://github.com/agrawroh)) (rohit.agrawal@databricks.com)
   * Dynamic Modules, Reverse Tunnels, Performance, Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
