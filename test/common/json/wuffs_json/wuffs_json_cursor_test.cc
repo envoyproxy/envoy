@@ -276,6 +276,70 @@ TEST(WuffsJsonCursorTest, DuplicateKeyInNestedObjectRejected) {
   EXPECT_THAT(parse(R"({"x":{"a":1,"a":2}})", h), Not(IsOk()));
 }
 
+// Sticky errors: after any failure, further feed() calls return the same
+// status and never re-enter the decoder. Errors raised inside the token loop
+// are the risky case, since undrained tokens still refer to the old chunk.
+
+TEST(WuffsJsonCursorTest, HandlerErrorIsStickyAcrossFurtherChunks) {
+  AbortOnNumberHandler h;
+  WuffsJsonCursor cursor(h);
+  // Fails on `1` with more tokens already queued behind it.
+  const absl::Status first = cursor.feed(R"({"a":1,"b":2,"c":3,"d":"xyz","e":[4,5,6]})",
+                                         /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(first.code(), absl::StatusCode::kInternal);
+
+  // Keep feeding, including chunks shorter than the queued token lengths.
+  const std::vector<std::string> more_chunks = {"", "}", R"({"f":7})", std::string(300, ' ')};
+  for (const std::string& more : more_chunks) {
+    const absl::Status again = cursor.feed(more, /*closed=*/false);
+    EXPECT_EQ(again.code(), first.code());
+    EXPECT_EQ(again.message(), first.message());
+  }
+  EXPECT_EQ(cursor.feed("", /*closed=*/true).message(), first.message());
+}
+
+TEST(WuffsJsonCursorTest, DepthLimitErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  // One level past the deepest legal nesting fails mid-chunk.
+  const std::string too_deep = std::string(WuffsJsonCursor::kMaxTrackedDepth, '[') + "1,2,3" +
+                               std::string(WuffsJsonCursor::kMaxTrackedDepth, ']');
+  const absl::Status first = cursor.feed(too_deep, /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed(R"({"ok":true})", /*closed=*/true).message(), first.message());
+  EXPECT_TRUE(h.fields.empty());
+}
+
+TEST(WuffsJsonCursorTest, MalformedJsonErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  const absl::Status first = cursor.feed(R"({"a" 1)", /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed(R"(,"b":2})", /*closed=*/true).message(), first.message());
+}
+
+TEST(WuffsJsonCursorTest, DuplicateKeyErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  const absl::Status first = cursor.feed(R"({"a":1,"a":2,"b":3)", /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed(R"(,"c":4})", /*closed=*/true).message(), first.message());
+  // Nothing after the duplicate reached the handler.
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].key, "a");
+}
+
+// An over-long split number also latches.
+TEST(WuffsJsonCursorTest, OversizedPendingNumberErrorIsSticky) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
+  const absl::Status first = cursor.feed(std::string(65, '1'), /*closed=*/false);
+  ASSERT_THAT(first, Not(IsOk()));
+  EXPECT_EQ(cursor.feed("}", /*closed=*/true).message(), first.message());
+}
+
 // Same key name at different nesting depths must not trigger a false positive.
 TEST(WuffsJsonCursorTest, SameKeyNameAtDifferentDepthsAllowed) {
   CapturingHandler h;
