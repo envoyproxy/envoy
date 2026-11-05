@@ -34,16 +34,16 @@ struct WindowParams {
   absl::string_view unit_tag;
 };
 
-WindowParams windowParams(Config::TimeUnit time_unit) {
+WindowParams windowParams(Config::TimeUnit time_unit, uint32_t multiplier) {
   switch (time_unit) {
   case Config::MINUTE:
-    return WindowParams{60, 1, 60, "m"};
+    return WindowParams{60ULL * multiplier, 1ULL * multiplier, 60, "m"};
   case Config::HOUR:
-    return WindowParams{3600, 60, 60, "h"};
+    return WindowParams{3600ULL * multiplier, 60ULL * multiplier, 60, "h"};
   case Config::DAY:
-    return WindowParams{86400, 900, 96, "d"};
+    return WindowParams{86400ULL * multiplier, 900ULL * multiplier, 96, "d"};
   default:
-    return WindowParams{60, 1, 60, "m"};
+    return WindowParams{60ULL * multiplier, 1ULL * multiplier, 60, "m"};
   }
 }
 
@@ -73,7 +73,8 @@ RedisQuota::buildQuotaMap(const Config::ModelRouter& proto) {
         model_quotas.disabled = true;
       }
 
-      const WindowParams params = windowParams(quota.time_unit());
+      const uint32_t multiplier = PROTOBUF_GET_WRAPPED_OR_DEFAULT(quota, unit_multiplier, 1);
+      const WindowParams params = windowParams(quota.time_unit(), multiplier);
       switch (quota.quota_type()) {
       case Config::REQUESTS:
         model_quotas.request_quotas.push_back(QuotaSpec{
@@ -82,7 +83,7 @@ RedisQuota::buildQuotaMap(const Config::ModelRouter& proto) {
             params.bucket_seconds,
             params.num_buckets,
             absl::StrCat("model_router:", model_entry.provider(), ":", model_entry.model(),
-                         ":req:", params.unit_tag, ":"),
+                         ":req:", multiplier, params.unit_tag, ":"),
         });
         break;
       case Config::TOKENS:
@@ -92,7 +93,7 @@ RedisQuota::buildQuotaMap(const Config::ModelRouter& proto) {
             params.bucket_seconds,
             params.num_buckets,
             absl::StrCat("model_router:", model_entry.provider(), ":", model_entry.model(),
-                         ":tok:", params.unit_tag, ":"),
+                         ":tok:", multiplier, params.unit_tag, ":"),
         });
         break;
       default:

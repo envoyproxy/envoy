@@ -7,6 +7,7 @@ import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -88,6 +89,11 @@ message Quota {
 
   // Maximum allowed usage within the time window. Setting ``limit`` to ``0`` disables the model.
   uint32 limit = 3;
+
+  // The number of time units in the quota window. For example, a value of ``6`` with a
+  // ``time_unit`` of ``HOUR`` specifies a 6-hour rolling window. If not specified, defaults to
+  // ``1``.
+  google.protobuf.UInt32Value unit_multiplier = 4 [(validate.rules).uint32 = {gt: 0}];
 }
 
 // Represents a concrete LLM model offered by a :ref:`Provider

@@ -494,6 +494,18 @@ models:
 )EOF",
        "QuotaValidationError\\.TimeUnit"},
       {R"EOF(
+models:
+  - name: haiku
+    provider: anthropic
+    model: claude-haiku-4-5
+    quotas:
+      - quota_type: REQUESTS
+        time_unit: HOUR
+        limit: 10
+        unit_multiplier: 0
+)EOF",
+       "QuotaValidationError\\.UnitMultiplier"},
+      {R"EOF(
 redis:
   host: ""
 )EOF",
@@ -536,6 +548,7 @@ models:
       - quota_type: TOKENS
         time_unit: HOUR
         limit: 10000
+        unit_multiplier: 6
       - quota_type: REQUESTS
         time_unit: DAY
         limit: 500

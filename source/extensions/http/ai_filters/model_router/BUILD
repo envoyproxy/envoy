@@ -30,6 +30,7 @@ envoy_cc_library(
         "//envoy/common:time_interface",
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/coroutine:task_lib",
+        "//source/common/protobuf:utility_lib",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/status:status",
         "@abseil-cpp//absl/status:statusor",

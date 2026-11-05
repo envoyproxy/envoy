@@ -52,11 +52,14 @@ protected:
   }
 
   static void addQuota(Config::Model& model, Config::QuotaType type, Config::TimeUnit unit,
-                       uint32_t limit) {
+                       uint32_t limit, uint32_t unit_multiplier = 0) {
     auto* q = model.add_quotas();
     q->set_quota_type(type);
     q->set_time_unit(unit);
     q->set_limit(limit);
+    if (unit_multiplier != 0) {
+      q->mutable_unit_multiplier()->set_value(unit_multiplier);
+    }
   }
 };
 
@@ -182,6 +185,39 @@ TEST_F(LocalQuotaTest, EnforcesHourAndDayWindowsAndMultipleQuotas) {
   // Advance 1 more minute (1 hour total): request quota refilled, token quota also capped at 86400.
   simTime().advanceTimeWait(std::chrono::minutes(1));
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86400)),
+              IsOkAndHolds(true));
+}
+
+TEST_F(LocalQuotaTest, EnforcesUnitMultiplierOverMultiHourWindow) {
+  Config::ModelRouter proto;
+  auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
+  // 2 requests per 6 hours (1 request refills every 3 hours) and 21600 tokens per 6 hours (1
+  // token/sec).
+  addQuota(*model, Config::REQUESTS, Config::HOUR, 2, /*unit_multiplier=*/6);
+  addQuota(*model, Config::TOKENS, Config::HOUR, 21600, /*unit_multiplier=*/6);
+
+  LocalQuota quota(proto, simTime());
+
+  // Consume both requests and 3600 tokens.
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 1000, 800)), IsOk());
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 1000, 800)), IsOk());
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
+              IsOkAndHolds(false));
+
+  // After 1 hour (when a 1-hour quota would have refilled), 6-hour request quota is still < 1.0.
+  simTime().advanceTimeWait(std::chrono::hours(1));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
+              IsOkAndHolds(false));
+
+  // After 2 hours and 59 minutes total, request bucket is still slightly below 1.0.
+  simTime().advanceTimeWait(std::chrono::hours(1) + std::chrono::minutes(59));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 10)),
+              IsOkAndHolds(false));
+
+  // At 3 hours total, 1 request has refilled and 3 hours * 3600 = 10800 tokens have refilled
+  // (capped at 21600 max, so 18000 remaining + 10800 -> 21600).
+  simTime().advanceTimeWait(std::chrono::minutes(1));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 21600)),
               IsOkAndHolds(true));
 }
 

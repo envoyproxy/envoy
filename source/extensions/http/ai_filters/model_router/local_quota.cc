@@ -6,6 +6,8 @@
 #include <string>
 #include <utility>
 
+#include "source/common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace AiFilters {
@@ -45,7 +47,9 @@ LocalQuota::buildQuotaMap(const Config::ModelRouter& proto, TimeSource& time_sou
     ModelQuotas& model_quotas = (*map)[ModelKey{model_entry.provider(), model_entry.model()}];
     for (const Config::Quota& quota : model_entry.quotas()) {
       const uint64_t limit = quota.limit();
-      const double fill_rate = static_cast<double>(limit) / windowSeconds(quota.time_unit());
+      const uint32_t multiplier = PROTOBUF_GET_WRAPPED_OR_DEFAULT(quota, unit_multiplier, 1);
+      const double fill_rate =
+          static_cast<double>(limit) / (windowSeconds(quota.time_unit()) * multiplier);
       auto bucket = std::make_unique<AtomicTokenBucketImpl>(limit, time_source, fill_rate);
 
       switch (quota.quota_type()) {

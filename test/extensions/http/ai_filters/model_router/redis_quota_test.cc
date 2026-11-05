@@ -254,11 +254,14 @@ protected:
   }
 
   static void addQuota(Config::Model& model, Config::QuotaType type, Config::TimeUnit unit,
-                       uint32_t limit) {
+                       uint32_t limit, uint32_t unit_multiplier = 0) {
     auto* q = model.add_quotas();
     q->set_quota_type(type);
     q->set_time_unit(unit);
     q->set_limit(limit);
+    if (unit_multiplier != 0) {
+      q->mutable_unit_multiplier()->set_value(unit_multiplier);
+    }
   }
 
   Api::ApiPtr api_;
@@ -327,7 +330,7 @@ TEST_F(RedisQuotaTest, EnforcesRequestsQuotaAndRollsSubBucketsOverMinuteWindow) 
   advanceTime(std::chrono::seconds(1));
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 0)), IsOkAndHolds(true));
 
-  EXPECT_EQ(server_.expirations().at("model_router:openai:gpt-4o:req:m:1000000"), 60);
+  EXPECT_EQ(server_.expirations().at("model_router:openai:gpt-4o:req:1m:1000000"), 60);
 }
 
 TEST_F(RedisQuotaTest, EnforcesTokensQuotaAndHandlesNegativeDebt) {
@@ -393,6 +396,58 @@ TEST_F(RedisQuotaTest, EnforcesHourAndDayWindowsAndMultipleQuotas) {
   advanceTime(std::chrono::hours(23));
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 86400)),
               IsOkAndHolds(true));
+}
+
+TEST_F(RedisQuotaTest, EnforcesUnitMultiplierWithScaledSubBucketsAndDistinctKeys) {
+  Config::ModelRouter proto = makeProtoWithRedis();
+  auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
+  // Configure both a 1-hour request quota (2 req/1h) and a 6-hour request quota (2 req/6h), plus a
+  // 6-hour token quota (1000 tok/6h).
+  addQuota(*model, Config::REQUESTS, Config::HOUR, 2, /*unit_multiplier=*/1);
+  addQuota(*model, Config::REQUESTS, Config::HOUR, 2, /*unit_multiplier=*/6);
+  addQuota(*model, Config::TOKENS, Config::HOUR, 1000, /*unit_multiplier=*/6);
+
+  // Align timestamp to a 6-minute (360s) boundary: 1080000 / 360 = 3000, 1080000 / 60 = 18000.
+  simTime().setSystemTime(std::chrono::seconds(1080000));
+
+  RedisQuota quota(proto, *dispatcher_, simTime());
+
+  // Consume 1 request (400 tokens) at t = 0, and 1 request (400 tokens) at t + 30m.
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 200, 200)), IsOk());
+  advanceTime(std::chrono::minutes(30));
+  EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 200, 200)), IsOk());
+
+  // Verify distinct Redis keys and TTLs for 1h (3600s) vs 6h (21600s).
+  EXPECT_EQ(server_.expirations().at("model_router:anthropic:claude-sonnet-4-5:req:1h:18000"),
+            3600);
+  EXPECT_EQ(server_.expirations().at("model_router:anthropic:claude-sonnet-4-5:req:6h:3000"),
+            21600);
+  EXPECT_EQ(server_.expirations().at("model_router:anthropic:claude-sonnet-4-5:tok:6h:3000"),
+            21600);
+
+  // Both 1h and 6h request quotas are now at 2/2.
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 100)),
+              IsOkAndHolds(false));
+
+  // Advance to t + 90m: the 1-hour quota (60x1m buckets) has rolled out both requests, but the
+  // 6-hour quota (60x6m buckets) still holds both requests.
+  advanceTime(std::chrono::minutes(60));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 100)),
+              IsOkAndHolds(false));
+
+  // Advance to t + 5h54m (354m total, 59 x 6m buckets since t = 0): first request at t = 0 is in
+  // bucket 3000, current bucket is 3059 -> still within the 60-bucket (6h) window.
+  advanceTime(std::chrono::minutes(264));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 100)),
+              IsOkAndHolds(false));
+
+  // Advance 6 more minutes to t + 6h (360m total, bucket 3060): bucket 3000 (from t = 0) rolls
+  // out of the 60-bucket window, leaving 1 request and 400 tokens from t + 30m.
+  advanceTime(std::chrono::minutes(6));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 600)),
+              IsOkAndHolds(true));
+  EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 601)),
+              IsOkAndHolds(false));
 }
 
 TEST_F(RedisQuotaTest, NonBlockingConcurrentConnectFailsOpenForSecondCaller) {
