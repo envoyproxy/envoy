@@ -133,7 +133,8 @@ pub enum TlsCertificateSelection {
   /// [`TlsCertificateSelectorConfig::new_selector`]. An index out of range fails the handshake.
   Configured(usize),
   /// Use the dynamic certificate of this name. When the module has not provided it yet, the
-  /// handshake waits for the answer to [`TlsCertificateSelectorConfig::on_certificate_requested`].
+  /// handshake waits for the answer to [`TlsCertificateSelectorConfig::on_certificate_requested`],
+  /// and fails when `dynamic_certificate_request_timeout` expires first.
   Dynamic(String),
   /// Fail the handshake.
   Failed,
@@ -158,11 +159,13 @@ pub trait TlsCertificateSelectorConfig: Send + Sync {
   /// Called on the main thread when a handshake waits for a dynamic certificate that the module
   /// has not provided.
   ///
-  /// It is called once for each name until the certificate is provided or removed. The module
-  /// answers with [`EnvoyTlsCertificateSelectorConfig::set_certificate`] or
+  /// It is called once for each name until the certificate is provided or removed, or its request
+  /// times out. The module answers with [`EnvoyTlsCertificateSelectorConfig::set_certificate`] or
   /// [`EnvoyTlsCertificateSelectorConfig::remove_certificate`], either during this call or later,
-  /// and the handshakes that wait for the certificate stay paused until then. The default
-  /// implementation removes the certificate, which fails them.
+  /// and the handshakes that wait for the certificate stay paused until then. When
+  /// `dynamic_certificate_request_timeout` expires first, Envoy fails them, and a later handshake
+  /// requests the certificate again. An answer after the timeout still applies to the name. The
+  /// default implementation removes the certificate, which fails them.
   fn on_certificate_requested(
     &self,
     envoy_config: &dyn EnvoyTlsCertificateSelectorConfig,
@@ -194,10 +197,10 @@ pub trait TlsCertificateSelector: Send + Sync {
 /// It is passed to the factory registered via the `tls_certificate_selector:` arm of
 /// [`crate::declare_all_init_functions!`] and to the hooks of [`TlsCertificateSelectorConfig`]. The
 /// metrics must be defined while the configuration is being created, and can be recorded on any
-/// thread. The dynamic certificates must be provided and removed on the main thread, which other
-/// threads reach through a scheduler. The handle borrows the Envoy side configuration, so a module
-/// must drop every clone of it no later than the [`TlsCertificateSelectorConfig`] it was created
-/// for, which outlives its selectors.
+/// thread. The dynamic certificates must be provided and removed, and the end of the initialization
+/// signaled, on the main thread, which other threads reach through a scheduler. The handle borrows
+/// the Envoy side configuration, so a module must drop every clone of it no later than the
+/// [`TlsCertificateSelectorConfig`] it was created for, which outlives its selectors.
 #[cfg_attr(any(test, feature = "mock"), automock)]
 #[allow(clippy::needless_lifetimes)]
 pub trait EnvoyTlsCertificateSelectorConfig: Send + Sync {
@@ -338,6 +341,14 @@ pub trait EnvoyTlsCertificateSelectorConfig: Send + Sync {
   /// fails the handshakes that wait for it. This must be called on the main thread.
   fn remove_certificate(&self, name: &str);
 
+  /// Signals that the configuration has completed its initialization.
+  ///
+  /// The listeners and clusters that use the TLS context warm until the first call, and Envoy does
+  /// not time out the wait. Later calls do nothing. The module must call this during or after the
+  /// creation of the configuration, and during it if the module does not require asynchronous
+  /// initialization. This must be called on the main thread.
+  fn signal_init_complete(&self);
+
   /// Creates a scheduler that posts events to this configuration on the main thread.
   fn new_scheduler(&self) -> Box<dyn EnvoyTlsCertificateSelectorConfigScheduler>;
 }
@@ -366,8 +377,8 @@ pub(crate) struct EnvoyTlsCertificateSelectorConfigImpl {
 }
 
 // SAFETY: the configuration wraps an opaque handle to the Envoy-side configuration. The metrics and
-// scheduler callbacks are safe to call from any thread, and the dynamic certificate callbacks
-// reject calls off the main thread, by ABI contract.
+// scheduler callbacks are safe to call from any thread, and the other callbacks reject calls off
+// the main thread, by ABI contract.
 unsafe impl Send for EnvoyTlsCertificateSelectorConfigImpl {}
 unsafe impl Sync for EnvoyTlsCertificateSelectorConfigImpl {}
 
@@ -664,6 +675,14 @@ impl EnvoyTlsCertificateSelectorConfig for EnvoyTlsCertificateSelectorConfigImpl
       abi::envoy_dynamic_module_callback_tls_certificate_selector_config_remove_certificate(
         self.raw,
         str_to_module_buffer(name),
+      )
+    }
+  }
+
+  fn signal_init_complete(&self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_tls_certificate_selector_config_signal_init_complete(
+        self.raw,
       )
     }
   }

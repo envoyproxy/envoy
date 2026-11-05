@@ -197,6 +197,7 @@ DESC
 DFATAL
 DGRAM
 DLOG
+DMA
 DNS
 DQUOTE
 DS
@@ -332,6 +333,7 @@ JWT
 JWTs
 alg
 aud
+audiobook
 crv
 iat
 iss
@@ -604,6 +606,7 @@ VM
 VPN
 WAITFORONE
 WASM
+WGS
 WIP
 WKT
 WRONGPASS
@@ -1544,6 +1547,7 @@ subnets
 subobject
 suboptimal
 subprocess
+subregion
 subsecond
 subseconds
 subsegment
@@ -1673,13 +1677,16 @@ util
 utils
 va
 valgrind
+valkey
 validator
 validators
+valkey
 vanishingly
 varchar
 variadic
 varint
 Vcluster
+vcluster
 vec
 vectorize
 VBC

@@ -1331,16 +1331,13 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_string_batch(
     // TODO(wbpcode): this should never happen and we should simplify this.
     return;
   }
-  // Build the whole namespace fragment first, then merge once instead of once per entry.
-  Protobuf::Struct metadata_value;
-  auto* fields = metadata_value.mutable_fields();
+  auto* fields = metadata_namespace->mutable_fields();
   for (size_t i = 0; i < entries_size; i++) {
     const auto& entry = entries[i];
     absl::string_view key_view(entry.key_ptr, entry.key_length);
     absl::string_view value_view(entry.value_ptr, entry.value_length);
     (*fields)[key_view].set_string_value(value_view);
   }
-  metadata_namespace->MergeFrom(metadata_value);
 }
 
 void envoy_dynamic_module_callback_http_set_dynamic_metadata_struct(
@@ -1426,16 +1423,13 @@ void envoy_dynamic_module_callback_http_set_dynamic_metadata_bool(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_buffer ns, envoy_dynamic_module_type_module_buffer key,
     bool value) {
-  auto metadata_namespace = getDynamicMetadataNamespace(filter_envoy_ptr, ns);
-  if (!metadata_namespace) {
+  auto* metadata_value = getMutableDynamicMetadataValue(filter_envoy_ptr, ns, key);
+  if (!metadata_value) {
     // If stream info is not available, we cannot guarantee that the namespace is created.
     // TODO(wbpcode): this should never happen and we should simplify this.
     return;
   }
-  absl::string_view key_view{key.ptr, key.length};
-  Protobuf::Struct metadata_value;
-  (*metadata_value.mutable_fields())[key_view].set_bool_value(value);
-  metadata_namespace->MergeFrom(metadata_value);
+  metadata_value->set_bool_value(value);
 }
 
 bool envoy_dynamic_module_callback_http_get_metadata_bool(

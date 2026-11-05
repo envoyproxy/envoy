@@ -39,8 +39,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (!on_config_new.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
-    throw EnvoyException("Failed to resolve symbol: " +
-                         std::string(on_config_new.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to resolve symbol: ", on_config_new.status().message()));
   }
 
   auto on_config_destroy = dynamic_module->getFunctionPointer<OnMatcherConfigDestroyType>(
@@ -48,8 +48,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (!on_config_destroy.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
-    throw EnvoyException("Failed to resolve symbol: " +
-                         std::string(on_config_destroy.status().message()));
+    throw EnvoyException(
+        absl::StrCat("Failed to resolve symbol: ", on_config_destroy.status().message()));
   }
 
   auto on_match = dynamic_module->getFunctionPointer<OnMatcherMatchType>(
@@ -57,7 +57,7 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
   if (!on_match.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, matcher_name, Extensions::DynamicModules::ModuleLoadErrorStat);
-    throw EnvoyException("Failed to resolve symbol: " + std::string(on_match.status().message()));
+    throw EnvoyException(absl::StrCat("Failed to resolve symbol: ", on_match.status().message()));
   }
 
   // Parse the matcher config.
@@ -67,8 +67,8 @@ DynamicModuleInputMatcherFactory::createInputMatcherFactoryCb(
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
           context, matcher_name, Extensions::DynamicModules::ConfigInitErrorStat);
-      throw EnvoyException("Failed to parse matcher config: " +
-                           std::string(config_or_error.status().message()));
+      throw EnvoyException(
+          absl::StrCat("Failed to parse matcher config: ", config_or_error.status().message()));
     }
     matcher_config_str = std::move(config_or_error.value());
   }

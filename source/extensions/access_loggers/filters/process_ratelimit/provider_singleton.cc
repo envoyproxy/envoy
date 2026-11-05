@@ -121,22 +121,22 @@ RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
                                 resource_name, parent.config_source_,
                                 Grpc::Common::typeUrl(resource_type_helper_.getResourceName()),
                                 *parent.scope_, *this, resource_type_helper_.resourceDecoder(), {}),
-                            Config::SubscriptionPtr);
-  subscription_->start({resource_name_});
+                            std::unique_ptr<Config::SingletonSubscription>);
+  subscription_->start();
 }
 
 RateLimiterProviderSingleton::TokenBucketSubscription::~TokenBucketSubscription() {
   parent_.subscriptions_.erase(resource_name_);
 }
 
-void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
-    const Config::DecodedResourceRef& resource) {
+absl::Status RateLimiterProviderSingleton::TokenBucketSubscription::onResourceUpdate(
+    const Config::DecodedResource& resource, const std::string&) {
   const auto& config =
-      Envoy::Protobuf::DynamicCastMessage<envoy::type::v3::TokenBucket>(resource.get().resource());
+      Envoy::Protobuf::DynamicCastMessage<envoy::type::v3::TokenBucket>(resource.resource());
   size_t new_hash = MessageUtil::hash(config);
   // If the config is the same, no op.
   if (new_hash == token_bucket_config_hash_) {
-    return;
+    return absl::OkStatus();
   }
 
   // Update the config and hash and reset the limiter.
@@ -149,10 +149,10 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
     // so setter will call `runOnAllThreads` to set underneath.
     setter(new_limiter);
   }
+  return absl::OkStatus();
 }
 
-void RateLimiterProviderSingleton::TokenBucketSubscription::handleRemovedResource(
-    absl::string_view) {
+void RateLimiterProviderSingleton::TokenBucketSubscription::onResourceRemoved() {
   // We simply reset the config and limiter here. The existing rate limiter will
   // continue to work before the new config is received.
   config_.reset();
@@ -163,48 +163,6 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleRemovedResourc
   for (auto& [key, setter] : setters_) {
     setter(parent_.fallback_always_deny_limiter_);
   }
-}
-
-absl::Status RateLimiterProviderSingleton::TokenBucketSubscription::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& resources, const std::string&) {
-  ENVOY_BUG(resources.size() == 1,
-            fmt::format("for singleton resource subscription, only one resource should be "
-                        "added or removed at a time but got {}",
-                        resources.size()));
-  ENVOY_BUG(resources[0].get().name() == resource_name_,
-            fmt::format("for singleton resource subscription, the added resource name "
-                        "should be the same as the subscription resource name but got "
-                        "{} != {}",
-                        resources[0].get().name(), resource_name_));
-
-  handleAddedResource(resources[0]);
-  return absl::OkStatus();
-}
-
-absl::Status RateLimiterProviderSingleton::TokenBucketSubscription::onConfigUpdate(
-    const std::vector<Config::DecodedResourceRef>& added_resources,
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
-  ENVOY_BUG(added_resources.size() + removed_resources.size() == 1,
-            fmt::format("for singleton resource subscription, only one resource should be "
-                        "added or removed at a time but got {}",
-                        added_resources.size() + removed_resources.size()));
-  if (added_resources.size() == 1) {
-    ENVOY_BUG(added_resources[0].get().name() == resource_name_,
-              fmt::format("for singleton resource subscription, the added resource name "
-                          "should be the same as the subscription resource name but got {} "
-                          "!= {}",
-                          added_resources[0].get().name(), resource_name_));
-    handleAddedResource(added_resources[0]);
-  } else {
-    ENVOY_BUG(removed_resources[0] == resource_name_,
-              fmt::format("for singleton resource subscription, the removed resource name "
-                          "should be the same as the subscription resource name but got {} "
-                          "!= {}",
-                          removed_resources[0], resource_name_));
-    handleRemovedResource(removed_resources[0]);
-  }
-
-  return absl::OkStatus();
 }
 
 } // namespace LocalRateLimit

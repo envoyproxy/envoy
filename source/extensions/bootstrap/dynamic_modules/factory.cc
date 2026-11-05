@@ -11,6 +11,7 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 
 #include "absl/status/status.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -48,8 +49,8 @@ DynamicModuleBootstrapExtensionFactory::createBootstrapExtension(
     if (!config_or_error.ok()) {
       Extensions::DynamicModules::incrementLoadFailure(
           context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-      return absl::InvalidArgumentError("Failed to parse extension config: " +
-                                        std::string(config_or_error.status().message()));
+      return absl::InvalidArgumentError(
+          absl::StrCat("Failed to parse extension config: ", config_or_error.status().message()));
     }
     extension_config_str = std::move(config_or_error.value());
   }
@@ -67,8 +68,8 @@ DynamicModuleBootstrapExtensionFactory::createBootstrapExtension(
   if (!extension_config.ok()) {
     Extensions::DynamicModules::incrementLoadFailure(
         context, proto_config.extension_name(), Extensions::DynamicModules::ConfigInitErrorStat);
-    return absl::InvalidArgumentError("Failed to create extension config: " +
-                                      std::string(extension_config.status().message()));
+    return absl::InvalidArgumentError(
+        absl::StrCat("Failed to create extension config: ", extension_config.status().message()));
   }
 
   // When the runtime guard is enabled, register the metrics namespace as a custom stat namespace.

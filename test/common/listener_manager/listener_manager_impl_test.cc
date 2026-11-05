@@ -134,6 +134,14 @@ public:
   }
 };
 
+// The real filter tests build filter chains and listener config, which
+// `envoy.restart_features.defer_worker_routing_init` does not affect, so they run with the
+// flag at its default. Tests that depend on what the flag changes, UDP listener worker routing
+// or when a listener registers its init target (eg warming), use this suite to run with both
+// values.
+class ListenerManagerImplWithRealFiltersWorkerRoutingTest
+    : public ListenerManagerImplWithRealFiltersTest {};
+
 class ListenerManagerImplForInPlaceFilterChainUpdateTest : public Event::SimulatedTimeSystem,
                                                            public ListenerManagerImplTest {
 public:
@@ -477,8 +485,15 @@ filter_chains:
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml1));
+#ifdef __linux__
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0)).Times(2);
   addOrUpdateListener(parseListenerFromV3Yaml(yaml2));
+#else
+  // Without reuse port, the new version of the listener cannot bind '127.0.0.1:1000' while the
+  // existing version holds it.
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml2)), EnvoyException,
+                          "'foo' has duplicate address");
+#endif
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest,
@@ -673,7 +688,7 @@ filter_chains:
       "test_value");
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, UdpGroDisabledByDefault) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, UdpGroDisabledByDefault) {
   if (!ENVOY_SOCKET_UDP_GRO.hasValue()) {
     GTEST_SKIP();
   }
@@ -694,7 +709,7 @@ address:
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, UdpGroDisabledOnUpdate) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, UdpGroDisabledOnUpdate) {
   if (!ENVOY_SOCKET_UDP_GRO.hasValue()) {
     GTEST_SKIP();
   }
@@ -729,7 +744,7 @@ udp_listener_config:
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_, _, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
   ASSERT_OK(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()));
@@ -1042,13 +1057,10 @@ filter_chains:
   envoy::config::listener::v3::Listener listener_config =
       parseListenerFromV3Yaml(fmt::format(listener_yaml_tmpl, namespace_path));
 
-  auto status = manager_->addOrUpdateListener(listener_config, "", true);
-#if defined(__linux__)
-  // On Linux, adding the listener should succeed.
-  EXPECT_OK(status);
-#else
-  EXPECT_THAT(status, Not(IsOk()));
-#endif
+  // Adding the listener succeeds on every platform: the network namespace is entered when the
+  // (mocked) listener factory creates the socket, and it has no effect on platforms other than
+  // Linux.
+  EXPECT_OK(manager_->addOrUpdateListener(listener_config, "", true));
 }
 
 #if defined(__linux__)
@@ -7933,7 +7945,7 @@ api_listener:
   EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
 }
 
-TEST_P(ListenerManagerImplWithRealFiltersTest, AddOrUpdateInternalListener) {
+TEST_P(ListenerManagerImplWithRealFiltersWorkerRoutingTest, AddOrUpdateInternalListener) {
   if (use_matcher_) {
     GTEST_SKIP() << "Filter chain match is auto-inserted in the config dump";
   }
@@ -11710,6 +11722,8 @@ filter_chains:
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest,
                          ::testing::Combine(::testing::Values(false), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersTest,
+                         ::testing::Combine(::testing::Bool(), ::testing::Values(true)));
+INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersWorkerRoutingTest,
                          ::testing::Combine(::testing::Bool(), ::testing::Bool()));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplForInPlaceFilterChainUpdateTest,
                          ::testing::Combine(::testing::Values(false), ::testing::Bool()));

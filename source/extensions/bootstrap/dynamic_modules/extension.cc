@@ -9,7 +9,11 @@ DynamicModuleBootstrapExtension::DynamicModuleBootstrapExtension(
     DynamicModuleBootstrapExtensionConfigSharedPtr config)
     : config_(config) {}
 
-DynamicModuleBootstrapExtension::~DynamicModuleBootstrapExtension() { destroy(); }
+DynamicModuleBootstrapExtension::~DynamicModuleBootstrapExtension() {
+  // The server can go away without a shutdown, for example in init only mode.
+  config_->onExtensionDestroyed();
+  destroy();
+}
 
 bool DynamicModuleBootstrapExtension::initializeInModuleExtension() {
   in_module_extension_ =
@@ -30,6 +34,10 @@ void DynamicModuleBootstrapExtension::onServerInitialized(Server::Instance& serv
     return;
   }
   config_->setListenerManager(server.listenerManager());
+  // A server that fails to start can shut down before it initializes its extensions.
+  if (server.isShutdown()) {
+    config_->onShutdown();
+  }
   config_->on_bootstrap_extension_server_initialized_(thisAsVoidPtr(), in_module_extension_);
   registerLifecycleCallbacks();
 }
@@ -72,6 +80,11 @@ void DynamicModuleBootstrapExtension::registerLifecycleCallbacks() {
           completion_cb();
         }
       });
+
+  // Callbacks with a completion only run once the workers started. The configuration can outlive
+  // the server's callback lists, so this extension holds the registration.
+  config_shutdown_handle_ = config_->context_.lifecycleNotifier().registerCallback(
+      Server::ServerLifecycleNotifier::Stage::ShutdownExit, [this]() { config_->onShutdown(); });
 }
 
 } // namespace DynamicModules

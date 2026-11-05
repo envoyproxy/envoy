@@ -18,6 +18,7 @@ envoy_extension_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:cluster_async_host_selection",
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:cluster_init_in_hooks",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
         "//test/extensions/dynamic_modules/test_data/c:cluster_null_lb",
@@ -99,6 +100,7 @@ envoy_extension_cc_dyn_module_test(
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/transport_sockets/tls:config",
+        "//test/config:utility_lib",
         "//test/extensions/dynamic_modules:util",
         "//test/integration:http_integration_lib",
         "//test/test_common:logging_lib",
@@ -106,6 +108,7 @@ envoy_extension_cc_dyn_module_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dynamic_modules/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )

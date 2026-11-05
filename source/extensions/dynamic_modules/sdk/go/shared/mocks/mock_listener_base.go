@@ -627,6 +627,34 @@ func (mr *MockListenerFilterHandleMockRecorder) SetDynamicMetadataString(metadat
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDynamicMetadataString", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetDynamicMetadataString), metadataNamespace, key, value)
 }
 
+// SetDynamicMetadataStruct mocks base method.
+func (m *MockListenerFilterHandle) SetDynamicMetadataStruct(metadataNamespace string, serializedStruct []byte) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDynamicMetadataStruct", metadataNamespace, serializedStruct)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetDynamicMetadataStruct indicates an expected call of SetDynamicMetadataStruct.
+func (mr *MockListenerFilterHandleMockRecorder) SetDynamicMetadataStruct(metadataNamespace, serializedStruct any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDynamicMetadataStruct", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetDynamicMetadataStruct), metadataNamespace, serializedStruct)
+}
+
+// SetDynamicTypedMetadata mocks base method.
+func (m *MockListenerFilterHandle) SetDynamicTypedMetadata(metadataNamespace string, serializedAny []byte) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetDynamicTypedMetadata", metadataNamespace, serializedAny)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SetDynamicTypedMetadata indicates an expected call of SetDynamicTypedMetadata.
+func (mr *MockListenerFilterHandleMockRecorder) SetDynamicTypedMetadata(metadataNamespace, serializedAny any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetDynamicTypedMetadata", reflect.TypeOf((*MockListenerFilterHandle)(nil).SetDynamicTypedMetadata), metadataNamespace, serializedAny)
+}
+
 // SetFilterState mocks base method.
 func (m *MockListenerFilterHandle) SetFilterState(key string, value []byte) bool {
 	m.ctrl.T.Helper()

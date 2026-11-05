@@ -52,8 +52,10 @@ envoy_extension_cc_test(
         "cpu:3",
     ],
     deps = [
+        "//source/common/config:well_known_names",
         "//source/extensions/filters/http/local_ratelimit:config",
         "//test/integration:http_protocol_integration_lib",
+        "//test/integration:utility_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

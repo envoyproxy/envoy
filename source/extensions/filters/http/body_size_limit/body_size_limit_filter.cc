@@ -78,7 +78,7 @@ void BodySizeLimitFilter::sizeExceeded(uint64_t length, const char* logMessage,
     target_host = upstream_info->upstreamHost()->address()->asStringView();
   }
 
-  ENVOY_LOG(error, "{} ({} > {}), client: {}, target: {}{}", logMessage, length,
+  ENVOY_LOG(debug, "{} ({} > {}), client: {}, target: {}{}", logMessage, length,
             config_->maxRequestBytes(), client_address, target_host, path);
 
   decoder_callbacks_->sendLocalReply(Http::Code::PayloadTooLarge, replyText, nullptr, std::nullopt,
