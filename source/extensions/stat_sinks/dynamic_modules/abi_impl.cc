@@ -178,8 +178,13 @@ namespace DynamicModules {
 DynamicModuleStatsSinkRetainedSnapshot::DynamicModuleStatsSinkRetainedSnapshot(
     DynamicModuleStatsSinkFlushContext& source)
     : snapshot_time_(source.snapshot_.snapshotTime()) {
-  // The flush hook's histogram statistics are only stable on the main thread.
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  // The flush hook's handle reads live stats, and its histogram statistics are only stable on the
+  // main thread. A retained source only exposes its frozen values and stats it already references,
+  // so adding references to them is a lock-free increment from a count of at least one, which is
+  // safe on whichever thread holds the source.
+  if (source.frozen_ == nullptr) {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+  }
   // Each RefcountPtr built from a raw stat pointer takes one reference through the stat's intrusive
   // count, exactly as Envoy's own snapshot does. The snapshot only hands out const references, and
   // taking a reference does not change anything the snapshot exposes, so casting away const is

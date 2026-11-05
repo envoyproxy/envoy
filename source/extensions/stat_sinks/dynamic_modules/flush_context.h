@@ -74,9 +74,10 @@ struct DynamicModuleStatsSinkFlushContext {
  * Envoy's own per-flush snapshot does, so stat names and tags stay readable on any thread after the
  * flush returns. Values are copied at retain time into DynamicModuleStatsSinkFrozenValues.
  *
- * It is created by envoy_dynamic_module_callback_stat_sink_snapshot_retain on the main thread and
- * deleted by envoy_dynamic_module_callback_stat_sink_snapshot_release, which the module may call on
- * any thread. Reads after construction only touch the frozen values and the immutable name and tag
+ * It is created by envoy_dynamic_module_callback_stat_sink_snapshot_retain, on the main thread from
+ * the flush hook's handle or on any thread from another retained handle, and deleted by
+ * envoy_dynamic_module_callback_stat_sink_snapshot_release, which the module may call on any
+ * thread. Reads after construction only touch the frozen values and the immutable name and tag
  * storage of the referenced stats, so one thread at a time may read it anywhere.
  *
  * Dropping the stat references off the main thread is supported: counters, gauges, and text
@@ -85,8 +86,9 @@ struct DynamicModuleStatsSinkFlushContext {
  */
 class DynamicModuleStatsSinkRetainedSnapshot : public Stats::MetricSnapshot {
 public:
-  // Must run on the main thread while `source` is valid. `source` is either the flush hook's handle
-  // or another retained snapshot's handle.
+  // `source` is either the flush hook's handle, in which case this must run on the main thread
+  // during that hook, or another retained snapshot's handle, in which case it may run on whichever
+  // thread holds that handle.
   explicit DynamicModuleStatsSinkRetainedSnapshot(DynamicModuleStatsSinkFlushContext& source);
   // context_ points back into this object, so it must never be copied.
   DynamicModuleStatsSinkRetainedSnapshot(const DynamicModuleStatsSinkRetainedSnapshot&) = delete;

@@ -16146,9 +16146,11 @@ void envoy_dynamic_module_on_stat_sink_config_scheduled(
  * do so before envoy_dynamic_module_on_stat_sink_config_destroy returns. Removed stats stay alive
  * until the handles that reference them are released.
  *
- * This must be called on the main thread, during envoy_dynamic_module_on_stat_sink_flush, with the
- * handle passed to that hook or with another retained handle. Its cost is linear in the number of
- * stats but does no name decoding.
+ * With the handle passed to envoy_dynamic_module_on_stat_sink_flush, this must be called on the
+ * main thread during that hook. With a retained handle that has not been released, it may be called
+ * on any thread, by the thread currently reading that handle. The new handle then reports the
+ * values that handle copied, so they date from the first retain rather than from this call. Its
+ * cost is linear in the number of stats but does no name decoding.
  *
  * @param snapshot_envoy_ptr is the handle passed to envoy_dynamic_module_on_stat_sink_flush, or a
  *        handle previously returned by this callback and not yet released.

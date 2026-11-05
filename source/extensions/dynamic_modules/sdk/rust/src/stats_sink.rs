@@ -439,7 +439,10 @@ impl<'a> MetricSnapshot<'a> {
   /// [`to_owned`](Self::to_owned), this decodes no names on the main thread. Names and tags are
   /// decoded when they are read from the retained snapshot, on whichever thread holds it.
   ///
-  /// This must be called on the main thread, from [`StatSink::on_flush`].
+  /// On the snapshot passed to [`StatSink::on_flush`], this must be called on the main thread,
+  /// from that hook. On a [`RetainedMetricSnapshot`], it may be called on whichever thread holds
+  /// it, and the new snapshot reports the values copied by the first retain, not values as of this
+  /// call.
   #[must_use]
   pub fn retain(&self) -> RetainedMetricSnapshot {
     let envoy_ptr =

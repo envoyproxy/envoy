@@ -1062,6 +1062,49 @@ TEST_F(DynamicModuleStatsSinkRetainAbiTest, RetainedHandleReadAndReleasedOnAnoth
   EXPECT_EQ(1u, h0_.use_count());
 }
 
+// A retained handle can itself be retained off the main thread, as a worker that fans a flush out
+// to several consumers does. The new handle reports the values copied by the first retain and holds
+// its own references.
+TEST_F(DynamicModuleStatsSinkRetainAbiTest, RetainedHandleRetainedOnAnotherThread) {
+  populateSnapshot();
+  auto* first = envoy_dynamic_module_callback_stat_sink_snapshot_retain(snapshotHandle());
+  advanceLiveStats();
+  // Retaining from a retained handle reads only its copied values, never the live histogram.
+  EXPECT_CALL(h0_, cumulativeStatistics()).Times(0);
+
+  envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr second = nullptr;
+  uint32_t use_count_after_retain = 0;
+  std::string name;
+  uint64_t value = 0;
+  uint64_t delta = 0;
+  uint64_t sample_count = 0;
+  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread([&]() {
+    second = envoy_dynamic_module_callback_stat_sink_snapshot_retain(first);
+    use_count_after_retain = c0_.use_count();
+    envoy_dynamic_module_callback_stat_sink_snapshot_release(first);
+    name = counterName(second, &value, &delta);
+    char name_buffer[256];
+    size_t name_size = 0;
+    double sample_sum = 0;
+    EXPECT_TRUE(envoy_dynamic_module_callback_stat_sink_snapshot_get_histogram(
+        second, 0, name_buffer, sizeof(name_buffer), &name_size, &sample_count, &sample_sum));
+  });
+  thread->join();
+
+  ASSERT_NE(nullptr, second);
+  EXPECT_NE(first, second);
+  EXPECT_EQ(3u, use_count_after_retain);
+  EXPECT_EQ(2u, c0_.use_count());
+  EXPECT_EQ("cluster.foo.rq_total", name);
+  EXPECT_EQ(100u, value);
+  EXPECT_EQ(7u, delta);
+  EXPECT_EQ(stats_->sampleCount(), sample_count);
+
+  envoy_dynamic_module_callback_stat_sink_snapshot_release(second);
+  EXPECT_EQ(1u, c0_.use_count());
+  EXPECT_EQ(1u, h0_.use_count());
+}
+
 // =============================================================================
 // Config gauge and scheduler callbacks
 // =============================================================================
