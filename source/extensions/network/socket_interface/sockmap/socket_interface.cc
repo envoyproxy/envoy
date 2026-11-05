@@ -29,7 +29,7 @@ IoHandlePtr SockmapSocketInterface::makeSocket(int socket_fd, bool socket_v6only
   return SocketInterfaceImpl::makeSocket(socket_fd, socket_v6only, socket_type, domain, options);
 }
 
-Server::BootstrapExtensionCreationResult SockmapSocketInterface::createBootstrapExtensionOrError(
+Server::BootstrapExtensionCreationResult SockmapSocketInterface::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::socket_interface::sockmap::v3::Sockmap&>(

@@ -22,7 +22,7 @@ public:
   MockBootstrapExtensionFactory();
   ~MockBootstrapExtensionFactory() override;
 
-  MOCK_METHOD(BootstrapExtensionCreationResult, createBootstrapExtensionOrError,
+  MOCK_METHOD(BootstrapExtensionCreationResult, createBootstrapExtension,
               (const Protobuf::Message&, Configuration::ServerFactoryContext&), (override));
   MOCK_METHOD(ProtobufTypes::MessagePtr, createEmptyConfigProto, (), (override));
   MOCK_METHOD(std::string, name, (), (const, override));

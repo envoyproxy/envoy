@@ -18,7 +18,7 @@ namespace Bootstrap {
 namespace DynamicModules {
 
 Server::BootstrapExtensionCreationResult
-DynamicModuleBootstrapExtensionFactory::createBootstrapExtensionOrError(
+DynamicModuleBootstrapExtensionFactory::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
 
   const auto& proto_config = MessageUtil::downcastAndValidate<

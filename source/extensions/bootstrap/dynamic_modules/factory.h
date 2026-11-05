@@ -18,8 +18,8 @@ public:
   std::string name() const override { return "envoy.bootstrap.dynamic_modules"; }
 
   Server::BootstrapExtensionCreationResult
-  createBootstrapExtensionOrError(const Protobuf::Message& config,
-                                  Server::Configuration::ServerFactoryContext& context) override;
+  createBootstrapExtension(const Protobuf::Message& config,
+                           Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };

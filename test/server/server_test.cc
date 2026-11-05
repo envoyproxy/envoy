@@ -1649,7 +1649,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
   });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
 
-  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce([](const Protobuf::Message& config, Configuration::ServerFactoryContext& ctx) {
         const auto* proto =
             Envoy::Protobuf::DynamicCastMessage<test::common::config::DummyConfig>(&config);
@@ -1676,7 +1676,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensionsThrowingError) {
     return std::make_unique<test::common::config::DummyConfig>();
   });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
-  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce([](const Protobuf::Message&,
                    Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
         return absl::InvalidArgumentError("Unable to initiate mock_bootstrap_extension.");

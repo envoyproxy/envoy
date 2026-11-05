@@ -3302,16 +3302,17 @@ TEST_F(ReverseConnectionIOHandleTest, DefaultMaintainInterval) {
 }
 
 // The interval is only visible when the handle re-arms its retry timer, so this goes through
-// createBootstrapExtension + socket() and checks the first enableTimer. 5s plus the fixture's
-// fixed jitter is 5000 + 3999 % 750 = 5249. The unique_ptr is kept so the initiator's cached
-// raw pointer stays valid.
+// createBootstrapExtension + socket() and checks the first enableTimer. 5s plus the
+// fixture's fixed jitter is 5000 + 3999 % 750 = 5249. The unique_ptr is kept so the initiator's
+// cached raw pointer stays valid.
 TEST_F(ReverseConnectionIOHandleTest, MaintainIntervalPassedOnFromExtension) {
   auto socket_interface = std::make_unique<ReverseTunnelInitiator>(context_);
   envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface extension_config;
   extension_config.mutable_maintain_interval()->set_seconds(5);
   auto extension = socket_interface->createBootstrapExtension(extension_config, context_);
-  ASSERT_NE(extension, nullptr);
+  ASSERT_OK(extension);
+  ASSERT_NE(*extension, nullptr);
 
   ReverseConnectionAddress::ReverseConnectionConfig config;
   config.src_cluster_id = "test-cluster";

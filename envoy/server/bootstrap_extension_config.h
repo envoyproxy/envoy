@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/common/exception.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/server/instance.h"
 
@@ -49,25 +48,6 @@ public:
   ~BootstrapExtensionFactory() override = default;
 
   /**
-   * Create a particular bootstrap extension implementation from a config proto. If the
-   * implementation is unable to produce a factory with the provided parameters, it should throw an
-   * EnvoyException. The returned pointer should never be nullptr.
-   * @param config the custom configuration for this bootstrap extension type.
-   * @param context is the context to use for the extension. Note that the clusterManager is not
-   *    yet initialized at this point and **must not** be used.
-   */
-  [[deprecated("Use createBootstrapExtensionOrError instead")]]
-  virtual BootstrapExtensionPtr createBootstrapExtension(const Protobuf::Message& /*config*/,
-                                                         ServerFactoryContext& /*context*/) {
-    // This is the terminal of the delegation below, so it must not delegate back: an extension
-    // that implements neither method lands here.
-    throwEnvoyExceptionOrPanic("Bootstrap extension factory implements neither "
-                               "createBootstrapExtensionOrError nor the deprecated "
-                               "createBootstrapExtension");
-    return nullptr;
-  }
-
-  /**
    * Create a particular bootstrap extension implementation from a config proto.
    * @param config the custom configuration for this bootstrap extension type.
    * @param context is the context to use for the extension. Note that the clusterManager is not
@@ -75,10 +55,7 @@ public:
    * @return BootstrapExtensionCreationResult the constructed extension, or an error status.
    */
   virtual BootstrapExtensionCreationResult
-  createBootstrapExtensionOrError(const Protobuf::Message& config, ServerFactoryContext& context) {
-    // Delegate to the legacy entry point so that extensions which only implement it keep working.
-    return createBootstrapExtension(config, context);
-  }
+  createBootstrapExtension(const Protobuf::Message& config, ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.bootstrap"; }
 };

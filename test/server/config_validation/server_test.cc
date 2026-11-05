@@ -467,7 +467,7 @@ TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionsCreatedDuringV
   EXPECT_CALL(*mock_extension, onServerInitialized(_)).Times(0);
   EXPECT_CALL(*mock_extension, onWorkerThreadInitialized()).Times(0);
 
-  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce([&](const Protobuf::Message& config,
                     Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
         const auto* proto = dynamic_cast<const test::common::config::DummyConfig*>(&config);
@@ -496,7 +496,7 @@ TEST_P(BootstrapExtensionValidationServerTest, BootstrapExtensionThrowingFailsVa
     return std::make_unique<test::common::config::DummyConfig>();
   });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
-  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce([](const Protobuf::Message&,
                    Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
         return absl::InvalidArgumentError("Unable to initiate mock_bootstrap_extension.");
@@ -545,7 +545,7 @@ TEST_P(BootstrapExtensionValidationServerTest, ValidateConfigReturnsTrueForValid
     return std::make_unique<test::common::config::DummyConfig>();
   });
   EXPECT_CALL(mock_factory, name()).WillRepeatedly(Return("envoy_test.bootstrap.foo"));
-  EXPECT_CALL(mock_factory, createBootstrapExtensionOrError(_, _))
+  EXPECT_CALL(mock_factory, createBootstrapExtension(_, _))
       .WillOnce([](const Protobuf::Message&,
                    Configuration::ServerFactoryContext&) -> BootstrapExtensionCreationResult {
         return BootstrapExtensionPtr{std::make_unique<MockBootstrapExtension>()};

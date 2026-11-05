@@ -50,7 +50,7 @@ TEST_F(FactoryTestBase, DynamicModuleLoadFail) {
   proto_config.set_extension_name("test");
 
   EXPECT_LOG_CONTAINS("error", "Unable to load dynamic module libnonexistent_module", {
-    EXPECT_THAT(factory.createBootstrapExtensionOrError(proto_config, context_),
+    EXPECT_THAT(factory.createBootstrapExtension(proto_config, context_),
                 Envoy::StatusHelpers::HasStatusMessage(
                     testing::ContainsRegex("Failed to load dynamic module:.*")));
   });
@@ -69,7 +69,7 @@ TEST_F(FactoryTestBase, ExtensionConfigCreateFail) {
   proto_config.mutable_dynamic_module_config()->set_name("bootstrap_no_config_new");
   proto_config.set_extension_name("test");
 
-  EXPECT_THAT(factory.createBootstrapExtensionOrError(proto_config, context_),
+  EXPECT_THAT(factory.createBootstrapExtension(proto_config, context_),
               Envoy::StatusHelpers::HasStatusMessage(
                   testing::ContainsRegex("Failed to create extension config:.*")));
 
@@ -88,7 +88,7 @@ TEST_F(FactoryTestBase, NullInModuleExtensionRejected) {
   proto_config.mutable_dynamic_module_config()->set_name("bootstrap_extension_new_null");
   proto_config.set_extension_name("test");
 
-  EXPECT_THAT(factory.createBootstrapExtensionOrError(proto_config, context_),
+  EXPECT_THAT(factory.createBootstrapExtension(proto_config, context_),
               Envoy::StatusHelpers::HasStatusMessage(
                   testing::ContainsRegex("Failed to initialize dynamic module bootstrap "
                                          "extension")));
@@ -114,7 +114,7 @@ TEST_F(FactoryTestBase, InvalidExtensionConfig) {
   extension_config->set_type_url("type.googleapis.com/google.protobuf.StringValue");
   extension_config->set_value("invalid\xff\xfe protobuf data that cannot be parsed");
 
-  EXPECT_THAT(factory.createBootstrapExtensionOrError(proto_config, context_),
+  EXPECT_THAT(factory.createBootstrapExtension(proto_config, context_),
               Envoy::StatusHelpers::HasStatusMessage(
                   testing::ContainsRegex("Failed to parse extension config:.*")));
 
@@ -132,7 +132,7 @@ TEST_F(FactoryTestBase, LocalFileLoading) {
       testDataDir() + "/libbootstrap_no_op.so");
   proto_config.set_extension_name("test");
 
-  auto extension_or_error = factory.createBootstrapExtensionOrError(proto_config, context_);
+  auto extension_or_error = factory.createBootstrapExtension(proto_config, context_);
   ASSERT_OK(extension_or_error);
   EXPECT_NE(extension_or_error.value(), nullptr);
 }
@@ -150,7 +150,7 @@ TEST_F(FactoryTestBase, RemoteSourceRejected) {
   remote->set_sha256("abc123");
   proto_config.set_extension_name("test");
 
-  EXPECT_THAT(factory.createBootstrapExtensionOrError(proto_config, context_),
+  EXPECT_THAT(factory.createBootstrapExtension(proto_config, context_),
               Envoy::StatusHelpers::HasStatusMessage(
                   testing::ContainsRegex("does not support remote module sources")));
 
@@ -173,7 +173,7 @@ TEST_F(FactoryTestBase, RemoteSourceWithNackRejected) {
   module_config->set_nack_on_cache_miss(true);
   proto_config.set_extension_name("test");
 
-  EXPECT_THAT(factory.createBootstrapExtensionOrError(proto_config, context_),
+  EXPECT_THAT(factory.createBootstrapExtension(proto_config, context_),
               Envoy::StatusHelpers::HasStatusMessage(
                   testing::ContainsRegex("does not support remote module sources")));
 
