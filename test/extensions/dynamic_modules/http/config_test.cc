@@ -25,7 +25,6 @@
 #include "gtest/gtest.h"
 
 using ::Envoy::StatusHelpers::HasStatusMessage;
-using testing::Invoke;
 using ::testing::Not;
 using testing::ReturnRef;
 
@@ -304,16 +303,14 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccess) {
   cm.initializeThreadLocalClusters({"cluster_1"});
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(module_bytes);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(module_bytes);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -367,16 +364,14 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessInvalidModule) {
   cm.initializeThreadLocalClusters({"cluster_1"});
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(garbage_bytes);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(garbage_bytes);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -432,16 +427,14 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteSourceFetchSuccessMissingFilterSymbo
   cm.initializeThreadLocalClusters({"cluster_1"});
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(module_bytes);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(module_bytes);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   DynamicModuleConfigFactory factory;
   auto cb_or_error = factory.createFilterFactoryFromProto(proto_config, "stats", context_);
@@ -501,16 +494,14 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheHitAfterFetch) {
   cm.initializeThreadLocalClusters({"cluster_1"});
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(module_bytes);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(module_bytes);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   // First call: remote fetch writes the module to disk.
   DynamicModuleConfigFactory factory;
@@ -702,16 +693,14 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchPopulatesCache) {
   cm.initializeThreadLocalClusters({"cluster_1"});
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(module_bytes);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(module_bytes);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   // First call: cache miss → NACK. The mock HTTP client fires synchronously,
   // so the background fetch writes the module to disk before we return.
@@ -820,12 +809,11 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeInFlightDedup) {
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* captured_cb = nullptr;
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            captured_cb = &callbacks;
-            return &request;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        captured_cb = &callbacks;
+        return &request;
+      });
 
   DynamicModuleConfigFactory factory;
 
@@ -881,16 +869,14 @@ TEST_F(DynamicModuleFilterConfigTest, NackModeBackgroundFetchBadModule) {
   cm.initializeThreadLocalClusters({"cluster_1"});
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(bad_data);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(bad_data);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   DynamicModuleConfigFactory factory;
   auto result1 = factory.createFilterFactory(proto_config, "", context_.server_factory_context_,
@@ -944,16 +930,14 @@ TEST_F(DynamicModuleFilterConfigTest, RemoteCacheInvalidationOnMissingFile) {
   cm.initializeThreadLocalClusters({"cluster_1"});
   NiceMock<Http::MockAsyncClientRequest> request(&cm.thread_local_cluster_.async_client_);
   EXPECT_CALL(cm.thread_local_cluster_.async_client_, send_(testing::_, testing::_, testing::_))
-      .WillOnce(
-          Invoke([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            Http::ResponseMessagePtr response(
-                new Http::ResponseMessageImpl(Http::ResponseHeaderMapPtr{
-                    new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
-            response->body().add(module_bytes);
-            callbacks.onSuccess(request, std::move(response));
-            return nullptr;
-          }));
+      .WillOnce([&](Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                    const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+        Http::ResponseMessagePtr response(new Http::ResponseMessageImpl(
+            Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "200"}}}));
+        response->body().add(module_bytes);
+        callbacks.onSuccess(request, std::move(response));
+        return nullptr;
+      });
 
   // First call: remote fetch writes the module to disk.
   DynamicModuleConfigFactory factory;

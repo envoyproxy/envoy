@@ -11,8 +11,10 @@ DynamicModuleHealthChecker::DynamicModuleHealthChecker(
     const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
     DynamicModuleHealthCheckerConfigSharedPtr module_config, Event::Dispatcher& dispatcher,
     Runtime::Loader& runtime, Random::RandomGenerator& random,
-    Upstream::HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+    Upstream::HealthCheckEventLoggerPtr&& event_logger,
+    Upstream::HealthFlagCallbacks& health_flag_callbacks)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
+                            health_flag_callbacks),
       module_config_(std::move(module_config)) {}
 
 void DynamicModuleHealthCheckerScheduler::report(envoy_dynamic_module_type_host_health health) {
@@ -57,6 +59,7 @@ void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::onInterv
     return;
   }
   awaiting_result_ = true;
+  staged_metadata_.clear();
   config_->on_session_on_interval_(session_module_ptr_, this);
 }
 
@@ -65,6 +68,8 @@ void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::onTimeou
   if (session_module_ptr_ != nullptr && config_->on_session_on_timeout_ != nullptr) {
     config_->on_session_on_timeout_(session_module_ptr_);
   }
+  host_->setHealthCheckMetadata(std::move(staged_metadata_));
+  staged_metadata_.clear();
 }
 
 void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::onDeferredDelete() {
@@ -84,6 +89,8 @@ void DynamicModuleHealthChecker::DynamicModuleActiveHealthCheckSession::reportRe
     return;
   }
   awaiting_result_ = false;
+  host_->setHealthCheckMetadata(std::move(staged_metadata_));
+  staged_metadata_.clear();
   switch (health) {
   case envoy_dynamic_module_type_host_health_Healthy:
     handleSuccess(false);

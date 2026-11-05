@@ -381,6 +381,10 @@ void ConnectionManagerUtility::cleanInternalHeaders(
   request_headers.removeEnvoyIpTags();
   request_headers.removeEnvoyOriginalUrl();
   request_headers.removeEnvoyHedgeOnPerTryTimeout();
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.sanitize_upstream_stream_duration_header")) {
+    request_headers.removeEnvoyUpstreamStreamDurationMs();
+  }
 
   for (const LowerCaseString& header : internal_only_headers) {
     request_headers.remove(header);

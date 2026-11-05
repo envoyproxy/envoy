@@ -217,18 +217,30 @@ void Span::log(SystemTime timestamp, const std::string& event) {
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   auto trace_context_option = tracer_.traceContextOption();
 
-  // Always inject B3 headers
-  ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, traceIdAsHexString());
-  ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, idAsHexString());
+  // Always inject B3 headers. Use the B3 single header if the downstream used it, so the
+  // downstream "b3" header is replaced rather than forwarded next to the "x-b3-*" headers.
+  if (use_b3_single_format_) {
+    // b3: {x-b3-traceid}-{x-b3-spanid}-{x-b3-sampled}[-{x-b3-parentspanid}]
+    std::string b3 = absl::StrCat(traceIdAsHexString(), "-", idAsHexString(), "-",
+                                  sampled() ? SAMPLED : NOT_SAMPLED);
+    if (isSetParentId()) {
+      absl::StrAppend(&b3, "-", parentIdAsHexString());
+    }
+    ZipkinCoreConstants::get().B3.setRefKey(trace_context, b3);
+  } else {
+    ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, traceIdAsHexString());
+    ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, idAsHexString());
 
-  // Set the parent-span header properly, based on the newly-created span structure.
-  if (isSetParentId()) {
-    ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.setRefKey(trace_context, parentIdAsHexString());
+    // Set the parent-span header properly, based on the newly-created span structure.
+    if (isSetParentId()) {
+      ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.setRefKey(trace_context,
+                                                               parentIdAsHexString());
+    }
+
+    // Set the sampled header.
+    ZipkinCoreConstants::get().X_B3_SAMPLED.setRefKey(trace_context,
+                                                      sampled() ? SAMPLED : NOT_SAMPLED);
   }
-
-  // Set the sampled header.
-  ZipkinCoreConstants::get().X_B3_SAMPLED.setRefKey(trace_context,
-                                                    sampled() ? SAMPLED : NOT_SAMPLED);
 
   // Additionally inject W3C headers if dual propagation is enabled
   if (trace_context_option == envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION) {
@@ -237,7 +249,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::Up
 }
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
-  return tracer_.startSpan(config, name, start_time, spanContext());
+  SpanPtr child = tracer_.startSpan(config, name, start_time, spanContext());
+  child->setUseB3SingleFormat(use_b3_single_format_);
+  return child;
 }
 
 SpanContext Span::spanContext() const {

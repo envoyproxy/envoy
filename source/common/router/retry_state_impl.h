@@ -10,7 +10,7 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/router/context.h"
-#include "envoy/router/router.h"
+#include "envoy/router/retry.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/upstream.h"
@@ -105,7 +105,7 @@ public:
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
   DoRetryType doRetryType() const override { return do_retry_type_; }
 
-  bool isAutomaticallyConfiguredForHttp3() const { return auto_configured_for_http3_; }
+  bool isAutomaticallyConfiguredForHttp3() const override { return auto_configured_for_http3_; }
 
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::RequestHeaderMap& request_headers,

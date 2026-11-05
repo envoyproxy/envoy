@@ -1,0 +1,5 @@
+body: "{\"id\":\"chatcmpl-identity-001\",\"object\":\"chat.completion\",\"created\":1700000000,\"model\":\"gpt-4\",\"system_fingerprint\":\"fp_0123456789\",\"service_tier\":\"default\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Direct OpenAI-to-OpenAI unary response.\"},\"logprobs\":null,\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":42,\"completion_tokens\":18,\"total_tokens\":60}}"
+fragmentation_seed: 1234605616436508552
+request_protocol: OPENAI_CHAT_COMPLETIONS
+response_protocol: OPENAI_CHAT_COMPLETIONS
+max_json_body_size: 4095

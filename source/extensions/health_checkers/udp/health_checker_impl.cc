@@ -32,7 +32,7 @@ HealthCheckerSharedPtr UdpHealthCheckerFactory::createCustomHealthChecker(
 
   return std::make_shared<ProdUdpHealthCheckerImpl>(
       context.cluster(), config, udp_config, context.mainThreadDispatcher(), context.runtime(),
-      context.api().randomGenerator(), context.eventLogger());
+      context.api().randomGenerator(), context.eventLogger(), context.healthFlagCallbacks());
 }
 
 REGISTER_FACTORY(UdpHealthCheckerFactory, Server::Configuration::CustomHealthCheckerFactory);
@@ -66,8 +66,9 @@ UdpHealthCheckerImpl::UdpHealthCheckerImpl(
     const Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
     const envoy::extensions::health_checkers::udp::v3::UdpHealthCheck& udp_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Random::RandomGenerator& random,
-    HealthCheckEventLoggerPtr&& event_logger)
-    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
+    HealthCheckEventLoggerPtr&& event_logger, HealthFlagCallbacks& health_flag_callbacks)
+    : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger),
+                            health_flag_callbacks),
       send_bytes_(decodePayload(udp_config.send(), "send")),
       receive_bytes_(decodePayload(udp_config.receive(), "receive")) {}
 

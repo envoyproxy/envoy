@@ -204,6 +204,7 @@ message VirtualHost {
   // will take precedence over this config and it'll be treated independently (e.g., values are not
   // inherited). :ref:`Retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>` should not be
   // set if this field is used.
+  // [#comment: add [#extension-category: envoy.router.retry_policy] when there are built-in extensions]
   google.protobuf.Any retry_policy_typed_config = 20;
 
   // Indicates the hedge policy for all routes in this virtual host. Note that setting a
@@ -265,10 +266,10 @@ message VirtualHost {
   // the request attributes (e.g., headers, path) directly.
   //
   // Specifiers are executed in order, and the output of each is the input of the next. The
-  // specifiers here will run after the ``route_specifiers`` of
-  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
-  // and before the ``route_specifiers`` of the resolved
-  // :ref:`route <envoy_v3_api_field_config.route.v3.Route.route_specifiers>`.
+  // specifiers here will run after the ``route_specifiers`` of the resolved
+  // :ref:`route <envoy_v3_api_field_config.route.v3.Route.route_specifiers>`
+  // and before the ``route_specifiers`` of
+  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration
@@ -448,10 +449,11 @@ message Route {
   // the request attributes (e.g., headers, path) directly.
   //
   // Specifiers are executed in order, and the output of each is the input of the next. The
-  // specifiers here will run last, after the ``route_specifiers`` of
-  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`
-  // and :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>`, so
-  // the route that comes out of the last specifier here is the final route used by Envoy.
+  // specifiers here will run first, before the ``route_specifiers`` of
+  // :ref:`virtual host <envoy_v3_api_field_config.route.v3.VirtualHost.route_specifiers>` and
+  // :ref:`route configuration <envoy_v3_api_field_config.route.v3.RouteConfiguration.route_specifiers>`,
+  // so the route that comes out of the last specifier here is the input of the specifiers of
+  // these two levels.
   //
   // .. note::
   //   If the route matching resolves no route, the route specifiers at the route configuration
@@ -873,8 +875,6 @@ message RouteAction {
   // Configures :ref:`internal redirect <arch_overview_internal_redirects>` behavior.
   // [#next-major-version: remove this definition - it's defined in the InternalRedirectPolicy message.]
   enum InternalRedirectAction {
-    option deprecated = true;
-
     PASS_THROUGH_INTERNAL_REDIRECT = 0;
     HANDLE_INTERNAL_REDIRECT = 1;
   }
@@ -1482,8 +1482,9 @@ message RouteAction {
   // [#not-implemented-hide:]
   // Specifies the configuration for retry policy extension. Note that if this is set, it'll take
   // precedence over the virtual host level retry policy entirely (e.g., policies are not merged,
-  // the most internal one becomes the enforced policy). :ref:`Retry policy <envoy_v3_api_field_config.route.v3.VirtualHost.retry_policy>`
+  // the most internal one becomes the enforced policy). :ref:`Retry policy <envoy_v3_api_field_config.route.v3.RouteAction.retry_policy>`
   // should not be set if this field is used.
+  // [#comment: add [#extension-category: envoy.router.retry_policy] when there are built-in extensions]
   google.protobuf.Any retry_policy_typed_config = 33;
 
   // Specify a set of route request mirroring policies.

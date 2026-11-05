@@ -7,12 +7,12 @@ import multiprocessing
 import os
 import pathlib
 import re
-import subprocess
+import shlex
+import shutil
 import stat
+import subprocess
 import sys
 import traceback
-import shutil
-import shlex
 from functools import cached_property
 from typing import Callable, Dict, Iterator, List, Pattern, Tuple, Union
 
@@ -351,6 +351,16 @@ class FormatChecker:
             ]
         return []
 
+    def check_optional_reference_wrapper(self, file_path):
+        if self.allow_listed_for_optional_reference_wrapper(file_path):
+            return []
+        text = self.read_file(file_path)
+        return [
+            "%s:%d: Don't use std::optional<std::reference_wrapper<T>>; use OptRef<T> instead" %
+            (file_path, text.count("\n", 0, match.start()) + 1)
+            for match in self.config.re["optional_reference_wrapper"].finditer(text)
+        ]
+
     # To avoid breaking the Lyft import, we just check for path inclusion here.
     def allow_listed_for_protobuf_deps(self, file_path):
         return (
@@ -388,6 +398,9 @@ class FormatChecker:
     def allow_listed_for_std_regex(self, file_path):
         return file_path.startswith(
             "./test") or file_path in self.config.paths["std_regex"]["include"]
+
+    def allow_listed_for_optional_reference_wrapper(self, file_path):
+        return file_path in self.config.paths["optional_reference_wrapper"]["include"]
 
     def allow_listed_for_grpc_init(self, file_path):
         return file_path in self.config.paths["grpc_init"]["include"]
@@ -892,6 +905,7 @@ class FormatChecker:
             error_messages = self.check_file_contents(file_path, self.check_source_line)
         if file_path.endswith((".cc", ".h")):
             error_messages += self.check_namespace(file_path)
+            error_messages += self.check_optional_reference_wrapper(file_path)
         error_messages.extend(self.clang_format(file_path, check=True))
         return error_messages
 
@@ -1075,9 +1089,12 @@ class FormatChecker:
             print("PASS")
 
     def check_visibility(self):
+        # CI sets `GIT_BIN` to the hermetic git toolchain.
+        git = shlex.quote(os.environ.get("GIT_BIN", "git"))
+        excludes = "".join([f"':(exclude){c}' " for c in self.config["visibility_excludes"]])
         command = (
-            "git diff $(tools/git/last_github_commit.sh) -- source/extensions/* %s |grep '+.*visibility ='"
-            % "".join([f"':(exclude){c}' " for c in self.config["visibility_excludes"]]))
+            f"{git} diff $(tools/git/last_github_commit.sh) -- source/extensions/* {excludes}"
+            "|grep '+.*visibility ='")
         try:
             output = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT).strip()
             if output:

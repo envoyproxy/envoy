@@ -265,7 +265,7 @@ void McpParserConfig::buildMethodRequirements(
     }
   }
 
-  if (!required_set.contains(std::string(Paths::PARAMS_META))) {
+  if (!required_set.contains(Paths::PARAMS_META)) {
     requirements.optional.push_back(std::string(Paths::PARAMS_META));
   }
 }
@@ -357,13 +357,15 @@ McpFieldExtractor* McpFieldExtractor::StartObject(absl::string_view name) {
   }
 
   depth_++;
+  // Push for every object, empty key included, so EndObject always pops the
+  // matching frame. Otherwise `{"":{}}` would pop its parent's path segment.
+  path_stack_.push_back({current_path_cache_.size()});
 
   bool is_duplicate = false;
   if (!name.empty()) {
     // Check for duplicate key in the parent scope before entering this object
     is_duplicate = checkDuplicateKey(name);
 
-    path_stack_.push_back(std::string(name));
     // Update cached path
     if (!current_path_cache_.empty()) {
       current_path_cache_ += ".";
@@ -445,13 +447,8 @@ McpFieldExtractor* McpFieldExtractor::EndObject() {
     }
 
     if (!path_stack_.empty()) {
-      // Update cached path before removing from stack
-      size_t last_dot = current_path_cache_.rfind('.');
-      if (last_dot != std::string::npos) {
-        current_path_cache_.resize(last_dot);
-      } else {
-        current_path_cache_.clear();
-      }
+      // Restore the path to what it was before this object's StartObject.
+      current_path_cache_.resize(path_stack_.back().cache_size_before);
       path_stack_.pop_back();
     }
     if (context_stack_.size() > 1) {
@@ -492,7 +489,7 @@ std::string McpFieldExtractor::buildFullPath(absl::string_view name) const {
       full_path += ".";
       full_path += name;
     } else {
-      full_path = std::string(name);
+      full_path = name;
     }
   } else {
     full_path = current_path_cache_;
@@ -538,7 +535,7 @@ McpFieldExtractor* McpFieldExtractor::RenderString(absl::string_view name,
   if (context_stack_.top().struct_ptr != nullptr && isPathInteresting(full_path)) {
     // Store in temp storage
     Protobuf::Value proto_value;
-    proto_value.set_string_value(std::string(value));
+    proto_value.set_string_value(value);
     storeField(full_path, name, proto_value);
   }
 

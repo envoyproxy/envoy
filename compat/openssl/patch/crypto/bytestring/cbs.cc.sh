@@ -4,6 +4,7 @@ set -euo pipefail
 
 uncomment.sh "$1" --comment \
   --uncomment-regex '\#include <' \
+  --sed '/^#include <string.h>$/a \\nnamespace bssl {\nint cbb_add_decimal_ascii(CBB *out, uint64_t v);\n}\nusing bssl::cbb_add_decimal_ascii;' \
   --uncomment-func-impl cbs_get \
   --uncomment-func-impl CBS_get_bytes \
   --uncomment-func-impl CBS_skip \
@@ -17,7 +18,6 @@ uncomment.sh "$1" --comment \
   --uncomment-func-impl parse_asn1_tag \
   --uncomment-func-impl cbs_get_any_asn1_element \
   --uncomment-static-func-impl cbs_get_asn1 \
-  --uncomment-static-func-impl add_decimal \
   --uncomment-func-impl CBS_get_u8_length_prefixed \
   --uncomment-func-impl CBS_get_asn1 \
   --uncomment-func-impl CBS_get_asn1_element \

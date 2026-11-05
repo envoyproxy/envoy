@@ -6,11 +6,10 @@
 namespace Envoy {
 namespace Upstream {
 using ::testing::_;
-using ::testing::Invoke;
 MockHealthChecker::MockHealthChecker() {
-  ON_CALL(*this, addHostCheckCompleteCb(_)).WillByDefault(Invoke([this](HostStatusCb cb) -> void {
+  ON_CALL(*this, addHostCheckCompleteCb(_)).WillByDefault([this](HostStatusCb cb) -> void {
     callbacks_.push_back(cb);
-  }));
+  });
 }
 
 MockHealthChecker::~MockHealthChecker() = default;

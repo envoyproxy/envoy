@@ -41,6 +41,7 @@
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/router.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/common/upstream/retry_factory.h"
@@ -131,14 +132,21 @@ public:
     ENVOY_BUG(!watermark_callbacks_, "Watermark callbacks should not already be registered!");
     watermark_callbacks_.emplace(callbacks);
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
+      watermark_callbacks_->onSidestreamAboveHighWatermark();
     }
   }
 
   void removeWatermarkCallbacks() override {
     ENVOY_BUG(watermark_callbacks_, "Watermark callbacks should already be registered!");
     for (uint32_t i = 0; i < high_watermark_calls_; ++i) {
-      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
+      watermark_callbacks_->onSidestreamBelowLowWatermark();
+    }
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.async_client_downstream_flow_control2")) {
+      if (downstream_watermark_callbacks_ != nullptr) {
+        watermark_callbacks_->removeDownstreamWatermarkCallbacks(*downstream_watermark_callbacks_);
+      }
     }
     watermark_callbacks_.reset();
   }
@@ -163,7 +171,7 @@ protected:
   // Callback to listen for stream destruction.
   std::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
-  std::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
+  OptRef<SidestreamWatermarkCallbacks> watermark_callbacks_;
   bool complete_{};
   const bool discard_response_body_;
   std::optional<uint64_t> buffer_limit_{std::nullopt};
@@ -207,6 +215,7 @@ private:
   }
   MetadataMapVector& addDecodedMetadata() override { PANIC("not implemented"); }
   void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {}
+  void injectDecodedHeadersToFilterChain(bool) override {}
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {}
   void sendLocalReply(Code code, absl::string_view body,
@@ -223,18 +232,35 @@ private:
   void onDecoderFilterAboveWriteBufferHighWatermark() override {
     ++high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onSidestreamAboveHighWatermark();
+      watermark_callbacks_->onSidestreamAboveHighWatermark();
     }
   }
   void onDecoderFilterBelowWriteBufferLowWatermark() override {
     ASSERT(high_watermark_calls_ != 0);
     --high_watermark_calls_;
     if (watermark_callbacks_.has_value()) {
-      watermark_callbacks_->get().onSidestreamBelowLowWatermark();
+      watermark_callbacks_->onSidestreamBelowLowWatermark();
     }
   }
-  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.async_client_downstream_flow_control2")) {
+      if (watermark_callbacks_.has_value()) {
+        downstream_watermark_callbacks_ = &callbacks;
+        watermark_callbacks_->addDownstreamWatermarkCallbacks(callbacks);
+      }
+    }
+  }
+  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& callbacks) override {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.async_client_downstream_flow_control2")) {
+      if (watermark_callbacks_.has_value()) {
+        watermark_callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
+        downstream_watermark_callbacks_ = nullptr;
+      }
+    }
+  }
+
   void addUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks&) override {}
   void removeUpstreamWatermarkCallbacks(UpstreamWatermarkCallbacks&) override {}
   void sendGoAwayAndClose(bool graceful [[maybe_unused]] = false) override {}
@@ -284,6 +310,8 @@ private:
     DUMP_DETAILS(&stream_info_);
   }
 
+  // AsyncStream only gets 1 set of downstream watermark callbacks.
+  DownstreamWatermarkCallbacks* downstream_watermark_callbacks_ = nullptr;
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
   Router::ProdFilter router_;

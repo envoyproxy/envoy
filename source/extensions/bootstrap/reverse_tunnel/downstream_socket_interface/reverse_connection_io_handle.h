@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/io_handle.h"
@@ -95,6 +96,8 @@ struct ReverseConnectionSocketConfig {
   std::shared_ptr<const std::vector<HandshakeHeader>> handshake_headers;
   // How often to re-check each host and dial missing tunnels.
   uint64_t maintain_interval_ms{ReverseConnectionUtility::kDefaultMaintainIntervalMs};
+  // Deadline for receiving the handshake response after a dial opens the connection.
+  uint64_t handshake_timeout_ms{15000};
   // TODO(basundhara-c): Add support for multiple remote clusters using the same
   // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
   // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
@@ -149,8 +152,8 @@ public:
 
   /**
    * Override of accept method for reverse connections.
-   * Returns established reverse connections when they become available. This is woken up using the
-   * trigger pipe when a tcp connection to an upstream cluster is established.
+   * Returns established reverse connections when they become available. maybePushConn() activates a
+   * read event when a tcp connection to an upstream cluster is established.
    * @param addr pointer to store the client address information.
    * @param addrlen pointer to the length of the address structure.
    * @return IoHandlePtr for the accepted reverse connection, or nullptr if none available.
@@ -189,6 +192,15 @@ public:
   Api::IoCallUint64Result close() override;
 
   /**
+   * Return a fresh, unstarted reverse connection handle rather than a raw fd dup. The listener
+   * manager duplicates the listen socket per worker under ``reuse_port`` and on every LDS update,
+   * and a raw dup of this handle's fd never dials and can auto-bind an unadvertised port. The copy
+   * shares the configuration and backs its own dial loop once the worker initializes it.
+   * @return a new ReverseConnectionIOHandle over a fresh unbound TCP socket.
+   */
+  Network::IoHandlePtr duplicate() override;
+
+  /**
    * Stop reverse-connection maintenance on listener teardown. On the owning worker this also
    * shuts down in-flight handshake wrappers and deferred-deletes them.
    */
@@ -203,6 +215,24 @@ public:
    */
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
                            Event::FileTriggerType trigger, uint32_t events) override;
+
+  // Check and signal to the listener that a new connection is available.
+  void maybePushConn() {
+    if (listener_want_read_ && !established_connections_.empty()) {
+      activateFileEvents(Event::FileReadyType::Read);
+    }
+  }
+
+  /**
+   * Enable the file events.
+   */
+  void enableFileEvents(uint32_t events) override {
+    listener_want_read_ = events & Event::FileReadyType::Read;
+    // Cancel the existing events for overload management.
+    // If the listener wants to read we will push in the maybePushConn().
+    Network::IoSocketHandleImpl::enableFileEvents(0);
+    maybePushConn();
+  }
 
   // Network::ConnectionCallbacks.
   /**
@@ -229,12 +259,6 @@ public:
     ENVOY_LOG(info, "Bind called on rc socket handle: {}", address->logicalName());
     return Api::SysCallIntResult{0, 0};
   }
-
-  /**
-   * Get the file descriptor for the pipe monitor used to wake up accept().
-   * @return the file descriptor for the pipe monitor
-   */
-  os_fd_t getPipeMonitorFd() const;
 
   // Callbacks from RCConnectionWrapper.
   /**
@@ -385,6 +409,13 @@ public:
     return config_.handshake_headers;
   }
 
+  /**
+   * @return the handshake response deadline applied to each dial attempt.
+   */
+  std::chrono::milliseconds handshakeTimeout() const {
+    return std::chrono::milliseconds(config_.handshake_timeout_ms);
+  }
+
 private:
   /**
    * Get time source for consistent time operations.
@@ -458,18 +489,6 @@ private:
    */
   void cleanup();
 
-  // Pipe trigger mechanism helpers
-  /**
-   * Create trigger pipe used to wake up accept() when a connection is established.
-   */
-  void createTriggerPipe();
-
-  /**
-   * Check if trigger pipe is ready for use.
-   * @return true if initialized and ready
-   */
-  bool isTriggerPipeReady() const;
-
   // Host/cluster mapping management
   /**
    * Update cluster -> host mappings from the cluster manager. Called before connection initiation
@@ -526,6 +545,7 @@ private:
   const ReverseConnectionSocketConfig config_; // Configuration for reverse connections
   Upstream::ClusterManager& cluster_manager_;
   ReverseTunnelInitiatorExtension* extension_;
+  Stats::Scope& scope_; // Stats scope, forwarded to handles created by duplicate().
 
   // Connection wrapper management
   std::vector<std::unique_ptr<RCConnectionWrapper>>
@@ -533,15 +553,18 @@ private:
   // Mapping from wrapper to host. This designates the number of successful connections to a host.
   absl::flat_hash_map<RCConnectionWrapper*, std::string> conn_wrapper_to_host_map_;
 
-  // Simple pipe-based trigger mechanism to wake up accept() when a connection is established.
-  // Inlined directly for simplicity and reduced test coverage requirements.
-  os_fd_t trigger_pipe_read_fd_{INVALID_SOCKET};
-  os_fd_t trigger_pipe_write_fd_{INVALID_SOCKET};
+  // An established tunnel awaiting accept(), with any bytes the responder coalesced with the
+  // handshake response so accept() can replay them before reading the socket.
+  struct EstablishedConnection {
+    Envoy::Network::ClientConnectionPtr connection;
+    Buffer::InstancePtr residual_bytes;
+  };
 
-  // Connection management : We store the established connections in a queue.
-  // and pop the last established connection when data is read on trigger_pipe_read_fd_
-  // to determine the connection that got established last.
-  std::queue<Envoy::Network::ClientConnectionPtr> established_connections_;
+  // Established tunnels wait here until the listener accepts them. accept() pops the front
+  // entry, and maybePushConn() injects a read event so the listener keeps draining the queue
+  // without the fd ever being registered for kernel readability.
+  std::queue<EstablishedConnection> established_connections_;
+  bool listener_want_read_{false}; // Whether the listener wants to read data.
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
@@ -553,9 +576,6 @@ private:
   bool is_reverse_conn_started_{
       false}; // Whether reverse connections have been started on worker thread
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
-
-  // Store original socket FD for cleanup.
-  os_fd_t original_socket_fd_{INVALID_SOCKET};
 };
 
 } // namespace ReverseConnection

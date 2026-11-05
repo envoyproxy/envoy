@@ -14,7 +14,6 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
@@ -76,7 +75,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
 
   EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
               HasStatus(absl::StatusCode::kInvalidArgument,
-                        "cache_time_ms must not be set when path_through_mode is disabled"));
+                        "cache_time_ms must not be set when pass_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
@@ -113,7 +112,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   EXPECT_THAT(
       healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
       HasStatus(absl::StatusCode::kInvalidArgument,
-                "cache_time_ms must not be set when path_through_mode is disabled"));
+                "cache_time_ms must not be set when pass_through_mode is disabled"));
 }
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {
@@ -166,9 +165,9 @@ void testHealthCheckHeaderMatch(
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   Http::StreamFilterSharedPtr health_check_filter;
   EXPECT_CALL(filter_callbacks, addStreamFilter(_))
-      .WillRepeatedly(Invoke([&health_check_filter](Http::StreamFilterSharedPtr filter) {
+      .WillRepeatedly([&health_check_filter](Http::StreamFilterSharedPtr filter) {
         health_check_filter = filter;
-      }));
+      });
 
   cb(filter_callbacks);
   ASSERT_NE(health_check_filter, nullptr);

@@ -8,7 +8,8 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/route/v3/route_components.pb.validate.h"
-#include "envoy/router/router.h"
+#include "envoy/registry/registry.h"
+#include "envoy/router/retry.h"
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {
@@ -56,12 +57,19 @@ public:
   }
   std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
   bool refreshClusterOnRetry() const override { return refresh_cluster_on_retry_; }
+  RetryStatePtr createRetryState(Http::RequestHeaderMap& request_headers,
+                                 const Upstream::ClusterInfo& cluster,
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Event::Dispatcher& dispatcher, Upstream::ResourcePriority priority,
+                                 OptRef<StreamInfo::StreamInfo> stream_info) const override;
 
-private:
+protected:
   RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor,
                   Server::Configuration::CommonFactoryContext& common_context,
                   absl::Status& creation_status);
+
+private:
   std::chrono::milliseconds per_try_timeout_{0};
   std::chrono::milliseconds per_try_idle_timeout_{0};
   // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
@@ -88,6 +96,26 @@ private:
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
   const bool refresh_cluster_on_retry_{false};
 };
+
+/**
+ * Default implementation of RetryPolicyFactory that creates a RetryPolicyImpl from
+ * envoy::config::route::v3::RetryPolicy.
+ */
+class DefaultRetryPolicyFactory : public RetryPolicyFactory {
+public:
+  absl::StatusOr<RetryPolicyConstSharedPtr>
+  createRetryPolicy(const Protobuf::Message& config,
+                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                    Server::Configuration::CommonFactoryContext& context) override;
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<envoy::config::route::v3::RetryPolicy>();
+  }
+
+  std::string name() const override { return "envoy.router.retry_policy.default"; }
+};
+
+DECLARE_FACTORY(DefaultRetryPolicyFactory);
 
 } // namespace Router
 } // namespace Envoy

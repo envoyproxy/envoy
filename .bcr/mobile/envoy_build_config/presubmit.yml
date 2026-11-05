@@ -15,6 +15,5 @@ tasks:
     build_targets:
     - "@envoy_build_config//..."
     build_flags:
-    - "--java_runtime_version=remotejdk_21"
     - "--cxxopt=-std=c++20"
     - "--host_cxxopt=-std=c++20"

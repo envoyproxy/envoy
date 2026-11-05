@@ -42,6 +42,7 @@ envoy_cc_library(
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":path_rewrite_utility_lib",
         ":per_filter_config_lib",
         ":retry_policy_lib",
         ":retry_state_lib",
@@ -78,6 +79,8 @@ envoy_cc_library(
         "//source/common/http/matching:data_impl_lib",
         "//source/common/matcher:matcher_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
         "//source/common/stream_info:filter_state_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:custom_tag_lib",
@@ -160,6 +163,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "path_rewrite_utility_lib",
+    srcs = ["path_rewrite_utility.cc"],
+    hdrs = ["path_rewrite_utility.h"],
+    deps = [
+        "//source/common/common:regex_lib",
+        "//source/common/http:path_utility_lib",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "config_utility_lib",
     srcs = ["config_utility.cc"],
     hdrs = ["config_utility.h"],
@@ -188,6 +202,8 @@ envoy_cc_library(
         "//envoy/router:router_interface",
         "//envoy/stats:stats_macros",
         "//source/common/config:utility_lib",
+        "//source/common/stats:symbol_table_lib",
+        "//source/common/stats:utility_lib",
     ],
 )
 
@@ -213,9 +229,9 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/protobuf:arena_wrapped_proto_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/rds:rds_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
@@ -267,6 +283,7 @@ envoy_cc_library(
         "//envoy/router:route_config_provider_manager_interface",
         "//envoy/router:route_config_update_info_interface",
         "//source/common/router:route_config_update_impl_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -296,6 +313,7 @@ envoy_cc_library(
         "//source/common/rds:rds_lib",
         "//source/common/router:route_config_update_impl_lib",
         "//source/common/router:vhds_lib",
+        "//source/common/runtime:runtime_features_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -362,6 +380,7 @@ envoy_cc_library(
         "//envoy/event:timer_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:header_map_interface",
+        "//envoy/router:retry_interface",
         "//envoy/router:router_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stream_info:stream_info_interface",
@@ -419,6 +438,7 @@ envoy_cc_library(
         "//envoy/router:shadow_writer_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/server:factory_context_interface",
+        "//envoy/server:filter_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
         "//envoy/upstream:cluster_manager_interface",
@@ -426,6 +446,7 @@ envoy_cc_library(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
+        "//source/common/common:empty_string",
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
         "//source/common/common:hex_lib",
@@ -451,6 +472,7 @@ envoy_cc_library(
         "//source/common/upstream:upstream_factory_context_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
     ],
@@ -558,7 +580,7 @@ envoy_cc_library(
     deps = [
         "//envoy/common:time_interface",
         "//envoy/http:header_map_interface",
-        "//envoy/router:router_interface",
+        "//envoy/router:retry_interface",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -600,10 +622,12 @@ envoy_cc_library(
     deps = [
         ":reset_header_parser_lib",
         ":retry_state_lib",
-        "//envoy/router:router_interface",
+        "//envoy/registry",
+        "//envoy/router:retry_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/config:utility_lib",
         "//source/common/upstream:retry_factory_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
+    alwayslink = LEGACY_ALWAYSLINK,
 )

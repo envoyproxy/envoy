@@ -145,5 +145,24 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
                                                            *validation_visitor_, num_retries_);
 }
 
+RetryStatePtr RetryPolicyImpl::createRetryState(
+    Http::RequestHeaderMap& request_headers, const Upstream::ClusterInfo& cluster,
+    Server::Configuration::CommonFactoryContext& context, Event::Dispatcher& dispatcher,
+    Upstream::ResourcePriority priority, OptRef<StreamInfo::StreamInfo> /*stream_info*/) const {
+  return RetryStateImpl::create(*this, request_headers, cluster, context, dispatcher, priority);
+}
+
+absl::StatusOr<RetryPolicyConstSharedPtr>
+DefaultRetryPolicyFactory::createRetryPolicy(const Protobuf::Message& config,
+                                             ProtobufMessage::ValidationVisitor& validation_visitor,
+                                             Server::Configuration::CommonFactoryContext& context) {
+  return RetryPolicyImpl::create(
+      MessageUtil::downcastAndValidate<const envoy::config::route::v3::RetryPolicy&>(
+          config, validation_visitor),
+      validation_visitor, context);
+}
+
+REGISTER_FACTORY(DefaultRetryPolicyFactory, RetryPolicyFactory);
+
 } // namespace Router
 } // namespace Envoy

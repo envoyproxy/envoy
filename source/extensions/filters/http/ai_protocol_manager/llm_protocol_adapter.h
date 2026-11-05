@@ -61,6 +61,18 @@ public:
   // the usage. Chat Completions' non-JSON `[DONE]` is handled before parsing.
   virtual bool isTerminalEvent(const nlohmann::json& json) const PURE;
 
+  // The root member that holds this dialect's usage in a response body or
+  // stream event (`usage`, `usageMetadata`), or empty when it has none.
+  virtual absl::string_view usagePath() const PURE;
+
+  // The inverse of extractUsage() plus canonicalizeUsage(): renders finalized
+  // canonical `usage` as this dialect's native usage object, the value that
+  // belongs at usagePath(). Only the counts `usage` carries are written, so
+  // an empty object means there was nothing to render. Lets usage move
+  // between any two dialects through the canonical contract, with no
+  // per-pair conversion code.
+  virtual nlohmann::json renderUsage(const TokenUsage& usage) const PURE;
+
 protected:
   // The dialect's usage reads, onto a result whose usage is already stamped
   // with protocol(). A known field with an unusable value reads as absent and

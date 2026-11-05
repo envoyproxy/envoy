@@ -258,10 +258,10 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificate) {
 
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
-      .WillOnce(Invoke([this]() {
+      .WillOnce([this]() {
         EXPECT_EQ(main_thread_id_, thread_factory_->currentPthreadId());
         dispatcher_->exit();
-      }));
+      });
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
@@ -294,10 +294,10 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptySanOverrides) {
 
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
-      .WillOnce(Invoke([this]() {
+      .WillOnce([this]() {
         EXPECT_EQ(main_thread_id_, thread_factory_->currentPthreadId());
         dispatcher_->exit();
-      }));
+      });
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
@@ -330,10 +330,10 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateEmptyHostNoOverrides) {
 
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
-      .WillOnce(Invoke([this]() {
+      .WillOnce([this]() {
         EXPECT_EQ(main_thread_id_, thread_factory_->currentPthreadId());
         dispatcher_->exit();
-      }));
+      });
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
@@ -364,7 +364,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateButInvalidSni) {
                   acceptInvalidCertificates(), Envoy::Ssl::ClientValidationStatus::Failed,
                   "PlatformBridgeCertValidator_verifySubjectAltName failed: SNI mismatch.",
                   SSL_AD_BAD_CERTIFICATE))
-      .WillOnce(Invoke([this]() { dispatcher_->exit(); }));
+      .WillOnce([this]() { dispatcher_->exit(); });
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
@@ -398,7 +398,7 @@ TEST_P(PlatformBridgeCertValidatorTest, ValidCertificateSniOverride) {
   // The cert will be validated against the overridden name not the invalid name "server2".
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
-      .WillOnce(Invoke([this]() { dispatcher_->exit(); }));
+      .WillOnce([this]() { dispatcher_->exit(); });
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 
@@ -484,10 +484,10 @@ TEST_P(PlatformBridgeCertValidatorTest, ThreadPriority) {
 
   EXPECT_CALL(callback_ref,
               onCertValidationResult(true, Envoy::Ssl::ClientValidationStatus::Validated, "", 46))
-      .WillOnce(Invoke([this, &validator, expected_thread_priority]() {
+      .WillOnce([this, &validator, expected_thread_priority]() {
         EXPECT_EQ(validator.recordedThreadPriority(), expected_thread_priority);
         dispatcher_->exit();
-      }));
+      });
   EXPECT_FALSE(waitForDispatcherToExit());
 }
 

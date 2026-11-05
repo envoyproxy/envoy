@@ -9,12 +9,21 @@ package abi
 #include "../../../abi/abi.h"
 
 typedef const envoy_dynamic_module_type_envoy_buffer* ConstEnvoyBufferPtr;
+
+extern void envoy_dynamic_module_go_sdk_filter_state_object_destroy(
+    envoy_dynamic_module_type_filter_state_object_module_ptr module_object);
+
+static inline envoy_dynamic_module_type_filter_state_object_module_ptr
+handleToFilterStateObject(uintptr_t handle) {
+  return (envoy_dynamic_module_type_filter_state_object_module_ptr)handle;
+}
 */
 import "C"
 import (
 	_ "embed"
 	"fmt"
 	"runtime"
+	"runtime/cgo"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -259,11 +268,13 @@ func (h *dymHeaderMap) GetAll() [][2]shared.UnsafeEnvoyBuffer {
 	}
 
 	resultHeaders := make([]C.envoy_dynamic_module_type_envoy_http_header, headerCount)
-	C.envoy_dynamic_module_callback_http_get_headers(
+	if !bool(C.envoy_dynamic_module_callback_http_get_headers(
 		(C.envoy_dynamic_module_type_http_filter_envoy_ptr)(h.hostPluginPtr),
 		(C.envoy_dynamic_module_type_http_header_type)(h.headerType),
 		unsafe.SliceData(resultHeaders),
-	)
+	)) {
+		return nil
+	}
 	finalResult := envoyHttpHeaderSliceToUnsafeHeaderSlice(resultHeaders)
 	runtime.KeepAlive(resultHeaders)
 	return finalResult
@@ -909,6 +920,23 @@ func (h *dymHttpFilterHandle) SetTypedMetadata(metadataNamespace string, seriali
 	runtime.KeepAlive(serializedAny)
 }
 
+func (h *dymHttpFilterHandle) GetTypedMetadata(source shared.MetadataSourceType, metadataNamespace string) (shared.UnsafeEnvoyBuffer, shared.UnsafeEnvoyBuffer, bool) {
+	var typeURLView C.envoy_dynamic_module_type_envoy_buffer
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	found := C.envoy_dynamic_module_callback_http_get_typed_metadata(
+		h.hostPluginPtr,
+		(C.envoy_dynamic_module_type_metadata_source)(source),
+		stringToModuleBuffer(metadataNamespace),
+		&typeURLView,
+		&valueView,
+	)
+	runtime.KeepAlive(metadataNamespace)
+	if !bool(found) {
+		return shared.UnsafeEnvoyBuffer{}, shared.UnsafeEnvoyBuffer{}, false
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(typeURLView), envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
 func (h *dymHttpFilterHandle) GetAttributeNumber(
 	attributeID shared.AttributeID,
 ) (float64, bool) {
@@ -961,17 +989,47 @@ func (h *dymHttpFilterHandle) GetAttributeBool(
 }
 
 func (h *dymHttpFilterHandle) GetTimingInfo() shared.TimingInfo {
-	var info C.envoy_dynamic_module_type_timing_info
+	var info C.envoy_dynamic_module_type_timing_info_v2
 	C.envoy_dynamic_module_callback_http_get_timing_info(h.hostPluginPtr, &info)
 	return shared.TimingInfo{
-		StartTimeUnixNs:               int64(info.start_time_unix_ns),
-		RequestCompleteDurationNs:     int64(info.request_complete_duration_ns),
-		FirstUpstreamTxByteSentNs:     int64(info.first_upstream_tx_byte_sent_ns),
-		LastUpstreamTxByteSentNs:      int64(info.last_upstream_tx_byte_sent_ns),
-		FirstUpstreamRxByteReceivedNs: int64(info.first_upstream_rx_byte_received_ns),
-		LastUpstreamRxByteReceivedNs:  int64(info.last_upstream_rx_byte_received_ns),
-		FirstDownstreamTxByteSentNs:   int64(info.first_downstream_tx_byte_sent_ns),
-		LastDownstreamTxByteSentNs:    int64(info.last_downstream_tx_byte_sent_ns),
+		StartTimeUnixNs:                       int64(info.start_time_unix_ns),
+		DownstreamConnectionBeginNs:           int64(info.downstream_connection_begin_ns),
+		DownstreamHandshakeStartNs:            int64(info.downstream_handshake_start_ns),
+		DownstreamHandshakeCompleteNs:         int64(info.downstream_handshake_complete_ns),
+		LastDownstreamHeaderRxByteReceivedNs:  int64(info.last_downstream_header_rx_byte_received_ns),
+		LastDownstreamRxByteReceivedNs:        int64(info.last_downstream_rx_byte_received_ns),
+		UpstreamConnectStartNs:                int64(info.upstream_connect_start_ns),
+		UpstreamConnectCompleteNs:             int64(info.upstream_connect_complete_ns),
+		UpstreamHandshakeCompleteNs:           int64(info.upstream_handshake_complete_ns),
+		FirstUpstreamTxByteSentNs:             int64(info.first_upstream_tx_byte_sent_ns),
+		LastUpstreamTxByteSentNs:              int64(info.last_upstream_tx_byte_sent_ns),
+		FirstUpstreamRxByteReceivedNs:         int64(info.first_upstream_rx_byte_received_ns),
+		FirstUpstreamRxBodyByteReceivedNs:     int64(info.first_upstream_rx_body_byte_received_ns),
+		LastUpstreamRxByteReceivedNs:          int64(info.last_upstream_rx_byte_received_ns),
+		FirstDownstreamTxByteSentNs:           int64(info.first_downstream_tx_byte_sent_ns),
+		LastDownstreamTxByteSentNs:            int64(info.last_downstream_tx_byte_sent_ns),
+		LastDownstreamAckReceivedNs:           int64(info.last_downstream_ack_received_ns),
+		RequestCompleteDurationNs:             int64(info.request_complete_duration_ns),
+		DownstreamConnectionEndNs:             int64(info.downstream_connection_end_ns),
+		HasStartTime:                          bool(info.has_start_time),
+		HasDownstreamConnectionBegin:          bool(info.has_downstream_connection_begin),
+		HasDownstreamHandshakeStart:           bool(info.has_downstream_handshake_start),
+		HasDownstreamHandshakeComplete:        bool(info.has_downstream_handshake_complete),
+		HasLastDownstreamHeaderRxByteReceived: bool(info.has_last_downstream_header_rx_byte_received),
+		HasLastDownstreamRxByteReceived:       bool(info.has_last_downstream_rx_byte_received),
+		HasUpstreamConnectStart:               bool(info.has_upstream_connect_start),
+		HasUpstreamConnectComplete:            bool(info.has_upstream_connect_complete),
+		HasUpstreamHandshakeComplete:          bool(info.has_upstream_handshake_complete),
+		HasFirstUpstreamTxByteSent:            bool(info.has_first_upstream_tx_byte_sent),
+		HasLastUpstreamTxByteSent:             bool(info.has_last_upstream_tx_byte_sent),
+		HasFirstUpstreamRxByteReceived:        bool(info.has_first_upstream_rx_byte_received),
+		HasFirstUpstreamRxBodyByteReceived:    bool(info.has_first_upstream_rx_body_byte_received),
+		HasLastUpstreamRxByteReceived:         bool(info.has_last_upstream_rx_byte_received),
+		HasFirstDownstreamTxByteSent:          bool(info.has_first_downstream_tx_byte_sent),
+		HasLastDownstreamTxByteSent:           bool(info.has_last_downstream_tx_byte_sent),
+		HasLastDownstreamAckReceived:          bool(info.has_last_downstream_ack_received),
+		HasRequestComplete:                    bool(info.has_request_complete),
+		HasDownstreamConnectionEnd:            bool(info.has_downstream_connection_end),
 	}
 }
 
@@ -1019,6 +1077,19 @@ func (h *dymHttpFilterHandle) SetFilterState(key string, value []byte) {
 	runtime.KeepAlive(value)
 }
 
+func (h *dymHttpFilterHandle) SetFilterStateValue(key string, value []byte, lifeSpan shared.FilterStateLifeSpan, streamSharing shared.FilterStateStreamSharing) bool {
+	ret := C.envoy_dynamic_module_callback_http_set_filter_state_value(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		bytesToModuleBuffer(value),
+		C.envoy_dynamic_module_type_filter_state_life_span(lifeSpan),
+		C.envoy_dynamic_module_type_filter_state_stream_sharing(streamSharing),
+	)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(value)
+	return bool(ret)
+}
+
 func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool {
 	ret := C.envoy_dynamic_module_callback_http_set_filter_state_typed(
 		h.hostPluginPtr,
@@ -1028,6 +1099,47 @@ func (h *dymHttpFilterHandle) SetFilterStateTyped(key string, value []byte) bool
 	runtime.KeepAlive(key)
 	runtime.KeepAlive(value)
 	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) HasFilterState(key string) bool {
+	ret := C.envoy_dynamic_module_callback_http_has_filter_state(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+	)
+	runtime.KeepAlive(key)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) SetFilterStateObject(key string, value any, lifeSpan shared.FilterStateLifeSpan) bool {
+	handle := cgo.NewHandle(value)
+	ret := C.envoy_dynamic_module_callback_http_set_filter_state_object(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+		C.handleToFilterStateObject(C.uintptr_t(handle)),
+		C.envoy_dynamic_module_type_filter_state_object_destructor(
+			C.envoy_dynamic_module_go_sdk_filter_state_object_destroy),
+		C.envoy_dynamic_module_type_filter_state_life_span(lifeSpan),
+	)
+	runtime.KeepAlive(key)
+	return bool(ret)
+}
+
+func (h *dymHttpFilterHandle) GetFilterStateObject(key string) (value any, found bool) {
+	object := C.envoy_dynamic_module_callback_http_get_filter_state_object(
+		h.hostPluginPtr,
+		stringToModuleBuffer(key),
+	)
+	runtime.KeepAlive(key)
+	if object == nil {
+		return nil, false
+	}
+	// Value panics if another module stored the object.
+	defer func() {
+		if recover() != nil {
+			value, found = nil, false
+		}
+	}()
+	return cgo.Handle(uintptr(unsafe.Pointer(object))).Value(), true
 }
 
 func (h *dymHttpFilterHandle) GetData(key string) any {
@@ -1292,6 +1404,73 @@ func (h *dymHttpFilterHandle) GetClusterHostCounts(priority uint32) (shared.Clus
 	}, true
 }
 
+func (h *dymHttpFilterHandle) GetUpstreamRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_remote_address(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
+func (h *dymHttpFilterHandle) GetDownstreamDirectRemoteAddress() (shared.UnsafeEnvoyBuffer, bool) {
+	var valueView C.envoy_dynamic_module_type_envoy_buffer
+	ret := C.envoy_dynamic_module_callback_http_get_downstream_direct_remote_address(
+		h.hostPluginPtr,
+		&valueView,
+	)
+	if !bool(ret) {
+		return shared.UnsafeEnvoyBuffer{}, false
+	}
+	if valueView.ptr == nil || valueView.length == 0 {
+		return shared.UnsafeEnvoyBuffer{}, true
+	}
+	return envoyBufferToUnsafeEnvoyBuffer(valueView), true
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamHostsAttempted() []shared.UnsafeEnvoyBuffer {
+	size := C.envoy_dynamic_module_callback_http_get_upstream_hosts_attempted_size(h.hostPluginPtr)
+	if size == 0 {
+		return nil
+	}
+	buffers := make([]C.envoy_dynamic_module_type_envoy_buffer, size)
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_hosts_attempted(
+		h.hostPluginPtr,
+		unsafe.SliceData(buffers),
+	)
+	if !bool(ret) {
+		return nil
+	}
+	hosts := envoyBufferSliceToUnsafeEnvoyBufferSlice(buffers)
+	runtime.KeepAlive(buffers)
+	return hosts
+}
+
+func (h *dymHttpFilterHandle) GetUpstreamConnectionIDsAttempted() []uint64 {
+	size := C.envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted_size(
+		h.hostPluginPtr,
+	)
+	if size == 0 {
+		return nil
+	}
+	connectionIDs := make([]uint64, size)
+	ret := C.envoy_dynamic_module_callback_http_get_upstream_connection_ids_attempted(
+		h.hostPluginPtr,
+		(*C.uint64_t)(unsafe.Pointer(unsafe.SliceData(connectionIDs))),
+	)
+	runtime.KeepAlive(connectionIDs)
+	if !bool(ret) {
+		return nil
+	}
+	return connectionIDs
+}
+
 func (h *dymHttpFilterHandle) SetUpstreamOverrideHost(host string, strict bool) bool {
 	ret := C.envoy_dynamic_module_callback_http_set_upstream_override_host(
 		h.hostPluginPtr,
@@ -1316,6 +1495,10 @@ func (h *dymHttpFilterHandle) SendGoAwayAndClose(graceful bool) {
 		h.hostPluginPtr,
 		C.bool(graceful),
 	)
+}
+
+func (h *dymHttpFilterHandle) DrainConnectionUponCompletion() {
+	C.envoy_dynamic_module_callback_http_drain_connection_upon_completion(h.hostPluginPtr)
 }
 
 func (h *dymHttpFilterHandle) RecreateStream(headers [][2]string) bool {
@@ -2046,6 +2229,19 @@ func (h *dymRouteConfigHandle) DefineCounter(name string,
 func envoy_dynamic_module_on_program_init() (version C.envoy_dynamic_module_type_abi_version_module_ptr) {
 	defer recovery.Export("envoy_dynamic_module_on_program_init", nil, &version)
 	return C.envoy_dynamic_module_type_abi_version_module_ptr(C.envoy_dynamic_modules_abi_version)
+}
+
+//export envoy_dynamic_module_go_sdk_filter_state_object_destroy
+func envoy_dynamic_module_go_sdk_filter_state_object_destroy(
+	object C.envoy_dynamic_module_type_filter_state_object_module_ptr,
+) {
+	defer recovery.ExportVoid("envoy_dynamic_module_go_sdk_filter_state_object_destroy")
+	handle := cgo.Handle(uintptr(unsafe.Pointer(object)))
+	value := handle.Value()
+	handle.Delete()
+	if destroyer, ok := value.(shared.FilterStateObjectDestroyer); ok {
+		destroyer.OnFilterStateObjectDestroy()
+	}
 }
 
 //export envoy_dynamic_module_on_http_filter_config_new

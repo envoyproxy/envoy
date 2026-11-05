@@ -22,7 +22,7 @@ absl::StatusOr<Http::FilterFactoryCb> CorsFilterFactory::createHttpFilterFactory
     Server::Configuration::ServerFactoryContext& context,
     Server::Configuration::ExtraFactoryContext& extra_context) {
   CorsFilterConfigSharedPtr config = std::make_shared<CorsFilterConfig>(
-      extra_context.stats_prefix, extra_context.scopeOr(context));
+      extra_context.statsPrefixOr(), extra_context.statsPrefixScopeOr(context));
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<CorsFilter>(config));
   };

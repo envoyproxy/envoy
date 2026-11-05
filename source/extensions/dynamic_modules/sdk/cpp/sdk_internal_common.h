@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include "source/extensions/dynamic_modules/abi/abi.h"
@@ -14,6 +15,21 @@
 
 namespace Envoy {
 namespace DynamicModules {
+
+// HeaderView is cast to and from the ABI header structs in place, which avoids copying the headers
+// into a second array, so it must keep the layout of those structs.
+static_assert(std::is_standard_layout_v<HeaderView>);
+static_assert(sizeof(HeaderView) == sizeof(envoy_dynamic_module_type_envoy_http_header));
+static_assert(alignof(HeaderView) == alignof(envoy_dynamic_module_type_envoy_http_header));
+static_assert(sizeof(HeaderView) == sizeof(envoy_dynamic_module_type_module_http_header));
+static_assert(alignof(HeaderView) == alignof(envoy_dynamic_module_type_module_http_header));
+// The member order is checked where the compiler can, since it does not change the size.
+#if defined(__has_builtin)
+#if __has_builtin(__is_layout_compatible)
+static_assert(__is_layout_compatible(HeaderView, envoy_dynamic_module_type_envoy_http_header));
+static_assert(__is_layout_compatible(HeaderView, envoy_dynamic_module_type_module_http_header));
+#endif
+#endif
 
 // Logs an exception caught at the ABI boundary at error level so a failure inside a module hook
 // stays visible.

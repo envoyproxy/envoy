@@ -7,9 +7,13 @@
 //! the decision setters, and the configuration metrics recorded on each decision.
 //!
 //! The headers the module reads are:
-//!   `x-decision`       `override`, `select-template`, `no-route` or `error`. Without it the
-//!                      module leaves the resolved route in place.
+//!   `x-decision`       `pass-through`, `unspecified`, `no-route`, `error` or `reuse-previous`.
+//!                      Without it the module records no decision, which leaves the default
+//!                      Unspecified decision of the ABI in effect.
 //!   `x-template`       the identifier of the route template to select.
+//!   `x-unset-template` the identifier of a template selection to revert or forget.
+//!   `x-cache-key`      a u64 the route is looked up with in the built route cache after the
+//!                      template is selected. On a hit the module records nothing more.
 //!   `x-cluster`        the upstream cluster to route to.
 //!   `x-timeout-ms`     the route timeout to set, in milliseconds.
 //!   `x-idle-timeout-ms` the stream idle timeout to set, in milliseconds.
@@ -18,8 +22,16 @@
 //!   `x-priority`       `high` or `default`, the upstream resource priority to set.
 //!   `x-not-found-code` the status code to reply with when the selected cluster does not exist.
 //!   `x-override`       the override_id of the route override to select.
+//!   `x-unset-override` the override_id of a route override selection to revert.
 //!   `x-set-path`       the path of the request sent upstream.
 //!   `x-set-host`       the authority of the request sent upstream.
+//!   `x-set-route-name` the name recorded for the route the decision produces.
+//!   `x-virtual-cluster` the name of the virtual cluster to select, none when it is empty.
+//!   `x-prefix-rewrite` a `matched=replacement` pair recorded as a prefix rewrite of the path.
+//!   `x-prefix-rewrite-rule` a `matched=replacement` pair recorded as a prefix rewrite rule, over
+//!                      the whole path when `matched` is empty.
+//!   `x-user-data`      a u64 recorded on the produced route, so the route destroy hook fires,
+//!                      or the user data discard hook when no route carries it.
 //!   `x-append-action`  `append`, `add-if-absent`, `overwrite` or `overwrite-if-exists`, how an
 //!                      added header combines with one of the same name. Defaults to `overwrite`.
 //!   `x-add-request-header`  a `key=value` pair added to the request sent upstream.
@@ -29,6 +41,7 @@
 //!   `x-filter-disabled` the name of an HTTP filter to disable for the request.
 //!   `x-stop-chain`     stops the route specifiers configured after this one.
 //!   `x-continue-chain` continues the route specifiers configured after this one.
+//!   `x-skip-route`     drops the route and asks route matching to carry on with the next route.
 //!   `x-route-meta-string` a string value set as route metadata under `envoy.test.route`.
 //!   `x-route-meta-number` a number value set as route metadata under `envoy.test.route`.
 //!   `x-route-meta-bool`   a bool value set as route metadata under `envoy.test.route`.
@@ -41,14 +54,28 @@
 //!                      the ABI boundary.
 //!   `x-query-cluster`  the cluster whose host counts the `cluster-host-count` echo reads.
 //!   `x-query-priority` the priority the `cluster-host-count` echo reads, defaulting to 0.
+//!   `x-metadata-namespace`  the namespace the route metadata echoes read, defaulting to
+//!                      `envoy.test.route`.
+//!   `x-metadata-key`   the key the route metadata echoes read, defaulting to `key` for a string
+//!                      and `number` for a number.
 //!
 //! A scalar header holding `max` selects the largest value the SDK type can express, which
 //! exercises the saturating conversion at the ABI boundary.
 
 use envoy_proxy_dynamic_modules_rust_sdk::route_specifier::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+
+// Counts the routes destroyed with user data, so a test can observe the route destroy hook through
+// the destroy-count echo. It is a process global because the hook may run on any thread and after
+// the stream that installed the route is gone.
+static ROUTE_DESTROY_COUNT: AtomicU64 = AtomicU64::new(0);
+
+// Counts the user data Envoy handed back because no route carried it, so a test can observe the
+// user data discard hook through the discard-count echo.
+static USER_DATA_DISCARD_COUNT: AtomicU64 = AtomicU64::new(0);
 
 declare_all_init_functions!(init, route_specifier: new_route_specifier_config_fn);
 
@@ -164,6 +191,13 @@ fn buffer_to_string_or_absent(buffer: Option<EnvoyBuffer>) -> String {
   buffer.map_or_else(|| ABSENT.to_owned(), buffer_to_string)
 }
 
+/// The value of the request header, or the default when the request does not carry it.
+fn header_or(ctx: &RouteSpecifierContext, name: &str, default: &str) -> String {
+  ctx
+    .get_request_header(name)
+    .map_or_else(|| default.to_owned(), buffer_to_string)
+}
+
 fn read_u64_header(ctx: &RouteSpecifierContext, key: &str) -> Option<u64> {
   let value = ctx.get_request_header(key)?;
   if value.as_slice() == b"max" {
@@ -208,6 +242,7 @@ fn read_echoed_value(ctx: &RouteSpecifierContext, name: &[u8]) -> String {
       .map_or_else(|| ABSENT.to_owned(), |(_, total)| total.to_string()),
     b"header-bulk" => ctx
       .get_all_request_headers()
+      .unwrap_or_default()
       .into_iter()
       .find(|(key, _)| key.as_slice() == b"x-multi")
       .map_or_else(|| ABSENT.to_owned(), |(_, value)| buffer_to_string(value)),
@@ -314,13 +349,28 @@ fn read_echoed_value(ctx: &RouteSpecifierContext, name: &[u8]) -> String {
     b"route-response-code" => ctx
       .input_route_response_code()
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
-    b"route-metadata" => {
-      buffer_to_string_or_absent(ctx.input_route_metadata_string("envoy.test.route", "key"))
-    },
+    b"route-metadata" => buffer_to_string_or_absent(ctx.input_route_metadata_string(
+      &header_or(ctx, "x-metadata-namespace", "envoy.test.route"),
+      &header_or(ctx, "x-metadata-key", "key"),
+    )),
     b"route-metadata-number" => ctx
-      .input_route_metadata_number("envoy.test.route", "number")
+      .input_route_metadata_number(
+        &header_or(ctx, "x-metadata-namespace", "envoy.test.route"),
+        &header_or(ctx, "x-metadata-key", "number"),
+      )
       .map_or_else(|| ABSENT.to_owned(), |value| value.to_string()),
     b"selected-template" => buffer_to_string_or_absent(ctx.selected_template_id()),
+    // Reads the previous route of the stream, the route the connection manager last installed.
+    b"previous-route-cluster" => ctx
+      .previous_route()
+      .and_then(|route| route.cluster_name.map(buffer_to_string))
+      .unwrap_or_else(|| ABSENT.to_owned()),
+    b"previous-route-metadata" => buffer_to_string_or_absent(ctx.previous_route_metadata_string(
+      &header_or(ctx, "x-metadata-namespace", "envoy.test.route"),
+      &header_or(ctx, "x-metadata-key", "key"),
+    )),
+    b"destroy-count" => ROUTE_DESTROY_COUNT.load(Ordering::Relaxed).to_string(),
+    b"discard-count" => USER_DATA_DISCARD_COUNT.load(Ordering::Relaxed).to_string(),
     _ => ABSENT.to_owned(),
   }
 }
@@ -367,17 +417,27 @@ impl TestRouteSpecifierConfig {
 }
 
 impl RouteSpecifierConfig for TestRouteSpecifierConfig {
-  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> RouteDecision {
-    let decision = match ctx.get_request_header("x-decision") {
-      Some(buffer) => match buffer.as_slice() {
-        b"override" => RouteDecision::Override,
-        b"select-template" => RouteDecision::SelectTemplate,
-        b"no-route" => RouteDecision::NoRoute,
-        b"error" => RouteDecision::Error,
-        _ => RouteDecision::PassThrough,
-      },
-      None => RouteDecision::PassThrough,
-    };
+  fn on_route_destroy(&self, _user_data: u64) {
+    ROUTE_DESTROY_COUNT.fetch_add(1, Ordering::Relaxed);
+  }
+
+  fn on_user_data_discard(&self, _user_data: u64) {
+    USER_DATA_DISCARD_COUNT.fetch_add(1, Ordering::Relaxed);
+  }
+
+  fn on_route(&self, ctx: &mut RouteSpecifierContext) -> OnRouteStatus {
+    // Without the header the module records no decision, which leaves the default Unspecified
+    // decision of the ABI in effect.
+    if let Some(buffer) = ctx.get_request_header("x-decision") {
+      match buffer.as_slice() {
+        b"pass-through" => ctx.set_decision(RouteDecision::PassThrough),
+        b"unspecified" => ctx.set_decision(RouteDecision::Unspecified),
+        b"no-route" => ctx.set_decision(RouteDecision::NoRoute),
+        b"error" => ctx.set_decision(RouteDecision::Error),
+        b"reuse-previous" => ctx.set_decision(RouteDecision::ReusePrevious),
+        _ => {},
+      }
+    }
 
     let mut template_label = String::from("none");
     if let Some(template_id) = ctx.get_request_header("x-template") {
@@ -387,12 +447,26 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         template_label = template_id;
       }
     }
+    if let Some(template_id) = ctx.get_request_header("x-unset-template") {
+      // Tests also unset identifiers that were never selected, so a miss is expected here.
+      let _ = ctx.unselect_template(&buffer_to_string(template_id));
+    }
+    let cache_hit = read_u64_header(ctx, "x-cache-key")
+      .is_some_and(|key| ctx.lookup_built_route(key) == BuiltRouteLookupResult::Hit);
 
+    let mut status = OnRouteStatus::Continue;
     if ctx.get_request_header("x-stop-chain").is_some() {
-      ctx.set_chain_status(ChainStatus::StopIteration);
+      status = OnRouteStatus::StopIteration;
     }
     if ctx.get_request_header("x-continue-chain").is_some() {
-      ctx.set_chain_status(ChainStatus::Continue);
+      status = OnRouteStatus::Continue;
+    }
+    if ctx.get_request_header("x-skip-route").is_some() {
+      status = OnRouteStatus::StopIterationAndSkipRoute;
+    }
+    // Envoy uses the cached route on a hit, so the module records nothing more.
+    if cache_hit {
+      return status;
     }
 
     if let Some(cluster_name) = ctx.get_request_header("x-cluster") {
@@ -421,12 +495,20 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         _ => ResourcePriority::Default,
       });
     }
+    if let Some(user_data) = read_u64_header(ctx, "x-user-data") {
+      ctx.set_route_user_data(user_data);
+    }
     if let Some(name) = ctx.get_request_header("x-override") {
-      // The declaration getter is queried, then the override is applied. Applying validates the name
-      // too, so a name that is not declared exercises the rejection path. Tests pass both kinds.
+      // The declaration getter is queried, then the override is applied. Applying validates the
+      // name too, so a name that is not declared exercises the rejection path. Tests pass
+      // both kinds.
       let name = buffer_to_string(name);
       let _ = self.envoy_config.has_route_override(&name);
       let _ = ctx.set_route_override(&name);
+    }
+    if let Some(name) = ctx.get_request_header("x-unset-override") {
+      // Tests also unset identifiers that were never selected, so a miss is expected here.
+      let _ = ctx.unset_route_override(&buffer_to_string(name));
     }
 
     if let Some(path) = ctx.get_request_header("x-set-path") {
@@ -435,6 +517,31 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     }
     if let Some(host) = ctx.get_request_header("x-set-host") {
       let _ = ctx.set_host(&buffer_to_string(host));
+    }
+    if let Some(name) = ctx.get_request_header("x-set-route-name") {
+      let _ = ctx.set_route_name(&buffer_to_string(name));
+    }
+    if let Some(name) = ctx.get_request_header("x-virtual-cluster") {
+      // Tests also pass names that are not declared, so a rejection is expected here.
+      let _ = ctx.set_virtual_cluster(&buffer_to_string(name));
+    }
+    if let Some(pair) = ctx.get_request_header("x-prefix-rewrite") {
+      let pair = buffer_to_string(pair);
+      if let Some((matched, replacement)) = split_pair(&pair) {
+        // Tests also pass a matched that is not a prefix, so a rejection is expected here.
+        let _ = ctx.set_prefix_rewrite(matched, replacement);
+      }
+    }
+    if let Some(pair) = ctx.get_request_header("x-prefix-rewrite-rule") {
+      let pair = buffer_to_string(pair);
+      if let Some((matched, replacement)) = split_pair(&pair) {
+        let span = if matched.is_empty() {
+          RewriteSpan::WholePath
+        } else {
+          RewriteSpan::Literal
+        };
+        let _ = ctx.set_prefix_rewrite_rule(span, matched, replacement);
+      }
     }
     let append_action = read_append_action(ctx);
     if let Some(pair) = ctx.get_request_header("x-add-request-header") {
@@ -494,6 +601,7 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
     if let Some(name) = ctx.get_request_header("x-echo") {
       let value = match name.as_slice() {
         b"template-ids" => self.envoy_config.template_ids().join(","),
+        b"has-built-route-cache" => self.envoy_config.has_built_route_cache().to_string(),
         name => read_echoed_value(ctx, name),
       };
       let _ = ctx.add_response_header(
@@ -541,6 +649,6 @@ impl RouteSpecifierConfig for TestRouteSpecifierConfig {
         .envoy_config
         .increment_counter_vec(id, &[template_label.as_str()], 1);
     }
-    decision
+    status
   }
 }

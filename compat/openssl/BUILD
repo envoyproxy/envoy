@@ -580,6 +580,7 @@ mapping_func_filegroup(
         "OPENSSL_memdup",
         "OPENSSL_realloc",
         "OPENSSL_sk_free",
+        "OPENSSL_sk_last",
         "OPENSSL_sk_new_null",
         "OPENSSL_sk_num",
         "OPENSSL_sk_pop",
@@ -953,6 +954,7 @@ cc_library(
     ],
     linkopts = ["-ldl"],
     linkstatic = True,
+    copts = ["-fvisibility=hidden"],
     visibility = ["//visibility:public"],
 )
 

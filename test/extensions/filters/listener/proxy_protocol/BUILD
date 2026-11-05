@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -55,10 +55,11 @@ envoy_proto_library(
     ],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "proxy_protocol_fuzz_test",
     srcs = ["proxy_protocol_fuzz_test.cc"],
     corpus = "proxy_protocol_corpus",
+    extension_names = ["envoy.filters.listener.proxy_protocol"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":proxy_protocol_fuzz_test_proto_cc_proto",
@@ -83,6 +84,8 @@ envoy_extension_cc_test(
         ":proxy_proto_integration_test_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stats:thread_local_store_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
         "//source/extensions/filters/listener/proxy_protocol:config",

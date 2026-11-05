@@ -80,6 +80,14 @@ out = server2cert.pem
 hash_header = server2cert_hash.h
 info_header = server2cert_info.h
 
+# Same as servercert.pem, but with its two DNS SANs joined into one.
+[cert concatenated_dns_server]
+key = concatenated_dns_serverkey.pem
+cfg = concatenated_dns_servercert.cfg
+issuer = ca
+out = concatenated_dns_servercert.pem
+hash_header = concatenated_dns_servercert_hash.h
+
 [cert server_ecdsa]
 key = server_ecdsakey.pem
 cfg = servercert.cfg
