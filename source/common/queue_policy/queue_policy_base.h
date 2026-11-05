@@ -48,8 +48,12 @@ public:
   virtual bool isOverloaded() const PURE;
 
   // Iterates over the queued items in dequeue order, invoking cb for each item. Iteration stops
-  // early if cb returns false. The callback is allowed to remove the visited item from the queue
-  // (via remove()); implementations must make this safe.
+  // early if cb returns false. The callback may re-enter the queue: it may remove any item with
+  // remove() or pop(), not only the visited one, and the owner may destroy a removed item before cb
+  // returns. This happens in the connection pool, where attaching one pending stream can
+  // synchronously cancel or fail other pending streams. Implementations must make this safe:
+  // never visit, or dereference, an item that was removed during the traversal. Items added during
+  // the traversal need not be visited.
   virtual void forEach(absl::FunctionRef<bool(ItemType&)> cb) PURE;
 };
 
