@@ -62,6 +62,8 @@ TEST_F(AsyncRedisTest, ConnectPingAndClose) {
     CO_RETURN_IF_ERROR(co_await redis->close());
     // Calling close() again when already closed is a no-op success.
     CO_RETURN_IF_ERROR(co_await redis->close());
+    // Calling connect() after close() fails with UnavailableError.
+    EXPECT_THAT(co_await redis->connect(), HasStatusCode(absl::StatusCode::kUnavailable));
     co_return absl::OkStatus();
   };
 
@@ -211,6 +213,7 @@ TEST_F(AsyncRedisTest, ErrorHandlingAndUnexpectedReplies) {
                 HasStatusCode(absl::StatusCode::kInternal));
 
     server_.setCustomHandler([](const auto&) { return "+OK\r\n"; });
+    EXPECT_THAT(co_await redis->get("k"), HasStatusCode(absl::StatusCode::kInternal));
     EXPECT_THAT(co_await redis->incrBy("k", 1), HasStatusCode(absl::StatusCode::kInternal));
     EXPECT_THAT(co_await redis->expire("k", 10), HasStatusCode(absl::StatusCode::kInternal));
 
@@ -295,6 +298,155 @@ TEST_F(AsyncRedisTest, CommandTimeoutDisconnectsAndFailsPendingCommand) {
   };
 
   EXPECT_THAT(runOnDispatcher(task()), IsOk());
+}
+
+TEST_F(AsyncRedisTest, ConnectFailureConcurrentConnectAndConnectCancellation) {
+  // 1. Concurrent connect() and cancellation while connect() is in flight.
+  {
+    auto redis_or = AsyncRedis::open(*dispatcher_, "127.0.0.1", server_.port());
+    ASSERT_OK(redis_or);
+    std::unique_ptr<AsyncRedis> redis = std::move(*redis_or);
+
+    std::optional<absl::Status> first_connect;
+    auto h1 = Coroutine::launch(
+        redis->connect(), exec_,
+        [&first_connect](absl::Status s) { first_connect.emplace(std::move(s)); },
+        Coroutine::StartMode::Inline);
+    EXPECT_FALSE(first_connect.has_value());
+
+    // Second connect while the first is in progress fails immediately.
+    EXPECT_THAT(runOnDispatcher(redis->connect()),
+                HasStatusCode(absl::StatusCode::kFailedPrecondition));
+
+    // Cancel the in-flight connect coroutine; when the socket event fires, onConnect is a no-op.
+    h1.cancel();
+    ASSERT_TRUE(first_connect.has_value());
+    EXPECT_THAT(*first_connect, HasStatusCode(absl::StatusCode::kCancelled));
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // 2. Asynchronous connect failure to a port that refuses connections.
+  {
+    const int unused_fd = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    RELEASE_ASSERT(unused_fd >= 0, "socket() failed");
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    RELEASE_ASSERT(::bind(unused_fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == 0,
+                   "bind() failed");
+    socklen_t len = sizeof(addr);
+    RELEASE_ASSERT(::getsockname(unused_fd, reinterpret_cast<sockaddr*>(&addr), &len) == 0,
+                   "getsockname() failed");
+    const int refused_port = ntohs(addr.sin_port);
+
+    auto redis_or = AsyncRedis::open(*dispatcher_, "127.0.0.1", refused_port);
+    ASSERT_OK(redis_or);
+    std::unique_ptr<AsyncRedis> redis = std::move(*redis_or);
+
+    EXPECT_THAT(runOnDispatcher(redis->connect()), HasStatusCode(absl::StatusCode::kUnavailable));
+    ::close(unused_fd);
+  }
+}
+
+TEST_F(AsyncRedisTest, CloseWhileCommandInFlightConcurrentCancelAndDisconnectError) {
+  // 1. Concurrent close() and close() cancellation while waiting for in-flight command to drain.
+  {
+    auto redis_or = AsyncRedis::open(*dispatcher_, "127.0.0.1", server_.port());
+    ASSERT_OK(redis_or);
+    std::unique_ptr<AsyncRedis> redis = std::move(*redis_or);
+    EXPECT_THAT(runOnDispatcher(redis->connect()), IsOk());
+
+    bool command_received = false;
+    server_.setCustomHandler([this, &command_received](const auto&) -> std::optional<std::string> {
+      command_received = true;
+      dispatcher_->exit();
+      return std::nullopt;
+    });
+
+    std::optional<absl::StatusOr<int64_t>> cmd_result;
+    auto cmd_handle = Coroutine::launch(
+        redis->get("held_key"), exec_,
+        [this, &cmd_result](absl::StatusOr<int64_t> res) {
+          cmd_result.emplace(std::move(res));
+          dispatcher_->exit();
+        },
+        Coroutine::StartMode::Inline);
+    if (!command_received) {
+      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+    }
+    EXPECT_TRUE(command_received);
+
+    // Start close() while `held_key` is still pending; hiredis defers disconnect until replies
+    // drain.
+    std::optional<absl::Status> close_result;
+    auto close_handle = Coroutine::launch(
+        redis->close(), exec_,
+        [&close_result](absl::Status s) { close_result.emplace(std::move(s)); },
+        Coroutine::StartMode::Inline);
+    EXPECT_FALSE(close_result.has_value());
+
+    // Second close() while first close() is in progress fails with FailedPrecondition.
+    EXPECT_THAT(runOnDispatcher(redis->close()),
+                HasStatusCode(absl::StatusCode::kFailedPrecondition));
+
+    // Cancel the first close() coroutine, then send the pending reply so hiredis finishes
+    // disconnecting with `self == nullptr`.
+    close_handle.cancel();
+    ASSERT_TRUE(close_result.has_value());
+    EXPECT_THAT(*close_result, HasStatusCode(absl::StatusCode::kCancelled));
+
+    server_.setCustomHandler(nullptr);
+    server_.sendRawReply("$2\r\n42\r\n");
+    if (!cmd_result.has_value()) {
+      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+    }
+    EXPECT_THAT(*cmd_result, IsOkAndHolds(42));
+  }
+
+  // 2. Close while command is in flight and peer drops the connection before replying.
+  {
+    auto redis_or = AsyncRedis::open(*dispatcher_, "127.0.0.1", server_.port());
+    ASSERT_OK(redis_or);
+    std::unique_ptr<AsyncRedis> redis = std::move(*redis_or);
+    EXPECT_THAT(runOnDispatcher(redis->connect()), IsOk());
+
+    bool command_received = false;
+    server_.setCustomHandler([this, &command_received](const auto&) -> std::optional<std::string> {
+      command_received = true;
+      dispatcher_->exit();
+      return std::nullopt;
+    });
+
+    std::optional<absl::StatusOr<int64_t>> cmd_result;
+    auto cmd_handle = Coroutine::launch(
+        redis->get("held_key"), exec_,
+        [&cmd_result](absl::StatusOr<int64_t> res) { cmd_result.emplace(std::move(res)); },
+        Coroutine::StartMode::Inline);
+    if (!command_received) {
+      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+    }
+    EXPECT_TRUE(command_received);
+
+    std::optional<absl::Status> close_result;
+    auto close_handle = Coroutine::launch(
+        redis->close(), exec_,
+        [this, &close_result](absl::Status s) {
+          close_result.emplace(std::move(s));
+          dispatcher_->exit();
+        },
+        Coroutine::StartMode::Inline);
+    EXPECT_FALSE(close_result.has_value());
+
+    // Peer closes connection before replying, causing onDisconnect to receive status != REDIS_OK.
+    server_.closeClient();
+    if (!close_result.has_value()) {
+      dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+    }
+    EXPECT_THAT(*close_result, HasStatusCode(absl::StatusCode::kUnavailable));
+    ASSERT_TRUE(cmd_result.has_value());
+    EXPECT_THAT(*cmd_result, HasStatusCode(absl::StatusCode::kUnavailable));
+  }
 }
 
 } // namespace

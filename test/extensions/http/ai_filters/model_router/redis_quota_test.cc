@@ -157,6 +157,9 @@ TEST_F(RedisQuotaTest, EnforcesTokensQuotaAndHandlesNegativeDebt) {
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 600)), IsOkAndHolds(true));
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 601)), IsOkAndHolds(false));
 
+  // Consuming 0 tokens when only token quotas are configured is a no-op.
+  EXPECT_THAT(runTask(quota.consumeQuota("openai", "gpt-4o", 0, 0)), IsOk());
+
   // Consume 500 tokens at t = 0, leaving 100 tokens.
   EXPECT_THAT(runTask(quota.consumeQuota("openai", "gpt-4o", 200, 300)), IsOk());
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 100)), IsOkAndHolds(true));

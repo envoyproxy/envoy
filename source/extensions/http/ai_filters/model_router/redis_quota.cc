@@ -42,8 +42,8 @@ WindowParams windowParams(Config::TimeUnit time_unit, uint32_t multiplier) {
     return WindowParams{3600ULL * multiplier, 60ULL * multiplier, 60, "h"};
   case Config::DAY:
     return WindowParams{86400ULL * multiplier, 900ULL * multiplier, 96, "d"};
-  default:
-    return WindowParams{60ULL * multiplier, 1ULL * multiplier, 60, "m"};
+  default:                                                               // LCOV_EXCL_LINE
+    return WindowParams{60ULL * multiplier, 1ULL * multiplier, 60, "m"}; // LCOV_EXCL_LINE
   }
 }
 
@@ -96,8 +96,8 @@ RedisQuota::buildQuotaMap(const Config::ModelRouter& proto) {
                          ":tok:", multiplier, params.unit_tag, ":"),
         });
         break;
-      default:
-        break;
+      default: // LCOV_EXCL_LINE
+        break; // LCOV_EXCL_LINE
       }
     }
   }

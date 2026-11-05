@@ -269,10 +269,6 @@ bool ModelRouterFilter::shouldConsumeQuota() const {
 }
 
 Coroutine::Task<absl::Status> ModelRouterFilter::consumeQuota() const {
-  if (!shouldConsumeQuota()) {
-    co_return absl::OkStatus();
-  }
-
   QuotaInterface* quotas = config_->quotas();
   const auto* routes =
       context_.stream_info.filterState()->getDataReadOnly<LlmRoutesFilterStateObject>(

@@ -25,8 +25,8 @@ double windowSeconds(Config::TimeUnit time_unit) {
     return 3600.0;
   case Config::DAY:
     return 86400.0;
-  default:
-    return 60.0;
+  default:       // LCOV_EXCL_LINE
+    return 60.0; // LCOV_EXCL_LINE
   }
 }
 
@@ -59,8 +59,8 @@ LocalQuota::buildQuotaMap(const Config::ModelRouter& proto, TimeSource& time_sou
       case Config::TOKENS:
         model_quotas.token_buckets.push_back(std::move(bucket));
         break;
-      default:
-        break;
+      default: // LCOV_EXCL_LINE
+        break; // LCOV_EXCL_LINE
       }
     }
   }

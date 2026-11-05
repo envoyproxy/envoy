@@ -485,6 +485,9 @@ TEST_F(ModelRouterFilterTest, ConsumesQuotaLogsWarningAndSucceedsOnQuotaErrorOrO
                      absl::InternalError("backend write failed"));
 
   setModelInFilterState("send_me_to_anthropic");
+  Protobuf::Any empty_request_info;
+  MessageUtil::packFrom(empty_request_info, envoy::data::ai::v3::RequestInfo{});
+  stream_info_.setDynamicTypedMetadata("envoy.ai.request_info", empty_request_info);
   run(config);
   setTokenUsageInMetadata(10, 20);
 
