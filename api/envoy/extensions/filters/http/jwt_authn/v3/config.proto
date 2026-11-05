@@ -104,8 +104,11 @@ message JwtProvider {
   // Validation of the JWT ``crit`` header.
   message CriticalHeaders {
     // Extension header parameters a JWT may list in ``crit``. Envoy does not process any extension
-    // parameter itself, so list only those the upstream handles. If empty, any JWT with ``crit``
-    // is rejected.
+    // parameter itself, so list only those handled after this filter. They must then see the JWT
+    // header: by default the JWT is removed from the request, so set
+    // :ref:`forward <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.forward>`
+    // or :ref:`header_in_metadata <envoy_v3_api_field_extensions.filters.http.jwt_authn.v3.JwtProvider.header_in_metadata>`.
+    // If empty, any JWT with ``crit`` is rejected.
     repeated string allowed = 1 [(validate.rules).repeated = {items {string {min_len: 1}}}];
   }
 
