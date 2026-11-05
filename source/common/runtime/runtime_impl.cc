@@ -72,8 +72,8 @@ void refreshReloadableFlags(const Snapshot::EntryMap& flag_map,
     if (!frozen(it.first)) {
       maybeSetRuntimeGuard(it.first, it.second.bool_value_.value());
     } else if (it.second.bool_value_.value() != Runtime::runtimeFeatureEnabled(it.first)) {
-      ENVOY_LOG_MISC(error, "ignoring {}={}: restart features only change with a restart",
-                     it.first, it.second.bool_value_.value());
+      ENVOY_LOG_MISC(error, "ignoring {}={}: restart features only change with a restart", it.first,
+                     it.second.bool_value_.value());
     }
   }
 #ifdef ENVOY_ENABLE_QUIC
