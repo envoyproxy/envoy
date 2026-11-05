@@ -29,8 +29,10 @@ class RedisQuota : public QuotaInterface {
 public:
   static constexpr int DefaultPort = 6379;
 
-  RedisQuota(const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
-             Event::Dispatcher& dispatcher, TimeSource& time_source);
+  RedisQuota(
+      const envoy::extensions::http::ai_filters::model_router::v3::ModelRouter& proto,
+      const envoy::extensions::http::ai_filters::model_router::v3::RedisQuotaConfig& redis_config,
+      Event::Dispatcher& dispatcher, TimeSource& time_source);
   ~RedisQuota() override = default;
 
   Coroutine::Task<absl::StatusOr<bool>> checkLimits(std::string provider, std::string model,

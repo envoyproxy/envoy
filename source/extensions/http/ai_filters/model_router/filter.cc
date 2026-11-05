@@ -90,6 +90,10 @@ absl::StatusOr<ModelRouterFilterConfig::ModelMap> ModelRouterFilterConfig::build
     if (models.contains(entry.name())) {
       return absl::InvalidArgumentError("Duplicate model name " + entry.name());
     }
+    if (!entry.quotas().empty() && !proto.has_quota_config()) {
+      return absl::InvalidArgumentError(
+          "quota_config must be specified when model quotas are configured");
+    }
     models[entry.name()] = entry;
   }
 

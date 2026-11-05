@@ -237,11 +237,11 @@ protected:
     simTime().advanceTimeAndRun(duration, *dispatcher_, Event::Dispatcher::RunType::NonBlock);
   }
 
-  Config::ModelRouter makeProtoWithRedis() const {
-    Config::ModelRouter proto;
-    proto.mutable_redis()->set_host("127.0.0.1");
-    proto.mutable_redis()->set_port(server_.port());
-    return proto;
+  Config::RedisQuotaConfig makeRedisConfig() const {
+    Config::RedisQuotaConfig redis_config;
+    redis_config.set_host("127.0.0.1");
+    redis_config.set_port(server_.port());
+    return redis_config;
   }
 
   static Config::Model* addModel(Config::ModelRouter& proto, const std::string& name,
@@ -271,10 +271,10 @@ protected:
 };
 
 TEST_F(RedisQuotaTest, AllowsUnconfiguredModelAndModelWithoutQuotas) {
-  Config::ModelRouter proto = makeProtoWithRedis();
+  Config::ModelRouter proto;
   addModel(proto, "haiku", "anthropic", "claude-haiku-4-5");
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-haiku-4-5", 1000)),
               IsOkAndHolds(true));
@@ -286,14 +286,14 @@ TEST_F(RedisQuotaTest, AllowsUnconfiguredModelAndModelWithoutQuotas) {
 }
 
 TEST_F(RedisQuotaTest, ZeroLimitDisablesModelWithoutConnecting) {
-  Config::ModelRouter proto = makeProtoWithRedis();
+  Config::ModelRouter proto;
   auto* req_disabled = addModel(proto, "gpt4o", "openai", "gpt-4o");
   addQuota(*req_disabled, Config::REQUESTS, Config::MINUTE, 0);
 
   auto* tok_disabled = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
   addQuota(*tok_disabled, Config::TOKENS, Config::HOUR, 0);
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 0)), IsOkAndHolds(false));
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 0)), IsOkAndHolds(false));
@@ -306,11 +306,11 @@ TEST_F(RedisQuotaTest, ZeroLimitDisablesModelWithoutConnecting) {
 }
 
 TEST_F(RedisQuotaTest, EnforcesRequestsQuotaAndRollsSubBucketsOverMinuteWindow) {
-  Config::ModelRouter proto = makeProtoWithRedis();
+  Config::ModelRouter proto;
   auto* model = addModel(proto, "gpt4o", "openai", "gpt-4o");
   addQuota(*model, Config::REQUESTS, Config::MINUTE, 2);
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 0)), IsOkAndHolds(true));
   EXPECT_THAT(runTask(quota.consumeQuota("openai", "gpt-4o", 0, 0)), IsOk());
@@ -334,11 +334,11 @@ TEST_F(RedisQuotaTest, EnforcesRequestsQuotaAndRollsSubBucketsOverMinuteWindow) 
 }
 
 TEST_F(RedisQuotaTest, EnforcesTokensQuotaAndHandlesNegativeDebt) {
-  Config::ModelRouter proto = makeProtoWithRedis();
+  Config::ModelRouter proto;
   auto* model = addModel(proto, "gpt4o", "openai", "gpt-4o");
   addQuota(*model, Config::TOKENS, Config::MINUTE, 600);
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 600)), IsOkAndHolds(true));
   EXPECT_THAT(runTask(quota.checkLimits("openai", "gpt-4o", 601)), IsOkAndHolds(false));
@@ -363,7 +363,7 @@ TEST_F(RedisQuotaTest, EnforcesTokensQuotaAndHandlesNegativeDebt) {
 }
 
 TEST_F(RedisQuotaTest, EnforcesHourAndDayWindowsAndMultipleQuotas) {
-  Config::ModelRouter proto = makeProtoWithRedis();
+  Config::ModelRouter proto;
   auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
   addQuota(*model, Config::REQUESTS, Config::HOUR, 1);
   addQuota(*model, Config::TOKENS, Config::DAY, 86400);
@@ -371,7 +371,7 @@ TEST_F(RedisQuotaTest, EnforcesHourAndDayWindowsAndMultipleQuotas) {
   // Align timestamp to a 15-minute (900s) boundary.
   simTime().setSystemTime(std::chrono::seconds(900000));
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
   EXPECT_THAT(runTask(quota.checkLimits("anthropic", "claude-sonnet-4-5", 100)),
               IsOkAndHolds(true));
@@ -399,7 +399,7 @@ TEST_F(RedisQuotaTest, EnforcesHourAndDayWindowsAndMultipleQuotas) {
 }
 
 TEST_F(RedisQuotaTest, EnforcesUnitMultiplierWithScaledSubBucketsAndDistinctKeys) {
-  Config::ModelRouter proto = makeProtoWithRedis();
+  Config::ModelRouter proto;
   auto* model = addModel(proto, "sonnet", "anthropic", "claude-sonnet-4-5");
   // Configure both a 1-hour request quota (2 req/1h) and a 6-hour request quota (2 req/6h), plus a
   // 6-hour token quota (1000 tok/6h).
@@ -410,7 +410,7 @@ TEST_F(RedisQuotaTest, EnforcesUnitMultiplierWithScaledSubBucketsAndDistinctKeys
   // Align timestamp to a 6-minute (360s) boundary: 1080000 / 360 = 3000, 1080000 / 60 = 18000.
   simTime().setSystemTime(std::chrono::seconds(1080000));
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
   // Consume 1 request (400 tokens) at t = 0, and 1 request (400 tokens) at t + 30m.
   EXPECT_THAT(runTask(quota.consumeQuota("anthropic", "claude-sonnet-4-5", 200, 200)), IsOk());
@@ -451,11 +451,11 @@ TEST_F(RedisQuotaTest, EnforcesUnitMultiplierWithScaledSubBucketsAndDistinctKeys
 }
 
 TEST_F(RedisQuotaTest, NonBlockingConcurrentConnectFailsOpenForSecondCaller) {
-  Config::ModelRouter proto = makeProtoWithRedis();
+  Config::ModelRouter proto;
   auto* model = addModel(proto, "gpt4o", "openai", "gpt-4o");
   addQuota(*model, Config::REQUESTS, Config::MINUTE, 5);
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, makeRedisConfig(), *dispatcher_, simTime());
 
   auto task = [&]() -> Coroutine::Task<absl::Status> {
     std::optional<absl::StatusOr<bool>> first_result;
@@ -488,12 +488,13 @@ TEST_F(RedisQuotaTest, NonBlockingConcurrentConnectFailsOpenForSecondCaller) {
 }
 
 TEST_F(RedisQuotaTest, AutoReconnectsAfterServerDisconnect) {
-  Config::ModelRouter proto = makeProtoWithRedis();
-  proto.mutable_redis()->mutable_timeout()->set_seconds(1);
+  Config::ModelRouter proto;
+  Config::RedisQuotaConfig redis_config = makeRedisConfig();
+  redis_config.mutable_timeout()->set_seconds(1);
   auto* model = addModel(proto, "gpt4o", "openai", "gpt-4o");
   addQuota(*model, Config::REQUESTS, Config::MINUTE, 2);
 
-  RedisQuota quota(proto, *dispatcher_, simTime());
+  RedisQuota quota(proto, redis_config, *dispatcher_, simTime());
 
   EXPECT_THAT(runTask(quota.consumeQuota("openai", "gpt-4o", 0, 0)), IsOk());
   EXPECT_EQ(server_.acceptedConnections(), 1);

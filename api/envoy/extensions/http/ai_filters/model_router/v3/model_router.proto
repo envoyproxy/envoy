@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.http.ai_filters.model_router.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/extension.proto";
 import "envoy/type/ai/v3/llm_binding.proto";
 import "envoy/type/ai/v3/llm_protocol.proto";
 
@@ -148,8 +149,12 @@ message RoutingEntry {
   repeated RoutingTarget targets = 2 [(validate.rules).repeated = {min_items: 1}];
 }
 
+// Configuration for tracking model usage quotas locally in memory.
+message LocalQuotaConfig {
+}
+
 // Connection parameters for the Redis backend used to track model usage quotas.
-message RedisConfig {
+message RedisQuotaConfig {
   // IP address or hostname of the Redis server.
   string host = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -186,7 +191,12 @@ message ModelRouter {
   // Routing rules mapping incoming requested model names to candidate targets.
   repeated RoutingEntry routes = 3;
 
-  // Optional Redis connection parameters for distributed quota tracking. When unset, quotas are
-  // tracked locally in memory.
-  RedisConfig redis = 4;
+  // Quota backend configuration (e.g., :ref:`LocalQuotaConfig
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.LocalQuotaConfig>` or
+  // :ref:`RedisQuotaConfig
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.RedisQuotaConfig>`). Must be
+  // specified if any configured :ref:`Model
+  // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.Model>` defines :ref:`quotas
+  // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.Model.quotas>`.
+  config.core.v3.TypedExtensionConfig quota_config = 4;
 }

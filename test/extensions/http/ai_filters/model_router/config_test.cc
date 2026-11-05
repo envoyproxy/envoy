@@ -386,6 +386,31 @@ routes:
       - model: gpt4o
 )EOF",
        "All models in the route must have the same provider"},
+      // Model quotas configured without quota_config.
+      {R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com
+models:
+  - name: gpt4o
+    provider: openai
+    model: gpt-4o
+    quotas:
+      - quota_type: REQUESTS
+        time_unit: MINUTE
+        limit: 10
+)EOF",
+       "quota_config must be specified when model quotas are configured"},
+      // Unknown quota_config typed_config type URL.
+      {R"EOF(
+quota_config:
+  name: unknown
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RoutingTarget
+    model: gpt4o
+)EOF",
+       "Unknown quota_config type:"},
   };
 
   for (const auto& c : cases) {
@@ -506,22 +531,35 @@ models:
 )EOF",
        "QuotaValidationError\\.UnitMultiplier"},
       {R"EOF(
-redis:
-  host: ""
+quota_config: {}
 )EOF",
-       "RedisConfigValidationError\\.Host"},
+       "TypedExtensionConfigValidationError"},
       {R"EOF(
-redis:
-  host: 127.0.0.1
-  port: 70000
+quota_config:
+  name: redis
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
+    host: ""
 )EOF",
-       "RedisConfigValidationError\\.Port"},
+       "RedisQuotaConfigValidationError\\.Host"},
       {R"EOF(
-redis:
-  host: 127.0.0.1
-  timeout: 0s
+quota_config:
+  name: redis
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
+    host: 127.0.0.1
+    port: 70000
 )EOF",
-       "RedisConfigValidationError\\.Timeout"},
+       "RedisQuotaConfigValidationError\\.Port"},
+      {R"EOF(
+quota_config:
+  name: redis
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
+    host: 127.0.0.1
+    timeout: 0s
+)EOF",
+       "RedisQuotaConfigValidationError\\.Timeout"},
   };
 
   for (const auto& c : cases) {
@@ -556,12 +594,19 @@ routes:
   - requested_model: chat
     targets:
       - model: gpt4o
+quota_config:
+  name: local
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.LocalQuotaConfig
 )EOF",
            R"EOF(
-redis:
-  host: 127.0.0.1
-  port: 6379
-  timeout: 2s
+quota_config:
+  name: redis
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.http.ai_filters.model_router.v3.RedisQuotaConfig
+    host: 127.0.0.1
+    port: 6379
+    timeout: 2s
 )EOF",
        }) {
     const auto factory_cb = createFactoryFromYaml(yaml);

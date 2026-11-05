@@ -49,14 +49,14 @@ WindowParams windowParams(Config::TimeUnit time_unit, uint32_t multiplier) {
 
 } // namespace
 
-RedisQuota::RedisQuota(const Config::ModelRouter& proto, Event::Dispatcher& dispatcher,
+RedisQuota::RedisQuota(const Config::ModelRouter& proto,
+                       const Config::RedisQuotaConfig& redis_config, Event::Dispatcher& dispatcher,
                        TimeSource& time_source)
     : quotas_(buildQuotaMap(proto)), dispatcher_(dispatcher), time_source_(time_source),
-      host_(proto.redis().host()),
-      port_(proto.redis().port() != 0 ? static_cast<int>(proto.redis().port()) : DefaultPort),
+      host_(redis_config.host()),
+      port_(redis_config.port() != 0 ? static_cast<int>(redis_config.port()) : DefaultPort),
       timeout_(std::chrono::milliseconds(
-          PROTOBUF_GET_MS_OR_DEFAULT(proto.redis(), timeout, AsyncRedis::DefaultTimeout.count()))) {
-}
+          PROTOBUF_GET_MS_OR_DEFAULT(redis_config, timeout, AsyncRedis::DefaultTimeout.count()))) {}
 
 std::shared_ptr<const RedisQuota::ModelQuotaMap>
 RedisQuota::buildQuotaMap(const Config::ModelRouter& proto) {

@@ -523,6 +523,9 @@ TEST_F(ModelRouterFilterTest, ConsumesQuotaLogsWarningAndSucceedsOnQuotaErrorOrO
 TEST_F(ModelRouterFilterTest, EndToEndLocalQuotaExhaustionAcrossRequests) {
   namespace Config = envoy::extensions::http::ai_filters::model_router::v3;
   ModelRouterProto proto = defaultProto();
+  proto.mutable_quota_config()->set_name("local");
+  MessageUtil::packFrom(*proto.mutable_quota_config()->mutable_typed_config(),
+                        Config::LocalQuotaConfig());
   // Configure gpt-4o with 1 request/min and gpt-4o-mini with 100 tokens/min.
   for (auto& model : *proto.mutable_models()) {
     if (model.name() == "gpt4o") {

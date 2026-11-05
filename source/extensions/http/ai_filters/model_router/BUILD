@@ -124,9 +124,12 @@ envoy_cc_extension(
         ":redis_quota_lib",
         "//envoy/registry",
         "//envoy/thread_local:thread_local_interface",
+        "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
+        "@abseil-cpp//absl/status:status",
         "@abseil-cpp//absl/status:status_macros",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/http/ai_filters/model_router/v3:pkg_cc_proto",
     ],
 )
