@@ -439,7 +439,9 @@ bool AsyncRedis::isConnected() const {
 }
 
 Coroutine::Task<absl::StatusOr<int64_t>> AsyncRedis::get(absl::string_view key) {
-  co_return co_await CommandAwaitable<absl::StatusOr<int64_t>>(context_, {"GET", std::string(key)},
+  std::vector<std::string> args = {"GET", std::string(key)};
+
+  co_return co_await CommandAwaitable<absl::StatusOr<int64_t>>(context_, std::move(args),
                                                                &parseCounterReply);
 }
 
