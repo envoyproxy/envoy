@@ -78,6 +78,10 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_lrs_server_self_ads);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_send_rst_on_user_space_socket);
+// When true (and the stats config carries no custom tags extraction rules), the stats store uses
+// the explicit-tags scope logic that propagates scope-level tags onto every stat instead of
+// re-parsing the flat stat name. Evaluated once at startup.
+RUNTIME_GUARD(envoy_reloadable_features_enable_stats_explicit_tags);
 // Ignore the automated "remove this flag" issue: never remove this before 2027/10. Confirm with
 // @yanjunxiang-google before removing.
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
@@ -230,10 +234,6 @@ RUNTIME_GUARD(envoy_restart_features_worker_threads_watchdog_fix);
 // Sentinel and test flag.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_test_feature_false);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_srds_partial_acceptance);
-// When true (and the stats config carries no custom tags), the stats store uses the explicit-tags
-// scope logic that propagates scope-level tags onto every stat. Evaluated once at startup.
-// TODO: flip to true after sufficient testing.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_stats_explicit_tags);
 // TODO: Flip to true after sufficient testing to enable formatter support for rate limit action
 // descriptor_value fields by default.
 FALSE_RUNTIME_GUARD(
