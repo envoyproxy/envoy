@@ -453,10 +453,10 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
   });
   initialize();
 
-  // Make sure worker threads are established (#32237).
-  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      test_server_->adminAddress(), "GET", "/config_dump", "", Http::CodecType::HTTP1);
-  EXPECT_TRUE(response->complete());
+  // Make sure worker threads are established (#32237). The worker watchdog stats are created in a
+  // post callback on each worker that runs after the listener-ready notification, so an admin
+  // request (served on the main thread) is not sufficient; run a worker barrier instead.
+  test_server_->waitForWorkerThreads();
 
   // Commented sample code to regenerate the map literals used below in the test log if necessary:
 
