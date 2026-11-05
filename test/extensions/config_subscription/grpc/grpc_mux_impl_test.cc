@@ -1711,6 +1711,14 @@ TEST(GrpcMuxFactoryTest, InvalidRateLimit) {
                                random, scope, ads_config, local_info, nullptr, nullptr,
                                std::nullopt, std::nullopt, nullptr),
                EnvoyException);
+
+  Stats::TestUtil::TestStore valid_store;
+  envoy::config::core::v3::ApiConfigSource valid_ads_config;
+  auto mux = factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher, random,
+                             *valid_store.rootScope(), valid_ads_config, local_info, nullptr,
+                             nullptr, std::nullopt, std::nullopt, nullptr);
+  EXPECT_NE(mux, nullptr);
+  factory->shutdownAll();
 }
 
 TEST_P(GrpcMuxImplTest, XdsConfigTrackerOnConfigAccepted) {

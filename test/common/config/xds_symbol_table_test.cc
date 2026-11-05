@@ -3,6 +3,10 @@
 
 #include "source/common/config/xds_symbol_table.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/hash/hash.h"
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
@@ -264,6 +268,81 @@ TEST(XdsSymbolTableTest, ForEachSymbolInlineVisitor) {
   ok = XdsSymbolTable::forEachSymbol(malformed, [&count](XdsSymbol) { ++count; });
   EXPECT_FALSE(ok);
   EXPECT_EQ(count, 0);
+}
+
+TEST(XdsSymbolTableTest, TryEncodeAndHeterogeneousLookup) {
+  auto table = XdsSymbolTable::create();
+  const size_t initial_active = table->numActiveSymbols();
+  const size_t initial_symbols = table->numSymbols();
+
+  absl::InlinedVector<uint8_t, 64> scratch;
+
+  // Empty name encodes without mutating the symbol table.
+  const auto empty_view = table->tryEncode("", scratch);
+  ASSERT_TRUE(empty_view.has_value());
+  EXPECT_TRUE(empty_view->empty());
+  EXPECT_EQ(table->numActiveSymbols(), initial_active);
+  EXPECT_EQ(table->numSymbols(), initial_symbols);
+
+  // Unknown tokens return std::nullopt without polluting the symbol table.
+  EXPECT_FALSE(table->tryEncode("xdstp://unknown.auth/envoy.config.cluster.v3.Cluster/foo", scratch)
+                   .has_value());
+  EXPECT_EQ(table->numActiveSymbols(), initial_active);
+  EXPECT_EQ(table->numSymbols(), initial_symbols);
+
+  absl::flat_hash_map<XdsResourceNameStorage, std::string, XdsResourceNameHash, XdsResourceNameEq>
+      version_map;
+  absl::flat_hash_set<XdsResourceNameStorage, XdsResourceNameHash, XdsResourceNameEq> tracked_set;
+
+  // Populate > 128 unique tokens so multi-byte `LEB128` symbols are also exercised by tryEncode.
+  std::vector<XdsResourceNameStorage> extra_storages;
+  extra_storages.reserve(150);
+  for (int i = 0; i < 150; ++i) {
+    extra_storages.emplace_back(table->encode(absl::StrCat("prefix_", i, "/service")));
+  }
+
+  const std::string target_name =
+      "xdstp://traffic-director.xds/envoy.config.cluster.v3.Cluster/proj_149/prefix_149/service";
+  XdsResourceNameStorage target_storage = table->encode(target_name);
+  XdsResourceNameStorage duplicate_storage = table->encode(target_name);
+  XdsResourceNameStorage other_storage = table->encode("prefix_0/service");
+
+  EXPECT_EQ(target_storage, duplicate_storage);
+  EXPECT_NE(target_storage, other_storage);
+  EXPECT_EQ(absl::Hash<XdsResourceNameStorage>()(target_storage),
+            absl::Hash<XdsResourceNameStorage>()(duplicate_storage));
+
+  version_map.emplace(std::move(target_storage), "v42");
+  tracked_set.insert(std::move(duplicate_storage));
+
+  // Heterogeneous lookup via tryEncode view succeeds without allocating storage.
+  const size_t active_before_lookup = table->numActiveSymbols();
+  const auto encoded_view = table->tryEncode(target_name, scratch);
+  ASSERT_TRUE(encoded_view.has_value());
+  const auto map_it = version_map.find(*encoded_view);
+  ASSERT_NE(map_it, version_map.end());
+  EXPECT_EQ(map_it->second, "v42");
+  EXPECT_TRUE(tracked_set.contains(*encoded_view));
+  EXPECT_TRUE(XdsResourceNameEq{}(*encoded_view, *tracked_set.find(*encoded_view)));
+  EXPECT_TRUE(XdsResourceNameEq{}(*encoded_view, *encoded_view));
+  EXPECT_TRUE(
+      XdsResourceNameEq{}(*tracked_set.find(*encoded_view), *tracked_set.find(*encoded_view)));
+  EXPECT_EQ(table->numActiveSymbols(), active_before_lookup);
+
+  // Partial prefix match where trailing token is unknown still returns std::nullopt.
+  EXPECT_FALSE(table
+                   ->tryEncode("xdstp://traffic-director.xds/envoy.config.cluster.v3.Cluster/"
+                               "proj_149/never_seen_token",
+                               scratch)
+                   .has_value());
+  EXPECT_EQ(table->numActiveSymbols(), active_before_lookup);
+
+  // Heterogeneous erase reclaims symbols once last storage reference is removed.
+  const auto erase_view = table->tryEncode(target_name, scratch);
+  ASSERT_TRUE(erase_view.has_value());
+  EXPECT_EQ(version_map.erase(*erase_view), 1);
+  EXPECT_EQ(tracked_set.erase(*erase_view), 1);
+  EXPECT_FALSE(table->tryEncode(target_name, scratch).has_value());
 }
 
 } // namespace

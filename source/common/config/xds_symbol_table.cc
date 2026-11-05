@@ -58,9 +58,9 @@ XdsSymbol XdsSymbolTable::toSymbol(absl::string_view token) {
   return sym;
 }
 
-std::vector<XdsSymbolTable::TokenItem> XdsSymbolTable::splitTokens(absl::string_view name) {
-  std::vector<TokenItem> items;
-  items.reserve(name.size() / 4 + 4);
+absl::InlinedVector<XdsSymbolTable::TokenItem, 32>
+XdsSymbolTable::splitTokens(absl::string_view name) {
+  absl::InlinedVector<TokenItem, 32> items;
 
   size_t i = 0;
   size_t token_start = 0;
@@ -206,7 +206,7 @@ void XdsSymbolTable::releaseRef(absl::Span<const XdsSymbol> symbols) {
 }
 
 XdsResourceNameStorage XdsSymbolTable::encode(absl::string_view name) {
-  std::vector<TokenItem> tokens = splitTokens(name);
+  const absl::InlinedVector<TokenItem, 32> tokens = splitTokens(name);
   std::vector<XdsSymbol> symbols;
   symbols.reserve(tokens.size());
 
@@ -229,6 +229,36 @@ XdsResourceNameStorage XdsSymbolTable::encode(absl::string_view name) {
     std::memcpy(data.get(), bytes.data(), bytes.size()); // NOLINT(safe-memcpy)
   }
   return {shared_from_this(), std::move(data), static_cast<uint32_t>(bytes.size())};
+}
+
+std::optional<XdsResourceName>
+XdsSymbolTable::tryEncode(absl::string_view name, absl::InlinedVector<uint8_t, 64>& scratch) const {
+  scratch.clear();
+  if (name.empty()) {
+    return XdsResourceName{};
+  }
+
+  const absl::InlinedVector<TokenItem, 32> tokens = splitTokens(name);
+  {
+    Thread::LockGuard lock(lock_);
+    for (const auto& item : tokens) {
+      XdsSymbol sym = item.delimiter_sym;
+      if (sym == 0) {
+        const auto it = encode_map_.find(item.word);
+        if (it == encode_map_.end()) {
+          scratch.clear();
+          return std::nullopt;
+        }
+        sym = it->second;
+      }
+      while (sym >= 128) {
+        scratch.push_back(static_cast<uint8_t>((sym & 0x7F) | 0x80));
+        sym >>= 7;
+      }
+      scratch.push_back(static_cast<uint8_t>(sym & 0x7F));
+    }
+  }
+  return XdsResourceName{scratch.data(), scratch.size()};
 }
 
 std::string XdsSymbolTable::toString(const XdsResourceName& name) const {

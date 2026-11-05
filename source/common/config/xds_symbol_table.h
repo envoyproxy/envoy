@@ -5,6 +5,7 @@
 #include <cstring>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,8 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/hash/hash.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 
@@ -132,6 +135,16 @@ public:
 
   size_t size() const { return size_; }
 
+  bool operator==(const XdsResourceNameStorage& other) const {
+    return resourceName() == other.resourceName();
+  }
+
+  bool operator!=(const XdsResourceNameStorage& other) const { return !(*this == other); }
+
+  template <typename H> friend H AbslHashValue(H h, const XdsResourceNameStorage& storage) {
+    return AbslHashValue(std::move(h), storage.resourceName());
+  }
+
 private:
   friend class XdsSymbolTable;
 
@@ -141,6 +154,40 @@ private:
   XdsSymbolTableSharedPtr table_;
   std::unique_ptr<uint8_t[]> data_;
   uint32_t size_{0};
+};
+
+/**
+ * Transparent hash functor allowing heterogeneous lookup in Abseil hash containers
+ * between `XdsResourceNameStorage` (owning) and `XdsResourceName` (non-owning view).
+ */
+struct XdsResourceNameHash {
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
+
+  size_t operator()(const XdsResourceName& name) const { return absl::HashOf(name); }
+  size_t operator()(const XdsResourceNameStorage& storage) const {
+    return absl::HashOf(storage.resourceName());
+  }
+};
+
+/**
+ * Transparent equality functor allowing heterogeneous lookup in Abseil hash containers
+ * between `XdsResourceNameStorage` (owning) and `XdsResourceName` (non-owning view).
+ */
+struct XdsResourceNameEq {
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
+
+  bool operator()(const XdsResourceName& lhs, const XdsResourceName& rhs) const {
+    return lhs == rhs;
+  }
+  bool operator()(const XdsResourceNameStorage& lhs, const XdsResourceNameStorage& rhs) const {
+    return lhs.resourceName() == rhs.resourceName();
+  }
+  bool operator()(const XdsResourceNameStorage& lhs, const XdsResourceName& rhs) const {
+    return lhs.resourceName() == rhs;
+  }
+  bool operator()(const XdsResourceName& lhs, const XdsResourceNameStorage& rhs) const {
+    return lhs == rhs.resourceName();
+  }
 };
 
 /**
@@ -154,6 +201,13 @@ public:
 
   // Encodes a resource name into owning RAII storage.
   XdsResourceNameStorage encode(absl::string_view name);
+
+  // Attempts to encode `name` using only symbols already active in the table, without mutating
+  // symbol state or ref-counts. Writes the encoded `LEB128` bytes into `scratch` (which must
+  // outlive the returned `XdsResourceName` view) and returns the view if all tokens exist, or
+  // `std::nullopt` if any token is unknown.
+  std::optional<XdsResourceName> tryEncode(absl::string_view name,
+                                           absl::InlinedVector<uint8_t, 64>& scratch) const;
 
   // Decodes an encoded XdsResourceName back into its original string with 100% fidelity.
   std::string toString(const XdsResourceName& name) const;
@@ -233,7 +287,7 @@ private:
   };
 
   // Tokenizes name into tokens and delimiters outside the lock.
-  static std::vector<TokenItem> splitTokens(absl::string_view name);
+  static absl::InlinedVector<TokenItem, 32> splitTokens(absl::string_view name);
 
   // Encodes a sequence of symbols into a compact byte vector using `LEB128`.
   static std::vector<uint8_t> encodeSymbolsToBytes(absl::Span<const XdsSymbol> symbols);

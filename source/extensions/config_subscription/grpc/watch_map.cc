@@ -8,6 +8,8 @@
 #include "source/common/config/utility.h"
 #include "source/common/config/xds_resource.h"
 
+#include "absl/container/inlined_vector.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -37,12 +39,13 @@ void WatchMap::forgetWatch(Watch* watch) {
 }
 
 bool WatchMap::watchTrackedInInterest(Watch* watch) {
-  for (const auto& [name, watches] : watch_interest_) {
-    if (watches.contains(watch)) {
-      return true;
-    }
+  if (compress_resource_names_) {
+    return std::any_of(
+        compressed_watch_interest_.begin(), compressed_watch_interest_.end(),
+        [watch](const auto& entry) { return entry.second.watches_.contains(watch); });
   }
-  return false;
+  return std::any_of(watch_interest_.begin(), watch_interest_.end(),
+                     [watch](const auto& entry) { return entry.second.contains(watch); });
 }
 
 void WatchMap::forgetAccept(Watch* watch) {
@@ -76,7 +79,21 @@ void WatchMap::updateWildcardWatches(Watch* watch) {
   }
   // No accept() filter: the watched set defines routing. An explicit "*" or an empty watched set
   // makes the watch a catch-all wildcard; otherwise it is routed only its specific resource names.
-  if (watch->resource_names_.contains(Wildcard) || watch->resource_names_.empty()) {
+  bool is_empty = false;
+  bool has_wildcard = false;
+  if (compress_resource_names_) {
+    is_empty = watch->compressed_resource_names_.empty();
+    if (!is_empty) {
+      absl::InlinedVector<uint8_t, 64> scratch;
+      const auto encoded_wildcard = xds_symbol_table_->tryEncode(Wildcard, scratch);
+      has_wildcard = encoded_wildcard.has_value() &&
+                     watch->compressed_resource_names_.contains(*encoded_wildcard);
+    }
+  } else {
+    is_empty = watch->resource_names_.empty();
+    has_wildcard = watch->resource_names_.contains(Wildcard);
+  }
+  if (has_wildcard || is_empty) {
     wildcard_watches_.insert(watch);
   } else {
     wildcard_watches_.erase(watch);
@@ -111,6 +128,68 @@ void WatchMap::removeDeferredWatches() {
 AddedRemoved
 WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& update_to_these_names) {
+  if (compress_resource_names_) {
+    absl::flat_hash_set<XdsResourceName> retained_names;
+    retained_names.reserve(update_to_these_names.size());
+    absl::flat_hash_set<std::string> added_resources;
+    absl::InlinedVector<uint8_t, 64> scratch;
+
+    for (const auto& name : update_to_these_names) {
+      const auto maybe_encoded = xds_symbol_table_->tryEncode(name, scratch);
+      if (maybe_encoded.has_value()) {
+        if (const auto existing_in_watch = watch->compressed_resource_names_.find(*maybe_encoded);
+            existing_in_watch != watch->compressed_resource_names_.end()) {
+          retained_names.insert(*existing_in_watch);
+          continue;
+        }
+        if (const auto interest_it = compressed_watch_interest_.find(*maybe_encoded);
+            interest_it != compressed_watch_interest_.end()) {
+          interest_it->second.watches_.insert(watch);
+          retained_names.insert(interest_it->first);
+          continue;
+        }
+      }
+      XdsResourceNameStorage storage = xds_symbol_table_->encode(name);
+      const XdsResourceName canonical = storage.resourceName();
+      compressed_watch_interest_.emplace(
+          canonical,
+          CompressedWatchInterest{std::move(storage), absl::flat_hash_set<Watch*>{watch}});
+      retained_names.insert(canonical);
+      added_resources.insert(name);
+    }
+
+    std::vector<XdsResourceName> removed_from_watch;
+    for (const XdsResourceName& old_name : watch->compressed_resource_names_) {
+      if (!retained_names.contains(old_name)) {
+        removed_from_watch.push_back(old_name);
+      }
+    }
+
+    watch->compressed_resource_names_ = std::move(retained_names);
+    updateWildcardWatches(watch);
+
+    absl::flat_hash_set<std::string> removed_resources;
+    for (const XdsResourceName& old_name : removed_from_watch) {
+      auto entry = compressed_watch_interest_.find(old_name);
+      RELEASE_ASSERT(entry != compressed_watch_interest_.end(),
+                     fmt::format("WatchMap: tried to remove a watch from untracked resource {}",
+                                 xds_symbol_table_->toString(old_name)));
+      entry->second.watches_.erase(watch);
+      if (entry->second.watches_.empty()) {
+        removed_resources.insert(xds_symbol_table_->toString(entry->first));
+        CompressedWatchInterest removed_entry = std::move(entry->second);
+        compressed_watch_interest_.erase(entry);
+      }
+    }
+
+    if (eds_resources_cache_.has_value()) {
+      for (const auto& resource_name : removed_resources) {
+        eds_resources_cache_->removeResource(resource_name);
+      }
+    }
+    return {std::move(added_resources), std::move(removed_resources)};
+  }
+
   absl::flat_hash_set<std::string> newly_added_to_watch;
   SetUtil::setDifference(update_to_these_names, watch->resource_names_, newly_added_to_watch);
 
@@ -140,6 +219,61 @@ AddedRemoved
 WatchMap::updateWatchInterest(Watch* watch,
                               const absl::flat_hash_set<std::string>& resources_to_add,
                               const absl::flat_hash_set<std::string>& resources_to_remove) {
+  if (compress_resource_names_) {
+    absl::flat_hash_set<std::string> added_resources;
+    absl::InlinedVector<uint8_t, 64> scratch;
+    for (const auto& name : resources_to_add) {
+      if (resources_to_remove.contains(name)) {
+        continue;
+      }
+      const auto maybe_encoded = xds_symbol_table_->tryEncode(name, scratch);
+      if (maybe_encoded.has_value()) {
+        if (watch->compressed_resource_names_.contains(*maybe_encoded)) {
+          continue;
+        }
+        if (const auto interest_it = compressed_watch_interest_.find(*maybe_encoded);
+            interest_it != compressed_watch_interest_.end()) {
+          interest_it->second.watches_.insert(watch);
+          watch->compressed_resource_names_.insert(interest_it->first);
+          continue;
+        }
+      }
+      XdsResourceNameStorage storage = xds_symbol_table_->encode(name);
+      const XdsResourceName canonical = storage.resourceName();
+      compressed_watch_interest_.emplace(
+          canonical,
+          CompressedWatchInterest{std::move(storage), absl::flat_hash_set<Watch*>{watch}});
+      watch->compressed_resource_names_.insert(canonical);
+      added_resources.insert(name);
+    }
+
+    absl::flat_hash_set<std::string> removed_resources;
+    for (const auto& name : resources_to_remove) {
+      const auto maybe_encoded = xds_symbol_table_->tryEncode(name, scratch);
+      if (!maybe_encoded.has_value() ||
+          watch->compressed_resource_names_.erase(*maybe_encoded) == 0) {
+        continue;
+      }
+      auto entry = compressed_watch_interest_.find(*maybe_encoded);
+      RELEASE_ASSERT(
+          entry != compressed_watch_interest_.end(),
+          fmt::format("WatchMap: tried to remove a watch from untracked resource {}", name));
+      entry->second.watches_.erase(watch);
+      if (entry->second.watches_.empty()) {
+        CompressedWatchInterest removed_entry = std::move(entry->second);
+        compressed_watch_interest_.erase(entry);
+        removed_resources.insert(name);
+      }
+    }
+
+    updateWildcardWatches(watch);
+    if (eds_resources_cache_.has_value()) {
+      for (const auto& resource_name : removed_resources) {
+        eds_resources_cache_->removeResource(resource_name);
+      }
+    }
+    return {std::move(added_resources), std::move(removed_resources)};
+  }
   absl::flat_hash_set<std::string> newly_added_to_watch;
   for (const auto& name : resources_to_add) {
     if (!resources_to_remove.contains(name) && watch->resource_names_.insert(name).second) {
@@ -192,6 +326,21 @@ void WatchMap::accept(Watch* watch, const absl::flat_hash_set<std::string>& patt
   updateWildcardWatches(watch);
 }
 
+const absl::flat_hash_set<Watch*>*
+WatchMap::findWatchesInterestedInKey(absl::string_view key) const {
+  if (compress_resource_names_) {
+    absl::InlinedVector<uint8_t, 64> scratch;
+    const auto encoded = xds_symbol_table_->tryEncode(key, scratch);
+    if (!encoded.has_value()) {
+      return nullptr;
+    }
+    const auto it = compressed_watch_interest_.find(*encoded);
+    return it == compressed_watch_interest_.end() ? nullptr : &it->second.watches_;
+  }
+  const auto it = watch_interest_.find(key);
+  return it == watch_interest_.end() ? nullptr : &it->second;
+}
+
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
   // Watches that accepted every other resource via accept("*").
@@ -219,24 +368,24 @@ absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& res
     THROW_IF_NOT_OK_REF(resource_or_error.status());
     xdstp_resource = resource_or_error.value();
   }
-  auto watches_interested = watch_interest_.find(
-      is_xdstp ? XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options) : resource_name);
+  const absl::flat_hash_set<Watch*>* watches_interested =
+      is_xdstp ? findWatchesInterestedInKey(
+                     XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options))
+               : findWatchesInterestedInKey(resource_name);
   // If that fails, consider namespace/glob matching. This is the slow path for xdstp:// and should
   // only happen for glob collections. TODO(htuch): It should be possible to have much more
   // efficient matchers here.
-  if (watches_interested == watch_interest_.end()) {
-    if (is_xdstp) {
-      // Replace resource name component with glob for purpose of matching.
-      const auto pos = xdstp_resource.id().find_last_of('/');
-      xdstp_resource.set_id(pos == std::string::npos ? "*"
-                                                     : xdstp_resource.id().substr(0, pos) + "/*");
-      const std::string encoded_name =
-          XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
-      watches_interested = watch_interest_.find(encoded_name);
-    }
+  if (watches_interested == nullptr && is_xdstp) {
+    // Replace resource name component with glob for purpose of matching.
+    const auto pos = xdstp_resource.id().find_last_of('/');
+    xdstp_resource.set_id(pos == std::string::npos ? "*"
+                                                   : xdstp_resource.id().substr(0, pos) + "/*");
+    const std::string encoded_name =
+        XdsResourceIdentifier::encodeUrn(xdstp_resource, encode_options);
+    watches_interested = findWatchesInterestedInKey(encoded_name);
   }
-  if (watches_interested != watch_interest_.end()) {
-    for (const auto& watch : watches_interested->second) {
+  if (watches_interested != nullptr) {
+    for (const auto& watch : *watches_interested) {
       ret.insert(watch);
     }
   }

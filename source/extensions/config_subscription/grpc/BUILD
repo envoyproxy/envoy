@@ -13,6 +13,7 @@ envoy_cc_library(
     name = "grpc_mux_context_lib",
     hdrs = ["grpc_mux_context.h"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/config:custom_config_validators_interface",
         "//envoy/config:eds_resources_cache_interface",
         "//envoy/config:xds_config_tracker_interface",
@@ -214,6 +215,7 @@ envoy_cc_library(
     srcs = ["watch_map.cc"],
     hdrs = ["watch_map.h"],
     deps = [
+        "//envoy/common:base_includes",
         "//envoy/config:custom_config_validators_interface",
         "//envoy/config:subscription_interface",
         "//envoy/config:xds_config_tracker_interface",
@@ -225,7 +227,12 @@ envoy_cc_library(
         "//source/common/config:resource_name_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:xds_resource_lib",
+        "//source/common/config:xds_symbol_table_lib",
         "//source/common/protobuf",
+        "//source/common/runtime:runtime_features_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/container:inlined_vector",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
