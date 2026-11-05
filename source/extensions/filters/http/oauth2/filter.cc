@@ -890,9 +890,15 @@ FilterConfig::FilterConfig(
   }
 
   use_par_ = proto_config.use_par();
-  if (use_par_ && !proto_config.has_par_endpoint()) {
-    creation_status = absl::InvalidArgumentError("use_par requires par_endpoint to be set");
+  if (use_par_) {
+    // PAR is not wired into the redirect yet; reject instead of failing every login with a 503.
+    creation_status = absl::UnimplementedError("use_par is not implemented yet");
     return;
+  }
+  if (proto_config.has_par_endpoint() &&
+      !context.clusterManager().hasCluster(par_endpoint_.cluster())) {
+    ENVOY_LOG(warn, "OAuth2 filter: unknown cluster '{}' in par_endpoint.",
+              par_endpoint_.cluster());
   }
 
   if (!context.clusterManager().hasCluster(oauth_token_endpoint_.cluster())) {

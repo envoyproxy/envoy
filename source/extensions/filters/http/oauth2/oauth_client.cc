@@ -26,6 +26,8 @@ namespace Oauth2 {
 
 namespace {
 constexpr absl::string_view WwwFormUrlEncodedReservedCharacters = ":/=&?+";
+// Upper bound on a PAR request_uri from the authorization server before it is used in a redirect.
+constexpr size_t kMaxRequestUriLength = 1024;
 
 constexpr const char* UrlBodyTemplateWithCredentialsForAuthCode =
     "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}&code_"
@@ -255,10 +257,16 @@ bool OAuth2ClientImpl::parsePushedAuthorizationResponse(const std::string& respo
   if (!request_uri_or_error.ok()) {
     return false;
   }
-  if (request_uri_or_error.value().empty()) {
+  const std::string& request_uri = request_uri_or_error.value();
+  if (request_uri.empty() || request_uri.size() > kMaxRequestUriLength) {
     return false;
   }
-  request_uri_ = request_uri_or_error.value();
+  for (const char c : request_uri) {
+    if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) == 0x7f) {
+      return false;
+    }
+  }
+  request_uri_ = request_uri;
   return true;
 }
 
@@ -268,7 +276,9 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg, const Http
     auto options = Http::AsyncClient::RequestOptions().setTimeout(
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(uri, timeout)));
 
-    if (retry_policy_ != nullptr) {
+    // PAR POSTs are not retried: a replayed single-use client assertion or a retried POST can
+    // leave orphan request_uri values.
+    if (retry_policy_ != nullptr && state_ != OAuthState::PendingPushedAuthorizationRequest) {
       options.setRetryPolicy(retry_policy_);
       options.setBufferBodyForRetry(true);
     }
