@@ -63,8 +63,8 @@ uint64_t TraceIdRatioBasedSampler::traceIdRandomness(absl::string_view trace_id)
   return randomness;
 }
 
-uint64_t TraceIdRatioBasedSampler::rejectionThreshold(
-    const envoy::type::v3::FractionalPercent& percentage) {
+uint64_t
+TraceIdRatioBasedSampler::rejectionThreshold(const envoy::type::v3::FractionalPercent& percentage) {
   const uint64_t denominator =
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(percentage.denominator());
   const uint64_t numerator = percentage.numerator();

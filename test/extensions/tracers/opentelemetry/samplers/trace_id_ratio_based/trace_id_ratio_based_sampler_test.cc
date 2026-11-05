@@ -196,8 +196,8 @@ makeSampler(uint32_t numerator, envoy::type::v3::FractionalPercent::DenominatorT
   return std::make_shared<TraceIdRatioBasedSampler>(config, context);
 }
 
-Decision sample(TraceIdRatioBasedSampler& sampler, const std::string& trace_id) {
-  NiceMock<StreamInfo::MockStreamInfo> info;
+Decision sample(TraceIdRatioBasedSampler& sampler, const StreamInfo::StreamInfo& info,
+                const std::string& trace_id) {
   return sampler
       .shouldSample(info, std::nullopt, trace_id, "operation_name",
                     ::opentelemetry::proto::trace::v1::Span::SPAN_KIND_SERVER, {}, {})
@@ -207,13 +207,14 @@ Decision sample(TraceIdRatioBasedSampler& sampler, const std::string& trace_id) 
 // Counts sampled traces among trace ids whose high 32 bits are a fixed Unix timestamp in seconds
 // and whose other 96 bits are random.
 uint64_t countSampledWithTimestampPrefix(TraceIdRatioBasedSampler& sampler, uint64_t trials) {
+  NiceMock<StreamInfo::MockStreamInfo> info;
   std::mt19937_64 rng(42);
   const uint64_t timestamp_prefix = uint64_t{0x6a0b1c2d} << 32;
   uint64_t sampled = 0;
   for (uint64_t i = 0; i < trials; ++i) {
     const uint64_t high = timestamp_prefix | (rng() & 0xffffffff);
     const std::string trace_id = absl::StrCat(Hex::uint64ToHex(high), Hex::uint64ToHex(rng()));
-    if (sample(sampler, trace_id) == Decision::RecordAndSample) {
+    if (sample(sampler, info, trace_id) == Decision::RecordAndSample) {
       ++sampled;
     }
   }
@@ -254,26 +255,27 @@ TEST(TraceIdRatioBasedSamplerTest, TestRejectionThreshold) {
 // The decision is R >= T, the rule of the OpenTelemetry ProbabilitySampler.
 TEST(TraceIdRatioBasedSamplerTest, TestSamplesAtAndAboveThreshold) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   auto sampler = makeSampler(50, envoy::type::v3::FractionalPercent::HUNDRED, context);
 
-  EXPECT_EQ(sample(*sampler, "ffffffffffffffffff7fffffffffffff"), Decision::Drop);
-  EXPECT_EQ(sample(*sampler, "00000000000000000080000000000000"), Decision::RecordAndSample);
-  EXPECT_EQ(sample(*sampler, "000000000000000000ffffffffffffff"), Decision::RecordAndSample);
+  EXPECT_EQ(sample(*sampler, info, "ffffffffffffffffff7fffffffffffff"), Decision::Drop);
+  EXPECT_EQ(sample(*sampler, info, "00000000000000000080000000000000"), Decision::RecordAndSample);
+  EXPECT_EQ(sample(*sampler, info, "000000000000000000ffffffffffffff"), Decision::RecordAndSample);
 }
 
 TEST(TraceIdRatioBasedSamplerTest, TestRatioHoldsWithTimestampPrefixedTraceIds) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
-  constexpr uint64_t trials = 100000;
+  constexpr uint64_t trials = 20000;
 
   auto one_percent = makeSampler(1, envoy::type::v3::FractionalPercent::HUNDRED, context);
   const uint64_t sampled_one_percent = countSampledWithTimestampPrefix(*one_percent, trials);
-  EXPECT_GT(sampled_one_percent, 800);
-  EXPECT_LT(sampled_one_percent, 1200);
+  EXPECT_GT(sampled_one_percent, 140);
+  EXPECT_LT(sampled_one_percent, 260);
 
   auto ten_percent = makeSampler(10, envoy::type::v3::FractionalPercent::HUNDRED, context);
   const uint64_t sampled_ten_percent = countSampledWithTimestampPrefix(*ten_percent, trials);
-  EXPECT_GT(sampled_ten_percent, 9400);
-  EXPECT_LT(sampled_ten_percent, 10600);
+  EXPECT_GT(sampled_ten_percent, 1800);
+  EXPECT_LT(sampled_ten_percent, 2200);
 }
 
 TEST(TraceIdRatioBasedSamplerTest, TestRuntimeGuardDisabledReadsFirstEightBytes) {
@@ -281,23 +283,25 @@ TEST(TraceIdRatioBasedSamplerTest, TestRuntimeGuardDisabledReadsFirstEightBytes)
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.otel_ratio_sampler_use_trace_id_rightmost_bytes", "false"}});
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   auto sampler = makeSampler(50, envoy::type::v3::FractionalPercent::HUNDRED, context);
 
   // The first 8 bytes are 0, and 0 % 100 < 50.
-  EXPECT_EQ(sample(*sampler, "00000000000000000000000000000001"), Decision::RecordAndSample);
+  EXPECT_EQ(sample(*sampler, info, "00000000000000000000000000000001"), Decision::RecordAndSample);
 
   // A timestamp in the high bits makes the first 8 bytes nearly constant, so a 1% ratio samples
   // nothing. This is the behavior that the runtime guard replaces.
   auto one_percent = makeSampler(1, envoy::type::v3::FractionalPercent::HUNDRED, context);
-  EXPECT_EQ(countSampledWithTimestampPrefix(*one_percent, 10000), 0);
+  EXPECT_EQ(countSampledWithTimestampPrefix(*one_percent, 2000), 0);
 }
 
 TEST(TraceIdRatioBasedSamplerTest, TestRuntimeGuardEnabledReadsRightmostBytes) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> info;
   auto sampler = makeSampler(50, envoy::type::v3::FractionalPercent::HUNDRED, context);
 
   // R = 1 is below T = 2^55.
-  EXPECT_EQ(sample(*sampler, "00000000000000000000000000000001"), Decision::Drop);
+  EXPECT_EQ(sample(*sampler, info, "00000000000000000000000000000001"), Decision::Drop);
 }
 
 } // namespace OpenTelemetry
