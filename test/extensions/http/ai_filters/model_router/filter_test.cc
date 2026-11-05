@@ -1,23 +1,42 @@
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
+#include "envoy/data/ai/v3/request_info.pb.h"
+#include "envoy/data/ai/v3/token_usage.pb.h"
 #include "envoy/extensions/http/ai_filters/model_router/v3/model_router.pb.h"
 
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/coroutine/task.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter.h"
 #include "source/extensions/filters/http/ai_protocol_manager/ai_filter_state.h"
+#include "source/extensions/filters/http/ai_protocol_manager/buffer_manager.h"
+#include "source/extensions/filters/http/ai_protocol_manager/external_buffer_impl.h"
+#include "source/extensions/filters/http/ai_protocol_manager/filter_manager.h"
 #include "source/extensions/filters/http/ai_protocol_manager/json_with_ext_buf.h"
 #include "source/extensions/http/ai_filters/model_router/filter.h"
+#include "source/extensions/http/ai_filters/model_router/local_quota.h"
+#include "source/extensions/http/ai_filters/model_router/quota_interface.h"
 
+#include "test/extensions/filters/http/ai_protocol_manager/fake_bridge.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "nlohmann/json.hpp"
 
 using testing::NiceMock;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -26,20 +45,44 @@ namespace ModelRouter {
 namespace {
 
 using HttpFilters::AiProtocolManager::AiFilterContext;
-using HttpFilters::AiProtocolManager::AiRequest;
+using HttpFilters::AiProtocolManager::AiFilterSharedPtr;
+using HttpFilters::AiProtocolManager::BufferManager;
+using HttpFilters::AiProtocolManager::FakeBridge;
+using HttpFilters::AiProtocolManager::FilterManager;
+using HttpFilters::AiProtocolManager::InMemoryExternalBufferFactory;
 using HttpFilters::AiProtocolManager::JsonWithExtBuf;
 using HttpFilters::AiProtocolManager::LLMProtocol;
 using HttpFilters::AiProtocolManager::LlmRoutesFilterStateObject;
 namespace FilterStateKeys = HttpFilters::AiProtocolManager::FilterStateKeys;
 using ModelRouterProto = envoy::extensions::http::ai_filters::model_router::v3::ModelRouter;
 
+class MockQuota : public QuotaInterface {
+public:
+  static Coroutine::Task<absl::StatusOr<bool>> makeCheckTask(absl::StatusOr<bool> res) {
+    co_return res;
+  }
+  static Coroutine::Task<absl::Status> makeConsumeTask(absl::Status res) { co_return res; }
+
+  MOCK_METHOD(Coroutine::Task<absl::StatusOr<bool>>, checkLimits,
+              (std::string provider, std::string model, uint64_t estimated_input_tokens),
+              (override));
+  MOCK_METHOD(Coroutine::Task<absl::Status>, consumeQuota,
+              (std::string provider, std::string model, uint64_t input_tokens,
+               uint64_t output_tokens),
+              (override));
+};
+
 class ModelRouterFilterTest : public testing::Test {
 public:
   ModelRouterFilterTest()
-      : api_(Api::createApiForTest()),
-        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
+      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test")),
+        bridge_(*dispatcher_), buffer_manager_(BufferManager::Config{}, factory_, bridge_),
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::FilterChain),
+        mock_quota_(std::make_shared<StrictMock<MockQuota>>()) {}
 
-  ModelRouterFilterConfigSharedPtr defaultConfig() {
+  ~ModelRouterFilterTest() override { buffer_manager_.onDestroy(); }
+
+  ModelRouterProto defaultProto() {
     ModelRouterProto proto;
     TestUtility::loadFromYaml(R"EOF(
 providers:
@@ -85,9 +128,22 @@ routes:
       - model: gpt4o_nano
 )EOF",
                               proto);
-    auto config_or = ModelRouterFilterConfig::create(proto, *api_, *stats_store_.rootScope());
+    return proto;
+  }
+
+  ModelRouterFilterConfigSharedPtr
+  defaultConfig(ModelRouterFilterConfig::QuotaPtr tl_quota = nullptr) {
+    auto config_or =
+        ModelRouterFilterConfig::create(defaultProto(), *api_, *stats_store_.rootScope());
     EXPECT_TRUE(config_or.ok()) << config_or.status();
+    (*config_or)->setQuotas(std::move(tl_quota));
     return *std::move(config_or);
+  }
+
+  ModelRouterFilterConfig::QuotaPtr makeMockQuotaSlot() {
+    auto slot = ThreadLocal::TypedSlot<QuotaInterface>::makeUnique(tls_);
+    slot->set([q = mock_quota_](Event::Dispatcher&) { return q; });
+    return slot;
   }
 
   void setModelInFilterState(absl::string_view model_name) {
@@ -96,27 +152,111 @@ routes:
                                         StreamInfo::FilterState::LifeSpan::FilterChain);
   }
 
-  void run(ModelRouterFilterConfigSharedPtr config = nullptr) {
+  void setEstimatedInputTokensInMetadata(uint64_t estimated_input_tokens) {
+    envoy::data::ai::v3::RequestInfo info;
+    info.mutable_estimated_input_tokens()->set_value(estimated_input_tokens);
+    Protobuf::Any any;
+    MessageUtil::packFrom(any, info);
+    stream_info_.setDynamicTypedMetadata("envoy.ai.request_info", any);
+  }
+
+  void setTokenUsageInMetadata(std::optional<uint64_t> input_tokens,
+                               std::optional<uint64_t> output_tokens) {
+    envoy::data::ai::v3::TokenUsage usage;
+    if (input_tokens.has_value()) {
+      usage.mutable_input_tokens()->set_value(*input_tokens);
+    }
+    if (output_tokens.has_value()) {
+      usage.mutable_output_tokens()->set_value(*output_tokens);
+    }
+    Protobuf::Any any;
+    MessageUtil::packFrom(any, usage);
+    stream_info_.setDynamicTypedMetadata("envoy.ai.token_usage", any);
+  }
+
+  std::string runResponse(const std::string& body, bool sse,
+                          ModelRouterFilterConfigSharedPtr config = nullptr,
+                          std::optional<uint32_t> response_code = 200) {
+    if (response_code.has_value()) {
+      stream_info_.setResponseCode(*response_code);
+    }
+    FakeBridge response_bridge(*dispatcher_);
+    BufferManager out_buffer(BufferManager::Config{}, factory_, response_bridge);
+    const AiFilterContext context{stream_info_, request_headers_,
+                                  LLMProtocol::OpenAiChatCompletions};
+    std::vector<AiFilterSharedPtr> filters;
+    filters.push_back(std::make_shared<ModelRouterFilter>(
+        config != nullptr ? std::move(config) : defaultConfig(), context));
+    FilterManager manager(std::move(filters));
+
+    absl::Status status;
+    bool done = false;
+    auto on_done = [&status, &done](absl::Status s) {
+      status = std::move(s);
+      done = true;
+    };
+    if (sse) {
+      manager.startSseResponse(factory_, response_bridge, out_buffer, on_done);
+    } else {
+      manager.startUnaryResponse(factory_, response_bridge, out_buffer, on_done);
+    }
+    Buffer::OwnedImpl data(body);
+    manager.onResponseData(data, /*end_stream=*/true);
+    for (int i = 0; i < 20; ++i) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    EXPECT_TRUE(done);
+    EXPECT_TRUE(status.ok()) << status;
+    std::string result = response_bridge.injected_.toString();
+    out_buffer.onDestroy();
+    return result;
+  }
+
+  void run(ModelRouterFilterConfigSharedPtr config = nullptr, bool expect_local_reply = false) {
     reply_code_.reset();
     reply_details_.clear();
+    bridge_.injected_.drain(bridge_.injected_.length());
     request_headers_ = Http::TestRequestHeaderMapImpl{
         {":method", "POST"}, {":path", "/v1/chat/completions"}, {":authority", "original.host"}};
 
+    JsonWithExtBuf doc;
+    doc.setJson(nlohmann::json::parse(R"({"messages":[]})"));
     const AiFilterContext context{stream_info_, request_headers_,
                                   LLMProtocol::OpenAiChatCompletions};
-    ModelRouterFilter filter(config != nullptr ? std::move(config) : defaultConfig(), context);
-    AiRequest request{JsonWithExtBuf{}};
-    const absl::Status status =
-        filter.decodeSync(request, [this](Http::Code code, std::string details) {
+    std::vector<AiFilterSharedPtr> filters;
+    filters.push_back(std::make_shared<ModelRouterFilter>(
+        config != nullptr ? std::move(config) : defaultConfig(), context));
+    FilterManager manager(std::move(filters));
+
+    absl::Status status;
+    bool completed = false;
+    manager.startRequest(
+        std::move(doc), &buffer_manager_, *dispatcher_, stream_info_,
+        [&status, &completed](absl::Status s) {
+          status = std::move(s);
+          completed = true;
+        },
+        &request_headers_,
+        [this](Http::Code code, std::string details) {
           reply_code_ = code;
           reply_details_ = std::move(details);
-        });
-    EXPECT_TRUE(status.ok()) << status;
+        },
+        /*always_serialize=*/true, LLMProtocol::OpenAiChatCompletions);
+    for (int i = 0; i < 20; ++i) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+    EXPECT_TRUE(completed);
+    if (expect_local_reply) {
+      EXPECT_TRUE(absl::IsCancelled(status)) << status;
+    } else {
+      EXPECT_TRUE(status.ok()) << status;
+    }
   }
 
   void expectLocalReply(Http::Code expected_code, absl::string_view expected_details) {
     EXPECT_EQ(reply_code_, expected_code);
     EXPECT_EQ(reply_details_, expected_details);
+    EXPECT_EQ(bridge_.injected_.length(), 0);
   }
 
   const LlmRoutesFilterStateObject* resolvedRoutes() {
@@ -131,15 +271,21 @@ routes:
   }
 
   Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  InMemoryExternalBufferFactory factory_;
+  FakeBridge bridge_;
+  BufferManager buffer_manager_;
   StreamInfo::StreamInfoImpl stream_info_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  NiceMock<ThreadLocal::MockInstance> tls_;
+  std::shared_ptr<StrictMock<MockQuota>> mock_quota_;
   Http::TestRequestHeaderMapImpl request_headers_;
   std::optional<Http::Code> reply_code_;
   std::string reply_details_;
 };
 
 TEST_F(ModelRouterFilterTest, ModelNameMissingInFilterState) {
-  run();
+  run(/*config=*/nullptr, /*expect_local_reply=*/true);
   expectLocalReply(Http::Code::NotFound, "Model name not found in filter state");
 
   EXPECT_EQ(resolvedRoutes(), nullptr);
@@ -153,7 +299,7 @@ TEST_F(ModelRouterFilterTest, ModelNameMissingInFilterState) {
 
 TEST_F(ModelRouterFilterTest, RouteNotFoundForModel) {
   setModelInFilterState("unknown_model");
-  run();
+  run(/*config=*/nullptr, /*expect_local_reply=*/true);
   expectLocalReply(Http::Code::NotFound, "Unknown model");
 
   EXPECT_EQ(resolvedRoutes(), nullptr);
@@ -174,6 +320,7 @@ TEST_F(ModelRouterFilterTest, SingleTargetRouteResolved) {
   ASSERT_NE(routes_obj, nullptr);
   ASSERT_EQ(routes_obj->routes().size(), 1);
   EXPECT_EQ(routes_obj->routes()[0].model, "claude-haiku-4-5");
+  EXPECT_EQ(routes_obj->routes()[0].provider, "anthropic");
   ASSERT_NE(routes_obj->routes()[0].binding, nullptr);
   EXPECT_EQ(routes_obj->routes()[0].binding->pattern()->source(), "/v1/messages");
 
@@ -194,8 +341,11 @@ TEST_F(ModelRouterFilterTest, MultipleTargetsRouteSetsMaxRetriesAndPrimaryAuthor
   ASSERT_NE(routes_obj, nullptr);
   ASSERT_EQ(routes_obj->routes().size(), 3);
   EXPECT_EQ(routes_obj->routes()[0].model, "gpt-4o");
+  EXPECT_EQ(routes_obj->routes()[0].provider, "primary_openai");
   EXPECT_EQ(routes_obj->routes()[1].model, "gpt-4o-mini");
+  EXPECT_EQ(routes_obj->routes()[1].provider, "primary_openai");
   EXPECT_EQ(routes_obj->routes()[2].model, "gpt-4o-nano");
+  EXPECT_EQ(routes_obj->routes()[2].provider, "primary_openai");
 
   ASSERT_NE(routes_obj->routes()[0].binding, nullptr);
   ASSERT_NE(routes_obj->routes()[1].binding, nullptr);
@@ -207,6 +357,282 @@ TEST_F(ModelRouterFilterTest, MultipleTargetsRouteSetsMaxRetriesAndPrimaryAuthor
   EXPECT_EQ(request_headers_.getHostValue(), "primary.llm.example.com:8443");
   EXPECT_EQ(request_headers_.getEnvoyMaxRetriesValue(), "2");
   EXPECT_EQ(counterValue("success"), 1);
+}
+
+TEST_F(ModelRouterFilterTest, FiltersOutModelsOverQuota) {
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(false); });
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o-mini", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o-nano", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(false); });
+
+  setModelInFilterState("multi_fallback_model");
+  run(defaultConfig(makeMockQuotaSlot()));
+
+  const auto* routes_obj = resolvedRoutes();
+  ASSERT_NE(routes_obj, nullptr);
+  ASSERT_EQ(routes_obj->routes().size(), 1);
+  EXPECT_EQ(routes_obj->routes()[0].model, "gpt-4o-mini");
+  EXPECT_EQ(routes_obj->routes()[0].provider, "primary_openai");
+  ASSERT_NE(routes_obj->routes()[0].binding, nullptr);
+  EXPECT_EQ(routes_obj->routes()[0].binding->pattern()->source(), "/v1/chat/completions");
+  EXPECT_EQ(request_headers_.getHostValue(), "primary.llm.example.com:8443");
+  EXPECT_EQ(request_headers_.getEnvoyMaxRetriesValue(), "0");
+  EXPECT_EQ(counterValue("success"), 1);
+  EXPECT_EQ(counterValue("quota_exceeded"), 0);
+}
+
+TEST_F(ModelRouterFilterTest, Returns429WhenAllModelsAreOverQuota) {
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(false); });
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o-mini", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(false); });
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o-nano", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(false); });
+
+  setModelInFilterState("multi_fallback_model");
+  run(defaultConfig(makeMockQuotaSlot()), /*expect_local_reply=*/true);
+
+  expectLocalReply(Http::Code::TooManyRequests, "Quota exceeded for all candidate models");
+  EXPECT_EQ(resolvedRoutes(), nullptr);
+  EXPECT_EQ(request_headers_.getHostValue(), "original.host");
+  EXPECT_TRUE(request_headers_.getEnvoyMaxRetriesValue().empty());
+  EXPECT_EQ(counterValue("quota_exceeded"), 1);
+  EXPECT_EQ(counterValue("success"), 0);
+}
+
+TEST_F(ModelRouterFilterTest, PassesEstimatedInputTokensFromRequestInfoAndFailsOpenOnError) {
+  EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 37))
+      .WillOnce([](std::string, std::string, uint64_t) {
+        return MockQuota::makeCheckTask(absl::UnavailableError("quota backend unavailable"));
+      });
+
+  setModelInFilterState("send_me_to_anthropic");
+  setEstimatedInputTokensInMetadata(37);
+  run(defaultConfig(makeMockQuotaSlot()));
+
+  const auto* routes_obj = resolvedRoutes();
+  ASSERT_NE(routes_obj, nullptr);
+  ASSERT_EQ(routes_obj->routes().size(), 1);
+  EXPECT_EQ(routes_obj->routes()[0].model, "claude-haiku-4-5");
+  EXPECT_EQ(counterValue("success"), 1);
+  EXPECT_EQ(counterValue("quota_exceeded"), 0);
+}
+
+TEST_F(ModelRouterFilterTest, EnforcesLocalQuotaWithZeroLimitDisablingPrimaryModel) {
+  namespace Config = envoy::extensions::http::ai_filters::model_router::v3;
+  ModelRouterProto proto = defaultProto();
+  // Set limit=0 on gpt-4o (the first target of multi_fallback_model).
+  for (auto& model : *proto.mutable_models()) {
+    if (model.name() == "gpt4o") {
+      auto* q = model.add_quotas();
+      q->set_quota_type(Config::REQUESTS);
+      q->set_time_unit(Config::MINUTE);
+      q->set_limit(0);
+    }
+  }
+
+  auto slot = ThreadLocal::TypedSlot<QuotaInterface>::makeUnique(tls_);
+  slot->set([base_quota = LocalQuota(proto, api_->timeSource())](Event::Dispatcher&) {
+    return std::make_shared<LocalQuota>(base_quota);
+  });
+  auto config_or = ModelRouterFilterConfig::create(proto, *api_, *stats_store_.rootScope());
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
+  (*config_or)->setQuotas(std::move(slot));
+
+  setModelInFilterState("multi_fallback_model");
+  run(*std::move(config_or));
+
+  const auto* routes_obj = resolvedRoutes();
+  ASSERT_NE(routes_obj, nullptr);
+  ASSERT_EQ(routes_obj->routes().size(), 2);
+  EXPECT_EQ(routes_obj->routes()[0].model, "gpt-4o-mini");
+  EXPECT_EQ(routes_obj->routes()[1].model, "gpt-4o-nano");
+  EXPECT_EQ(request_headers_.getEnvoyMaxRetriesValue(), "1");
+  EXPECT_EQ(counterValue("success"), 1);
+}
+
+TEST_F(ModelRouterFilterTest, ConsumesQuotaOnUnaryResponseWithTokenUsage) {
+  auto config = defaultConfig(makeMockQuotaSlot());
+  EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, consumeQuota("anthropic", "claude-haiku-4-5", 120, 45))
+      .WillOnce([](std::string, std::string, uint64_t, uint64_t) {
+        return MockQuota::makeConsumeTask(absl::OkStatus());
+      });
+
+  setModelInFilterState("send_me_to_anthropic");
+  run(config);
+
+  setTokenUsageInMetadata(120, 45);
+  const std::string response_body = R"({"id":"msg_1","content":"hi"})";
+  const std::string wire = runResponse(response_body, /*sse=*/false, config);
+  EXPECT_EQ(nlohmann::json::parse(wire), nlohmann::json::parse(response_body));
+}
+
+TEST_F(ModelRouterFilterTest, ConsumesQuotaOnSseResponseWithTokenUsage) {
+  auto config = defaultConfig(makeMockQuotaSlot());
+  EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, consumeQuota("anthropic", "claude-haiku-4-5", 80, 25))
+      .WillOnce([](std::string, std::string, uint64_t, uint64_t) {
+        return MockQuota::makeConsumeTask(absl::OkStatus());
+      });
+
+  setModelInFilterState("send_me_to_anthropic");
+  run(config);
+
+  setTokenUsageInMetadata(80, 25);
+  const std::string sse_body =
+      "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"}}],\"id\":\"1\"}\n\n"
+      "data: [DONE]\n\n";
+  const std::string wire = runResponse(sse_body, /*sse=*/true, config);
+  EXPECT_EQ(wire, sse_body);
+}
+
+TEST_F(ModelRouterFilterTest, DoesNotConsumeQuotaOnNon2xxOrMissingResponseCode) {
+  auto config = defaultConfig(makeMockQuotaSlot());
+  EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, consumeQuota(testing::_, testing::_, testing::_, testing::_)).Times(0);
+
+  setModelInFilterState("send_me_to_anthropic");
+  run(config);
+  setTokenUsageInMetadata(100, 50);
+
+  // Missing response code (nullopt).
+  const std::string response_body = R"({"error":"bad"})";
+  EXPECT_EQ(nlohmann::json::parse(
+                runResponse(response_body, /*sse=*/false, config, /*response_code=*/std::nullopt)),
+            nlohmann::json::parse(response_body));
+
+  // 500 Internal Server Error on unary response.
+  EXPECT_EQ(nlohmann::json::parse(
+                runResponse(response_body, /*sse=*/false, config, /*response_code=*/500)),
+            nlohmann::json::parse(response_body));
+
+  // 429 Too Many Requests on SSE response.
+  const std::string sse_body = "data: {\"error\":\"rate_limited\"}\n\n";
+  EXPECT_EQ(runResponse(sse_body, /*sse=*/true, config, /*response_code=*/429), sse_body);
+}
+
+TEST_F(ModelRouterFilterTest, ConsumesQuotaUsesAttemptCountForRetriedRoute) {
+  auto config = defaultConfig(makeMockQuotaSlot());
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o-mini", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, checkLimits("primary_openai", "gpt-4o-nano", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+
+  // Attempt 2 corresponds to index 1 (gpt-4o-mini).
+  EXPECT_CALL(*mock_quota_, consumeQuota("primary_openai", "gpt-4o-mini", 200, 100))
+      .WillOnce([](std::string, std::string, uint64_t, uint64_t) {
+        return MockQuota::makeConsumeTask(absl::OkStatus());
+      });
+
+  setModelInFilterState("multi_fallback_model");
+  run(config);
+
+  stream_info_.setAttemptCount(2);
+  setTokenUsageInMetadata(200, 100);
+  runResponse(R"({"id":"msg_2"})", /*sse=*/false, config);
+}
+
+TEST_F(ModelRouterFilterTest, ConsumesQuotaFallsBackToEstimatedInputTokensWhenTokenUsageMissing) {
+  auto config = defaultConfig(makeMockQuotaSlot());
+  EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 42))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, consumeQuota("anthropic", "claude-haiku-4-5", 42, 0))
+      .WillOnce([](std::string, std::string, uint64_t, uint64_t) {
+        return MockQuota::makeConsumeTask(absl::OkStatus());
+      });
+
+  setModelInFilterState("send_me_to_anthropic");
+  setEstimatedInputTokensInMetadata(42);
+  run(config);
+
+  // Do not set envoy.ai.token_usage metadata; consumeQuota falls back to estimated_input_tokens.
+  runResponse(R"({"id":"msg_3"})", /*sse=*/false, config);
+}
+
+TEST_F(ModelRouterFilterTest, ConsumesQuotaLogsWarningAndSucceedsOnQuotaErrorOrOutOfBoundsAttempt) {
+  auto config = defaultConfig(makeMockQuotaSlot());
+  EXPECT_CALL(*mock_quota_, checkLimits("anthropic", "claude-haiku-4-5", 0))
+      .WillOnce([](std::string, std::string, uint64_t) { return MockQuota::makeCheckTask(true); });
+  EXPECT_CALL(*mock_quota_, consumeQuota("anthropic", "claude-haiku-4-5", 10, 20))
+      .WillOnce([](std::string, std::string, uint64_t, uint64_t) {
+        return MockQuota::makeConsumeTask(absl::InternalError("backend write failed"));
+      });
+
+  setModelInFilterState("send_me_to_anthropic");
+  run(config);
+  setTokenUsageInMetadata(10, 20);
+
+  // Non-OK status from consumeQuota is logged and does not fail the response.
+  runResponse(R"({"id":"msg_4"})", /*sse=*/false, config);
+
+  // Out-of-bounds attempt count logs a warning and skips consumeQuota without failing.
+  stream_info_.setAttemptCount(5);
+  runResponse(R"({"id":"msg_5"})", /*sse=*/false, config);
+}
+
+TEST_F(ModelRouterFilterTest, EndToEndLocalQuotaExhaustionAcrossRequests) {
+  namespace Config = envoy::extensions::http::ai_filters::model_router::v3;
+  ModelRouterProto proto = defaultProto();
+  // Configure gpt-4o with 1 request/min and gpt-4o-mini with 100 tokens/min.
+  for (auto& model : *proto.mutable_models()) {
+    if (model.name() == "gpt4o") {
+      auto* q = model.add_quotas();
+      q->set_quota_type(Config::REQUESTS);
+      q->set_time_unit(Config::MINUTE);
+      q->set_limit(1);
+    } else if (model.name() == "gpt4o_mini") {
+      auto* q = model.add_quotas();
+      q->set_quota_type(Config::TOKENS);
+      q->set_time_unit(Config::MINUTE);
+      q->set_limit(100);
+    }
+  }
+
+  auto slot = ThreadLocal::TypedSlot<QuotaInterface>::makeUnique(tls_);
+  slot->set([base_quota = LocalQuota(proto, api_->timeSource())](Event::Dispatcher&) {
+    return std::make_shared<LocalQuota>(base_quota);
+  });
+  auto config_or = ModelRouterFilterConfig::create(proto, *api_, *stats_store_.rootScope());
+  ASSERT_TRUE(config_or.ok()) << config_or.status();
+  (*config_or)->setQuotas(std::move(slot));
+  auto config = *std::move(config_or);
+
+  // Request 1: all 3 models are within quota; gpt-4o (route 0) is primary.
+  setModelInFilterState("multi_fallback_model");
+  run(config);
+  ASSERT_NE(resolvedRoutes(), nullptr);
+  ASSERT_EQ(resolvedRoutes()->routes().size(), 3);
+  EXPECT_EQ(resolvedRoutes()->routes()[0].model, "gpt-4o");
+
+  // Response 1 completes on attempt 1 (gpt-4o), consuming its 1 request/min quota.
+  setTokenUsageInMetadata(10, 10);
+  runResponse(R"({"id":"resp_1"})", /*sse=*/false, config);
+
+  // Request 2: gpt-4o is now over request quota, so gpt-4o-mini becomes route 0 (2 routes left).
+  run(config);
+  ASSERT_NE(resolvedRoutes(), nullptr);
+  ASSERT_EQ(resolvedRoutes()->routes().size(), 2);
+  EXPECT_EQ(resolvedRoutes()->routes()[0].model, "gpt-4o-mini");
+  EXPECT_EQ(resolvedRoutes()->routes()[1].model, "gpt-4o-nano");
+
+  // Response 2 completes on attempt 1 (now gpt-4o-mini), consuming 60 + 50 = 110 tokens (> 100
+  // limit).
+  setTokenUsageInMetadata(60, 50);
+  runResponse("data: {\"id\":\"resp_2\"}\n\n", /*sse=*/true, config);
+
+  // Request 3: both gpt-4o and gpt-4o-mini are now over quota; only gpt-4o-nano remains.
+  run(config);
+  ASSERT_NE(resolvedRoutes(), nullptr);
+  ASSERT_EQ(resolvedRoutes()->routes().size(), 1);
+  EXPECT_EQ(resolvedRoutes()->routes()[0].model, "gpt-4o-nano");
 }
 
 } // namespace

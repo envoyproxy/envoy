@@ -151,6 +151,7 @@ routes:
   const auto& r0 = fast_it->second->routes()[0];
   EXPECT_EQ(r0.llm_protocol, LLMProtocol::AnthropicMessages);
   EXPECT_EQ(r0.model, "claude-haiku-4-5");
+  EXPECT_EQ(r0.provider, "anthropic");
   EXPECT_EQ(r0.host_and_port, "api.anthropic.com");
   EXPECT_EQ(r0.api_key, "Bearer sk-ant");
   ASSERT_NE(r0.binding, nullptr);
@@ -159,6 +160,7 @@ routes:
   const auto& r1 = fast_it->second->routes()[1];
   EXPECT_EQ(r1.llm_protocol, LLMProtocol::AnthropicMessages);
   EXPECT_EQ(r1.model, "claude-sonnet-4-5");
+  EXPECT_EQ(r1.provider, "anthropic");
   EXPECT_EQ(r1.host_and_port, "api.anthropic.com");
   EXPECT_EQ(r1.api_key, "Bearer sk-ant-sonnet");
   ASSERT_NE(r1.binding, nullptr);
@@ -167,6 +169,7 @@ routes:
   const auto& r2 = fast_it->second->routes()[2];
   EXPECT_EQ(r2.llm_protocol, LLMProtocol::AnthropicMessages);
   EXPECT_EQ(r2.model, "claude-opus-4-5");
+  EXPECT_EQ(r2.provider, "anthropic");
   EXPECT_EQ(r2.host_and_port, "api.anthropic.com");
   EXPECT_TRUE(r2.api_key.empty());
   ASSERT_NE(r2.binding, nullptr);
@@ -178,6 +181,7 @@ routes:
   ASSERT_EQ(reasoning_it->second->routes().size(), 1);
   EXPECT_EQ(reasoning_it->second->routes()[0].llm_protocol, LLMProtocol::GeminiGenerateContent);
   EXPECT_EQ(reasoning_it->second->routes()[0].model, "gemini-2.5-pro");
+  EXPECT_EQ(reasoning_it->second->routes()[0].provider, "gemini");
   EXPECT_EQ(reasoning_it->second->routes()[0].host_and_port, "generativelanguage.googleapis.com");
   EXPECT_EQ(reasoning_it->second->routes()[0].api_key, "Bearer g-pro");
   ASSERT_NE(reasoning_it->second->routes()[0].binding, nullptr);
@@ -190,6 +194,7 @@ routes:
   ASSERT_EQ(openai_it->second->routes().size(), 1);
   EXPECT_EQ(openai_it->second->routes()[0].llm_protocol, LLMProtocol::OpenAiChatCompletions);
   EXPECT_EQ(openai_it->second->routes()[0].model, "gpt-4o-mini");
+  EXPECT_EQ(openai_it->second->routes()[0].provider, "openai");
   EXPECT_EQ(openai_it->second->routes()[0].host_and_port, "api.openai.com:443");
   EXPECT_EQ(openai_it->second->routes()[0].api_key, "Bearer sk-oai");
   EXPECT_EQ(openai_it->second->routes()[0].binding, nullptr);
@@ -471,6 +476,78 @@ routes:
   for (const auto& c : cases) {
     EXPECT_THROW_WITH_REGEX(createFactoryFromYaml(c.yaml).IgnoreError(), EnvoyException,
                             c.expected_regex);
+  }
+}
+
+TEST_F(ModelRouterConfigTest, AcceptsValidQuotasIncludingZeroLimit) {
+  const auto factory_cb = createFactoryFromYaml(R"EOF(
+providers:
+  - name: openai
+    llm_protocol: OPENAI_CHAT_COMPLETIONS
+    host_and_port: api.openai.com
+models:
+  - name: gpt4o
+    provider: openai
+    model: gpt-4o
+    quotas:
+      - quota_type: REQUESTS
+        time_unit: MINUTE
+        limit: 0
+      - quota_type: TOKENS
+        time_unit: HOUR
+        limit: 10000
+      - quota_type: REQUESTS
+        time_unit: DAY
+        limit: 500
+routes:
+  - requested_model: chat
+    targets:
+      - model: gpt4o
+)EOF");
+  ASSERT_TRUE(factory_cb.ok()) << factory_cb.status();
+}
+
+TEST_F(ModelRouterConfigTest, RejectsInvalidQuotaTypeOrTimeUnit) {
+  {
+    const std::string yaml = R"EOF(
+models:
+  - name: haiku
+    provider: anthropic
+    model: claude-haiku-4-5
+    quotas:
+      - quota_type: QUOTA_UNSPECIFIED
+        time_unit: MINUTE
+        limit: 10
+)EOF";
+    EXPECT_THROW_WITH_REGEX(createFactoryFromYaml(yaml).IgnoreError(), EnvoyException,
+                            "QuotaValidationError\\.QuotaType");
+
+    const auto config_or = createConfig(yaml);
+    ASSERT_FALSE(config_or.ok());
+    EXPECT_EQ(config_or.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(std::string(config_or.status().message()),
+                HasSubstr("Invalid quota type for model haiku"));
+  }
+
+  {
+    const std::string yaml = R"EOF(
+models:
+  - name: haiku
+    provider: anthropic
+    model: claude-haiku-4-5
+    quotas:
+      - quota_type: REQUESTS
+        time_unit: TIME_UNSPECIFIED
+        limit: 10
+)EOF";
+    EXPECT_THROW_WITH_REGEX(createFactoryFromYaml(yaml).IgnoreError(), EnvoyException,
+                            "QuotaValidationError\\.TimeUnit");
+
+    const auto config_or = createConfig(yaml);
+    ASSERT_FALSE(config_or.ok());
+    EXPECT_EQ(config_or.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(std::string(config_or.status().message()),
+                HasSubstr("Invalid quota time unit for model haiku"));
   }
 }
 

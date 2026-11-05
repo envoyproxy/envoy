@@ -24,6 +24,33 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // <config_http_filters_ai_protocol_manager_ai_filters>`.
 // [#extension: envoy.http.ai_filters.model_router]
 
+// Time window unit for evaluating model usage quotas.
+enum TimeUnit {
+  // Unspecified time unit.
+  TIME_UNSPECIFIED = 0;
+
+  // One-minute rolling window.
+  MINUTE = 1;
+
+  // One-hour rolling window.
+  HOUR = 2;
+
+  // One-day (24-hour) rolling window.
+  DAY = 3;
+}
+
+// Type of usage metric tracked by a model quota.
+enum QuotaType {
+  // Unspecified quota type.
+  QUOTA_UNSPECIFIED = 0;
+
+  // Total number of requests sent to the model.
+  REQUESTS = 1;
+
+  // Total number of input and output tokens consumed by the model.
+  TOKENS = 2;
+}
+
 // Represents an upstream LLM service provider or API endpoint host.
 //
 // A provider defines the wire protocol, destination address, and HTTP binding characteristics
@@ -49,11 +76,24 @@ message Provider {
   type.ai.v3.LLMBinding binding = 4;
 }
 
+// Defines a usage limit for a model over a rolling time window.
+message Quota {
+  // The metric counted by this quota (requests or tokens).
+  QuotaType quota_type = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // The rolling time window over which usage is aggregated.
+  TimeUnit time_unit = 2 [(validate.rules).enum = {defined_only: true not_in: 0}];
+
+  // Maximum allowed usage within the time window. Setting ``limit`` to ``0`` disables the model.
+  uint32 limit = 3;
+}
+
 // Represents a concrete LLM model offered by a :ref:`Provider
 // <envoy_v3_api_msg_extensions.http.ai_filters.model_router.v3.Provider>`.
 //
 // Associates an upstream model identifier and authentication credentials with a specific backend
 // provider.
+// [#next-free-field: 6]
 message Model {
   // Unique name for this model definition, referenced by :ref:`RoutingTarget.model
   // <envoy_v3_api_field_extensions.http.ai_filters.model_router.v3.RoutingTarget.model>`.
@@ -72,6 +112,10 @@ message Model {
   // is trimmed. When set, Envoy populates the provider-specific authentication header
   // (``Authorization`` or ``x-goog-api-key``) when routing to this model.
   config.core.v3.DataSource api_key = 4 [(udpa.annotations.sensitive) = true];
+
+  // Usage quotas enforced for this model. If any configured quota is reached or exceeded, the
+  // model is skipped during route resolution.
+  repeated Quota quotas = 5;
 }
 
 // A single candidate destination model within a :ref:`RoutingEntry
