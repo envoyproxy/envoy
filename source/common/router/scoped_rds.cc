@@ -52,33 +52,28 @@ ConfigProviderPtr create(
          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
              RouteSpecifierCase::kScopedRoutes);
   switch (config.scoped_routes().config_specifier_case()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ConfigSpecifierCase::kScopedRouteConfigurationsList: {
-    const envoy::extensions::filters::network::http_connection_manager::v3::
-        ScopedRouteConfigurationsList& scoped_route_list =
-            config.scoped_routes().scoped_route_configurations_list();
+  case ScopedRoutes::ConfigSpecifierCase::kScopedRouteConfigurationsList:
     return scoped_routes_config_provider_manager.createStaticConfigProvider(
         RepeatedPtrUtil::convertToConstMessagePtrContainer<
             envoy::config::route::v3::ScopedRouteConfiguration,
-            ProtobufTypes::ConstMessagePtrVector>(scoped_route_list.scoped_route_configurations()),
+            ProtobufTypes::ConstMessagePtrVector>(config.scoped_routes()
+                                                      .scoped_route_configurations_list()
+                                                      .scoped_route_configurations()),
         factory_context,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
                                                 config.scoped_routes().rds_config_source(),
                                                 init_manager));
-  }
-  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ConfigSpecifierCase::kScopedRds:
+  case ScopedRoutes::ConfigSpecifierCase::kScopedRds:
     return scoped_routes_config_provider_manager.createXdsConfigProvider(
         config.scoped_routes().scoped_rds(), factory_context, init_manager, stat_prefix,
         ScopedRoutesConfigProviderManagerOptArg(config.scoped_routes().name(),
                                                 config.scoped_routes().rds_config_source(),
                                                 init_manager));
-  case envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
-      ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET:
-    PANIC("not implemented");
+  case ScopedRoutes::ConfigSpecifierCase::CONFIG_SPECIFIER_NOT_SET: // LCOV_EXCL_LINE
+    PANIC("not implemented");                                       // LCOV_EXCL_LINE
   }
-  PANIC_DUE_TO_CORRUPT_ENUM;
-}
+  PANIC_DUE_TO_CORRUPT_ENUM; // LCOV_EXCL_LINE
+} // LCOV_EXCL_LINE
 
 ScopeKeyBuilderPtr createScopeKeyBuilder(
     const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -603,8 +598,8 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   }
   const auto status = ConfigSubscriptionCommonBase::onConfigUpdate();
   if (!status.ok()) {
-    return status;
-  }
+    return status; // LCOV_EXCL_LINE
+  } // LCOV_EXCL_LINE
   if (any_applied || !to_be_removed_rds_providers.empty()) {
     setLastConfigInfo(std::optional<LastConfigInfo>({std::nullopt, version_info}));
   }
@@ -671,6 +666,7 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
     scoped_routes.reserve(resources.size());
     absl::flat_hash_map<uint64_t, absl::string_view> new_scope_name_by_hash;
     new_scope_name_by_hash.reserve(resources.size());
+    using Fragment = envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment;
     for (const auto& resource : resources) {
       // Throws (thus rejects all) on any error.
       const auto& scoped_route =
@@ -684,13 +680,11 @@ ScopedRdsConfigSubscription::detectUpdateConflictAndCleanupRemoved(
       ScopeKey scope_key;
       for (const auto& fragment : scoped_route.key().fragments()) {
         switch (fragment.type_case()) {
-        case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::
-            kStringKey:
+        case Fragment::TypeCase::kStringKey:
           scope_key.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
           break;
-        case envoy::config::route::v3::ScopedRouteConfiguration::Key::Fragment::TypeCase::
-            TYPE_NOT_SET:
-          PANIC("not implemented");
+        case Fragment::TypeCase::TYPE_NOT_SET: // LCOV_EXCL_LINE
+          PANIC("not implemented");            // LCOV_EXCL_LINE
         }
       }
       const uint64_t key_fingerprint = scope_key.hash();

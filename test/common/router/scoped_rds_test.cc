@@ -332,6 +332,38 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+
+  testing::StrictMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("foo")).WillOnce(Return(false));
+  EXPECT_CALL(mock_matcher, match("foo2")).WillOnce(Return(true));
+  message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& filtered_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo2
+         virtual_hosts:
+           - name: bar2
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(filtered_config_dump));
 }
 
 class ScopedRdsTest : public ScopedRoutesTestBase {
@@ -2565,13 +2597,21 @@ key:
   EXPECT_FALSE(callback_value);
 }
 
+class ScopedRdsFastConfigUpdateTest : public ScopedRdsTest,
+                                      public testing::WithParamInterface<bool> {
+protected:
+  bool fastConfigUpdateEnabled() const { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(FastConfigUpdate, ScopedRdsFastConfigUpdateTest, testing::Bool());
+
 // Verify that simultaneous scope additions and removals in a single delta
-// onConfigUpdate are coalesced and applied atomically under
-// srds_fast_config_update.
-TEST_F(ScopedRdsTest, UnifiedAtomicOnConfigUpdate) {
+// onConfigUpdate are applied properly with and without srds_fast_config_update.
+TEST_P(ScopedRdsFastConfigUpdateTest, UnifiedAtomicOnConfigUpdate) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.srds_fast_config_update", "true"},
+      {"envoy.reloadable_features.srds_fast_config_update",
+       fastConfigUpdateEnabled() ? "true" : "false"},
   });
 
   setup();
@@ -2634,14 +2674,31 @@ key:
                     TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}}))
                 ->name(),
             "foo_routes");
+
+  // Step 3: State-of-the-world update retaining foo_scope3 and implicitly removing foo_scope2
+  // (exercises filtering retained scopes out of removed_resources and removal-only propagation).
+  EXPECT_OK(srds_subscription_->onConfigUpdate(decoded_added.refvec_, "3"));
+  EXPECT_EQ(1UL, all_scopes_.value());
+  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope3")));
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
+              IsNull());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}}))
+                ->name(),
+            "foo_routes");
 }
 
-// Verify conflict detection under srds_fast_config_update for duplicate scope
-// names within a batch, intra-batch key conflicts, and key conflicts with
-// untouched existing scopes.
-TEST_F(ScopedRdsTest, FastConfigUpdateConflictDetection) {
+// Verify conflict detection with and without srds_fast_config_update for
+// duplicate scope names within a batch, intra-batch key conflicts, and key
+// conflicts with untouched existing scopes.
+TEST_P(ScopedRdsFastConfigUpdateTest, FastConfigUpdateConflictDetection) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update",
+                               fastConfigUpdateEnabled() ? "true" : "false"}});
 
   setup();
   init_watcher_.expectReady();
@@ -2717,11 +2774,13 @@ key:
 }
 
 // Verify that when an addition fails validation (e.g., empty
-// route_configuration_name), the entire delta update is rejected before any
-// scope removals or earlier additions in the same batch are applied.
-TEST_F(ScopedRdsTest, TransactionalAbortOnAdditionFailure) {
+// route_configuration_name), srds_fast_config_update rejects the entire delta
+// update before any scope removals or earlier additions in the same batch are
+// applied, whereas the legacy path fails mid-update in addOrUpdateScopes.
+TEST_P(ScopedRdsFastConfigUpdateTest, TransactionalAbortOnAdditionFailure) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update",
+                               fastConfigUpdateEnabled() ? "true" : "false"}});
 
   setup();
   init_watcher_.expectReady();
@@ -2765,15 +2824,30 @@ key:
   EXPECT_FALSE(status.ok());
   EXPECT_EQ(status.message(), "route_configuration_name is empty.");
 
-  // Neither the removal of foo_scope1 nor the addition of valid_scope should
-  // have taken effect.
-  EXPECT_EQ(1UL, all_scopes_.value());
-  EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope1")));
-  auto route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-      scope_key_builder_->computeScopeKey(
-          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}));
-  ASSERT_THAT(route_config, Not(IsNull()));
-  EXPECT_EQ(route_config->name(), "foo_routes");
+  if (fastConfigUpdateEnabled()) {
+    // Neither the removal of foo_scope1 nor the addition of valid_scope should
+    // have taken effect.
+    EXPECT_EQ(1UL, all_scopes_.value());
+    EXPECT_EQ(1UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("foo_scope1")));
+    auto route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+        scope_key_builder_->computeScopeKey(
+            TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}));
+    ASSERT_THAT(route_config, Not(IsNull()));
+    EXPECT_EQ(route_config->name(), "foo_routes");
+  } else {
+    // Without srds_fast_config_update, removeScopes() has already removed
+    // foo_scope1 from both the main thread and worker threads, and
+    // addOrUpdateScopes() inserted valid_scope into scoped_route_map_ before
+    // returning an error prior to worker propagation and gauge update.
+    EXPECT_EQ(1UL, all_scopes_.value());
+    EXPECT_EQ(1UL, active_scopes_.value());
+    EXPECT_THAT(getScopedRouteMap(), UnorderedElementsAre(Key("valid_scope")));
+    EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                    scope_key_builder_->computeScopeKey(
+                        TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
+                IsNull());
+  }
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
                   scope_key_builder_->computeScopeKey(
                       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-valid-key"}})),
@@ -2784,10 +2858,11 @@ key:
 // same ScopeKey in a single delta update preserves both worker routing state
 // and main-thread scope_name_by_hash_ (for both small and >10 scope removal
 // batches).
-TEST_F(ScopedRdsTest, AtomicScopeKeyReplacement) {
+TEST_P(ScopedRdsFastConfigUpdateTest, AtomicScopeKeyReplacement) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.srds_fast_config_update", "true"},
+      {"envoy.reloadable_features.srds_fast_config_update",
+       fastConfigUpdateEnabled() ? "true" : "false"},
   });
 
   setup();
@@ -2858,12 +2933,15 @@ key:
 }
 
 // Verify that when an existing scope is updated in-place to a new
-// route_configuration_name, its old RdsRouteConfigProviderHelper is kept alive
-// until the end of addOrUpdateScopes so another scope in the same batch can
-// reuse the existing RDS subscription.
-TEST_F(ScopedRdsTest, InPlaceRdsUpdateReusesSubscriptionAcrossBatch) {
+// route_configuration_name, srds_fast_config_update keeps its old
+// RdsRouteConfigProviderHelper alive until the end of addOrUpdateScopes so
+// another scope in the same batch can reuse the existing RDS subscription,
+// whereas the legacy path overwrites the helper immediately and requires RDS
+// delivery for the new subscription.
+TEST_P(ScopedRdsFastConfigUpdateTest, InPlaceRdsUpdateReusesSubscriptionAcrossBatch) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update",
+                               fastConfigUpdateEnabled() ? "true" : "false"}});
 
   setup();
   init_watcher_.expectReady();
@@ -2881,9 +2959,7 @@ key:
   pushRdsConfig({"shared_routes"}, "111");
 
   // Now update foo_scope1 to use "other_routes" while adding foo_scope2 using
-  // "shared_routes" in the same batch. Because foo_scope1's old helper is held
-  // until the loop finishes, foo_scope2 reuses the already-warm "shared_routes"
-  // RDS provider without re-subscribing.
+  // "shared_routes" in the same batch.
   const auto scope1_v2 = parseScopedRouteConfigurationFromYaml(R"EOF(
 name: foo_scope1
 route_configuration_name: other_routes
@@ -2903,9 +2979,29 @@ key:
   EXPECT_EQ(2UL, all_scopes_.value());
   EXPECT_EQ(2UL, active_scopes_.value());
 
-  // foo_scope2 immediately has the already-warm "shared_routes" config without
-  // needing a new pushRdsConfig("shared_routes") call!
   auto scope2_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}));
+  ASSERT_THAT(scope2_route_config, Not(IsNull()));
+  if (fastConfigUpdateEnabled()) {
+    // foo_scope2 immediately has the already-warm "shared_routes" config without
+    // needing a new pushRdsConfig("shared_routes") call.
+    EXPECT_EQ(scope2_route_config->name(), "shared_routes");
+    pushRdsConfig({"other_routes"}, "222");
+  } else {
+    // Without srds_fast_config_update, foo_scope1's old helper was destroyed on
+    // overwrite before foo_scope2 was processed, so foo_scope2 starts with an
+    // uninitialized NullConfigImpl until RDS delivers "shared_routes".
+    EXPECT_EQ(scope2_route_config->name(), "");
+    pushRdsConfig({"other_routes", "shared_routes"}, "222");
+  }
+
+  auto scope1_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}));
+  ASSERT_THAT(scope1_route_config, Not(IsNull()));
+  EXPECT_EQ(scope1_route_config->name(), "other_routes");
+  scope2_route_config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
       scope_key_builder_->computeScopeKey(
           TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}));
   ASSERT_THAT(scope2_route_config, Not(IsNull()));
@@ -2915,10 +3011,12 @@ key:
 // Verify that transitioning existing inline scopes to dynamic RDS scopes (where
 // net_new_scopes == 0 but net_new_rds_scopes > 0) and simultaneously
 // transitioning an existing RDS scope to inline (while reusing its RDS
-// subscription in the same batch) works properly under srds_fast_config_update.
-TEST_F(ScopedRdsTest, InlineToRdsAndRdsToInlineTransitionWithSubscriptionReuse) {
+// subscription in the same batch) works properly with and without
+// srds_fast_config_update.
+TEST_P(ScopedRdsFastConfigUpdateTest, InlineToRdsAndRdsToInlineTransitionWithSubscriptionReuse) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update", "true"}});
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.srds_fast_config_update",
+                               fastConfigUpdateEnabled() ? "true" : "false"}});
 
   server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
   setup();
@@ -3000,14 +3098,15 @@ key:
   EXPECT_EQ(scope2_route_config->name(), "shared_routes");
 }
 
-// Verify that when both srds_fast_config_update and srds_partial_acceptance are
-// enabled, a batch containing scope removals along with both valid and invalid
-// scope additions applies the removals and valid additions atomically via a
-// single coalesced update while still returning a NACK for the invalid scopes.
-TEST_F(ScopedRdsTest, FastConfigUpdateWithPartialAcceptanceAndRemovals) {
+// Verify that when srds_partial_acceptance is enabled (with and without
+// srds_fast_config_update), a batch containing scope removals along with both
+// valid and invalid scope additions applies the removals and valid additions
+// while still returning a NACK for the invalid scopes.
+TEST_P(ScopedRdsFastConfigUpdateTest, FastConfigUpdateWithPartialAcceptanceAndRemovals) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.srds_fast_config_update", "true"},
+      {"envoy.reloadable_features.srds_fast_config_update",
+       fastConfigUpdateEnabled() ? "true" : "false"},
       {"envoy.reloadable_features.srds_partial_acceptance", "true"},
   });
 
