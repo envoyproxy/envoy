@@ -28,8 +28,11 @@ envoy_cc_library(
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/common:safe_memcpy_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
+        "@abseil-cpp//absl/numeric:int128",
+        "@abseil-cpp//absl/strings",
         "@envoy_api//envoy/extensions/tracers/opentelemetry/samplers/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
