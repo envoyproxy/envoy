@@ -1290,6 +1290,7 @@ precompile
 precompiled
 precompute
 precomputed
+precomputing
 preconnect
 preconnected
 preconnecting
