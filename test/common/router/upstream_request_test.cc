@@ -23,12 +23,31 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+class MockGenericUpstream : public Router::GenericUpstream {
+public:
+  MockGenericUpstream() { ON_CALL(*this, bytesMeter()).WillByDefault(ReturnRef(bytes_meter_)); }
+  MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool), (override));
+  MOCK_METHOD(void, encodeMetadata, (const Http::MetadataMapVector&), (override));
+  MOCK_METHOD(Http::Status, encodeHeaders, (const Http::RequestHeaderMap&, bool), (override));
+  MOCK_METHOD(void, encodeTrailers, (const Http::RequestTrailerMap&), (override));
+  MOCK_METHOD(void, enableTcpTunneling, (), (override));
+  MOCK_METHOD(void, readDisable, (bool), (override));
+  MOCK_METHOD(void, resetStream, (), (override));
+  MOCK_METHOD(void, setAccount, (Buffer::BufferMemoryAccountSharedPtr), (override));
+  MOCK_METHOD(const StreamInfo::BytesMeterSharedPtr&, bytesMeter, (), (override));
+
+  StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+};
+
 class UpstreamRequestTest : public testing::Test {
 public:
   UpstreamRequestTest() : pool_(*symbol_table_) {
     HttpTestUtility::addDefaultHeaders(downstream_request_header_map_);
     ON_CALL(router_filter_interface_, downstreamHeaders())
         .WillByDefault(Return(&downstream_request_header_map_));
+    address_ = Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:5678");
+    ON_CALL(connection_info_provider_, localAddress()).WillByDefault(ReturnRef(address_));
+    ON_CALL(connection_info_provider_, remoteAddress()).WillByDefault(ReturnRef(address_));
   }
 
   void initialize() {
@@ -45,6 +64,42 @@ public:
     };
   }
 
+  void setupUpstreamAndGetBridge(MockGenericUpstream*& mock_upstream, UpstreamToDownstream*& bridge,
+                                 std::shared_ptr<UpstreamCodecFilter>* codec_filter = nullptr) {
+    std::shared_ptr<Http::MockStreamDecoderFilter> filter(
+        new NiceMock<Http::MockStreamDecoderFilter>());
+
+    EXPECT_CALL(*router_filter_interface_.cluster_info_, createFilterChain(_))
+        .WillOnce([&](Http::FilterChainFactoryCallbacks& callbacks) -> bool {
+          callbacks.setFilterConfigName("");
+          callbacks.addStreamDecoderFilter(filter);
+          auto f = std::make_shared<UpstreamCodecFilter>();
+          if (codec_filter != nullptr) {
+            *codec_filter = f;
+          }
+          callbacks.addStreamDecoderFilter(f);
+          return true;
+        });
+
+    initialize();
+
+    GenericConnectionPoolCallbacks* pool_callbacks = nullptr;
+    EXPECT_CALL(*conn_pool_, newStream(_)).WillOnce([&](GenericConnectionPoolCallbacks* callbacks) {
+      pool_callbacks = callbacks;
+    });
+
+    upstream_request_->acceptHeadersFromRouter(false);
+    ASSERT_NE(pool_callbacks, nullptr);
+
+    auto mock_upstream_unique = std::make_unique<NiceMock<MockGenericUpstream>>();
+    mock_upstream = mock_upstream_unique.get();
+
+    pool_callbacks->onPoolReady(std::move(mock_upstream_unique), host_, connection_info_provider_,
+                                stream_info_, std::nullopt);
+
+    bridge = &pool_callbacks->upstreamToDownstream();
+  }
+
   Router::MockGenericConnPool* conn_pool_{}; // Owned by the upstream request
   Http::TestRequestHeaderMapImpl downstream_request_header_map_{};
   Stats::TestUtil::TestSymbolTable symbol_table_;
@@ -55,6 +110,9 @@ public:
   std::unique_ptr<UpstreamRequest> upstream_request_;
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
       new NiceMock<Upstream::MockHostDescription>()};
+  NiceMock<Network::MockConnectionInfoProvider> connection_info_provider_;
+  Network::Address::InstanceConstSharedPtr address_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
 
 // UpstreamRequest is responsible processing for passing 101 upgrade headers to onUpstreamHeaders.
@@ -345,6 +403,69 @@ TEST_F(UpstreamRequestTest, OnHostSelectedMultipleCallbacksStopsAfterSendLocalRe
 
   EXPECT_TRUE(filter1->on_host_selected_called_);
   EXPECT_FALSE(filter2->on_host_selected_called_);
+}
+
+TEST_F(UpstreamRequestTest, ReentrantResetDuringDecodeData) {
+  MockGenericUpstream* mock_upstream_ptr = nullptr;
+  UpstreamToDownstream* bridge = nullptr;
+  std::shared_ptr<UpstreamCodecFilter> codec_filter;
+  setupUpstreamAndGetBridge(mock_upstream_ptr, bridge, &codec_filter);
+
+  EXPECT_CALL(*mock_upstream_ptr, encodeData(_, _))
+      .WillOnce([&, bridge, mock_upstream_ptr](Buffer::Instance&, bool) {
+        bridge->onResetStream(Http::StreamResetReason::LocalReset, "test_failure");
+        mock_upstream_ptr->bytes_meter_ = nullptr;
+      });
+
+  EXPECT_CALL(router_filter_interface_, onUpstreamReset(Http::StreamResetReason::LocalReset,
+                                                        HasSubstr("test_failure|codec_error"), _));
+
+  Buffer::OwnedImpl data("hello");
+  Http::FilterDataStatus status = codec_filter->decodeData(data, false);
+  EXPECT_EQ(status, Http::FilterDataStatus::StopIterationNoBuffer);
+  upstream_request_.reset();
+}
+
+TEST_F(UpstreamRequestTest, ReentrantResetDuringDecodeTrailers) {
+  MockGenericUpstream* mock_upstream_ptr = nullptr;
+  UpstreamToDownstream* bridge = nullptr;
+  std::shared_ptr<UpstreamCodecFilter> codec_filter;
+  setupUpstreamAndGetBridge(mock_upstream_ptr, bridge, &codec_filter);
+
+  EXPECT_CALL(*mock_upstream_ptr, encodeTrailers(_))
+      .WillOnce([&, bridge, mock_upstream_ptr](const Http::RequestTrailerMap&) {
+        bridge->onResetStream(Http::StreamResetReason::LocalReset, "test_failure");
+        mock_upstream_ptr->bytes_meter_ = nullptr;
+      });
+
+  EXPECT_CALL(router_filter_interface_, onUpstreamReset(Http::StreamResetReason::LocalReset,
+                                                        HasSubstr("test_failure|codec_error"), _));
+
+  Http::TestRequestTrailerMapImpl trailers;
+  Http::FilterTrailersStatus status = codec_filter->decodeTrailers(trailers);
+  EXPECT_EQ(status, Http::FilterTrailersStatus::StopIteration);
+  upstream_request_.reset();
+}
+
+TEST_F(UpstreamRequestTest, ReentrantResetDuringDecodeMetadata) {
+  MockGenericUpstream* mock_upstream_ptr = nullptr;
+  UpstreamToDownstream* bridge = nullptr;
+  std::shared_ptr<UpstreamCodecFilter> codec_filter;
+  setupUpstreamAndGetBridge(mock_upstream_ptr, bridge, &codec_filter);
+
+  EXPECT_CALL(*mock_upstream_ptr, encodeMetadata(_))
+      .WillOnce([&, bridge, mock_upstream_ptr](const Http::MetadataMapVector&) {
+        bridge->onResetStream(Http::StreamResetReason::LocalReset, "test_failure");
+        mock_upstream_ptr->bytes_meter_ = nullptr;
+      });
+
+  EXPECT_CALL(router_filter_interface_, onUpstreamReset(Http::StreamResetReason::LocalReset,
+                                                        HasSubstr("test_failure|codec_error"), _));
+
+  Http::MetadataMap metadata;
+  Http::FilterMetadataStatus status = codec_filter->decodeMetadata(metadata);
+  EXPECT_EQ(status, Http::FilterMetadataStatus::StopIterationForLocalReply);
+  upstream_request_.reset();
 }
 
 } // namespace
