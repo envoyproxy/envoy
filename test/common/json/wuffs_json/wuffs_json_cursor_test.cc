@@ -763,32 +763,49 @@ TEST(WuffsJsonCursorTest, UnicodeEscapeSplitChunkCorrectValue) {
   EXPECT_EQ(h.fields[0].str_val, "aAb"); // U+0041 = 'A'
 }
 
-// A NUMBER token that straddles a chunk boundary causes Wuffs to rewind its
-// read cursor and the cursor to save the unread bytes in pending_bytes_.
-// If those bytes exceed kMaxPendingBytes the cursor must reject immediately.
+// Number-length enforcement tests
 
-// A number whose in-flight byte count equals kMaxPendingBytes (64) must not
-// trigger the cap: the next chunk completes it normally.
-TEST(WuffsJsonCursorTest, NumberAtPendingCapAccepted) {
+// A number at kMaxNumberBytes (64) must be accepted.
+TEST(WuffsJsonCursorTest, NumberAtMaxBytesAccepted) {
+  CapturingHandler h;
+  const std::string num(64, '1');
+  ASSERT_OK(parse(absl::StrCat("{\"n\":", num, "}"), h));
+  ASSERT_EQ(h.fields.size(), 1u);
+  EXPECT_EQ(h.fields[0].raw_val, num);
+}
+
+// A number one byte over kMaxNumberBytes (65) must be rejected.
+TEST(WuffsJsonCursorTest, NumberExceedsMaxBytesRejected) {
+  CapturingHandler h;
+  const std::string num(65, '1');
+  EXPECT_THAT(parse(absl::StrCat("{\"n\":", num, "}"), h), Not(IsOk()));
+}
+
+// A 64-byte number split across two chunks must be accepted.
+TEST(WuffsJsonCursorTest, NumberAtMaxBytesAcceptedSplitAcrossChunks) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  // Feed structure first; no number in flight yet.
-  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
-  // Feed exactly 64 digit bytes with no terminator — pending_bytes_ = 64, not over cap.
-  ASSERT_OK(cursor.feed(std::string(64, '1'), /*closed=*/false));
-  // Close with '}': Wuffs now sees terminator and completes the NUMBER token.
-  ASSERT_OK(cursor.feed("}", /*closed=*/true));
+  ASSERT_OK(cursor.feed(absl::StrCat("{\"n\":", std::string(32, '1')), /*closed=*/false));
+  ASSERT_OK(cursor.feed(absl::StrCat(std::string(32, '1'), "}"), /*closed=*/true));
   ASSERT_EQ(h.fields.size(), 1u);
   EXPECT_EQ(h.fields[0].raw_val, std::string(64, '1'));
 }
 
-// A number with 65 in-flight bytes (one over kMaxPendingBytes) must be rejected.
-TEST(WuffsJsonCursorTest, NumberOverPendingCapRejected) {
+// A 65-byte number split across two chunks must be rejected once reassembled.
+TEST(WuffsJsonCursorTest, NumberExceedsMaxBytesRejectedSplitAcrossChunks) {
   CapturingHandler h;
   WuffsJsonCursor cursor(h);
-  ASSERT_OK(cursor.feed("{\"n\":", /*closed=*/false));
-  // 65 digit bytes with no terminator — leftover = 65 > 64 → error.
-  EXPECT_THAT(cursor.feed(std::string(65, '1'), /*closed=*/false), Not(IsOk()));
+  ASSERT_OK(cursor.feed(absl::StrCat("{\"n\":", std::string(32, '1')), /*closed=*/false));
+  EXPECT_THAT(cursor.feed(absl::StrCat(std::string(33, '1'), "}"), /*closed=*/true), Not(IsOk()));
+}
+
+// An unterminated number chunk that already exceeds kMaxNumberBytes (65) must
+// be rejected immediately before buffering into pending_bytes_.
+TEST(WuffsJsonCursorTest, NumberExceedsMaxBytesRejectedInPendingChunk) {
+  CapturingHandler h;
+  WuffsJsonCursor cursor(h);
+  EXPECT_THAT(cursor.feed(absl::StrCat("{\"n\":", std::string(65, '1')), /*closed=*/false),
+              Not(IsOk()));
 }
 
 } // namespace

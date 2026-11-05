@@ -212,11 +212,10 @@ absl::Status WuffsJsonCursor::feed(absl::string_view chunk, bool closed) {
       // keyword without advancing the cursor at all, so no rewind is needed.
       if (source_buf.meta.ri < effective_chunk.size()) {
         // LITERAL is always 4–5 bytes (null/true/false) — completely bounded.
-        // For NUMBER split across chunks: cap pending_bytes_ to kMaxPendingBytes (see its
-        // declaration). Numbers that arrive complete with their terminator in the same chunk
-        // never reach this path and are bounded by the upstream max_body_bytes limit instead.
+        // For NUMBER split across chunks: cap pending_bytes_ to kMaxNumberBytes (see its
+        // declaration).
         const size_t leftover = effective_chunk.size() - source_buf.meta.ri;
-        if (leftover > kMaxPendingBytes) {
+        if (leftover > kMaxNumberBytes) {
           return absl::InvalidArgumentError("wuffs json: number token too large");
         }
         pending_bytes_.assign(effective_chunk.data() + source_buf.meta.ri, leftover);
@@ -371,6 +370,9 @@ absl::Status WuffsJsonCursor::handleNumberOrLiteralToken(int64_t token_category,
                                           ? absl::string_view(key_stack_[depth_])
                                           : absl::string_view();
   if (token_category == WUFFS_BASE__TOKEN__VBC__NUMBER) {
+    if (raw.size() > kMaxNumberBytes) {
+      return absl::InvalidArgumentError("wuffs json: number token too large");
+    }
     if (auto s = handler_.onNumber(value_key, raw, depth_, token_start, body_src_pos_); !s.ok()) {
       return s;
     }
