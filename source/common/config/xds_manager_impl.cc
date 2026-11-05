@@ -237,11 +237,11 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
             local_info_, *cm_, *stats_.rootScope(), primary_client, main_thread_dispatcher_);
       };
 
-      ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
-                                 main_thread_dispatcher_, random_, *stats_.rootScope(),
-                                 dyn_resources.ads_config(), local_info_,
-                                 std::move(custom_config_validators), std::move(backoff_strategy),
-                                 xds_config_tracker, {}, lrs_factory);
+      ads_mux_ = factory->create(
+          std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
+          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          std::move(custom_config_validators), std::move(backoff_strategy), xds_config_tracker, {},
+          lrs_factory, makeOptRef(*xds_symbol_table_));
     } else {
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
@@ -271,11 +271,11 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
 
       OptRef<XdsResourcesDelegate> xds_resources_delegate =
           makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
-      ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
-                                 main_thread_dispatcher_, random_, *stats_.rootScope(),
-                                 dyn_resources.ads_config(), local_info_,
-                                 std::move(custom_config_validators), std::move(backoff_strategy),
-                                 xds_config_tracker, xds_resources_delegate, lrs_factory);
+      ads_mux_ = factory->create(
+          std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
+          *stats_.rootScope(), dyn_resources.ads_config(), local_info_,
+          std::move(custom_config_validators), std::move(backoff_strategy), xds_config_tracker,
+          xds_resources_delegate, lrs_factory, makeOptRef(*xds_symbol_table_));
     }
   } else {
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
@@ -490,7 +490,8 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
-        std::move(backoff_strategy), xds_config_tracker, {}, lrs_factory);
+        std::move(backoff_strategy), xds_config_tracker, {}, lrs_factory,
+        makeOptRef(*xds_symbol_table_));
   } else {
     ASSERT(api_config_source.api_type() ==
            envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
@@ -525,7 +526,8 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
-        std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate, lrs_factory);
+        std::move(backoff_strategy), xds_config_tracker, xds_resources_delegate, lrs_factory,
+        makeOptRef(*xds_symbol_table_));
   }
   ASSERT(authority_mux != nullptr);
 

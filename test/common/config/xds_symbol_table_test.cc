@@ -3,6 +3,10 @@
 
 #include "source/common/config/xds_symbol_table.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/hash/hash.h"
 #include "absl/strings/str_cat.h"
 #include "gtest/gtest.h"
 
@@ -158,6 +162,7 @@ TEST(XdsSymbolTableTest, ConcurrentAccessThreadSafe) {
 
   for (size_t t = 0; t < num_threads; ++t) {
     threads.emplace_back([table, t]() {
+      absl::InlinedVector<uint8_t, 64> scratch;
       for (size_t i = 0; i < iterations; ++i) {
         std::string name =
             absl::StrCat("xdstp://authority.org/envoy.config.cluster.v3.Cluster/thread_", t,
@@ -166,6 +171,14 @@ TEST(XdsSymbolTableTest, ConcurrentAccessThreadSafe) {
         XdsResourceName res_name = storage.resourceName();
         std::string decoded = table->toString(res_name);
         EXPECT_EQ(name, decoded);
+
+        // Concurrent tryEncode while other threads mutate the symbol table.
+        for (int probe = 0; probe < 3; ++probe) {
+          const auto encoded_view = table->tryEncode(name, scratch);
+          ASSERT_TRUE(encoded_view.has_value());
+          EXPECT_EQ(*encoded_view, res_name);
+          EXPECT_FALSE(table->tryEncode("untrusted_unknown_token/foo", scratch).has_value());
+        }
 
         // Copy and move storage across variables to exercise addRef and releaseRef concurrently.
         auto copy_storage = storage;
@@ -264,6 +277,102 @@ TEST(XdsSymbolTableTest, ForEachSymbolInlineVisitor) {
   ok = XdsSymbolTable::forEachSymbol(malformed, [&count](XdsSymbol) { ++count; });
   EXPECT_FALSE(ok);
   EXPECT_EQ(count, 0);
+}
+
+TEST(XdsSymbolTableTest, TryEncodeAndHeterogeneousLookup) {
+  auto table = XdsSymbolTable::create();
+  const size_t initial_active = table->numActiveSymbols();
+  const size_t initial_symbols = table->numSymbols();
+
+  absl::InlinedVector<uint8_t, 64> scratch;
+
+  // Empty name encodes without mutating the symbol table.
+  const auto empty_view = table->tryEncode("", scratch);
+  ASSERT_TRUE(empty_view.has_value());
+  EXPECT_TRUE(empty_view->empty());
+  EXPECT_EQ(table->numActiveSymbols(), initial_active);
+  EXPECT_EQ(table->numSymbols(), initial_symbols);
+
+  // Unknown tokens return std::nullopt without polluting the symbol table.
+  EXPECT_FALSE(table->tryEncode("xdstp://unknown.auth/envoy.config.cluster.v3.Cluster/foo", scratch)
+                   .has_value());
+  EXPECT_EQ(table->numActiveSymbols(), initial_active);
+  EXPECT_EQ(table->numSymbols(), initial_symbols);
+
+  absl::flat_hash_map<XdsResourceNameStorage, std::string, XdsResourceNameHash, XdsResourceNameEq>
+      version_map;
+  absl::flat_hash_set<XdsResourceNameStorage, XdsResourceNameHash, XdsResourceNameEq> tracked_set;
+
+  // Populate > 128 unique tokens so multi-byte `LEB128` symbols are also exercised by tryEncode.
+  std::vector<XdsResourceNameStorage> extra_storages;
+  extra_storages.reserve(150);
+  for (int i = 0; i < 150; ++i) {
+    extra_storages.emplace_back(table->encode(absl::StrCat("prefix_", i, "/service")));
+  }
+
+  const std::string target_name =
+      "xdstp://traffic-director.xds/envoy.config.cluster.v3.Cluster/proj_149/prefix_149/service";
+  XdsResourceNameStorage target_storage = table->encode(target_name);
+  XdsResourceNameStorage duplicate_storage = table->encode(target_name);
+  XdsResourceNameStorage other_storage = table->encode("prefix_0/service");
+
+  EXPECT_EQ(target_storage, duplicate_storage);
+  EXPECT_NE(target_storage, other_storage);
+  EXPECT_EQ(absl::Hash<XdsResourceNameStorage>()(target_storage),
+            absl::Hash<XdsResourceNameStorage>()(duplicate_storage));
+
+  version_map.emplace(std::move(target_storage), "v42");
+  tracked_set.insert(std::move(duplicate_storage));
+
+  // Heterogeneous lookup via tryEncode view succeeds without allocating storage.
+  const size_t active_before_lookup = table->numActiveSymbols();
+  const auto encoded_view = table->tryEncode(target_name, scratch);
+  ASSERT_TRUE(encoded_view.has_value());
+  const auto map_it = version_map.find(*encoded_view);
+  ASSERT_NE(map_it, version_map.end());
+  EXPECT_EQ(map_it->second, "v42");
+  EXPECT_TRUE(tracked_set.contains(*encoded_view));
+  EXPECT_TRUE(XdsResourceNameEq{}(*encoded_view, *tracked_set.find(*encoded_view)));
+  EXPECT_TRUE(XdsResourceNameEq{}(*encoded_view, *encoded_view));
+  EXPECT_TRUE(
+      XdsResourceNameEq{}(*tracked_set.find(*encoded_view), *tracked_set.find(*encoded_view)));
+  EXPECT_EQ(table->numActiveSymbols(), active_before_lookup);
+
+  // Partial prefix match where trailing token is unknown still returns std::nullopt.
+  EXPECT_FALSE(table
+                   ->tryEncode("xdstp://traffic-director.xds/envoy.config.cluster.v3.Cluster/"
+                               "proj_149/never_seen_token",
+                               scratch)
+                   .has_value());
+  EXPECT_EQ(table->numActiveSymbols(), active_before_lookup);
+
+  // Heterogeneous erase reclaims symbols once last storage reference is removed.
+  const auto erase_view = table->tryEncode(target_name, scratch);
+  ASSERT_TRUE(erase_view.has_value());
+  EXPECT_EQ(version_map.erase(*erase_view), 1);
+  EXPECT_EQ(tracked_set.erase(*erase_view), 1);
+  EXPECT_FALSE(table->tryEncode(target_name, scratch).has_value());
+  // Second probe after erase exercises full rebuild of the thread-local cache.
+  EXPECT_FALSE(table->tryEncode(target_name, scratch).has_value());
+  // Fast-path misses from synced thread-local cache (before '://', before '/', and at EOF).
+  EXPECT_FALSE(table->tryEncode("unknownscheme://service", scratch).has_value());
+  EXPECT_FALSE(table->tryEncode("unknownprefix/service", scratch).has_value());
+  EXPECT_FALSE(table->tryEncode("prefix_0/unknownleaf", scratch).has_value());
+  ASSERT_TRUE(table->tryEncode("prefix_0/service", scratch).has_value());
+
+  // Appending a brand-new symbol when free_list_ is empty exercises incremental cache sync.
+  extra_storages.clear();
+  other_storage = XdsResourceNameStorage(nullptr, "");
+  auto fresh_table = XdsSymbolTable::create();
+  auto first_storage = fresh_table->encode("alpha/one");
+  ASSERT_TRUE(fresh_table->tryEncode("alpha/one", scratch).has_value());
+  ASSERT_TRUE(fresh_table->tryEncode("alpha/one", scratch).has_value());
+  auto appended_storage = fresh_table->encode("beta/two");
+  ASSERT_TRUE(fresh_table->tryEncode("beta/two", scratch).has_value());
+  // Second tryEncode at the new version performs incremental delta sync on tls_cache.
+  ASSERT_TRUE(fresh_table->tryEncode("beta/two", scratch).has_value());
+  // Third tryEncode hits the lock-free synced fast path.
+  ASSERT_TRUE(fresh_table->tryEncode("beta/two", scratch).has_value());
 }
 
 } // namespace

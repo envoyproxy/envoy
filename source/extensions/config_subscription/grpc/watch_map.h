@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/custom_config_validators.h"
 #include "envoy/config/eds_resources_cache.h"
 #include "envoy/config/subscription.h"
@@ -12,6 +13,8 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/resource_name.h"
+#include "source/common/config/xds_symbol_table.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -32,6 +35,10 @@ struct Watch {
   SubscriptionCallbacks& callbacks_;
   OpaqueResourceDecoder& resource_decoder_;
   absl::flat_hash_set<std::string> resource_names_;
+  // Populated instead of `resource_names_` when `compress_xds_resource_names` is enabled.
+  // Views point into `WatchMap::compressed_watch_interest_` keys, which outlive all watch
+  // references to the corresponding resource name.
+  absl::flat_hash_set<XdsResourceName> compressed_resource_names_;
   // Needed only for state-of-the-world.
   // Whether the most recent update contained any resources this watch cares about.
   // If true, a new update that also contains no resources can skip this watch.
@@ -79,8 +86,15 @@ struct Watch {
 class WatchMap : public UntypedConfigUpdateCallbacks, public Logger::Loggable<Logger::Id::config> {
 public:
   WatchMap(const std::string& type_url, CustomConfigValidators* config_validators,
-           EdsResourcesCacheOptRef eds_resources_cache)
-      : type_url_(type_url), config_validators_(config_validators),
+           EdsResourcesCacheOptRef eds_resources_cache,
+           OptRef<XdsSymbolTable> xds_symbol_table = {})
+      : compress_resource_names_(Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.compress_xds_resource_names")),
+        xds_symbol_table_(compress_resource_names_
+                              ? (xds_symbol_table.has_value() ? xds_symbol_table->shared_from_this()
+                                                              : XdsSymbolTable::create())
+                              : nullptr),
+        type_url_(type_url), config_validators_(config_validators),
         eds_resources_cache_(eds_resources_cache) {
     // If eds resources cache is provided, then the type must be ClusterLoadAssignment.
     ASSERT(!eds_resources_cache_.has_value() ||
@@ -178,6 +192,12 @@ private:
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
 
+  // Looks up the set of watches explicitly tracking `key`, or nullptr if none.
+  const absl::flat_hash_set<Watch*>* findWatchesInterestedInKey(absl::string_view key) const;
+
+  const bool compress_resource_names_;
+  XdsSymbolTableSharedPtr xds_symbol_table_;
+
   absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
 
   // Watches whose interest set is currently empty, which is interpreted as "everything".
@@ -188,10 +208,16 @@ private:
   // removeWatch().
   std::unique_ptr<absl::flat_hash_set<Watch*>> deferred_removed_during_update_;
 
+  struct CompressedWatchInterest {
+    XdsResourceNameStorage storage_;
+    absl::flat_hash_set<Watch*> watches_;
+  };
+
   // Maps a resource name to the set of watches interested in that resource. Has two purposes:
   // 1) Acts as a reference count; no watches care anymore ==> the resource can be removed.
   // 2) Enables efficient lookup of all interested watches when a resource has been updated.
   absl::flat_hash_map<std::string, absl::flat_hash_set<Watch*>> watch_interest_;
+  absl::flat_hash_map<XdsResourceName, CompressedWatchInterest> compressed_watch_interest_;
 
   // Glob interest registered via accept(). Unlike wildcard_watches_/watch_interest_
   // above, these affect routing only and never contribute to the subscription. Parallel to

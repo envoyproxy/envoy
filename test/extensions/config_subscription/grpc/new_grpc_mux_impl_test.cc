@@ -11,6 +11,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
@@ -95,7 +96,9 @@ public:
         /*backoff_strategy_=*/std::move(backoff_strategy),
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
-        /*skip_subsequent_node_=*/skip_subsequent_node_};
+        /*skip_subsequent_node_=*/skip_subsequent_node_,
+        /*load_stats_reporter_factory_=*/nullptr,
+        /*xds_symbol_table_=*/makeOptRefFromPtr(xds_symbol_table_.get())};
     if (isUnifiedMuxTest()) {
       grpc_mux_ = std::make_unique<XdsMux::GrpcMuxDelta>(grpc_mux_context);
       return;
@@ -213,6 +216,7 @@ public:
   bool use_resources_delegate_{false};
   NiceMock<MockXdsConfigTracker> config_tracker_;
   NiceMock<MockXdsResourcesDelegate> resources_delegate_;
+  XdsSymbolTableSharedPtr xds_symbol_table_;
 };
 
 class NewGrpcMuxImplTest : public NewGrpcMuxImplTestBase {
@@ -1207,6 +1211,16 @@ TEST(NewGrpcMuxFactoryTest, InvalidRateLimit) {
                                random, scope, ads_config, local_info, nullptr, nullptr,
                                std::nullopt, std::nullopt, nullptr),
                EnvoyException);
+
+  Stats::TestUtil::TestStore valid_store;
+  auto symbol_table = XdsSymbolTable::create();
+  envoy::config::core::v3::ApiConfigSource valid_ads_config;
+  auto mux =
+      factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher, random,
+                      *valid_store.rootScope(), valid_ads_config, local_info, nullptr, nullptr,
+                      std::nullopt, std::nullopt, nullptr, makeOptRef(*symbol_table));
+  EXPECT_NE(mux, nullptr);
+  factory->shutdownAll();
 }
 
 TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnConfigAccepted) {
@@ -1336,6 +1350,42 @@ TEST_P(NewGrpcMuxImplTest, XdsConfigTrackerOnDemandUnsubscribed) {
   expectSendMessage({.type_url = type_url, .resource_names_unsubscribe = {"y"}});
   foo_sub.reset();
 
+  shutdownMux();
+}
+
+// Verifies that `GrpcMuxContext::xds_symbol_table_` is threaded into both `WatchMap` and
+// `DeltaSubscriptionState` across type URLs, sharing common tokens and reclaiming active
+// symbols when watches are destroyed.
+TEST_P(NewGrpcMuxImplTest, SharedXdsSymbolTableAcrossSubscriptions) {
+  xds_symbol_table_ = XdsSymbolTable::create();
+  const size_t initial_active = xds_symbol_table_->numActiveSymbols();
+  setup();
+
+  const std::string res_cds =
+      "xdstp://shared_authority/envoy.config.cluster.v3.Cluster/shared_ns/svc_1";
+  const std::string res_eds =
+      "xdstp://shared_authority/envoy.config.endpoint.v3.ClusterLoadAssignment/shared_ns/svc_1";
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage({.type_url = "cds", .resource_names_subscribe = {res_cds}, .with_node = true});
+  expectSendMessage({.type_url = "eds", .resource_names_subscribe = {res_eds}, .with_node = true});
+
+  auto cds_watch = grpc_mux_->addWatch("cds", {res_cds}, callbacks_, resource_decoder_, {});
+  const size_t symbols_after_cds = xds_symbol_table_->numSymbols();
+  auto eds_watch = grpc_mux_->addWatch("eds", {res_eds}, callbacks_, resource_decoder_, {});
+  EXPECT_GT(xds_symbol_table_->numActiveSymbols(), initial_active);
+  EXPECT_EQ(xds_symbol_table_->numSymbols() - symbols_after_cds, 2);
+
+  grpc_mux_->start();
+
+  expectSendMessage(
+      {.type_url = "cds", .resource_names_unsubscribe = {res_cds}, .with_node = true});
+  cds_watch.reset();
+  expectSendMessage(
+      {.type_url = "eds", .resource_names_unsubscribe = {res_eds}, .with_node = true});
+  eds_watch.reset();
+
+  EXPECT_EQ(xds_symbol_table_->numActiveSymbols(), initial_active);
   shutdownMux();
 }
 

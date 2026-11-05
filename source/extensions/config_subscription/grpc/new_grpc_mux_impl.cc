@@ -53,6 +53,7 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
       xds_config_tracker_(grpc_mux_context.xds_config_tracker_),
       skip_subsequent_node_(grpc_mux_context.skip_subsequent_node_),
       eds_resources_cache_(std::move(grpc_mux_context.eds_resources_cache_)),
+      xds_symbol_table_(grpc_mux_context.xds_symbol_table_),
       load_stats_reporter_factory_(grpc_mux_context.load_stats_reporter_factory_) {
   AllMuxes::get().insert(this);
 }
@@ -392,8 +393,9 @@ NewGrpcMuxImpl::addSubscription(const std::string& type_url) {
     resources_cache = makeOptRefFromPtr(eds_resources_cache_.get());
   }
   auto [it, success] = subscriptions_.emplace(
-      type_url, std::make_unique<SubscriptionStuff>(type_url, dispatcher_, config_validators_.get(),
-                                                    xds_config_tracker_, resources_cache));
+      type_url,
+      std::make_unique<SubscriptionStuff>(type_url, dispatcher_, config_validators_.get(),
+                                          xds_config_tracker_, resources_cache, xds_symbol_table_));
   // Insertion must succeed, as the addSubscription method is only called if
   // the map doesn't have the type_url.
   ASSERT(success);
@@ -519,8 +521,8 @@ public:
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,
          OptRef<XdsResourcesDelegate>,
-         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory)
-      override {
+         std::function<std::unique_ptr<Upstream::LoadStatsReporter>()> load_stats_reporter_factory,
+         OptRef<XdsSymbolTable> xds_symbol_table = {}) override {
     absl::StatusOr<RateLimitSettings> rate_limit_settings_or_error =
         Utility::parseRateLimitSettings(ads_config);
     THROW_IF_NOT_OK_REF(rate_limit_settings_or_error.status());
@@ -541,7 +543,8 @@ public:
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::make_unique<EdsResourcesCacheImpl>(dispatcher),
         /*skip_subsequent_node_=*/ads_config.set_node_on_first_message_only(),
-        /*load_stats_reporter_factory_=*/load_stats_reporter_factory};
+        /*load_stats_reporter_factory_=*/load_stats_reporter_factory,
+        /*xds_symbol_table_=*/xds_symbol_table};
     return std::make_shared<Config::NewGrpcMuxImpl>(grpc_mux_context);
   }
 };

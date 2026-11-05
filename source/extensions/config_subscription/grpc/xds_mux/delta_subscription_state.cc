@@ -1,11 +1,15 @@
 #include "source/extensions/config_subscription/grpc/xds_mux/delta_subscription_state.h"
 
+#include <utility>
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/common/hash.h"
 #include "source/common/config/utility.h"
 #include "source/common/runtime/runtime_features.h"
+
+#include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Config {
@@ -14,8 +18,15 @@ namespace XdsMux {
 DeltaSubscriptionState::DeltaSubscriptionState(std::string type_url,
                                                UntypedConfigUpdateCallbacks& watch_map,
                                                Event::Dispatcher& dispatcher,
-                                               XdsConfigTrackerOptRef xds_config_tracker)
+                                               XdsConfigTrackerOptRef xds_config_tracker,
+                                               OptRef<XdsSymbolTable> xds_symbol_table)
     : BaseSubscriptionState(std::move(type_url), watch_map, dispatcher, xds_config_tracker),
+      compress_resource_names_(
+          Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compress_xds_resource_names")),
+      xds_symbol_table_(compress_resource_names_
+                            ? (xds_symbol_table.has_value() ? xds_symbol_table->shared_from_this()
+                                                            : XdsSymbolTable::create())
+                            : nullptr),
       // TODO(snowp): Hard coding VHDS here is temporary until we can move it away from relying on
       // empty resources as updates.
       supports_heartbeats_(type_url_ != "envoy.config.route.v3.VirtualHost") {}
@@ -32,7 +43,32 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     // If the requested resource existed as a wildcard resource,
     // transition it to requested. Otherwise mark it as a resource
     // waiting for the server to receive the version.
-    if (auto it = wildcard_resource_state_.find(a); it != wildcard_resource_state_.end()) {
+    if (compress_resource_names_) {
+      bool transitioned = false;
+      absl::InlinedVector<uint8_t, 64> scratch;
+      if (const auto maybe_encoded = xds_symbol_table_->tryEncode(a, scratch);
+          maybe_encoded.has_value()) {
+        if (auto it = compressed_wildcard_resource_state_.find(*maybe_encoded);
+            it != compressed_wildcard_resource_state_.end()) {
+          ResourceState state = ResourceState::withVersion(it->second);
+          auto node = compressed_wildcard_resource_state_.extract(it);
+          compressed_requested_resource_state_.insert_or_assign(std::move(node.key()),
+                                                                std::move(state));
+          transitioned = true;
+        } else if (auto amb_it = compressed_ambiguous_resource_state_.find(*maybe_encoded);
+                   amb_it != compressed_ambiguous_resource_state_.end()) {
+          ResourceState state = ResourceState::withVersion(amb_it->second);
+          auto node = compressed_ambiguous_resource_state_.extract(amb_it);
+          compressed_requested_resource_state_.insert_or_assign(std::move(node.key()),
+                                                                std::move(state));
+          transitioned = true;
+        }
+      }
+      if (!transitioned) {
+        compressed_requested_resource_state_.insert_or_assign(xds_symbol_table_->encode(a),
+                                                              ResourceState::waitingForServer());
+      }
+    } else if (auto it = wildcard_resource_state_.find(a); it != wildcard_resource_state_.end()) {
       requested_resource_state_.insert_or_assign(a, ResourceState::withVersion(it->second));
       wildcard_resource_state_.erase(it);
     } else if (it = ambiguous_resource_state_.find(a); it != ambiguous_resource_state_.end()) {
@@ -41,9 +77,9 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     } else {
       requested_resource_state_.insert_or_assign(a, ResourceState::waitingForServer());
     }
-    ASSERT(requested_resource_state_.contains(a));
-    ASSERT(!wildcard_resource_state_.contains(a));
-    ASSERT(!ambiguous_resource_state_.contains(a));
+    ASSERT(containsRequestedResource(a));
+    ASSERT(!getWildcardResourceVersion(a).has_value());
+    ASSERT(!getAmbiguousResourceVersion(a).has_value());
     // If interest in a resource is removed-then-added (all before a discovery request
     // can be sent), we must treat it as a "new" addition: our user may have forgotten its
     // copy of the resource after instructing us to remove it, and need to be reminded of it.
@@ -56,7 +92,31 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     // just don't know it at this point. Instead of removing it outright, mark the resource as not
     // interesting to us any more and the server will send us an update. If we don't have a wildcard
     // subscription then there is no ambiguity and just drop the resource.
-    if (requested_resource_state_.contains(Wildcard)) {
+    if (compress_resource_names_) {
+      absl::InlinedVector<uint8_t, 64> scratch;
+      if (const auto maybe_encoded = xds_symbol_table_->tryEncode(r, scratch);
+          maybe_encoded.has_value()) {
+        if (containsRequestedResource(Wildcard)) {
+          if (auto it = compressed_requested_resource_state_.find(*maybe_encoded);
+              it != compressed_requested_resource_state_.end()) {
+            // Wildcard resources always have a version. If our requested resource has no version,
+            // it won't be a wildcard resource then. If r is Wildcard itself, then it never has a
+            // version attached to it, so it will not be moved to ambiguous category.
+            if (!it->second.isWaitingForServer()) {
+              std::string version = it->second.version();
+              auto node = compressed_requested_resource_state_.extract(it);
+              compressed_ambiguous_resource_state_.insert_or_assign(std::move(node.key()),
+                                                                    std::move(version));
+            } else {
+              compressed_requested_resource_state_.erase(it);
+            }
+            actually_erased = true;
+          }
+        } else {
+          actually_erased = (compressed_requested_resource_state_.erase(*maybe_encoded) > 0);
+        }
+      }
+    } else if (requested_resource_state_.contains(Wildcard)) {
       if (auto it = requested_resource_state_.find(r); it != requested_resource_state_.end()) {
         // Wildcard resources always have a version. If our requested resource has no version, it
         // won't be a wildcard resource then. If r is Wildcard itself, then it never has a version
@@ -70,7 +130,7 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
     } else {
       actually_erased = (requested_resource_state_.erase(r) > 0);
     }
-    ASSERT(!requested_resource_state_.contains(r));
+    ASSERT(!containsRequestedResource(r));
     // Ideally, when interest in a resource is added-then-removed in between requests,
     // we would avoid putting a superfluous "unsubscribe [resource that was never subscribed]"
     // in the request. However, the removed-then-added case *does* need to go in the request,
@@ -85,8 +145,13 @@ void DeltaSubscriptionState::updateSubscriptionInterest(
   // If we unsubscribe from wildcard resource, drop all the resources that came from wildcard from
   // cache.
   if (cur_removed.contains(Wildcard)) {
-    wildcard_resource_state_.clear();
-    ambiguous_resource_state_.clear();
+    if (compress_resource_names_) {
+      compressed_wildcard_resource_state_.clear();
+      compressed_ambiguous_resource_state_.clear();
+    } else {
+      wildcard_resource_state_.clear();
+      ambiguous_resource_state_.clear();
+    }
   }
 }
 
@@ -101,7 +166,7 @@ bool DeltaSubscriptionState::subscriptionUpdatePending() const {
   if (!any_request_sent_yet_in_current_stream_) {
     // If we haven't sent anything on the current stream, but we are actually interested in some
     // resource then we obviously need to let the server know about those.
-    if (!requested_resource_state_.empty()) {
+    if (!requestedResourceStateEmpty()) {
       return true;
     }
     // So there are no new names and we are interested in nothing. This may either mean that we want
@@ -139,17 +204,17 @@ bool DeltaSubscriptionState::isHeartbeatResource(
     return !maybe_resource->isWaitingForServer() && resource.version() == maybe_resource->version();
   }
 
-  if (const auto itr = wildcard_resource_state_.find(resource.name());
-      itr != wildcard_resource_state_.end()) {
-    return resource.version() == itr->second;
+  if (const auto maybe_version = getWildcardResourceVersion(resource.name());
+      maybe_version.has_value()) {
+    return resource.version() == *maybe_version;
   }
 
-  if (const auto itr = ambiguous_resource_state_.find(resource.name());
-      itr != ambiguous_resource_state_.end()) {
+  if (const auto maybe_version = getAmbiguousResourceVersion(resource.name());
+      maybe_version.has_value()) {
     // In theory we should move the ambiguous resource to wildcard, because probably we shouldn't be
     // getting heartbeat responses about resources that we are not interested in, but the server
     // could have sent this heartbeat before it learned about our lack of interest in the resource.
-    return resource.version() == itr->second;
+    return resource.version() == *maybe_version;
   }
 
   return false;
@@ -208,7 +273,7 @@ void DeltaSubscriptionState::handleGoodResponse(
 
   {
     const auto scoped_update = ttl_.scopedTtlUpdate();
-    if (requested_resource_state_.contains(Wildcard)) {
+    if (containsRequestedResource(Wildcard)) {
       for (const auto& resource : message.resources()) {
         addResourceStateFromServer(resource);
       }
@@ -217,7 +282,7 @@ void DeltaSubscriptionState::handleGoodResponse(
       // and ignore the others.
       // NOTE: This is not gonna work for xdstp resources with glob resource matching.
       for (const auto& resource : message.resources()) {
-        if (requested_resource_state_.contains(resource.name())) {
+        if (containsRequestedResource(resource.name())) {
           addResourceStateFromServer(resource);
         }
       }
@@ -238,9 +303,8 @@ void DeltaSubscriptionState::handleGoodResponse(
     if (auto maybe_resource = getRequestedResourceState(resource_name);
         maybe_resource.has_value()) {
       maybe_resource->setAsWaitingForServer();
-    } else if (const auto erased_count = ambiguous_resource_state_.erase(resource_name);
-               erased_count == 0) {
-      wildcard_resource_state_.erase(resource_name);
+    } else {
+      eraseWildcardOrAmbiguousResource(resource_name);
     }
   }
   ENVOY_LOG(debug, "Delta config for {} accepted with {} resources added, {} removed", typeUrl(),
@@ -257,25 +321,47 @@ DeltaSubscriptionState::getNextRequestInternal() {
     // initial_resource_versions "must be populated for first request in a stream".
     // Also, since this might be a new server, we must explicitly state *all* of our subscription
     // interest.
-    for (auto const& [resource_name, resource_state] : requested_resource_state_) {
+    if (compress_resource_names_) {
+      for (auto const& [resource_name, resource_state] : compressed_requested_resource_state_) {
+        std::string decoded_name = xds_symbol_table_->toString(resource_name.resourceName());
+        if (should_send_initial_resource_versions_ && !resource_state.isWaitingForServer()) {
+          (*request->mutable_initial_resource_versions())[decoded_name] = resource_state.version();
+        }
+        names_added_.insert(std::move(decoded_name));
+      }
       if (should_send_initial_resource_versions_) {
-        // Populate initial_resource_versions with the resource versions we currently have.
-        // Resources we are interested in, but are still waiting to get any version of from the
-        // server, do not belong in initial_resource_versions. (But do belong in new subscriptions!)
-        if (!resource_state.isWaitingForServer()) {
-          (*request->mutable_initial_resource_versions())[resource_name] = resource_state.version();
+        for (auto const& [resource_name, resource_version] : compressed_wildcard_resource_state_) {
+          (*request->mutable_initial_resource_versions())[xds_symbol_table_->toString(
+              resource_name.resourceName())] = resource_version;
+        }
+        for (auto const& [resource_name, resource_version] : compressed_ambiguous_resource_state_) {
+          (*request->mutable_initial_resource_versions())[xds_symbol_table_->toString(
+              resource_name.resourceName())] = resource_version;
         }
       }
-      // We are going over a list of resources that we are interested in, so add them to
-      // resource_names_subscribe.
-      names_added_.insert(resource_name);
-    }
-    if (should_send_initial_resource_versions_) {
-      for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
-        (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+    } else {
+      for (auto const& [resource_name, resource_state] : requested_resource_state_) {
+        if (should_send_initial_resource_versions_) {
+          // Populate initial_resource_versions with the resource versions we currently have.
+          // Resources we are interested in, but are still waiting to get any version of from the
+          // server, do not belong in initial_resource_versions. (But do belong in new
+          // subscriptions!)
+          if (!resource_state.isWaitingForServer()) {
+            (*request->mutable_initial_resource_versions())[resource_name] =
+                resource_state.version();
+          }
+        }
+        // We are going over a list of resources that we are interested in, so add them to
+        // resource_names_subscribe.
+        names_added_.insert(resource_name);
       }
-      for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
-        (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+      if (should_send_initial_resource_versions_) {
+        for (auto const& [resource_name, resource_version] : wildcard_resource_state_) {
+          (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+        }
+        for (auto const& [resource_name, resource_version] : ambiguous_resource_state_) {
+          (*request->mutable_initial_resource_versions())[resource_name] = resource_version;
+        }
       }
     }
     // If this is a legacy wildcard request, then make sure that the resource_names_subscribe is
@@ -298,10 +384,15 @@ DeltaSubscriptionState::getNextRequestInternal() {
 
 bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
   if (in_initial_legacy_wildcard_) {
-    requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
-    ASSERT(requested_resource_state_.contains(Wildcard));
-    ASSERT(!wildcard_resource_state_.contains(Wildcard));
-    ASSERT(!ambiguous_resource_state_.contains(Wildcard));
+    if (compress_resource_names_) {
+      compressed_requested_resource_state_.insert_or_assign(xds_symbol_table_->encode(Wildcard),
+                                                            ResourceState::waitingForServer());
+    } else {
+      requested_resource_state_.insert_or_assign(Wildcard, ResourceState::waitingForServer());
+    }
+    ASSERT(containsRequestedResource(Wildcard));
+    ASSERT(!getWildcardResourceVersion(Wildcard).has_value());
+    ASSERT(!getAmbiguousResourceVersion(Wildcard).has_value());
     return true;
   }
 
@@ -316,7 +407,7 @@ bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
   // The invariant of the code here is that this code is executed only when
   // subscriptionUpdatePending actually returns true, which in our case can only happen if the
   // requested resources state_ isn't empty.
-  ASSERT(!requested_resource_state_.empty());
+  ASSERT(!requestedResourceStateEmpty());
 
   // If our subscription interest didn't change then the first condition for using legacy wildcard
   // subscription is met.
@@ -325,6 +416,9 @@ bool DeltaSubscriptionState::isInitialRequestForLegacyWildcard() {
   }
   // If we requested only a wildcard resource then the second condition for using legacy wildcard
   // condition is met.
+  if (compress_resource_names_) {
+    return compressed_requested_resource_state_.size() == 1 && containsRequestedResource(Wildcard);
+  }
   return requested_resource_state_.size() == 1 &&
          requested_resource_state_.begin()->first == Wildcard;
 }
@@ -337,18 +431,37 @@ void DeltaSubscriptionState::addResourceStateFromServer(
       maybe_resource.has_value()) {
     // It is a resource that we requested.
     maybe_resource->setVersion(resource.version());
-    ASSERT(requested_resource_state_.contains(resource.name()));
-    ASSERT(!wildcard_resource_state_.contains(resource.name()));
-    ASSERT(!ambiguous_resource_state_.contains(resource.name()));
+    ASSERT(containsRequestedResource(resource.name()));
+    ASSERT(!getWildcardResourceVersion(resource.name()).has_value());
+    ASSERT(!getAmbiguousResourceVersion(resource.name()).has_value());
   } else {
     // It is a resource that is a part of our wildcard request.
-    wildcard_resource_state_.insert_or_assign(resource.name(), resource.version());
-    // The resource could be ambiguous before, but now the ambiguity
-    // is resolved.
-    ambiguous_resource_state_.erase(resource.name());
-    ASSERT(!requested_resource_state_.contains(resource.name()));
-    ASSERT(wildcard_resource_state_.contains(resource.name()));
-    ASSERT(!ambiguous_resource_state_.contains(resource.name()));
+    if (compress_resource_names_) {
+      bool transitioned = false;
+      absl::InlinedVector<uint8_t, 64> scratch;
+      if (const auto maybe_encoded = xds_symbol_table_->tryEncode(resource.name(), scratch);
+          maybe_encoded.has_value()) {
+        if (auto amb_it = compressed_ambiguous_resource_state_.find(*maybe_encoded);
+            amb_it != compressed_ambiguous_resource_state_.end()) {
+          auto node = compressed_ambiguous_resource_state_.extract(amb_it);
+          compressed_wildcard_resource_state_.insert_or_assign(std::move(node.key()),
+                                                               resource.version());
+          transitioned = true;
+        }
+      }
+      if (!transitioned) {
+        compressed_wildcard_resource_state_.insert_or_assign(
+            xds_symbol_table_->encode(resource.name()), resource.version());
+      }
+    } else {
+      wildcard_resource_state_.insert_or_assign(resource.name(), resource.version());
+      // The resource could be ambiguous before, but now the ambiguity
+      // is resolved.
+      ambiguous_resource_state_.erase(resource.name());
+    }
+    ASSERT(!containsRequestedResource(resource.name()));
+    ASSERT(getWildcardResourceVersion(resource.name()).has_value());
+    ASSERT(!getAmbiguousResourceVersion(resource.name()).has_value());
   }
 }
 
@@ -368,9 +481,7 @@ void DeltaSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& e
     if (auto maybe_resource = getRequestedResourceState(resource); maybe_resource.has_value()) {
       maybe_resource->setAsWaitingForServer();
       removed_resources.Add(std::string(resource));
-    } else if (const auto erased_count = wildcard_resource_state_.erase(resource) +
-                                         ambiguous_resource_state_.erase(resource);
-               erased_count > 0) {
+    } else if (eraseWildcardOrAmbiguousResource(resource)) {
       removed_resources.Add(std::string(resource));
     }
   }
@@ -379,6 +490,18 @@ void DeltaSubscriptionState::ttlExpiryCallback(const std::vector<std::string>& e
 
 OptRef<DeltaSubscriptionState::ResourceState>
 DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) {
+  if (compress_resource_names_) {
+    absl::InlinedVector<uint8_t, 64> scratch;
+    const auto encoded = xds_symbol_table_->tryEncode(resource_name, scratch);
+    if (!encoded.has_value()) {
+      return {};
+    }
+    auto itr = compressed_requested_resource_state_.find(*encoded);
+    if (itr == compressed_requested_resource_state_.end()) {
+      return {};
+    }
+    return {itr->second};
+  }
   auto itr = requested_resource_state_.find(resource_name);
   if (itr == requested_resource_state_.end()) {
     return {};
@@ -388,11 +511,81 @@ DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_nam
 
 OptRef<const DeltaSubscriptionState::ResourceState>
 DeltaSubscriptionState::getRequestedResourceState(absl::string_view resource_name) const {
+  if (compress_resource_names_) {
+    absl::InlinedVector<uint8_t, 64> scratch;
+    const auto encoded = xds_symbol_table_->tryEncode(resource_name, scratch);
+    if (!encoded.has_value()) {
+      return {};
+    }
+    auto itr = compressed_requested_resource_state_.find(*encoded);
+    if (itr == compressed_requested_resource_state_.end()) {
+      return {};
+    }
+    return {itr->second};
+  }
   auto itr = requested_resource_state_.find(resource_name);
   if (itr == requested_resource_state_.end()) {
     return {};
   }
   return {itr->second};
+}
+
+OptRef<const std::string>
+DeltaSubscriptionState::getWildcardResourceVersion(absl::string_view resource_name) const {
+  if (compress_resource_names_) {
+    absl::InlinedVector<uint8_t, 64> scratch;
+    const auto encoded = xds_symbol_table_->tryEncode(resource_name, scratch);
+    if (!encoded.has_value()) {
+      return {};
+    }
+    auto itr = compressed_wildcard_resource_state_.find(*encoded);
+    if (itr == compressed_wildcard_resource_state_.end()) {
+      return {};
+    }
+    return {itr->second};
+  }
+  auto itr = wildcard_resource_state_.find(resource_name);
+  if (itr == wildcard_resource_state_.end()) {
+    return {};
+  }
+  return {itr->second};
+}
+
+OptRef<const std::string>
+DeltaSubscriptionState::getAmbiguousResourceVersion(absl::string_view resource_name) const {
+  if (compress_resource_names_) {
+    absl::InlinedVector<uint8_t, 64> scratch;
+    const auto encoded = xds_symbol_table_->tryEncode(resource_name, scratch);
+    if (!encoded.has_value()) {
+      return {};
+    }
+    auto itr = compressed_ambiguous_resource_state_.find(*encoded);
+    if (itr == compressed_ambiguous_resource_state_.end()) {
+      return {};
+    }
+    return {itr->second};
+  }
+  auto itr = ambiguous_resource_state_.find(resource_name);
+  if (itr == ambiguous_resource_state_.end()) {
+    return {};
+  }
+  return {itr->second};
+}
+
+bool DeltaSubscriptionState::eraseWildcardOrAmbiguousResource(absl::string_view resource_name) {
+  if (compress_resource_names_) {
+    absl::InlinedVector<uint8_t, 64> scratch;
+    const auto encoded = xds_symbol_table_->tryEncode(resource_name, scratch);
+    if (!encoded.has_value()) {
+      return false;
+    }
+    const size_t erased = compressed_wildcard_resource_state_.erase(*encoded) +
+                          compressed_ambiguous_resource_state_.erase(*encoded);
+    return erased > 0;
+  }
+  const size_t erased = wildcard_resource_state_.erase(resource_name) +
+                        ambiguous_resource_state_.erase(resource_name);
+  return erased > 0;
 }
 
 } // namespace XdsMux

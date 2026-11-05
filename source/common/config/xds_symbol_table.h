@@ -1,10 +1,12 @@
 #pragma once
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -13,6 +15,8 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/hash/hash.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 
@@ -132,6 +136,16 @@ public:
 
   size_t size() const { return size_; }
 
+  bool operator==(const XdsResourceNameStorage& other) const {
+    return resourceName() == other.resourceName();
+  }
+
+  bool operator!=(const XdsResourceNameStorage& other) const { return !(*this == other); }
+
+  template <typename H> friend H AbslHashValue(H h, const XdsResourceNameStorage& storage) {
+    return AbslHashValue(std::move(h), storage.resourceName());
+  }
+
 private:
   friend class XdsSymbolTable;
 
@@ -141,6 +155,40 @@ private:
   XdsSymbolTableSharedPtr table_;
   std::unique_ptr<uint8_t[]> data_;
   uint32_t size_{0};
+};
+
+/**
+ * Transparent hash functor allowing heterogeneous lookup in Abseil hash containers
+ * between `XdsResourceNameStorage` (owning) and `XdsResourceName` (non-owning view).
+ */
+struct XdsResourceNameHash {
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
+
+  size_t operator()(const XdsResourceName& name) const { return absl::HashOf(name); }
+  size_t operator()(const XdsResourceNameStorage& storage) const {
+    return absl::HashOf(storage.resourceName());
+  }
+};
+
+/**
+ * Transparent equality functor allowing heterogeneous lookup in Abseil hash containers
+ * between `XdsResourceNameStorage` (owning) and `XdsResourceName` (non-owning view).
+ */
+struct XdsResourceNameEq {
+  using is_transparent = void; // NOLINT(readability-identifier-naming)
+
+  bool operator()(const XdsResourceName& lhs, const XdsResourceName& rhs) const {
+    return lhs == rhs;
+  }
+  bool operator()(const XdsResourceNameStorage& lhs, const XdsResourceNameStorage& rhs) const {
+    return lhs.resourceName() == rhs.resourceName();
+  }
+  bool operator()(const XdsResourceNameStorage& lhs, const XdsResourceName& rhs) const {
+    return lhs.resourceName() == rhs;
+  }
+  bool operator()(const XdsResourceName& lhs, const XdsResourceNameStorage& rhs) const {
+    return lhs == rhs.resourceName();
+  }
 };
 
 /**
@@ -154,6 +202,13 @@ public:
 
   // Encodes a resource name into owning RAII storage.
   XdsResourceNameStorage encode(absl::string_view name);
+
+  // Attempts to encode `name` using only symbols already active in the table, without mutating
+  // symbol state or ref-counts. Writes the encoded `LEB128` bytes into `scratch` (which must
+  // outlive the returned `XdsResourceName` view) and returns the view if all tokens exist, or
+  // `std::nullopt` if any token is unknown.
+  std::optional<XdsResourceName> tryEncode(absl::string_view name,
+                                           absl::InlinedVector<uint8_t, 64>& scratch) const;
 
   // Decodes an encoded XdsResourceName back into its original string with 100% fidelity.
   std::string toString(const XdsResourceName& name) const;
@@ -232,16 +287,28 @@ private:
     absl::string_view word;
   };
 
+  template <typename Callback>
+  static bool forEachToken(absl::string_view name, Callback&& callback);
+
+  template <typename Map>
+  static bool tryEncodeWithMap(absl::string_view name, const Map& encode_map,
+                               absl::InlinedVector<uint8_t, 64>& scratch);
+
   // Tokenizes name into tokens and delimiters outside the lock.
-  static std::vector<TokenItem> splitTokens(absl::string_view name);
+  static absl::InlinedVector<TokenItem, 64> splitTokens(absl::string_view name);
 
   // Encodes a sequence of symbols into a compact byte vector using `LEB128`.
   static std::vector<uint8_t> encodeSymbolsToBytes(absl::Span<const XdsSymbol> symbols);
 
-  XdsSymbol toSymbol(absl::string_view token) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  XdsSymbol toSymbol(absl::string_view token, bool& added_symbol, bool& reused_slot)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void addRefLocked(absl::Span<const XdsSymbol> symbols) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void recordMutationLocked(bool erased_or_reused_slot) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
+  const uint64_t table_id_;
+  std::atomic<uint64_t> version_{1};
   mutable Thread::MutexBasicLockable lock_;
+  uint64_t last_erase_version_ ABSL_GUARDED_BY(lock_){1};
   absl::flat_hash_map<absl::string_view, XdsSymbol> encode_map_ ABSL_GUARDED_BY(lock_);
   std::deque<std::string> decode_table_ ABSL_GUARDED_BY(lock_);
   std::vector<uint32_t> ref_counts_ ABSL_GUARDED_BY(lock_);

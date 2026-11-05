@@ -10,6 +10,7 @@
 #include "source/common/config/protobuf_link_hacks.h"
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_symbol_table.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/config_subscription/grpc/xds_mux/grpc_mux_impl.h"
 
@@ -89,7 +90,9 @@ public:
             random_),
         /*target_xds_authority_=*/"",
         /*eds_resources_cache_=*/std::unique_ptr<MockEdsResourcesCache>(eds_resources_cache_),
-        /*skip_subsequent_node_=*/true};
+        /*skip_subsequent_node_=*/true,
+        /*load_stats_reporter_factory_=*/nullptr,
+        /*xds_symbol_table_=*/makeOptRefFromPtr(xds_symbol_table_.get())};
     grpc_mux_ = std::make_unique<XdsMux::GrpcMuxSotw>(grpc_mux_context);
   }
 
@@ -154,6 +157,7 @@ public:
   Stats::Gauge& control_plane_connected_state_;
   Stats::Gauge& control_plane_pending_requests_;
   MockEdsResourcesCache* eds_resources_cache_{nullptr};
+  XdsSymbolTableSharedPtr xds_symbol_table_;
 };
 
 class GrpcMuxImplTest : public GrpcMuxImplTestBase {
@@ -1608,6 +1612,16 @@ TEST(UnifiedSotwGrpcMuxFactoryTest, InvalidRateLimit) {
                                random, scope, ads_config, local_info, nullptr, nullptr,
                                std::nullopt, std::nullopt, nullptr),
                EnvoyException);
+
+  Stats::TestUtil::TestStore valid_store;
+  auto symbol_table = XdsSymbolTable::create();
+  envoy::config::core::v3::ApiConfigSource valid_ads_config;
+  auto mux =
+      factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher, random,
+                      *valid_store.rootScope(), valid_ads_config, local_info, nullptr, nullptr,
+                      std::nullopt, std::nullopt, nullptr, makeOptRef(*symbol_table));
+  EXPECT_NE(mux, nullptr);
+  factory->shutdownAll();
 }
 
 TEST(UnifiedDeltaGrpcMuxFactoryTest, InvalidRateLimit) {
@@ -1626,6 +1640,16 @@ TEST(UnifiedDeltaGrpcMuxFactoryTest, InvalidRateLimit) {
                                random, scope, ads_config, local_info, nullptr, nullptr,
                                std::nullopt, std::nullopt, nullptr),
                EnvoyException);
+
+  Stats::TestUtil::TestStore valid_store;
+  auto symbol_table = XdsSymbolTable::create();
+  envoy::config::core::v3::ApiConfigSource valid_ads_config;
+  auto mux =
+      factory->create(std::make_unique<Grpc::MockAsyncClient>(), nullptr, dispatcher, random,
+                      *valid_store.rootScope(), valid_ads_config, local_info, nullptr, nullptr,
+                      std::nullopt, std::nullopt, nullptr, makeOptRef(*symbol_table));
+  EXPECT_NE(mux, nullptr);
+  factory->shutdownAll();
 }
 
 class GrpcMuxImplConfigTrackerTest : public GrpcMuxImplTest {
@@ -1726,6 +1750,39 @@ TEST_P(GrpcMuxImplConfigTrackerTest, XdsConfigTrackerTransitionToWildcardTest) {
 
   // Update to wildcard (empty set)
   watch->update({});
+}
+
+// Verifies that `GrpcMuxContext::xds_symbol_table_` is threaded into both `WatchMap` and
+// `SotwSubscriptionState` across type URLs, sharing common tokens and reclaiming active
+// symbols when watches are destroyed.
+TEST_P(GrpcMuxImplTest, SharedXdsSymbolTableAcrossSubscriptions) {
+  xds_symbol_table_ = XdsSymbolTable::create();
+  const size_t initial_active = xds_symbol_table_->numActiveSymbols();
+  setup();
+  InSequence s;
+
+  const std::string res_cds =
+      "xdstp://shared_authority/envoy.config.cluster.v3.Cluster/shared_ns/svc_1";
+  const std::string res_eds =
+      "xdstp://shared_authority/envoy.config.endpoint.v3.ClusterLoadAssignment/shared_ns/svc_1";
+
+  auto cds_watch = makeWatch("type_url_cds", {res_cds});
+  const size_t symbols_after_cds = xds_symbol_table_->numSymbols();
+  auto eds_watch = makeWatch("type_url_eds", {res_eds});
+  EXPECT_GT(xds_symbol_table_->numActiveSymbols(), initial_active);
+  EXPECT_EQ(xds_symbol_table_->numSymbols() - symbols_after_cds, 2);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage("type_url_cds", {res_cds}, "", true);
+  expectSendMessage("type_url_eds", {res_eds}, "");
+  grpc_mux_->start();
+
+  expectSendMessage("type_url_cds", {}, "");
+  cds_watch.reset();
+  expectSendMessage("type_url_eds", {}, "");
+  eds_watch.reset();
+
+  EXPECT_EQ(xds_symbol_table_->numActiveSymbols(), initial_active);
 }
 
 } // namespace
