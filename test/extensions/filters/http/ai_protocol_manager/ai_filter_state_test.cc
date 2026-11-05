@@ -303,6 +303,19 @@ TEST(LlmBindingObjectTest, ReadsOnlyWhatTheKeysFactoryBuilds) {
   binding = LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingRequest);
   ASSERT_TRUE(binding.ok());
   EXPECT_EQ(*binding, *set->binding());
+
+  // A pre-parsed binding passed directly via LlmBindingConstSharedPtr.
+  auto preparsed = std::make_shared<LlmBindingObject>(*set->binding());
+  EXPECT_TRUE(preparsed->binding().ok());
+  EXPECT_EQ(*preparsed->binding(), *set->binding());
+  EXPECT_TRUE(preparsed->asString().empty());
+  EXPECT_FALSE(preparsed->serializeAsString().has_value());
+  filter_state.setData(FilterStateKeys::BindingResponse, preparsed,
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
+  binding = LlmBindingObject::fromFilterState(filter_state, FilterStateKeys::BindingResponse);
+  ASSERT_TRUE(binding.ok());
+  EXPECT_EQ(*binding, *set->binding());
+
   filter_state.setData(FilterStateKeys::BindingRequest,
                        std::make_shared<LlmBindingObject>("/v1/{model"),
                        StreamInfo::FilterState::LifeSpan::FilterChain);
