@@ -198,10 +198,10 @@ TEST_F(InternalClientConnectionImplTest, AbortResetEmitsEofToPeerGuardDisabled) 
   EXPECT_EQ(nullptr, read_res.err_);
 }
 
-// With half-close enabled and the feature on, a peer full close surfaces as ECONNRESET once
-// pending data drains and fires RemoteClose. Without this, tcp_proxy CONNECT tunneling through
-// an internal_listener leaks upstream streams. The connection is fully connected before the
-// peer closes so the close is observed on the read path, not through connect completion.
+// With half-close enabled and the feature on, a peer full close fires a normal RemoteClose once
+// pending data drains. Without this, tcp_proxy CONNECT tunneling through an internal_listener
+// leaks upstream streams. The connection is fully connected before the peer closes so the close
+// is observed on the read path, not through connect completion.
 TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullClosePropagatesRemoteClose) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues(
@@ -227,6 +227,44 @@ TEST_F(InternalClientConnectionImplTest, HalfCloseEnabledPeerFullClosePropagates
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
       .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
+}
+
+// Feature on: the connection already read the peer's EOF as a half-close when the peer closes.
+// The close is not missed and stays a normal RemoteClose.
+TEST_F(InternalClientConnectionImplTest,
+       HalfCloseEnabledPeerFullCloseAfterEofReadEmitsCleanRemoteClose) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_send_rst_on_user_space_socket", "true"}});
+
+  client_ = std::make_unique<Network::ClientConnectionImpl>(
+      *dispatcher_,
+      std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_), local_addr_,
+                                                      remote_addr_),
+      nullptr, std::make_unique<Network::RawBufferSocket>(), nullptr, nullptr);
+  client_->enableHalfClose(true);
+  auto read_filter = std::make_shared<NiceMock<Network::MockReadFilter>>();
+  client_->addReadFilter(read_filter);
+  client_->addConnectionCallbacks(connection_callbacks);
+  client_->connect();
+  client_->noDelay(true);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_CALL(*read_filter, onData(testing::_, true));
+  io_handle_peer_->shutdown(ENVOY_SHUT_WR);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); });
+  io_handle_peer_->close();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  EXPECT_EQ(StreamInfo::DetectedCloseType::Normal, client_->detectedCloseType());
 }
 
 // Feature off: legacy half-close behavior preserved. No RemoteClose on peer full close.

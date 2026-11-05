@@ -422,6 +422,19 @@ TEST_P(InternalListenerTunnelingCloseIntegrationTest, UpstreamEndStreamThenReset
   expectCleanClientClose();
 }
 
+// Same, but the reset comes after the end of stream was read and reached the client.
+TEST_P(InternalListenerTunnelingCloseIntegrationTest, UpstreamEndStreamThenLateResetClientOpen) {
+  initialize();
+  setUpTunnel();
+  upstream_request_->encodeData("world", true);
+  tcp_client_->waitForData("world");
+  tcp_client_->waitForHalfClose();
+  upstream_request_->encodeResetStream();
+  // The client still has its side open, so the real listener closing is only seen in the log.
+  EXPECT_THAT(waitForAccessLog(real_access_log_path_), testing::Eq("Normal -"));
+  tcp_client_->close();
+}
+
 TEST_P(InternalListenerTunnelingCloseIntegrationTest,
        UpstreamEndStreamThenResetClientOpenUserSpaceRstDisabled) {
   config_helper_.addRuntimeOverride(

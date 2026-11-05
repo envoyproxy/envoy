@@ -180,15 +180,11 @@ private:
   // pending data to drain.
   bool receive_data_end_stream_{false};
   bool receive_data_reset_{false};
-  // Set by onPeerDestroy() when the peer fully closed (close(), not shutdown(WR)). Reads drain
-  // pending data first, then report ECONNRESET where they would report EOF. This is how a full
-  // peer close is distinguished from a write half-close, which real sockets cannot signal on the
-  // read side.
-  bool receive_data_reset_after_drain_{false};
-  // Next read reports EOF before the pending reset.
-  bool eof_before_reset_{false};
-  // True once a read has reported EOF.
-  bool eof_read_{false};
+  // Set by onPeerDestroy() when the peer fully closed (close(), not shutdown(WR)) before this
+  // handle sent EOF. Reads drain pending data first, then fail with an error other than
+  // ECONNRESET, even if EOF was already read. Both ends live in this process, so this tells a full
+  // close from a half-close, and the connection closes as a normal remote close, not a reset.
+  bool peer_closed_{false};
 
   // The buffer owned by this socket. This buffer is populated by the write operations of the peer
   // socket and drained by read operations of this socket.

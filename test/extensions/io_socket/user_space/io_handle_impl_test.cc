@@ -1253,10 +1253,11 @@ TEST_F(IoHandleImplTest, PassthroughState) {
   ASSERT_EQ(object->value_, dest_object->value_);
 }
 
-// A full peer close() surfaces as ECONNRESET once pending data is drained, while a peer
+// A full peer close() surfaces as a read error once pending data is drained, while a peer
 // shutdown(WR) stays a plain EOF. This is how half-close-enabled consumers distinguish a peer
-// that is fully gone from one that only stopped writing.
-TEST_F(IoHandleImplTest, PeerCloseEmitsConnectionResetAfterDrain) {
+// that is fully gone from one that only stopped writing. The error is not ECONNRESET, so the
+// connection closes as a normal remote close.
+TEST_F(IoHandleImplTest, PeerCloseEmitsErrorAfterDrain) {
   Buffer::OwnedImpl buf_to_write("hello");
   io_handle_peer_->write(buf_to_write);
   io_handle_peer_->close();
@@ -1267,11 +1268,11 @@ TEST_F(IoHandleImplTest, PeerCloseEmitsConnectionResetAfterDrain) {
   EXPECT_EQ(5, read_res.return_value_);
   EXPECT_EQ("hello", read_buf.toString());
 
-  auto reset_res = io_handle_->read(read_buf, 1024);
-  EXPECT_FALSE(reset_res.ok());
-  EXPECT_EQ(0, reset_res.return_value_);
-  ASSERT_NE(nullptr, reset_res.err_);
-  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+  auto close_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(close_res.ok());
+  EXPECT_EQ(0, close_res.return_value_);
+  ASSERT_NE(nullptr, close_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::InvalidArgument, close_res.err_->getErrorCode());
 }
 
 TEST_F(IoHandleImplTest, PeerShutdownWriteStaysEof) {
@@ -1284,7 +1285,7 @@ TEST_F(IoHandleImplTest, PeerShutdownWriteStaysEof) {
   EXPECT_EQ(0, read_res.return_value_);
 }
 
-TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
+TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseAfterEofEmitsError) {
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
 
   Buffer::OwnedImpl read_buf;
@@ -1293,32 +1294,28 @@ TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseEmitsConnectionReset) {
   EXPECT_EQ(0, eof_res.return_value_);
 
   io_handle_peer_->close();
-  auto reset_res = io_handle_->read(read_buf, 1024);
-  EXPECT_FALSE(reset_res.ok());
-  ASSERT_NE(nullptr, reset_res.err_);
-  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+  auto close_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(close_res.ok());
+  ASSERT_NE(nullptr, close_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::InvalidArgument, close_res.err_->getErrorCode());
 }
 
-TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseBeforeReadEmitsEofThenConnectionReset) {
+// Same result whether or not EOF was read before the peer closed.
+TEST_F(IoHandleImplTest, PeerShutdownWriteThenCloseBeforeReadEmitsDataThenError) {
   Buffer::OwnedImpl data("hello");
   io_handle_peer_->write(data);
   io_handle_peer_->shutdown(ENVOY_SHUT_WR);
   io_handle_peer_->close();
 
-  // Data and EOF are read before the reset.
   Buffer::OwnedImpl read_buf;
   auto data_res = io_handle_->read(read_buf, 1024);
   EXPECT_TRUE(data_res.ok());
   EXPECT_EQ("hello", read_buf.toString());
 
-  auto eof_res = io_handle_->read(read_buf, 1024);
-  EXPECT_TRUE(eof_res.ok());
-  EXPECT_EQ(0, eof_res.return_value_);
-
-  auto reset_res = io_handle_->read(read_buf, 1024);
-  EXPECT_FALSE(reset_res.ok());
-  ASSERT_NE(nullptr, reset_res.err_);
-  EXPECT_EQ(Network::IoSocketError::IoErrorCode::ConnectionReset, reset_res.err_->getErrorCode());
+  auto close_res = io_handle_->read(read_buf, 1024);
+  EXPECT_FALSE(close_res.ok());
+  ASSERT_NE(nullptr, close_res.err_);
+  EXPECT_EQ(Network::IoSocketError::IoErrorCode::InvalidArgument, close_res.err_->getErrorCode());
 }
 
 TEST_F(IoHandleImplTest, ShutdownWriteFollowedByPeerCloseEmitsEof) {
