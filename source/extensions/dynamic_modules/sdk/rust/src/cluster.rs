@@ -110,7 +110,9 @@ pub trait Cluster: Send + Sync {
   }
 
   /// Called on the main thread when an HTTP callout initiated by
-  /// [`EnvoyCluster::send_http_callout`] receives a response or fails.
+  /// [`EnvoyCluster::send_http_callout`] receives a response or fails. Envoy reports a failure from
+  /// a later callback, and does not call this for the callouts in flight when the cluster is
+  /// destroyed.
   ///
   /// * `envoy_cluster` can be used to interact with the underlying Envoy cluster object.
   /// * `callout_id` is the ID of the callout returned by [`EnvoyCluster::send_http_callout`].
@@ -445,8 +447,10 @@ pub trait EnvoyCluster: Send + Sync {
 
   /// Signal that the cluster's initial host discovery is complete.
   ///
-  /// This must be called during or after [`Cluster::on_init`] to allow Envoy to start
-  /// routing traffic to this cluster.
+  /// This must be called from [`ClusterConfig::new_cluster`] onward to allow Envoy to start
+  /// routing traffic to this cluster. Called before [`Cluster::on_init`] returns, for example
+  /// inside [`ClusterConfig::new_cluster`], it takes effect once [`Cluster::on_init`] returns.
+  /// Otherwise it takes effect from a later callback on the main thread.
   fn pre_init_complete(&self);
 
   /// Back the cluster's cross-priority host map with a persistent map instead of the default
@@ -564,11 +568,14 @@ pub trait EnvoyCluster: Send + Sync {
   fn new_scheduler(&self) -> Box<dyn EnvoyClusterScheduler>;
 
   /// Posts the module's worker-event hook to every worker thread registered with the server's
-  /// thread-local engine. The main thread is excluded. Must be called from the main thread.
+  /// thread-local engine. The main thread is excluded. Must be called from the main thread. Called
+  /// inside [`ClusterConfig::new_cluster`], the events are posted once it returns. Once Envoy
+  /// stopped its workers at exit, this does nothing.
   fn run_on_all_workers(&self, event_id: u64);
 
   /// Publishes a raw opaque pointer to every registered thread's worker slot. Must be called
-  /// from the main thread. Most callers should prefer the typed
+  /// from the main thread. Once Envoy stopped its workers at exit, the pointer is released through
+  /// the destroy hook right away. Most callers should prefer the typed
   /// [`EnvoyClusterWorkerSlotExt::worker_slot_set`].
   fn worker_slot_set_raw(
     &self,
@@ -590,7 +597,8 @@ pub trait EnvoyCluster: Send + Sync {
   ///
   /// This must be called on the main thread. The request requires `:method`, `:path`, and `host`
   /// headers to be present. To call from other threads, use the scheduler mechanism to post an
-  /// event to the main thread first.
+  /// event to the main thread first. Off the main thread this reports an Envoy bug and returns
+  /// `CannotCreateRequest`.
   ///
   /// Returns a tuple of the callout initialization result and the callout ID. The callout ID is
   /// only valid if the result is `Success`.
@@ -608,7 +616,8 @@ pub trait EnvoyCluster: Send + Sync {
 /// `&dyn EnvoyCluster` in their callbacks.
 pub trait EnvoyClusterWorkerSlotExt {
   /// Publishes an `Arc<T>` to every registered thread's worker slot. Replaces any prior payload.
-  /// Must be called from the main thread.
+  /// Must be called from the main thread. Once Envoy stopped its workers at exit, `value` is
+  /// dropped before this returns and the prior payload stays.
   fn worker_slot_set<T: Send + Sync + 'static>(&self, value: Arc<T>);
 
   /// Returns the current `Arc<T>` for this thread, or `None` if the slot has not been populated

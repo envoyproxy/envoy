@@ -53,7 +53,8 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
   fn on_scheduled(&self, _envoy_config: &mut EnvoyHttpFilterConfigImpl, _event_id: u64) {}
 
   /// This is called when an HTTP callout initiated via
-  /// [`EnvoyHttpFilterConfig::send_http_callout`] completes.
+  /// [`EnvoyHttpFilterConfig::send_http_callout`] completes. Envoy reports a failure of a callout
+  /// in flight from a later callback on the same thread.
   ///
   /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
   /// * `callout_id` is the opaque handle returned from
@@ -130,7 +131,9 @@ pub trait HttpFilterConfig<EHF: EnvoyHttpFilter>: Sync {
   }
 
   /// This is called when an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`]
-  /// is reset (failed or cancelled).
+  /// is reset (failed or cancelled). Envoy reports a reset that the module did not request from a
+  /// later callback on the same thread. A reset requested with
+  /// [`EnvoyHttpFilterConfig::reset_http_stream`] is reported before that call returns.
   ///
   /// * `envoy_config` can be used to interact with the underlying Envoy filter config object.
   /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
@@ -255,7 +258,8 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// This is called before this [`HttpFilter`] object is dropped and access logs are flushed.
   fn on_stream_complete(&self, _envoy_filter: &mut EHF) {}
 
-  /// This is called when the HTTP callout is done.
+  /// This is called when the HTTP callout is done. Envoy reports a failure of a callout in flight
+  /// from a later callback on the same thread.
   ///
   /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
   /// * `callout_id` is the ID of the callout that was done.
@@ -321,7 +325,9 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
   /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
   fn on_http_stream_complete(&self, _envoy_filter: &mut EHF, _stream_handle: u64) {}
 
-  /// This is called when an HTTP stream callout is reset (failed or cancelled).
+  /// This is called when an HTTP stream callout is reset (failed or cancelled). Envoy reports a
+  /// reset that the module did not request from a later callback on the same thread. A reset
+  /// requested with [`EnvoyHttpFilter::reset_http_stream`] is reported before that call returns.
   ///
   /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
   /// * `stream_handle` is the opaque handle to the HTTP stream (no longer valid after this call).
@@ -555,6 +561,10 @@ pub trait EnvoyHttpFilterConfig {
 
   /// Send data on an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
   ///
+  /// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+  /// and did not call the reset hook yet, the data is dropped, and the reset hook follows unless
+  /// the configuration is destroyed first.
+  ///
   /// # Safety
   ///
   /// * `stream_handle` must be a valid handle returned from
@@ -567,6 +577,10 @@ pub trait EnvoyHttpFilterConfig {
   ) -> bool;
 
   /// Send trailers on an HTTP stream started via [`EnvoyHttpFilterConfig::start_http_stream`].
+  ///
+  /// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+  /// and did not call the reset hook yet, the trailers are dropped, and the reset hook follows
+  /// unless the configuration is destroyed first.
   ///
   /// # Safety
   ///
@@ -1807,7 +1821,9 @@ pub trait EnvoyHttpFilter {
   /// * `data` is the data to send.
   /// * `end_stream` indicates whether this is the final frame of the request.
   ///
-  /// Returns true if the data was sent successfully, false otherwise.
+  /// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+  /// and did not call the reset hook yet, the data is dropped, and the reset hook follows unless
+  /// the filter is destroyed first.
   unsafe fn send_http_stream_data(
     &mut self,
     _stream_handle: u64,
@@ -1822,7 +1838,9 @@ pub trait EnvoyHttpFilter {
   /// * `stream_handle` must be a valid handle returned from [`EnvoyHttpFilter::start_http_stream`].
   /// * `trailers` is a list of key-value pairs for the trailers.
   ///
-  /// Returns true if the trailers were sent successfully, false otherwise.
+  /// Returns false if the stream does not exist, and true otherwise. When Envoy reset the stream
+  /// and did not call the reset hook yet, the trailers are dropped, and the reset hook follows
+  /// unless the filter is destroyed first.
   unsafe fn send_http_stream_trailers<'a>(
     &mut self,
     _stream_handle: u64,

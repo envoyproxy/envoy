@@ -166,7 +166,8 @@ pub trait NetworkFilter<ENF: EnvoyNetworkFilter> {
   ) {
   }
 
-  /// This is called when an HTTP callout response is received.
+  /// This is called when an HTTP callout response is received. Envoy reports a failure of a
+  /// callout in flight from a later callback on the same thread.
   ///
   /// @param _callout_id is the ID of the callout returned by send_http_callout.
   /// @param _result is the result of the callout.

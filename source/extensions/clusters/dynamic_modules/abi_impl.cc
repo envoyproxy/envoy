@@ -1806,6 +1806,11 @@ envoy_dynamic_module_callback_cluster_http_callout(
     envoy_dynamic_module_type_module_buffer cluster_name,
     envoy_dynamic_module_type_module_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_module_buffer body, uint64_t timeout_milliseconds) {
+  if (!Envoy::Thread::MainThread::isMainOrTestThread()) {
+    IS_ENVOY_BUG("envoy_dynamic_module_callback_cluster_http_callout must be called on the main "
+                 "thread");
+    return envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest;
+  }
   auto* cluster = getCluster(cluster_envoy_ptr);
 
   Envoy::Http::RequestHeaderMapPtr header_map = Envoy::Http::RequestHeaderMapImpl::create();

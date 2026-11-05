@@ -8,6 +8,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/event/dispatcher_thread_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/dynamic_modules/v3/cluster.pb.validate.h"
@@ -173,6 +174,7 @@ using DynamicModuleClusterHandleSharedPtr = std::shared_ptr<DynamicModuleCluster
  * The module manages hosts via add/remove callbacks and provides its own load balancer.
  */
 class DynamicModuleCluster : public Upstream::ClusterImplBase,
+                             public Event::DispatcherThreadDeletable,
                              public std::enable_shared_from_this<DynamicModuleCluster> {
 public:
   ~DynamicModuleCluster() override;
@@ -181,6 +183,7 @@ public:
   Upstream::Cluster::InitializePhase initializePhase() const override {
     return Upstream::Cluster::InitializePhase::Primary;
   }
+  void initialize(std::function<absl::Status()> callback) override;
 
   // Methods called by the dynamic module via ABI callbacks.
   bool addHosts(
@@ -260,9 +263,20 @@ protected:
 
 private:
   /**
+   * Creates the in-module cluster. The factory calls this once a shared_ptr owns the cluster so
+   * that schedulers and callouts created in on_cluster_new can reach it.
+   */
+  absl::Status initializeInModuleCluster();
+
+  /**
    * Registers server lifecycle callbacks (server_initialized, drain, shutdown).
    */
   void registerLifecycleCallbacks();
+
+  /**
+   * Finishes the pre-init phase unless the cluster manager released this cluster.
+   */
+  void completePreInit();
 
   // The PersistentHostSet at `priority`, created if missing. Only valid with persistent partitions.
   PersistentHostSet& persistentHostSet(uint32_t priority);
@@ -287,8 +301,8 @@ private:
    */
   class HttpCalloutCallback : public Http::AsyncClient::Callbacks {
   public:
-    HttpCalloutCallback(std::shared_ptr<DynamicModuleCluster> cluster, uint64_t id)
-        : cluster_(std::move(cluster)), callout_id_(id) {}
+    HttpCalloutCallback(DynamicModuleCluster& cluster, uint64_t id)
+        : cluster_(cluster), callout_id_(id) {}
     ~HttpCalloutCallback() override = default;
 
     void onSuccess(const Http::AsyncClient::Request& request,
@@ -301,7 +315,9 @@ private:
     Http::AsyncClient::Request* request_ = nullptr;
 
   private:
-    const std::shared_ptr<DynamicModuleCluster> cluster_;
+    // Not owning, so that a callout in flight does not keep a released cluster alive. The cluster
+    // cancels its callouts when it is destroyed.
+    DynamicModuleCluster& cluster_;
     const uint64_t callout_id_{};
   };
 
@@ -355,10 +371,19 @@ private:
 
   // Thread-local slot backing both the worker fan-out and the worker_slot_set/get pattern.
   ThreadLocal::TypedSlotPtr<WorkerSlotData> worker_slot_;
+  // The worker events that on_cluster_new requested, posted once it returns.
+  std::vector<uint64_t> worker_event_ids_from_on_cluster_new_;
 
   // HTTP callout tracking.
   uint64_t next_callout_id_ = 1; // 0 is reserved as an invalid id.
   absl::flat_hash_map<uint64_t, std::unique_ptr<HttpCalloutCallback>> http_callouts_;
+
+  // Whether on_cluster_init has returned.
+  bool on_cluster_init_returned_ = false;
+  // Whether the module called pre_init_complete before on_cluster_init returned.
+  bool pre_init_complete_pending_ = false;
+  // Set once the cluster manager released this cluster.
+  bool released_ = false;
 };
 
 /**

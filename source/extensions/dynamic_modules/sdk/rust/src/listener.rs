@@ -146,6 +146,7 @@ pub trait ListenerFilter<ELF: EnvoyListenerFilter> {
   fn on_close(&mut self, _envoy_filter: &mut ELF) {}
 
   /// This is called when the HTTP callout response is received initiated by a listener filter.
+  /// Envoy reports a failure of a callout in flight from a later callback on the same thread.
   ///
   /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
   /// * `callout_id` is the ID of the callout. This is used to differentiate between multiple calls.

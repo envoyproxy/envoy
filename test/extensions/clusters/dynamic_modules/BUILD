@@ -18,6 +18,7 @@ envoy_extension_cc_dyn_module_test(
     data = [
         "//test/extensions/dynamic_modules/test_data/c:cluster_async_host_selection",
         "//test/extensions/dynamic_modules/test_data/c:cluster_config_new_fail",
+        "//test/extensions/dynamic_modules/test_data/c:cluster_init_in_hooks",
         "//test/extensions/dynamic_modules/test_data/c:cluster_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:cluster_no_op",
         "//test/extensions/dynamic_modules/test_data/c:cluster_null_lb",
