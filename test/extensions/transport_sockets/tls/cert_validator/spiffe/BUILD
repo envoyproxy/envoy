@@ -1,12 +1,12 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_fuzz_test",
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_cc_fuzz_test",
     "envoy_extension_cc_test",
 )
 
@@ -86,10 +86,11 @@ envoy_proto_library(
     deps = ["@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg"],
 )
 
-envoy_cc_fuzz_test(
+envoy_extension_cc_fuzz_test(
     name = "spiffe_validator_fuzz_test",
     srcs = ["spiffe_validator_fuzz_test.cc"],
     corpus = "spiffe_validator_corpus",
+    extension_names = ["envoy.tls.cert_validator.spiffe"],
     rbe_pool = "linux_x64_small",
     deps = [
         ":spiffe_validator_fuzz_proto_cc_proto",
