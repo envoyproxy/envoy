@@ -1994,6 +1994,8 @@ TEST_P(MultiplexedIntegrationTest, TestEncode1xxHeadersWithLocalReplyDuringData)
   std::set<std::string> expected_metadata_keys = {"local-reply", "duplicate", "headers",
                                                   "100-continue"};
   verifyExpectedMetadata(response->metadataMap(), expected_metadata_keys);
+  // Close the open request while its response decoder can still handle reset callbacks.
+  cleanupUpstreamAndDownstream();
 }
 
 class MultiplexedRingHashIntegrationTest : public HttpProtocolIntegrationTest {
