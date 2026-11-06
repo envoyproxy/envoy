@@ -184,6 +184,7 @@ public:
         expected_cert_pem);
     std::string expected_body;
     std::ignore = Protobuf::util::MessageToJsonString(expected_body_struct, &expected_body);
+    EXPECT_EQ(request_->headers().getContentLengthValue(), std::to_string(expected_body.length()));
     EXPECT_TRUE(TestUtility::jsonStringEqual(request_->body().toString(), expected_body));
 
     // Send response headers with end_stream false because we want to add response body next.
@@ -243,6 +244,7 @@ public:
         expected_cert_pem);
     std::string expected_body;
     std::ignore = Protobuf::util::MessageToJsonString(expected_body_struct, &expected_body);
+    EXPECT_EQ(request_->headers().getContentLengthValue(), std::to_string(expected_body.length()));
     EXPECT_TRUE(TestUtility::jsonStringEqual(request_->body().toString(), expected_body));
 
     // Send response headers with end_stream false because we want to add response body next.
@@ -807,6 +809,47 @@ TEST_P(GcpAuthnFilterIntegrationTest, PreserveExistingHeaderSkipsAuthn) {
   cleanup();
 
   EXPECT_EQ(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 0);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, BoundJwtStripsPrivateKeyFromCombinedPemBundle) {
+  upstream_tls_ = true;
+  initializeConfig(/*add_audience=*/false);
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+
+    envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+    audience.mutable_bound_jwt()->set_url("http://test.com");
+    std::ignore = (*cluster_0->mutable_metadata()->mutable_typed_filter_metadata())
+                      [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                          .PackFrom(audience);
+  });
+
+  const std::string cert_pem = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
+  const std::string key_pem = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
+  const std::string combined_bundle_pem = absl::StrCat(cert_pem, key_pem);
+
+  config_helper_.configureUpstreamTls(
+      /*use_alpn=*/false, /*http3=*/false, /*alternate_protocol_cache_config=*/std::nullopt,
+      [combined_bundle_pem](
+          envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& tls_context) {
+        auto* certs = tls_context.mutable_common_tls_context()->add_tls_certificates();
+        certs->mutable_certificate_chain()->set_inline_string(combined_bundle_pem);
+        certs->mutable_private_key()->set_inline_string(combined_bundle_pem);
+      });
+
+  HttpIntegrationTest::initialize();
+  initiateClientConnection();
+
+  // Verify the POST body sent to MDS contains only cert_pem and strips the private key.
+  waitForGcpAuthnServerResponseBoundJwt(cert_pem);
+  sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+  cleanup();
+
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), 1);
   EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
 }
 

@@ -123,8 +123,16 @@ GcpAuthnFilter::getClientCertData(Upstream::ThreadLocalCluster* cluster) {
     return std::nullopt;
   }
 
+  auto cert_chain_or_error = fingerprinter_->getCertChainFromPem(cert_pem);
+  if (!cert_chain_or_error.ok()) {
+    ENVOY_LOG(warn, "Failed to extract certificate chain: {}",
+              cert_chain_or_error.status().message());
+    return std::nullopt;
+  }
+
   filter_config_->stats().client_cert_fingerprint_calculated_.inc();
-  return ClientCertData{std::move(fingerprint_or_error).value(), cert_pem};
+  return ClientCertData{std::move(fingerprint_or_error).value(),
+                        std::move(cert_chain_or_error).value()};
 }
 
 // TODO(tyxia) Handle the duplicated outstanding requests.
@@ -193,14 +201,13 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // remains std::nullopt by default for unbound tokens.
     client_cert_data = getClientCertData(cluster);
     if (!client_cert_data.has_value()) {
-      ENVOY_LOG(warn,
-                "Failed to fetch bound token: client certificate fingerprint is unavailable.");
+      ENVOY_LOG(warn, "Failed to fetch bound token: client certificate is unavailable.");
       filter_config_->stats().bound_token_fingerprint_unavailable_.inc();
       state_ = State::Complete;
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
-          "Failed to fetch bound token: client certificate fingerprint is unavailable.", nullptr,
-          std::nullopt, "bound_token_fingerprint_unavailable");
+          "Failed to fetch bound token: client certificate is unavailable.", nullptr, std::nullopt,
+          "bound_token_fingerprint_unavailable");
       return FilterHeadersStatus::StopAllIterationAndWatermark;
     }
     client_cert_fingerprint_ = client_cert_data->fingerprint;

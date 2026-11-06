@@ -59,6 +59,7 @@ Http::RequestMessagePtr buildMdsPostRequest(absl::string_view url, const std::st
   (*request_body_struct.mutable_fields())["certificate_chain"].set_string_value(cert_pem);
   std::string body;
   std::ignore = Protobuf::util::MessageToJsonString(request_body_struct, &body);
+  message->headers().setContentLength(body.length());
   message->body().add(body);
   return message;
 }
@@ -91,6 +92,7 @@ buildIamPostRequest(const envoy::extensions::filters::http::gcp_authn::v3::Audie
   std::ignore = Protobuf::util::MessageToJsonString(request_body_struct, &body);
 
   auto message = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));
+  message->headers().setContentLength(body.length());
   message->body().add(body);
   return message;
 }

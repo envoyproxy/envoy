@@ -521,6 +521,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundJwt) {
             "test_audience");
   EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
             "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
                                            R"({"certificate_chain":"dummy cert PEM"})"));
 
@@ -552,6 +553,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessToken) {
             "/computeMetadata/v1/instance/service-accounts/default/token");
   EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
             "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
                                            R"({"certificate_chain":"dummy cert PEM"})"));
 
@@ -589,6 +591,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessBoundAccessTokenWithScopes) {
             "token?scopes=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform,openid");
   EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
             "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
                                            R"({"certificate_chain":"dummy cert PEM"})"));
 
@@ -632,6 +635,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessIamAccessTokenDefaultScopes) {
             "Bearer my_gce_token");
   EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
             "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(
       message_->bodyAsString(),
       "{\"lifetime\":\"3600s\",\"scope\":[\"https://www.googleapis.com/auth/cloud-platform\"]}"));
@@ -665,6 +669,7 @@ TEST_F(GcpAuthnClientImplTest, SuccessIamAccessTokenCustomScopes) {
   client_->fetchIamAccessToken(audience, "Bearer token", request_callbacks_);
 
   EXPECT_EQ(message_->headers().Method()->value().getStringView(), "POST");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(
       message_->bodyAsString(),
       "{\"lifetime\":\"3600s\",\"scope\":[\"https://www.googleapis.com/auth/"

@@ -29,6 +29,8 @@ class MockCertFingerprinter : public CertFingerprinter {
 public:
   MOCK_METHOD(absl::StatusOr<std::string>, getFingerprintFromPem, (const std::string& pem),
               (const, override));
+  MOCK_METHOD(absl::StatusOr<std::string>, getCertChainFromPem, (const std::string& pem),
+              (const, override));
 };
 
 class MockGcpAuthnClient : public GcpAuthnClient {
@@ -103,6 +105,9 @@ public:
                                                     "stats", context_.scope_, status);
     EXPECT_OK(status);
     fingerprinter_ = std::make_shared<NiceMock<MockCertFingerprinter>>();
+    ON_CALL(*fingerprinter_, getCertChainFromPem(_)).WillByDefault([](const std::string& pem) {
+      return pem;
+    });
   }
 
   void setupMockObjects() {
@@ -645,7 +650,10 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithoutFingerprintFails) {
   EXPECT_CALL(*cluster_info_, transportSocketMatcher())
       .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Failed to fetch bound token: client certificate is unavailable.", _,
+                             _, "bound_token_fingerprint_unavailable"));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
@@ -689,7 +697,10 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyTlsCertificatesFails) {
   EXPECT_CALL(*cluster_info_, transportSocketMatcher())
       .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Failed to fetch bound token: client certificate is unavailable.", _,
+                             _, "bound_token_fingerprint_unavailable"));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
@@ -730,7 +741,10 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithEmptyCertChainFails) {
   EXPECT_CALL(*cluster_info_, transportSocketMatcher())
       .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Failed to fetch bound token: client certificate is unavailable.", _,
+                             _, "bound_token_fingerprint_unavailable"));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
@@ -774,11 +788,112 @@ TEST_F(GcpAuthnFilterTest, BoundJwtWithFingerprinterErrorFails) {
   EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(dummy_pem))
       .WillOnce(testing::Return(absl::InternalError("fingerprint failure")));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Failed to fetch bound token: client certificate is unavailable.", _,
+                             _, "bound_token_fingerprint_unavailable"));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
   EXPECT_FALSE(filter_->fingerprint().has_value());
+}
+
+TEST_F(GcpAuthnFilterTest, BoundJwtWithCertChainExtractionErrorFails) {
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_jwt()->set_url("http://bound_audience");
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  auto client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
+  auto tls_cert_config = std::make_unique<NiceMock<Ssl::MockTlsCertificateConfig>>();
+
+  const std::string dummy_pem = "dummy PEM";
+  ON_CALL(*tls_cert_config, certificateChain()).WillByDefault(testing::ReturnRef(dummy_pem));
+
+  std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>> tls_certs;
+  tls_certs.push_back(*tls_cert_config);
+  ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
+
+  ON_CALL(*socket_factory, clientContextConfig())
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+
+  auto transport_socket_matcher =
+      std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
+  EXPECT_CALL(*cluster_info_, transportSocketMatcher())
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
+
+  EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(dummy_pem))
+      .WillOnce(testing::Return("mock_fingerprint_base64"));
+  EXPECT_CALL(*fingerprinter_, getCertChainFromPem(dummy_pem))
+      .WillOnce(testing::Return(absl::InvalidArgumentError("cert chain failure")));
+
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Failed to fetch bound token: client certificate is unavailable.", _,
+                             _, "bound_token_fingerprint_unavailable"));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+  EXPECT_FALSE(filter_->fingerprint().has_value());
+}
+
+TEST_F(GcpAuthnFilterTest, BoundJwtSendsSanitizedCertChain) {
+  setupMockObjects();
+  setupFilterAndCallback();
+
+  cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+  EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_));
+
+  envoy::extensions::filters::http::gcp_authn::v3::Audience audience;
+  audience.mutable_bound_jwt()->set_url("test");
+  std::ignore = (*metadata_.mutable_typed_filter_metadata())
+                    [std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName)]
+                        .PackFrom(audience);
+  ON_CALL(*cluster_info_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+
+  const std::string raw_bundle_pem = "dummy cert PEM\n-----BEGIN PRIVATE KEY-----\nsecret";
+  const std::string sanitized_pem = "dummy cert PEM";
+  const std::string expected_fingerprint = "mock_fingerprint_base64";
+
+  auto socket_factory = std::make_unique<NiceMock<Network::MockTransportSocketFactory>>();
+  auto client_context_config = std::make_unique<NiceMock<Ssl::MockClientContextConfig>>();
+  auto tls_cert_config = std::make_unique<NiceMock<Ssl::MockTlsCertificateConfig>>();
+
+  ON_CALL(*tls_cert_config, certificateChain()).WillByDefault(testing::ReturnRef(raw_bundle_pem));
+
+  std::vector<std::reference_wrapper<const Ssl::TlsCertificateConfig>> tls_certs;
+  tls_certs.push_back(*tls_cert_config);
+  ON_CALL(*client_context_config, tlsCertificates()).WillByDefault(testing::Return(tls_certs));
+
+  ON_CALL(*socket_factory, clientContextConfig())
+      .WillByDefault(
+          testing::Return(OptRef<const Ssl::ClientContextConfig>(*client_context_config)));
+
+  auto transport_socket_matcher =
+      std::make_unique<NiceMock<Upstream::MockTransportSocketMatcher>>(std::move(socket_factory));
+  EXPECT_CALL(*cluster_info_, transportSocketMatcher())
+      .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
+
+  EXPECT_CALL(*fingerprinter_, getFingerprintFromPem(raw_bundle_pem))
+      .WillOnce(testing::Return(expected_fingerprint));
+  EXPECT_CALL(*fingerprinter_, getCertChainFromPem(raw_bundle_pem))
+      .WillOnce(testing::Return(sanitized_pem));
+
+  EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
+            Http::FilterHeadersStatus::StopAllIterationAndWatermark);
+
+  EXPECT_TRUE(TestUtility::jsonStringEqual(message_->bodyAsString(),
+                                           R"({"certificate_chain":"dummy cert PEM"})"));
 }
 
 TEST_F(GcpAuthnFilterTest, BoundJwtCacheHit) {
@@ -860,7 +975,10 @@ TEST_F(GcpAuthnFilterTest, BoundAccessTokenWithoutFingerprintFails) {
   EXPECT_CALL(*cluster_info_, transportSocketMatcher())
       .WillRepeatedly(testing::ReturnRef(*transport_socket_matcher));
 
-  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::InternalServerError, _, _, _, _));
+  EXPECT_CALL(decoder_callbacks_,
+              sendLocalReply(Http::Code::InternalServerError,
+                             "Failed to fetch bound token: client certificate is unavailable.", _,
+                             _, "bound_token_fingerprint_unavailable"));
 
   EXPECT_EQ(filter_->decodeHeaders(default_headers_, true),
             Http::FilterHeadersStatus::StopAllIterationAndWatermark);
@@ -1207,6 +1325,7 @@ TEST_F(GcpAuthnFilterTest, ResumeFilterChainIterationWithIamAccessToken) {
             "Bearer mock_gce_token_123");
   EXPECT_EQ(message_->headers().ContentType()->value().getStringView(),
             "application/json; charset=utf-8");
+  EXPECT_EQ(message_->headers().getContentLengthValue(), std::to_string(message_->body().length()));
   EXPECT_TRUE(TestUtility::jsonStringEqual(
       message_->bodyAsString(),
       "{\"lifetime\":\"3600s\",\"scope\":[\"https://www.googleapis.com/auth/cloud-platform\"]}"));
