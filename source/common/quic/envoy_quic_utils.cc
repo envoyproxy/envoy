@@ -23,7 +23,9 @@
 #include "source/common/http/http_option_limits.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_option_factory.h"
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/runtime/runtime_features.h"
@@ -63,6 +65,27 @@ getLoopbackAddress(Network::Address::InstanceConstSharedPtr peer_address) {
   }
   return std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1",
                                                           &peer_address->socketInterface());
+}
+
+Network::ConnectionSocketPtr
+createDatagramSocket(const Network::Address::InstanceConstSharedPtr& local_addr,
+                     const Network::Address::InstanceConstSharedPtr& peer_addr,
+                     const Network::SocketCreationOptions& options) {
+  auto create_socket = [&]() {
+    return std::make_unique<Network::ConnectionSocketImpl>(Network::Socket::Type::Datagram,
+                                                           local_addr, peer_addr, options);
+  };
+#if defined(__linux__)
+  if (const auto netns = local_addr->networkNamespace(); netns.has_value()) {
+    auto result = Network::Utility::execInNetworkNamespace(create_socket, netns->c_str());
+    // The packet writer requires a non-null socket even on namespace failure.
+    return result.ok()
+               ? *std::move(result)
+               : std::make_unique<Network::ConnectionSocketImpl>(
+                     std::make_unique<Network::IoSocketHandleImpl>(), local_addr, peer_addr);
+  }
+#endif
+  return create_socket();
 }
 
 } // namespace
@@ -226,6 +249,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
     const Network::ConnectionSocket::OptionsSharedPtr& options, quic::QuicNetworkHandle network,
     std::function<void(Network::ConnectionSocket&, quic::QuicNetworkHandle)> custom_bind_func) {
   ASSERT(peer_addr != nullptr);
+  const auto netns = local_addr ? local_addr->networkNamespace() : std::nullopt;
   // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
   // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
   //
@@ -233,8 +257,7 @@ Network::ConnectionSocketPtr createConnectionSocket(
   // `recent_received_addresses_` cache in
   // https://github.com/envoyproxy/envoy/blob/main/source/common/network/io_socket_handle_impl.h.
   constexpr size_t max_addresses_cache_size = 4u;
-  auto connection_socket = std::make_unique<Network::ConnectionSocketImpl>(
-      Network::Socket::Type::Datagram,
+  auto connection_socket = createDatagramSocket(
       // Use the loopback address if `local_addr` is null, to pass in the socket interface used to
       // create the IoHandle, without having to make the more expensive `getifaddrs` call.
       local_addr ? local_addr : getLoopbackAddress(peer_addr), peer_addr,
@@ -304,6 +327,11 @@ Network::ConnectionSocketPtr createConnectionSocket(
   }
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
+  if (local_addr && netns.has_value()) {
+    // Port migration creates new sockets from this address and must retain the namespace.
+    local_addr = local_addr->withNetworkNamespace(netns.value());
+    connection_socket->connectionInfoProvider().setLocalAddress(local_addr);
+  }
   ENVOY_LOG_MISC(trace, "connected to local address: {}",
                  local_addr != nullptr ? local_addr->asString() : "<none>");
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
