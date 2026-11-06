@@ -1311,7 +1311,7 @@ impl EnvoyBootstrapExtension for EnvoyBootstrapExtensionImpl {
 
 // Bootstrap Extension Event Hook Implementations
 
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_config_new")]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_new(
   envoy_extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -1360,7 +1360,7 @@ pub(crate) fn init_bootstrap_extension_config(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_config_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_destroy(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
 ) {
@@ -1379,7 +1379,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_dest
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_new(
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
   envoy_extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
@@ -1406,7 +1406,9 @@ pub(crate) fn envoy_dynamic_module_on_bootstrap_extension_new_impl(
   wrap_into_c_void_ptr!(extension)
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_server_initialized"
+)]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_server_initialized(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
@@ -1424,7 +1426,9 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_server_initialized
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized"
+)]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_initialized(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
@@ -1442,7 +1446,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_worker_thread_init
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_drain_started")]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
@@ -1460,7 +1464,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_drain_started(
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_shutdown")]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_envoy_ptr,
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
@@ -1481,7 +1485,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_shutdown(
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_destroy")]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
   extension_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_module_ptr,
 ) {
@@ -1493,7 +1497,9 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_destroy(
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_config_scheduled"
+)]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1525,7 +1531,9 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_config_scheduled(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_http_callout_done"
+)]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callout_done(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1578,7 +1586,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_http_callou
 }
 
 /// Event hook called by Envoy when a timer created by a bootstrap extension fires.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_timer_fired")]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1605,7 +1613,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_timer_fired(
 }
 
 /// Event hook called by Envoy when a watched file changes for a bootstrap extension.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_file_changed")]
 pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1644,7 +1652,7 @@ pub extern "C" fn envoy_dynamic_module_on_bootstrap_extension_file_changed(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_bootstrap_extension_admin_request")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_request(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1701,7 +1709,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_admin_reque
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update"
+)]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_add_or_update(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1734,7 +1744,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_add
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_cluster_removal"
+)]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_removal(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1767,7 +1779,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_cluster_rem
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update"
+)]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_add_or_update(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,
@@ -1800,7 +1814,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_ad
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_bootstrap_extension_listener_removal"
+)]
 pub unsafe extern "C" fn envoy_dynamic_module_on_bootstrap_extension_listener_removal(
   envoy_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_envoy_ptr,
   extension_config_ptr: abi::envoy_dynamic_module_type_bootstrap_extension_config_module_ptr,

@@ -1372,7 +1372,7 @@ unsafe impl Sync for AccessLoggerConfigHandle {}
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_access_logger_config_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_new(
   config_envoy_ptr: *mut c_void,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -1430,7 +1430,7 @@ pub fn envoy_dynamic_module_on_access_logger_config_new_impl(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_access_logger_config_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
   config_ptr: *const c_void,
 ) {
@@ -1449,7 +1449,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_access_logger_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_new(
   config_ptr: *const c_void,
   logger_envoy_ptr: *mut c_void,
@@ -1470,7 +1470,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_access_logger_log")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
   envoy_ptr: *mut c_void,
   logger_ptr: *mut c_void,
@@ -1491,7 +1491,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_log(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_access_logger_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_ptr: *mut c_void) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     crate::drop_wrapped_c_void_ptr!(logger_ptr, AccessLogger);
@@ -1505,7 +1505,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_destroy(logger_pt
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_access_logger_flush")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_flush(logger_ptr: *mut c_void) {
   let _ = catch_unwind(AssertUnwindSafe(|| {
     let logger = &mut *(logger_ptr as *mut Box<dyn AccessLogger>);
@@ -1583,7 +1583,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_access_logger_flush(logger_ptr:
 #[macro_export]
 macro_rules! declare_access_logger {
   ($config_type:ty) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       fn __single_access_logger_factory(
         ctx: &$crate::access_log::ConfigContext,

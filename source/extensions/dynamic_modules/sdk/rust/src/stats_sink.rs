@@ -411,7 +411,7 @@ impl EnvoyStatSinkConfigScheduler for Box<dyn EnvoyStatSinkConfigScheduler> {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_stat_sink_config_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_new(
   config_envoy_ptr: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -462,7 +462,7 @@ pub fn envoy_dynamic_module_on_stat_sink_config_new_impl(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_stat_sink_config_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_destroy(
   config_ptr: *const c_void,
 ) {
@@ -478,7 +478,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_stat_sink_flush")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_flush(
   config_ptr: *const c_void,
   snapshot_envoy_ptr: *mut c_void,
@@ -497,7 +497,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_flush(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_stat_sink_on_histogram_complete")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_on_histogram_complete(
   config_ptr: *const c_void,
   histogram_name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -521,7 +521,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_on_histogram_complete
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_stat_sink_config_scheduled")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_stat_sink_config_scheduled(
   config_envoy_ptr: abi::envoy_dynamic_module_type_stat_sink_config_envoy_ptr,
   config_ptr: *const c_void,

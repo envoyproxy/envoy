@@ -2346,7 +2346,7 @@ impl ClusterLbContext for ClusterLbContextRef<'_> {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_config_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_new(
   config_envoy_ptr: abi::envoy_dynamic_module_type_cluster_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -2382,7 +2382,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_config_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
 ) {
@@ -2398,7 +2398,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_new(
   config_module_ptr: abi::envoy_dynamic_module_type_cluster_config_module_ptr,
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
@@ -2420,7 +2420,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_init")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_init(
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -2440,7 +2440,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_init(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_destroy(
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
 ) {
@@ -2464,7 +2464,7 @@ struct ClusterLbWrapper {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_lb_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
   lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
@@ -2487,7 +2487,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_lb_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
 ) {
@@ -2504,7 +2504,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_lb_choose_host")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
   context_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_context_envoy_ptr,
@@ -2565,7 +2565,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_choose_host(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_lb_cancel_host_selection")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_cancel_host_selection(
   _lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
   async_handle_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_async_handle_module_ptr,
@@ -2587,7 +2587,9 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_cancel_host_selectio
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_cluster_lb_on_host_membership_update"
+)]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_on_host_membership_update(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
@@ -2613,7 +2615,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_lb_on_host_membership_u
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_worker_timer_fired")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_timer_fired(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_cluster_lb_envoy_ptr,
   lb_module_ptr: abi::envoy_dynamic_module_type_cluster_lb_module_ptr,
@@ -2635,7 +2637,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_timer_fired(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_scheduled")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_scheduled(
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -2655,7 +2657,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_scheduled(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_worker_event")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_event(
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -2675,7 +2677,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_event(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_worker_slot_data_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_slot_data_destroy(
   data_module_ptr: abi::envoy_dynamic_module_type_cluster_worker_slot_data_module_ptr,
 ) {
@@ -2698,7 +2700,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_worker_slot_data_destro
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_server_initialized")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_server_initialized(
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -2717,7 +2719,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_server_initialized(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_drain_started")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_drain_started(
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -2736,7 +2738,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_drain_started(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_shutdown")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_shutdown(
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,
@@ -2758,7 +2760,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_shutdown(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_cluster_http_callout_done")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_cluster_http_callout_done(
   cluster_envoy_ptr: abi::envoy_dynamic_module_type_cluster_envoy_ptr,
   cluster_module_ptr: abi::envoy_dynamic_module_type_cluster_module_ptr,

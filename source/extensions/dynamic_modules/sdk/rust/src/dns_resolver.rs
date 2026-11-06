@@ -607,7 +607,7 @@ struct DnsResolverWrapper {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_dns_resolver_config_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_new(
   config_envoy_ptr: abi::envoy_dynamic_module_type_dns_resolver_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -644,7 +644,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_dns_resolver_config_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_dns_resolver_config_module_ptr,
 ) {
@@ -660,7 +660,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_dns_resolver_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_new(
   config_module_ptr: abi::envoy_dynamic_module_type_dns_resolver_config_module_ptr,
   resolver_envoy_ptr: abi::envoy_dynamic_module_type_dns_resolver_envoy_ptr,
@@ -684,7 +684,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_dns_resolver_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_destroy(
   resolver_module_ptr: abi::envoy_dynamic_module_type_dns_resolver_module_ptr,
 ) {
@@ -701,7 +701,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_dns_resolve")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve(
   resolver_module_ptr: abi::envoy_dynamic_module_type_dns_resolver_module_ptr,
   dns_name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -742,7 +742,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_dns_resolve_cancel")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve_cancel(
   _resolver_module_ptr: abi::envoy_dynamic_module_type_dns_resolver_module_ptr,
   query_module_ptr: abi::envoy_dynamic_module_type_dns_query_module_ptr,
@@ -761,7 +761,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolve_cancel(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_dns_resolver_reset_networking")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_dns_resolver_reset_networking(
   resolver_module_ptr: abi::envoy_dynamic_module_type_dns_resolver_module_ptr,
 ) {

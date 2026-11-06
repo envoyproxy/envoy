@@ -1240,7 +1240,7 @@ pub trait LoadBalancer {
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_lb_config_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
   lb_config_envoy_ptr: abi::envoy_dynamic_module_type_lb_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -1273,7 +1273,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_lb_config_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
 ) {
@@ -1289,7 +1289,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_config_destroy(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_lb_new")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
   config_ptr: abi::envoy_dynamic_module_type_lb_config_module_ptr,
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
@@ -1314,7 +1314,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_new(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_lb_choose_host")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
@@ -1349,7 +1349,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_choose_host(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_lb_on_host_membership_update")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
   lb_envoy_ptr: abi::envoy_dynamic_module_type_lb_envoy_ptr,
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
@@ -1376,7 +1376,7 @@ pub unsafe extern "C" fn envoy_dynamic_module_on_lb_on_host_membership_update(
 ///
 /// This is an FFI function called by Envoy. All pointer arguments must be valid as guaranteed
 /// by the Envoy dynamic module ABI.
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_lb_destroy")]
 pub unsafe extern "C" fn envoy_dynamic_module_on_lb_destroy(
   lb_module_ptr: abi::envoy_dynamic_module_type_lb_module_ptr,
 ) {

@@ -325,7 +325,9 @@ impl EnvoyUpstreamHttpTcpBridge for EnvoyUpstreamHttpTcpBridgeImpl {
 
 // Upstream HTTP TCP Bridge Event Hook Implementations
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new"
+)]
 pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
   _config_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_envoy_ptr,
   name: abi::envoy_dynamic_module_type_envoy_buffer,
@@ -354,7 +356,9 @@ pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_new(
   })
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy"
+)]
 unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_destroy(
   config_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
 ) {
@@ -369,7 +373,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_config_des
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_upstream_http_tcp_bridge_new")]
 unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
   config_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_config_module_ptr,
   bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
@@ -390,7 +394,9 @@ unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_new(
   })
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers"
+)]
 pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_headers(
   bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
   bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
@@ -410,7 +416,9 @@ pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_header
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data"
+)]
 pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
   bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
   bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
@@ -430,7 +438,9 @@ pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_data(
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers"
+)]
 pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_trailers(
   bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
   bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
@@ -449,7 +459,9 @@ pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_encode_traile
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!(
+  "envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data"
+)]
 pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_data(
   bridge_envoy_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_envoy_ptr,
   bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
@@ -469,7 +481,7 @@ pub extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_on_upstream_d
   });
 }
 
-#[no_mangle]
+#[export_name = crate::__export_name!("envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy")]
 unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
   bridge_module_ptr: abi::envoy_dynamic_module_type_upstream_http_tcp_bridge_module_ptr,
 ) {
@@ -492,7 +504,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_upstream_http_tcp_bridge_destroy(
 #[macro_export]
 macro_rules! declare_upstream_http_tcp_bridge_init_functions {
   ($f:ident, $new_bridge_config_fn:expr) => {
-    #[no_mangle]
+    #[export_name = $crate::__export_name!("envoy_dynamic_module_on_program_init")]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
       match ::std::panic::catch_unwind(::std::panic::AssertUnwindSafe(|| {
         envoy_proxy_dynamic_modules_rust_sdk::set_factory_once!(

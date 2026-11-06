@@ -42,7 +42,10 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/dynamic_modules:abi_impl",
         "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules/abi",
         "//test/extensions/dynamic_modules/test_data/c:matcher_no_op_static",
+        "//test/extensions/dynamic_modules/test_data/rust:listener_no_op_static",
+        "//test/extensions/dynamic_modules/test_data/rust:no_op_static",
         "//test/mocks/init:init_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/dynamic_modules/v3:pkg_cc_proto",
@@ -102,5 +105,8 @@ rust_doc_test(
 rust_clippy(
     name = "rust_sdk_clippy",
     tags = ["nocoverage"],
-    deps = ["//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk"],
+    deps = [
+        "//source/extensions/dynamic_modules/sdk/rust:envoy_proxy_dynamic_modules_rust_sdk",
+        "//source/extensions/dynamic_modules/sdk/rust:rust_runtime",
+    ],
 )
