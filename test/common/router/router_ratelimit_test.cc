@@ -98,7 +98,7 @@ public:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
 };
 
-TEST_F(RateLimitConfiguration, NoApplicableRateLimit) {
+TEST_F(RateLimitConfiguration, DEPRECATED_FEATURE_TEST(LegacyNoApplicableRateLimit)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -151,7 +151,7 @@ virtual_hosts:
   EXPECT_TRUE(route_entry->rateLimitPolicy().empty());
 }
 
-TEST_F(RateLimitConfiguration, TestGetApplicationRateLimit) {
+TEST_F(RateLimitConfiguration, DEPRECATED_FEATURE_TEST(LegacyTestGetApplicationRateLimit)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -186,7 +186,7 @@ virtual_hosts:
               testing::ContainerEq(descriptors));
 }
 
-TEST_F(RateLimitConfiguration, TestVirtualHost) {
+TEST_F(RateLimitConfiguration, DEPRECATED_FEATURE_TEST(LegacyTestVirtualHost)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -220,7 +220,7 @@ virtual_hosts:
               testing::ContainerEq(descriptors));
 }
 
-TEST_F(RateLimitConfiguration, Stages) {
+TEST_F(RateLimitConfiguration, DEPRECATED_FEATURE_TEST(LegacyStages)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2

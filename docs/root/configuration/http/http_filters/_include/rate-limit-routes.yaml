@@ -23,62 +23,77 @@ static_resources:
                 route:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
-                  rate_limits:
-                  - actions:
-                    - source_cluster: {}
-                    - generic_key:
-                        descriptor_value: some_value0
+                typed_per_filter_config:
+                  envoy.filters.http.ratelimit:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+                    rate_limits:
+                    - actions:
+                      - source_cluster: {}
+                      - generic_key:
+                          descriptor_value: some_value0
               - match:
                   prefix: "/route1"
                 route:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
-                  rate_limits:
-                  - actions:
-                    - source_cluster: {}
-                    - remote_address: {}
-                    - generic_key:
-                        descriptor_value: some_value1
+                typed_per_filter_config:
+                  envoy.filters.http.ratelimit:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+                    rate_limits:
+                    - actions:
+                      - source_cluster: {}
+                      - remote_address: {}
+                      - generic_key:
+                          descriptor_value: some_value1
               - match:
                   prefix: "/route2"
                 route:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
-                  rate_limits:
-                  - actions:
-                    - generic_key:
-                        descriptor_value: some_value2
-                    limit:
-                      dynamic_metadata:
-                        metadata_key:
-                          key: test.filter.key
-                          path:
-                          - key: test
+                typed_per_filter_config:
+                  envoy.filters.http.ratelimit:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+                    rate_limits:
+                    - actions:
+                      - generic_key:
+                          descriptor_value: some_value2
+                      limit:
+                        dynamic_metadata:
+                          metadata_key:
+                            key: test.filter.key
+                            path:
+                            - key: test
               - match:
                   prefix: "/route3"
                 route:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
-                  rate_limits:
-                  - actions:
-                    - extension:
-                        name: custom
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
-                          descriptor_key: my_descriptor_name
-                          text: request.method
+                typed_per_filter_config:
+                  envoy.filters.http.ratelimit:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+                    rate_limits:
+                    - actions:
+                      - extension:
+                          name: custom
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.rate_limit_descriptors.expr.v3.Descriptor
+                            descriptor_key: my_descriptor_name
+                            text: request.method
               - match:
                   prefix: "/route4"
                 route:
                   host_rewrite_literal: upstream.com
                   cluster: upstream_com
-                  rate_limits:
-                  - actions:
-                    - extension:
-                        name: custom
-                        typed_config:
-                          "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                          header_name: x-header-name
+                typed_per_filter_config:
+                  envoy.filters.http.ratelimit:
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimitPerRoute
+                    rate_limits:
+                    - actions:
+                      - extension:
+                          name: custom
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                            header_name: x-header-name
           http_filters:
           - name: envoy.filters.http.router
             typed_config:

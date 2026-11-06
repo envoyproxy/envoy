@@ -20,6 +20,12 @@ namespace {
 using DynamicModuleRouteSpecifierProto =
     envoy::extensions::router::route_specifiers::dynamic_modules::v3::DynamicModuleRouteSpecifier;
 
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+constexpr absl::string_view FullTemplateHasRateLimits = "true";
+#else
+constexpr absl::string_view FullTemplateHasRateLimits = "false";
+#endif
+
 class DynamicModuleRouteSpecifierIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
@@ -112,8 +118,6 @@ route_templates:
       - header: {header_name: x-hash}
       request_mirror_policies:
       - cluster: canary
-      rate_limits:
-      - actions: [{destination_cluster: {}}]
 - template_id: traced
   route:
     match: {prefix: "/"}
@@ -142,6 +146,18 @@ route_overrides:
 )EOF" + extra_specifier_yaml;
           DynamicModuleRouteSpecifierProto specifier_config;
           TestUtility::loadFromYaml(specifier_yaml, specifier_config);
+#ifndef ENVOY_DISABLE_DEPRECATED_FEATURES
+          // The deprecated route rate limits are the only source of a route rate limit policy.
+          for (auto& route_template : *specifier_config.mutable_route_templates()) {
+            if (route_template.template_id() == "full") {
+              route_template.mutable_route()
+                  ->mutable_route()
+                  ->add_rate_limits()
+                  ->add_actions()
+                  ->mutable_destination_cluster();
+            }
+          }
+#endif
 
           auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
           // A specifier at the route configuration level also runs when matching resolves no route,
@@ -901,7 +917,8 @@ TEST_P(DynamicModuleRouteSpecifierIntegrationTest, ReadsExpandedRouteSnapshot) {
       {"route-priority", "high"},
       {"route-buffer-limit", "4096"},
       {"route-not-found-code", "404"},
-      {"route-flags", "meta=true,mm=true,hash=true,rl=true,mirror=1"},
+      {"route-flags",
+       absl::StrCat("meta=true,mm=true,hash=true,rl=", FullTemplateHasRateLimits, ",mirror=1")},
       {"route-metadata", "value"},
       {"route-metadata-number", "42"},
       {"selected-template", "full"},
