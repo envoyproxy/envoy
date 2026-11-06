@@ -429,6 +429,10 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, BasicFailWithoutDefault) {
   sendXdsResponse(filter_name_, "1", 1);
   test_server_->waitForCounter(
       "extension_config_discovery.network_filter." + filter_name_ + ".config_fail", Ge(1));
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
+
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   // New connections will close since there's no valid configuration.
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
@@ -792,6 +796,9 @@ TEST_P(NetworkExtensionDiscoveryIntegrationTest, ConfigUpdateDoesNotApplyToExist
   sendXdsResponse(filter_name_, "1", bytes_to_drain);
   test_server_->waitForCounter(
       "extension_config_discovery.network_filter." + filter_name_ + ".config_reload", Ge(1));
+  test_server_->waitUntilListenersReady();
+  test_server_->waitForGauge("listener_manager.workers_started", Ge(1));
+  EXPECT_EQ(test_server_->server().initManager().state(), Init::Manager::State::Initialized);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort(port_name_));
   FakeRawConnectionPtr fake_upstream_connection;
