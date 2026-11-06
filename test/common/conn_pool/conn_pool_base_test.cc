@@ -9,6 +9,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/overload_manager.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
@@ -92,7 +93,8 @@ public:
 
   bool empty() const override { return items_.empty(); }
 
-  void add(PendingStream& item, Extensions::QueuePolicy::QueueItemMetadata) override {
+  void add(PendingStream& item, Extensions::QueuePolicy::QueueItemMetadata metadata) override {
+    last_added_metadata_ = metadata;
     items_.push_back(&item);
   }
 
@@ -125,6 +127,8 @@ public:
     }
   }
 
+  Extensions::QueuePolicy::QueueItemMetadata last_added_metadata_{};
+
 private:
   std::list<PendingStream*> items_;
 };
@@ -140,11 +144,14 @@ public:
   createQueuePolicy(const Protobuf::Message&, const std::string& stat_prefix,
                     ProtobufMessage::ValidationVisitor&) override {
     stat_prefix_ = stat_prefix;
-    return std::make_unique<TestPendingStreamQueue>();
+    auto queue = std::make_unique<TestPendingStreamQueue>();
+    last_queue_ = queue.get();
+    return queue;
   }
 
   std::string name() const override { return "envoy.queue_policy.fifo"; }
   std::string stat_prefix_;
+  TestPendingStreamQueue* last_queue_{nullptr};
 };
 
 // Creates a resolved queue policy bundle for the test factory, mirroring what
@@ -261,6 +268,15 @@ TEST(ConnPoolImplBaseConfigTest, UsesConfiguredQueuePolicy) {
   TestConnPoolImplBase pool(host, Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr,
                             state, overload_manager);
   EXPECT_EQ("cluster.test_cluster.envoy.queue_policy.fifo", factory.stat_prefix_);
+  ASSERT_NE(factory.last_queue_, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  AttachContext context_with_stream_info(makeOptRef<const StreamInfo::StreamInfo>(stream_info));
+  auto* cancellable =
+      pool.newPendingStream(context_with_stream_info, /*can_send_early_data=*/false);
+  ASSERT_TRUE(factory.last_queue_->last_added_metadata_.stream_info_.has_value());
+  EXPECT_EQ(&factory.last_queue_->last_added_metadata_.stream_info_.ref(), &stream_info);
+  cancellable->cancel(ConnectionPool::CancelPolicy::Default);
 }
 
 TEST_F(ConnPoolImplBaseQueuePolicyTest, QueueOverloadedGaugeTracksTransitions) {

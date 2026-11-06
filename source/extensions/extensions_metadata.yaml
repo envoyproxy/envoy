@@ -1468,6 +1468,13 @@ envoy.queue_policy.adaptive_lifo:
   status: alpha
   type_urls:
   - envoy.extensions.queue_policy.adaptive_lifo.v3.AdaptiveLifoQueuePolicyConfig
+envoy.queue_policy.fair_queue:
+  categories:
+  - envoy.queue_policy
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.queue_policy.fair_queue.v3.FairQueuePolicyConfig
 envoy.queue_policy.fifo:
   categories:
   - envoy.queue_policy

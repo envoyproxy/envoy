@@ -103,7 +103,9 @@ envoy_cc_library(
     deps = [
         ":codec_interface",
         "//envoy/common:conn_pool_interface",
+        "//envoy/common:optref_lib",
         "//envoy/event:deferred_deletable",
+        "//envoy/stream_info:stream_info_interface",
         "//envoy/upstream:upstream_interface",
     ],
 )

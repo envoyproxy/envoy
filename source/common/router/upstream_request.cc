@@ -108,7 +108,10 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
                    StreamInfo::FilterState::LifeSpan::FilterChain),
       start_time_(parent_.callbacks()->dispatcher().timeSource().monotonicTime()),
       record_timeout_budget_(parent_.cluster()->timeoutBudgetStats().has_value()),
-      stream_options_({can_send_early_data, can_use_http3}), enable_half_close_(enable_half_close) {
+      stream_options_(
+          {can_send_early_data, can_use_http3,
+           makeOptRef<const StreamInfo::StreamInfo>(parent_.callbacks()->streamInfo())}),
+      enable_half_close_(enable_half_close) {
   // Get tracing config once and reuse it.
   auto tracing_config = parent_.callbacks()->tracingConfig();
 
