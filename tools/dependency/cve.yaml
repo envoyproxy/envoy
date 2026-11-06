@@ -23,3 +23,8 @@ ignored_cves:
 # Python-only: google.protobuf.json_format.ParseDict() recursion-depth bypass via nested Any.
 # NVD uses cpe:2.3:a:google:protobuf for all language runtimes; Envoy links protobuf C++.
 - CVE-2026-0994
+
+# C-only: heap overflow in msgpack_unpacker_expand_buffer (src/unpack.c), reached via the
+# msgpack_unpacker_reserve_buffer C API. Envoy uses the header-only C++ library (msgpack-cxx)
+# and only packs (fluentd access logger/tracer); the C unpacker is neither built nor called.
+- CVE-2026-72854
