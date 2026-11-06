@@ -1352,6 +1352,30 @@ TEST_F(OAuth2Test, RequestSignout) {
             filter_->decodeHeaders(request_headers, false));
 }
 
+struct LogoutTestParams {
+  const char* name_;
+  const char* cookie_;
+  const char* query_;
+};
+
+class OAuth2LogoutTest : public OAuth2Test, public testing::WithParamInterface<LogoutTestParams> {
+public:
+  void addIdTokenCookie(Http::RequestHeaderMap& headers) {
+    if (GetParam().cookie_ != nullptr) {
+      headers.addCopy(Http::Headers::get().Cookie, GetParam().cookie_);
+    }
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IdTokenCookies, OAuth2LogoutTest,
+                         testing::Values(LogoutTestParams{"NonEmpty", "IdToken=xyztoken",
+                                                          "id_token_hint=xyztoken&client_id=1"},
+                                         LogoutTestParams{"Missing", nullptr, "client_id=1"},
+                                         LogoutTestParams{"Empty", "IdToken=", "client_id=1"}),
+                         [](const testing::TestParamInfo<LogoutTestParams>& info) {
+                           return info.param.name_;
+                         });
+
 /**
  * Scenario: The OAuth filter receives a sign-out request when end session endpoint is configured.
  * The post_logout_redirect_uri is not defined and is not disabled.
@@ -1360,7 +1384,7 @@ TEST_F(OAuth2Test, RequestSignout) {
  * request-derived default
  * ``post_logout_redirect_uri`` query parameter (<scheme>://<host>/).
  */
-TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
+TEST_P(OAuth2LogoutTest, RequestSignoutWhenEndSessionEndpointIsConfigured) {
   // Create a filter config with end session endpoint and openid scope.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
@@ -1389,8 +1413,8 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
-      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
   };
+  addIdTokenCookie(request_headers);
 
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
@@ -1404,9 +1428,9 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
        "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().Location.get(), "https://auth.example.com/oauth/"
-                                            "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
-                                            "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"},
+      {Http::Headers::get().Location.get(),
+       absl::StrCat("https://auth.example.com/oauth/logout?", GetParam().query_,
+                    "&post_logout_redirect_uri=https%3A%2F%2Ftraffic.example.com%2F")},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -1421,7 +1445,7 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
  * Expected behavior: the filter should redirect to the end session endpoint and use the configured
  * URI as the ``post_logout_redirect_uri`` query parameter, instead of the request-derived default.
  */
-TEST_F(OAuth2Test, RequestSignoutWithCustomPostLogoutRedirectUri) {
+TEST_P(OAuth2LogoutTest, RequestSignoutWithCustomPostLogoutRedirectUri) {
   // Create a filter config with end session endpoint, post logout redirect uri and openid scope.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
@@ -1451,8 +1475,8 @@ TEST_F(OAuth2Test, RequestSignoutWithCustomPostLogoutRedirectUri) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
-      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
   };
+  addIdTokenCookie(request_headers);
 
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
@@ -1467,9 +1491,8 @@ TEST_F(OAuth2Test, RequestSignoutWithCustomPostLogoutRedirectUri) {
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(),
-       "https://auth.example.com/oauth/"
-       "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
-       "redirect_uri=https%3A%2F%2Ftraffic.example.com%2Floggedout"},
+       absl::StrCat("https://auth.example.com/oauth/logout?", GetParam().query_,
+                    "&post_logout_redirect_uri=https%3A%2F%2Ftraffic.example.com%2Floggedout")},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -1484,7 +1507,7 @@ TEST_F(OAuth2Test, RequestSignoutWithCustomPostLogoutRedirectUri) {
  * Expected behavior: the filter should substitute the token against the inbound request before
  * percent-encoding the value and emitting it as the ``post_logout_redirect_uri`` query parameter.
  */
-TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
+TEST_P(OAuth2LogoutTest, RequestSignoutWithFormattedPostLogoutRedirectUri) {
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
@@ -1512,8 +1535,8 @@ TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
-      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
   };
+  addIdTokenCookie(request_headers);
 
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
@@ -1528,9 +1551,8 @@ TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(),
-       "https://auth.example.com/oauth/"
-       "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
-       "redirect_uri=https%3A%2F%2Fapp.example.com%2Floggedout"},
+       absl::StrCat("https://auth.example.com/oauth/logout?", GetParam().query_,
+                    "&post_logout_redirect_uri=https%3A%2F%2Fapp.example.com%2Floggedout")},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
@@ -1545,7 +1567,7 @@ TEST_F(OAuth2Test, RequestSignoutWithFormattedPostLogoutRedirectUri) {
  * Expected behavior: the filter should redirect to the end session endpoint without including the
  * ``post_logout_redirect_uri`` query parameter at all.
  */
-TEST_F(OAuth2Test, RequestSignoutWithDisabledPostLogoutRedirectUri) {
+TEST_P(OAuth2LogoutTest, RequestSignoutWithDisabledPostLogoutRedirectUri) {
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
   endpoint->set_cluster("auth.example.com");
@@ -1574,8 +1596,8 @@ TEST_F(OAuth2Test, RequestSignoutWithDisabledPostLogoutRedirectUri) {
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
-      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
   };
+  addIdTokenCookie(request_headers);
 
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
@@ -1589,8 +1611,8 @@ TEST_F(OAuth2Test, RequestSignoutWithDisabledPostLogoutRedirectUri) {
        "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().SetCookie.get(),
        "OauthExpires=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
-      {Http::Headers::get().Location.get(), "https://auth.example.com/oauth/"
-                                            "logout?id_token_hint=xyztoken&client_id=1"},
+      {Http::Headers::get().Location.get(),
+       absl::StrCat("https://auth.example.com/oauth/logout?", GetParam().query_)},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 
