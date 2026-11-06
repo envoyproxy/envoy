@@ -14,10 +14,13 @@ envoy_cc_library(
     srcs = ["extractor.cc"],
     hdrs = ["extractor.h"],
     deps = [
+        "//source/common/protobuf",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/types:span",
         "@nlohmann_json//:json",
     ],
 )
@@ -32,6 +35,7 @@ envoy_cc_library(
         "//envoy/stats:stats_macros",
         "//envoy/stream_info:filter_state_interface",
         "//source/common/common:logger_lib",
+        "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:string_accessor_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",

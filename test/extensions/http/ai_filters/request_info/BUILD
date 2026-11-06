@@ -17,6 +17,8 @@ envoy_extension_cc_test(
     extension_names = ["envoy.http.ai_filters.request_info"],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_readers_lib",
         "//source/extensions/filters/http/ai_protocol_manager:json_with_ext_buf_lib",
         "//source/extensions/filters/http/ai_protocol_manager:token_usage_lib",
@@ -33,6 +35,8 @@ envoy_extension_cc_test(
     rbe_pool = "linux_x64_small",
     deps = [
         "//envoy/router:string_accessor_interface",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "//source/common/router:string_accessor_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/ai_protocol_manager:ai_filter_lib",
@@ -79,6 +83,8 @@ envoy_extension_cc_test(
     ],
     rbe_pool = "linux_x64_small",
     deps = [
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/ai_protocol_manager:config",
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/http/ai_filters/request_info:config",
