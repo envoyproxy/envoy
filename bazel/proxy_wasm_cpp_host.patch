@@ -39,15 +39,25 @@
  )
  
 
+
 --- a/bazel/external/wasmtime.BUILD
 +++ b/bazel/external/wasmtime.BUILD
-@@ -49,6 +49,9 @@
+@@ -49,10 +49,16 @@
          "prefixed_wasmtime_c_api.a",
      ],
      cmd = """
-+        # The sources are already prefixed by prefixed_wasmtime.patch, so there may be nothing
-+        # left to rename; objcopy still needs the (then empty) symbol map to exist.
-+        touch prefixed
-         for symbol in $$(nm -P $(<) 2>/dev/null | grep -E ^_?wasm_ | cut -d" " -f1); do
+-        for symbol in $$(nm -P $(<) 2>/dev/null | grep -E ^_?wasm_ | cut -d" " -f1); do
++        # Use the toolchain nm (like OBJCOPY below): the system one is not on PATH on RBE, and
++        # with its errors hidden the symbol map was silently empty.
++        for symbol in $$($(NM) -P $(<) | grep -E ^_?wasm_ | cut -d" " -f1); do
              echo $$symbol | perl -p -e 's!^(_?)(wasm_[a-z_0-9.:-]+)$$!\\1\\2 \\1wasmtime_\\2!' >>prefixed
          done
+-        $(OBJCOPY) --redefine-syms=prefixed $(<) $@ 
++        if [[ ! -s prefixed ]]; then
++            echo "No wasm_* symbols found in $(<)" >&2
++            exit 1
++        fi
++        $(OBJCOPY) --redefine-syms=prefixed $(<) $@
+         """,
+     toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
+ )
