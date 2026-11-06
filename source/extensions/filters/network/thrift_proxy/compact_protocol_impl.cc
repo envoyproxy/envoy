@@ -56,7 +56,7 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMeta
     throw EnvoyException(absl::StrCat("negative compact protocol message name length ", name_len));
   }
 
-  if (buffer.length() < static_cast<uint64_t>(id_size + name_len_size + name_len + 2)) {
+  if (buffer.length() < static_cast<uint64_t>(id_size) + static_cast<uint64_t>(name_len_size) + static_cast<uint64_t>(name_len) + 2UL) {
     return false;
   }
 
@@ -409,7 +409,7 @@ bool CompactProtocolImpl::readString(Buffer::Instance& buffer, std::string& valu
     return true;
   }
 
-  if (buffer.length() < static_cast<uint64_t>(str_len + len_size)) {
+  if (buffer.length() < static_cast<uint64_t>(str_len) + static_cast<uint64_t>(len_size)) {
     return false;
   }
 
