@@ -25,8 +25,9 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
     ExceptionUtil::throwEnvoyException(
         "Only one of `token_bucket` or `dynamic_config` can be set.");
   } else if (config.has_token_bucket()) {
-    auto limiter = Envoy::Extensions::Filters::Common::LocalRateLimit::createRateLimiterImpl(
-        config.token_bucket(), context.serverFactoryContext().mainThreadDispatcher());
+    auto limiter =
+        Envoy::Extensions::Filters::Common::LocalRateLimit::InlineRateLimiterCache::getRateLimiter(
+            context.serverFactoryContext(), config.token_bucket());
     rate_limiter_ = std::make_unique<Envoy::Extensions::Filters::Common::LocalRateLimit::
                                          RateLimiterProviderSingleton::RateLimiterWrapper>(
         context.serverFactoryContext().threadLocal(), nullptr, nullptr, limiter, nullptr);

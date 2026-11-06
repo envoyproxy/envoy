@@ -210,8 +210,9 @@ typed_config:
       EnvoyException);
 }
 
-TEST_F(AccessLogImplTestWithRateLimitFilter, InlineTokenBucket) {
-  const std::string access_log = R"EOF(
+// Returns an access log config with an inline token bucket that refills every second.
+std::string inlineAccessLog(uint32_t max_tokens) {
+  return fmt::format(R"EOF(
 name: accesslog
 filter:
   extension_filter:
@@ -219,17 +220,20 @@ filter:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
       token_bucket:
-        max_tokens: 1
+        max_tokens: {}
         tokens_per_fill: 1
         fill_interval:
           seconds: 1
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
-  )EOF";
+  )EOF",
+                     max_tokens);
+}
 
-  AccessLog::InstanceSharedPtr log =
-      AccessLog::AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(access_log), context_);
+TEST_F(AccessLogImplTestWithRateLimitFilter, InlineTokenBucket) {
+  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(inlineAccessLog(1)), context_);
 
   // No subscription should be created for inline config.
   ASSERT_EQ(subscriptions_.size(), 0);
@@ -244,6 +248,46 @@ typed_config:
   expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.allowed").value(), 2);
   EXPECT_EQ(context_.scope().counterFromString("access_log.process_ratelimit.denied").value(), 2);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, InlineTokenBucketSharedWithIdenticalConfig) {
+  AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(inlineAccessLog(1)), context_);
+  AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(inlineAccessLog(1)), context_);
+
+  // log1 consumes the only token. log2 shares the same token bucket, so it's rate limited.
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
+  expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
+
+  // After refill, log2 gets the token and log1 is rate limited.
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
+  expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, InlineTokenBucketNotSharedWithDifferentConfig) {
+  AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(inlineAccessLog(1)), context_);
+  AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(inlineAccessLog(2)), context_);
+
+  // Different config, so each log has its own token bucket.
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
+  expectWritesAndLog(log2, /*expect_write_times=*/2, /*log_call_times=*/3);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, InlineTokenBucketRecreatedAfterRelease) {
+  AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(inlineAccessLog(1)), context_);
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
+
+  // Reset log1, which destructs the token bucket.
+  log1.reset();
+  // log2 creates a new token bucket, so its first log is written.
+  AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(inlineAccessLog(1)), context_);
+  expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/2);
 }
 
 TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {

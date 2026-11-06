@@ -56,11 +56,6 @@ namespace LocalRateLimit {
 class RateLimiterProviderSingleton;
 using RateLimiterProviderSingletonSharedPtr = std::shared_ptr<RateLimiterProviderSingleton>;
 
-// Creates a LocalRateLimiterImpl from a TokenBucket proto config.
-std::shared_ptr<LocalRateLimiterImpl>
-createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
-                      Event::Dispatcher& dispatcher);
-
 class RateLimiterProviderSingleton : public Singleton::Instance {
 public:
   class TokenBucketSubscription;
@@ -174,6 +169,20 @@ public:
   Stats::ScopeSharedPtr scope_;
   LocalRateLimiterSharedPtr fallback_always_deny_limiter_;
   absl::flat_hash_map<std::string, std::weak_ptr<TokenBucketSubscription>> subscriptions_;
+};
+
+// Shares inline token buckets between filters with identical config, so that inline buckets
+// are shared across the process like the ones from `dynamic_config`.
+class InlineRateLimiterCache : public Singleton::Instance {
+public:
+  // Returns the rate limiter for the given config, creating it if needed.
+  static std::shared_ptr<LocalRateLimiterImpl>
+  getRateLimiter(Server::Configuration::ServerFactoryContext& factory_context,
+                 const envoy::type::v3::TokenBucket& config);
+
+private:
+  // Rate limiters indexed by the hash of their config. The filters own the rate limiters.
+  absl::flat_hash_map<size_t, std::weak_ptr<LocalRateLimiterImpl>> limiters_;
 };
 
 } // namespace LocalRateLimit
