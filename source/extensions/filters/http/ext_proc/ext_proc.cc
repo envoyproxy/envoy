@@ -721,6 +721,13 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
               ? more_specific.processing_request_modifier_factory_cb_
               : less_specific.processing_request_modifier_factory_cb_) {}
 
+void Filter::updateDownstreamWatermarkPushback() {
+  const bool enabled = decoding_state_.completeBodyAvailable() &&
+                       (decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED) &&
+                       (encoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED);
+  watermark_callbacks_.setDownstreamWatermarkPushbackEnabled(enabled);
+}
+
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
   filter_callbacks_ = &callbacks;
@@ -973,6 +980,7 @@ FilterHeadersStatus Filter::decodeHeaders(RequestHeaderMap& headers, bool end_st
   if (!processing_complete_ && decoding_state_.shouldRemoveContentLength()) {
     headers.removeContentLength();
   }
+  updateDownstreamWatermarkPushback();
   return status;
 }
 
@@ -1291,6 +1299,7 @@ FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   ENVOY_STREAM_LOG(trace, "decodeData({}): end_stream = {}", *decoder_callbacks_, data.length(),
                    end_stream);
   const auto status = onData(decoding_state_, data, end_stream);
+  updateDownstreamWatermarkPushback();
   ENVOY_STREAM_LOG(trace, "decodeData returning {}", *decoder_callbacks_, static_cast<int>(status));
   return status;
 }
@@ -1386,6 +1395,7 @@ FilterTrailersStatus Filter::onTrailers(ProcessorState& state, Http::HeaderMap& 
 FilterTrailersStatus Filter::decodeTrailers(RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(trace, "decodeTrailers", *decoder_callbacks_);
   const auto status = onTrailers(decoding_state_, trailers);
+  updateDownstreamWatermarkPushback();
   ENVOY_STREAM_LOG(trace, "decodeTrailers returning {}", *decoder_callbacks_,
                    static_cast<int>(status));
   return status;
@@ -1952,6 +1962,7 @@ void Filter::onReceiveMessage(Grpc::ResponsePtr<ProcessingResponse>&& r) {
       const auto old_decoding_body_mode = decoding_state_.bodyMode();
       decoding_state_.setProcessingMode(mode_override);
       encoding_state_.setProcessingMode(mode_override);
+      updateDownstreamWatermarkPushback();
 
       // If the response case is not set, this response message is for overriding the
       // processing mode only.

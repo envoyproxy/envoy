@@ -74,6 +74,9 @@ public:
                                           ProcessorState& state, bool end_stream) {
     filter.sendDataInObservabilityMode(data, state, end_stream);
   }
+  static Envoy::Http::StreamFilterSidestreamWatermarkCallbacks& watermarkCallbacks(Filter& filter) {
+    return filter.watermark_callbacks_;
+  }
 };
 
 namespace {
@@ -7615,6 +7618,198 @@ TEST_F(HttpFilterTest, EmitClientSpanPerRouteOverride) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   processRequestHeaders(false, std::nullopt);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, DownstreamWatermarkPushbackOnlyForFullDuplexStreamedBodyInBothDirections) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "STREAMED"
+  allow_mode_override: true
+  )EOF");
+
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  Envoy::Http::MockDownstreamWatermarkCallbacks downstream_watermark_callbacks;
+  EXPECT_CALL(decoder_callbacks_, addSidestreamWatermarkCallbacks(_)).Times(0);
+  FilterAccessor::watermarkCallbacks(*filter_).addDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
+
+  // STREAMED body mode does not enable downstream backpressure on the side-stream.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  // Override both request_body_mode and response_body_mode to FULL_DUPLEX_STREAMED: once request
+  // header processing applies the override (and end_stream was true on decodeHeaders), downstream
+  // backpressure should be enabled and register the sidestream watermark callbacks.
+  EXPECT_CALL(decoder_callbacks_,
+              addSidestreamWatermarkCallbacks(testing::Ref(downstream_watermark_callbacks)));
+  processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    auto* mode = resp.mutable_mode_override();
+    mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    mode->set_request_trailer_mode(ProcessingMode::SEND);
+    mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+    mode->set_response_trailer_mode(ProcessingMode::SEND);
+  });
+  EXPECT_TRUE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  // Override response_body_mode back to STREAMED on response headers: downstream backpressure
+  // should be disabled and unregister the sidestream watermark callbacks.
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, true));
+  EXPECT_CALL(decoder_callbacks_,
+              removeSidestreamWatermarkCallbacks(testing::Ref(downstream_watermark_callbacks)));
+  processResponseHeaders(false, [](const HttpHeaders&, ProcessingResponse& resp, HeadersResponse&) {
+    resp.mutable_mode_override()->set_response_body_mode(ProcessingMode::STREAMED);
+  });
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  FilterAccessor::watermarkCallbacks(*filter_).removeDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, DownstreamWatermarkPushbackDisabledWhenOnlyOneDirectionFullDuplex) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, DownstreamWatermarkPushbackPerRouteOverride) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    response_body_mode: "NONE"
+  )EOF");
+
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute route_proto;
+  auto* mode = route_proto.mutable_overrides()->mutable_processing_mode();
+  mode->set_request_header_mode(ProcessingMode::SEND);
+  mode->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  mode->set_request_trailer_mode(ProcessingMode::SEND);
+  mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  mode->set_response_trailer_mode(ProcessingMode::SEND);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; });
+
+  // While the request end-of-stream has not been received (end_stream = false), downstream
+  // backpressure stays disabled.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  // As soon as the request end-of-stream arrives (end_stream = true), downstream backpressure is
+  // enabled immediately without waiting for the ext_proc server's response.
+  Buffer::OwnedImpl req_data("hello");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+  EXPECT_TRUE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, DownstreamWatermarkPushbackEnabledOnDecodeTrailers) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "true"}});
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  Envoy::Http::MockDownstreamWatermarkCallbacks downstream_watermark_callbacks;
+  EXPECT_CALL(decoder_callbacks_, addSidestreamWatermarkCallbacks(_)).Times(0);
+  FilterAccessor::watermarkCallbacks(*filter_).addDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
+
+  // Headers and body arrive with end_stream = false because trailers follow.
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  Buffer::OwnedImpl req_data("hello");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, false));
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  // When decodeTrailers is called, the request is complete so downstream backpressure is enabled
+  // and registers the sidestream watermark callbacks.
+  EXPECT_CALL(decoder_callbacks_,
+              addSidestreamWatermarkCallbacks(testing::Ref(downstream_watermark_callbacks)));
+  EXPECT_EQ(FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_trailers_));
+  EXPECT_TRUE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  EXPECT_CALL(decoder_callbacks_,
+              removeSidestreamWatermarkCallbacks(testing::Ref(downstream_watermark_callbacks)));
+  FilterAccessor::watermarkCallbacks(*filter_).removeDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, DownstreamWatermarkPushbackDisabledWhenRuntimeFlagFalse) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.grpc_side_stream_flow_control_3", "false"}});
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SEND"
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+    response_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  Envoy::Http::MockDownstreamWatermarkCallbacks downstream_watermark_callbacks;
+  EXPECT_CALL(decoder_callbacks_, addSidestreamWatermarkCallbacks(_)).Times(0);
+  EXPECT_CALL(decoder_callbacks_, removeSidestreamWatermarkCallbacks(_)).Times(0);
+  FilterAccessor::watermarkCallbacks(*filter_).addDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  Buffer::OwnedImpl req_data("hello");
+  EXPECT_EQ(FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(req_data, true));
+  EXPECT_FALSE(FilterAccessor::watermarkCallbacks(*filter_).downstreamWatermarkPushbackEnabled());
+
+  FilterAccessor::watermarkCallbacks(*filter_).removeDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
   filter_->onDestroy();
 }
 
