@@ -160,7 +160,7 @@ public:
 
   Event::TestTimeSystem& timeSystem() { return time_system_; }
 
-  Stats::IsolatedStoreImpl stats_store_;
+  Stats::TestIsolatedStoreImpl stats_store_;
   Stats::Scope& stats_scope_{*stats_store_.rootScope()};
   Api::ApiPtr api_;
   Api::ApiPtr api_for_server_stat_store_;
