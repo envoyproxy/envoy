@@ -12,11 +12,14 @@
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using ::Envoy::StatusHelpers::HasStatus;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using testing::_;
+using testing::HasSubstr;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -118,7 +121,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptr) {
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
-      creation_status);
+      /*metadata_config=*/nullptr, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -143,7 +146,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecReturnsNullptrWhenBaseReturnsNullptrDrai
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
-      creation_status);
+      /*metadata_config=*/nullptr, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -187,7 +190,7 @@ hcm_config:
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/false,
-      creation_status);
+      /*metadata_config=*/nullptr, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -231,7 +234,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledNonReverseSocket) {
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
-      creation_status);
+      /*metadata_config=*/nullptr, creation_status);
   ASSERT_OK(creation_status);
 
   NiceMock<Network::MockConnection> connection;
@@ -262,7 +265,7 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
       hcm_config, context_, *singletons.date_provider_, *singletons.route_config_provider_manager_,
       singletons.scoped_routes_config_provider_manager_.get(), *singletons.tracer_manager_,
       *singletons.filter_config_provider_manager_, /*enable_drain_with_goaway=*/true,
-      creation_status);
+      /*metadata_config=*/nullptr, creation_status);
   ASSERT_OK(creation_status);
 
   // Build a real initiator IoHandle to act as the tunnel's parent. The extension is unused during
@@ -303,6 +306,69 @@ TEST_F(DrainAwareConfigTest, CreateCodecDrainEnabledReverseTunnelWiresRedial) {
   // dial a replacement tunnel. With no tunnels tracked this is a safe no-op, but it exercises the
   // wired closure.
   codec->shutdownNotice();
+}
+
+TEST_F(DrainAwareConfigTest, DrainConnectionMetadataRequiresEnableDrainWithGoaway) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
+drain_connection_metadata:
+  delay: 2s
+)EOF"));
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("requires enable_drain_with_goaway")));
+}
+
+TEST_F(DrainAwareConfigTest, DrainConnectionMetadataRequiresAllowMetadata) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
+enable_drain_with_goaway: true
+drain_connection_metadata:
+  delay: 2s
+)EOF"));
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
+              HasStatus(absl::StatusCode::kInvalidArgument, HasSubstr("allow_metadata")));
+}
+
+TEST_F(DrainAwareConfigTest, DrainConnectionMetadataDelayMustBeLessThanShutdownNoticeDelay) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
+enable_drain_with_goaway: true
+drain_connection_metadata:
+  delay: 3s
+)EOF"));
+  proto_config.mutable_hcm_config()->mutable_http2_protocol_options()->set_allow_metadata(true);
+  // delay (3s) == default shutdown_notice_delay (3s) violates the strict ordering.
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("must be less than shutdown_notice_delay")));
+}
+
+TEST_F(DrainAwareConfigTest, DrainConnectionMetadataShutdownNoticeDelayMustBeLessThanDrainTimeout) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
+enable_drain_with_goaway: true
+drain_connection_metadata:
+  delay: 1s
+  shutdown_notice_delay: 5s
+)EOF"));
+  proto_config.mutable_hcm_config()->mutable_http2_protocol_options()->set_allow_metadata(true);
+  // shutdown_notice_delay (5s) == default drain_timeout (5s) violates the strict ordering.
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        HasSubstr("must be less than hcm_config.drain_timeout")));
+}
+
+TEST_F(DrainAwareConfigTest, DrainConnectionMetadataValidConfig) {
+  DrainAwareHttpConnectionManagerFilterConfigFactory factory;
+  auto proto_config = parseConfig(absl::StrCat(kMinimalConfig, R"EOF(
+enable_drain_with_goaway: true
+drain_connection_metadata:
+  delay: 2s
+)EOF"));
+  proto_config.mutable_hcm_config()->mutable_http2_protocol_options()->set_allow_metadata(true);
+  EXPECT_THAT(factory.createFilterFactoryFromProto(proto_config, context_),
+              IsOkAndHolds(::testing::NotNull()));
 }
 
 } // namespace

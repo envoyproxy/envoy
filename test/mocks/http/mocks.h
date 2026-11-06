@@ -160,6 +160,7 @@ public:
   MOCK_METHOD(void, goAway, ());
   MOCK_METHOD(Protocol, protocol, ());
   MOCK_METHOD(void, shutdownNotice, ());
+  MOCK_METHOD(void, encodeMetadata, (const MetadataMapVector& metadata_map_vector));
   MOCK_METHOD(bool, wantsToWrite, ());
   MOCK_METHOD(void, onUnderlyingConnectionAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onUnderlyingConnectionBelowWriteBufferLowWatermark, ());
