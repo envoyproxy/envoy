@@ -9051,6 +9051,83 @@ fn test_envoy_dynamic_module_on_access_logger_new_destroy() {
   assert!(LOGGER_DROPPED.load(std::sync::atomic::Ordering::SeqCst));
 }
 
+#[test]
+fn test_response_flag_to_bitmask() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  assert_eq!(Flag::FailedLocalHealthCheck.to_bitmask(), 0x1);
+  assert_eq!(Flag::NoHealthyUpstream.to_bitmask(), 0x2);
+  assert_eq!(Flag::UnconditionalDropOverload.to_bitmask(), 1u64 << 29);
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_empty() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  assert_eq!(Flag::iter_from_bitmask(0).collect::<Vec<_>>(), Vec::new());
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_selected_flags() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let bitmask = Flag::NoHealthyUpstream.to_bitmask() | Flag::RateLimited.to_bitmask();
+  assert_eq!(
+    Flag::iter_from_bitmask(bitmask).collect::<Vec<_>>(),
+    vec![Flag::NoHealthyUpstream, Flag::RateLimited]
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_ignores_unknown_bits() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  // Bit 63 doesn't correspond to any known flag (today, this enum only defines bits 0..=29); it
+  // should be silently skipped rather than panicking or producing a bogus value. `bitmask` is a
+  // `u64` specifically so a bit this high is representable at all.
+  let bitmask = Flag::LocalReset.to_bitmask() | (1u64 << 63);
+  assert_eq!(
+    Flag::iter_from_bitmask(bitmask).collect::<Vec<_>>(),
+    vec![Flag::LocalReset]
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_full_mask_matches_from_repr() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let all = <Flag as strum::VariantArray>::VARIANTS;
+  let full_bitmask = all.iter().fold(0u64, |acc, &flag| acc | flag.to_bitmask());
+  assert_eq!(
+    Flag::iter_from_bitmask(full_bitmask).collect::<Vec<_>>(),
+    all
+  );
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_is_exact_size_iterator() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  let bitmask = Flag::NoHealthyUpstream.to_bitmask()
+    | Flag::RateLimited.to_bitmask()
+    | Flag::LocalReset.to_bitmask();
+  let mut iter = Flag::iter_from_bitmask(bitmask);
+  assert_eq!(iter.len(), 3);
+  assert_eq!(iter.size_hint(), (3, Some(3)));
+  iter.next();
+  assert_eq!(iter.len(), 2);
+  assert_eq!(iter.size_hint(), (2, Some(2)));
+}
+
+#[test]
+fn test_response_flag_iter_from_bitmask_exact_size_ignores_unknown_bits() {
+  use abi::envoy_dynamic_module_type_response_flag as Flag;
+
+  // Unknown bits are pruned at construction, so len() doesn't overcount them.
+  let bitmask = Flag::LocalReset.to_bitmask() | (1u64 << 63);
+  assert_eq!(Flag::iter_from_bitmask(bitmask).len(), 1);
+}
+
 // =================================================================================================
 // FFI panic-handling helpers
 // =================================================================================================
