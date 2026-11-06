@@ -60,6 +60,9 @@ FilterConfig::FilterConfig(
               : std::nullopt),
       stage_(static_cast<uint64_t>(config.stage())),
       has_descriptors_(!config.descriptors().empty()),
+      has_stream_done_actions_(
+          std::any_of(config.rate_limits().begin(), config.rate_limits().end(),
+                      [](const auto& rate_limit) { return rate_limit.apply_on_stream_done(); })),
       enable_x_rate_limit_headers_(config.enable_x_ratelimit_headers() ==
                                    envoy::extensions::common::ratelimit::v3::DRAFT_VERSION_03),
       enable_retry_after_header_(config.enable_retry_after_header() &&
@@ -164,6 +167,9 @@ bool FilterConfig::enforced() const {
   return filter_enforced_.has_value() ? filter_enforced_->enabled() : false;
 }
 
+Filter::Filter(FilterConfigSharedPtr config)
+    : config_(std::move(config)), used_config_(config_.get()) {}
+
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   const auto* route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfig>(decoder_callbacks_);
@@ -176,7 +182,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     used_config_ = route_config; // Overwrite the used configuration.
   }
 
-  if (!used_config_->enabled()) {
+  rate_limit_enabled_ = used_config_->enabled();
+  if (!rate_limit_enabled_) {
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -185,7 +192,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   std::vector<RateLimit::Descriptor> descriptors;
   if (used_config_->hasDescriptors()) {
     if (used_config_->hasRateLimitConfigs()) {
-      used_config_->populateDescriptors(headers, decoder_callbacks_->streamInfo(), descriptors);
+      used_config_->populateDescriptors(headers, /*response_headers=*/nullptr,
+                                        decoder_callbacks_->streamInfo(), descriptors,
+                                        /*on_stream_done=*/false);
     } else {
       populateDescriptors(descriptors, headers);
     }
@@ -263,6 +272,32 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+void Filter::onDestroy() {
+  // Completion accounting needs local descriptors and embedded apply_on_stream_done rate limits.
+  if (!rate_limit_enabled_ || !used_config_->hasDescriptors() ||
+      !used_config_->hasStreamDoneActions()) {
+    return;
+  }
+  // Read the headers from the stream rather than keeping references to them.
+  const auto request_headers = decoder_callbacks_->requestHeaders();
+  if (!request_headers.has_value()) {
+    return;
+  }
+  const auto response_headers = decoder_callbacks_->responseHeaders();
+  std::vector<RateLimit::Descriptor> descriptors;
+  used_config_->populateDescriptors(*request_headers, response_headers.ptr(),
+                                    decoder_callbacks_->streamInfo(), descriptors,
+                                    /*on_stream_done=*/true);
+  if (descriptors.empty()) {
+    return;
+  }
+  if (used_config_->rateLimitPerConnection()) {
+    getPerConnectionRateLimiter().consumeDescriptors(descriptors);
+  } else {
+    used_config_->consumeDescriptors(descriptors);
+  }
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
