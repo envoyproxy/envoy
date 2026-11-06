@@ -39,25 +39,74 @@
  )
  
 
-
 --- a/bazel/external/wasmtime.BUILD
 +++ b/bazel/external/wasmtime.BUILD
-@@ -49,10 +49,16 @@
+@@ -13,12 +13,16 @@
+ # limitations under the License.
+ 
+ load("@rules_cc//cc:defs.bzl", "cc_library")
+-load("@rules_rust//rust:defs.bzl", "rust_static_library")
+ 
+ licenses(["notice"])  # Apache 2
+ 
+ package(default_visibility = ["//visibility:public"])
+ 
++# The C API crate is linked as an rlib: a Rust staticlib bundles its own copy of std and the
++# allocator shim, which collides with every other Rust archive in the Envoy binary (the built-in
++# dynamic modules). The prefixed rlib no longer carries the crate's Rust dependencies, so they are
++# linked from the crate graph via rules_rust; the std runtime comes from Envoy's single
++# `rust_runtime` staticlib (see source/extensions/dynamic_modules/sdk/rust).
+ cc_library(
+     name = "wasmtime_lib",
+     srcs = [
+@@ -26,33 +30,37 @@
+     ],
+     hdrs = glob(["crates/c-api/include/**"]) + [":wasmtime_conf.h"],
+     includes = ["crates/c-api/include/"],
+-)
+-
+-# Wrap wasmtime-c-api-impl in a rust_static_library so it can be used as a cc_library.
+-rust_static_library(
+-    name = "wasmtime_lib_staticlib",
+-    srcs = [
+-        "src/lib.rs",
+-    ],
+-    edition = "2021",
+     deps = [
+-        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:wasmtime-c-api-impl",
++        "@cu__log-0.4.29//:log",
++        "@cu__tracing-0.1.44//:tracing",
++        "@cu__wasmtime-45.0.2//:wasmtime",
+     ],
+ )
+ 
+ genrule(
+     name = "prefixed_wasmtime_c_api_lib",
+     srcs = [
+-        ":wasmtime_lib_staticlib",
++        "@proxy_wasm_cpp_host//bazel/cargo/wasmtime/remote:wasmtime-c-api-impl",
+     ],
+     outs = [
          "prefixed_wasmtime_c_api.a",
      ],
      cmd = """
 -        for symbol in $$(nm -P $(<) 2>/dev/null | grep -E ^_?wasm_ | cut -d" " -f1); do
-+        # Use the toolchain nm (like OBJCOPY below): the system one is not on PATH on RBE, and
-+        # with its errors hidden the symbol map was silently empty.
-+        for symbol in $$($(NM) -P $(<) | grep -E ^_?wasm_ | cut -d" " -f1); do
++        RLIB=""
++        for f in $(SRCS); do case $$f in *.rlib) RLIB=$$f; break;; esac; done
++        if [[ -z "$$RLIB" ]]; then
++            echo "No rlib among: $(SRCS)" >&2
++            exit 1
++        fi
++        # Use the toolchain's nm (like OBJCOPY below): the system one is not on PATH on RBE.
++        for symbol in $$($(NM) -P $$RLIB | grep -E ^_?wasm_ | cut -d" " -f1); do
              echo $$symbol | perl -p -e 's!^(_?)(wasm_[a-z_0-9.:-]+)$$!\\1\\2 \\1wasmtime_\\2!' >>prefixed
          done
 -        $(OBJCOPY) --redefine-syms=prefixed $(<) $@ 
 +        if [[ ! -s prefixed ]]; then
-+            echo "No wasm_* symbols found in $(<)" >&2
++            echo "No wasm_* symbols found in $$RLIB" >&2
 +            exit 1
 +        fi
-+        $(OBJCOPY) --redefine-syms=prefixed $(<) $@
++        $(OBJCOPY) --redefine-syms=prefixed $$RLIB $@
          """,
      toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
  )
