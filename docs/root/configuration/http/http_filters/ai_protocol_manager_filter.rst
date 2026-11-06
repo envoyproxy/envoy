@@ -593,7 +593,7 @@ reply.
 
 The module addresses the payload by JSON pointer (RFC 6901) and exchanges values as JSON text.
 Strings longer than :ref:`inline_string_threshold_bytes
-<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestHandling.inline_string_threshold_bytes>`
+<envoy_v3_api_field_extensions.filters.http.ai_protocol_manager.v3.RequestParsingLimits.inline_string_threshold_bytes>`
 are offloaded to the external buffer rather than held in memory, and a read of a value that is or
 holds one fails; raise the threshold for a module that inspects message content. A module may
 replace an offloaded value. A header the module rewrites reaches the upstream, but changing a
