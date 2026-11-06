@@ -68,7 +68,9 @@ message UpstreamTlsContext {
   bool allow_renegotiation = 3;
 
   // Maximum number of session keys (Pre-Shared Keys for TLSv1.3+, Session IDs and Session Tickets
-  // for TLSv1.2 and older) to be stored for session resumption.
+  // for TLSv1.2 and older) to be stored for session resumption. The limit applies across all
+  // upstream endpoints that use this TLS context. Configure enough keys to cover the number of
+  // endpoints and the required number of tickets for each endpoint.
   //
   // Defaults to 1, setting this to 0 disables session resumption.
   google.protobuf.UInt32Value max_session_keys = 4;
