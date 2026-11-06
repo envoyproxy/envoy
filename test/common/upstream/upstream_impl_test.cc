@@ -5210,6 +5210,83 @@ TEST_P(MainPrioritySetCrossPriorityHostMapTest, SameHostMovedToLowerPriorityIsNo
   EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
 }
 
+// Batch update that updates the hosts of the given priorities in order, with all the hosts healthy.
+class UpdateHostsInOrderBatch : public PrioritySet::BatchUpdateCb {
+public:
+  struct PriorityUpdate {
+    uint32_t priority;
+    HostVector hosts;
+    HostVector hosts_added;
+    HostVector hosts_removed;
+  };
+
+  UpdateHostsInOrderBatch(std::vector<PriorityUpdate> updates,
+                          HostsPerLocalitySharedPtr hosts_per_locality)
+      : updates_(std::move(updates)), hosts_per_locality_(std::move(hosts_per_locality)) {}
+
+  // PrioritySet::BatchUpdateCb
+  void batchUpdate(PrioritySet::HostUpdateCb& cb) override {
+    for (const PriorityUpdate& update : updates_) {
+      auto hosts = std::make_shared<const HostVector>(update.hosts);
+      cb.updateHosts(update.priority,
+                     updateHostsParams(hosts, hosts_per_locality_,
+                                       std::make_shared<const HealthyHostVector>(*hosts),
+                                       hosts_per_locality_),
+                     {}, update.hosts_added, update.hosts_removed, std::nullopt, std::nullopt);
+    }
+  }
+
+private:
+  const std::vector<PriorityUpdate> updates_;
+  const HostsPerLocalitySharedPtr hosts_per_locality_;
+};
+
+// Replacing a host with a new host instance at the same address in another priority during a batch
+// update preserves the new host regardless of priority update order.
+TEST_P(MainPrioritySetCrossPriorityHostMapTest,
+       ReplacedHostMovedAcrossPrioritiesInBatchIsNotEvicted) {
+  HostSharedPtr old_p1 = makeHost("tcp://127.0.0.1:80", 1);
+  updateHosts(1, {old_p1}, {old_p1}, {});
+  EXPECT_EQ(old_p1, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // Move 127.0.0.1:80 from priority 1 to priority 0 with a new Host instance, updating priority 0
+  // before priority 1.
+  HostSharedPtr new_p0 = makeHost("tcp://127.0.0.1:80", 0);
+  UpdateHostsInOrderBatch move_to_p0({{0, {new_p0}, {new_p0}, {}}, {1, {}, {}, {old_p1}}},
+                                     hosts_per_locality_);
+  priority_set_.batchHostUpdate(move_to_p0);
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(new_p0, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  // Move 127.0.0.1:80 back from priority 0 to priority 1 with a new Host instance, updating
+  // priority 1 before priority 0 (as when healthy priorities update first).
+  HostSharedPtr new_p1 = makeHost("tcp://127.0.0.1:80", 1);
+  UpdateHostsInOrderBatch move_to_p1({{1, {new_p1}, {new_p1}, {}}, {0, {}, {}, {new_p0}}},
+                                     hosts_per_locality_);
+  priority_set_.batchHostUpdate(move_to_p1);
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(new_p1, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+}
+
+// A host added during a batch update at an address owned by a host of another priority that is not
+// removed in the same batch is not deferred beyond the batch: a later removal of the owning host
+// outside of a batch update erases the address, as without batch updates (see
+// FirstHostWinsAndRemovalIsPriorityGuarded).
+TEST_P(MainPrioritySetCrossPriorityHostMapTest, HostAddedAtOwnedAddressInBatchIsNotDeferred) {
+  HostSharedPtr host_p0 = makeHost("tcp://127.0.0.1:80", 0);
+  updateHosts(0, {host_p0}, {host_p0}, {});
+
+  // Add a new Host instance at the same address to priority 1, while priority 0 keeps its host.
+  HostSharedPtr host_p1 = makeHost("tcp://127.0.0.1:80", 1);
+  UpdateHostsInOrderBatch add_to_p1({{1, {host_p1}, {host_p1}, {}}}, hosts_per_locality_);
+  priority_set_.batchHostUpdate(add_to_p1);
+  EXPECT_EQ(1, priority_set_.crossPriorityHostMap()->size());
+  EXPECT_EQ(host_p0, priority_set_.crossPriorityHostMap()->findHost("127.0.0.1:80"));
+
+  updateHosts(0, {}, {}, {host_p0});
+  EXPECT_TRUE(priority_set_.crossPriorityHostMap()->empty());
+}
+
 // Selecting the persistent backing after a host was added is reported as a bug for both backings
 // and leaves the backing in use unchanged.
 TEST_P(MainPrioritySetCrossPriorityHostMapTest, SelectPersistentBackingAfterHostsAdded) {
