@@ -123,12 +123,26 @@ impl PartialEq<&[u8]> for EnvoyBuffer<'_> {
 
 /// This is exactly the same as [`EnvoyBuffer`] except that it is mutable and data can be written
 /// in-place. See [`EnvoyBuffer`] for more details.
+///
+/// Mutable buffers cannot be cloned because the underlying memory must be borrowed exclusively.
+///
+/// ```compile_fail,E0599
+/// use envoy_proxy_dynamic_modules_rust_sdk::EnvoyMutBuffer;
+///
+/// fn alias(mut buffer: EnvoyMutBuffer<'_>) {
+///   let mut other = buffer.clone();
+///   let first = buffer.as_mut_slice();
+///   let second = other.as_mut_slice();
+///   first[0] = 1;
+///   second[0] = 2;
+/// }
+/// ```
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct EnvoyMutBuffer<'a> {
   raw_ptr: *mut u8,
   length: usize,
-  _marker: std::marker::PhantomData<&'a ()>,
+  _marker: std::marker::PhantomData<&'a mut [u8]>,
 }
 
 impl EnvoyMutBuffer<'_> {
