@@ -6,12 +6,18 @@
 #include "source/common/network/io_socket_error_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
-#include "absl/container/fixed_array.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
+
+namespace {
+// Cap on RPING keepalive echo bytes per read burst while the echo phase is active, shared by the
+// read() and readv() paths. Mirrors the per-wake idle path cap in
+// UpstreamSocketManager::onPingResponse. A peer that floods keepalives past this budget on a single
+// wake closes its own tunnel rather than spinning the worker.
+constexpr uint64_t kMaxKeepaliveEchoBytes = 64 * 1024;
+} // namespace
 
 Api::IoCallUint64Result RpingInterceptor::read(Buffer::Instance& buffer,
                                                std::optional<uint64_t> max_length) {
@@ -27,44 +33,74 @@ Api::IoCallUint64Result RpingInterceptor::read(Buffer::Instance& buffer,
 
 Api::IoCallUint64Result RpingInterceptor::applyRpingToBuffer(Buffer::Instance& buffer,
                                                              Api::IoCallUint64Result result) {
-  // If RPING keepalives are still active, check whether the incoming data is a RPING message.
-  if (ping_echo_active_ && result.err_ == nullptr && result.return_value_ > 0) {
-    const uint64_t expected = ReverseConnectionUtility::PING_MESSAGE.size();
+  // Only inspect successful reads while RPING keepalives are still active.
+  if (!ping_echo_active_ || result.err_ != nullptr || result.return_value_ == 0) {
+    // While echo is active, a would-block or empty read ends the current read burst. Reset the echo
+    // budget so a slow, healthy keepalive stream over the connection lifetime is never torn down;
+    // only a burst that floods past the budget on a single wake is closed.
+    if (ping_echo_active_) {
+      echoed_bytes_ = 0;
+    }
+    return result;
+  }
+
+  // A split echo prefix seeded at checkout sits logically ahead of the freshly read bytes. Prepend
+  // it so a completing RPING is stripped rather than delivered to the caller.
+  if (!partial_ping_.empty()) {
+    buffer.prepend(absl::string_view{partial_ping_.data(), partial_ping_.size()});
+    result.return_value_ += partial_ping_.size();
+    partial_ping_.clear();
+  }
+
+  const uint64_t expected = ReverseConnectionUtility::PING_MESSAGE.size();
+  uint64_t stripped = 0;
+
+  // Strip every complete RPING coalesced at the front of the buffer. A stalled initiator can batch
+  // several keepalives ahead of the first application bytes, so stop only when the front is no
+  // longer a complete `RPING`.
+  while (ping_echo_active_) {
+    const uint64_t len = std::min<uint64_t>(buffer.length(), expected);
+    if (len == 0) {
+      // The buffer held only `RPING`s. Report the stripped bytes so the caller does not see EOF.
+      return Api::IoCallUint64Result{stripped, Api::IoError::none()};
+    }
 
     // Classify the front of the buffer using a zero-copy view of up to the expected size.
-    const uint64_t len = std::min<uint64_t>(buffer.length(), expected);
     const char* data = static_cast<const char*>(buffer.linearize(len));
     absl::string_view peek_sv{data, static_cast<size_t>(len)};
 
     switch (ReverseConnectionUtility::classifyRpingPrefix(peek_sv)) {
-    case ReverseConnectionUtility::RpingPrefixMatch::Complete: {
-      // Found a complete RPING. Echo and drain it from the buffer.
+    case ReverseConnectionUtility::RpingPrefixMatch::Complete:
+      // Found a complete `RPING`. Echo it, drain it, and continue stripping any coalesced behind
+      // it.
       buffer.drain(expected);
       onPingMessage();
-
-      // If buffer only contained RPING, return showing we processed it.
-      if (buffer.length() == 0) {
-        return Api::IoCallUint64Result{expected, Api::IoError::none()};
+      stripped += expected;
+      echoed_bytes_ += expected;
+      if (echoed_bytes_ >= kMaxKeepaliveEchoBytes) {
+        // A keepalive flood before any application byte. Close rather than spin the worker, since
+        // RawBufferSocket::doRead re-reads until EAGAIN and stripping keeps the buffer drainable.
+        ENVOY_LOG(debug, "RpingInterceptor: excessive RPING keepalive flood on FD: {}, closing.",
+                  fd_);
+        return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
       }
-
-      // RPING followed by application data. Disable echo and return the remaining data.
-      ENVOY_LOG(trace,
-                "RpingInterceptor: received application data after RPING, "
-                "disabling RPING echo for FD: {}",
-                fd_);
-      ping_echo_active_ = false;
-      // The adjusted return value is the number of bytes excluding the drained RPING. It should be
-      // transparent to upper layers that the RPING was processed.
-      const uint64_t adjusted =
-          (result.return_value_ >= expected) ? (result.return_value_ - expected) : 0;
-      return Api::IoCallUint64Result{adjusted, Api::IoError::none()};
-    }
-    case ReverseConnectionUtility::RpingPrefixMatch::PartialPrefix:
+      continue;
+    case ReverseConnectionUtility::RpingPrefixMatch::PartialPrefix: {
       ENVOY_LOG(trace, "RpingInterceptor: partial RPING received ({} bytes), waiting for more.",
                 len);
-      return result; // Wait for more data.
+      // Move the incomplete prefix out of the caller's buffer into partial_ping_, as the readv path
+      // does, so it is not delivered to the codec; the next read prepends it to complete the
+      // `RPING`. Report a non-zero count so the caller does not see EOF, with the partial now
+      // hidden.
+      const uint64_t partial_len = buffer.length();
+      const char* partial_data = static_cast<const char*>(buffer.linearize(partial_len));
+      partial_ping_.assign(partial_data, partial_data + partial_len);
+      buffer.drain(partial_len);
+      return Api::IoCallUint64Result{stripped + partial_len, Api::IoError::none()};
+    }
     case ReverseConnectionUtility::RpingPrefixMatch::NotRping:
-      // Data is not RPING (complete or partial). Disable echo permanently.
+      // Application data at the front. Disable echo permanently and pass the remaining data
+      // through.
       ENVOY_LOG(trace,
                 "RpingInterceptor: received application data ({} bytes), "
                 "disabling RPING echo for FD: {}",
@@ -72,11 +108,19 @@ Api::IoCallUint64Result RpingInterceptor::applyRpingToBuffer(Buffer::Instance& b
       ping_echo_active_ = false;
       break;
     }
+    break;
   }
 
-  return result;
+  // The remaining bytes in the buffer are application data with the stripped `RPING`s hidden from
+  // the caller.
+  const uint64_t adjusted =
+      (result.return_value_ >= stripped) ? (result.return_value_ - stripped) : 0;
+  return Api::IoCallUint64Result{adjusted, Api::IoError::none()};
 }
 
+// Copies src across the caller slices. The caller must offer at least src.size() bytes of capacity,
+// which holds while echo is active because the TLS BIO classifies with a window of at least a full
+// RPING. The pull-rest optimization in readv() only applies when num_slice is one.
 uint64_t RpingInterceptor::scatterToSlices(absl::string_view src, Buffer::RawSlice* slices,
                                            uint64_t num_slice) {
   uint64_t written = 0;
@@ -85,14 +129,20 @@ uint64_t RpingInterceptor::scatterToSlices(absl::string_view src, Buffer::RawSli
     memcpy(slices[i].mem_, src.data() + written, n); // NOLINT(safe-memcpy)
     written += n;
   }
-  ASSERT(written == src.size());
+  // readv() reads a whole RPING window off the socket before scattering it, so a caller that offers
+  // less capacity than src.size() would silently drop already-read bytes and de-synchronize the
+  // stream. Fail closed rather than corrupting the stream if a future caller ever violates the
+  // contract above.
+  RELEASE_ASSERT(written == src.size(),
+                 "RpingInterceptor caller offered less slice capacity than a RPING window while "
+                 "echo was active");
   return written;
 }
 
 Api::IoCallUint64Result RpingInterceptor::readv(uint64_t max_length, Buffer::RawSlice* slices,
                                                 uint64_t num_slice) {
-  // Read straight through without inspecting for RPING in two cases:
-  //   - processing_read_: the raw read() path is driving this readv() and already strips RPING
+  // Read straight through without inspecting for `RPING` in two cases:
+  //   - processing_read_: the raw read() path is driving this readv() and already strips `RPING`
   //     itself, so doing it here too would double-process.
   //   - ping keepalives have stopped (!ping_echo_active_) and no partial ping is held over from a
   //     previous read (partial_ping_ empty), so there is nothing left to strip.
@@ -100,84 +150,84 @@ Api::IoCallUint64Result RpingInterceptor::readv(uint64_t max_length, Buffer::Raw
     return IoSocketHandleImpl::readv(max_length, slices, num_slice);
   }
 
-  const uint64_t expected = ReverseConnectionUtility::PING_MESSAGE.size();
-
-  // Total space the caller offered; the most we can deliver. A partial ping is only ever held
-  // before real data flows, so capacity here is always >= a full ping (5 bytes), keeping
-  // room (capacity - partial_ping_) positive so the loop below makes progress.
-  uint64_t capacity = 0;
-  for (uint64_t i = 0; i < num_slice; i++) {
-    capacity += slices[i].len_;
-  }
-  capacity = std::min<uint64_t>(capacity, max_length);
-  if (capacity == 0) {
-    return IoSocketHandleImpl::readv(max_length, slices, num_slice);
-  }
-
-  // epoll wakes us only when new data *arrives*, not while unread data is already sitting in the
-  // socket. So a single read can return an RPING with real data (e.g. a TLS ClientHello) packed
-  // right behind it. If we swallowed the RPING and returned, that trailing data would sit unread
-  // with no further wakeup coming. To avoid that, once we consume an RPING we keep reading until
-  // the socket is actually empty (a short read or EAGAIN).
+  // Classify one five byte window at a time into a small stack buffer so the caller's slices only
+  // ever receive application data. A partial prefix is side buffered in partial_ping_ (at most
+  // expected minus one bytes), so no large scratch buffer is allocated per read.
   //
-  // Scratch buffer for one read, reused across loop iterations. Sized to full capacity so it fits
-  // every iteration; each read uses only `room` of it.
-  absl::FixedArray<char> tmp(capacity);
-  while (true) {
-    // Size the read so partial_ping_ + fresh never exceeds caller capacity.
-    const uint64_t room = capacity - partial_ping_.size();
-    Buffer::RawSlice tmp_slice;
-    tmp_slice.mem_ = tmp.data();
-    tmp_slice.len_ = room;
+  // epoll wakes us only when new data arrives, so an `RPING` can be packed ahead of real data (for
+  // example a TLS ClientHello). Looping until a short read or EAGAIN drains the coalesced bytes.
+  constexpr uint64_t kPingSize = ReverseConnectionUtility::PING_MESSAGE.size();
+  while (ping_echo_active_) {
+    char window[kPingSize];
+    const uint64_t held = partial_ping_.size();
+    memcpy(window, partial_ping_.data(), held); // NOLINT(safe-memcpy)
 
-    Api::IoCallUint64Result fresh = IoSocketHandleImpl::readv(room, &tmp_slice, 1);
+    Buffer::RawSlice read_slice;
+    read_slice.mem_ = window + held;
+    read_slice.len_ = kPingSize - held;
+    Api::IoCallUint64Result fresh = IoSocketHandleImpl::readv(read_slice.len_, &read_slice, 1);
 
     if (fresh.err_ != nullptr) {
-      // Would-block/error: partial_ping_ is preserved for the next call.
+      // Would-block or error. partial_ping_ is preserved for the next call, and the read burst
+      // ends, so reset the echo budget (see the read() path for the rationale).
+      echoed_bytes_ = 0;
       return fresh;
     }
     if (fresh.return_value_ == 0) {
-      // EOF. A held partial keepalive can never complete; drop it and report shutdown.
+      // EOF. A held partial keepalive can never complete. Drop it and report shutdown.
+      echoed_bytes_ = 0;
       partial_ping_.clear();
       return Api::IoCallUint64Result{0, Api::IoError::none()};
     }
 
-    std::string assembled;
-    assembled.reserve(partial_ping_.size() + fresh.return_value_);
-    assembled.append(partial_ping_.data(), partial_ping_.size());
-    assembled.append(tmp.data(), static_cast<size_t>(fresh.return_value_));
-
-    switch (ReverseConnectionUtility::classifyRpingPrefix(assembled)) {
-    case ReverseConnectionUtility::RpingPrefixMatch::Complete: {
-      // Complete RPING at the front: echo it and drop it.
+    const uint64_t window_len = held + fresh.return_value_;
+    absl::string_view window_sv{window, static_cast<size_t>(window_len)};
+    switch (ReverseConnectionUtility::classifyRpingPrefix(window_sv)) {
+    case ReverseConnectionUtility::RpingPrefixMatch::Complete:
+      // A complete RPING. Echo it, drop it, and loop to drain any coalesced behind it.
       onPingMessage();
       partial_ping_.clear();
-
-      absl::string_view remainder{assembled.data() + expected, assembled.size() - expected};
-      if (remainder.empty()) {
-        // Loop to drain any data coalesced behind the RPING before returning EAGAIN.
-        continue;
+      echoed_bytes_ += kPingSize;
+      if (echoed_bytes_ >= kMaxKeepaliveEchoBytes) {
+        // A keepalive flood during the echo phase. Close the connection rather than spin the
+        // worker.
+        ENVOY_LOG(debug, "RpingInterceptor: excessive RPING keepalive flood on FD: {}, closing.",
+                  fd_);
+        return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
       }
-      ping_echo_active_ = false;
-      const uint64_t written = scatterToSlices(remainder, slices, num_slice);
-      return Api::IoCallUint64Result{written, Api::IoError::none()};
-    }
+      continue;
     case ReverseConnectionUtility::RpingPrefixMatch::PartialPrefix:
-      // Proper RPING prefix: the short read means the kernel is drained. Hold it and return
-      // EAGAIN; the rest arrives as a fresh readable event.
-      partial_ping_.assign(assembled.begin(), assembled.end());
+      // Proper but incomplete prefix. The short read means the kernel is drained, so hold it and
+      // return EAGAIN; the rest arrives as a fresh readable event. The burst ends, so reset the
+      // echo budget.
+      echoed_bytes_ = 0;
+      partial_ping_.assign(window, window + window_len);
       return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
     case ReverseConnectionUtility::RpingPrefixMatch::NotRping: {
-      // Not RPING: echo latches off and all bytes pass through in order.
+      // Application data begins here. Latch echo off and deliver the window into the caller's
+      // slices, then pull any bytes coalesced behind it into the remaining space so the caller
+      // receives them together while the bulk stays zero-copy.
       ping_echo_active_ = false;
       partial_ping_.clear();
-      const uint64_t written = scatterToSlices(assembled, slices, num_slice);
+      const uint64_t written = scatterToSlices(window_sv, slices, num_slice);
+      if (num_slice == 1 && max_length > written && slices[0].len_ > written) {
+        Buffer::RawSlice rest;
+        rest.mem_ = static_cast<char*>(slices[0].mem_) + written;
+        rest.len_ = slices[0].len_ - written;
+        Api::IoCallUint64Result more = IoSocketHandleImpl::readv(max_length - written, &rest, 1);
+        if (more.err_ == nullptr && more.return_value_ > 0) {
+          return Api::IoCallUint64Result{written + more.return_value_, Api::IoError::none()};
+        }
+      }
       return Api::IoCallUint64Result{written, Api::IoError::none()};
     }
     }
     // Unreachable: every classification case above returns or continues.
     PANIC("unexpected RPING classification");
   }
+
+  // Echo latched off during the loop with no held prefix, so read application data zero-copy.
+  return IoSocketHandleImpl::readv(max_length, slices, num_slice);
 }
 
 } // namespace ReverseConnection
