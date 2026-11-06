@@ -2060,7 +2060,7 @@ TEST_F(UdpProxyFilterTest, PerSessionClusterBasicFlow) {
 
   const std::string session_access_log_format =
       "%DYNAMIC_METADATA(udp.proxy.session:cluster_name)% "
-      "%METADATA(CLUSTER:example:hostname)%";
+      "%CLUSTER_METADATA(example:hostname)%";
 
   setup(accessLogConfig(R"EOF(
 stat_prefix: foo

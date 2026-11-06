@@ -640,7 +640,7 @@ TEST_P(UdpTunnelingIntegrationTest, ProxyHostFromClusterMetadataWithPost) {
     (*fields)["hostname"].set_string_value("metadata.example.com");
   });
 
-  const std::string proxy_host = "'%METADATA(CLUSTER:example:hostname)%'";
+  const std::string proxy_host = "'%CLUSTER_METADATA(example:hostname)%'";
   TestConfig config{proxy_host,   "target.com", 1,           30, true,
                     "/post/path", std::nullopt, std::nullopt};
   setup(config);
