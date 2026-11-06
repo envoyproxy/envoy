@@ -838,7 +838,7 @@
     },
     "@@rules_rust+//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "6V81fYWf88wgzHptJlMgH0AWANJg/PuPUfelURDNLWE=",
+        "bzlTransitiveDigest": "yvqqXkEktElsp5Abonk5d/sYzVwjUrrSmeSKBxAmKlg=",
         "usagesDigest": "tG3p3Nb5XxC7vWY/bcKdb//g0HoAxpxxH3F5/jBVlk4=",
         "recordedInputs": [
           "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
