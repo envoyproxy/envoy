@@ -12,6 +12,9 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/io_socket/user_space/file_event_impl.h"
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 
 namespace Extensions {
@@ -446,6 +449,21 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   metadata_ = nullptr;
   filter_state_objects_.clear();
   state_ = State::Done;
+}
+
+void PassthroughStateImpl::setCloseDetails(absl::string_view local_close_reason,
+                                           absl::string_view upstream_transport_failure_reason) {
+  std::vector<std::string> fields;
+  if (!local_close_reason.empty()) {
+    fields.push_back(absl::StrCat(CloseDetailsLocalClosePrefix, local_close_reason));
+  }
+  if (!upstream_transport_failure_reason.empty()) {
+    fields.push_back(
+        absl::StrCat(CloseDetailsUpstreamFailurePrefix, upstream_transport_failure_reason));
+  }
+  close_details_ = absl::StrJoin(fields, "|");
+  ENVOY_LOG(trace, "passthrough state {} close details: {}", static_cast<void*>(this),
+            close_details_);
 }
 
 std::pair<IoHandleImplPtr, IoHandleImplPtr>

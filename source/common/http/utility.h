@@ -520,6 +520,12 @@ RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_ur
 const std::string resetReasonToString(const Http::StreamResetReason reset_reason);
 
 /**
+ * @return true if the reset reason means that the stream was reset because its connection failed
+ * or was closed, rather than because of something specific to the stream.
+ */
+bool isConnectionResetReason(const Http::StreamResetReason reset_reason);
+
+/**
  * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.
  * Changes the method to connection, moves the Upgrade to a :protocol header,
  * @param headers the headers to convert.

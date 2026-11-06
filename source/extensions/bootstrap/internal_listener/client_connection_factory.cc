@@ -19,6 +19,45 @@ ThreadLocal::TypedSlot<Bootstrap::InternalListener::ThreadLocalRegistryImpl>*
 uint32_t InternalClientConnectionFactory::buffer_size_ =
     InternalClientConnectionFactory::DefaultBufferSize;
 
+namespace {
+
+/**
+ * Client connection to an internal listener. If the internal listener side recorded why it closed
+ * the connection in the shared PassthroughState, e.g. that tcp_proxy failed to connect to its
+ * upstream, the connection reports that as its transport failure reason. This lets the client side
+ * tell such a failure apart from a bare connection termination.
+ */
+class InternalClientConnectionImpl : public Network::ClientConnectionImpl {
+public:
+  InternalClientConnectionImpl(
+      Event::Dispatcher& dispatcher, std::unique_ptr<Network::ConnectionSocket> socket,
+      const Network::Address::InstanceConstSharedPtr& source_address,
+      Network::TransportSocketPtr&& transport_socket,
+      const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_options,
+      IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state)
+      : Network::ClientConnectionImpl(dispatcher, std::move(socket), source_address,
+                                      std::move(transport_socket), options, transport_options),
+        passthrough_state_(std::move(passthrough_state)) {}
+
+  // Network::Connection
+  absl::string_view transportFailureReason() const override {
+    // The listener side records close details only when it closed the connection, which then
+    // causes whatever failure the client side observes. E.g. if the listener side closes the
+    // connection while accepting it, before the client side connects, the client side fails to
+    // connect with an uninformative error. So the close details take precedence.
+    if (passthrough_state_ != nullptr && !passthrough_state_->closeDetails().empty()) {
+      return passthrough_state_->closeDetails();
+    }
+    return Network::ClientConnectionImpl::transportFailureReason();
+  }
+
+private:
+  const IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state_;
+};
+
+} // namespace
+
 Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnection(
     Event::Dispatcher& dispatcher, Network::Address::InstanceConstSharedPtr address,
     Network::Address::InstanceConstSharedPtr source_address,
@@ -34,11 +73,14 @@ Network::ClientConnectionPtr InternalClientConnectionFactory::createClientConnec
       Extensions::IoSocket::UserSpace::IoHandleFactory::createBufferLimitedIoHandlePair(
           buffer_size_);
 
-  auto client_conn = std::make_unique<Network::ClientConnectionImpl>(
+  IoSocket::UserSpace::PassthroughStateSharedPtr passthrough_state =
+      io_handle_client->passthroughState();
+  auto client_conn = std::make_unique<InternalClientConnectionImpl>(
       dispatcher,
       std::make_unique<Network::ConnectionSocketImpl>(std::move(io_handle_client), source_address,
                                                       address),
-      source_address, std::move(transport_socket), options, transport_options);
+      source_address, std::move(transport_socket), options, transport_options,
+      std::move(passthrough_state));
 
   if (registry_tls_slot_ == nullptr || !registry_tls_slot_->get().has_value()) {
     ENVOY_LOG_MISC(debug,
