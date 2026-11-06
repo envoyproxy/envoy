@@ -1574,6 +1574,112 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerResetStreamOnBeginHeaders) {
   EXPECT_EQ("200", response2->headers().getStatusValue());
 }
 
+TEST_P(LoadShedPointIntegrationTest,
+       Http1ServerDecodeHeadersShedsLoadAndKeepsConnectionOpenForBodylessGet) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http1_server_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.scale_percent", Eq(100));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "503");
+  test_server_->waitForCounter("http.config_test.downstream_rq_overload_close", Eq(1));
+  test_server_->waitForCounter(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.shed_load_count", Eq(1));
+
+  // Verify the connection remains open and subsequent requests succeed once pressure abates.
+  updateResource(0.80);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.scale_percent", Eq(0));
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_EQ(response2->headers().getStatusValue(), "200");
+}
+
+TEST_P(LoadShedPointIntegrationTest,
+       Http1ServerDecodeHeadersShedsLoadAndClosesConnectionWhenBodyPresent) {
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http1_server_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.scale_percent", Eq(100));
+
+  // Request with a body pending (POST with content-length).
+  // When overloaded on decodeHeaders, Envoy sends 503 and closes the downstream connection.
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/test"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"content-length", "1024"}};
+  auto [request_encoder, response_decoder] = codec_client_->startRequest(request_headers);
+  ASSERT_TRUE(response_decoder->waitForEndStream());
+  EXPECT_EQ(response_decoder->headers().getStatusValue(), "503");
+  test_server_->waitForCounter("http.config_test.downstream_rq_overload_close", Eq(1));
+  test_server_->waitForCounter(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.shed_load_count", Eq(1));
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+}
+
+TEST_P(LoadShedPointIntegrationTest, Http1ServerDecodeHeadersDoesNotAffectHttp2OrHttp3) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http1_server_decode_headers"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  updateResource(0.95);
+  test_server_->waitForGauge(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.scale_percent", Eq(100));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
+  test_server_->waitForCounter("http.config_test.downstream_rq_overload_close", Eq(0));
+  test_server_->waitForCounter(
+      "overload.envoy.load_shed_points.http1_server_decode_headers.shed_load_count", Eq(0));
+}
+
 TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreatingCodec) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
     return;
