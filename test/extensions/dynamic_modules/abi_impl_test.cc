@@ -1904,6 +1904,9 @@ WEAK_STUB(TransportSocketGetUpstreamConnectionId,
 WEAK_STUB(TransportSocketAddWireBytes,
           envoy_dynamic_module_callback_transport_socket_add_wire_bytes(nullptr, 0, 0))
 
+WEAK_STUB(StatSinkSnapshotRetain, envoy_dynamic_module_callback_stat_sink_snapshot_retain(nullptr))
+WEAK_STUB(StatSinkSnapshotRelease,
+          envoy_dynamic_module_callback_stat_sink_snapshot_release(nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounterCount,
           envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count(nullptr))
 WEAK_STUB(StatSinkSnapshotGetCounter,

@@ -3002,6 +3002,13 @@ WEAK_STUB_VOID(envoy_dynamic_module_callback_transport_socket_add_wire_bytes,
 // Stats sink snapshot callbacks. Real implementations live in
 // source/extensions/stat_sinks/dynamic_modules/abi_impl.cc when the stats sink extension is linked.
 
+WEAK_STUB(envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr,
+          envoy_dynamic_module_callback_stat_sink_snapshot_retain, nullptr,
+          envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr)
+
+WEAK_STUB_VOID(envoy_dynamic_module_callback_stat_sink_snapshot_release,
+               envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr)
+
 WEAK_STUB(size_t, envoy_dynamic_module_callback_stat_sink_snapshot_get_counter_count, 0,
           envoy_dynamic_module_type_stat_sink_snapshot_envoy_ptr)
 

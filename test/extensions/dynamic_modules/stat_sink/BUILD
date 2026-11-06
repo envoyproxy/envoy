@@ -76,6 +76,7 @@ envoy_extension_cc_test(
         "//source/extensions/stat_sinks/dynamic_modules:sink_config_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:thread_factory_for_test_lib",
         "//test/test_common:utility_lib",
         "@libcircllhist",
     ],
