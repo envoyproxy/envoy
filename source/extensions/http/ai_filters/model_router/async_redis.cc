@@ -463,13 +463,16 @@ AsyncRedis::mget(absl::Span<const std::string> keys) {
 }
 
 Coroutine::Task<absl::StatusOr<int64_t>> AsyncRedis::incrBy(absl::string_view key, int64_t delta) {
-  co_return co_await CommandAwaitable<absl::StatusOr<int64_t>>(
-      context_, {"INCRBY", std::string(key), absl::StrCat(delta)}, &parseIncrByReply);
+  std::vector<std::string> args = {"INCRBY", std::string(key), absl::StrCat(delta)};
+
+  co_return co_await CommandAwaitable<absl::StatusOr<int64_t>>(context_, std::move(args),
+                                                               &parseIncrByReply);
 }
 
 Coroutine::Task<absl::Status> AsyncRedis::expire(absl::string_view key, uint64_t seconds) {
-  co_return co_await CommandAwaitable<absl::Status>(
-      context_, {"EXPIRE", std::string(key), absl::StrCat(seconds)}, &parseExpireReply);
+  std::vector<std::string> args = {"EXPIRE", std::string(key), absl::StrCat(seconds)};
+
+  co_return co_await CommandAwaitable<absl::Status>(context_, std::move(args), &parseExpireReply);
 }
 
 } // namespace ModelRouter

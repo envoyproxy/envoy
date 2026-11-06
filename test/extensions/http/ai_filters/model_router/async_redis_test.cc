@@ -207,10 +207,10 @@ TEST_F(AsyncRedisTest, ErrorHandlingAndUnexpectedReplies) {
     EXPECT_THAT(co_await redis->get("k"), IsOkAndHolds(42));
 
     // Unexpected reply type for `PING`, `INCRBY`, `EXPIRE`, `MGET`.
+    const std::vector<std::string> keys = {"k"};
     server_.setCustomHandler([](const auto&) { return ":1\r\n"; });
     EXPECT_THAT(co_await redis->ping(), HasStatusCode(absl::StatusCode::kInternal));
-    EXPECT_THAT(co_await redis->mget(std::vector<std::string>{"k"}),
-                HasStatusCode(absl::StatusCode::kInternal));
+    EXPECT_THAT(co_await redis->mget(keys), HasStatusCode(absl::StatusCode::kInternal));
 
     server_.setCustomHandler([](const auto&) { return "+OK\r\n"; });
     EXPECT_THAT(co_await redis->get("k"), HasStatusCode(absl::StatusCode::kInternal));
@@ -219,12 +219,10 @@ TEST_F(AsyncRedisTest, ErrorHandlingAndUnexpectedReplies) {
 
     // `MGET` array containing an error element or non-integer string.
     server_.setCustomHandler([](const auto&) { return "*1\r\n-ERR element error\r\n"; });
-    EXPECT_THAT(co_await redis->mget(std::vector<std::string>{"k"}),
-                HasStatusCode(absl::StatusCode::kInternal));
+    EXPECT_THAT(co_await redis->mget(keys), HasStatusCode(absl::StatusCode::kInternal));
 
     server_.setCustomHandler([](const auto&) { return "*1\r\n$3\r\nbad\r\n"; });
-    EXPECT_THAT(co_await redis->mget(std::vector<std::string>{"k"}),
-                HasStatusCode(absl::StatusCode::kInternal));
+    EXPECT_THAT(co_await redis->mget(keys), HasStatusCode(absl::StatusCode::kInternal));
 
     // Peer closes connection mid-command.
     server_.setCustomHandler([this](const auto&) -> std::optional<std::string> {

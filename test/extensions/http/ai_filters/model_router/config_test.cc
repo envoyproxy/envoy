@@ -528,7 +528,7 @@ quota_config:
 }
 
 TEST_F(ModelRouterConfigTest, AcceptsValidQuotasAndRedisConfig) {
-  for (const std::string& yaml : {
+  for (const char* yaml : {
            R"EOF(
 providers:
   - name: openai
