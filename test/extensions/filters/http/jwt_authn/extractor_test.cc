@@ -145,9 +145,151 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocationWithValidJWT) {
   EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
 }
 
+TEST_F(ExtractorTest, TestBearerSchemeCaseInsensitive) {
+  for (const std::string prefix : {"Bearer ", "bearer ", "BEARER ", "bEaReR "}) {
+    SCOPED_TRACE(prefix);
+    auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat(prefix, GoodToken)}};
+    auto tokens = extractor_->extract(headers);
+    ASSERT_EQ(tokens.size(), 1);
+    EXPECT_EQ(tokens[0]->token(), GoodToken);
+    EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+    EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer2"));
+    tokens[0]->removeJwt(headers);
+    EXPECT_FALSE(headers.has(Http::CustomHeaders::get().Authorization));
+  }
+}
+
+TEST_F(ExtractorTest, TestBearerSchemeRequiresMatchingPrefix) {
+  for (const std::string value :
+       {"Basic jwt_token", "bearer", "bearerjwt_token", "bearer\tjwt_token"}) {
+    SCOPED_TRACE(value);
+    auto headers = TestRequestHeaderMapImpl{{"Authorization", value}};
+    EXPECT_TRUE(extractor_->extract(headers).empty());
+  }
+}
+
+TEST_F(ExtractorTest, TestConfiguredBearerSchemeCaseInsensitive) {
+  JwtProvider provider;
+  provider.set_issuer("issuer1");
+  auto* header = provider.add_from_headers();
+  header->set_name("Authorization");
+  for (const std::string prefix : {"Bearer ", "bearer ", "BEARER "}) {
+    SCOPED_TRACE(prefix);
+    header->set_value_prefix(prefix);
+    auto extractor = Extractor::create(provider);
+    for (const std::string scheme : {"Bearer ", "bearer ", "bEaReR "}) {
+      SCOPED_TRACE(scheme);
+      auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat(scheme, GoodToken)}};
+      auto tokens = extractor->extract(headers);
+      ASSERT_EQ(tokens.size(), 1);
+      EXPECT_EQ(tokens[0]->token(), GoodToken);
+      EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+    }
+  }
+}
+
+TEST_F(ExtractorTest, TestCustomPrefixesRemainCaseSensitive) {
+  for (const std::string header_name : {"Authorization", "custom-header"}) {
+    SCOPED_TRACE(header_name);
+    JwtProvider provider;
+    auto* header = provider.add_from_headers();
+    header->set_name(header_name);
+    for (const std::string prefix : {"Custom ", "Bearer "}) {
+      SCOPED_TRACE(prefix);
+      if (header_name == "Authorization" && prefix == "Bearer ") {
+        continue;
+      }
+      header->set_value_prefix(prefix);
+      auto extractor = Extractor::create(provider);
+      auto headers = TestRequestHeaderMapImpl{{header_name, absl::StrCat(prefix, GoodToken)}};
+      auto tokens = extractor->extract(headers);
+      ASSERT_EQ(tokens.size(), 1);
+      EXPECT_EQ(tokens[0]->token(), GoodToken);
+      headers.setCopy(Http::LowerCaseString(header_name),
+                      absl::StrCat(prefix == "Custom " ? "custom " : "bearer ", GoodToken));
+      EXPECT_TRUE(extractor->extract(headers).empty());
+    }
+  }
+}
+
+TEST_F(ExtractorTest, TestBearerSchemeCaseInsensitiveProvidersShareLocation) {
+  setUp(R"(
+providers:
+  provider1:
+    issuer: issuer1
+  provider2:
+    issuer: issuer2
+    from_headers:
+      - name: Authorization
+        value_prefix: 'bearer '
+)");
+  auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat("bEaReR ", GoodToken)}};
+  auto tokens = extractor_->extract(headers);
+  ASSERT_EQ(tokens.size(), 1);
+  EXPECT_EQ(tokens[0]->token(), GoodToken);
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+  EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer2"));
+  EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
+}
+
+TEST_F(ExtractorTest, TestBearerSchemeRuntimeChanges) {
+  TestScopedRuntime scoped_runtime;
+  for (const std::string enabled : {"false", "true", "false"}) {
+    SCOPED_TRACE(enabled);
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_case_insensitive_bearer", enabled}});
+    for (const std::string prefix : {"Bearer ", "bearer ", "BEARER ", "bEaReR "}) {
+      SCOPED_TRACE(prefix);
+      auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat(prefix, GoodToken)}};
+      auto tokens = extractor_->extract(headers);
+      if (enabled == "false" && prefix != "Bearer ") {
+        EXPECT_TRUE(tokens.empty());
+      } else {
+        ASSERT_EQ(tokens.size(), 1);
+        EXPECT_EQ(tokens[0]->token(), GoodToken);
+        EXPECT_TRUE(tokens[0]->isIssuerAllowed("issuer1"));
+        EXPECT_FALSE(tokens[0]->isIssuerAllowed("issuer2"));
+      }
+    }
+  }
+}
+
+TEST_F(ExtractorTest, TestBearerSchemeRuntimeChangesRestoreIssuerGrouping) {
+  setUp(R"(
+providers:
+  provider1:
+    issuer: issuer1
+  provider2:
+    issuer: issuer2
+    from_headers:
+      - name: Authorization
+        value_prefix: 'bearer '
+)");
+  TestScopedRuntime scoped_runtime;
+  for (const std::string enabled : {"false", "true", "false"}) {
+    SCOPED_TRACE(enabled);
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.jwt_authn_case_insensitive_bearer", enabled}});
+    for (const std::string prefix : {"Bearer ", "bearer ", "bEaReR "}) {
+      SCOPED_TRACE(prefix);
+      auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat(prefix, GoodToken)}};
+      auto tokens = extractor_->extract(headers);
+      if (enabled == "false" && prefix == "bEaReR ") {
+        EXPECT_TRUE(tokens.empty());
+      } else {
+        ASSERT_EQ(tokens.size(), 1);
+        EXPECT_EQ(tokens[0]->token(), GoodToken);
+        EXPECT_EQ(tokens[0]->isIssuerAllowed("issuer1"), enabled == "true" || prefix == "Bearer ");
+        EXPECT_EQ(tokens[0]->isIssuerAllowed("issuer2"), enabled == "true" || prefix == "bearer ");
+        EXPECT_FALSE(tokens[0]->isIssuerAllowed("unknown_issuer"));
+      }
+    }
+  }
+}
+
 TEST_F(ExtractorTest, TestDuplicatedHeadersWithDuplicatedTokenPrefixes) {
   auto headers = TestRequestHeaderMapImpl{{"Authorization", absl::StrCat("Bearer ", GoodToken)},
-                                          {"Authorization", absl::StrCat("Bearer ", GoodToken)}};
+                                          {"Authorization", absl::StrCat("bearer ", GoodToken)}};
   auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 2);
 
