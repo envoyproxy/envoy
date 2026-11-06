@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package envoy.extensions.router.cluster_specifiers.header_weighted.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifiers.header_weighted.v3";
+option java_outer_classname = "HeaderWeightedProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/router/cluster_specifiers/header_weighted/v3;header_weightedv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Header Weighted Cluster Specifier]
+// [#extension: envoy.router.cluster_specifier_plugin.header_weighted]
+
+// Configuration for the header weighted cluster specifier plugin.
+//
+// This plugin first checks a request header for an explicit cluster name. If
+// the header is present and non-empty, its value is used as the target cluster
+// name. If the header is absent or empty, the request is routed to one of the
+// configured clusters selected by weighted random choice. If no cluster can
+// be selected (e.g. all configured weights are zero), the ``default_cluster``
+// is used.
+message HeaderWeighted {
+  message ClusterWeight {
+    // Name of the upstream cluster. The cluster must exist in the
+    // :ref:`cluster manager configuration <config_cluster_manager>`.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
+
+    // The weight of the cluster. The choice of an upstream cluster is
+    // determined by its weight relative to the other clusters' weights. The
+    // sum of weights across all entries must be greater than 0 for weighted
+    // selection to be effective.
+    uint32 weight = 2;
+  }
+
+  // The name of the request header that carries an explicit target cluster
+  // name. When present and non-empty, the header value takes precedence and
+  // weighted selection is skipped.
+  string header = 1
+      [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+
+  // The list of clusters to select from when the configured header is absent
+  // or empty.
+  repeated ClusterWeight clusters = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // The fallback cluster used when the header is absent and no cluster can be
+  // selected by weighted choice (for example when the total weight is zero).
+  // The cluster must exist in the
+  // :ref:`cluster manager configuration <config_cluster_manager>`.
+  string default_cluster = 3 [(validate.rules).string = {min_len: 1}];
+}
